@@ -14,10 +14,13 @@ Victor is a powerful terminal-based AI coding assistant that provides a **unifie
 
 - **Universal Provider Support**: Seamlessly switch between Anthropic Claude, OpenAI GPT, Google Gemini, and local models
 - **Cost-Effective Development**: Use free local models (Ollama) for development and testing
+- **Enterprise-Grade Tools**: Code review, security scanning, project scaffolding for production workflows
 - **MCP Protocol Support**: Full Model Context Protocol server and client implementation
 - **Advanced Tool Suite**: Database operations, Docker management, HTTP/API testing, Git integration, web search
 - **Semantic Search**: AI-powered codebase indexing with context-aware search
 - **Multi-File Editing**: Transaction-based atomic edits across multiple files with rollback support
+- **Security First**: Automated vulnerability detection, secret scanning, dependency auditing
+- **Code Quality**: Automated reviews with complexity analysis, best practices, and documentation coverage
 - **Rich Terminal UI**: Beautiful, interactive terminal experience with streaming responses
 - **Extensible Architecture**: Easy to add new providers, tools, and capabilities
 - **Type-Safe**: Built with Pydantic for robust type checking and validation
@@ -150,6 +153,11 @@ Victor has access to a comprehensive suite of tools:
 - **HTTP/API Testing**: Make requests, test endpoints, validate responses
 - **Web Search**: Fetch documentation and online resources
 - **Semantic Search**: AI-powered codebase indexing and context-aware search
+
+#### Enterprise Tools
+- **Code Review**: Automated quality analysis, complexity metrics, security checks
+- **Security Scanner**: Secret detection, vulnerability scanning, dependency auditing
+- **Project Scaffolding**: Generate production-ready project templates (FastAPI, Flask, React, CLI)
 
 #### MCP Integration
 - **MCP Server**: Expose Victor's tools to Claude Desktop and other MCP clients
