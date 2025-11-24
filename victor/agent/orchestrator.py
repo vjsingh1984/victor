@@ -17,6 +17,8 @@ from victor.providers.registry import ProviderRegistry
 from victor.tools.base import ToolRegistry
 from victor.tools.bash import BashTool
 from victor.tools.filesystem import ListDirectoryTool, ReadFileTool, WriteFileTool
+from victor.tools.file_editor_tool import FileEditorTool
+from victor.tools.git_tool import GitTool
 
 
 class AgentOrchestrator:
@@ -58,6 +60,8 @@ class AgentOrchestrator:
         self.tools.register(WriteFileTool())
         self.tools.register(ListDirectoryTool())
         self.tools.register(BashTool(timeout=60))
+        self.tools.register(FileEditorTool())
+        self.tools.register(GitTool(provider=self.provider, model=self.model))
 
     def add_message(self, role: str, content: str) -> None:
         """Add a message to conversation history.
