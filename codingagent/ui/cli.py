@@ -231,5 +231,215 @@ providers:
     console.print(f"Edit {profiles_file} to customize profiles")
 
 
+@app.command()
+def providers() -> None:
+    """List all available providers."""
+    from codingagent.providers.registry import ProviderRegistry
+    from rich.table import Table
+
+    available_providers = ProviderRegistry.list_providers()
+
+    table = Table(title="Available Providers", show_header=True)
+    table.add_column("Provider", style="cyan", no_wrap=True)
+    table.add_column("Status", style="green")
+    table.add_column("Features")
+
+    provider_info = {
+        "ollama": ("✅ Ready", "Local models, Free, Tool calling"),
+        "anthropic": ("✅ Ready", "Claude, Tool calling, Streaming"),
+        "openai": ("✅ Ready", "GPT-4/3.5, Function calling, Vision"),
+        "google": ("✅ Ready", "Gemini, 1M context, Multimodal"),
+        "xai": ("✅ Ready", "Grok, Real-time info, Vision"),
+        "grok": ("✅ Ready", "Alias for xai"),
+    }
+
+    for provider in sorted(available_providers):
+        status, features = provider_info.get(provider, ("❓ Unknown", ""))
+        table.add_row(provider, status, features)
+
+    console.print(table)
+    console.print("\n[dim]Use 'codingagent profiles' to see configured profiles[/]")
+
+
+@app.command()
+def profiles_cmd() -> None:
+    """List configured profiles."""
+    from rich.table import Table
+
+    settings = load_settings()
+    profiles = settings.load_profiles()
+
+    if not profiles:
+        console.print("[yellow]No profiles configured[/]")
+        console.print("Run [bold]codingagent init[/] to create default configuration")
+        return
+
+    table = Table(title="Configured Profiles", show_header=True)
+    table.add_column("Profile", style="cyan", no_wrap=True)
+    table.add_column("Provider", style="green")
+    table.add_column("Model", style="yellow")
+    table.add_column("Temperature")
+    table.add_column("Max Tokens")
+
+    for name, profile in profiles.items():
+        table.add_row(
+            name,
+            profile.provider,
+            profile.model,
+            f"{profile.temperature}",
+            f"{profile.max_tokens}",
+        )
+
+    console.print(table)
+    console.print(
+        f"\n[dim]Config file: {settings.get_config_dir() / 'profiles.yaml'}[/]"
+    )
+
+
+@app.command()
+def models(
+    provider: str = typer.Option(
+        "ollama",
+        "--provider",
+        "-p",
+        help="Provider to list models from",
+    ),
+) -> None:
+    """List available models for a provider."""
+    from rich.table import Table
+
+    asyncio.run(list_models_async(provider))
+
+
+async def list_models_async(provider: str) -> None:
+    """Async function to list models."""
+    settings = load_settings()
+
+    try:
+        # Special handling for Ollama
+        if provider == "ollama":
+            from codingagent.providers.ollama import OllamaProvider
+
+            provider_settings = settings.get_provider_settings(provider)
+            ollama = OllamaProvider(**provider_settings)
+
+            try:
+                models_list = await ollama.list_models()
+
+                if not models_list:
+                    console.print(f"[yellow]No models found for {provider}[/]")
+                    console.print("\nPull a model with: [bold]ollama pull qwen2.5-coder:7b[/]")
+                    return
+
+                table = Table(title=f"Available Models ({provider})", show_header=True)
+                table.add_column("Model", style="cyan", no_wrap=True)
+                table.add_column("Size", style="yellow")
+                table.add_column("Modified", style="dim")
+
+                for model in models_list:
+                    name = model.get("name", "unknown")
+                    size = model.get("size", 0)
+                    size_gb = size / (1024**3) if size else 0
+
+                    modified = model.get("modified_at", "")
+                    if modified:
+                        # Format timestamp
+                        from datetime import datetime
+                        try:
+                            dt = datetime.fromisoformat(modified.replace("Z", "+00:00"))
+                            modified = dt.strftime("%Y-%m-%d")
+                        except:
+                            pass
+
+                    table.add_row(
+                        name,
+                        f"{size_gb:.1f} GB" if size_gb > 0 else "unknown",
+                        modified,
+                    )
+
+                console.print(table)
+                console.print(
+                    f"\n[dim]Use a model with: [bold]codingagent --profile <profile>[/dim]"
+                )
+
+                await ollama.close()
+
+            except Exception as e:
+                console.print(f"[red]Error listing models:[/] {e}")
+                console.print("\nMake sure Ollama is running: [bold]ollama serve[/]")
+
+        else:
+            console.print(f"[yellow]Model listing not yet implemented for {provider}[/]")
+            console.print(
+                "Currently only Ollama supports model listing via CLI"
+            )
+
+    except Exception as e:
+        console.print(f"[red]Error:[/] {e}")
+
+
+@app.command()
+def test_provider(
+    provider: str = typer.Argument(..., help="Provider name to test"),
+) -> None:
+    """Test if a provider is working correctly."""
+    console.print(f"Testing provider: [cyan]{provider}[/]")
+
+    asyncio.run(test_provider_async(provider))
+
+
+async def test_provider_async(provider: str) -> None:
+    """Async function to test provider."""
+    from codingagent.providers.registry import ProviderRegistry, ProviderNotFoundError
+
+    settings = load_settings()
+
+    try:
+        # Check if provider is registered
+        if not ProviderRegistry.is_registered(provider):
+            console.print(f"[red]✗[/] Provider '{provider}' not found")
+            console.print(f"\nAvailable providers: {', '.join(ProviderRegistry.list_providers())}")
+            return
+
+        console.print(f"[green]✓[/] Provider registered")
+
+        # Get provider settings
+        provider_settings = settings.get_provider_settings(provider)
+
+        # Check API key for cloud providers
+        if provider in ["anthropic", "openai", "google", "xai", "grok"]:
+            api_key = provider_settings.get("api_key")
+            if not api_key:
+                console.print(f"[red]✗[/] No API key configured for {provider}")
+                console.print(f"\nSet environment variable: [bold]{provider.upper()}_API_KEY[/]")
+                return
+            console.print(f"[green]✓[/] API key configured")
+
+        # For Ollama, test connection
+        if provider == "ollama":
+            from codingagent.providers.ollama import OllamaProvider
+
+            ollama = OllamaProvider(**provider_settings)
+            try:
+                models = await ollama.list_models()
+                if models:
+                    console.print(f"[green]✓[/] Ollama is running with {len(models)} models")
+                else:
+                    console.print("[yellow]⚠[/] Ollama is running but no models installed")
+                    console.print("\nPull a model: [bold]ollama pull qwen2.5-coder:7b[/]")
+
+                await ollama.close()
+
+            except Exception as e:
+                console.print(f"[red]✗[/] Cannot connect to Ollama: {e}")
+                console.print("\nMake sure Ollama is running: [bold]ollama serve[/]")
+                return
+
+        console.print(f"\n[green]✓[/] Provider {provider} is ready to use!")
+
+    except Exception as e:
+        console.print(f"[red]✗[/] Error: {e}")
+
+
 if __name__ == "__main__":
     app()

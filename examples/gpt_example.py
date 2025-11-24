@@ -1,0 +1,99 @@
+"""Example using OpenAI GPT provider."""
+
+import asyncio
+import os
+
+from codingagent.agent.orchestrator import AgentOrchestrator
+from codingagent.providers.openai_provider import OpenAIProvider
+
+
+async def main():
+    """Run examples with GPT."""
+    # Check for API key
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        print("Error: OPENAI_API_KEY environment variable not set")
+        print("Get your API key from: https://platform.openai.com/api-keys")
+        return
+
+    print("🤖 OpenAI GPT Example\n")
+    print("=" * 60)
+
+    # Create OpenAI provider
+    provider = OpenAIProvider(api_key=api_key)
+
+    # Example with GPT-4 Turbo
+    print("\n💎 Using GPT-4 Turbo")
+    print("-" * 60)
+
+    agent = AgentOrchestrator(
+        provider=provider,
+        model="gpt-4-turbo-preview",
+        temperature=0.7,
+    )
+
+    # Example 1: Code review
+    print("\n📝 Example 1: Code Review")
+    print("-" * 60)
+
+    code_to_review = '''
+def calculate_total(items):
+    total = 0
+    for item in items:
+        total = total + item['price'] * item['qty']
+    return total
+'''
+
+    response = await agent.chat(
+        f"Review this Python code and suggest improvements:\n\n{code_to_review}"
+    )
+    print(f"GPT-4: {response.content}")
+
+    # Example 2: Creative writing
+    print("\n\n✍️ Example 2: Creative Writing")
+    print("-" * 60)
+    agent.reset_conversation()
+
+    response = await agent.chat(
+        "Write a creative product name and tagline for an AI coding assistant that works with any LLM."
+    )
+    print(f"GPT-4: {response.content}")
+
+    # Example with GPT-3.5 Turbo (faster, cheaper)
+    print("\n\n⚡ Using GPT-3.5 Turbo (faster)")
+    print("-" * 60)
+
+    provider2 = OpenAIProvider(api_key=api_key)
+    agent2 = AgentOrchestrator(
+        provider=provider2,
+        model="gpt-3.5-turbo",
+        temperature=0.5,
+    )
+
+    print("\nGPT-3.5: ", end="", flush=True)
+    async for chunk in agent2.stream_chat("List 5 Python best practices in one sentence each."):
+        if chunk.content:
+            print(chunk.content, end="", flush=True)
+    print()
+
+    # Example 3: Problem solving
+    print("\n\n🧩 Example 3: Problem Solving")
+    print("-" * 60)
+    agent.reset_conversation()
+
+    response = await agent.chat(
+        "I have a list of 1 million integers. I need to find the top 10 largest numbers efficiently. "
+        "What's the best approach and why?"
+    )
+    print(f"GPT-4: {response.content}")
+
+    # Clean up
+    await provider.close()
+    await provider2.close()
+
+    print("\n\n✅ Examples completed!")
+    print("\n💡 Tip: Use GPT-3.5 for quick tasks, GPT-4 for complex reasoning")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

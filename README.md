@@ -96,6 +96,18 @@ codingagent --profile claude
 
 # One-shot command
 codingagent "Write a Python function to calculate Fibonacci numbers"
+
+# List available providers
+codingagent providers
+
+# List configured profiles
+codingagent profiles
+
+# List Ollama models
+codingagent models
+
+# Test a provider
+codingagent test-provider ollama
 ```
 
 ## Usage Examples

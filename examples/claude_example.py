@@ -1,0 +1,81 @@
+"""Example using Anthropic Claude provider."""
+
+import asyncio
+import os
+
+from codingagent.agent.orchestrator import AgentOrchestrator
+from codingagent.providers.anthropic_provider import AnthropicProvider
+
+
+async def main():
+    """Run examples with Claude."""
+    # Check for API key
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        print("Error: ANTHROPIC_API_KEY environment variable not set")
+        print("Get your API key from: https://console.anthropic.com/")
+        return
+
+    print("🤖 Anthropic Claude Example\n")
+    print("=" * 60)
+
+    # Create Claude provider
+    provider = AnthropicProvider(api_key=api_key)
+
+    # Create agent
+    agent = AgentOrchestrator(
+        provider=provider,
+        model="claude-sonnet-4-5",  # or claude-3-opus, claude-3-sonnet
+        temperature=1.0,
+    )
+
+    # Example 1: Simple question
+    print("\n📝 Example 1: Simple Question")
+    print("-" * 60)
+    response = await agent.chat("Explain async/await in Python in 2 sentences.")
+    print(f"Claude: {response.content}")
+    print(f"\nTokens used: {response.usage}")
+
+    # Example 2: Code generation
+    print("\n\n💻 Example 2: Code Generation")
+    print("-" * 60)
+    agent.reset_conversation()  # Start fresh
+    response = await agent.chat(
+        "Write a Python function to find the longest palindrome substring. "
+        "Include docstring and example."
+    )
+    print(f"Claude:\n{response.content}")
+
+    # Example 3: Streaming
+    print("\n\n🌊 Example 3: Streaming Response")
+    print("-" * 60)
+    agent.reset_conversation()
+    print("Claude: ", end="", flush=True)
+
+    async for chunk in agent.stream_chat(
+        "Write a haiku about programming."
+    ):
+        if chunk.content:
+            print(chunk.content, end="", flush=True)
+    print()
+
+    # Example 4: Multi-turn conversation
+    print("\n\n💬 Example 4: Multi-turn Conversation")
+    print("-" * 60)
+    agent.reset_conversation()
+
+    response1 = await agent.chat("I'm building a REST API. Should I use FastAPI or Flask?")
+    print(f"User: I'm building a REST API. Should I use FastAPI or Flask?")
+    print(f"Claude: {response1.content[:200]}...")
+
+    response2 = await agent.chat("Why is async important for this choice?")
+    print(f"\nUser: Why is async important for this choice?")
+    print(f"Claude: {response2.content[:200]}...")
+
+    # Clean up
+    await provider.close()
+    print("\n\n✅ Examples completed!")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
