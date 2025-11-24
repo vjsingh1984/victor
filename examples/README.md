@@ -1,11 +1,11 @@
-# CodingAgent Examples
+# Victor Examples
 
-This directory contains example scripts demonstrating how to use CodingAgent with different providers.
+This directory contains example scripts demonstrating how to use Victor with different providers and features.
 
 ## Quick Start
 
 ```bash
-# Install CodingAgent
+# Install Victor
 pip install -e ".[dev]"
 
 # Set up API keys (for cloud providers)
@@ -18,12 +18,14 @@ export XAI_API_KEY="xai-..."
 python examples/simple_chat.py
 ```
 
-## Available Examples
+## Examples by Category
 
-### 1. `simple_chat.py` - Basic Ollama Usage
+### Getting Started
+
+#### 1. `simple_chat.py` - Basic Ollama Usage
 **Requirements:** Ollama running locally
 
-Simple introduction to CodingAgent with Ollama. Shows:
+Simple introduction to Victor with Ollama. Shows:
 - Basic chat
 - Follow-up questions
 - Streaming responses
@@ -39,6 +41,8 @@ ollama pull qwen2.5-coder:7b
 # Run example
 python examples/simple_chat.py
 ```
+
+### Provider Examples
 
 ### 2. `claude_example.py` - Anthropic Claude
 **Requirements:** ANTHROPIC_API_KEY
@@ -114,6 +118,126 @@ export ANTHROPIC_API_KEY="..."
 export OPENAI_API_KEY="..."
 
 python examples/multi_provider_workflow.py
+```
+
+### Advanced Features
+
+#### 7. `semantic_search_demo.py` - AI-Powered Codebase Search
+**Requirements:** Ollama running locally
+
+Demonstrates semantic search capabilities:
+- Embed and index codebase
+- Natural language code search
+- Context-aware results
+- Find similar code patterns
+
+```bash
+python examples/semantic_search_demo.py
+```
+
+#### 8. `codebase_indexing_demo.py` - Index Your Codebase
+**Requirements:** Ollama running locally
+
+Shows how to index a codebase for semantic search:
+- Automatic file discovery
+- Embedding generation
+- Index persistence
+- Query optimization
+
+```bash
+python examples/codebase_indexing_demo.py
+```
+
+#### 9. `multi_file_editing_demo.py` - Transaction-Based Multi-File Edits
+**Requirements:** Ollama running locally
+
+Advanced multi-file editing with atomic transactions:
+- Edit multiple files atomically
+- Automatic rollback on errors
+- File creation, modification, deletion
+- Transaction logging
+
+```bash
+python examples/multi_file_editing_demo.py
+```
+
+#### 10. `git_tool_demo.py` - AI-Powered Git Operations
+**Requirements:** Ollama running locally
+
+Intelligent git integration:
+- AI-generated commit messages
+- Smart staging
+- Branch management
+- Diff analysis
+
+```bash
+python examples/git_tool_demo.py
+```
+
+#### 11. `web_search_demo.py` - Web Search Integration
+**Requirements:** Ollama running locally
+
+Search and fetch web content:
+- DuckDuckGo search integration
+- Content fetching and parsing
+- Documentation lookup
+- Research assistance
+
+```bash
+python examples/web_search_demo.py
+```
+
+#### 12. `context_management_demo.py` - Advanced Context Handling
+**Requirements:** Ollama running locally
+
+Sophisticated context management:
+- Conversation history
+- Context window optimization
+- Token counting
+- History persistence
+
+```bash
+python examples/context_management_demo.py
+```
+
+#### 13. `advanced_tools_demo.py` - Database, Docker, and HTTP Tools
+**Requirements:** Ollama running locally (Docker optional)
+
+Advanced tool integrations:
+- **Database**: SQLite, PostgreSQL, MySQL queries
+- **Docker**: Container management, image operations
+- **HTTP**: API testing, request/response handling
+
+```bash
+python examples/advanced_tools_demo.py
+```
+
+### MCP Protocol Examples
+
+#### 14. `mcp_server_demo.py` - MCP Server Implementation
+**Requirements:** Ollama running locally
+
+Run Victor as an MCP server:
+- Expose tools via MCP protocol
+- Stdio transport for Claude Desktop
+- Tool and resource discovery
+- JSON-RPC 2.0 compliance
+
+```bash
+python examples/mcp_server_demo.py
+```
+
+#### 15. `mcp_client_demo.py` - MCP Client Integration
+**Requirements:** External MCP server
+
+Connect to external MCP servers:
+- Discover remote tools
+- Execute remote operations
+- Extend Victor's capabilities
+- Protocol compliance testing
+
+```bash
+python examples/mcp_client_demo.py
 ```
 
 ## Provider Profiles Example

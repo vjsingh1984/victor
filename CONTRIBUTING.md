@@ -1,6 +1,6 @@
-# Contributing to CodingAgent
+# Contributing to Victor
 
-Thank you for your interest in contributing to CodingAgent! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to Victor! This document provides guidelines and instructions for contributing to the project.
 
 ## Code of Conduct
 
@@ -248,4 +248,4 @@ All contributors will be:
 - Credited in release notes
 - Acknowledged in project documentation
 
-Thank you for contributing to CodingAgent!
+Thank you for contributing to Victor!
