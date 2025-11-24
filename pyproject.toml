@@ -66,6 +66,10 @@ dependencies = [
     # Code Analysis
     "tree-sitter>=0.21",
     "pygments>=2.17",
+
+    # Caching
+    "cachetools>=5.3",
+    "diskcache>=5.6",
 ]
 
 [project.optional-dependencies]
