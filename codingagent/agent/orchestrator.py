@@ -13,7 +13,7 @@ from codingagent.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
-from codingagent.providers.ollama import OllamaProvider
+from codingagent.providers.registry import ProviderRegistry
 from codingagent.tools.base import ToolRegistry
 from codingagent.tools.bash import BashTool
 from codingagent.tools.filesystem import ListDirectoryTool, ReadFileTool, WriteFileTool
@@ -205,12 +205,8 @@ class AgentOrchestrator:
         # Get provider settings
         provider_settings = settings.get_provider_settings(profile.provider)
 
-        # Create provider instance
-        # For now, only Ollama is implemented
-        if profile.provider == "ollama":
-            provider = OllamaProvider(**provider_settings)
-        else:
-            raise ValueError(f"Provider not yet implemented: {profile.provider}")
+        # Create provider instance using registry
+        provider = ProviderRegistry.create(profile.provider, **provider_settings)
 
         return cls(
             provider=provider,

@@ -25,6 +25,7 @@ CodingAgent is a powerful terminal-based AI coding assistant that provides a **u
 - **Anthropic**: Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku
 - **OpenAI**: GPT-4, GPT-4 Turbo, GPT-3.5 Turbo
 - **Google**: Gemini 1.5 Pro, Gemini 1.5 Flash
+- **xAI**: Grok, Grok with Vision
 
 ### Local/Self-Hosted Models
 - **Ollama**: Any model from the Ollama library (Llama 3, Qwen, CodeLlama, etc.)
@@ -57,6 +58,7 @@ Create a `.env` file or export environment variables:
 export ANTHROPIC_API_KEY="your-key-here"
 export OPENAI_API_KEY="your-key-here"
 export GOOGLE_API_KEY="your-key-here"
+export XAI_API_KEY="your-key-here"
 ```
 
 ### 2. Configure Provider Profile

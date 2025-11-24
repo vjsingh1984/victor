@@ -1,0 +1,101 @@
+"""Provider registry for managing and discovering LLM providers."""
+
+from typing import Any, Dict, Optional, Type
+
+from codingagent.providers.base import BaseProvider, ProviderNotFoundError
+
+
+class ProviderRegistry:
+    """Registry for LLM provider management."""
+
+    _providers: Dict[str, Type[BaseProvider]] = {}
+
+    @classmethod
+    def register(cls, name: str, provider_class: Type[BaseProvider]) -> None:
+        """Register a provider.
+
+        Args:
+            name: Provider name (e.g., "ollama", "anthropic")
+            provider_class: Provider class
+        """
+        cls._providers[name] = provider_class
+
+    @classmethod
+    def get(cls, name: str) -> Type[BaseProvider]:
+        """Get a provider class by name.
+
+        Args:
+            name: Provider name
+
+        Returns:
+            Provider class
+
+        Raises:
+            ProviderNotFoundError: If provider not found
+        """
+        provider = cls._providers.get(name)
+        if provider is None:
+            raise ProviderNotFoundError(
+                message=f"Provider '{name}' not found. Available: {', '.join(cls._providers.keys())}",
+                provider=name,
+            )
+        return provider
+
+    @classmethod
+    def create(cls, name: str, **kwargs: Any) -> BaseProvider:
+        """Create a provider instance.
+
+        Args:
+            name: Provider name
+            **kwargs: Provider initialization arguments
+
+        Returns:
+            Provider instance
+
+        Raises:
+            ProviderNotFoundError: If provider not found
+        """
+        provider_class = cls.get(name)
+        return provider_class(**kwargs)
+
+    @classmethod
+    def list_providers(cls) -> list[str]:
+        """List all registered provider names.
+
+        Returns:
+            List of provider names
+        """
+        return list(cls._providers.keys())
+
+    @classmethod
+    def is_registered(cls, name: str) -> bool:
+        """Check if a provider is registered.
+
+        Args:
+            name: Provider name
+
+        Returns:
+            True if registered, False otherwise
+        """
+        return name in cls._providers
+
+
+# Auto-register all providers
+def _register_default_providers() -> None:
+    """Register all default providers."""
+    from codingagent.providers.ollama import OllamaProvider
+    from codingagent.providers.anthropic_provider import AnthropicProvider
+    from codingagent.providers.openai_provider import OpenAIProvider
+    from codingagent.providers.google_provider import GoogleProvider
+    from codingagent.providers.xai_provider import XAIProvider
+
+    ProviderRegistry.register("ollama", OllamaProvider)
+    ProviderRegistry.register("anthropic", AnthropicProvider)
+    ProviderRegistry.register("openai", OpenAIProvider)
+    ProviderRegistry.register("google", GoogleProvider)
+    ProviderRegistry.register("xai", XAIProvider)
+    ProviderRegistry.register("grok", XAIProvider)  # Alias for xai
+
+
+# Register providers on module import
+_register_default_providers()

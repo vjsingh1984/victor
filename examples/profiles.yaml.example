@@ -44,6 +44,20 @@ profiles:
     temperature: 0.9
     max_tokens: 8192
 
+  # xAI Grok
+  grok:
+    provider: xai
+    model: grok-beta
+    temperature: 0.8
+    max_tokens: 4096
+
+  # xAI Grok with Vision
+  grok-vision:
+    provider: xai
+    model: grok-vision-beta
+    temperature: 0.8
+    max_tokens: 4096
+
   # Local Models
   llama3-local:
     provider: ollama
@@ -94,6 +108,12 @@ providers:
 
   google:
     api_key: ${GOOGLE_API_KEY}
+    timeout: 60
+    max_retries: 3
+
+  xai:
+    api_key: ${XAI_API_KEY}
+    base_url: https://api.x.ai/v1
     timeout: 60
     max_retries: 3
 
