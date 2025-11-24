@@ -19,6 +19,7 @@ class EmbeddingConfig(BaseModel):
 
     # Vector Store Configuration
     vector_store: str = Field(
+        default="chromadb",
         description="Vector store provider (chromadb, proximadb, faiss, etc.)"
     )
     persist_directory: Optional[str] = Field(
@@ -34,8 +35,8 @@ class EmbeddingConfig(BaseModel):
         description="Embedding model type (sentence-transformers, openai, cohere)"
     )
     embedding_model_name: str = Field(
-        default="all-MiniLM-L6-v2",
-        description="Specific embedding model name"
+        default="all-mpnet-base-v2",
+        description="Specific embedding model name (all-mpnet-base-v2 = best quality local model)"
     )
     embedding_api_key: Optional[str] = Field(
         default=None,

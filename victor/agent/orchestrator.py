@@ -156,25 +156,40 @@ class AgentOrchestrator:
         Args:
             tool_calls: List of tool call requests
         """
+        if not tool_calls:
+            return
+
         for tool_call in tool_calls:
+            # Validate tool call structure
+            if not isinstance(tool_call, dict):
+                self.console.print(f"[yellow]⚠ Skipping invalid tool call (not a dict): {tool_call}[/]")
+                continue
+
             tool_name = tool_call.get("name")
+            if not tool_name:
+                self.console.print(f"[yellow]⚠ Skipping tool call without name: {tool_call}[/]")
+                continue
+
             tool_args = tool_call.get("arguments", {})
 
             self.console.print(f"\n[bold cyan]Executing tool:[/] {tool_name}")
             self.console.print(f"[dim]Arguments:[/] {tool_args}")
 
-            # Execute tool
-            result = await self.tools.execute(tool_name, **tool_args)
+            try:
+                # Execute tool
+                result = await self.tools.execute(tool_name, **tool_args)
 
-            if result.success:
-                self.console.print(f"[green]✓ Tool executed successfully[/]")
-                # Add tool result to conversation
-                self.add_message(
-                    "user",
-                    f"Tool '{tool_name}' result: {result.output}",
-                )
-            else:
-                self.console.print(f"[red]✗ Tool execution failed: {result.error}[/]")
+                if result.success:
+                    self.console.print(f"[green]✓ Tool executed successfully[/]")
+                    # Add tool result to conversation
+                    self.add_message(
+                        "user",
+                        f"Tool '{tool_name}' result: {result.output}",
+                    )
+                else:
+                    self.console.print(f"[red]✗ Tool execution failed: {result.error}[/]")
+            except Exception as e:
+                self.console.print(f"[red]✗ Tool execution error: {e}[/]")
 
     def reset_conversation(self) -> None:
         """Clear conversation history."""

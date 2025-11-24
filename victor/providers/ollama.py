@@ -244,6 +244,42 @@ class OllamaProvider(BaseProvider):
         payload.update(kwargs)
         return payload
 
+    def _normalize_tool_calls(self, tool_calls: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
+        """Normalize tool calls from Ollama's OpenAI-compatible format.
+
+        Ollama returns tool calls in OpenAI format:
+        {'id': '...', 'function': {'name': 'tool_name', 'arguments': {...}}}
+
+        We need:
+        {'name': 'tool_name', 'arguments': {...}}
+
+        Args:
+            tool_calls: Raw tool calls from Ollama
+
+        Returns:
+            Normalized tool calls
+        """
+        if not tool_calls:
+            return None
+
+        normalized = []
+        for call in tool_calls:
+            if isinstance(call, dict) and 'function' in call:
+                # OpenAI format
+                function = call.get('function', {})
+                normalized.append({
+                    'name': function.get('name'),
+                    'arguments': function.get('arguments', {})
+                })
+            elif isinstance(call, dict) and 'name' in call:
+                # Already normalized
+                normalized.append(call)
+            else:
+                # Unknown format, skip
+                continue
+
+        return normalized if normalized else None
+
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
         """Parse Ollama API response.
 
@@ -256,7 +292,7 @@ class OllamaProvider(BaseProvider):
         """
         message = result.get("message", {})
         content = message.get("content", "")
-        tool_calls = message.get("tool_calls")
+        tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
 
         # Parse usage stats if available
         usage = None
@@ -288,7 +324,7 @@ class OllamaProvider(BaseProvider):
         """
         message = chunk_data.get("message", {})
         content = message.get("content", "")
-        tool_calls = message.get("tool_calls")
+        tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
         is_done = chunk_data.get("done", False)
 
         return StreamChunk(

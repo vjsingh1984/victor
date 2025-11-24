@@ -1,6 +1,8 @@
 """Codebase indexing for intelligent code awareness.
 
 This is the HIGHEST PRIORITY feature to match Claude Code capabilities.
+
+Supports both keyword search and semantic search (with embeddings).
 """
 
 from pathlib import Path
@@ -40,14 +42,28 @@ class CodebaseIndex:
     """Indexes codebase for intelligent code understanding.
 
     This is the foundation for matching Claude Code's codebase awareness.
+
+    Supports:
+    - AST-based symbol extraction
+    - Keyword search
+    - Semantic search (with embeddings)
+    - Dependency graph analysis
     """
 
-    def __init__(self, root_path: str, ignore_patterns: Optional[List[str]] = None):
+    def __init__(
+        self,
+        root_path: str,
+        ignore_patterns: Optional[List[str]] = None,
+        use_embeddings: bool = False,
+        embedding_config: Optional[Dict[str, Any]] = None
+    ):
         """Initialize codebase indexer.
 
         Args:
             root_path: Root directory of the codebase
             ignore_patterns: Patterns to ignore (e.g., ["venv/", "node_modules/"])
+            use_embeddings: Whether to use semantic search with embeddings
+            embedding_config: Configuration for embedding provider (optional)
         """
         self.root = Path(root_path).resolve()
         self.ignore_patterns = ignore_patterns or [
@@ -69,6 +85,12 @@ class CodebaseIndex:
         self.symbols: Dict[str, Symbol] = {}  # symbol_name -> Symbol
         self.symbol_index: Dict[str, List[str]] = {}  # file -> symbol names
 
+        # Embedding support (optional)
+        self.use_embeddings = use_embeddings
+        self.embedding_provider = None
+        if use_embeddings:
+            self._initialize_embeddings(embedding_config)
+
     def should_ignore(self, path: Path) -> bool:
         """Check if path should be ignored."""
         rel_path = str(path.relative_to(self.root))
@@ -78,6 +100,7 @@ class CodebaseIndex:
         """Index the entire codebase.
 
         This is the main entry point for building the index.
+        Includes both AST indexing and optional semantic indexing with embeddings.
         """
         print(f"🔍 Indexing codebase at {self.root}")
 
@@ -90,7 +113,7 @@ class CodebaseIndex:
 
         print(f"Found {len(python_files)} Python files")
 
-        # Index files in parallel
+        # Index files in parallel (AST parsing)
         tasks = [self.index_file(file) for file in python_files]
         await asyncio.gather(*tasks)
 
@@ -98,6 +121,41 @@ class CodebaseIndex:
         self._build_dependency_graph()
 
         print(f"✅ Indexed {len(self.files)} files, {len(self.symbols)} symbols")
+
+        # Index with embeddings if enabled
+        if self.use_embeddings and self.embedding_provider:
+            await self._index_with_embeddings()
+
+    async def _index_with_embeddings(self) -> None:
+        """Index symbols with embeddings for semantic search."""
+        print(f"\n🤖 Generating embeddings for semantic search...")
+
+        # Initialize provider if needed
+        if not self.embedding_provider._initialized:
+            await self.embedding_provider.initialize()
+
+        # Build documents for each symbol
+        documents = []
+        for file_path, metadata in self.files.items():
+            for symbol in metadata.symbols:
+                doc = {
+                    "id": f"{file_path}:{symbol.name}",
+                    "content": self._build_symbol_context(symbol),
+                    "metadata": {
+                        "file_path": file_path,
+                        "symbol_name": symbol.name,
+                        "symbol_type": symbol.type,
+                        "line_number": symbol.line_number,
+                    }
+                }
+                documents.append(doc)
+
+        if documents:
+            # Index with embedding provider
+            await self.embedding_provider.index_documents(documents)
+            print(f"✅ Generated embeddings for {len(documents)} symbols")
+        else:
+            print("⚠️  No symbols to index with embeddings")
 
     async def index_file(self, file_path: Path) -> None:
         """Index a single file."""
@@ -244,12 +302,113 @@ class CodebaseIndex:
 
     def get_stats(self) -> Dict[str, Any]:
         """Get index statistics."""
-        return {
+        stats = {
             "total_files": len(self.files),
             "total_symbols": len(self.symbols),
             "total_lines": sum(f.lines for f in self.files.values()),
             "languages": {"python": len(self.files)},
+            "embeddings_enabled": self.use_embeddings,
         }
+        if self.use_embeddings and self.embedding_provider:
+            stats["embedding_stats"] = asyncio.run(self.embedding_provider.get_stats())
+        return stats
+
+    def _initialize_embeddings(self, config: Optional[Dict[str, Any]]) -> None:
+        """Initialize embedding provider.
+
+        Args:
+            config: Embedding configuration dict
+        """
+        try:
+            from victor.codebase.embeddings import EmbeddingConfig, EmbeddingRegistry
+
+            # Create config with defaults
+            if not config:
+                config = {}
+
+            embedding_config = EmbeddingConfig(
+                vector_store=config.get("vector_store", "chromadb"),
+                embedding_model_type=config.get("embedding_model_type", "sentence-transformers"),
+                embedding_model_name=config.get("embedding_model_name", "all-mpnet-base-v2"),
+                persist_directory=config.get("persist_directory", str(Path.home() / ".victor/embeddings")),
+                extra_config=config.get("extra_config", {})
+            )
+
+            # Create embedding provider
+            self.embedding_provider = EmbeddingRegistry.create(embedding_config)
+            print(f"✓ Embeddings enabled: {embedding_config.embedding_model_name} + {embedding_config.vector_store}")
+
+        except ImportError as e:
+            print(f"⚠️  Warning: Embeddings not available: {e}")
+            print("   Install with: pip install chromadb sentence-transformers")
+            self.use_embeddings = False
+            self.embedding_provider = None
+
+    async def semantic_search(
+        self,
+        query: str,
+        max_results: int = 10,
+        filter_metadata: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """Perform semantic search using embeddings.
+
+        Args:
+            query: Search query (natural language)
+            max_results: Maximum number of results
+            filter_metadata: Optional metadata filters
+
+        Returns:
+            List of search results with file paths, symbols, and relevance scores
+        """
+        if not self.use_embeddings or not self.embedding_provider:
+            raise ValueError("Embeddings not enabled. Initialize with use_embeddings=True")
+
+        # Ensure provider is initialized
+        if not self.embedding_provider._initialized:
+            await self.embedding_provider.initialize()
+
+        # Search using embedding provider
+        results = await self.embedding_provider.search_similar(
+            query=query,
+            limit=max_results,
+            filter_metadata=filter_metadata
+        )
+
+        # Convert to dict format
+        return [
+            {
+                "file_path": result.file_path,
+                "symbol_name": result.symbol_name,
+                "content": result.content,
+                "score": result.score,
+                "line_number": result.line_number,
+                "metadata": result.metadata
+            }
+            for result in results
+        ]
+
+    def _build_symbol_context(self, symbol: Symbol) -> str:
+        """Build context string for a symbol (for embedding).
+
+        Args:
+            symbol: Symbol to build context for
+
+        Returns:
+            Context string combining symbol information
+        """
+        parts = [
+            f"Symbol: {symbol.name}",
+            f"Type: {symbol.type}",
+            f"File: {symbol.file_path}",
+        ]
+
+        if symbol.signature:
+            parts.append(f"Signature: {symbol.signature}")
+
+        if symbol.docstring:
+            parts.append(f"Documentation: {symbol.docstring}")
+
+        return "\n".join(parts)
 
 
 class SymbolVisitor(ast.NodeVisitor):
