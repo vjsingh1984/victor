@@ -1,6 +1,6 @@
-# CodingAgent
+# Victor
 
-> A universal terminal-based coding agent that works with any LLM provider
+> A universal terminal-based AI coding assistant that works with any LLM provider
 
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -8,13 +8,16 @@
 
 ## Overview
 
-CodingAgent is a powerful terminal-based AI coding assistant that provides a **unified interface** for working with multiple LLM providers. Whether you're using frontier models like Claude, GPT-4, and Gemini, or running open-source models locally via Ollama, LMStudio, or vLLM, CodingAgent has you covered.
+Victor is a powerful terminal-based AI coding assistant that provides a **unified interface** for working with multiple LLM providers. Whether you're using frontier models like Claude, GPT-4, and Gemini, or running open-source models locally via Ollama, LMStudio, or vLLM, Victor has you covered.
 
 ### Key Features
 
 - **Universal Provider Support**: Seamlessly switch between Anthropic Claude, OpenAI GPT, Google Gemini, and local models
 - **Cost-Effective Development**: Use free local models (Ollama) for development and testing
-- **Unified Tool Calling**: Standardized tool interface across all providers with MCP support
+- **MCP Protocol Support**: Full Model Context Protocol server and client implementation
+- **Advanced Tool Suite**: Database operations, Docker management, HTTP/API testing, Git integration, web search
+- **Semantic Search**: AI-powered codebase indexing with context-aware search
+- **Multi-File Editing**: Transaction-based atomic edits across multiple files with rollback support
 - **Rich Terminal UI**: Beautiful, interactive terminal experience with streaming responses
 - **Extensible Architecture**: Easy to add new providers, tools, and capabilities
 - **Type-Safe**: Built with Pydantic for robust type checking and validation
@@ -117,7 +120,7 @@ victor test-provider ollama
 ```bash
 $ victor
 
-Welcome to CodingAgent v0.1.0
+Welcome to Victor v0.1.0
 Using: Ollama (qwen2.5-coder:7b)
 
 > Create a FastAPI endpoint for user authentication
@@ -133,13 +136,24 @@ I'll help you create a FastAPI authentication endpoint...
 
 ### Tool Calling
 
-The agent has access to various tools:
+Victor has access to a comprehensive suite of tools:
 
-- **File Operations**: Read, write, edit files
-- **Bash Commands**: Execute shell commands
-- **Code Analysis**: Parse and analyze code structure
-- **Web Search**: Fetch documentation and resources
-- **Git Operations**: Commit, branch, diff
+#### Core Tools
+- **File Operations**: Read, write, edit files with transaction support
+- **Multi-File Editor**: Atomic edits across multiple files with rollback
+- **Bash Commands**: Execute shell commands safely
+- **Git Operations**: AI-powered git with smart commits, staging, branching
+
+#### Advanced Tools
+- **Database**: Query SQLite, PostgreSQL, MySQL, SQL Server with safety controls
+- **Docker**: Container and image management (list, run, stop, logs, stats)
+- **HTTP/API Testing**: Make requests, test endpoints, validate responses
+- **Web Search**: Fetch documentation and online resources
+- **Semantic Search**: AI-powered codebase indexing and context-aware search
+
+#### MCP Integration
+- **MCP Server**: Expose Victor's tools to Claude Desktop and other MCP clients
+- **MCP Client**: Connect to external MCP servers and use their tools
 
 ### Switching Models On-The-Fly
 
@@ -154,29 +168,44 @@ Switched to Ollama (llama3:8b)
 ## Architecture
 
 ```
-┌─────────────────────────────────────┐
-│     Terminal Interface (Rich)       │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│      Agent Orchestrator             │
-│  • Conversation Management          │
-│  • Context Handling                 │
-│  • Tool Execution                   │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│   Unified Provider Interface        │
-│  • Request/Response Normalization   │
-│  • Streaming Support                │
-│  • Tool Call Translation            │
-└──────────────┬──────────────────────┘
-               │
-    ┌──────────┼──────────┬───────────┐
-    │          │          │           │
-┌───▼───┐  ┌──▼───┐  ┌──▼────┐  ┌───▼────┐
-│Claude │  │ GPT  │  │Gemini │  │ Ollama │
-└───────┘  └──────┘  └───────┘  └────────┘
+┌──────────────────────────────────────────────┐
+│   MCP Clients (Claude Desktop, VS Code)      │
+└───────────────────┬──────────────────────────┘
+                    │ MCP Protocol
+                    │
+┌───────────────────▼──────────────────────────┐
+│          Terminal Interface (Rich)           │
+│        • Interactive REPL                    │
+│        • Streaming Responses                 │
+└───────────────────┬──────────────────────────┘
+                    │
+┌───────────────────▼──────────────────────────┐
+│           Agent Orchestrator                 │
+│   • Conversation Management                  │
+│   • Context & Semantic Search                │
+│   • Tool Execution & MCP Server              │
+│   • Multi-File Transaction Manager           │
+└───────────────────┬──────────────────────────┘
+                    │
+┌───────────────────▼──────────────────────────┐
+│      Unified Provider Interface              │
+│   • Request/Response Normalization           │
+│   • Streaming Support                        │
+│   • Tool Call Translation                    │
+└───────────────────┬──────────────────────────┘
+                    │
+        ┌───────────┼──────────┬───────────┐
+        │           │          │           │
+    ┌───▼───┐  ┌───▼───┐  ┌───▼────┐  ┌──▼─────┐
+    │Claude │  │  GPT  │  │ Gemini │  │ Ollama │
+    └───────┘  └───────┘  └────────┘  └────────┘
+                    │
+        ┌───────────┴──────────┬────────────────┐
+        │                      │                │
+    ┌───▼────┐          ┌─────▼─────┐    ┌────▼────┐
+    │Database│          │  Docker   │    │  HTTP   │
+    │ Tools  │          │   Tools   │    │  Tools  │
+    └────────┘          └───────────┘    └─────────┘
 ```
 
 ## Configuration
@@ -264,15 +293,30 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 ## Roadmap
 
-- [x] Core provider abstraction
-- [x] Ollama integration
-- [x] Basic tool system
-- [ ] Full Anthropic/OpenAI/Google support
-- [ ] MCP server integration
-- [ ] Multi-agent collaboration
-- [ ] Context caching optimization
-- [ ] Docker support
+### Completed ✅
+- [x] Core provider abstraction with unified interface
+- [x] Ollama, Anthropic, OpenAI, Google, xAI integration
+- [x] Comprehensive tool system (15+ tools)
+- [x] MCP protocol server and client
+- [x] Multi-file editing with transactions
+- [x] Advanced git integration with AI commits
+- [x] Semantic search and codebase indexing
+- [x] Database tool (SQLite, PostgreSQL, MySQL, SQL Server)
+- [x] Docker management tool
+- [x] HTTP/API testing tool
+- [x] Web search integration
+
+### In Progress 🚧
+- [ ] Enhanced context caching and optimization
+- [ ] Comprehensive test coverage (target: 90%+)
+- [ ] Performance profiling and optimization
+
+### Planned 📋
+- [ ] IDE Extensions (VS Code, JetBrains)
+- [ ] Multi-agent collaboration system
 - [ ] Web UI (optional)
+- [ ] Plugin marketplace
+- [ ] Community templates and workflows
 
 ## License
 
