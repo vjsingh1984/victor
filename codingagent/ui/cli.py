@@ -306,13 +306,13 @@ def models(
     ),
 ) -> None:
     """List available models for a provider."""
-    from rich.table import Table
-
     asyncio.run(list_models_async(provider))
 
 
 async def list_models_async(provider: str) -> None:
     """Async function to list models."""
+    from rich.table import Table
+
     settings = load_settings()
 
     try:
