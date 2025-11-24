@@ -14,7 +14,7 @@ Get up and running with CodingAgent in minutes!
 ### Step 1: Create Virtual Environment
 
 ```bash
-cd /Users/vijaysingh/code/codingagent
+cd /Users/vijaysingh/code/victor
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
@@ -29,8 +29,8 @@ pip install -e ".[dev]"
 ### Step 3: Initialize Configuration
 
 ```bash
-# This creates ~/.codingagent/profiles.yaml with default settings
-codingagent init
+# This creates ~/.victor/profiles.yaml with default settings
+victor init
 ```
 
 ## Verify Ollama is Ready
@@ -53,7 +53,7 @@ ollama pull codellama:13b
 
 ```bash
 # Start interactive REPL
-codingagent
+victor
 
 # Now you can chat with the agent!
 ```
@@ -71,7 +71,7 @@ Assistant: [Creates test file with pytest tests]
 
 ```bash
 # Execute a single command
-codingagent "Write a hello world FastAPI application"
+victor "Write a hello world FastAPI application"
 ```
 
 ### Option 3: Run Example Script
@@ -83,7 +83,7 @@ python examples/simple_chat.py
 
 ## Configure Your Profile
 
-Edit `~/.codingagent/profiles.yaml`:
+Edit `~/.victor/profiles.yaml`:
 
 ```yaml
 profiles:
@@ -103,19 +103,19 @@ providers:
 ### 1. Code Generation
 
 ```bash
-codingagent "Create a REST API endpoint for user authentication with FastAPI"
+victor "Create a REST API endpoint for user authentication with FastAPI"
 ```
 
 ### 2. Code Review
 
 ```bash
-codingagent "Review the code in src/main.py and suggest improvements"
+victor "Review the code in src/main.py and suggest improvements"
 ```
 
 ### 3. Debugging
 
 ```bash
-codingagent "Analyze the error in error.log and suggest fixes"
+victor "Analyze the error in error.log and suggest fixes"
 ```
 
 ### 4. File Operations
@@ -198,7 +198,7 @@ ollama pull deepseek-coder:6.7b
 ollama pull mistral:7b
 ```
 
-Then add profiles in `~/.codingagent/profiles.yaml`:
+Then add profiles in `~/.victor/profiles.yaml`:
 ```yaml
 profiles:
   llama:
@@ -210,7 +210,7 @@ profiles:
     model: deepseek-coder:6.7b
 ```
 
-Use with: `codingagent --profile llama`
+Use with: `victor --profile llama`
 
 ### 2. Add API Keys for Frontier Models
 
@@ -256,7 +256,7 @@ Check out [CONTRIBUTING.md](CONTRIBUTING.md) to:
 ### Create a New Project
 
 ```bash
-codingagent "Create a new FastAPI project structure with:
+victor "Create a new FastAPI project structure with:
 - User authentication
 - Database models with SQLAlchemy
 - API endpoints for CRUD operations
@@ -267,19 +267,19 @@ codingagent "Create a new FastAPI project structure with:
 ### Refactor Code
 
 ```bash
-codingagent "Refactor the code in src/legacy.py to use modern Python 3.11 features and improve performance"
+victor "Refactor the code in src/legacy.py to use modern Python 3.11 features and improve performance"
 ```
 
 ### Generate Documentation
 
 ```bash
-codingagent "Generate comprehensive docstrings for all functions in src/utils.py"
+victor "Generate comprehensive docstrings for all functions in src/utils.py"
 ```
 
 ### Debug Issues
 
 ```bash
-codingagent "Analyze the test failures in test_results.txt and fix the issues"
+victor "Analyze the test failures in test_results.txt and fix the issues"
 ```
 
 ## Tips for Best Results

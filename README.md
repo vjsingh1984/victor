@@ -37,14 +37,14 @@ CodingAgent is a powerful terminal-based AI coding assistant that provides a **u
 ### From PyPI (Coming Soon)
 
 ```bash
-pip install codingagent
+pip install victor
 ```
 
 ### From Source
 
 ```bash
-git clone https://github.com/vijaysingh/codingagent.git
-cd codingagent
+git clone https://github.com/vijaysingh/victor.git
+cd victor
 pip install -e ".[dev]"
 ```
 
@@ -63,7 +63,7 @@ export XAI_API_KEY="your-key-here"
 
 ### 2. Configure Provider Profile
 
-Create `~/.codingagent/profiles.yaml`:
+Create `~/.victor/profiles.yaml`:
 
 ```yaml
 profiles:
@@ -89,25 +89,25 @@ providers:
 
 ```bash
 # Use default profile (Ollama)
-codingagent
+victor
 
 # Use specific profile
-codingagent --profile claude
+victor --profile claude
 
 # One-shot command
-codingagent "Write a Python function to calculate Fibonacci numbers"
+victor "Write a Python function to calculate Fibonacci numbers"
 
 # List available providers
-codingagent providers
+victor providers
 
 # List configured profiles
-codingagent profiles
+victor profiles
 
 # List Ollama models
-codingagent models
+victor models
 
 # Test a provider
-codingagent test-provider ollama
+victor test-provider ollama
 ```
 
 ## Usage Examples
@@ -115,7 +115,7 @@ codingagent test-provider ollama
 ### Interactive REPL Mode
 
 ```bash
-$ codingagent
+$ victor
 
 Welcome to CodingAgent v0.1.0
 Using: Ollama (qwen2.5-coder:7b)
@@ -190,7 +190,7 @@ See [docs/configuration.md](docs/configuration.md) for detailed configuration op
 Create custom tools by extending the `BaseTool` class:
 
 ```python
-from codingagent.tools.base import BaseTool
+from victor.tools.base import BaseTool
 
 class MyCustomTool(BaseTool):
     name = "my_tool"
@@ -207,8 +207,8 @@ class MyCustomTool(BaseTool):
 
 ```bash
 # Clone repository
-git clone https://github.com/vijaysingh/codingagent.git
-cd codingagent
+git clone https://github.com/vijaysingh/victor.git
+cd victor
 
 # Create virtual environment
 python -m venv venv
@@ -241,13 +241,13 @@ pytest tests/integration/
 
 ```bash
 # Format code
-black codingagent tests
+black victor tests
 
 # Lint
-ruff check codingagent tests
+ruff check victor tests
 
 # Type check
-mypy codingagent
+mypy victor
 ```
 
 ## Contributing
@@ -286,9 +286,9 @@ MIT License - see [LICENSE](LICENSE) for details
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/vijaysingh/codingagent/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/vijaysingh/codingagent/discussions)
-- **Documentation**: [Full Documentation](https://github.com/vijaysingh/codingagent/docs)
+- **Issues**: [GitHub Issues](https://github.com/vijaysingh/victor/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/vijaysingh/victor/discussions)
+- **Documentation**: [Full Documentation](https://github.com/vijaysingh/victor/docs)
 
 ---
 

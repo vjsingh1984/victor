@@ -3,8 +3,8 @@
 import asyncio
 import os
 
-from codingagent.agent.orchestrator import AgentOrchestrator
-from codingagent.providers.xai_provider import XAIProvider
+from victor.agent.orchestrator import AgentOrchestrator
+from victor.providers.xai_provider import XAIProvider
 
 
 async def main():

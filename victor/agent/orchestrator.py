@@ -5,18 +5,18 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 from rich.console import Console
 from rich.markdown import Markdown
 
-from codingagent.config.settings import Settings
-from codingagent.providers.base import (
+from victor.config.settings import Settings
+from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
     StreamChunk,
     ToolDefinition,
 )
-from codingagent.providers.registry import ProviderRegistry
-from codingagent.tools.base import ToolRegistry
-from codingagent.tools.bash import BashTool
-from codingagent.tools.filesystem import ListDirectoryTool, ReadFileTool, WriteFileTool
+from victor.providers.registry import ProviderRegistry
+from victor.tools.base import ToolRegistry
+from victor.tools.bash import BashTool
+from victor.tools.filesystem import ListDirectoryTool, ReadFileTool, WriteFileTool
 
 
 class AgentOrchestrator:

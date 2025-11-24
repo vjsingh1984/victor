@@ -3,10 +3,10 @@
 import asyncio
 import os
 
-from codingagent.agent.orchestrator import AgentOrchestrator
-from codingagent.providers.ollama import OllamaProvider
-from codingagent.providers.anthropic_provider import AnthropicProvider
-from codingagent.providers.openai_provider import OpenAIProvider
+from victor.agent.orchestrator import AgentOrchestrator
+from victor.providers.ollama import OllamaProvider
+from victor.providers.anthropic_provider import AnthropicProvider
+from victor.providers.openai_provider import OpenAIProvider
 
 
 async def main():

@@ -5,7 +5,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 from anthropic import AsyncAnthropic
 from anthropic.types import ContentBlock, Message as AnthropicMessage, MessageStreamEvent
 
-from codingagent.providers.base import (
+from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,

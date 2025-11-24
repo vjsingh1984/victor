@@ -3,8 +3,8 @@
 import asyncio
 import os
 
-from codingagent.agent.orchestrator import AgentOrchestrator
-from codingagent.providers.google_provider import GoogleProvider
+from victor.agent.orchestrator import AgentOrchestrator
+from victor.providers.google_provider import GoogleProvider
 
 
 async def main():

@@ -2,8 +2,8 @@
 
 import asyncio
 
-from codingagent.agent.orchestrator import AgentOrchestrator
-from codingagent.providers.ollama import OllamaProvider
+from victor.agent.orchestrator import AgentOrchestrator
+from victor.providers.ollama import OllamaProvider
 
 
 async def main():

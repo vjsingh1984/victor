@@ -11,8 +11,8 @@ Be respectful, constructive, and collaborative. We're building something useful 
 ### 1. Fork and Clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/codingagent.git
-cd codingagent
+git clone https://github.com/YOUR_USERNAME/victor.git
+cd victor
 ```
 
 ### 2. Set Up Development Environment
@@ -52,16 +52,16 @@ We use several tools to maintain code quality:
 
 ```bash
 # Format code
-black codingagent tests
+black victor tests
 
 # Lint
-ruff check codingagent tests
+ruff check victor tests
 
 # Type check
-mypy codingagent
+mypy victor
 
 # Run all checks
-black . && ruff check . && mypy codingagent && pytest
+black . && ruff check . && mypy victor && pytest
 ```
 
 ### Pre-commit Hooks
@@ -77,7 +77,7 @@ pre-commit install
 
 ### Adding a New Provider
 
-1. Create a new file in `codingagent/providers/`
+1. Create a new file in `victor/providers/`
 2. Inherit from `BaseProvider`
 3. Implement required methods: `chat()`, `stream()`, `supports_tools()`
 4. Add configuration to example profiles
@@ -87,7 +87,7 @@ pre-commit install
 Example:
 
 ```python
-from codingagent.providers.base import BaseProvider
+from victor.providers.base import BaseProvider
 
 class MyProvider(BaseProvider):
     async def chat(self, messages, **kwargs):
@@ -97,7 +97,7 @@ class MyProvider(BaseProvider):
 
 ### Adding a New Tool
 
-1. Create tool in `codingagent/tools/`
+1. Create tool in `victor/tools/`
 2. Inherit from `BaseTool`
 3. Define JSON schema
 4. Implement `execute()` method
@@ -150,7 +150,7 @@ Example test structure:
 
 ```python
 import pytest
-from codingagent.providers.ollama import OllamaProvider
+from victor.providers.ollama import OllamaProvider
 
 @pytest.fixture
 async def ollama_provider():

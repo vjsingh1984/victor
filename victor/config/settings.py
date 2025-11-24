@@ -70,7 +70,7 @@ class Settings(BaseSettings):
         Returns:
             Path to config directory
         """
-        config_dir = Path.home() / ".codingagent"
+        config_dir = Path.home() / ".victor"
         config_dir.mkdir(parents=True, exist_ok=True)
         return config_dir
 

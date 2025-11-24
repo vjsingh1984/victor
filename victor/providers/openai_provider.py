@@ -5,7 +5,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
-from codingagent.providers.base import (
+from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,

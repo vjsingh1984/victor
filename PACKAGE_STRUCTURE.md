@@ -2,13 +2,13 @@
 
 ## Why This Package Structure?
 
-The current structure (`codingagent/` at the root) is a valid and commonly used Python package layout. Let me explain the different approaches:
+The current structure (`victor/` at the root) is a valid and commonly used Python package layout. Let me explain the different approaches:
 
 ### Current Structure (Recommended for this project)
 
 ```
-codingagent/
-├── codingagent/           # Package directory (importable)
+victor/
+├── victor/           # Package directory (importable)
 │   ├── __init__.py
 │   ├── agent/
 │   ├── providers/
@@ -30,9 +30,9 @@ codingagent/
 ### Alternative: src/ Layout
 
 ```
-codingagent/
+victor/
 ├── src/
-│   └── codingagent/       # Package inside src/
+│   └── victor/       # Package inside src/
 │       ├── __init__.py
 │       └── ...
 ├── tests/
@@ -124,12 +124,12 @@ pip install -e ".[dev]"
 - Package is symlinked to current directory
 - All dev tools installed (pytest, ruff, mypy)
 - Code changes take effect immediately
-- `codingagent` command available globally
+- `victor` command available globally
 
 ### 2. User Installation (from PyPI - future)
 
 ```bash
-pip install codingagent
+pip install victor
 ```
 
 **Use when:**
@@ -163,14 +163,14 @@ pip install .
 After installation, you can import from anywhere:
 
 ```python
-from codingagent import AgentOrchestrator
-from codingagent.providers import OllamaProvider
-from codingagent.tools.bash import BashTool
+from victor import AgentOrchestrator
+from victor.providers import OllamaProvider
+from victor.tools.bash import BashTool
 ```
 
 This works because:
-1. `pyproject.toml` defines the package name as "codingagent"
-2. Installation creates `codingagent` in Python's import path
+1. `pyproject.toml` defines the package name as "victor"
+2. Installation creates `victor` in Python's import path
 3. The directory structure matches the import structure
 
 ## Package Discovery
@@ -181,26 +181,26 @@ In `pyproject.toml`:
 
 ```toml
 [tool.setuptools.packages.find]
-include = ["codingagent*"]
+include = ["victor*"]
 exclude = ["tests*", "docs*"]
 ```
 
 This tells setuptools:
-- Include: `codingagent` and all subpackages
+- Include: `victor` and all subpackages
 - Exclude: `tests` and `docs` from distribution
 
-**Result:** Only the `codingagent/` directory is packaged and installed
+**Result:** Only the `victor/` directory is packaged and installed
 
 ## Entry Points (CLI Commands)
 
 ```toml
 [project.scripts]
-codingagent = "codingagent.ui.cli:app"
-ca = "codingagent.ui.cli:app"
+victor = "victor.ui.cli:app"
+ca = "victor.ui.cli:app"
 ```
 
 This creates two commands:
-- `codingagent` → runs `app` from `codingagent/ui/cli.py`
+- `victor` → runs `app` from `victor/ui/cli.py`
 - `ca` → same, just a shorter alias
 
 After installation, these commands are available globally in your terminal.
@@ -212,7 +212,7 @@ After installation, these commands are available globally in your terminal.
 ```bash
 # Clone repo
 git clone <repo>
-cd codingagent
+cd victor
 
 # Create virtual environment
 python -m venv venv
@@ -225,15 +225,15 @@ pip install -e ".[dev]"
 ### 2. Making Changes
 
 ```python
-# Edit code in codingagent/providers/new_provider.py
+# Edit code in victor/providers/new_provider.py
 class NewProvider(BaseProvider):
     # ... your changes
 ```
 
 ```bash
 # Test immediately (no reinstall needed!)
-codingagent  # Your changes are live
-python -c "from codingagent.providers.new_provider import NewProvider"  # Works!
+victor  # Your changes are live
+python -c "from victor.providers.new_provider import NewProvider"  # Works!
 ```
 
 ### 3. Running Tests
@@ -249,8 +249,8 @@ pytest -v tests/unit/
 
 ```bash
 # All tools available from [dev] extras
-ruff check codingagent
-mypy codingagent
+ruff check victor
+mypy victor
 ```
 
 ## Why Not Use src/?
@@ -286,16 +286,16 @@ pip install build
 python -m build
 
 # Creates:
-# dist/codingagent-0.1.0-py3-none-any.whl
-# dist/codingagent-0.1.0.tar.gz
+# dist/victor-0.1.0-py3-none-any.whl
+# dist/victor-0.1.0.tar.gz
 ```
 
 ### What gets included:
 
-Only the `codingagent/` directory:
+Only the `victor/` directory:
 ```
-codingagent-0.1.0/
-├── codingagent/
+victor-0.1.0/
+├── victor/
 │   ├── __init__.py
 │   ├── agent/
 │   ├── providers/
@@ -310,7 +310,7 @@ Tests, examples, and docs are excluded (configured in pyproject.toml).
 
 ## Common Issues & Solutions
 
-### Issue: "ModuleNotFoundError: No module named 'codingagent'"
+### Issue: "ModuleNotFoundError: No module named 'victor'"
 
 **Solution:**
 ```bash
@@ -318,7 +318,7 @@ Tests, examples, and docs are excluded (configured in pyproject.toml).
 pip install -e ".[dev]"
 
 # Check it's installed
-pip list | grep codingagent
+pip list | grep victor
 
 # Verify virtual environment is activated
 which python  # Should point to venv/bin/python
@@ -332,11 +332,11 @@ which python  # Should point to venv/bin/python
 pip install -e ".[dev]"
 
 # Or check if you accidentally did non-editable install
-pip list -v | grep codingagent
-# Should show: /path/to/codingagent (editable)
+pip list -v | grep victor
+# Should show: /path/to/victor (editable)
 ```
 
-### Issue: "command not found: codingagent"
+### Issue: "command not found: victor"
 
 **Solution:**
 ```bash
@@ -347,7 +347,7 @@ pip install -e ".[dev]"
 echo $PATH | grep venv
 
 # Try with full path
-python -m codingagent.ui.cli
+python -m victor.ui.cli
 ```
 
 ## Best Practices
@@ -355,7 +355,7 @@ python -m codingagent.ui.cli
 ### For Development:
 1. ✅ Always use `pip install -e ".[dev]"`
 2. ✅ Use virtual environments
-3. ✅ Keep package code in `codingagent/`
+3. ✅ Keep package code in `victor/`
 4. ✅ Keep tests in `tests/`
 5. ✅ Run tests before committing
 

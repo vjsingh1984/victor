@@ -3,22 +3,25 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "codingagent"
+name = "victor"
 version = "0.1.0"
-description = "A universal terminal-based coding agent supporting multiple LLM providers"
+description = "Universal AI Coding Assistant - Code to Victory with Any AI"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Vijay Singh"}
+    {name = "Vijaykumar Singh"}
 ]
 requires-python = ">=3.10"
 keywords = [
     "ai",
     "llm",
     "coding-agent",
+    "victor",
     "anthropic",
     "openai",
     "ollama",
+    "claude",
+    "gpt",
     "cli",
     "terminal"
 ]
@@ -91,21 +94,21 @@ docs = [
 ]
 
 all = [
-    "codingagent[dev,docs]",
+    "victor[dev,docs]",
 ]
 
 [project.urls]
-Homepage = "https://github.com/vijaysingh/codingagent"
-Documentation = "https://github.com/vijaysingh/codingagent#readme"
-Repository = "https://github.com/vijaysingh/codingagent"
-Issues = "https://github.com/vijaysingh/codingagent/issues"
+Homepage = "https://github.com/vijayksingh/victor"
+Documentation = "https://github.com/vijayksingh/victor#readme"
+Repository = "https://github.com/vijayksingh/victor"
+Issues = "https://github.com/vijayksingh/victor/issues"
 
 [project.scripts]
-codingagent = "codingagent.ui.cli:app"
-ca = "codingagent.ui.cli:app"
+victor = "victor.ui.cli:app"
+vic = "victor.ui.cli:app"
 
 [tool.setuptools.packages.find]
-include = ["codingagent*"]
+include = ["victor*"]
 exclude = ["tests*", "docs*"]
 
 [tool.pytest.ini_options]
@@ -116,7 +119,7 @@ python_functions = ["test_*"]
 addopts = [
     "--strict-markers",
     "--strict-config",
-    "--cov=codingagent",
+    "--cov=victor",
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
@@ -165,7 +168,7 @@ target-version = ['py310']
 include = '\.pyi?$'
 
 [tool.coverage.run]
-source = ["codingagent"]
+source = ["victor"]
 omit = [
     "*/tests/*",
     "*/__init__.py",

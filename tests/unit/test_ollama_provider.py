@@ -3,8 +3,8 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from codingagent.providers.base import Message, ProviderError
-from codingagent.providers.ollama import OllamaProvider
+from victor.providers.base import Message, ProviderError
+from victor.providers.ollama import OllamaProvider
 
 
 @pytest.fixture

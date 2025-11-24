@@ -118,7 +118,7 @@ python examples/multi_provider_workflow.py
 
 ## Provider Profiles Example
 
-Create `~/.codingagent/profiles.yaml`:
+Create `~/.victor/profiles.yaml`:
 
 ```yaml
 profiles:
@@ -172,19 +172,19 @@ providers:
 Then use profiles:
 
 ```bash
-codingagent --profile dev    # Ollama
-codingagent --profile claude # Claude
-codingagent --profile gpt35  # GPT-3.5
-codingagent --profile grok   # Grok
-codingagent --profile gemini # Gemini
+victor --profile dev    # Ollama
+victor --profile claude # Claude
+victor --profile gpt35  # GPT-3.5
+victor --profile grok   # Grok
+victor --profile gemini # Gemini
 ```
 
 ## Creating Your Own Examples
 
 ```python
 import asyncio
-from codingagent.agent.orchestrator import AgentOrchestrator
-from codingagent.providers.ollama import OllamaProvider
+from victor.agent.orchestrator import AgentOrchestrator
+from victor.providers.ollama import OllamaProvider
 
 async def main():
     # Create provider
@@ -255,11 +255,11 @@ echo $OPENAI_API_KEY
 curl -H "x-api-key: $ANTHROPIC_API_KEY" https://api.anthropic.com/v1/messages
 ```
 
-### "No module named 'codingagent'"
+### "No module named 'victor'"
 
 ```bash
 # Install in development mode
-cd /path/to/codingagent
+cd /path/to/victor
 pip install -e ".[dev]"
 ```
 

@@ -29,11 +29,11 @@ jobs:
 
     - name: Lint with ruff
       run: |
-        ruff check codingagent tests
+        ruff check victor tests
 
     - name: Type check with mypy
       run: |
-        mypy codingagent
+        mypy victor
       continue-on-error: true
 
     - name: Run tests

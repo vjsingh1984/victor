@@ -7,9 +7,9 @@ Skip if Ollama is not available.
 import pytest
 from httpx import ConnectError
 
-from codingagent.agent.orchestrator import AgentOrchestrator
-from codingagent.providers.base import Message
-from codingagent.providers.ollama import OllamaProvider
+from victor.agent.orchestrator import AgentOrchestrator
+from victor.providers.base import Message
+from victor.providers.ollama import OllamaProvider
 
 
 @pytest.fixture

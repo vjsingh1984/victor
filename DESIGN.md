@@ -152,7 +152,7 @@ A universal terminal-based coding agent that works seamlessly with any LLM provi
 
 ## Configuration System
 
-### Model Profiles (`~/.codingagent/profiles.yaml`)
+### Model Profiles (`~/.victor/profiles.yaml`)
 
 ```yaml
 profiles:
@@ -219,7 +219,7 @@ tools:
 
 ## Distribution Strategy
 
-1. **PyPI Package**: `pip install codingagent`
+1. **PyPI Package**: `pip install victor`
 2. **GitHub Releases**: Binary distributions via PyInstaller
 3. **Docker Image**: Pre-configured container
 4. **Homebrew Formula**: macOS easy install

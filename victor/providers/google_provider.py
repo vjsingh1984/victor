@@ -5,7 +5,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 import google.generativeai as genai
 from google.generativeai.types import GenerateContentResponse
 
-from codingagent.providers.base import (
+from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,

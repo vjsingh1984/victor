@@ -40,5 +40,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Easy to extend with new providers and tools
 - Well-structured codebase following best practices
 
-[Unreleased]: https://github.com/vijaysingh/codingagent/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/vijaysingh/codingagent/releases/tag/v0.1.0
+[Unreleased]: https://github.com/vijaysingh/victor/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/vijaysingh/victor/releases/tag/v0.1.0

@@ -1,0 +1,362 @@
+"""Embedding model providers (separate from vector stores).
+
+This module handles GENERATING embeddings (converting text to vectors).
+The vector stores (ChromaDB, ProximaDB, etc.) handle STORING and SEARCHING.
+
+This separation allows mixing and matching:
+- OpenAI embeddings + FAISS storage
+- Sentence-transformers + ProximaDB storage
+- Cohere embeddings + ChromaDB storage
+"""
+
+import asyncio
+from abc import ABC, abstractmethod
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
+
+
+class EmbeddingModelConfig(BaseModel):
+    """Configuration for embedding model."""
+
+    model_type: str = Field(
+        description="Model type (sentence-transformers, openai, cohere, etc.)"
+    )
+    model_name: str = Field(
+        default="all-MiniLM-L6-v2",
+        description="Specific model name"
+    )
+    dimension: int = Field(
+        default=384,
+        description="Embedding dimension (auto-detected if possible)"
+    )
+    api_key: Optional[str] = Field(
+        default=None,
+        description="API key for cloud providers"
+    )
+    batch_size: int = Field(
+        default=32,
+        description="Batch size for embedding generation"
+    )
+
+
+class BaseEmbeddingModel(ABC):
+    """Abstract base for embedding models.
+
+    Handles converting text -> vectors.
+    Does NOT handle storage/search (that's the vector store's job).
+    """
+
+    def __init__(self, config: EmbeddingModelConfig):
+        """Initialize embedding model.
+
+        Args:
+            config: Model configuration
+        """
+        self.config = config
+        self._initialized = False
+
+    @abstractmethod
+    async def initialize(self) -> None:
+        """Initialize the model (load weights, connect to API, etc.)."""
+        pass
+
+    @abstractmethod
+    async def embed_text(self, text: str) -> List[float]:
+        """Generate embedding for single text.
+
+        Args:
+            text: Text to embed
+
+        Returns:
+            Embedding vector
+        """
+        pass
+
+    @abstractmethod
+    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        """Generate embeddings for multiple texts (batch optimized).
+
+        Args:
+            texts: List of texts to embed
+
+        Returns:
+            List of embedding vectors
+        """
+        pass
+
+    @abstractmethod
+    def get_dimension(self) -> int:
+        """Get the dimension of embeddings produced by this model.
+
+        Returns:
+            Embedding dimension
+        """
+        pass
+
+    async def close(self) -> None:
+        """Clean up resources."""
+        pass
+
+
+class SentenceTransformerModel(BaseEmbeddingModel):
+    """Sentence-transformers embedding model (local, CPU/GPU).
+
+    Pros:
+    - Free
+    - Runs locally
+    - No API limits
+    - Many pre-trained models available
+
+    Cons:
+    - Slower than cloud APIs (unless you have GPU)
+    - Requires downloading models
+    - CPU inference can be slow for large batches
+
+    Good for: Development, privacy-sensitive data, offline use
+    """
+
+    def __init__(self, config: EmbeddingModelConfig):
+        """Initialize sentence-transformers model."""
+        super().__init__(config)
+        self.model = None
+
+    async def initialize(self) -> None:
+        """Load the sentence-transformers model."""
+        if self._initialized:
+            return
+
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError:
+            raise ImportError(
+                "sentence-transformers not installed. "
+                "Install with: pip install sentence-transformers"
+            )
+
+        print(f"🤖 Loading sentence-transformer model: {self.config.model_name}")
+
+        # Load model in executor (CPU-bound operation)
+        loop = asyncio.get_event_loop()
+        self.model = await loop.run_in_executor(
+            None, SentenceTransformer, self.config.model_name
+        )
+
+        self._initialized = True
+        print(f"✅ Model loaded! Dimension: {self.get_dimension()}")
+
+    async def embed_text(self, text: str) -> List[float]:
+        """Generate embedding for single text."""
+        if not self._initialized:
+            await self.initialize()
+
+        loop = asyncio.get_event_loop()
+        embedding = await loop.run_in_executor(
+            None, self.model.encode, text
+        )
+        return embedding.tolist()
+
+    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        """Generate embeddings for multiple texts (batch optimized)."""
+        if not self._initialized:
+            await self.initialize()
+
+        loop = asyncio.get_event_loop()
+        embeddings = await loop.run_in_executor(
+            None,
+            lambda: self.model.encode(
+                texts,
+                batch_size=self.config.batch_size,
+                show_progress_bar=len(texts) > 100
+            )
+        )
+        return [emb.tolist() for emb in embeddings]
+
+    def get_dimension(self) -> int:
+        """Get embedding dimension."""
+        if self.model:
+            return self.model.get_sentence_embedding_dimension()
+        return self.config.dimension
+
+
+class OpenAIEmbeddingModel(BaseEmbeddingModel):
+    """OpenAI embedding model (cloud API).
+
+    Pros:
+    - Very fast
+    - High quality embeddings
+    - Scalable
+    - No local resources needed
+
+    Cons:
+    - Costs money ($0.0001 per 1K tokens for text-embedding-3-small)
+    - Requires internet
+    - Rate limits
+    - Data sent to OpenAI
+
+    Good for: Production, when cost is acceptable
+    """
+
+    def __init__(self, config: EmbeddingModelConfig):
+        """Initialize OpenAI embedding model."""
+        super().__init__(config)
+        self.client = None
+
+    async def initialize(self) -> None:
+        """Initialize OpenAI client."""
+        if self._initialized:
+            return
+
+        try:
+            from openai import AsyncOpenAI
+        except ImportError:
+            raise ImportError(
+                "openai not installed. Install with: pip install openai"
+            )
+
+        if not self.config.api_key:
+            raise ValueError("OpenAI API key required")
+
+        self.client = AsyncOpenAI(api_key=self.config.api_key)
+        self._initialized = True
+
+        print(f"✅ OpenAI embedding model initialized: {self.config.model_name}")
+
+    async def embed_text(self, text: str) -> List[float]:
+        """Generate embedding using OpenAI API."""
+        if not self._initialized:
+            await self.initialize()
+
+        response = await self.client.embeddings.create(
+            model=self.config.model_name,
+            input=text
+        )
+        return response.data[0].embedding
+
+    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        """Generate embeddings for multiple texts."""
+        if not self._initialized:
+            await self.initialize()
+
+        # OpenAI API handles batching internally (up to 2048 texts per request)
+        response = await self.client.embeddings.create(
+            model=self.config.model_name,
+            input=texts
+        )
+        return [item.embedding for item in response.data]
+
+    def get_dimension(self) -> int:
+        """Get embedding dimension based on model."""
+        # OpenAI model dimensions
+        dimensions = {
+            "text-embedding-3-small": 1536,
+            "text-embedding-3-large": 3072,
+            "text-embedding-ada-002": 1536,
+        }
+        return dimensions.get(self.config.model_name, self.config.dimension)
+
+
+class CohereEmbeddingModel(BaseEmbeddingModel):
+    """Cohere embedding model (cloud API).
+
+    Pros:
+    - Fast and high quality
+    - Good multilingual support
+    - Competitive pricing
+
+    Cons:
+    - Costs money
+    - Requires internet
+    - Data sent to Cohere
+
+    Good for: Production, multilingual use cases
+    """
+
+    def __init__(self, config: EmbeddingModelConfig):
+        """Initialize Cohere embedding model."""
+        super().__init__(config)
+        self.client = None
+
+    async def initialize(self) -> None:
+        """Initialize Cohere client."""
+        if self._initialized:
+            return
+
+        try:
+            import cohere
+        except ImportError:
+            raise ImportError(
+                "cohere not installed. Install with: pip install cohere"
+            )
+
+        if not self.config.api_key:
+            raise ValueError("Cohere API key required")
+
+        self.client = cohere.AsyncClient(api_key=self.config.api_key)
+        self._initialized = True
+
+        print(f"✅ Cohere embedding model initialized: {self.config.model_name}")
+
+    async def embed_text(self, text: str) -> List[float]:
+        """Generate embedding using Cohere API."""
+        if not self._initialized:
+            await self.initialize()
+
+        response = await self.client.embed(
+            texts=[text],
+            model=self.config.model_name
+        )
+        return response.embeddings[0]
+
+    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        """Generate embeddings for multiple texts."""
+        if not self._initialized:
+            await self.initialize()
+
+        response = await self.client.embed(
+            texts=texts,
+            model=self.config.model_name
+        )
+        return response.embeddings
+
+    def get_dimension(self) -> int:
+        """Get embedding dimension."""
+        # Cohere model dimensions
+        dimensions = {
+            "embed-english-v3.0": 1024,
+            "embed-multilingual-v3.0": 1024,
+            "embed-english-light-v3.0": 384,
+            "embed-multilingual-light-v3.0": 384,
+        }
+        return dimensions.get(self.config.model_name, self.config.dimension)
+
+
+# Model Registry
+_embedding_models = {
+    "sentence-transformers": SentenceTransformerModel,
+    "openai": OpenAIEmbeddingModel,
+    "cohere": CohereEmbeddingModel,
+}
+
+
+def create_embedding_model(config: EmbeddingModelConfig) -> BaseEmbeddingModel:
+    """Factory function to create embedding model.
+
+    Args:
+        config: Model configuration
+
+    Returns:
+        Embedding model instance
+
+    Raises:
+        ValueError: If model type not recognized
+    """
+    model_class = _embedding_models.get(config.model_type)
+    if not model_class:
+        available = ", ".join(_embedding_models.keys())
+        raise ValueError(
+            f"Unknown embedding model type: {config.model_type}. "
+            f"Available: {available}"
+        )
+
+    return model_class(config)

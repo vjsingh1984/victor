@@ -3,8 +3,8 @@
 import asyncio
 import os
 
-from codingagent.agent.orchestrator import AgentOrchestrator
-from codingagent.providers.anthropic_provider import AnthropicProvider
+from victor.agent.orchestrator import AgentOrchestrator
+from victor.providers.anthropic_provider import AnthropicProvider
 
 
 async def main():

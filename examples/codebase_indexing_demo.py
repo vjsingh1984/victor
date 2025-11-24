@@ -4,7 +4,7 @@ This shows how to use the CodebaseIndex to understand a codebase.
 """
 
 import asyncio
-from codingagent.codebase.indexer import CodebaseIndex
+from victor.codebase.indexer import CodebaseIndex
 
 
 async def main():
@@ -51,9 +51,9 @@ async def main():
         print("Symbol not found")
 
     # Get context for a file
-    print("\n\n📋 Getting context for 'codingagent/providers/base.py':")
+    print("\n\n📋 Getting context for 'victor/providers/base.py':")
     print("-" * 60)
-    context = indexer.get_file_context("codingagent/providers/base.py")
+    context = indexer.get_file_context("victor/providers/base.py")
 
     if context:
         file = context["file"]

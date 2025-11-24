@@ -81,18 +81,18 @@
 
 ### Basic Commands
 ```bash
-codingagent                    # Interactive mode
-codingagent "message"          # One-shot mode
-codingagent --profile <name>   # Use specific profile
-codingagent init               # Initialize configuration
+victor                    # Interactive mode
+victor "message"          # One-shot mode
+victor --profile <name>   # Use specific profile
+victor init               # Initialize configuration
 ```
 
 ### Management Commands
 ```bash
-codingagent providers          # List all available providers
-codingagent profiles           # Show configured profiles
-codingagent models             # List Ollama models
-codingagent test-provider      # Test provider connectivity
+victor providers          # List all available providers
+victor profiles           # Show configured profiles
+victor models             # List Ollama models
+victor test-provider      # Test provider connectivity
 ```
 
 ### Options
@@ -107,8 +107,8 @@ codingagent test-provider      # Test provider connectivity
 ## 📁 **Project Structure**
 
 ```
-codingagent/
-├── codingagent/              # Main package
+victor/
+├── victor/              # Main package
 │   ├── agent/                # Agent orchestration
 │   │   └── orchestrator.py
 │   ├── providers/            # LLM providers (5 total)
@@ -312,9 +312,9 @@ pip install -e ".[dev]"
 
 ### Great CLI
 ```bash
-codingagent providers  # See what's available
-codingagent models     # Check installed models
-codingagent profiles   # View configurations
+victor providers  # See what's available
+victor models     # Check installed models
+victor profiles   # View configurations
 ```
 
 ### Clear Documentation
@@ -418,7 +418,7 @@ codingagent profiles   # View configurations
 
 ## 📞 **Support**
 
-- **Issues**: [GitHub Issues](https://github.com/vijaysingh/codingagent/issues)
+- **Issues**: [GitHub Issues](https://github.com/vijaysingh/victor/issues)
 - **Docs**: All documentation in repo
 - **Examples**: 6 working examples included
 - **Tests**: Integration tests with Ollama
@@ -463,6 +463,6 @@ Start using CodingAgent today! 🚀
 
 ```bash
 pip install -e ".[dev]"
-codingagent init
-codingagent
+victor init
+victor
 ```

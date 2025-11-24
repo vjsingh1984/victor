@@ -9,7 +9,7 @@ __version__ = "0.1.0"
 __author__ = "Vijay Singh"
 __license__ = "MIT"
 
-from codingagent.agent.orchestrator import AgentOrchestrator
-from codingagent.config.settings import Settings
+from victor.agent.orchestrator import AgentOrchestrator
+from victor.config.settings import Settings
 
 __all__ = ["AgentOrchestrator", "Settings"]

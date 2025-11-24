@@ -4,7 +4,7 @@ import asyncio
 import shlex
 from typing import Any, Dict
 
-from codingagent.tools.base import BaseTool, ToolResult
+from victor.tools.base import BaseTool, ToolResult
 
 
 class BashTool(BaseTool):

@@ -1,4 +1,4 @@
-"""Command-line interface for CodingAgent."""
+"""Command-line interface for Victor - Universal AI Coding Assistant."""
 
 import asyncio
 from typing import Optional
@@ -9,13 +9,13 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
 
-from codingagent import __version__
-from codingagent.agent.orchestrator import AgentOrchestrator
-from codingagent.config.settings import load_settings
+from victor import __version__
+from victor.agent.orchestrator import AgentOrchestrator
+from victor.config.settings import load_settings
 
 app = typer.Typer(
-    name="codingagent",
-    help="Universal terminal-based coding agent supporting multiple LLM providers",
+    name="victor",
+    help="Victor - Code to Victory with Any AI. Universal terminal-based coding assistant supporting multiple LLM providers.",
     add_completion=False,
 )
 
@@ -25,7 +25,7 @@ console = Console()
 def version_callback(value: bool) -> None:
     """Show version and exit."""
     if value:
-        console.print(f"CodingAgent v{__version__}")
+        console.print(f"Victor v{__version__}")
         raise typer.Exit()
 
 
@@ -55,17 +55,17 @@ def main(
         help="Show version and exit",
     ),
 ) -> None:
-    """CodingAgent - Universal terminal-based coding agent.
+    """Victor - Universal AI coding assistant. Code to Victory with Any AI.
 
     Examples:
         # Interactive mode
-        codingagent
+        victor
 
         # One-shot command
-        codingagent "Write a Python function to calculate Fibonacci numbers"
+        victor "Write a Python function to calculate Fibonacci numbers"
 
         # Use specific profile
-        codingagent --profile claude "Explain how async/await works"
+        victor --profile claude "Explain how async/await works"
     """
     # Load settings
     settings = load_settings()
@@ -202,7 +202,7 @@ def init() -> None:
     from pathlib import Path
     import shutil
 
-    config_dir = Path.home() / ".codingagent"
+    config_dir = Path.home() / ".victor"
     config_dir.mkdir(parents=True, exist_ok=True)
 
     # Copy example profiles if they don't exist
@@ -234,7 +234,7 @@ providers:
 @app.command()
 def providers() -> None:
     """List all available providers."""
-    from codingagent.providers.registry import ProviderRegistry
+    from victor.providers.registry import ProviderRegistry
     from rich.table import Table
 
     available_providers = ProviderRegistry.list_providers()
@@ -258,7 +258,7 @@ def providers() -> None:
         table.add_row(provider, status, features)
 
     console.print(table)
-    console.print("\n[dim]Use 'codingagent profiles' to see configured profiles[/]")
+    console.print("\n[dim]Use 'victor profiles' to see configured profiles[/]")
 
 
 @app.command()
@@ -271,7 +271,7 @@ def profiles_cmd() -> None:
 
     if not profiles:
         console.print("[yellow]No profiles configured[/]")
-        console.print("Run [bold]codingagent init[/] to create default configuration")
+        console.print("Run [bold]victor init[/] to create default configuration")
         return
 
     table = Table(title="Configured Profiles", show_header=True)
@@ -318,7 +318,7 @@ async def list_models_async(provider: str) -> None:
     try:
         # Special handling for Ollama
         if provider == "ollama":
-            from codingagent.providers.ollama import OllamaProvider
+            from victor.providers.ollama import OllamaProvider
 
             provider_settings = settings.get_provider_settings(provider)
             ollama = OllamaProvider(**provider_settings)
@@ -359,7 +359,7 @@ async def list_models_async(provider: str) -> None:
 
                 console.print(table)
                 console.print(
-                    f"\n[dim]Use a model with: [bold]codingagent --profile <profile>[/dim]"
+                    f"\n[dim]Use a model with: [bold]victor --profile <profile>[/dim]"
                 )
 
                 await ollama.close()
@@ -390,7 +390,7 @@ def test_provider(
 
 async def test_provider_async(provider: str) -> None:
     """Async function to test provider."""
-    from codingagent.providers.registry import ProviderRegistry, ProviderNotFoundError
+    from victor.providers.registry import ProviderRegistry, ProviderNotFoundError
 
     settings = load_settings()
 
@@ -417,7 +417,7 @@ async def test_provider_async(provider: str) -> None:
 
         # For Ollama, test connection
         if provider == "ollama":
-            from codingagent.providers.ollama import OllamaProvider
+            from victor.providers.ollama import OllamaProvider
 
             ollama = OllamaProvider(**provider_settings)
             try:

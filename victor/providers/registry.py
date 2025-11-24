@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional, Type
 
-from codingagent.providers.base import BaseProvider, ProviderNotFoundError
+from victor.providers.base import BaseProvider, ProviderNotFoundError
 
 
 class ProviderRegistry:
@@ -83,11 +83,11 @@ class ProviderRegistry:
 # Auto-register all providers
 def _register_default_providers() -> None:
     """Register all default providers."""
-    from codingagent.providers.ollama import OllamaProvider
-    from codingagent.providers.anthropic_provider import AnthropicProvider
-    from codingagent.providers.openai_provider import OpenAIProvider
-    from codingagent.providers.google_provider import GoogleProvider
-    from codingagent.providers.xai_provider import XAIProvider
+    from victor.providers.ollama import OllamaProvider
+    from victor.providers.anthropic_provider import AnthropicProvider
+    from victor.providers.openai_provider import OpenAIProvider
+    from victor.providers.google_provider import GoogleProvider
+    from victor.providers.xai_provider import XAIProvider
 
     ProviderRegistry.register("ollama", OllamaProvider)
     ProviderRegistry.register("anthropic", AnthropicProvider)

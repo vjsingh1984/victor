@@ -78,7 +78,7 @@ providers:
 #### Usage
 
 ```bash
-codingagent --profile default
+victor --profile default
 ```
 
 ---
@@ -127,7 +127,7 @@ providers:
 #### Usage
 
 ```bash
-codingagent --profile claude-sonnet "Write a REST API"
+victor --profile claude-sonnet "Write a REST API"
 ```
 
 ---
@@ -175,7 +175,7 @@ providers:
 #### Usage
 
 ```bash
-codingagent --profile gpt4 "Debug this code"
+victor --profile gpt4 "Debug this code"
 ```
 
 ---
@@ -221,7 +221,7 @@ providers:
 #### Usage
 
 ```bash
-codingagent --profile gemini "Analyze this architecture"
+victor --profile gemini "Analyze this architecture"
 ```
 
 ---
@@ -268,7 +268,7 @@ providers:
 #### Usage
 
 ```bash
-codingagent --profile grok "Explain quantum computing"
+victor --profile grok "Explain quantum computing"
 ```
 
 ---
@@ -326,10 +326,10 @@ profiles:
 
 ```bash
 # Development (free)
-codingagent --profile dev
+victor --profile dev
 
 # Production (when quality matters)
-codingagent --profile prod
+victor --profile prod
 ```
 
 ### Strategy 2: Task-Specific Providers
@@ -353,13 +353,13 @@ profiles:
 
 ```bash
 # Prototype with free local models
-codingagent --profile ollama "Draft initial implementation"
+victor --profile ollama "Draft initial implementation"
 
 # Refine with cheaper cloud model
-codingagent --profile gpt35 "Improve the code"
+victor --profile gpt35 "Improve the code"
 
 # Final review with best model
-codingagent --profile claude-sonnet "Review and polish"
+victor --profile claude-sonnet "Review and polish"
 ```
 
 ---
@@ -379,9 +379,9 @@ Future syntax:
 ### For Each Command
 
 ```bash
-codingagent --profile ollama "Task 1"
-codingagent --profile claude "Task 2"
-codingagent --profile gpt4 "Task 3"
+victor --profile ollama "Task 1"
+victor --profile claude "Task 2"
+victor --profile gpt4 "Task 3"
 ```
 
 ---
@@ -431,7 +431,7 @@ Error: Provider 'xyz' not found
 **Solution:**
 ```bash
 # List available providers
-python -c "from codingagent.providers.registry import ProviderRegistry; print(ProviderRegistry.list_providers())"
+python -c "from victor.providers.registry import ProviderRegistry; print(ProviderRegistry.list_providers())"
 
 # Output: ['ollama', 'anthropic', 'openai', 'google', 'xai', 'grok']
 ```
@@ -476,7 +476,7 @@ Error: Rate limit exceeded
 Want to add a provider? See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 Template:
-1. Create `codingagent/providers/your_provider.py`
+1. Create `victor/providers/your_provider.py`
 2. Extend `BaseProvider`
 3. Implement `chat()`, `stream()`, `supports_tools()`
 4. Register in `registry.py`
@@ -523,7 +523,7 @@ A: See [CONTRIBUTING.md](CONTRIBUTING.md) for the provider template.
 Ready to start? Pick a provider and run:
 
 ```bash
-codingagent --profile <profile-name>
+victor --profile <profile-name>
 ```
 
 Happy coding! 🚀
