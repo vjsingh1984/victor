@@ -1,7 +1,7 @@
 """Base tool framework for CodingAgent."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 class ToolParameter(BaseModel):
     """Tool parameter definition."""
 
+    name: str = Field(..., description="Parameter name")
     type: str = Field(..., description="Parameter type (string, number, boolean, etc.)")
     description: str = Field(..., description="Parameter description")
     enum: Optional[list[str]] = Field(None, description="Allowed values for enum types")
@@ -44,6 +45,43 @@ class BaseTool(ABC):
     def parameters(self) -> Dict[str, Any]:
         """JSON Schema for tool parameters."""
         pass
+
+    @staticmethod
+    def convert_parameters_to_schema(parameters: List[ToolParameter]) -> Dict[str, Any]:
+        """Convert list of ToolParameter objects to JSON Schema format.
+
+        Args:
+            parameters: List of ToolParameter objects
+
+        Returns:
+            JSON Schema dictionary
+        """
+        properties = {}
+        required = []
+
+        for param in parameters:
+            param_schema = {
+                "type": param.type,
+                "description": param.description,
+            }
+
+            if param.enum:
+                param_schema["enum"] = param.enum
+
+            properties[param.name] = param_schema
+
+            if param.required:
+                required.append(param.name)
+
+        schema = {
+            "type": "object",
+            "properties": properties,
+        }
+
+        if required:
+            schema["required"] = required
+
+        return schema
 
     @abstractmethod
     async def execute(self, **kwargs: Any) -> ToolResult:

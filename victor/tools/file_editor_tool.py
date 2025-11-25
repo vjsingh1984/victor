@@ -56,9 +56,10 @@ Example workflow:
 """
 
     @property
-    def parameters(self) -> List[ToolParameter]:
+    def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
-        return [
+        return self.convert_parameters_to_schema(
+        [
             ToolParameter(
                 name="operation",
                 type="string",
@@ -108,6 +109,7 @@ Example workflow:
                 required=False
             )
         ]
+        )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         """Execute file editor operation.
