@@ -14,11 +14,14 @@ Victor is a powerful terminal-based AI coding assistant that provides a **unifie
 
 - **Universal Provider Support**: Seamlessly switch between Anthropic Claude, OpenAI GPT, Google Gemini, and local models
 - **Cost-Effective Development**: Use free local models (Ollama) for development and testing
-- **Enterprise-Grade Tools**: 20+ production-ready tools for professional development workflows
+- **Enterprise-Grade Tools**: 25+ production-ready tools for professional development workflows
 - **Batch Processing**: Parallel multi-file operations with search, replace, and analysis
 - **Code Refactoring**: AST-based safe transformations (rename, extract, inline, organize)
 - **Test Generation**: Automated pytest-compatible test suite creation with fixtures
 - **CI/CD Automation**: Generate and validate GitHub Actions, GitLab CI, CircleCI pipelines
+- **Documentation Automation**: Auto-generate docstrings, API docs, README sections
+- **Dependency Management**: Package analysis, security auditing, requirements management
+- **Code Metrics**: Complexity analysis, maintainability index, technical debt tracking
 - **Code Quality**: Automated reviews with complexity analysis, best practices, security checks
 - **Security First**: Secret detection (12+ patterns), vulnerability scanning, dependency auditing
 - **Caching System**: Tiered caching (memory + disk) for cost savings and performance
@@ -167,6 +170,9 @@ Victor has access to a comprehensive suite of tools:
 - **Refactoring**: Safe code transformations (rename, extract function, inline variable, organize imports)
 - **Testing**: Automated test generation (pytest-compatible, fixtures, coverage analysis)
 - **CI/CD Integration**: Generate and validate pipelines (GitHub Actions, GitLab CI, CircleCI)
+- **Documentation**: Auto-generate docstrings, API docs, README sections with coverage analysis
+- **Dependency Management**: Package analysis, outdated detection, security auditing, requirements management
+- **Code Metrics**: Complexity analysis, maintainability index, technical debt estimation
 - **Caching System**: Tiered caching (memory + disk) for LLM responses and embeddings
 
 #### MCP Integration
@@ -361,7 +367,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 ### Completed ✅
 - [x] Core provider abstraction with unified interface
 - [x] Ollama, Anthropic, OpenAI, Google, xAI integration
-- [x] Comprehensive tool system (20+ tools)
+- [x] Comprehensive tool system (25+ tools)
 - [x] MCP protocol server and client
 - [x] Multi-file editing with transactions
 - [x] Advanced git integration with AI commits
@@ -376,6 +382,9 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 - [x] Code refactoring tool (AST-based transformations)
 - [x] Automated test generation (pytest-compatible)
 - [x] CI/CD pipeline generation and validation
+- [x] Documentation generation (docstrings, API docs, README)
+- [x] Dependency management (analysis, security, updates)
+- [x] Code metrics (complexity, maintainability, technical debt)
 - [x] Tiered caching system (memory + disk)
 
 ### In Progress 🚧
