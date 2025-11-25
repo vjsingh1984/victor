@@ -14,13 +14,18 @@ Victor is a powerful terminal-based AI coding assistant that provides a **unifie
 
 - **Universal Provider Support**: Seamlessly switch between Anthropic Claude, OpenAI GPT, Google Gemini, and local models
 - **Cost-Effective Development**: Use free local models (Ollama) for development and testing
-- **Enterprise-Grade Tools**: Code review, security scanning, project scaffolding for production workflows
+- **Enterprise-Grade Tools**: 20+ production-ready tools for professional development workflows
+- **Batch Processing**: Parallel multi-file operations with search, replace, and analysis
+- **Code Refactoring**: AST-based safe transformations (rename, extract, inline, organize)
+- **Test Generation**: Automated pytest-compatible test suite creation with fixtures
+- **CI/CD Automation**: Generate and validate GitHub Actions, GitLab CI, CircleCI pipelines
+- **Code Quality**: Automated reviews with complexity analysis, best practices, security checks
+- **Security First**: Secret detection (12+ patterns), vulnerability scanning, dependency auditing
+- **Caching System**: Tiered caching (memory + disk) for cost savings and performance
 - **MCP Protocol Support**: Full Model Context Protocol server and client implementation
-- **Advanced Tool Suite**: Database operations, Docker management, HTTP/API testing, Git integration, web search
 - **Semantic Search**: AI-powered codebase indexing with context-aware search
-- **Multi-File Editing**: Transaction-based atomic edits across multiple files with rollback support
-- **Security First**: Automated vulnerability detection, secret scanning, dependency auditing
-- **Code Quality**: Automated reviews with complexity analysis, best practices, and documentation coverage
+- **Multi-File Editing**: Transaction-based atomic edits across multiple files with rollback
+- **Advanced Tool Suite**: Database, Docker, HTTP/API, Git, web search, and more
 - **Rich Terminal UI**: Beautiful, interactive terminal experience with streaming responses
 - **Extensible Architecture**: Easy to add new providers, tools, and capabilities
 - **Type-Safe**: Built with Pydantic for robust type checking and validation
@@ -155,9 +160,14 @@ Victor has access to a comprehensive suite of tools:
 - **Semantic Search**: AI-powered codebase indexing and context-aware search
 
 #### Enterprise Tools
-- **Code Review**: Automated quality analysis, complexity metrics, security checks
-- **Security Scanner**: Secret detection, vulnerability scanning, dependency auditing
-- **Project Scaffolding**: Generate production-ready project templates (FastAPI, Flask, React, CLI)
+- **Code Review**: Automated quality analysis, complexity metrics, security checks, code smells
+- **Security Scanner**: Secret detection (12+ patterns), vulnerability scanning, dependency auditing
+- **Project Scaffolding**: Generate production-ready project templates (FastAPI, Flask, React, CLI, Microservice)
+- **Batch Processing**: Multi-file parallel operations (search, replace, analyze) with dry-run mode
+- **Refactoring**: Safe code transformations (rename, extract function, inline variable, organize imports)
+- **Testing**: Automated test generation (pytest-compatible, fixtures, coverage analysis)
+- **CI/CD Integration**: Generate and validate pipelines (GitHub Actions, GitLab CI, CircleCI)
+- **Caching System**: Tiered caching (memory + disk) for LLM responses and embeddings
 
 #### MCP Integration
 - **MCP Server**: Expose Victor's tools to Claude Desktop and other MCP clients
@@ -171,6 +181,53 @@ Switched to Anthropic Claude Sonnet 4.5
 
 > use ollama:llama3:8b
 Switched to Ollama (llama3:8b)
+```
+
+### Enterprise Workflow Examples
+
+#### Batch Processing
+```python
+> Search for all TODO comments across the codebase
+[Agent uses batch_process tool to search across all Python files]
+Found in 15 files (47 matches)
+
+> Replace all print statements with logger.info in preview mode
+[Agent shows preview of changes across files]
+
+> Apply the changes
+[Agent applies changes to all files]
+```
+
+#### Code Refactoring
+```python
+> Rename the function 'process' to 'process_user_data' across the project
+[Agent uses refactor tool with AST analysis]
+Renamed in 8 locations across 3 files
+
+> Organize imports in all Python files
+[Agent organizes imports following PEP 8]
+Organized imports in 12 files
+```
+
+#### Test Generation
+```python
+> Generate pytest tests for the ShoppingCart class
+[Agent analyzes code and generates comprehensive test suite]
+Generated test file: tests/test_cart.py
+  • test_add_item()
+  • test_remove_item()
+  • test_get_total()
+  • Edge cases and error handling
+```
+
+#### CI/CD Setup
+```python
+> Create GitHub Actions workflow for testing and deployment
+[Agent generates workflow files]
+Created workflows:
+  • .github/workflows/test.yml (Python 3.10, 3.11, 3.12 matrix)
+  • .github/workflows/release.yml (PyPI publishing)
+All configurations validated ✅
 ```
 
 ## Architecture
@@ -304,7 +361,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 ### Completed ✅
 - [x] Core provider abstraction with unified interface
 - [x] Ollama, Anthropic, OpenAI, Google, xAI integration
-- [x] Comprehensive tool system (15+ tools)
+- [x] Comprehensive tool system (20+ tools)
 - [x] MCP protocol server and client
 - [x] Multi-file editing with transactions
 - [x] Advanced git integration with AI commits
@@ -313,11 +370,18 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 - [x] Docker management tool
 - [x] HTTP/API testing tool
 - [x] Web search integration
+- [x] Enterprise code review and security scanning
+- [x] Project scaffolding with 5+ templates
+- [x] Batch processing for multi-file operations
+- [x] Code refactoring tool (AST-based transformations)
+- [x] Automated test generation (pytest-compatible)
+- [x] CI/CD pipeline generation and validation
+- [x] Tiered caching system (memory + disk)
 
 ### In Progress 🚧
-- [ ] Enhanced context caching and optimization
 - [ ] Comprehensive test coverage (target: 90%+)
 - [ ] Performance profiling and optimization
+- [ ] Additional provider integrations (Anthropic Bedrock, Azure OpenAI)
 
 ### Planned 📋
 - [ ] IDE Extensions (VS Code, JetBrains)
