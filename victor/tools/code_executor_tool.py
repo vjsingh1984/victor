@@ -20,11 +20,19 @@ import io
 import os
 import tarfile
 from pathlib import Path
-from typing import List
+from typing import List, Optional, TYPE_CHECKING
 
-import docker
-from docker.models.containers import Container
-from docker.errors import DockerException
+# Optional docker import
+try:
+    import docker
+    from docker.models.containers import Container
+    from docker.errors import DockerException
+    DOCKER_AVAILABLE = True
+except ImportError:
+    DOCKER_AVAILABLE = False
+    docker = None  # type: ignore
+    Container = None  # type: ignore
+    DockerException = Exception  # Fallback
 
 from victor.tools.decorators import tool
 
@@ -40,6 +48,14 @@ class CodeExecutionManager:
         self.working_dir = "/app"
         self.docker_available = False
         self.docker_client = None
+
+        if not DOCKER_AVAILABLE:
+            if require_docker:
+                raise RuntimeError(
+                    "Docker package not installed. Install with: pip install docker"
+                )
+            # Docker package not available - continue without it
+            return
 
         try:
             self.docker_client = docker.from_env()
@@ -83,8 +99,8 @@ class CodeExecutionManager:
         if self.container:
             try:
                 self.container.remove(force=True)
-            except docker.errors.NotFound:
-                pass  # Container already gone
+            except Exception:
+                pass  # Container already gone or other error
             self.container = None
 
     def execute(self, code: str, timeout: int = 60) -> dict:
