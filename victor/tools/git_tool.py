@@ -15,13 +15,10 @@
 """Git tool with AI-powered commit messages and smart operations.
 
 This tool provides:
-1. AI-generated commit messages based on diff analysis
-2. Intelligent staging of related files
+1. Unified git operations (status, diff, stage, commit, log, branch)
+2. AI-generated commit messages based on diff analysis
 3. PR creation and management
 4. Conflict detection and resolution help
-5. Git hooks integration
-
-Migrated to decorator pattern for better maintainability.
 """
 
 import subprocess
@@ -71,215 +68,190 @@ def _run_git(*args: str) -> Tuple[bool, str, str]:
 
 
 @tool
-async def git_status() -> Dict[str, Any]:
-    """Get repository status.
-
-    Shows both short and full git status to provide a complete
-    view of the current repository state.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - output: Status information (short and full)
-        - error: Error message if failed
+async def git(
+    operation: str,
+    files: Optional[List[str]] = None,
+    message: Optional[str] = None,
+    branch: Optional[str] = None,
+    staged: bool = False,
+    limit: int = 10,
+    options: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """
-    success, stdout, stderr = _run_git("status", "--short", "--branch")
+    Unified git operations tool.
 
-    if not success:
-        return {"success": False, "output": "", "error": stderr}
-
-    # Also get longer status for summary
-    _, long_status, _ = _run_git("status")
-
-    return {
-        "success": True,
-        "output": f"Short status:\n{stdout}\n\nFull status:\n{long_status}",
-        "error": ""
-    }
-
-
-@tool
-async def git_diff(staged: bool = False) -> Dict[str, Any]:
-    """Show changes in the repository.
-
-    Displays git diff output for either staged or unstaged changes.
+    Performs common git operations (status, diff, stage, commit, log, branch)
+    through a single unified interface. Consolidates basic git functionality.
 
     Args:
-        staged: If True, show staged changes; if False, show unstaged changes
+        operation: Git operation to perform. Options: "status", "diff", "stage",
+            "commit", "log", "branch".
+        files: List of file paths (for stage operation).
+        message: Commit message (for commit operation).
+        branch: Branch name (for branch operation).
+        staged: Show staged changes for diff (default: False).
+        limit: Number of commits for log (default: 10).
+        options: Additional operation-specific options.
 
     Returns:
         Dictionary containing:
         - success: Whether operation succeeded
-        - output: Diff output
+        - output: Operation result
         - error: Error message if failed
+
+    Examples:
+        # Show repository status
+        git(operation="status")
+
+        # Show unstaged changes
+        git(operation="diff")
+
+        # Show staged changes
+        git(operation="diff", staged=True)
+
+        # Stage specific files
+        git(operation="stage", files=["src/main.py", "tests/test.py"])
+
+        # Stage all changes
+        git(operation="stage")
+
+        # Commit with message
+        git(operation="commit", message="Fix authentication bug")
+
+        # Show commit history
+        git(operation="log", limit=20)
+
+        # List branches
+        git(operation="branch")
+
+        # Create/switch to branch
+        git(operation="branch", branch="feature/new-feature")
     """
-    args = ["diff"]
-    if staged:
-        args.append("--staged")
+    if not operation:
+        return {"success": False, "error": "Missing required parameter: operation"}
 
-    success, stdout, stderr = _run_git(*args)
+    if options is None:
+        options = {}
 
-    if not success:
-        return {"success": False, "output": "", "error": stderr}
+    # Status operation
+    if operation == "status":
+        success, stdout, stderr = _run_git("status", "--short", "--branch")
 
-    if not stdout:
+        if not success:
+            return {"success": False, "output": "", "error": stderr}
+
+        # Also get longer status for summary
+        _, long_status, _ = _run_git("status")
+
         return {
             "success": True,
-            "output": "No changes to show" if not staged else "No staged changes",
+            "output": f"Short status:\n{stdout}\n\nFull status:\n{long_status}",
             "error": ""
         }
 
-    return {"success": True, "output": stdout, "error": ""}
+    # Diff operation
+    elif operation == "diff":
+        args = ["diff"]
+        if staged:
+            args.append("--staged")
 
+        if files:
+            args.extend(["--"] + files)
 
-@tool
-async def git_stage(files: Optional[List[str]] = None) -> Dict[str, Any]:
-    """Stage files for commit.
+        success, stdout, stderr = _run_git(*args)
 
-    If no files are specified, stages all changes. Otherwise, stages
-    only the specified files.
+        if not success:
+            return {"success": False, "output": "", "error": stderr}
 
-    Args:
-        files: List of file paths to stage. If None or empty, stages all changes.
+        if not stdout:
+            return {
+                "success": True,
+                "output": "No changes to show" if not staged else "No staged changes",
+                "error": ""
+            }
 
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - output: Status after staging
-        - error: Error message if failed
-    """
-    if not files:
-        # Stage all changes
-        success, stdout, stderr = _run_git("add", ".")
-    else:
-        # Stage specific files
-        success, stdout, stderr = _run_git("add", *files)
+        return {"success": True, "output": stdout, "error": ""}
 
-    if not success:
-        return {"success": False, "output": "", "error": stderr}
-
-    # Get updated status
-    _, status, _ = _run_git("status", "--short")
-
-    return {
-        "success": True,
-        "output": f"Files staged successfully\n\nStatus:\n{status}",
-        "error": ""
-    }
-
-
-@tool
-async def git_commit(message: Optional[str] = None, generate_ai: Optional[bool] = None) -> Dict[str, Any]:
-    """Commit staged changes.
-
-    Creates a commit with the provided message. If no message is provided
-    and AI is available, generates one automatically from the staged diff.
-
-    Args:
-        message: Commit message. If None, will attempt AI generation
-        generate_ai: Force AI generation. Defaults to True if provider available
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - output: Commit result
-        - error: Error message if failed
-    """
-    if generate_ai is None:
-        generate_ai = _provider is not None
-
-    # If no message and AI available, generate one
-    if not message and generate_ai and _provider:
-        suggest_result = await git_suggest_commit()
-        if suggest_result["success"]:
-            message = suggest_result["output"]
+    # Stage operation
+    elif operation == "stage":
+        if not files:
+            # Stage all changes
+            success, stdout, stderr = _run_git("add", ".")
         else:
+            # Stage specific files
+            success, stdout, stderr = _run_git("add", *files)
+
+        if not success:
+            return {"success": False, "output": "", "error": stderr}
+
+        # Get updated status
+        _, status, _ = _run_git("status", "--short")
+
+        return {
+            "success": True,
+            "output": f"Files staged successfully\n\nStatus:\n{status}",
+            "error": ""
+        }
+
+    # Commit operation
+    elif operation == "commit":
+        if not message:
             return {
                 "success": False,
                 "output": "",
-                "error": "No commit message provided and AI generation failed"
+                "error": "Commit message required. Use message parameter."
             }
 
-    if not message:
+        # Commit with message
+        success, stdout, stderr = _run_git("commit", "-m", message)
+
+        if not success:
+            return {"success": False, "output": "", "error": stderr}
+
         return {
-            "success": False,
-            "output": "",
-            "error": "No commit message provided"
+            "success": True,
+            "output": f"Committed successfully:\n{stdout}",
+            "error": ""
         }
 
-    # Commit with message
-    success, stdout, stderr = _run_git("commit", "-m", message)
+    # Log operation
+    elif operation == "log":
+        success, stdout, stderr = _run_git(
+            "log",
+            f"-{limit}",
+            "--pretty=format:%h - %s (%an, %ar)",
+            "--graph"
+        )
 
-    if not success:
-        return {"success": False, "output": "", "error": stderr}
+        if not success:
+            return {"success": False, "output": "", "error": stderr}
 
-    return {
-        "success": True,
-        "output": f"Committed successfully:\n{stdout}",
-        "error": ""
-    }
+        return {"success": True, "output": stdout, "error": ""}
 
+    # Branch operation
+    elif operation == "branch":
+        if not branch:
+            # List branches
+            success, stdout, stderr = _run_git("branch", "-a")
+        else:
+            # Create or switch to branch
+            # Try to switch first
+            success, stdout, stderr = _run_git("checkout", branch)
 
-@tool
-async def git_log(limit: int = 10) -> Dict[str, Any]:
-    """Show commit history.
+            if not success and "did not match" in stderr:
+                # Branch doesn't exist, create it
+                success, stdout, stderr = _run_git("checkout", "-b", branch)
 
-    Displays the commit log with graph visualization and formatted output.
+        if not success:
+            return {"success": False, "output": "", "error": stderr}
 
-    Args:
-        limit: Number of commits to show (default: 10)
+        return {"success": True, "output": stdout, "error": ""}
 
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - output: Formatted commit log
-        - error: Error message if failed
-    """
-    success, stdout, stderr = _run_git(
-        "log",
-        f"-{limit}",
-        "--pretty=format:%h - %s (%an, %ar)",
-        "--graph"
-    )
-
-    if not success:
-        return {"success": False, "output": "", "error": stderr}
-
-    return {"success": True, "output": stdout, "error": ""}
-
-
-@tool
-async def git_branch(branch: Optional[str] = None) -> Dict[str, Any]:
-    """List, create, or switch branches.
-
-    If no branch name is provided, lists all branches. If a branch name
-    is provided, switches to it (or creates it if it doesn't exist).
-
-    Args:
-        branch: Branch name to switch to/create. If None, lists branches.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - output: Branch information or operation result
-        - error: Error message if failed
-    """
-    if not branch:
-        # List branches
-        success, stdout, stderr = _run_git("branch", "-a")
     else:
-        # Create or switch to branch
-        # Try to switch first
-        success, stdout, stderr = _run_git("checkout", branch)
-
-        if not success and "did not match" in stderr:
-            # Branch doesn't exist, create it
-            success, stdout, stderr = _run_git("checkout", "-b", branch)
-
-    if not success:
-        return {"success": False, "output": "", "error": stderr}
-
-    return {"success": True, "output": stdout, "error": ""}
+        return {
+            "success": False,
+            "error": f"Unknown operation: {operation}. Valid operations: status, diff, stage, commit, log, branch"
+        }
 
 
 @tool
@@ -553,7 +525,7 @@ async def git_analyze_conflicts() -> Dict[str, Any]:
     analysis = [f"Found {len(conflicted)} conflicted file(s):\n"]
 
     for file in conflicted:
-        analysis.append(f"\n📄 {file}:")
+        analysis.append(f"\n{file}:")
 
         # Read file to show conflict markers
         try:
@@ -578,7 +550,7 @@ async def git_analyze_conflicts() -> Dict[str, Any]:
 
     # If AI available, get resolution suggestions
     if _provider:
-        analysis.append("\n\n💡 AI-generated resolution suggestions:")
+        analysis.append("\n\nAI-generated resolution suggestions:")
         analysis.append("   (Using LLM to analyze conflicts...)")
         # TODO: Implement AI conflict resolution suggestions
 
@@ -597,17 +569,17 @@ async def git_analyze_conflicts() -> Dict[str, Any]:
 
 # Keep class for backward compatibility
 class GitTool:
-    """Deprecated: Use individual git_* functions instead.
+    """Deprecated: Use git and git_* functions instead.
 
     This class is kept for backward compatibility but will be removed
-    in a future version. Use the decorator-based git_* functions instead.
+    in a future version. Use the decorator-based git and git_* functions instead.
     """
 
     def __init__(self, provider=None, model: Optional[str] = None):
         """Initialize - deprecated."""
         import warnings
         warnings.warn(
-            "GitTool class is deprecated. Use git_* functions instead.",
+            "GitTool class is deprecated. Use git and git_* functions instead.",
             DeprecationWarning,
             stacklevel=2
         )

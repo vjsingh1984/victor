@@ -41,12 +41,7 @@ from victor.tools.code_executor_tool import (
 from victor.tools.filesystem import list_directory, read_file, write_file
 from victor.tools.file_editor_tool import edit_files
 from victor.tools.git_tool import (
-    git_status,
-    git_diff,
-    git_stage,
-    git_commit,
-    git_log,
-    git_branch,
+    git,
     git_suggest_commit,
     git_create_pr,
     git_analyze_conflicts,
@@ -183,12 +178,9 @@ class AgentOrchestrator:
 
         # Set git provider and register git tools
         set_git_provider(self.provider, self.model)
-        self.tools.register(git_status)
-        self.tools.register(git_diff)
-        self.tools.register(git_stage)
-        self.tools.register(git_commit)
-        self.tools.register(git_log)
-        self.tools.register(git_branch)
+        # Register git tool (consolidated)
+        self.tools.register(git)
+        # Register AI-powered git tools (keep separate)
         self.tools.register(git_suggest_commit)
         self.tools.register(git_create_pr)
         self.tools.register(git_analyze_conflicts)
@@ -310,7 +302,7 @@ class AgentOrchestrator:
 
         # Categorize tools by use case
         tool_categories = {
-            "git": ["git_status", "git_diff", "git_stage", "git_commit", "git_log", "git_branch"],
+            "git": ["git", "git_suggest_commit", "git_create_pr"],
             "testing": ["testing_generate", "testing_run", "testing_coverage"],
             "refactor": ["refactor_extract_function", "refactor_inline_variable", "refactor_organize_imports"],
             "security": ["security_scan"],
