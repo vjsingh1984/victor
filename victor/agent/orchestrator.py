@@ -314,7 +314,32 @@ class AgentOrchestrator:
             self.tools.register(web_search)
             self.tools.register(web_fetch)
             self.tools.register(web_summarize)
-        
+
+
+    def _should_use_tools(self) -> bool:
+        """Determine if tools should be sent to the provider based on model capability.
+
+        Small models (<7B parameters) can be overwhelmed by large tool payloads.
+        Disable tools for these models to prevent hanging.
+
+        Returns:
+            True if tools should be used, False otherwise
+        """
+        # Check if it's an Ollama model
+        if self.provider.name == "ollama":
+            # Extract parameter size from model name (e.g., "qwen2.5-coder:1.5b" -> 1.5)
+            model_lower = self.model.lower()
+
+            # Common small model patterns
+            small_model_indicators = [":0.5b", ":1.5b", ":3b"]
+            for indicator in small_model_indicators:
+                if indicator in model_lower:
+                    return False
+
+            # Models 7B and above can handle tools
+            # If no size indicator found, assume it can handle tools
+
+        return True
 
     def add_message(self, role: str, content: str) -> None:
         """Add a message to conversation history.
@@ -338,8 +363,9 @@ class AgentOrchestrator:
         self.add_message("user", user_message)
 
         # Get tool definitions if provider supports them
+        # For small Ollama models (<7B parameters), disable tools to prevent hanging
         tools = None
-        if self.provider.supports_tools():
+        if self.provider.supports_tools() and self._should_use_tools():
             tools = [
                 ToolDefinition(
                     name=tool.name,
@@ -380,8 +406,9 @@ class AgentOrchestrator:
         self.add_message("user", user_message)
 
         # Get tool definitions
+        # For small Ollama models (<7B parameters), disable tools to prevent hanging
         tools = None
-        if self.provider.supports_tools():
+        if self.provider.supports_tools() and self._should_use_tools():
             tools = [
                 ToolDefinition(
                     name=tool.name,
