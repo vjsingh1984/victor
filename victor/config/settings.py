@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     # Privacy and Security
     airgapped_mode: bool = False
 
+    # Tool Selection Strategy
+    use_semantic_tool_selection: bool = False  # Use embeddings instead of keywords
+
     # UI
     theme: str = "monokai"
     show_token_count: bool = True

@@ -140,6 +140,7 @@ from victor.tools.testing_tool import run_tests
 from victor.tools.web_search_tool import web_search, web_fetch, web_summarize, set_web_search_provider
 from victor.tools.workflow_tool import run_workflow
 from victor.tools.code_intelligence_tool import find_symbol, find_references, rename_symbol
+from victor.tools.semantic_selector import SemanticToolSelector
 from victor.workflows.base import WorkflowRegistry
 from victor.workflows.new_feature_workflow import NewFeatureWorkflow
 
@@ -188,6 +189,21 @@ class AgentOrchestrator:
         self.tools = ToolRegistry()
         self._register_default_tools()
         self.tools.register_before_hook(self._log_tool_call)
+
+        # Semantic tool selector (optional, configured via settings)
+        self.use_semantic_selection = getattr(settings, 'use_semantic_tool_selection', False)
+        self.semantic_selector: Optional[SemanticToolSelector] = None
+
+        if self.use_semantic_selection:
+            ollama_base_url = getattr(settings, 'ollama_base_url', 'http://localhost:11434')
+            self.semantic_selector = SemanticToolSelector(
+                embedding_model="nomic-embed-text",
+                embedding_provider="ollama",
+                ollama_base_url=ollama_base_url,
+                cache_embeddings=True,
+            )
+            # Initialize embeddings asynchronously (will be done in first call)
+            self._embeddings_initialized = False
 
     def shutdown(self):
         """Gracefully shut down stateful managers."""
@@ -323,7 +339,45 @@ class AgentOrchestrator:
         """Always return True - tool selection is handled by _select_relevant_tools()."""
         return True
 
-    def _select_relevant_tools(self, user_message: str) -> List[ToolDefinition]:
+    async def _select_relevant_tools_semantic(self, user_message: str) -> List[ToolDefinition]:
+        """Select tools using embedding-based semantic similarity.
+
+        Args:
+            user_message: The user's input message
+
+        Returns:
+            List of relevant ToolDefinition objects based on semantic similarity
+        """
+        if not self.semantic_selector:
+            # Fallback to keyword-based if semantic not initialized
+            return self._select_relevant_tools_keywords(user_message)
+
+        # Initialize embeddings on first call
+        if not self._embeddings_initialized:
+            logger.info("Initializing tool embeddings (one-time operation)...")
+            await self.semantic_selector.initialize_tool_embeddings(self.tools)
+            self._embeddings_initialized = True
+
+        # Determine max tools based on model size
+        is_small_model = False
+        if self.provider.name == "ollama":
+            model_lower = self.model.lower()
+            small_model_indicators = [":0.5b", ":1.5b", ":3b"]
+            is_small_model = any(indicator in model_lower for indicator in small_model_indicators)
+
+        max_tools = 10 if is_small_model else 20
+
+        # Select tools semantically
+        tools = await self.semantic_selector.select_relevant_tools(
+            user_message=user_message,
+            tools=self.tools,
+            max_tools=max_tools,
+            similarity_threshold=0.3,
+        )
+
+        return tools
+
+    def _select_relevant_tools_keywords(self, user_message: str) -> List[ToolDefinition]:
         """Intelligently select relevant tools based on the user's message.
 
         For small models (<7B), limit to essential tools to prevent overwhelming.
@@ -441,7 +495,10 @@ class AgentOrchestrator:
         # Intelligently select relevant tools based on the user's message
         tools = None
         if self.provider.supports_tools():
-            tools = self._select_relevant_tools(user_message)
+            if self.use_semantic_selection:
+                tools = await self._select_relevant_tools_semantic(user_message)
+            else:
+                tools = self._select_relevant_tools_keywords(user_message)
 
         # Get response from provider
         response = await self.provider.chat(
@@ -477,7 +534,10 @@ class AgentOrchestrator:
         # Intelligently select relevant tools based on the user's message
         tools = None
         if self.provider.supports_tools():
-            tools = self._select_relevant_tools(user_message)
+            if self.use_semantic_selection:
+                tools = await self._select_relevant_tools_semantic(user_message)
+            else:
+                tools = self._select_relevant_tools_keywords(user_message)
 
         # Stream response
         full_content = ""
