@@ -116,14 +116,7 @@ from victor.tools.documentation_tool import (
     docs_add_type_hints,
     docs_analyze_coverage,
 )
-from victor.tools.code_review_tool import (
-    code_review_file,
-    code_review_directory,
-    code_review_security,
-    code_review_complexity,
-    code_review_best_practices,
-    set_code_review_config,
-)
+from victor.tools.code_review_tool import code_review, set_code_review_config
 from victor.tools.refactor_tool import (
     refactor_extract_function,
     refactor_inline_variable,
@@ -304,11 +297,8 @@ class AgentOrchestrator:
 
         # Register code review tools
         set_code_review_config(max_complexity=10)
-        self.tools.register(code_review_file)
-        self.tools.register(code_review_directory)
-        self.tools.register(code_review_security)
-        self.tools.register(code_review_complexity)
-        self.tools.register(code_review_best_practices)
+        # Register code review tool (consolidated)
+        self.tools.register(code_review)
 
         # Register refactor tools
         # Note: rename_symbol is in code_intelligence_tool, not here (avoid duplicate)
@@ -395,7 +385,7 @@ class AgentOrchestrator:
             "refactor": ["refactor_extract_function", "refactor_inline_variable", "refactor_organize_imports"],
             "security": ["security_scan"],
             "docs": ["docs_generate_docstrings", "docs_generate_api", "docs_generate_readme"],
-            "review": ["code_review_file", "code_review_directory", "code_review_security"],
+            "review": ["code_review"],
             "web": ["web_search", "web_fetch", "web_summarize"],
             "docker": ["docker_ps", "docker_images", "docker_logs"],
             "metrics": ["metrics_complexity", "metrics_maintainability", "metrics_analyze"],

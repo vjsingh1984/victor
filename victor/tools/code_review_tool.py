@@ -443,334 +443,238 @@ def _build_best_practices_report(path: Path, issues: List[Dict[str, Any]]) -> st
     return "\n".join(report)
 
 
-# Tool functions
+# Consolidated Tool Function
 
 @tool
-async def code_review_file(
+async def code_review(
     path: str,
-    include_metrics: bool = False,
-) -> Dict[str, Any]:
-    """
-    Review a single file.
-
-    Performs comprehensive code review including security checks,
-    code smells, complexity analysis, and documentation coverage.
-
-    Args:
-        path: File path to review.
-        include_metrics: Include detailed metrics (default: False).
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - issues_count: Number of issues found
-        - issues: List of all issues with details
-        - formatted_report: Human-readable review report
-        - error: Error message if failed
-    """
-    if not path:
-        return {"success": False, "error": "Missing required parameter: path"}
-
-    file_path = Path(path)
-    if not file_path.exists():
-        return {"success": False, "error": f"File not found: {path}"}
-
-    if not file_path.is_file():
-        return {"success": False, "error": f"Path is not a file: {path}"}
-
-    # Read file content
-    try:
-        content = file_path.read_text()
-    except Exception as e:
-        return {"success": False, "error": f"Failed to read file: {e}"}
-
-    # Perform review
-    issues = []
-
-    # Security issues
-    security_issues = _check_security(content, file_path)
-    issues.extend(security_issues)
-
-    # Code smells
-    smells = _check_code_smells(content, file_path)
-    issues.extend(smells)
-
-    # Complexity (for Python files)
-    if file_path.suffix == ".py":
-        complexity_issues = _check_complexity(content, file_path)
-        issues.extend(complexity_issues)
-
-        # Documentation
-        doc_issues = _check_documentation(content, file_path)
-        issues.extend(doc_issues)
-
-    # Build report
-    report = _build_report(file_path, issues, include_metrics, content)
-
-    return {
-        "success": True,
-        "issues_count": len(issues),
-        "issues": issues,
-        "formatted_report": report
-    }
-
-
-@tool
-async def code_review_directory(
-    path: str,
+    aspects: List[str] = None,
     file_pattern: str = "*.py",
+    severity: str = "low",
     include_metrics: bool = False,
+    max_issues: int = 50
 ) -> Dict[str, Any]:
     """
-    Review all files in directory.
+    Comprehensive code review for automated quality analysis.
 
-    Scans all matching files in the directory and provides
-    a comprehensive summary of all issues found.
+    Performs code review including security checks, complexity analysis,
+    best practices validation, and documentation coverage. Consolidates
+    multiple review aspects into a single unified interface.
 
     Args:
-        path: Directory path to review.
-        file_pattern: File pattern for matching (default: *.py).
-        include_metrics: Include detailed metrics (default: False).
+        path: File or directory path to review.
+        aspects: List of review aspects to check. Options: "security", "complexity",
+            "best_practices", "documentation", "all". Defaults to ["all"].
+        file_pattern: Glob pattern for files to review (default: *.py).
+        severity: Minimum severity to report for security issues: "low", "medium",
+            "high", "critical". Defaults to "low" (report all).
+        include_metrics: Include detailed metrics in report (default: False).
+        max_issues: Maximum number of issues to return (default: 50).
 
     Returns:
         Dictionary containing:
         - success: Whether operation succeeded
-        - files_reviewed: Number of files reviewed
+        - aspects_checked: List of aspects that were checked
+        - results: Dictionary with results for each aspect
         - total_issues: Total number of issues found
-        - issues: List of all issues with details
-        - formatted_report: Human-readable summary report
+        - files_reviewed: Number of files reviewed
+        - issues_by_severity: Count of issues grouped by severity
+        - formatted_report: Human-readable comprehensive review report
         - error: Error message if failed
+
+    Examples:
+        # Review for security only
+        code_review("./src", aspects=["security"])
+
+        # Comprehensive review
+        code_review("./", aspects=["all"])
+
+        # Complexity and best practices
+        code_review("./src", aspects=["complexity", "best_practices"])
+
+        # Security with high severity only
+        code_review("./src", aspects=["security"], severity="high")
     """
     if not path:
         return {"success": False, "error": "Missing required parameter: path"}
 
-    dir_path = Path(path)
-    if not dir_path.exists():
-        return {"success": False, "error": f"Directory not found: {path}"}
+    if aspects is None:
+        aspects = ["all"]
 
-    # Find all matching files
-    files = list(dir_path.rglob(file_pattern))
+    # Expand "all" to all aspects
+    if "all" in aspects:
+        aspects = ["security", "complexity", "best_practices", "documentation"]
 
-    if not files:
+    path_obj = Path(path)
+    if not path_obj.exists():
+        return {"success": False, "error": f"Path not found: {path}"}
+
+    # Collect files to review
+    files_to_review = []
+    if path_obj.is_file():
+        files_to_review = [path_obj]
+    else:
+        files_to_review = list(path_obj.rglob(file_pattern))
+
+    if not files_to_review:
         return {
             "success": True,
             "files_reviewed": 0,
             "total_issues": 0,
-            "issues": [],
-            "message": f"No files matching pattern '{file_pattern}' found in {path}"
+            "message": f"No files found matching pattern '{file_pattern}'"
         }
 
-    # Review each file
+    # Initialize results
+    results = {aspect: {"issues": [], "count": 0} for aspect in aspects}
     all_issues = []
-    file_count = 0
+    files_reviewed = 0
 
-    for file_path in files:
-        if file_path.is_file():
-            try:
-                content = file_path.read_text()
-                file_issues = []
+    # Review each file
+    for file_path in files_to_review:
+        if not file_path.is_file():
+            continue
 
-                # Security
-                file_issues.extend(_check_security(content, file_path))
+        try:
+            content = file_path.read_text()
+            files_reviewed += 1
 
-                # Code smells
-                file_issues.extend(_check_code_smells(content, file_path))
+            # Security review
+            if "security" in aspects:
+                security_issues = _check_security(content, file_path)
+                results["security"]["issues"].extend(security_issues)
+                all_issues.extend(security_issues)
 
-                # Python-specific
-                if file_path.suffix == ".py":
-                    file_issues.extend(_check_complexity(content, file_path))
-                    file_issues.extend(_check_documentation(content, file_path))
+            # Complexity analysis (Python only)
+            if "complexity" in aspects and file_path.suffix == ".py":
+                complexity_issues = _check_complexity(content, file_path)
+                results["complexity"]["issues"].extend(complexity_issues)
+                all_issues.extend(complexity_issues)
 
-                all_issues.extend(file_issues)
-                file_count += 1
+            # Best practices
+            if "best_practices" in aspects:
+                smell_issues = _check_code_smells(content, file_path)
+                results["best_practices"]["issues"].extend(smell_issues)
+                all_issues.extend(smell_issues)
 
-            except Exception as e:
-                logger.warning("Failed to review %s: %s", file_path, e)
+            # Documentation (Python only)
+            if "documentation" in aspects and file_path.suffix == ".py":
+                doc_issues = _check_documentation(content, file_path)
+                results["documentation"]["issues"].extend(doc_issues)
+                all_issues.extend(doc_issues)
 
-    # Build summary report
-    report = _build_summary_report(dir_path, file_count, all_issues, include_metrics)
+        except Exception as e:
+            logger.warning("Failed to review %s: %s", file_path, e)
 
-    return {
-        "success": True,
-        "files_reviewed": file_count,
-        "total_issues": len(all_issues),
-        "issues": all_issues,
-        "formatted_report": report
-    }
+    # Update result counts
+    for aspect in aspects:
+        results[aspect]["count"] = len(results[aspect]["issues"])
 
-
-@tool
-async def code_review_security(
-    path: str,
-    severity: str = "low",
-) -> Dict[str, Any]:
-    """
-    Perform security-focused scan.
-
-    Scans for security vulnerabilities including hardcoded secrets,
-    SQL injection risks, command injection, and weak crypto.
-
-    Args:
-        path: File or directory path to scan.
-        severity: Minimum severity to report (low, medium, high, critical)
-                 (default: low).
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - security_issues: Number of security issues found
-        - issues: List of security issues with details
-        - formatted_report: Human-readable security report
-        - error: Error message if failed
-    """
-    if not path:
-        return {"success": False, "error": "Missing required parameter: path"}
-
-    path_obj = Path(path)
-    if not path_obj.exists():
-        return {"success": False, "error": f"Path not found: {path}"}
-
-    # Collect all security issues
-    security_issues = []
-
-    if path_obj.is_file():
-        content = path_obj.read_text()
-        security_issues = _check_security(content, path_obj)
-    else:
-        # Scan directory
-        for file_path in path_obj.rglob("*.py"):
-            if file_path.is_file():
-                try:
-                    content = file_path.read_text()
-                    issues = _check_security(content, file_path)
-                    security_issues.extend(issues)
-                except Exception as e:
-                    logger.warning("Failed to scan %s: %s", file_path, e)
-
-    # Filter by severity
+    # Filter by severity (for security issues)
     severity_levels = {"low": 0, "medium": 1, "high": 2, "critical": 3}
     min_severity = severity_levels.get(severity, 0)
 
-    filtered_issues = [
-        issue
-        for issue in security_issues
-        if severity_levels.get(issue.get("severity", "low"), 0) >= min_severity
-    ]
+    filtered_issues = []
+    for issue in all_issues:
+        issue_severity = severity_levels.get(issue.get("severity", "low"), 0)
+        if issue_severity >= min_severity:
+            filtered_issues.append(issue)
 
-    # Build security report
-    report = _build_security_report(path_obj, filtered_issues)
+    # Limit results
+    if len(filtered_issues) > max_issues:
+        filtered_issues = filtered_issues[:max_issues]
+
+    # Count issues by severity
+    issues_by_severity = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+    for issue in filtered_issues:
+        sev = issue.get("severity", "low")
+        issues_by_severity[sev] = issues_by_severity.get(sev, 0) + 1
+
+    # Build comprehensive report
+    report = []
+    report.append("Code Review Report")
+    report.append("=" * 70)
+    report.append("")
+    report.append(f"Path: {path}")
+    report.append(f"Files reviewed: {files_reviewed}")
+    report.append(f"Aspects checked: {', '.join(aspects)}")
+    report.append("")
+    report.append(f"Total issues: {len(filtered_issues)}")
+    report.append(f"  Critical: {issues_by_severity['critical']}")
+    report.append(f"  High: {issues_by_severity['high']}")
+    report.append(f"  Medium: {issues_by_severity['medium']}")
+    report.append(f"  Low: {issues_by_severity['low']}")
+    report.append("")
+
+    # Security section
+    if "security" in aspects:
+        sec_count = results["security"]["count"]
+        sec_filtered = [i for i in results["security"]["issues"]
+                       if severity_levels.get(i.get("severity", "low"), 0) >= min_severity]
+        report.append("Security Issues:")
+        report.append(f"  Found: {len(sec_filtered)}")
+        if sec_filtered:
+            for issue in sec_filtered[:5]:
+                report.append(f"    {issue.get('severity', 'low').upper()}: {issue.get('file', '')} "
+                            f"(line {issue.get('line', '?')})")
+                report.append(f"      {issue.get('message', '')}")
+            if len(sec_filtered) > 5:
+                report.append(f"    ... and {len(sec_filtered) - 5} more")
+        report.append("")
+
+    # Complexity section
+    if "complexity" in aspects:
+        comp_count = results["complexity"]["count"]
+        report.append("Complexity Issues:")
+        report.append(f"  High complexity functions: {comp_count}")
+        if results["complexity"]["issues"]:
+            for issue in results["complexity"]["issues"][:5]:
+                report.append(f"    {issue.get('file', '')} - {issue.get('function', '')} "
+                            f"(complexity: {issue.get('complexity', '?')})")
+            if comp_count > 5:
+                report.append(f"    ... and {comp_count - 5} more")
+        report.append("")
+
+    # Best practices section
+    if "best_practices" in aspects:
+        bp_count = results["best_practices"]["count"]
+        report.append("Best Practice Issues:")
+        report.append(f"  Found: {bp_count}")
+        if results["best_practices"]["issues"]:
+            for issue in results["best_practices"]["issues"][:5]:
+                report.append(f"    {issue.get('file', '')} (line {issue.get('line', '?')})")
+                report.append(f"      {issue.get('message', '')}")
+            if bp_count > 5:
+                report.append(f"    ... and {bp_count - 5} more")
+        report.append("")
+
+    # Documentation section
+    if "documentation" in aspects:
+        doc_count = results["documentation"]["count"]
+        report.append("Documentation Issues:")
+        report.append(f"  Found: {doc_count}")
+        if results["documentation"]["issues"]:
+            for issue in results["documentation"]["issues"][:5]:
+                report.append(f"    {issue.get('file', '')} - {issue.get('function', '')}")
+                report.append(f"      {issue.get('message', '')}")
+            if doc_count > 5:
+                report.append(f"    ... and {doc_count - 5} more")
+        report.append("")
+
+    # Summary
+    if len(filtered_issues) == 0:
+        report.append("No issues found. Code looks good!")
+    else:
+        report.append(f"Review complete. {len(filtered_issues)} issues require attention.")
 
     return {
         "success": True,
-        "security_issues": len(filtered_issues),
+        "aspects_checked": aspects,
+        "results": results,
+        "total_issues": len(filtered_issues),
+        "files_reviewed": files_reviewed,
+        "issues_by_severity": issues_by_severity,
         "issues": filtered_issues,
-        "formatted_report": report
-    }
-
-
-@tool
-async def code_review_complexity(path: str) -> Dict[str, Any]:
-    """
-    Analyze code complexity.
-
-    Calculates cyclomatic complexity for all functions and identifies
-    functions that exceed the complexity threshold.
-
-    Args:
-        path: File or directory path to analyze.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - high_complexity_count: Number of high complexity functions
-        - complexity_data: List of complexity issues with details
-        - formatted_report: Human-readable complexity report
-        - error: Error message if failed
-    """
-    if not path:
-        return {"success": False, "error": "Missing required parameter: path"}
-
-    path_obj = Path(path)
-    if not path_obj.exists():
-        return {"success": False, "error": f"Path not found: {path}"}
-
-    complexity_data = []
-
-    if path_obj.is_file() and path_obj.suffix == ".py":
-        content = path_obj.read_text()
-        issues = _check_complexity(content, path_obj)
-        complexity_data.extend(issues)
-    else:
-        for file_path in path_obj.rglob("*.py"):
-            if file_path.is_file():
-                try:
-                    content = file_path.read_text()
-                    issues = _check_complexity(content, file_path)
-                    complexity_data.extend(issues)
-                except Exception as e:
-                    logger.warning("Failed to analyze %s: %s", file_path, e)
-
-    # Build complexity report
-    report = _build_complexity_report(path_obj, complexity_data)
-
-    return {
-        "success": True,
-        "high_complexity_count": len(complexity_data),
-        "complexity_data": complexity_data,
-        "formatted_report": report
-    }
-
-
-@tool
-async def code_review_best_practices(path: str) -> Dict[str, Any]:
-    """
-    Check coding best practices.
-
-    Checks for common code smells including print debugging,
-    long lines, commented code, and bare except clauses.
-
-    Args:
-        path: File or directory path to check.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - issues_count: Number of best practice issues found
-        - issues: List of issues with details
-        - formatted_report: Human-readable best practices report
-        - error: Error message if failed
-    """
-    if not path:
-        return {"success": False, "error": "Missing required parameter: path"}
-
-    path_obj = Path(path)
-    if not path_obj.exists():
-        return {"success": False, "error": f"Path not found: {path}"}
-
-    best_practice_issues = []
-
-    if path_obj.is_file():
-        content = path_obj.read_text()
-        issues = _check_code_smells(content, path_obj)
-        best_practice_issues.extend(issues)
-    else:
-        for file_path in path_obj.rglob("*.py"):
-            if file_path.is_file():
-                try:
-                    content = file_path.read_text()
-                    issues = _check_code_smells(content, file_path)
-                    best_practice_issues.extend(issues)
-                except Exception as e:
-                    logger.warning("Failed to check %s: %s", file_path, e)
-
-    # Build best practices report
-    report = _build_best_practices_report(path_obj, best_practice_issues)
-
-    return {
-        "success": True,
-        "issues_count": len(best_practice_issues),
-        "issues": best_practice_issues,
-        "formatted_report": report
+        "formatted_report": "\n".join(report)
     }
 
 
