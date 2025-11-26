@@ -83,23 +83,7 @@ from victor.tools.scaffold_tool import (
     scaffold_add_file,
     scaffold_init_git,
 )
-from victor.tools.docker_tool import (
-    docker_ps,
-    docker_images,
-    docker_pull,
-    docker_run,
-    docker_stop,
-    docker_start,
-    docker_restart,
-    docker_rm,
-    docker_rmi,
-    docker_logs,
-    docker_stats,
-    docker_inspect,
-    docker_networks,
-    docker_volumes,
-    docker_exec,
-)
+from victor.tools.docker_tool import docker
 from victor.tools.metrics_tool import analyze_metrics
 from victor.tools.security_scanner_tool import security_scan
 from victor.tools.documentation_tool import (
@@ -253,22 +237,8 @@ class AgentOrchestrator:
         self.tools.register(scaffold_add_file)
         self.tools.register(scaffold_init_git)
 
-        # Register Docker tools
-        self.tools.register(docker_ps)
-        self.tools.register(docker_images)
-        self.tools.register(docker_pull)
-        self.tools.register(docker_run)
-        self.tools.register(docker_stop)
-        self.tools.register(docker_start)
-        self.tools.register(docker_restart)
-        self.tools.register(docker_rm)
-        self.tools.register(docker_rmi)
-        self.tools.register(docker_logs)
-        self.tools.register(docker_stats)
-        self.tools.register(docker_inspect)
-        self.tools.register(docker_networks)
-        self.tools.register(docker_volumes)
-        self.tools.register(docker_exec)
+        # Register Docker tool (consolidated)
+        self.tools.register(docker)
 
         # Register metrics tool (consolidated)
         self.tools.register(analyze_metrics)
@@ -375,7 +345,7 @@ class AgentOrchestrator:
             "docs": ["docs_generate_docstrings", "docs_generate_api", "docs_generate_readme"],
             "review": ["code_review"],
             "web": ["web_search", "web_fetch", "web_summarize"],
-            "docker": ["docker_ps", "docker_images", "docker_logs"],
+            "docker": ["docker"],
             "metrics": ["analyze_metrics"],
         }
 
