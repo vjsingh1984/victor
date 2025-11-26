@@ -177,21 +177,21 @@ selector = SemanticToolSelector(
 
 | Tools | Embedding Time | Cache Size |
 |-------|----------------|------------|
-| 86 tools | ~3-5 seconds | ~260KB |
-| 41 tools (consolidated) | ~1-2 seconds | ~125KB |
+| 86 tools (original) | ~3-5 seconds | ~260KB |
+| 31 tools (consolidated) | <1 second | ~95KB |
 
-**Note:** Only happens once per session, embeddings cached in memory.
+**Note:** Only happens once per session, embeddings cached in memory. Tool consolidation from 86 → 31 significantly reduced initialization time and memory usage.
 
 ### Query Time
 
 | Operation | Time |
 |-----------|------|
 | Embed query | ~50-100ms |
-| Compute similarities (86 tools) | ~1ms |
+| Compute similarities (31 tools) | <1ms |
 | Sort & select | <1ms |
 | **Total** | **~50-100ms overhead** |
 
-**Impact:** Negligible compared to LLM inference (5-30+ seconds).
+**Impact:** Negligible compared to LLM inference (5-30+ seconds). Tool consolidation reduced similarity computation overhead by 64%.
 
 ## Advanced Features
 
@@ -303,9 +303,9 @@ logger = logging.getLogger("victor.tools.semantic_selector")
 
 **Log Output:**
 ```
-2025-11-26 20:00:00 - INFO - Initializing tool embeddings for 86 tools
-2025-11-26 20:00:03 - INFO - Tool embeddings initialized
-2025-11-26 20:00:05 - INFO - Selected 8 tools by semantic similarity:
+2025-11-26 20:00:00 - INFO - Initializing tool embeddings for 31 tools
+2025-11-26 20:00:01 - INFO - Tool embeddings initialized
+2025-11-26 20:00:03 - INFO - Selected 8 tools by semantic similarity:
   run_tests(0.872), write_file(0.721), read_file(0.684), ...
 ```
 
