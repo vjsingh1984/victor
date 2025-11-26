@@ -308,6 +308,45 @@ class OllamaProvider(BaseProvider):
 
         return normalized if normalized else None
 
+    def _parse_json_tool_call_from_content(self, content: str) -> Optional[List[Dict[str, Any]]]:
+        """Parse tool calls from JSON text in content (fallback for models without native support).
+
+        Some Ollama models (like qwen2.5-coder, llama3.1) return tool calls as JSON in content
+        instead of using the structured tool_calls field. This method detects and parses them.
+
+        Supported formats:
+        - {"name": "tool_name", "arguments": {...}}  (qwen format)
+        - {"name": "tool_name", "parameters": {...}}  (llama format)
+
+        Args:
+            content: Message content that might contain JSON tool call
+
+        Returns:
+            List of tool calls if detected, None otherwise
+        """
+        if not content or not content.strip():
+            return None
+
+        # Try to parse as JSON
+        try:
+            data = json.loads(content.strip())
+
+            # Check if it looks like a tool call (has "name" and "arguments" or "parameters")
+            if isinstance(data, dict) and "name" in data:
+                # Handle both "arguments" and "parameters" keys
+                arguments = data.get("arguments") or data.get("parameters", {})
+
+                # Convert to normalized format
+                return [{
+                    "name": data.get("name"),
+                    "arguments": arguments
+                }]
+        except (json.JSONDecodeError, ValueError):
+            # Not JSON or invalid format
+            pass
+
+        return None
+
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
         """Parse Ollama API response.
 
@@ -321,6 +360,15 @@ class OllamaProvider(BaseProvider):
         message = result.get("message", {})
         content = message.get("content", "")
         tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
+
+        # Fallback: Check if content contains JSON tool call (for models without native support)
+        if not tool_calls and content:
+            parsed_tool_calls = self._parse_json_tool_call_from_content(content)
+            if parsed_tool_calls:
+                logger.debug(f"Parsed tool call from content (fallback for model: {model})")
+                tool_calls = parsed_tool_calls
+                # Clear content since it was a tool call, not actual text response
+                content = ""
 
         # Parse usage stats if available
         usage = None
@@ -354,6 +402,17 @@ class OllamaProvider(BaseProvider):
         content = message.get("content", "")
         tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
         is_done = chunk_data.get("done", False)
+
+        # Fallback: Check if this is a final chunk with JSON tool call in content
+        # (for models without native tool calling support)
+        if not tool_calls and content and is_done:
+            parsed_tool_calls = self._parse_json_tool_call_from_content(content)
+            if parsed_tool_calls:
+                model = chunk_data.get("model", "unknown")
+                logger.debug(f"Parsed tool call from streaming content (fallback for model: {model})")
+                tool_calls = parsed_tool_calls
+                # Clear content since it was a tool call, not actual text response
+                content = ""
 
         return StreamChunk(
             content=content,

@@ -447,17 +447,34 @@ class AgentOrchestrator:
 
             # Collect tool calls from chunks
             if chunk.tool_calls:
+                logger.debug(f"Received tool_calls in chunk: {chunk.tool_calls}")
                 tool_calls = chunk.tool_calls
 
             yield chunk
+
+        # Fallback: Try to parse tool call from accumulated content
+        # (for models that return tool calls as JSON text in streaming mode)
+        if not tool_calls and full_content:
+            # Import the provider's parser if it's an Ollama provider
+            if hasattr(self.provider, '_parse_json_tool_call_from_content'):
+                parsed_tool_calls = self.provider._parse_json_tool_call_from_content(full_content)
+                if parsed_tool_calls:
+                    logger.debug("Parsed tool call from accumulated streaming content (fallback)")
+                    tool_calls = parsed_tool_calls
+                    # Clear full_content since it was a tool call, not actual response
+                    full_content = ""
 
         # Add to history
         if full_content:
             self.add_message("assistant", full_content)
 
         # Handle tool calls if present (CRITICAL FIX)
+        logger.debug(f"After streaming, tool_calls = {tool_calls}")
         if tool_calls:
+            logger.info(f"Handling {len(tool_calls)} tool call(s)")
             await self._handle_tool_calls(tool_calls)
+        else:
+            logger.debug("No tool calls to handle")
 
     async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> None:
         """Handle tool calls from the model.

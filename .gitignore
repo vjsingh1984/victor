@@ -132,3 +132,7 @@ EMBEDDING_ARCHITECTURE.md
 # Root-level test files (should be in tests/ directory)
 /test_*.py
 /script.sh
+
+# Temporary test files
+test_semantic_fix.py
+test_victor_tools.sh
