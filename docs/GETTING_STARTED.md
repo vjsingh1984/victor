@@ -24,7 +24,7 @@ pip install -e ".[dev]"
 
 ```bash
 # Start Victor with default settings (Ollama + local embeddings)
-victor
+victor main
 
 # Victor will:
 # - Use Ollama as the default provider
@@ -34,7 +34,7 @@ victor
 
 Example session:
 ```
-$ victor
+$ victor main
 🤖 Victor v0.1.0 - Universal AI Coding Assistant
 Provider: ollama (qwen2.5-coder:7b)
 Tools: 31 loaded (semantic selection enabled)
@@ -50,26 +50,26 @@ Victor: [Analyzes request, selects relevant tools semantically]
 
 ```bash
 # Execute a single command and exit
-victor "Create a REST API endpoint for user registration"
+victor main "Create a REST API endpoint for user registration"
 
 # With specific provider
-victor --profile claude "Review this code for security issues"
+victor main --profile claude "Review this code for security issues"
 ```
 
 #### 3. Specific Provider
 
 ```bash
 # Use Claude Sonnet 4.5
-victor --profile claude
+victor main --profile claude
 
 # Use OpenAI GPT-4
-victor --profile gpt4
+victor main --profile gpt4
 
 # Use Google Gemini
-victor --profile gemini
+victor main --profile gemini
 
-# Use local Ollama
-victor --profile ollama
+# Use local Ollama (default)
+victor main --profile ollama
 ```
 
 ## Configuration
@@ -148,43 +148,43 @@ CODEBASE_EMBEDDING_PROVIDER=sentence-transformers
 
 ```bash
 # Interactive review
-victor
+victor main
 > Review the code in src/auth/login.py for security vulnerabilities
 
 # One-shot command
-victor "Scan the entire codebase for SQL injection vulnerabilities"
+victor main "Scan the entire codebase for SQL injection vulnerabilities"
 ```
 
 ### 2. Test Generation
 
 ```bash
-victor "Generate pytest tests for src/utils/validators.py with 100% coverage"
+victor main "Generate pytest tests for src/utils/validators.py with 100% coverage"
 ```
 
 ### 3. Documentation
 
 ```bash
-victor "Generate API documentation for all endpoints in src/api/"
+victor main "Generate API documentation for all endpoints in src/api/"
 ```
 
 ### 4. Refactoring
 
 ```bash
-victor "Refactor the UserService class to use dependency injection"
+victor main "Refactor the UserService class to use dependency injection"
 ```
 
 ### 5. Git Automation
 
 ```bash
-victor "Create a commit for the changes with a descriptive message"
-victor "Generate a pull request description for these changes"
+victor main "Create a commit for the changes with a descriptive message"
+victor main "Generate a pull request description for these changes"
 ```
 
 ### 6. CI/CD Pipeline
 
 ```bash
-victor "Generate a GitHub Actions workflow for Python testing and linting"
-victor "Validate the CircleCI config in .circleci/config.yml"
+victor main "Generate a GitHub Actions workflow for Python testing and linting"
+victor main "Validate the CircleCI config in .circleci/config.yml"
 ```
 
 ## Air-gapped / Offline Usage
@@ -207,7 +207,7 @@ ollama pull qwen2.5-coder:7b
 ollama serve
 
 # 4. Use Victor (works offline)
-victor
+victor main
 ```
 
 ### Docker (Pre-packaged Air-gapped Image)
