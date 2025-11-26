@@ -75,13 +75,7 @@ from victor.tools.scaffold_tool import (
 from victor.tools.docker_tool import docker
 from victor.tools.metrics_tool import analyze_metrics
 from victor.tools.security_scanner_tool import security_scan
-from victor.tools.documentation_tool import (
-    docs_generate_docstrings,
-    docs_generate_api,
-    docs_generate_readme,
-    docs_add_type_hints,
-    docs_analyze_coverage,
-)
+from victor.tools.documentation_tool import generate_docs, analyze_docs
 from victor.tools.code_review_tool import code_review, set_code_review_config
 from victor.tools.refactor_tool import (
     refactor_extract_function,
@@ -228,12 +222,9 @@ class AgentOrchestrator:
         # Register security scanner tool (consolidated)
         self.tools.register(security_scan)
 
-        # Register documentation tools
-        self.tools.register(docs_generate_docstrings)
-        self.tools.register(docs_generate_api)
-        self.tools.register(docs_generate_readme)
-        self.tools.register(docs_add_type_hints)
-        self.tools.register(docs_analyze_coverage)
+        # Register documentation tools (consolidated)
+        self.tools.register(generate_docs)
+        self.tools.register(analyze_docs)
 
         # Register code review tools
         set_code_review_config(max_complexity=10)
@@ -323,7 +314,7 @@ class AgentOrchestrator:
             "testing": ["testing_generate", "testing_run", "testing_coverage"],
             "refactor": ["refactor_extract_function", "refactor_inline_variable", "refactor_organize_imports"],
             "security": ["security_scan"],
-            "docs": ["docs_generate_docstrings", "docs_generate_api", "docs_generate_readme"],
+            "docs": ["generate_docs", "analyze_docs"],
             "review": ["code_review"],
             "web": ["web_search", "web_fetch", "web_summarize"],
             "docker": ["docker"],

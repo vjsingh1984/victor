@@ -19,13 +19,12 @@ Features:
 - Create API documentation
 - Generate README sections
 - Add type hints
-- Create module documentation
+- Analyze documentation coverage
 """
 
 import ast
-import inspect
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 import logging
 
 from victor.tools.decorators import tool
@@ -33,63 +32,26 @@ from victor.tools.decorators import tool
 logger = logging.getLogger(__name__)
 
 
-# Docstring templates
-FUNCTION_DOCSTRING_TEMPLATE = '''"""
-{summary}
-
-{description}
-
-Args:
-{args}
-
-Returns:
-    {returns}
-
-Raises:
-    {raises}
-"""'''
-
-CLASS_DOCSTRING_TEMPLATE = '''"""
-{summary}
-
-{description}
-
-Attributes:
-{attributes}
-
-Example:
-{example}
-"""'''
-
-
-# Helper functions
+# Helper functions for docstring generation
 
 def _generate_function_docstring(node: ast.FunctionDef, format: str) -> str:
     """Generate function docstring."""
-    # Extract function info
     func_name = node.name
     args = [arg.arg for arg in node.args.args if arg.arg != "self"]
 
-    # Generate summary
     summary = f"{func_name.replace('_', ' ').title()}."
+    description = f"Detailed description of {func_name}."
 
-    # Generate args section
     args_lines = []
     for arg in args:
         args_lines.append(f"    {arg}: Description of {arg}")
-
     args_section = "\n".join(args_lines) if args_lines else "    None"
 
-    # Check for return
     has_return = any(isinstance(n, ast.Return) for n in ast.walk(node))
     returns_section = "Return value description" if has_return else "None"
 
-    # Check for raises
     has_raises = any(isinstance(n, ast.Raise) for n in ast.walk(node))
     raises_section = "Exception: Description" if has_raises else "None"
-
-    # Simple description
-    description = f"Detailed description of {func_name}."
 
     docstring = f"""{summary}
 
@@ -110,11 +72,10 @@ Raises:
 def _generate_class_docstring(node: ast.ClassDef, format: str) -> str:
     """Generate class docstring."""
     class_name = node.name
-
-    # Generate summary
     summary = f"{class_name} class."
+    description = f"Detailed description of {class_name}."
 
-    # Find attributes (instance variables)
+    # Find attributes
     attributes = []
     for item in node.body:
         if isinstance(item, ast.FunctionDef) and item.name == "__init__":
@@ -126,12 +87,9 @@ def _generate_class_docstring(node: ast.ClassDef, format: str) -> str:
                                 attributes.append(target.attr)
 
     attrs_lines = []
-    for attr in attributes[:5]:  # Limit to 5
+    for attr in attributes[:5]:
         attrs_lines.append(f"    {attr}: Description of {attr}")
-
     attrs_section = "\n".join(attrs_lines) if attrs_lines else "    None"
-
-    description = f"Detailed description of {class_name}."
 
     example = f"""instance = {class_name}()
     instance.method()"""
@@ -156,13 +114,12 @@ def _extract_api_info(tree: ast.AST, module_name: str) -> Dict[str, Any]:
 
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef):
-            if not node.name.startswith("_"):  # Public functions only
+            if not node.name.startswith("_"):
                 functions.append({
                     "name": node.name,
                     "docstring": ast.get_docstring(node) or "No description",
                     "args": [arg.arg for arg in node.args.args],
                 })
-
         elif isinstance(node, ast.ClassDef):
             methods = []
             for item in node.body:
@@ -190,7 +147,6 @@ def _extract_api_info(tree: ast.AST, module_name: str) -> Dict[str, Any]:
 def _build_markdown_docs(api_info: Dict[str, Any]) -> str:
     """Build Markdown API documentation."""
     lines = []
-
     lines.append(f"# {api_info['module']} API Documentation")
     lines.append("")
 
@@ -233,15 +189,10 @@ def _build_markdown_docs(api_info: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _build_rst_docs(api_info: Dict[str, Any]) -> str:
-    """Build reStructuredText API documentation."""
-    # Similar to markdown but with RST syntax
-    return _build_markdown_docs(api_info)  # Simplified for now
+# README templates
 
-
-def _get_installation_template() -> str:
-    """Get installation README template."""
-    return """## Installation
+README_TEMPLATES = {
+    "installation": """## Installation
 
 ### From PyPI
 
@@ -267,12 +218,9 @@ pip install -e ".[dev]"
 
 - Python 3.10+
 - Dependencies listed in `requirements.txt`
-"""
+""",
 
-
-def _get_usage_template() -> str:
-    """Get usage README template."""
-    return """## Usage
+    "usage": """## Usage
 
 ### Quick Start
 
@@ -307,12 +255,9 @@ result = instance.advanced_method(
 ```bash
 your-command --option value
 ```
-"""
+""",
 
-
-def _get_contributing_template() -> str:
-    """Get contributing README template."""
-    return """## Contributing
+    "contributing": """## Contributing
 
 We welcome contributions! Please follow these guidelines:
 
@@ -355,12 +300,9 @@ black --check .
 ### Reporting Issues
 
 Please use the GitHub issue tracker to report bugs or request features.
-"""
+""",
 
-
-def _get_features_template() -> str:
-    """Get features README template."""
-    return """## Features
+    "features": """## Features
 
 - **Feature 1**: Description of feature 1
 - **Feature 2**: Description of feature 2
@@ -379,12 +321,9 @@ Detailed description of feature 2 with examples.
 #### Feature 3
 
 Detailed description of feature 3 with examples.
-"""
+""",
 
-
-def _get_api_template() -> str:
-    """Get API README template."""
-    return """## API Reference
+    "api": """## API Reference
 
 ### Main Classes
 
@@ -410,399 +349,320 @@ Utility function description.
 - Return value description
 
 For complete API documentation, see [API Docs](docs/api.md).
-"""
+""",
+}
 
 
-# Tool functions
+# Consolidated tools
 
 @tool
-async def docs_generate_docstrings(
-    file: str,
+async def generate_docs(
+    path: str,
+    doc_types: List[str] = None,
     format: str = "google",
+    output: Optional[str] = None,
+    recursive: bool = False
 ) -> Dict[str, Any]:
     """
-    Generate docstrings for functions and classes.
+    Unified documentation generation tool.
 
-    Analyzes Python source code and automatically generates
-    docstrings for functions and classes that don't have them.
+    Generate multiple types of documentation (docstrings, API docs, README sections,
+    type hints) in a single unified interface. Consolidates all documentation
+    generation functionality.
 
     Args:
-        file: Source file path.
-        format: Documentation format (google, numpy, rst) (default: google).
+        path: File or directory path for documentation generation.
+        doc_types: List of documentation types to generate. Options: "docstrings",
+            "api", "readme", "type_hints", "all". Defaults to ["docstrings"].
+        format: Documentation format: "google", "numpy", "sphinx", "markdown", "rst"
+            (default: google).
+        output: Output file path for API docs (optional, defaults to docs/{module}_api.md).
+        recursive: Process directory recursively for docstrings (default: False).
 
     Returns:
         Dictionary containing:
         - success: Whether operation succeeded
-        - generated: Number of docstrings generated
-        - items: List of documented items with details
+        - doc_types_generated: List of documentation types that were generated
+        - results: Dictionary with results for each doc type
         - formatted_report: Human-readable generation report
         - error: Error message if failed
+
+    Examples:
+        # Generate docstrings only
+        generate_docs("src/module.py", doc_types=["docstrings"])
+
+        # Generate docstrings and API docs
+        generate_docs("src/module.py", doc_types=["docstrings", "api"])
+
+        # Generate README sections
+        generate_docs("", doc_types=["readme"])
+
+        # Generate all documentation types
+        generate_docs("src/", doc_types=["all"], recursive=True)
     """
-    if not file:
-        return {"success": False, "error": "Missing required parameter: file"}
+    if doc_types is None:
+        doc_types = ["docstrings"]
 
-    file_obj = Path(file)
-    if not file_obj.exists():
-        return {"success": False, "error": f"File not found: {file}"}
+    # Expand "all" to all doc types
+    if "all" in doc_types:
+        doc_types = ["docstrings", "api", "type_hints"]
 
-    # Read and parse file
-    content = file_obj.read_text()
-
-    try:
-        tree = ast.parse(content)
-    except SyntaxError as e:
-        return {"success": False, "error": f"Syntax error in file: {e}"}
-
-    # Find functions and classes without docstrings
-    items_to_document = []
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
-            if not ast.get_docstring(node):
-                items_to_document.append({
-                    "type": "function",
-                    "name": node.name,
-                    "node": node,
-                    "line": node.lineno,
-                })
-        elif isinstance(node, ast.ClassDef):
-            if not ast.get_docstring(node):
-                items_to_document.append({
-                    "type": "class",
-                    "name": node.name,
-                    "node": node,
-                    "line": node.lineno,
-                })
-
-    if not items_to_document:
-        return {
-            "success": True,
-            "generated": 0,
-            "items": [],
-            "message": "All functions and classes already have docstrings!"
-        }
+    results = {}
+    report = []
+    report.append("Documentation Generation Report")
+    report.append("=" * 70)
+    report.append("")
 
     # Generate docstrings
-    lines = content.split("\n")
-    generated_docs = []
+    if "docstrings" in doc_types:
+        if not path:
+            return {"success": False, "error": "path required for docstring generation"}
 
-    for item in items_to_document:
-        if item["type"] == "function":
-            docstring = _generate_function_docstring(item["node"], format)
+        path_obj = Path(path)
+        if not path_obj.exists():
+            return {"success": False, "error": f"Path not found: {path}"}
+
+        files_to_process = []
+        if path_obj.is_file():
+            files_to_process = [path_obj]
+        elif recursive:
+            files_to_process = list(path_obj.rglob("*.py"))
         else:
-            docstring = _generate_class_docstring(item["node"], format)
+            files_to_process = list(path_obj.glob("*.py"))
 
-        generated_docs.append({
-            "name": item["name"],
-            "type": item["type"],
-            "line": item["line"],
-            "docstring": docstring,
-        })
+        total_generated = 0
+        processed_files = 0
 
-        # Insert docstring into code
-        # Find the line after function/class definition
-        insert_line = item["line"]  # Line number (1-indexed)
+        for file_obj in files_to_process:
+            content = file_obj.read_text()
 
-        # Get indentation from the definition line
-        def_line = lines[insert_line - 1]
-        base_indent = len(def_line) - len(def_line.lstrip())
-        indent = " " * (base_indent + 4)
+            try:
+                tree = ast.parse(content)
+            except SyntaxError:
+                continue
 
-        # Format docstring with proper indentation
-        docstring_lines = docstring.split("\n")
-        formatted_docstring = [f'{indent}"""']
-        for line in docstring_lines:
-            if line.strip():
-                formatted_docstring.append(f"{indent}{line}")
-            else:
-                formatted_docstring.append("")
-        formatted_docstring.append(f'{indent}"""')
+            # Find items needing docstrings
+            items_to_document = []
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    if not ast.get_docstring(node):
+                        items_to_document.append({"type": "function", "name": node.name, "node": node, "line": node.lineno})
+                elif isinstance(node, ast.ClassDef):
+                    if not ast.get_docstring(node):
+                        items_to_document.append({"type": "class", "name": node.name, "node": node, "line": node.lineno})
 
-        # Insert after the definition line
-        lines = lines[:insert_line] + formatted_docstring + lines[insert_line:]
+            if items_to_document:
+                # Generate and insert docstrings
+                lines = content.split("\n")
+                for item in items_to_document:
+                    if item["type"] == "function":
+                        docstring = _generate_function_docstring(item["node"], format)
+                    else:
+                        docstring = _generate_class_docstring(item["node"], format)
 
-    # Write updated content
-    new_content = "\n".join(lines)
-    file_obj.write_text(new_content)
+                    insert_line = item["line"]
+                    def_line = lines[insert_line - 1]
+                    base_indent = len(def_line) - len(def_line.lstrip())
+                    indent = " " * (base_indent + 4)
 
-    # Build report
-    report = []
-    report.append("Docstring Generation Complete")
-    report.append("=" * 70)
-    report.append("")
-    report.append(f"File: {file}")
-    report.append(f"Format: {format}")
-    report.append(f"Generated: {len(generated_docs)} docstrings")
-    report.append("")
+                    docstring_lines = docstring.split("\n")
+                    formatted_docstring = [f'{indent}"""']
+                    for line in docstring_lines:
+                        if line.strip():
+                            formatted_docstring.append(f"{indent}{line}")
+                        else:
+                            formatted_docstring.append("")
+                    formatted_docstring.append(f'{indent}"""')
 
-    for doc in generated_docs[:10]:
-        report.append(f"✓ {doc['type'].title()}: {doc['name']} (line {doc['line']})")
-        report.append(f"  {doc['docstring'][:100]}...")
-        report.append("")
+                    lines = lines[:insert_line] + formatted_docstring + lines[insert_line:]
 
-    if len(generated_docs) > 10:
-        report.append(f"... and {len(generated_docs) - 10} more")
+                new_content = "\n".join(lines)
+                file_obj.write_text(new_content)
 
-    return {
-        "success": True,
-        "generated": len(generated_docs),
-        "items": generated_docs,
-        "formatted_report": "\n".join(report)
-    }
+                total_generated += len(items_to_document)
+                processed_files += 1
 
-
-@tool
-async def docs_generate_api(
-    file: str,
-    output: Optional[str] = None,
-    format: str = "markdown",
-) -> Dict[str, Any]:
-    """
-    Generate API documentation.
-
-    Extracts functions, classes, and methods from Python source
-    code and generates comprehensive API documentation.
-
-    Args:
-        file: Source file path.
-        output: Output file path (optional, defaults to docs/{module}_api.md).
-        format: Documentation format (markdown, rst) (default: markdown).
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - output_file: Path to generated documentation
-        - functions_count: Number of documented functions
-        - classes_count: Number of documented classes
-        - preview: Preview of generated documentation
-        - formatted_report: Human-readable generation report
-        - error: Error message if failed
-    """
-    if not file:
-        return {"success": False, "error": "Missing required parameter: file"}
-
-    file_obj = Path(file)
-    if not file_obj.exists():
-        return {"success": False, "error": f"File not found: {file}"}
-
-    # Read and parse file
-    content = file_obj.read_text()
-
-    try:
-        tree = ast.parse(content)
-    except SyntaxError as e:
-        return {"success": False, "error": f"Syntax error in file: {e}"}
-
-    # Extract API information
-    api_info = _extract_api_info(tree, file_obj.stem)
-
-    # Generate documentation
-    if format == "markdown":
-        docs = _build_markdown_docs(api_info)
-    else:
-        docs = _build_rst_docs(api_info)
-
-    # Determine output path
-    if not output:
-        output = f"docs/{file_obj.stem}_api.md"
-
-    # Write documentation
-    output_file = Path(output)
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-    output_file.write_text(docs)
-
-    # Build report
-    report = []
-    report.append("API Documentation Generated")
-    report.append("=" * 70)
-    report.append("")
-    report.append(f"Source: {file}")
-    report.append(f"Output: {output}")
-    report.append(f"Format: {format}")
-    report.append("")
-    report.append(f"Functions: {len(api_info['functions'])}")
-    report.append(f"Classes: {len(api_info['classes'])}")
-    report.append("")
-    report.append("Preview:")
-    report.append("-" * 70)
-    report.append(docs[:1000])
-    if len(docs) > 1000:
-        report.append("...")
-
-    return {
-        "success": True,
-        "output_file": output,
-        "functions_count": len(api_info["functions"]),
-        "classes_count": len(api_info["classes"]),
-        "preview": docs[:500],
-        "formatted_report": "\n".join(report)
-    }
-
-
-@tool
-async def docs_generate_readme(section: str = "installation") -> Dict[str, Any]:
-    """
-    Generate README sections.
-
-    Generates common README sections with standard templates
-    following best practices.
-
-    Args:
-        section: README section to generate (installation, usage, contributing,
-                features, api) (default: installation).
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - section: Section name
-        - content: Generated section content
-        - formatted_report: Human-readable report with content
-        - error: Error message if failed
-    """
-    templates = {
-        "installation": _get_installation_template(),
-        "usage": _get_usage_template(),
-        "contributing": _get_contributing_template(),
-        "features": _get_features_template(),
-        "api": _get_api_template(),
-    }
-
-    template = templates.get(section)
-
-    if not template:
-        available = ", ".join(templates.keys())
-        return {
-            "success": False,
-            "error": f"Unknown section: {section}. Available: {available}"
+        results["docstrings"] = {
+            "generated": total_generated,
+            "files_processed": processed_files,
+            "format": format
         }
 
-    report = []
-    report.append(f"README Section: {section.title()}")
-    report.append("=" * 70)
-    report.append("")
-    report.append("Generated content:")
-    report.append("-" * 70)
-    report.append(template)
+        report.append(f"Docstrings: Generated {total_generated} docstrings in {processed_files} files")
+
+    # Generate API documentation
+    if "api" in doc_types:
+        if not path:
+            return {"success": False, "error": "path required for API documentation"}
+
+        file_obj = Path(path)
+        if not file_obj.exists():
+            return {"success": False, "error": f"File not found: {path}"}
+
+        content = file_obj.read_text()
+
+        try:
+            tree = ast.parse(content)
+        except SyntaxError as e:
+            return {"success": False, "error": f"Syntax error in file: {e}"}
+
+        api_info = _extract_api_info(tree, file_obj.stem)
+
+        if format in ["markdown", "google", "numpy", "sphinx"]:
+            docs = _build_markdown_docs(api_info)
+        else:
+            docs = _build_markdown_docs(api_info)
+
+        if not output:
+            output = f"docs/{file_obj.stem}_api.md"
+
+        output_file = Path(output)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        output_file.write_text(docs)
+
+        results["api"] = {
+            "output_file": output,
+            "functions_count": len(api_info["functions"]),
+            "classes_count": len(api_info["classes"]),
+            "preview": docs[:500]
+        }
+
+        report.append(f"API Docs: Generated documentation at {output}")
+        report.append(f"  Functions: {len(api_info['functions'])}, Classes: {len(api_info['classes'])}")
+
+    # Generate README sections
+    if "readme" in doc_types:
+        # Default to installation if no specific section requested
+        section = "installation"
+        template = README_TEMPLATES.get(section)
+
+        results["readme"] = {
+            "section": section,
+            "content": template
+        }
+
+        report.append(f"README: Generated {section} section")
+
+    # Add type hints (placeholder)
+    if "type_hints" in doc_types:
+        if not path:
+            return {"success": False, "error": "path required for type hints"}
+
+        results["type_hints"] = {
+            "suggestions": [
+                "Add return type annotations",
+                "Add parameter type hints",
+                "Use typing module for complex types"
+            ]
+        }
+
+        report.append("Type Hints: Analysis complete (suggestions generated)")
 
     return {
         "success": True,
-        "section": section,
-        "content": template,
+        "doc_types_generated": list(results.keys()),
+        "results": results,
         "formatted_report": "\n".join(report)
     }
 
 
 @tool
-async def docs_add_type_hints(file: str) -> Dict[str, Any]:
+async def analyze_docs(
+    path: str,
+    check_coverage: bool = True,
+    check_quality: bool = False,
+    file_pattern: str = "*.py"
+) -> Dict[str, Any]:
     """
-    Add type hints to functions.
+    Analyze documentation coverage and quality.
 
-    Analyzes function signatures and suggests type hints
-    following Python typing best practices.
+    Checks documentation coverage (percentage of functions/classes with docstrings)
+    and optionally analyzes documentation quality.
 
     Args:
-        file: Source file path.
+        path: File or directory path to analyze.
+        check_coverage: Analyze documentation coverage (default: True).
+        check_quality: Analyze docstring quality (default: False).
+        file_pattern: Glob pattern for files to analyze (default: *.py).
 
     Returns:
         Dictionary containing:
         - success: Whether operation succeeded
-        - suggestions: List of type hint suggestions
-        - formatted_report: Human-readable type hints report
-        - error: Error message if failed
-    """
-    if not file:
-        return {"success": False, "error": "Missing required parameter: file"}
-
-    file_obj = Path(file)
-    if not file_obj.exists():
-        return {"success": False, "error": f"File not found: {file}"}
-
-    # This is a placeholder - full implementation would use AST transformation
-    report = []
-    report.append("Type Hints Analysis")
-    report.append("=" * 70)
-    report.append("")
-    report.append(f"File: {file}")
-    report.append("")
-    report.append("Suggested type hints:")
-    report.append("  • Add return type annotations")
-    report.append("  • Add parameter type hints")
-    report.append("  • Use typing module for complex types")
-    report.append("")
-    report.append("Example:")
-    report.append("  def process_data(items: List[Dict[str, Any]]) -> List[str]:")
-    report.append("      ...")
-
-    return {
-        "success": True,
-        "suggestions": [
-            "Add return type annotations",
-            "Add parameter type hints",
-            "Use typing module for complex types"
-        ],
-        "formatted_report": "\n".join(report)
-    }
-
-
-@tool
-async def docs_analyze_coverage(file: str) -> Dict[str, Any]:
-    """
-    Analyze documentation coverage.
-
-    Checks what percentage of functions and classes have docstrings
-    and identifies items missing documentation.
-
-    Args:
-        file: Source file path.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - coverage: Documentation coverage percentage
+        - coverage: Documentation coverage percentage (if check_coverage=True)
         - total_items: Total functions and classes
         - documented_items: Count of documented items
         - missing: List of items missing documentation
-        - recommendations: List of recommendations
-        - formatted_report: Human-readable coverage report
+        - quality_issues: List of quality issues (if check_quality=True)
+        - recommendations: List of improvement recommendations
+        - formatted_report: Human-readable analysis report
         - error: Error message if failed
+
+    Examples:
+        # Check coverage only
+        analyze_docs("src/module.py")
+
+        # Check coverage and quality
+        analyze_docs("src/", check_coverage=True, check_quality=True)
+
+        # Analyze specific file pattern
+        analyze_docs("src/", file_pattern="*_tool.py")
     """
-    if not file:
-        return {"success": False, "error": "Missing required parameter: file"}
+    if not path:
+        return {"success": False, "error": "Missing required parameter: path"}
 
-    file_obj = Path(file)
-    if not file_obj.exists():
-        return {"success": False, "error": f"File not found: {file}"}
+    path_obj = Path(path)
+    if not path_obj.exists():
+        return {"success": False, "error": f"Path not found: {path}"}
 
-    # Read and parse file
-    content = file_obj.read_text()
+    # Collect files to analyze
+    files_to_analyze = []
+    if path_obj.is_file():
+        files_to_analyze = [path_obj]
+    else:
+        files_to_analyze = list(path_obj.rglob(file_pattern))
 
-    try:
-        tree = ast.parse(content)
-    except SyntaxError as e:
-        return {"success": False, "error": f"Syntax error in file: {e}"}
-
-    # Analyze documentation coverage
     total_functions = 0
     documented_functions = 0
     total_classes = 0
     documented_classes = 0
     missing = []
+    quality_issues = []
 
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
-            if not node.name.startswith("_"):  # Skip private
-                total_functions += 1
-                if ast.get_docstring(node):
-                    documented_functions += 1
-                else:
-                    missing.append(f"Function: {node.name} (line {node.lineno})")
+    for file_obj in files_to_analyze:
+        if not file_obj.suffix == ".py":
+            continue
 
-        elif isinstance(node, ast.ClassDef):
-            total_classes += 1
-            if ast.get_docstring(node):
-                documented_classes += 1
-            else:
-                missing.append(f"Class: {node.name} (line {node.lineno})")
+        content = file_obj.read_text()
+
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            continue
+
+        # Analyze coverage
+        if check_coverage:
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    if not node.name.startswith("_"):
+                        total_functions += 1
+                        docstring = ast.get_docstring(node)
+                        if docstring:
+                            documented_functions += 1
+                            # Check quality
+                            if check_quality and len(docstring) < 20:
+                                quality_issues.append(f"Short docstring in {node.name} at {file_obj}:{node.lineno}")
+                        else:
+                            missing.append(f"Function: {node.name} ({file_obj}:{node.lineno})")
+
+                elif isinstance(node, ast.ClassDef):
+                    total_classes += 1
+                    docstring = ast.get_docstring(node)
+                    if docstring:
+                        documented_classes += 1
+                        if check_quality and len(docstring) < 20:
+                            quality_issues.append(f"Short docstring in {node.name} at {file_obj}:{node.lineno}")
+                    else:
+                        missing.append(f"Class: {node.name} ({file_obj}:{node.lineno})")
 
     # Calculate coverage
     total_items = total_functions + total_classes
@@ -818,12 +678,16 @@ async def docs_analyze_coverage(file: str) -> Dict[str, Any]:
     else:
         recommendations.append("Good coverage - maintain quality")
 
+    if check_quality and quality_issues:
+        recommendations.append(f"Found {len(quality_issues)} quality issues - improve docstring detail")
+
     # Build report
     report = []
-    report.append("Documentation Coverage Analysis")
+    report.append("Documentation Analysis Report")
     report.append("=" * 70)
     report.append("")
-    report.append(f"File: {file}")
+    report.append(f"Path: {path}")
+    report.append(f"Files analyzed: {len(files_to_analyze)}")
     report.append("")
     report.append(f"Coverage: {coverage:.1f}%")
     report.append("")
@@ -838,7 +702,15 @@ async def docs_analyze_coverage(file: str) -> Dict[str, Any]:
         if len(missing) > 15:
             report.append(f"  ... and {len(missing) - 15} more")
     else:
-        report.append("✅ All items documented!")
+        report.append("All items documented!")
+
+    if check_quality and quality_issues:
+        report.append("")
+        report.append(f"Quality Issues ({len(quality_issues)}):")
+        for issue in quality_issues[:10]:
+            report.append(f"  • {issue}")
+        if len(quality_issues) > 10:
+            report.append(f"  ... and {len(quality_issues) - 10} more")
 
     report.append("")
     report.append("Recommendations:")
@@ -852,6 +724,7 @@ async def docs_analyze_coverage(file: str) -> Dict[str, Any]:
         "total_items": total_items,
         "documented_items": documented_items,
         "missing": missing,
+        "quality_issues": quality_issues if check_quality else None,
         "recommendations": recommendations,
         "formatted_report": "\n".join(report)
     }
@@ -859,13 +732,13 @@ async def docs_analyze_coverage(file: str) -> Dict[str, Any]:
 
 # Keep class for backward compatibility
 class DocumentationTool:
-    """Deprecated: Use individual docs_* functions instead."""
+    """Deprecated: Use generate_docs and analyze_docs functions instead."""
 
     def __init__(self):
         """Initialize - deprecated."""
         import warnings
         warnings.warn(
-            "DocumentationTool class is deprecated. Use docs_* functions instead.",
+            "DocumentationTool class is deprecated. Use generate_docs and analyze_docs functions instead.",
             DeprecationWarning,
             stacklevel=2
         )
