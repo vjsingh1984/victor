@@ -38,16 +38,18 @@ COPY victor ./victor
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e .
+    pip install --no-cache-dir -e . && \
+    pip install --no-cache-dir lancedb
 
 # Pre-download embedding model for air-gapped deployment
 # This downloads all-MiniLM-L12-v2 (120MB) during build time
-# Model will be cached in Docker image at ~/.cache/torch/sentence_transformers/
+# Model will be cached in Docker image at ~/.cache/huggingface/
 RUN python3 -c "from sentence_transformers import SentenceTransformer; \
     print('📦 Pre-downloading embedding model: all-MiniLM-L12-v2'); \
     model = SentenceTransformer('all-MiniLM-L12-v2'); \
     print('✅ Embedding model cached in Docker image'); \
-    print(f'📊 Model dimension: {model.get_sentence_embedding_dimension()}');"
+    print(f'📊 Model dimension: {model.get_sentence_embedding_dimension()}'); \
+    import os; print(f'📂 Cache location: {os.path.expanduser(\"~/.cache\")}')"
 
 # Stage 2: Runtime
 FROM python:3.12-slim
@@ -74,18 +76,18 @@ COPY --from=builder /app /app
 
 # Copy pre-downloaded embedding model cache (air-gapped capability)
 # This makes the Docker image 100% offline-capable
-COPY --from=builder /root/.cache/torch/sentence_transformers /tmp/.cache/torch/sentence_transformers
+COPY --from=builder /root/.cache /tmp/.cache
 
 # Copy examples and demos
 COPY examples ./examples
 COPY docs ./docs
 
-# Copy configuration templates
-COPY docker/config/profiles.yaml.template /home/victor/.victor/profiles.yaml.template
+# Copy docker scripts and config
+COPY docker ./docker
 
 # Create cache directory and copy model to victor's home
-RUN mkdir -p /home/victor/.cache/torch/sentence_transformers && \
-    cp -r /tmp/.cache/torch/sentence_transformers/* /home/victor/.cache/torch/sentence_transformers/ && \
+RUN mkdir -p /home/victor/.cache && \
+    cp -r /tmp/.cache/* /home/victor/.cache/ && \
     rm -rf /tmp/.cache
 
 # Set ownership
@@ -97,8 +99,9 @@ USER victor
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV VICTOR_HOME=/home/victor/.victor
-ENV SENTENCE_TRANSFORMERS_HOME=/home/victor/.cache/torch/sentence_transformers
-ENV TRANSFORMERS_CACHE=/home/victor/.cache/torch/sentence_transformers
+ENV HF_HOME=/home/victor/.cache/huggingface
+ENV TRANSFORMERS_CACHE=/home/victor/.cache/huggingface
+ENV SENTENCE_TRANSFORMERS_HOME=/home/victor/.cache/huggingface
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

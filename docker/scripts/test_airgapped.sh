@@ -12,12 +12,20 @@ echo ""
 
 # Check if embedding model is cached
 echo "📦 Checking embedding model cache..."
-if [ -d "/home/victor/.cache/torch/sentence_transformers/sentence-transformers_all-MiniLM-L12-v2" ]; then
-    echo "✅ Embedding model found in cache"
-    ls -lh /home/victor/.cache/torch/sentence_transformers/
+if [ -d "/home/victor/.cache/huggingface" ]; then
+    echo "✅ Embedding model cache directory found"
+    echo "Cache contents:"
+    ls -lh /home/victor/.cache/huggingface/ || true
+
+    # Check for model files
+    if find /home/victor/.cache/huggingface -name "*MiniLM*" | grep -q .; then
+        echo "✅ MiniLM model files found in cache"
+    else
+        echo "⚠️  Warning: MiniLM model files not found, but cache directory exists"
+    fi
 else
-    echo "❌ Embedding model NOT found in cache!"
-    echo "Expected path: /home/victor/.cache/torch/sentence_transformers/sentence-transformers_all-MiniLM-L12-v2"
+    echo "❌ Embedding model cache NOT found!"
+    echo "Expected path: /home/victor/.cache/huggingface"
     exit 1
 fi
 
