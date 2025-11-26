@@ -5,7 +5,7 @@
 <h3>Universal AI Coding Assistant - Code to Victory with Any AI</h3>
 
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -702,34 +702,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ## License
 
-Victor is open source software licensed under the **MIT License**.
-
-```
-MIT License - Copyright (c) 2025 Vijaykumar Singh
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-```
+Victor is open source software licensed under the **Apache License 2.0**.
 
 See [LICENSE](LICENSE) for full text.
-
----
-
-## Acknowledgments
-
-Victor stands on the shoulders of giants:
-
-- **Inspired by**: [Claude Code](https://github.com/anthropics/claude-code) - For pioneering AI coding assistants
-- **Built with**: [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python) - Excellent API design
-- **Uses**: [Model Context Protocol](https://modelcontextprotocol.io/) - MCP standard implementation
-- **Powered by**: Open source community - Contributors worldwide
 
 ---
 
