@@ -18,435 +18,236 @@ This tool provides transaction-based file editing with diff preview and
 rollback capability to the agent.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from pathlib import Path
 
 from victor.editing import FileEditor
 from victor.tools.decorators import tool
 
-# Global editor state (one active transaction at a time)
-_editor: Optional[FileEditor] = None
-_current_transaction_id: Optional[str] = None
-
-
-def _get_editor() -> Optional[FileEditor]:
-    """Get the current editor instance."""
-    return _editor
-
-
-def _clear_editor() -> None:
-    """Clear the current editor instance."""
-    global _editor, _current_transaction_id
-    _editor = None
-    _current_transaction_id = None
-
 
 @tool
-async def file_editor_start_transaction(description: str = "") -> Dict[str, Any]:
+async def edit_files(
+    operations: List[Dict[str, Any]],
+    preview: bool = False,
+    auto_commit: bool = True,
+    description: str = "",
+    context_lines: int = 3
+) -> Dict[str, Any]:
     """
-    Start a new file editing transaction.
+    Unified file editing with transaction support.
 
-    Begins a new transaction-based editing session where you can queue
-    multiple file operations (create, modify, delete, rename) and apply
-    them atomically with preview and rollback capability.
+    Perform multiple file operations (create, modify, delete, rename) in a single
+    transaction with built-in preview and rollback capability. Consolidates all
+    file editing functionality into one unified interface.
 
     Args:
-        description: Description of this transaction (optional).
-
-    Returns:
-        Dictionary containing:
-        - success: Whether transaction started
-        - transaction_id: ID of the started transaction
-        - message: Status message
-        - error: Error message if failed
-    """
-    global _editor, _current_transaction_id
-
-    if _editor is not None:
-        return {
-            "success": False,
-            "error": "Transaction already in progress. Commit, rollback, or abort first."
-        }
-
-    backup_dir = Path.home() / ".victor" / "backups"
-    _editor = FileEditor(backup_dir=str(backup_dir))
-    _current_transaction_id = _editor.start_transaction(description)
-
-    return {
-        "success": True,
-        "transaction_id": _current_transaction_id,
-        "message": f"Started transaction: {_current_transaction_id}",
-        "description": description
-    }
-
-
-@tool
-async def file_editor_add_create(path: str, content: str = "") -> Dict[str, Any]:
-    """
-    Queue a file creation operation.
-
-    Adds a file creation to the current transaction. The file will be
-    created when you commit the transaction.
-
-    Args:
-        path: Path where the file will be created.
-        content: Content for the new file (default: empty string).
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation was queued
-        - path: Path of file to be created
-        - message: Status message
-        - error: Error message if failed
-    """
-    if _editor is None:
-        return {
-            "success": False,
-            "error": "No active transaction. Call file_editor_start_transaction first."
-        }
-
-    if not path:
-        return {
-            "success": False,
-            "error": "Missing required parameter: path"
-        }
-
-    _editor.add_create(path, content)
-
-    return {
-        "success": True,
-        "path": path,
-        "message": f"Queued file creation: {path}"
-    }
-
-
-@tool
-async def file_editor_add_modify(path: str, new_content: str) -> Dict[str, Any]:
-    """
-    Queue a file modification operation.
-
-    Adds a file modification to the current transaction. The file will be
-    modified when you commit the transaction.
-
-    Args:
-        path: Path of the file to modify.
-        new_content: New content for the file.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation was queued
-        - path: Path of file to be modified
-        - message: Status message
-        - error: Error message if failed
-    """
-    if _editor is None:
-        return {
-            "success": False,
-            "error": "No active transaction. Call file_editor_start_transaction first."
-        }
-
-    if not path:
-        return {
-            "success": False,
-            "error": "Missing required parameter: path"
-        }
-
-    if new_content is None:
-        return {
-            "success": False,
-            "error": "Missing required parameter: new_content"
-        }
-
-    _editor.add_modify(path, new_content)
-
-    return {
-        "success": True,
-        "path": path,
-        "message": f"Queued file modification: {path}"
-    }
-
-
-@tool
-async def file_editor_add_delete(path: str) -> Dict[str, Any]:
-    """
-    Queue a file deletion operation.
-
-    Adds a file deletion to the current transaction. The file will be
-    deleted when you commit the transaction.
-
-    Args:
-        path: Path of the file to delete.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation was queued
-        - path: Path of file to be deleted
-        - message: Status message
-        - error: Error message if failed
-    """
-    if _editor is None:
-        return {
-            "success": False,
-            "error": "No active transaction. Call file_editor_start_transaction first."
-        }
-
-    if not path:
-        return {
-            "success": False,
-            "error": "Missing required parameter: path"
-        }
-
-    _editor.add_delete(path)
-
-    return {
-        "success": True,
-        "path": path,
-        "message": f"Queued file deletion: {path}"
-    }
-
-
-@tool
-async def file_editor_add_rename(path: str, new_path: str) -> Dict[str, Any]:
-    """
-    Queue a file rename operation.
-
-    Adds a file rename to the current transaction. The file will be
-    renamed when you commit the transaction.
-
-    Args:
-        path: Current path of the file.
-        new_path: New path for the file.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation was queued
-        - old_path: Original file path
-        - new_path: New file path
-        - message: Status message
-        - error: Error message if failed
-    """
-    if _editor is None:
-        return {
-            "success": False,
-            "error": "No active transaction. Call file_editor_start_transaction first."
-        }
-
-    if not path:
-        return {
-            "success": False,
-            "error": "Missing required parameter: path"
-        }
-
-    if not new_path:
-        return {
-            "success": False,
-            "error": "Missing required parameter: new_path"
-        }
-
-    _editor.add_rename(path, new_path)
-
-    return {
-        "success": True,
-        "old_path": path,
-        "new_path": new_path,
-        "message": f"Queued file rename: {path} → {new_path}"
-    }
-
-
-@tool
-async def file_editor_preview(context_lines: int = 3) -> Dict[str, Any]:
-    """
-    Preview all queued changes with diffs.
-
-    Shows a preview of all file operations queued in the current transaction
-    with unified diff format for modifications.
-
-    Args:
+        operations: List of file operations. Each operation is a dict with:
+            - type: "create", "modify", "delete", or "rename" (required)
+            - path: File path (required)
+            - content: File content (for create/modify, optional for create)
+            - new_content: New file content (alias for content in modify)
+            - new_path: New file path (required for rename)
+        preview: If True, show diff preview without applying changes (default: False).
+        auto_commit: If True, automatically commit changes after queuing (default: True).
+        description: Optional description of this edit operation.
         context_lines: Number of context lines to show in diffs (default: 3).
 
     Returns:
         Dictionary containing:
-        - success: Whether preview was generated
-        - operations_count: Number of queued operations
+        - success: Whether operation succeeded
+        - operations_queued: Number of operations queued
+        - operations_applied: Number of operations applied (if auto_commit=True)
+        - by_type: Breakdown of operations by type
         - message: Status message
+        - preview_output: Diff preview text (if preview=True)
         - error: Error message if failed
+
+    Examples:
+        # Create and modify files
+        edit_files(operations=[
+            {"type": "create", "path": "foo.py", "content": "print('hello')"},
+            {"type": "modify", "path": "bar.py", "content": "updated content"}
+        ])
+
+        # Delete and rename files
+        edit_files(operations=[
+            {"type": "delete", "path": "old.py"},
+            {"type": "rename", "path": "temp.py", "new_path": "final.py"}
+        ])
+
+        # Preview changes without applying
+        edit_files(operations=[...], preview=True, auto_commit=False)
+
+        # Queue operations without committing
+        edit_files(operations=[...], auto_commit=False)
     """
-    if _editor is None:
+    if not operations:
+        return {"success": False, "error": "No operations provided"}
+
+    # Validate operations
+    for i, op in enumerate(operations):
+        if not isinstance(op, dict):
+            return {
+                "success": False,
+                "error": f"Operation {i} must be a dictionary, got {type(op).__name__}"
+            }
+
+        op_type = op.get("type")
+        if not op_type:
+            return {
+                "success": False,
+                "error": f"Operation {i} missing required field: type"
+            }
+
+        if op_type not in ["create", "modify", "delete", "rename"]:
+            return {
+                "success": False,
+                "error": f"Operation {i} has invalid type: {op_type}. Must be create, modify, delete, or rename"
+            }
+
+        if "path" not in op:
+            return {
+                "success": False,
+                "error": f"Operation {i} missing required field: path"
+            }
+
+        # Validate type-specific requirements
+        if op_type == "rename" and "new_path" not in op:
+            return {
+                "success": False,
+                "error": f"Rename operation {i} missing required field: new_path"
+            }
+
+    # Initialize editor
+    backup_dir = Path.home() / ".victor" / "backups"
+    editor = FileEditor(backup_dir=str(backup_dir))
+    transaction_id = editor.start_transaction(description)
+
+    # Count operations by type
+    by_type = {"create": 0, "modify": 0, "delete": 0, "rename": 0}
+
+    # Queue all operations
+    try:
+        for op in operations:
+            op_type = op["type"]
+            path = op["path"]
+
+            if op_type == "create":
+                content = op.get("content", "")
+                editor.add_create(path, content)
+                by_type["create"] += 1
+
+            elif op_type == "modify":
+                # Support both "content" and "new_content" keys
+                content = op.get("new_content") or op.get("content")
+                if content is None:
+                    return {
+                        "success": False,
+                        "error": f"Modify operation for {path} missing content or new_content"
+                    }
+                editor.add_modify(path, content)
+                by_type["modify"] += 1
+
+            elif op_type == "delete":
+                editor.add_delete(path)
+                by_type["delete"] += 1
+
+            elif op_type == "rename":
+                new_path = op["new_path"]
+                editor.add_rename(path, new_path)
+                by_type["rename"] += 1
+
+    except Exception as e:
+        editor.abort()
         return {
             "success": False,
-            "error": "No active transaction. Call file_editor_start_transaction first."
+            "error": f"Failed to queue operations: {str(e)}"
         }
 
-    # Capture preview output
-    _editor.preview_diff(context_lines=context_lines)
+    operations_queued = len(operations)
 
-    summary = _editor.get_transaction_summary()
+    # Handle preview mode
+    if preview:
+        import io
+        import sys
 
-    return {
-        "success": True,
-        "operations_count": summary['operations'],
-        "message": f"Preview shown. Transaction has {summary['operations']} operations."
-    }
+        # Capture preview output
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = io.StringIO()
 
+        try:
+            editor.preview_diff(context_lines=context_lines)
+            preview_text = captured_output.getvalue()
+        finally:
+            sys.stdout = old_stdout
 
-@tool
-async def file_editor_commit(dry_run: bool = False) -> Dict[str, Any]:
-    """
-    Commit the transaction and apply all changes.
+        if not auto_commit:
+            editor.abort()
+            return {
+                "success": True,
+                "operations_queued": operations_queued,
+                "operations_applied": 0,
+                "by_type": by_type,
+                "preview_output": preview_text,
+                "message": f"Preview generated for {operations_queued} operations (not applied)"
+            }
+        else:
+            # Preview but still commit
+            success = editor.commit(dry_run=False)
+            if success:
+                return {
+                    "success": True,
+                    "operations_queued": operations_queued,
+                    "operations_applied": operations_queued,
+                    "by_type": by_type,
+                    "preview_output": preview_text,
+                    "message": f"Applied {operations_queued} operations successfully"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Failed to commit changes. Transaction rolled back."
+                }
 
-    Applies all queued file operations. If dry_run is True, previews
-    changes without applying them.
-
-    Args:
-        dry_run: If True, preview changes without applying (default: False).
-
-    Returns:
-        Dictionary containing:
-        - success: Whether commit succeeded
-        - message: Status message
-        - error: Error message if failed
-    """
-    global _editor, _current_transaction_id
-
-    if _editor is None:
-        return {
-            "success": False,
-            "error": "No active transaction. Call file_editor_start_transaction first."
-        }
-
-    success = _editor.commit(dry_run=dry_run)
-
-    if success:
-        message = "Dry run complete - no changes applied" if dry_run else "Transaction committed successfully"
-        _editor = None
-        _current_transaction_id = None
-
-        return {
-            "success": True,
-            "message": message
-        }
+    # Handle auto_commit
+    if auto_commit:
+        success = editor.commit(dry_run=False)
+        if success:
+            return {
+                "success": True,
+                "operations_queued": operations_queued,
+                "operations_applied": operations_queued,
+                "by_type": by_type,
+                "message": f"Successfully applied {operations_queued} operations",
+                "transaction_id": transaction_id
+            }
+        else:
+            return {
+                "success": False,
+                "error": "Failed to commit changes. Transaction rolled back."
+            }
     else:
-        return {
-            "success": False,
-            "error": "Transaction commit failed. Changes were rolled back."
-        }
-
-
-@tool
-async def file_editor_rollback() -> Dict[str, Any]:
-    """
-    Rollback the transaction and undo all changes.
-
-    Reverts all file operations that were applied during commit.
-    Only works if the transaction was already committed.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether rollback succeeded
-        - message: Status message
-        - error: Error message if failed
-    """
-    global _editor, _current_transaction_id
-
-    if _editor is None:
-        return {
-            "success": False,
-            "error": "No active transaction. Call file_editor_start_transaction first."
-        }
-
-    success = _editor.rollback()
-    _editor = None
-    _current_transaction_id = None
-
-    if success:
+        # Queue only, don't commit
+        editor.abort()  # Abort to clean up, since we're not committing
         return {
             "success": True,
-            "message": "Transaction rolled back successfully"
+            "operations_queued": operations_queued,
+            "operations_applied": 0,
+            "by_type": by_type,
+            "message": f"Queued {operations_queued} operations (not applied, auto_commit=False)"
         }
-    else:
-        return {
-            "success": False,
-            "error": "Rollback failed"
-        }
-
-
-@tool
-async def file_editor_abort() -> Dict[str, Any]:
-    """
-    Abort the transaction without applying changes.
-
-    Cancels the current transaction and discards all queued operations
-    without applying them.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether abort succeeded
-        - message: Status message
-        - error: Error message if failed
-    """
-    global _editor, _current_transaction_id
-
-    if _editor is None:
-        return {
-            "success": False,
-            "error": "No active transaction"
-        }
-
-    _editor.abort()
-    _editor = None
-    _current_transaction_id = None
-
-    return {
-        "success": True,
-        "message": "Transaction aborted"
-    }
-
-
-@tool
-async def file_editor_status() -> Dict[str, Any]:
-    """
-    Get the current transaction status.
-
-    Returns information about the active transaction including ID,
-    description, and counts of queued operations by type.
-
-    Returns:
-        Dictionary containing:
-        - success: Always True
-        - transaction_id: ID of active transaction (if any)
-        - description: Transaction description
-        - operations: Total number of queued operations
-        - by_type: Breakdown of operations by type (create, modify, delete, rename)
-        - message: Status message
-    """
-    if _editor is None:
-        return {
-            "success": True,
-            "message": "No active transaction"
-        }
-
-    summary = _editor.get_transaction_summary()
-
-    return {
-        "success": True,
-        "transaction_id": summary['id'],
-        "description": summary['description'],
-        "operations": summary['operations'],
-        "by_type": summary['by_type'],
-        "message": f"Active transaction with {summary['operations']} operations"
-    }
 
 
 # Keep the class for backward compatibility during transition
 # This can be removed once all imports are updated
 class FileEditorTool:
-    """Deprecated: Use individual file_editor_* functions instead."""
+    """Deprecated: Use edit_files function instead."""
 
     def __init__(self):
         """Initialize - deprecated."""
         import warnings
         warnings.warn(
-            "FileEditorTool class is deprecated. Use file_editor_* functions instead.",
+            "FileEditorTool class is deprecated. Use edit_files function instead.",
             DeprecationWarning,
             stacklevel=2
         )

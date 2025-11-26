@@ -39,18 +39,7 @@ from victor.tools.code_executor_tool import (
     upload_files_to_sandbox,
 )
 from victor.tools.filesystem import list_directory, read_file, write_file
-from victor.tools.file_editor_tool import (
-    file_editor_start_transaction,
-    file_editor_add_create,
-    file_editor_add_modify,
-    file_editor_add_delete,
-    file_editor_add_rename,
-    file_editor_preview,
-    file_editor_commit,
-    file_editor_rollback,
-    file_editor_abort,
-    file_editor_status,
-)
+from victor.tools.file_editor_tool import edit_files
 from victor.tools.git_tool import (
     git_status,
     git_diff,
@@ -194,16 +183,9 @@ class AgentOrchestrator:
         self.tools.register(find_symbol)
         self.tools.register(find_references)
         self.tools.register(rename_symbol)
-        self.tools.register(file_editor_start_transaction)
-        self.tools.register(file_editor_add_create)
-        self.tools.register(file_editor_add_modify)
-        self.tools.register(file_editor_add_delete)
-        self.tools.register(file_editor_add_rename)
-        self.tools.register(file_editor_preview)
-        self.tools.register(file_editor_commit)
-        self.tools.register(file_editor_rollback)
-        self.tools.register(file_editor_abort)
-        self.tools.register(file_editor_status)
+
+        # Register file editor tool (consolidated)
+        self.tools.register(edit_files)
 
         # Set git provider and register git tools
         set_git_provider(self.provider, self.model)
@@ -332,8 +314,7 @@ class AgentOrchestrator:
         core_tool_names = {
             "read_file", "write_file", "list_directory",
             "execute_bash",
-            "file_editor_start_transaction", "file_editor_add_create",
-            "file_editor_add_modify", "file_editor_commit"
+            "edit_files"
         }
 
         # Categorize tools by use case
