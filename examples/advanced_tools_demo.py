@@ -13,7 +13,7 @@ from pathlib import Path
 
 from victor.tools.database_tool import DatabaseTool
 from victor.tools.docker_tool import DockerTool
-from victor.tools.http_tool import HTTPTool
+from victor.tools.http_tool import http_request, http_test
 
 
 async def demo_database_tool():
@@ -163,75 +163,65 @@ async def demo_http_tool():
     print("\n\n🌐 HTTP Tool Demo")
     print("=" * 70)
 
-    http_tool = HTTPTool(timeout=15)
-
     # Simple GET request
     print("\n1️⃣ GET request to GitHub API...")
-    result = await http_tool.execute(
-        operation="request",
+    result = await http_request(
         method="GET",
-        url="https://api.github.com/users/octocat"
+        url="https://api.github.com/users/octocat",
+        timeout=15
     )
-    if result.success:
-        import json
-        response = json.loads(result.output)
-        print(f"Status: {response['status_code']}")
-        print(f"Duration: {response['duration_ms']}ms")
-        print(f"User: {response['body'].get('name', 'N/A')}")
+    if result.get("success"):
+        print(f"Status: {result['status_code']}")
+        print(f"Duration: {result['duration_ms']}ms")
+        print(f"User: {result['body'].get('name', 'N/A')}")
     else:
-        print(f"Error: {result.error}")
+        print(f"Error: {result.get('error')}")
 
     # GET with query parameters
     print("\n2️⃣ GET with query parameters...")
-    result = await http_tool.execute(
-        operation="request",
+    result = await http_request(
         method="GET",
         url="https://api.github.com/search/repositories",
-        params={"q": "language:python", "sort": "stars", "per_page": 3}
+        params={"q": "language:python", "sort": "stars", "per_page": 3},
+        timeout=15
     )
-    if result.success:
-        import json
-        response = json.loads(result.output)
-        print(f"Status: {response['status_code']}")
-        print(f"Duration: {response['duration_ms']}ms")
-        if isinstance(response['body'], dict):
-            print(f"Total count: {response['body'].get('total_count', 'N/A')}")
+    if result.get("success"):
+        print(f"Status: {result['status_code']}")
+        print(f"Duration: {result['duration_ms']}ms")
+        if isinstance(result['body'], dict):
+            print(f"Total count: {result['body'].get('total_count', 'N/A')}")
     else:
-        print(f"Error: {result.error}")
+        print(f"Error: {result.get('error')}")
 
     # API testing with validation
     print("\n3️⃣ API testing with validation...")
-    result = await http_tool.execute(
-        operation="test",
+    result = await http_test(
         method="GET",
         url="https://api.github.com",
-        expected_status=200
+        expected_status=200,
+        timeout=15
     )
-    if result.success:
-        import json
-        test_result = json.loads(result.output)
-        print(f"Test passed: {test_result['all_passed']}")
-        print(f"Status: {test_result['status_code']}")
-        print(f"Duration: {test_result['duration_ms']}ms")
+    if result.get("success"):
+        print(f"Test passed: {result['all_passed']}")
+        print(f"Status: {result['status_code']}")
+        print(f"Duration: {result['duration_ms']}ms")
     else:
-        print(f"Error: {result.error}")
+        print(f"Error: {result.get('error')}")
 
     # POST request (httpbin echo)
     print("\n4️⃣ POST request with JSON body...")
-    result = await http_tool.execute(
-        operation="request",
+    result = await http_request(
         method="POST",
         url="https://httpbin.org/post",
         headers={"Content-Type": "application/json"},
-        json={"key": "value", "test": True}
+        json={"key": "value", "test": True},
+        timeout=15
     )
-    if result.success:
-        import json
-        response = json.loads(result.output)
-        print(f"Status: {response['status_code']}")
-        print(f"Duration: {response['duration_ms']}ms")
+    if result.get("success"):
+        print(f"Status: {result['status_code']}")
+        print(f"Duration: {result['duration_ms']}ms")
     else:
-        print(f"Error: {result.error}")
+        print(f"Error: {result.get('error')}")
 
     print("\n✅ HTTP Tool Features:")
     print("  ✓ All HTTP methods (GET, POST, PUT, PATCH, DELETE)")

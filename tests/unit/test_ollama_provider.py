@@ -51,8 +51,12 @@ async def test_chat_success(ollama_provider):
         "post",
         new_callable=AsyncMock,
     ) as mock_post:
-        mock_post.return_value.json.return_value = mock_response
-        mock_post.return_value.raise_for_status = lambda: None
+        # Create a mock response object
+        # Note: json() is synchronous in httpx, not async
+        mock_response_obj = AsyncMock()
+        mock_response_obj.json = lambda: mock_response  # Synchronous method
+        mock_response_obj.raise_for_status = lambda: None  # Synchronous method
+        mock_post.return_value = mock_response_obj
 
         messages = [Message(role="user", content="Hello")]
         response = await ollama_provider.chat(

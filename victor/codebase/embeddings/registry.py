@@ -108,6 +108,13 @@ def _auto_register_providers() -> None:
         pass  # ChromaDB not installed
 
     try:
+        from victor.codebase.embeddings.lancedb_provider import LanceDBProvider
+
+        EmbeddingRegistry.register("lancedb", LanceDBProvider)
+    except ImportError:
+        pass  # LanceDB not installed
+
+    try:
         from victor.codebase.embeddings.proximadb_provider import ProximaDBProvider
 
         EmbeddingRegistry.register("proximadb", ProximaDBProvider)

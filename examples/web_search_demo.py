@@ -11,7 +11,7 @@ Usage:
 """
 
 import asyncio
-from victor.tools.web_search_tool import WebSearchTool
+from victor.tools.web_search_tool import web_search, web_fetch
 
 
 async def main():
@@ -21,90 +21,83 @@ async def main():
     print("\nUsing DuckDuckGo for privacy-focused search")
     print("No API keys required!\n")
 
-    # Create web search tool (without AI provider for basic demo)
-    search_tool = WebSearchTool(provider=None, max_results=3)
-
     # Test 1: Basic web search
     print("\n1️⃣ Basic Web Search")
     print("-" * 70)
     print("Query: Python async programming best practices")
 
-    result = await search_tool.execute(
-        operation="search",
+    result = await web_search(
         query="Python async programming best practices",
         max_results=3
     )
 
-    if result.success:
-        print(result.output)
+    if result.get("success"):
+        print(result.get("results"))
     else:
-        print(f"Error: {result.error}")
+        print(f"Error: {result.get('error')}")
 
     # Test 2: Technical search
     print("\n\n2️⃣ Technical Search")
     print("-" * 70)
     print("Query: Victor AI coding assistant features")
 
-    result = await search_tool.execute(
-        operation="search",
+    result = await web_search(
         query="AI coding assistant features comparison",
         max_results=3
     )
 
-    if result.success:
-        print(result.output)
+    if result.get("success"):
+        print(result.get("results"))
     else:
-        print(f"Error: {result.error}")
+        print(f"Error: {result.get('error')}")
 
     # Test 3: Fetch specific URL
     print("\n\n3️⃣ Fetch Content from URL")
     print("-" * 70)
     print("URL: https://www.python.org")
 
-    result = await search_tool.execute(
-        operation="fetch",
+    result = await web_fetch(
         url="https://www.python.org"
     )
 
-    if result.success:
+    if result.get("success"):
         # Show first 500 chars of content
-        content = result.output[:500] + "..." if len(result.output) > 500 else result.output
+        content = result.get("content", "")
+        content = content[:500] + "..." if len(content) > 500 else content
         print(content)
     else:
-        print(f"Error: {result.error}")
+        print(f"Error: {result.get('error')}")
 
     # Test 4: Search with more results
     print("\n\n4️⃣ Extended Search")
     print("-" * 70)
     print("Query: machine learning tutorials")
 
-    result = await search_tool.execute(
-        operation="search",
+    result = await web_search(
         query="machine learning tutorials for beginners",
         max_results=5
     )
 
-    if result.success:
-        print(result.output)
+    if result.get("success"):
+        print(result.get("results"))
     else:
-        print(f"Error: {result.error}")
+        print(f"Error: {result.get('error')}")
 
     # Test 5: Region-specific search
     print("\n\n5️⃣ Region-Specific Search")
     print("-" * 70)
     print("Query: local AI meetups (US region)")
 
-    result = await search_tool.execute(
-        operation="search",
+    result = await web_search(
         query="AI and machine learning meetups",
         max_results=3,
         region="us-en"
     )
 
-    if result.success:
-        print(result.output)
+    if result.get("success"):
+        print(result.get("results"))
     else:
-        print(f"Error: {result.error}")
+        print(f"Error: {result.get('error')}")
 
     print("\n\n✨ Demo Complete!")
     print("\nWeb Search Tool Features:")

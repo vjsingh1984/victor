@@ -11,280 +11,220 @@ Features:
 
 import json
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import httpx
 
-from victor.tools.base import BaseTool, ToolParameter, ToolResult
+from victor.tools.decorators import tool
 
 
-class HTTPTool(BaseTool):
-    """Tool for HTTP requests and API testing."""
+@tool
+async def http_request(
+    method: str,
+    url: str,
+    headers: Optional[Dict[str, Any]] = None,
+    params: Optional[Dict[str, Any]] = None,
+    json: Optional[Dict[str, Any]] = None,
+    data: Optional[Dict[str, Any]] = None,
+    auth: Optional[str] = None,
+    follow_redirects: bool = True,
+    timeout: int = 30
+) -> Dict[str, Any]:
+    """
+    Make an HTTP request to a URL.
 
-    def __init__(self, timeout: int = 30):
-        """Initialize HTTP tool.
+    Supports all HTTP methods with headers, authentication, query parameters,
+    JSON body, form data, and performance metrics.
 
-        Args:
-            timeout: Request timeout in seconds
-        """
-        super().__init__()
-        self.timeout = timeout
+    Args:
+        method: HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS).
+        url: Request URL.
+        headers: Request headers (optional).
+        params: Query parameters (optional).
+        json: JSON body as dictionary (optional).
+        data: Form data as dictionary (optional).
+        auth: Authentication - 'Bearer TOKEN' or 'Basic USER:PASS' (optional).
+        follow_redirects: Follow redirects (default: true).
+        timeout: Request timeout in seconds (default: 30).
 
-    @property
-    def name(self) -> str:
-        """Get tool name."""
-        return "http"
+    Returns:
+        Dictionary containing:
+        - success: Whether request succeeded
+        - status_code: HTTP status code
+        - status: Status reason phrase
+        - headers: Response headers
+        - body: Parsed JSON or text response
+        - duration_ms: Request duration in milliseconds
+        - url: Final URL (after redirects)
+        - error: Error message if failed
+    """
+    if not url:
+        return {
+            "success": False,
+            "error": "Missing required parameter: url"
+        }
 
-    @property
-    def description(self) -> str:
-        """Get tool description."""
-        return """HTTP requests and API testing.
+    method = method.upper()
+    request_headers = headers or {}
 
-Make HTTP requests to test APIs and web endpoints.
+    # Handle authentication
+    if auth:
+        if auth.startswith("Bearer ") or auth.startswith("Basic "):
+            request_headers["Authorization"] = auth
 
-Operations:
-- request: Make HTTP request (GET, POST, PUT, PATCH, DELETE)
-- test: Test API endpoint with validation
+    try:
+        # Make request
+        start_time = time.time()
 
-Supports:
-- All HTTP methods
-- Custom headers
-- Authentication (Bearer, Basic)
-- JSON and form data
-- Query parameters
-- Response validation
-
-Example workflows:
-1. Simple GET request:
-   http(operation="request", method="GET", url="https://api.github.com/users/octocat")
-
-2. POST with JSON:
-   http(operation="request", method="POST", url="https://api.example.com/data",
-        headers={"Content-Type": "application/json"},
-        json={"key": "value"})
-
-3. API testing:
-   http(operation="test", method="GET", url="https://api.example.com/health",
-        expected_status=200)
-"""
-
-    @property
-    def parameters(self) -> Dict[str, Any]:
-        """Get tool parameters."""
-        return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: request, test",
-                required=True,
-            ),
-            ToolParameter(
-                name="method",
-                type="string",
-                description="HTTP method: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS",
-                required=True,
-            ),
-            ToolParameter(
-                name="url",
-                type="string",
-                description="Request URL",
-                required=True,
-            ),
-            ToolParameter(
-                name="headers",
-                type="object",
-                description="Request headers (dict)",
-                required=False,
-            ),
-            ToolParameter(
-                name="params",
-                type="object",
-                description="Query parameters (dict)",
-                required=False,
-            ),
-            ToolParameter(
-                name="json",
-                type="object",
-                description="JSON body (dict)",
-                required=False,
-            ),
-            ToolParameter(
-                name="data",
-                type="object",
-                description="Form data (dict)",
-                required=False,
-            ),
-            ToolParameter(
-                name="auth",
-                type="string",
-                description="Authentication: 'Bearer TOKEN' or 'Basic USER:PASS'",
-                required=False,
-            ),
-            ToolParameter(
-                name="expected_status",
-                type="integer",
-                description="Expected status code (for test operation)",
-                required=False,
-            ),
-            ToolParameter(
-                name="follow_redirects",
-                type="boolean",
-                description="Follow redirects (default: true)",
-                required=False,
-            ),
-        ]
-        )
-
-    async def execute(self, **kwargs: Any) -> ToolResult:
-        """Execute HTTP operation.
-
-        Args:
-            operation: Operation to perform
-            **kwargs: Operation-specific parameters
-
-        Returns:
-            Tool result with response or error
-        """
-        operation = kwargs.get("operation")
-
-        if not operation:
-            return ToolResult(
-                success=False,
-                output="",
-                error="Missing required parameter: operation",
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=follow_redirects) as client:
+            response = await client.request(
+                method=method,
+                url=url,
+                headers=request_headers,
+                params=params,
+                json=json,
+                data=data,
             )
 
-        try:
-            if operation == "request":
-                return await self._request(kwargs)
-            elif operation == "test":
-                return await self._test(kwargs)
-            else:
-                return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Unknown operation: {operation}",
-                )
-
-        except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"HTTP error: {str(e)}"
-            )
-
-    async def _request(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Make HTTP request."""
-        method = kwargs.get("method", "GET").upper()
-        url = kwargs.get("url")
-
-        if not url:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: url"
-            )
-
-        # Prepare request
-        headers = kwargs.get("headers", {})
-        params = kwargs.get("params")
-        json_data = kwargs.get("json")
-        form_data = kwargs.get("data")
-        follow_redirects = kwargs.get("follow_redirects", True)
-
-        # Handle authentication
-        auth = kwargs.get("auth")
-        if auth:
-            if auth.startswith("Bearer "):
-                headers["Authorization"] = auth
-            elif auth.startswith("Basic "):
-                headers["Authorization"] = auth
-
-        try:
-            # Make request
-            start_time = time.time()
-
-            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=follow_redirects) as client:
-                response = await client.request(
-                    method=method,
-                    url=url,
-                    headers=headers,
-                    params=params,
-                    json=json_data,
-                    data=form_data,
-                )
-
-            duration = time.time() - start_time
-
-            # Parse response
-            try:
-                response_json = response.json()
-            except:
-                response_json = None
-
-            # Build result
-            result = {
-                "status_code": response.status_code,
-                "status": response.reason_phrase,
-                "headers": dict(response.headers),
-                "body": response_json if response_json else response.text[:1000],  # Limit text
-                "duration_ms": int(duration * 1000),
-                "url": str(response.url),
-            }
-
-            return ToolResult(
-                success=True,
-                output=json.dumps(result, indent=2),
-                error="",
-            )
-
-        except httpx.TimeoutException:
-            return ToolResult(
-                success=False,
-                output="",
-                error=f"Request timed out after {self.timeout} seconds",
-            )
-        except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"Request failed: {str(e)}"
-            )
-
-    async def _test(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Test API endpoint with validation."""
-        # Make request first
-        request_result = await self._request(kwargs)
-
-        if not request_result.success:
-            return request_result
+        duration = time.time() - start_time
 
         # Parse response
-        response = json.loads(request_result.output)
+        try:
+            response_json = response.json()
+        except:
+            response_json = None
+
+        # Build result
+        return {
+            "success": True,
+            "status_code": response.status_code,
+            "status": response.reason_phrase,
+            "headers": dict(response.headers),
+            "body": response_json if response_json else response.text[:1000],  # Limit text
+            "duration_ms": int(duration * 1000),
+            "url": str(response.url),
+        }
+
+    except httpx.TimeoutException:
+        return {
+            "success": False,
+            "error": f"Request timed out after {timeout} seconds"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Request failed: {str(e)}"
+        }
+
+
+@tool
+async def http_test(
+    method: str,
+    url: str,
+    expected_status: Optional[int] = None,
+    headers: Optional[Dict[str, Any]] = None,
+    params: Optional[Dict[str, Any]] = None,
+    json: Optional[Dict[str, Any]] = None,
+    data: Optional[Dict[str, Any]] = None,
+    auth: Optional[str] = None,
+    follow_redirects: bool = True,
+    timeout: int = 30
+) -> Dict[str, Any]:
+    """
+    Test an API endpoint with validation.
+
+    Makes an HTTP request and validates the response against expected values.
+    Currently validates status code, can be extended for more validations.
+
+    Args:
+        method: HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS).
+        url: Request URL.
+        expected_status: Expected HTTP status code (optional).
+        headers: Request headers (optional).
+        params: Query parameters (optional).
+        json: JSON body as dictionary (optional).
+        data: Form data as dictionary (optional).
+        auth: Authentication - 'Bearer TOKEN' or 'Basic USER:PASS' (optional).
+        follow_redirects: Follow redirects (default: true).
+        timeout: Request timeout in seconds (default: 30).
+
+    Returns:
+        Dictionary containing:
+        - success: Whether all validations passed
+        - url: Final URL tested
+        - method: HTTP method used
+        - status_code: HTTP status code received
+        - duration_ms: Request duration in milliseconds
+        - validations: List of validation results
+        - all_passed: Whether all validations passed
+        - error: Error message if request failed
+    """
+    # Make request first using http_request
+    # We need to call the underlying logic directly to avoid double decoration
+    if not url:
+        return {
+            "success": False,
+            "error": "Missing required parameter: url"
+        }
+
+    method_upper = method.upper()
+    request_headers = headers or {}
+
+    # Handle authentication
+    if auth:
+        if auth.startswith("Bearer ") or auth.startswith("Basic "):
+            request_headers["Authorization"] = auth
+
+    try:
+        # Make request
+        start_time = time.time()
+
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=follow_redirects) as client:
+            response = await client.request(
+                method=method_upper,
+                url=url,
+                headers=request_headers,
+                params=params,
+                json=json,
+                data=data,
+            )
+
+        duration = time.time() - start_time
 
         # Validate
         validations = []
         all_passed = True
 
         # Check status code
-        expected_status = kwargs.get("expected_status")
         if expected_status is not None:
-            passed = response["status_code"] == expected_status
+            passed = response.status_code == expected_status
             all_passed = all_passed and passed
             validations.append({
                 "test": "Status code",
                 "expected": expected_status,
-                "actual": response["status_code"],
+                "actual": response.status_code,
                 "passed": passed,
             })
 
         # Build test result
-        test_result = {
-            "url": response["url"],
-            "method": kwargs.get("method", "GET").upper(),
-            "status_code": response["status_code"],
-            "duration_ms": response["duration_ms"],
+        return {
+            "success": all_passed,
+            "url": str(response.url),
+            "method": method_upper,
+            "status_code": response.status_code,
+            "duration_ms": int(duration * 1000),
             "validations": validations,
             "all_passed": all_passed,
+            "error": "" if all_passed else "Some validations failed"
         }
 
-        return ToolResult(
-            success=all_passed,
-            output=json.dumps(test_result, indent=2),
-            error="" if all_passed else "Some validations failed",
-        )
+    except httpx.TimeoutException:
+        return {
+            "success": False,
+            "error": f"Request timed out after {timeout} seconds"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Request failed: {str(e)}"
+        }

@@ -1,0 +1,313 @@
+# Tool Calling Model Manifest for Ollama
+# This file ranks models by their tool calling capabilities
+# Based on research from: https://collabnix.com/best-ollama-models-for-function-calling-tools-complete-guide-2025/
+
+# Model Tiers:
+# - Tier S: Exceptional (90%+ accuracy)
+# - Tier A: Excellent (85-89% accuracy)
+# - Tier B: Good (80-84% accuracy)
+# - Tier C: Fair (75-79% accuracy)
+# - Tier D: Limited tool calling support
+
+tool_calling_models:
+  # ==================== TIER S: EXCEPTIONAL ====================
+  tier_s:
+    - name: "llama3.1:70b"
+      short_name: "llama3.1:70b"
+      parameters: "70B"
+      ram_required: "64GB+"
+      ram_recommended: "128GB"
+      overall_score: 94
+      schema_understanding: 96
+      parameter_extraction: 94
+      error_handling: 92
+      speed: "slow"
+      use_cases:
+        - "Enterprise systems"
+        - "Mission-critical processes"
+        - "Complex multi-step orchestration"
+        - "Financial/Healthcare applications"
+      notes: "Best accuracy, requires significant resources"
+
+    - name: "llama3.1:8b"
+      short_name: "llama3.1:8b"
+      parameters: "8B"
+      ram_required: "8GB+"
+      ram_recommended: "16GB"
+      overall_score: 89
+      schema_understanding: 91
+      parameter_extraction: 89
+      error_handling: 87
+      speed: "fast"
+      use_cases:
+        - "Enterprise chatbots"
+        - "Customer service automation"
+        - "Data analysis workflows"
+        - "General purpose tool calling"
+      notes: "Best overall choice - excellent balance of performance and resource usage"
+      recommended: true
+
+  # ==================== TIER A: EXCELLENT ====================
+  tier_a:
+    - name: "codellama:34b-python"
+      short_name: "codellama:34b"
+      parameters: "34B"
+      ram_required: "32GB+"
+      ram_recommended: "64GB"
+      overall_score: 88
+      schema_understanding: 89
+      parameter_extraction: 92
+      error_handling: 85
+      speed: "medium"
+      use_cases:
+        - "Code generation and modification"
+        - "API integration"
+        - "DevOps automation"
+        - "Development workflows"
+      notes: "Superior for code-related tool calling"
+      code_specialized: true
+
+    - name: "mixtral:8x7b"
+      short_name: "mixtral:8x7b"
+      parameters: "8x7B (MoE)"
+      ram_required: "24GB+"
+      ram_recommended: "48GB"
+      overall_score: 88
+      schema_understanding: 88
+      parameter_extraction: 87
+      error_handling: 89
+      speed: "medium"
+      use_cases:
+        - "Multi-domain applications"
+        - "International automation"
+        - "Complex reasoning tasks"
+        - "Research platforms"
+      notes: "Mixture of Experts architecture, excellent error handling"
+
+    - name: "mistral:7b-instruct"
+      short_name: "mistral:7b"
+      parameters: "7B"
+      ram_required: "7GB+"
+      ram_recommended: "16GB"
+      overall_score: 85
+      schema_understanding: 86
+      parameter_extraction: 85
+      error_handling: 84
+      speed: "very_fast"
+      use_cases:
+        - "Real-time applications"
+        - "Edge deployments"
+        - "High-throughput automation"
+        - "Resource-constrained environments"
+      notes: "Fastest inference (0.8s), good for real-time needs"
+
+    - name: "qwen2.5-coder:7b"
+      short_name: "qwen-coder:7b"
+      parameters: "7B"
+      ram_required: "7GB+"
+      ram_recommended: "16GB"
+      overall_score: 87
+      schema_understanding: 88
+      parameter_extraction: 90
+      error_handling: 83
+      speed: "fast"
+      use_cases:
+        - "Code generation"
+        - "Code modification"
+        - "Development automation"
+        - "Programming tasks"
+      notes: "Excellent for coding tasks, good tool parameter understanding"
+      code_specialized: true
+      recommended_for_coding: true
+
+    - name: "deepseek-coder:33b-instruct"
+      short_name: "deepseek-coder:33b"
+      parameters: "33B"
+      ram_required: "32GB+"
+      ram_recommended: "64GB"
+      overall_score: 88
+      schema_understanding: 90
+      parameter_extraction: 91
+      error_handling: 84
+      speed: "medium"
+      use_cases:
+        - "Complex code generation"
+        - "Architecture design"
+        - "Code refactoring"
+        - "Technical documentation"
+      notes: "DeepSeek's code-specialized model, excellent for programming"
+      code_specialized: true
+
+    - name: "qwen3-coder:30b"
+      short_name: "qwen3-coder:30b"
+      parameters: "30B"
+      ram_required: "30GB+"
+      ram_recommended: "64GB"
+      overall_score: 88
+      schema_understanding: 89
+      parameter_extraction: 91
+      error_handling: 84
+      speed: "medium"
+      use_cases:
+        - "Enterprise code generation"
+        - "Complex programming tasks"
+        - "Multi-file refactoring"
+        - "Architecture planning"
+      notes: "Latest Qwen coder model, excellent for complex coding"
+      code_specialized: true
+
+  # ==================== TIER B: GOOD ====================
+  tier_b:
+    - name: "llama3:8b"
+      short_name: "llama3:8b"
+      parameters: "8B"
+      ram_required: "8GB+"
+      ram_recommended: "16GB"
+      overall_score: 82
+      schema_understanding: 83
+      parameter_extraction: 82
+      error_handling: 81
+      speed: "fast"
+      use_cases:
+        - "General purpose"
+        - "Basic automation"
+        - "Simple tool calling"
+      notes: "Previous generation Llama, still capable"
+
+    - name: "phi4-reasoning:plus"
+      short_name: "phi4"
+      parameters: "14B"
+      ram_required: "14GB+"
+      ram_recommended: "24GB"
+      overall_score: 83
+      schema_understanding: 85
+      parameter_extraction: 82
+      error_handling: 82
+      speed: "fast"
+      use_cases:
+        - "Reasoning tasks"
+        - "Logic-based automation"
+        - "Problem solving"
+      notes: "Microsoft's reasoning-focused model"
+
+  # ==================== TIER C: FAIR ====================
+  tier_c:
+    - name: "gemma3:27b"
+      short_name: "gemma3:27b"
+      parameters: "27B"
+      ram_required: "27GB+"
+      ram_recommended: "48GB"
+      overall_score: 78
+      schema_understanding: 79
+      parameter_extraction: 77
+      error_handling: 78
+      speed: "medium"
+      use_cases:
+        - "General tasks"
+        - "Basic automation"
+      notes: "Google's Gemma, moderate tool calling support"
+
+    - name: "llama3.2:latest"
+      short_name: "llama3.2"
+      parameters: "3B"
+      ram_required: "3GB+"
+      ram_recommended: "8GB"
+      overall_score: 75
+      schema_understanding: 76
+      parameter_extraction: 74
+      error_handling: 75
+      speed: "very_fast"
+      use_cases:
+        - "Lightweight applications"
+        - "Simple tasks"
+        - "Resource-constrained environments"
+      notes: "Smallest Llama model, limited tool calling"
+
+# ==================== RECOMMENDATIONS ====================
+recommendations:
+  general_purpose:
+    primary: "llama3.1:8b"
+    alternative: "mistral:7b-instruct"
+    high_accuracy: "llama3.1:70b"
+
+  code_generation:
+    primary: "qwen2.5-coder:7b"
+    alternative: "deepseek-coder:33b-instruct"
+    advanced: "qwen3-coder:30b"
+    legacy: "codellama:34b-python"
+
+  resource_constrained:
+    primary: "mistral:7b-instruct"
+    alternative: "qwen2.5-coder:7b"
+    minimal: "llama3.2:latest"
+
+  enterprise:
+    primary: "llama3.1:70b"
+    alternative: "deepseek-coder:33b-instruct"
+    balanced: "llama3.1:8b"
+
+# ==================== SYSTEM REQUIREMENTS ====================
+system_recommendations:
+  minimum:
+    ram: "16GB"
+    storage: "10GB"
+    recommended_models:
+      - "llama3.1:8b"
+      - "qwen2.5-coder:7b"
+      - "mistral:7b-instruct"
+
+  recommended:
+    ram: "32GB"
+    storage: "50GB"
+    recommended_models:
+      - "llama3.1:8b"
+      - "qwen3-coder:30b"
+      - "deepseek-coder:33b-instruct"
+      - "mixtral:8x7b"
+
+  high_performance:
+    ram: "64GB+"
+    storage: "100GB+"
+    recommended_models:
+      - "llama3.1:70b"
+      - "qwen3-coder:30b"
+      - "deepseek-coder:33b-instruct"
+      - "codellama:34b-python"
+
+# ==================== TOOL CALLING FEATURES ====================
+tool_calling_features:
+  supported_features:
+    - "Function schema definition"
+    - "Parameter validation"
+    - "Multi-step tool orchestration"
+    - "Error handling and recovery"
+    - "Streaming tool calls"
+    - "Parallel tool execution"
+
+  model_compatibility:
+    native_support:
+      - "llama3.1:*"
+      - "mistral:*"
+      - "mixtral:*"
+      - "qwen2.5-coder:*"
+      - "qwen3-coder:*"
+
+    workaround_required:
+      - "older models without native function calling"
+
+# ==================== NOTES ====================
+notes:
+  - "Scores based on research from https://collabnix.com/best-ollama-models-for-function-calling-tools-complete-guide-2025/"
+  - "Tool calling support requires Ollama 0.1.32+"
+  - "Streaming tool calls supported in latest Ollama versions"
+  - "Code-specialized models (qwen-coder, deepseek-coder, codellama) excel at tool calling for programming tasks"
+  - "For Victor, qwen2.5-coder:7b is recommended as default for balance of code quality and tool calling"
+  - "RAM requirements assume Q4 quantization; higher quantization needs more RAM"
+
+# ==================== VERSION ====================
+version: "1.0"
+last_updated: "2025-11-24"
+sources:
+  - "https://collabnix.com/best-ollama-models-for-function-calling-tools-complete-guide-2025/"
+  - "https://docs.ollama.com/capabilities/tool-calling"
+  - "https://ollama.com/blog/tool-support"

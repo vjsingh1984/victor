@@ -5,7 +5,12 @@ ChromaDB is a lightweight, easy-to-use embedding database perfect for:
 - Small to medium codebases (< 100k documents)
 - Quick prototyping
 
-Install: pip install chromadb sentence-transformers
+Install: pip install chromadb
+
+For embedding models:
+- Ollama: pip install httpx (then: ollama pull qwen3-embedding:8b)
+- Sentence-transformers: pip install sentence-transformers
+- OpenAI: pip install openai (requires API key)
 """
 
 import asyncio
@@ -15,7 +20,6 @@ from typing import Any, Dict, List, Optional
 try:
     import chromadb
     from chromadb.config import Settings
-    from sentence_transformers import SentenceTransformer
 
     CHROMADB_AVAILABLE = True
 except ImportError:
@@ -26,23 +30,28 @@ from victor.codebase.embeddings.base import (
     EmbeddingConfig,
     SearchResult,
 )
+from victor.codebase.embeddings.models import (
+    BaseEmbeddingModel,
+    EmbeddingModelConfig,
+    create_embedding_model,
+)
 
 
 class ChromaDBProvider(BaseEmbeddingProvider):
     """ChromaDB embedding provider.
 
-    Uses ChromaDB for vector storage and sentence-transformers for embeddings.
+    Uses ChromaDB for vector storage with pluggable embedding models.
 
     Features:
     - In-memory or persistent storage
     - Automatic embedding generation
     - Metadata filtering
     - Easy setup (no external services)
+    - Support for multiple embedding models (Ollama, OpenAI, Sentence-transformers, Cohere)
 
     Limitations:
     - Not optimized for very large datasets (>100k docs)
     - Single-machine only
-    - CPU-based inference (slower than GPU)
     """
 
     def __init__(self, config: EmbeddingConfig):
@@ -55,20 +64,25 @@ class ChromaDBProvider(BaseEmbeddingProvider):
 
         if not CHROMADB_AVAILABLE:
             raise ImportError(
-                "ChromaDB not available. Install with: "
-                "pip install chromadb sentence-transformers"
+                "ChromaDB not available. Install with: pip install chromadb"
             )
 
         self.client: Optional[chromadb.Client] = None
         self.collection: Optional[chromadb.Collection] = None
-        self.embedding_model: Optional[SentenceTransformer] = None
+        self.embedding_model: Optional[BaseEmbeddingModel] = None
 
     async def initialize(self) -> None:
         """Initialize ChromaDB and load embedding model."""
         if self._initialized:
             return
 
-        print(f"🔧 Initializing ChromaDB provider (model: {self.config.model})")
+        # Get embedding model configuration from EmbeddingConfig
+        model_type = self.config.embedding_model_type
+        model_name = self.config.embedding_model_name
+
+        print(f"🔧 Initializing ChromaDB provider")
+        print(f"📦 Vector Store: ChromaDB")
+        print(f"🤖 Embedding Model: {model_name} ({model_type})")
 
         # Initialize ChromaDB client
         if self.config.persist_directory:
@@ -101,12 +115,18 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             print(f"⚠️  Warning: Could not create collection: {e}")
             self.collection = self.client.get_collection(collection_name)
 
-        # Load embedding model (runs in executor to avoid blocking)
-        print(f"🤖 Loading embedding model: {self.config.model}...")
-        loop = asyncio.get_event_loop()
-        self.embedding_model = await loop.run_in_executor(
-            None, SentenceTransformer, self.config.model
+        # Create embedding model config
+        embedding_config = EmbeddingModelConfig(
+            model_type=model_type,
+            model_name=model_name,
+            dimension=self.config.extra_config.get("dimension", 4096),  # Default to 4096 for Qwen3
+            api_key=self.config.embedding_api_key,  # For OpenAI/Cohere API key, or Ollama base_url
+            batch_size=self.config.extra_config.get("batch_size", 16),  # Lower batch size for large models
         )
+
+        # Initialize embedding model
+        self.embedding_model = create_embedding_model(embedding_config)
+        await self.embedding_model.initialize()
 
         self._initialized = True
         print("✅ ChromaDB provider initialized!")
@@ -123,12 +143,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
-        # Run embedding in executor (CPU-bound)
-        loop = asyncio.get_event_loop()
-        embedding = await loop.run_in_executor(
-            None, self.embedding_model.encode, text
-        )
-        return embedding.tolist()
+        return await self.embedding_model.embed_text(text)
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts (optimized).
@@ -142,12 +157,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
 
-        # Batch encoding is much faster than individual
-        loop = asyncio.get_event_loop()
-        embeddings = await loop.run_in_executor(
-            None, self.embedding_model.encode, texts
-        )
-        return [emb.tolist() for emb in embeddings]
+        return await self.embedding_model.embed_batch(texts)
 
     async def index_document(
         self, doc_id: str, content: str, metadata: Dict[str, Any]
@@ -310,8 +320,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         return {
             "provider": "chromadb",
             "total_documents": count,
-            "model_name": self.config.model,
-            "dimension": self.config.dimension,
+            "embedding_model_type": self.config.embedding_model_type,
+            "embedding_model_name": self.config.embedding_model_name,
+            "dimension": self.embedding_model.get_dimension() if self.embedding_model else 4096,
             "distance_metric": self.config.distance_metric,
             "collection_name": self.collection.name,
             "persist_directory": self.config.persist_directory,
@@ -319,6 +330,10 @@ class ChromaDBProvider(BaseEmbeddingProvider):
 
     async def close(self) -> None:
         """Clean up resources."""
+        if self.embedding_model:
+            await self.embedding_model.close()
+            self.embedding_model = None
+
         if self.client and self.config.persist_directory:
             # ChromaDB auto-persists, no explicit save needed
             pass

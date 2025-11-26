@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_file: Optional[str] = None
 
+    # Privacy and Security
+    airgapped_mode: bool = False
+
     # UI
     theme: str = "monokai"
     show_token_count: bool = True

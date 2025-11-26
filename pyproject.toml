@@ -62,6 +62,8 @@ dependencies = [
     "jsonschema>=4.20",
     "tiktoken>=0.7",
     "pyyaml>=6.0",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
 
     # Code Analysis
     "tree-sitter>=0.21",
@@ -70,6 +72,8 @@ dependencies = [
     # Caching
     "cachetools>=5.3",
     "diskcache>=5.6",
+    "docker>=7.0",
+    "docstring-parser>=0.15",
 ]
 
 [project.optional-dependencies]
@@ -79,6 +83,7 @@ dev = [
     "pytest-asyncio>=0.23",
     "pytest-cov>=4.1",
     "pytest-mock>=3.12",
+    "pytest-json-report>=1.5.0",
     "respx>=0.21",
 
     # Linting/Formatting

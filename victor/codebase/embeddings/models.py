@@ -331,11 +331,187 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
         return dimensions.get(self.config.model_name, self.config.dimension)
 
 
+class OllamaEmbeddingModel(BaseEmbeddingModel):
+    """Ollama embedding model (local, high-performance).
+
+    Pros:
+    - Free and runs locally (no API costs)
+    - High accuracy models (Qwen3-Embedding:8b is #1 on MTEB multilingual)
+    - No API limits or rate limiting
+    - Large context windows (40K tokens for Qwen3)
+    - Full data privacy (embeddings stay local)
+    - No internet required after model download
+
+    Cons:
+    - Requires Ollama to be running locally
+    - Larger disk space for bigger models (4.7GB for Qwen3:8b)
+    - CPU/GPU dependent performance
+
+    Good for: Production deployments, accuracy-driven use cases, privacy,
+              offline work, cost-sensitive applications
+
+    Supported Models:
+    - qwen3-embedding:8b (RECOMMENDED) - 70.58 MTEB, 40K context, 4096-dim
+    - qwen3-embedding:4b - Fast variant, 32K context, 2560-dim (user-definable 32-2560)
+    - gte-Qwen2-7B-instruct - Instruction-tuned, large model, 3584-dim
+    - bge-m3 - Multi-functional retrieval, 8K context, 1024-dim
+    - mxbai-embed-large - SOTA for Bert-large size, 512 context, 1024-dim
+    - nomic-embed-text - Beats OpenAI ada-002, 2K context, 768-dim
+    """
+
+    def __init__(self, config: EmbeddingModelConfig):
+        """Initialize Ollama embedding model."""
+        super().__init__(config)
+        self.base_url = config.api_key or "http://localhost:11434"  # Reuse api_key field for base_url
+        self.client = None
+
+    async def initialize(self) -> None:
+        """Initialize Ollama client and verify model availability."""
+        if self._initialized:
+            return
+
+        try:
+            import httpx
+        except ImportError:
+            raise ImportError(
+                "httpx not installed. Install with: pip install httpx"
+            )
+
+        # Create async HTTP client
+        self.client = httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=120.0  # Longer timeout for large models
+        )
+
+        print(f"🤖 Initializing Ollama embedding model: {self.config.model_name}")
+        print(f"🔗 Ollama server: {self.base_url}")
+
+        # Verify model is available by testing with a small prompt
+        try:
+            response = await self.client.post(
+                "/api/embeddings",
+                json={"model": self.config.model_name, "prompt": "test"}
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise RuntimeError(
+                    f"❌ Ollama model '{self.config.model_name}' not found.\n"
+                    f"   Pull it with: ollama pull {self.config.model_name}\n"
+                    f"   Available models: ollama list"
+                )
+            else:
+                raise RuntimeError(f"❌ Ollama API error: {e}")
+        except httpx.ConnectError:
+            raise RuntimeError(
+                f"❌ Cannot connect to Ollama at {self.base_url}\n"
+                f"   Make sure Ollama is running: ollama serve\n"
+                f"   Or check if it's running on a different port"
+            )
+
+        self._initialized = True
+        print(f"✅ Ollama embedding model ready: {self.config.model_name}")
+        print(f"📊 Embedding dimension: {self.get_dimension()}")
+
+    async def embed_text(self, text: str) -> List[float]:
+        """Generate embedding for single text using Ollama.
+
+        Args:
+            text: Text to embed
+
+        Returns:
+            Embedding vector as list of floats
+        """
+        if not self._initialized:
+            await self.initialize()
+
+        try:
+            response = await self.client.post(
+                "/api/embeddings",
+                json={"model": self.config.model_name, "prompt": text}
+            )
+            response.raise_for_status()
+            result = response.json()
+            return result["embedding"]
+        except Exception as e:
+            raise RuntimeError(f"Failed to generate embedding: {e}")
+
+    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        """Generate embeddings for multiple texts (optimized with concurrent requests).
+
+        Ollama doesn't have a native batch API, so we use asyncio.gather
+        to send concurrent requests for better performance.
+
+        Args:
+            texts: List of texts to embed
+
+        Returns:
+            List of embedding vectors
+        """
+        if not self._initialized:
+            await self.initialize()
+
+        # Use asyncio.gather for concurrent requests
+        # This is much faster than sequential processing
+        tasks = [self.embed_text(text) for text in texts]
+        embeddings = await asyncio.gather(*tasks)
+        return embeddings
+
+    def get_dimension(self) -> int:
+        """Get embedding dimension based on model.
+
+        Returns:
+            Embedding dimension for the model
+        """
+        # Ollama model dimensions (based on MTEB research and official docs)
+        dimensions = {
+            # Qwen3 family (RECOMMENDED for production - highest dimensional)
+            "qwen3-embedding:8b": 4096,
+            "qwen3-embedding:4b": 2560,  # User-definable 32-2560
+            "qwen3-embedding:0.6b": 4096,
+
+            # High-dimensional instruction-tuned models
+            "gte-Qwen2-7B-instruct": 3584,
+            "gte-qwen2-7b-instruct": 3584,
+
+            # Other high-quality models
+            "snowflake-arctic-embed2": 1024,
+            "bge-m3": 1024,
+            "mxbai-embed-large": 1024,
+            "nomic-embed-text": 768,
+            "nomic-embed-text:v1.5": 768,
+
+            # Smaller models
+            "all-minilm": 384,
+            "all-minilm:l6-v2": 384,
+        }
+
+        # Check for exact match first
+        if self.config.model_name in dimensions:
+            return dimensions[self.config.model_name]
+
+        # Check for partial match (e.g., "qwen3-embedding" matches "qwen3-embedding:8b")
+        for model_key, dim in dimensions.items():
+            if self.config.model_name in model_key or model_key in self.config.model_name:
+                return dim
+
+        # Fall back to config dimension
+        return self.config.dimension
+
+    async def close(self) -> None:
+        """Clean up HTTP client resources."""
+        if self.client:
+            await self.client.aclose()
+            self.client = None
+        self._initialized = False
+
+
 # Model Registry
 _embedding_models = {
     "sentence-transformers": SentenceTransformerModel,
     "openai": OpenAIEmbeddingModel,
     "cohere": CohereEmbeddingModel,
+    "ollama": OllamaEmbeddingModel,
 }
 
 

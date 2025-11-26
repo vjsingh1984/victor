@@ -1,0 +1,131 @@
+# Victor Configuration Example: Qwen3-Embedding:8b (Production)
+#
+# This configuration uses the #1 ranked embedding model on MTEB multilingual leaderboard
+# for maximum accuracy in semantic code search.
+#
+# MTEB Score: 70.58 (Highest for open-source multilingual models)
+# Context Window: 40K tokens (excellent for large code files)
+# Embedding Dimension: 4096 (high quality semantic representations)
+# Languages: 100+ (including all programming languages)
+#
+# Setup:
+#   1. Install Ollama: https://ollama.ai/
+#   2. Pull model: ollama pull qwen3-embedding:8b
+#   3. Start Ollama: ollama serve
+#   4. Copy this file to ~/.victor/config.yaml
+#   5. Run: victor index  # Index your codebase
+
+profiles:
+  # Production profile with maximum accuracy
+  production:
+    provider: ollama
+    model: qwen2.5-coder:7b  # For code generation
+    temperature: 0.7
+    max_tokens: 8192
+
+  # Claude for complex tasks
+  claude:
+    provider: anthropic
+    model: claude-sonnet-4-5
+    temperature: 1.0
+    max_tokens: 8192
+
+# Embedding Configuration (for semantic search)
+codebase:
+  # Vector Store
+  vector_store: chromadb
+  persist_directory: ~/.victor/embeddings/production
+  distance_metric: cosine
+
+  # Embedding Model: Qwen3-Embedding:8b (RECOMMENDED for production)
+  embedding_model_type: ollama
+  embedding_model_name: qwen3-embedding:8b
+  embedding_api_key: http://localhost:11434  # Ollama server URL
+
+  # Extra configuration
+  extra_config:
+    collection_name: victor_codebase
+    dimension: 4096  # Qwen3 embedding dimension
+    batch_size: 8    # Adjust based on available RAM (lower for large models)
+
+# Alternative Configurations
+# -------------------------
+
+# Option 2: Snowflake Arctic-Embed 2.0 (Balanced - Fast & Accurate)
+# codebase:
+#   vector_store: chromadb
+#   persist_directory: ~/.victor/embeddings/arctic
+#   embedding_model_type: ollama
+#   embedding_model_name: snowflake-arctic-embed2
+#   embedding_api_key: http://localhost:11434
+#   extra_config:
+#     dimension: 1024
+#     batch_size: 32
+
+# Option 3: BGE-M3 (Multi-functional retrieval)
+# codebase:
+#   vector_store: chromadb
+#   persist_directory: ~/.victor/embeddings/bge
+#   embedding_model_type: ollama
+#   embedding_model_name: bge-m3
+#   embedding_api_key: http://localhost:11434
+#   extra_config:
+#     dimension: 1024
+#     batch_size: 32
+
+# Option 4: Sentence-Transformers (Local, no Ollama required)
+# codebase:
+#   vector_store: chromadb
+#   persist_directory: ~/.victor/embeddings/local
+#   embedding_model_type: sentence-transformers
+#   embedding_model_name: BAAI/bge-m3  # or all-mpnet-base-v2
+#   extra_config:
+#     dimension: 1024
+#     batch_size: 32
+
+# Option 5: OpenAI Embeddings (Cloud, costs money)
+# codebase:
+#   vector_store: chromadb
+#   persist_directory: ~/.victor/embeddings/openai
+#   embedding_model_type: openai
+#   embedding_model_name: text-embedding-3-large
+#   embedding_api_key: ${OPENAI_API_KEY}
+#   extra_config:
+#     dimension: 3072
+#     batch_size: 100
+
+# Provider Configuration
+providers:
+  anthropic:
+    api_key: ${ANTHROPIC_API_KEY}
+    timeout: 120
+    max_retries: 3
+
+  openai:
+    api_key: ${OPENAI_API_KEY}
+    timeout: 120
+    max_retries: 3
+
+  ollama:
+    base_url: http://localhost:11434
+    timeout: 180  # Longer timeout for large models
+
+# Performance Tuning
+# ------------------
+# For Qwen3-Embedding:8b (4.7GB model):
+#   - RAM: 8GB minimum, 16GB recommended
+#   - GPU: Optional but recommended (CUDA, Metal, ROCm)
+#   - Batch Size: 4-16 (adjust based on available RAM)
+#   - Context: 40K tokens (can embed entire large files)
+
+# For faster performance with slight accuracy trade-off:
+#   - Use qwen3-embedding:4b (2.5GB, still excellent accuracy)
+#   - Or snowflake-arctic-embed2 (568M, very fast)
+
+# Benchmarks (MTEB Leaderboard):
+# -------------------------------
+# qwen3-embedding:8b:       70.58 (Best open-source multilingual)
+# snowflake-arctic-embed2:  ~58-60 (Best efficiency)
+# bge-m3:                   59.56 (Best for RAG)
+# mxbai-embed-large:        SOTA for Bert-large size
+# all-MiniLM-L6-v2:         ~46 (Fast but lower accuracy)

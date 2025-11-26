@@ -1,7 +1,7 @@
 """Base tool framework for CodingAgent."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -84,10 +84,11 @@ class BaseTool(ABC):
         return schema
 
     @abstractmethod
-    async def execute(self, **kwargs: Any) -> ToolResult:
+    async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
         """Execute the tool.
 
         Args:
+            context: A dictionary of shared resources, e.g. {'code_manager': ...}.
             **kwargs: Tool parameters
 
         Returns:
@@ -169,14 +170,33 @@ class ToolRegistry:
     def __init__(self) -> None:
         """Initialize tool registry."""
         self._tools: Dict[str, BaseTool] = {}
+        self._before_hooks: list = []
+        self._after_hooks: list = []
 
-    def register(self, tool: BaseTool) -> None:
+    def register_before_hook(self, hook: Callable[[str, Dict[str, Any]], None]) -> None:
+        """Register a hook to be called before a tool is executed."""
+        self._before_hooks.append(hook)
+
+    def register_after_hook(self, hook: Callable[[ToolResult], None]) -> None:
+        """Register a hook to be called after a tool is executed."""
+        self._after_hooks.append(hook)
+
+
+    def register(self, tool: Any) -> None:
         """Register a tool.
 
+        Can register a BaseTool instance or a function decorated with @tool.
+
         Args:
-            tool: Tool to register
+            tool: Tool instance or decorated function to register
         """
-        self._tools[tool.name] = tool
+        if hasattr(tool, "Tool"):  # It's a decorated function
+            tool_instance = tool.Tool
+            self._tools[tool_instance.name] = tool_instance
+        elif isinstance(tool, BaseTool):  # It's a class instance
+            self._tools[tool.name] = tool
+        else:
+            raise TypeError("Can only register BaseTool instances or functions decorated with @tool")
 
     def unregister(self, name: str) -> None:
         """Unregister a tool.
@@ -213,37 +233,47 @@ class ToolRegistry:
         """
         return [tool.to_json_schema() for tool in self._tools.values()]
 
-    async def execute(self, name: str, **kwargs: Any) -> ToolResult:
+    async def execute(self, name: str, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
         """Execute a tool by name.
 
         Args:
             name: Tool name
+            context: A dictionary of shared resources.
             **kwargs: Tool parameters
 
         Returns:
             ToolResult with execution outcome
         """
+        # Trigger before-execution hooks
+        for hook in self._before_hooks:
+            hook(name, kwargs)
+
         tool = self.get(name)
         if tool is None:
-            return ToolResult(
+            result = ToolResult(
                 success=False,
                 output=None,
                 error=f"Tool '{name}' not found",
             )
-
-        if not tool.validate_parameters(**kwargs):
-            return ToolResult(
+        elif not tool.validate_parameters(**kwargs):
+            result = ToolResult(
                 success=False,
                 output=None,
                 error=f"Invalid parameters for tool '{name}'",
             )
+        else:
+            try:
+                result = await tool.execute(context, **kwargs)
+            except Exception as e:
+                result = ToolResult(
+                    success=False,
+                    output=None,
+                    error=f"Tool execution failed: {str(e)}",
+                    metadata={"exception": type(e).__name__},
+                )
 
-        try:
-            return await tool.execute(**kwargs)
-        except Exception as e:
-            return ToolResult(
-                success=False,
-                output=None,
-                error=f"Tool execution failed: {str(e)}",
-                metadata={"exception": type(e).__name__},
-            )
+        # Trigger after-execution hooks
+        for hook in self._after_hooks:
+            hook(result)
+
+        return result

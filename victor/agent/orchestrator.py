@@ -15,11 +15,21 @@ from victor.providers.base import (
 )
 from victor.providers.registry import ProviderRegistry
 from victor.tools.base import ToolRegistry
-from victor.tools.bash import BashTool
-from victor.tools.filesystem import ListDirectoryTool, ReadFileTool, WriteFileTool
+from victor.tools.bash import execute_bash
+from victor.tools.code_executor_tool import (
+    CodeExecutionManager,
+    execute_python_in_sandbox,
+    upload_files_to_sandbox,
+)
+from victor.tools.filesystem import list_directory, read_file, write_file
 from victor.tools.file_editor_tool import FileEditorTool
 from victor.tools.git_tool import GitTool
-from victor.tools.web_search_tool import WebSearchTool
+from victor.tools.testing_tool import run_tests
+from victor.tools.web_search_tool import web_search, web_fetch, web_summarize, set_web_search_provider
+from victor.tools.workflow_tool import run_workflow
+from victor.tools.code_intelligence_tool import find_symbol, find_references, rename_symbol
+from victor.workflows.base import WorkflowRegistry
+from victor.workflows.new_feature_workflow import NewFeatureWorkflow
 
 
 class AgentOrchestrator:
@@ -27,6 +37,7 @@ class AgentOrchestrator:
 
     def __init__(
         self,
+        settings: Settings,
         provider: BaseProvider,
         model: str,
         temperature: float = 0.7,
@@ -36,17 +47,27 @@ class AgentOrchestrator:
         """Initialize orchestrator.
 
         Args:
+            settings: The application settings.
             provider: LLM provider instance
             model: Model identifier
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
             console: Rich console for output
         """
+        self.settings = settings
         self.provider = provider
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.console = console or Console()
+
+        # Stateful managers
+        self.code_manager = CodeExecutionManager()
+        self.code_manager.start()
+
+        # Workflow registry
+        self.workflow_registry = WorkflowRegistry()
+        self._register_default_workflows()
 
         # Conversation history
         self.messages: List[Message] = []
@@ -54,16 +75,44 @@ class AgentOrchestrator:
         # Tool registry
         self.tools = ToolRegistry()
         self._register_default_tools()
+        self.tools.register_before_hook(self._log_tool_call)
+
+    def shutdown(self):
+        """Gracefully shut down stateful managers."""
+        self.console.print("[dim]Shutting down code execution environment...[/dim]")
+        self.code_manager.stop()
+
+    def _log_tool_call(self, name: str, kwargs: dict) -> None:
+        """A hook that logs information before a tool is called."""
+        self.console.print(f"[dim]Attempting to call tool '{name}' with arguments: {kwargs}[/dim]")
+
+    def _register_default_workflows(self) -> None:
+        """Register default workflows."""
+        self.workflow_registry.register(NewFeatureWorkflow())
 
     def _register_default_tools(self) -> None:
         """Register default tools."""
-        self.tools.register(ReadFileTool())
-        self.tools.register(WriteFileTool())
-        self.tools.register(ListDirectoryTool())
-        self.tools.register(BashTool(timeout=60))
+        self.tools.register(run_workflow)
+        self.tools.register(execute_python_in_sandbox)
+        self.tools.register(upload_files_to_sandbox)
+        self.tools.register(read_file)
+        self.tools.register(write_file)
+        self.tools.register(list_directory)
+        self.tools.register(execute_bash)
+        self.tools.register(run_tests)
+        self.tools.register(find_symbol)
+        self.tools.register(find_references)
+        self.tools.register(rename_symbol)
         self.tools.register(FileEditorTool())
         self.tools.register(GitTool(provider=self.provider, model=self.model))
-        self.tools.register(WebSearchTool(provider=self.provider, model=self.model))
+
+        # Only register network-dependent tools if not in air-gapped mode
+        if not self.settings.airgapped_mode:
+            set_web_search_provider(self.provider, self.model)
+            self.tools.register(web_search)
+            self.tools.register(web_fetch)
+            self.tools.register(web_summarize)
+        
 
     def add_message(self, role: str, content: str) -> None:
         """Add a message to conversation history.
@@ -179,11 +228,19 @@ class AgentOrchestrator:
             tool_args = tool_call.get("arguments", {})
 
             self.console.print(f"\n[bold cyan]Executing tool:[/] {tool_name}")
-            self.console.print(f"[dim]Arguments:[/] {tool_args}")
 
             try:
+                # Create context for the tool
+                context = {
+                    "code_manager": self.code_manager,
+                    "provider": self.provider,
+                    "model": self.model,
+                    "tool_registry": self.tools,
+                    "workflow_registry": self.workflow_registry,
+                }
+                
                 # Execute tool
-                result = await self.tools.execute(tool_name, **tool_args)
+                result = await self.tools.execute(tool_name, context=context, **tool_args)
 
                 if result.success:
                     self.console.print(f"[green]✓ Tool executed successfully[/]")
@@ -230,6 +287,7 @@ class AgentOrchestrator:
         provider = ProviderRegistry.create(profile.provider, **provider_settings)
 
         return cls(
+            settings=settings,
             provider=provider,
             model=profile.model,
             temperature=profile.temperature,

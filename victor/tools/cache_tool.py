@@ -3,223 +3,202 @@
 Features:
 - Cache statistics
 - Cache clearing
-- Cache warmup
 - Cache configuration
 """
 
-from typing import Any, Dict, List
+from typing import Dict, Any, Optional
 import logging
 
-from victor.tools.base import BaseTool, ToolParameter, ToolResult
+from victor.tools.decorators import tool
 from victor.cache.manager import CacheManager
-from victor.cache.config import CacheConfig
 
 logger = logging.getLogger(__name__)
 
+# Global cache manager instance (set by orchestrator)
+_cache_manager: Optional[CacheManager] = None
 
-class CacheTool(BaseTool):
-    """Tool for cache management and monitoring."""
 
-    def __init__(self, cache_manager: CacheManager):
-        """Initialize cache tool.
+def set_cache_manager(manager: CacheManager) -> None:
+    """Set the global cache manager instance.
 
-        Args:
-            cache_manager: Cache manager instance to control
-        """
-        super().__init__()
-        self.cache = cache_manager
+    Args:
+        manager: Cache manager to use for cache operations
+    """
+    global _cache_manager
+    _cache_manager = manager
 
-    @property
-    def name(self) -> str:
-        """Get tool name."""
-        return "cache"
 
-    @property
-    def description(self) -> str:
-        """Get tool description."""
-        return """Cache management and monitoring.
+@tool
+async def cache_stats() -> Dict[str, Any]:
+    """
+    Get cache statistics and performance metrics.
 
-Control Victor's tiered caching system (memory + disk).
+    Shows hit rates, counts, and cache sizes for Victor's tiered
+    caching system (memory + disk).
 
-Operations:
-- stats: Get cache statistics and hit rates
-- clear: Clear cache (all or by namespace)
-- info: Show cache configuration
-- warmup: Preload cache with data
+    Returns:
+        Dictionary containing:
+        - memory_hit_rate: Percentage of cache hits in memory
+        - disk_hit_rate: Percentage of cache hits on disk
+        - memory_hits, memory_misses: Memory cache statistics
+        - disk_hits, disk_misses: Disk cache statistics
+        - memory_size, disk_size: Current cache sizes
+        - formatted_report: Human-readable statistics report
+    """
+    if _cache_manager is None:
+        return {
+            "success": False,
+            "error": "Cache manager not initialized"
+        }
 
-Example workflows:
-1. View cache stats:
-   cache(operation="stats")
+    stats = _cache_manager.get_stats()
 
-2. Clear all cache:
-   cache(operation="clear")
+    # Build formatted report
+    report = []
+    report.append("Cache Statistics")
+    report.append("=" * 70)
+    report.append("")
 
-3. Clear specific namespace:
-   cache(operation="clear", namespace="responses")
+    report.append("Performance:")
+    report.append(f"  Memory Hit Rate: {stats.get('memory_hit_rate', 0):.2%}")
+    report.append(f"  Disk Hit Rate: {stats.get('disk_hit_rate', 0):.2%}")
+    report.append("")
 
-4. Show configuration:
-   cache(operation="info")
-"""
+    report.append("Counts:")
+    report.append(f"  Memory Hits: {stats.get('memory_hits', 0)}")
+    report.append(f"  Memory Misses: {stats.get('memory_misses', 0)}")
+    report.append(f"  Disk Hits: {stats.get('disk_hits', 0)}")
+    report.append(f"  Disk Misses: {stats.get('disk_misses', 0)}")
+    report.append(f"  Total Sets: {stats.get('sets', 0)}")
+    report.append("")
 
-    @property
-    def parameters(self) -> Dict[str, Any]:
-        """Get tool parameters."""
-        return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: stats, clear, info",
-                required=True,
-            ),
-            ToolParameter(
-                name="namespace",
-                type="string",
-                description="Cache namespace (for clear operation)",
-                required=False,
-            ),
-        ]
-        )
-
-    async def execute(self, **kwargs: Any) -> ToolResult:
-        """Execute cache operation.
-
-        Args:
-            operation: Operation to perform
-            **kwargs: Operation-specific parameters
-
-        Returns:
-            Tool result with cache information
-        """
-        operation = kwargs.get("operation")
-
-        if not operation:
-            return ToolResult(
-                success=False,
-                output="",
-                error="Missing required parameter: operation",
-            )
-
-        try:
-            if operation == "stats":
-                return await self._get_stats(kwargs)
-            elif operation == "clear":
-                return await self._clear_cache(kwargs)
-            elif operation == "info":
-                return await self._get_info(kwargs)
-            else:
-                return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Unknown operation: {operation}",
-                )
-
-        except Exception as e:
-            logger.exception("Cache operation failed")
-            return ToolResult(
-                success=False, output="", error=f"Cache error: {str(e)}"
-            )
-
-    async def _get_stats(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Get cache statistics."""
-        stats = self.cache.get_stats()
-
-        report = []
-        report.append("Cache Statistics")
-        report.append("=" * 70)
+    if "memory_size" in stats:
+        report.append("Memory Cache:")
+        report.append(f"  Current Size: {stats['memory_size']}/{stats.get('memory_max_size', 0)}")
         report.append("")
 
-        report.append("Performance:")
-        report.append(
-            f"  Memory Hit Rate: {stats.get('memory_hit_rate', 0):.2%}"
-        )
-        report.append(f"  Disk Hit Rate: {stats.get('disk_hit_rate', 0):.2%}")
-        report.append("")
+    if "disk_size" in stats:
+        report.append("Disk Cache:")
+        report.append(f"  Entries: {stats['disk_size']}")
+        if "disk_volume" in stats:
+            volume_mb = stats["disk_volume"] / (1024 * 1024)
+            report.append(f"  Volume: {volume_mb:.2f} MB")
 
-        report.append("Counts:")
-        report.append(f"  Memory Hits: {stats.get('memory_hits', 0)}")
-        report.append(f"  Memory Misses: {stats.get('memory_misses', 0)}")
-        report.append(f"  Disk Hits: {stats.get('disk_hits', 0)}")
-        report.append(f"  Disk Misses: {stats.get('disk_misses', 0)}")
-        report.append(f"  Total Sets: {stats.get('sets', 0)}")
-        report.append("")
+    return {
+        "success": True,
+        "stats": stats,
+        "formatted_report": "\n".join(report)
+    }
 
-        if "memory_size" in stats:
-            report.append("Memory Cache:")
-            report.append(
-                f"  Current Size: {stats['memory_size']}/{stats.get('memory_max_size', 0)}"
-            )
-            report.append("")
 
-        if "disk_size" in stats:
-            report.append("Disk Cache:")
-            report.append(f"  Entries: {stats['disk_size']}")
-            if "disk_volume" in stats:
-                volume_mb = stats["disk_volume"] / (1024 * 1024)
-                report.append(f"  Volume: {volume_mb:.2f} MB")
+@tool
+async def cache_clear(namespace: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Clear cache entries.
 
-        return ToolResult(
-            success=True,
-            output="\n".join(report),
-            error="",
-        )
+    Can clear all cache or just a specific namespace. This affects
+    both memory and disk caches.
 
-    async def _clear_cache(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Clear cache."""
-        namespace = kwargs.get("namespace")
+    Args:
+        namespace: Optional namespace to clear (e.g., "responses", "embeddings").
+                  If not provided, clears all cache.
 
-        count = self.cache.clear(namespace)
+    Returns:
+        Dictionary containing:
+        - success: Whether operation succeeded
+        - cleared_count: Number of entries cleared
+        - message: Human-readable result message
+    """
+    if _cache_manager is None:
+        return {
+            "success": False,
+            "error": "Cache manager not initialized"
+        }
+
+    try:
+        count = _cache_manager.clear(namespace)
 
         if namespace:
             message = f"Cleared {count} entries from namespace '{namespace}'"
         else:
             message = f"Cleared all cache ({count} entries)"
 
-        return ToolResult(
-            success=True,
-            output=message,
-            error="",
-        )
+        return {
+            "success": True,
+            "cleared_count": count,
+            "message": message
+        }
 
-    async def _get_info(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Get cache configuration info."""
-        config = self.cache.config
+    except Exception as e:
+        logger.exception("Failed to clear cache")
+        return {
+            "success": False,
+            "error": f"Failed to clear cache: {str(e)}"
+        }
 
-        report = []
-        report.append("Cache Configuration")
-        report.append("=" * 70)
-        report.append("")
 
-        report.append("Architecture: Tiered (L1 Memory + L2 Disk)")
-        report.append("")
+@tool
+async def cache_info() -> Dict[str, Any]:
+    """
+    Get cache configuration information.
 
-        report.append("L1 Memory Cache:")
-        report.append(f"  Enabled: {config.enable_memory}")
-        if config.enable_memory:
-            report.append(f"  Max Size: {config.memory_max_size} entries")
-            report.append(f"  TTL: {config.memory_ttl} seconds ({config.memory_ttl//60} min)")
-        report.append("")
+    Shows the current cache settings including memory/disk
+    configuration, TTL settings, and enabled features.
 
-        report.append("L2 Disk Cache:")
-        report.append(f"  Enabled: {config.enable_disk}")
-        if config.enable_disk:
-            size_mb = config.disk_max_size / (1024 * 1024)
-            report.append(f"  Max Size: {size_mb:.0f} MB")
-            report.append(
-                f"  TTL: {config.disk_ttl} seconds ({config.disk_ttl//86400} days)"
-            )
-            report.append(f"  Path: {config.disk_path}")
-        report.append("")
+    Returns:
+        Dictionary containing:
+        - config: Raw configuration dictionary
+        - formatted_report: Human-readable configuration report
+    """
+    if _cache_manager is None:
+        return {
+            "success": False,
+            "error": "Cache manager not initialized"
+        }
 
-        report.append("Features:")
-        report.append("  ✓ Automatic tiering (memory → disk → source)")
-        report.append("  ✓ TTL-based expiration")
-        report.append("  ✓ Thread-safe operations")
-        report.append("  ✓ Persistent across restarts (disk cache)")
-        report.append("  ✓ Zero external dependencies")
+    config = _cache_manager.config
 
-        return ToolResult(
-            success=True,
-            output="\n".join(report),
-            error="",
-        )
+    report = []
+    report.append("Cache Configuration")
+    report.append("=" * 70)
+    report.append("")
+
+    report.append("Architecture: Tiered (L1 Memory + L2 Disk)")
+    report.append("")
+
+    report.append("L1 Memory Cache:")
+    report.append(f"  Enabled: {config.enable_memory}")
+    if config.enable_memory:
+        report.append(f"  Max Size: {config.memory_max_size} entries")
+        report.append(f"  TTL: {config.memory_ttl} seconds ({config.memory_ttl//60} min)")
+    report.append("")
+
+    report.append("L2 Disk Cache:")
+    report.append(f"  Enabled: {config.enable_disk}")
+    if config.enable_disk:
+        size_mb = config.disk_max_size / (1024 * 1024)
+        report.append(f"  Max Size: {size_mb:.0f} MB")
+        report.append(f"  TTL: {config.disk_ttl} seconds ({config.disk_ttl//86400} days)")
+        report.append(f"  Path: {config.disk_path}")
+    report.append("")
+
+    report.append("Features:")
+    report.append("  ✓ Automatic tiering (memory → disk → source)")
+    report.append("  ✓ TTL-based expiration")
+    report.append("  ✓ Thread-safe operations")
+    report.append("  ✓ Persistent across restarts (disk cache)")
+    report.append("  ✓ Zero external dependencies")
+
+    return {
+        "success": True,
+        "config": {
+            "enable_memory": config.enable_memory,
+            "memory_max_size": config.memory_max_size,
+            "memory_ttl": config.memory_ttl,
+            "enable_disk": config.enable_disk,
+            "disk_max_size": config.disk_max_size,
+            "disk_ttl": config.disk_ttl,
+            "disk_path": str(config.disk_path),
+        },
+        "formatted_report": "\n".join(report)
+    }

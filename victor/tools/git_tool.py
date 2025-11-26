@@ -134,10 +134,11 @@ Example workflows:
         ]
         )
 
-    async def execute(self, **kwargs: Any) -> ToolResult:
+    async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
         """Execute git operation.
 
         Args:
+            context: The tool context (unused by this tool).
             operation: Operation to perform
             **kwargs: Operation-specific parameters
 

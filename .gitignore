@@ -94,3 +94,4 @@ dmypy.json
 tmp/
 temp/
 *.tmp
+coverage.json
