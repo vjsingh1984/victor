@@ -409,53 +409,217 @@ class SemanticToolSelector:
             tool_name: Name of the tool
 
         Returns:
-            String describing common use cases
+            String describing common use cases with rich keywords and examples
         """
         # Map tools to their common use cases for better semantic matching
+        # Each description includes:
+        # 1. Common use cases
+        # 2. Keywords users might say
+        # 3. Concrete examples
+        # 4. Programming concepts
         use_case_map = {
             # File operations
-            "write_file": "Use for: creating Python files, saving code, writing scripts, creating configuration files, saving data, generating files",
-            "read_file": "Use for: reading Python code, loading configuration, reading source files, examining file contents, loading data",
-            "list_directory": "Use for: exploring codebase structure, finding files, listing project contents, browsing directories",
-            "edit_files": "Use for: modifying code, updating files, refactoring, making changes to existing files",
+            "write_file": (
+                "Use for: creating Python files, saving code, writing scripts, creating configuration files, saving data, generating files. "
+                "Common requests: write a Python function, create a script, save code to file, create a module, "
+                "write a class, implement a function, create a program, save implementation, write validation logic, "
+                "create email validator, write calculator, implement fibonacci, save solution, create hello world. "
+                "Examples: writing functions (factorial, fibonacci, email validation), creating classes (User, Product), "
+                "saving scripts (data processing, automation), generating config files (YAML, JSON, .env), "
+                "writing tests, creating utilities, implementing algorithms, saving code solutions."
+            ),
+            "read_file": (
+                "Use for: reading Python code, loading configuration, reading source files, examining file contents, loading data, viewing code. "
+                "Common requests: read this file, show me the code, load the configuration, view the source, "
+                "examine the implementation, check the file, look at the code, read the script, see the contents. "
+                "Examples: reading Python modules, loading config files (settings.py, config.yaml), "
+                "examining source code, reviewing implementations, loading data files, checking scripts."
+            ),
+            "list_directory": (
+                "Use for: exploring codebase structure, finding files, listing project contents, browsing directories, viewing file structure. "
+                "Common requests: show me the files, list the directory, what files are here, explore the codebase, "
+                "find all Python files, show project structure, list source files, browse the project. "
+                "Examples: exploring project layout, finding Python modules, listing source files, "
+                "viewing directory tree, discovering file organization."
+            ),
+            "edit_files": (
+                "Use for: modifying code, updating files, refactoring, making changes to existing files, fixing bugs, improving code. "
+                "Common requests: update this code, modify the function, fix the bug, change the implementation, "
+                "improve this code, refactor the function, update the logic, fix the error, change the variable. "
+                "Examples: fixing bugs in functions, updating variable names, modifying implementations, "
+                "improving algorithms, refactoring code structure, updating configurations."
+            ),
 
             # Code execution
-            "execute_bash": "Use for: running scripts, executing commands, testing code, installing packages, git operations, file operations",
-            "execute_python_in_sandbox": "Use for: testing Python code, validating functions, running Python scripts, executing code safely, testing implementations",
+            "execute_bash": (
+                "Use for: running scripts, executing commands, testing code, installing packages, git operations, file operations, running programs. "
+                "Common requests: run this script, execute the code, test this, install package, run the program, "
+                "execute command, test the function, run tests, verify the code works, check if it runs. "
+                "Examples: running Python scripts, executing shell commands, testing programs, "
+                "installing dependencies (pip install), running tests (pytest), verifying code execution."
+            ),
+            "execute_python_in_sandbox": (
+                "Use for: testing Python code, validating functions, running Python scripts, executing code safely, testing implementations, "
+                "verifying code works, running Python programs, checking code correctness, testing solutions, executing Python functions. "
+                "Common requests: test this Python function, run this code, validate this implementation, "
+                "execute this Python script, test if it works, run this function with test data, verify the code, "
+                "test the validation function, run the calculator, execute the fibonacci function, test email validator. "
+                "Examples: testing functions (factorial, fibonacci, email validation), running algorithms, "
+                "validating implementations, testing calculators, verifying solutions, running Python programs safely."
+            ),
 
             # Code intelligence
-            "find_symbol": "Use for: locating function definitions, finding class declarations, searching for variables, code navigation",
-            "find_references": "Use for: finding where code is used, tracking function calls, analyzing dependencies",
-            "rename_symbol": "Use for: refactoring variable names, renaming functions, updating identifiers across codebase",
+            "find_symbol": (
+                "Use for: locating function definitions, finding class declarations, searching for variables, code navigation, "
+                "finding where functions are defined, locating classes, searching symbols, finding declarations. "
+                "Common requests: find this function, where is this class defined, locate the variable, "
+                "find the definition, search for this symbol, where is the implementation. "
+                "Examples: finding function definitions, locating class declarations, searching for variables."
+            ),
+            "find_references": (
+                "Use for: finding where code is used, tracking function calls, analyzing dependencies, finding usages, "
+                "seeing where functions are called, tracking references, finding all uses. "
+                "Common requests: where is this used, find all calls to this function, show me the references, "
+                "where is this called, find usages, track dependencies. "
+                "Examples: finding function calls, tracking variable usage, analyzing dependencies."
+            ),
+            "rename_symbol": (
+                "Use for: refactoring variable names, renaming functions, updating identifiers across codebase, "
+                "renaming classes, changing variable names, refactoring identifiers. "
+                "Common requests: rename this variable, change the function name, update this identifier, "
+                "refactor the variable name, rename the class. "
+                "Examples: renaming variables, updating function names, refactoring class names."
+            ),
 
             # Code quality
-            "code_review": "Use for: analyzing code quality, checking for issues, reviewing implementations, code analysis",
-            "security_scan": "Use for: finding security vulnerabilities, detecting secrets, security analysis, vulnerability scanning",
-            "analyze_metrics": "Use for: measuring code complexity, analyzing code quality metrics, technical debt analysis",
+            "code_review": (
+                "Use for: analyzing code quality, checking for issues, reviewing implementations, code analysis, "
+                "quality checks, finding problems, reviewing code, checking best practices. "
+                "Common requests: review this code, check code quality, analyze this implementation, "
+                "find issues in the code, check for problems, review my code. "
+                "Examples: reviewing implementations, checking code quality, finding issues."
+            ),
+            "security_scan": (
+                "Use for: finding security vulnerabilities, detecting secrets, security analysis, vulnerability scanning, "
+                "checking for security issues, finding exposed secrets, scanning for vulnerabilities. "
+                "Common requests: check for security issues, scan for vulnerabilities, find security problems, "
+                "check for exposed secrets, security audit. "
+                "Examples: finding SQL injection, detecting hardcoded passwords, scanning for XSS."
+            ),
+            "analyze_metrics": (
+                "Use for: measuring code complexity, analyzing code quality metrics, technical debt analysis, "
+                "complexity analysis, quality metrics, code health. "
+                "Common requests: analyze code complexity, check code metrics, measure quality, "
+                "calculate complexity, analyze code health. "
+                "Examples: measuring cyclomatic complexity, analyzing code quality."
+            ),
 
             # Testing
-            "run_tests": "Use for: executing test suites, running pytest, validating code, test automation, checking test coverage",
+            "run_tests": (
+                "Use for: executing test suites, running pytest, validating code, test automation, checking test coverage, "
+                "running unit tests, executing tests, testing code, verifying tests pass. "
+                "Common requests: run the tests, execute test suite, run pytest, check if tests pass, "
+                "run unit tests, verify tests, execute test cases. "
+                "Examples: running pytest, executing unit tests, checking test coverage."
+            ),
 
             # Documentation
-            "generate_docs": "Use for: creating documentation, generating API docs, documenting code, writing README files",
-            "analyze_docs": "Use for: reviewing documentation, checking doc coverage, analyzing documentation quality",
+            "generate_docs": (
+                "Use for: creating documentation, generating API docs, documenting code, writing README files, "
+                "creating docstrings, generating documentation, writing docs. "
+                "Common requests: document this code, generate docs, create documentation, write API docs, "
+                "add docstrings, create README. "
+                "Examples: generating API documentation, writing docstrings, creating README files."
+            ),
+            "analyze_docs": (
+                "Use for: reviewing documentation, checking doc coverage, analyzing documentation quality, "
+                "checking if code is documented, reviewing docs. "
+                "Common requests: check documentation, review docs, analyze doc coverage, "
+                "check if code is documented. "
+                "Examples: reviewing documentation quality, checking doc coverage."
+            ),
 
             # Git operations
-            "git": "Use for: version control, committing changes, managing branches, git operations, source control",
-            "git_suggest_commit": "Use for: generating commit messages, analyzing changes, creating commits",
-            "git_create_pr": "Use for: creating pull requests, proposing changes, code review workflow",
+            "git": (
+                "Use for: version control, committing changes, managing branches, git operations, source control, "
+                "committing code, creating branches, git workflow. "
+                "Common requests: commit these changes, create a branch, git operations, version control, "
+                "commit my code, push changes. "
+                "Examples: committing changes, creating branches, pushing code."
+            ),
+            "git_suggest_commit": (
+                "Use for: generating commit messages, analyzing changes, creating commits, writing commit messages. "
+                "Common requests: create a commit message, generate commit message, suggest commit message. "
+                "Examples: generating commit messages based on changes."
+            ),
+            "git_create_pr": (
+                "Use for: creating pull requests, proposing changes, code review workflow, creating PRs. "
+                "Common requests: create a pull request, create PR, propose changes. "
+                "Examples: creating pull requests for code review."
+            ),
 
             # Refactoring
-            "refactor_extract_function": "Use for: extracting methods, refactoring code, improving code structure",
-            "refactor_inline_variable": "Use for: inlining variables, simplifying code, removing unnecessary variables",
-            "refactor_organize_imports": "Use for: organizing imports, cleaning up dependencies, import management",
+            "refactor_extract_function": (
+                "Use for: extracting methods, refactoring code, improving code structure, extracting functions. "
+                "Common requests: extract this into a function, refactor this code, extract method. "
+                "Examples: extracting code into functions, refactoring for better structure."
+            ),
+            "refactor_inline_variable": (
+                "Use for: inlining variables, simplifying code, removing unnecessary variables. "
+                "Common requests: inline this variable, simplify this code, remove unnecessary variable. "
+                "Examples: inlining temporary variables, simplifying code."
+            ),
+            "refactor_organize_imports": (
+                "Use for: organizing imports, cleaning up dependencies, import management, sorting imports. "
+                "Common requests: organize imports, clean up imports, sort imports. "
+                "Examples: organizing Python imports, cleaning up dependencies."
+            ),
 
             # Web & HTTP
-            "web_search": "Use for: searching documentation, finding examples, looking up information, web research",
-            "web_fetch": "Use for: downloading documentation, fetching web content, retrieving online resources",
+            "web_search": (
+                "Use for: searching documentation, finding examples, looking up information, web research, "
+                "searching for solutions, finding tutorials, looking up APIs. "
+                "Common requests: search for documentation, find examples, look up information, "
+                "search online, find tutorials. "
+                "Examples: searching Python documentation, finding code examples."
+            ),
+            "web_fetch": (
+                "Use for: downloading documentation, fetching web content, retrieving online resources, "
+                "downloading pages, fetching data. "
+                "Common requests: fetch this webpage, download documentation, get web content. "
+                "Examples: downloading API documentation, fetching web pages."
+            ),
 
             # Workflows
-            "run_workflow": "Use for: executing multi-step tasks, complex operations, automated workflows, orchestration",
+            "run_workflow": (
+                "Use for: executing multi-step tasks, complex operations, automated workflows, orchestration, "
+                "running workflows, executing automation. "
+                "Common requests: run workflow, execute automation, run multi-step process. "
+                "Examples: executing complex workflows, running automation."
+            ),
+
+            # Additional tools
+            "batch": (
+                "Use for: processing multiple files, batch operations, bulk processing, mass operations, "
+                "processing many files at once. "
+                "Common requests: process all files, batch update, bulk operation, update multiple files. "
+                "Examples: batch processing files, bulk updates."
+            ),
+            "cicd": (
+                "Use for: CI/CD operations, pipeline management, continuous integration, deployment automation. "
+                "Common requests: setup CI/CD, configure pipeline, deployment automation. "
+                "Examples: setting up GitHub Actions, configuring CI/CD pipelines."
+            ),
+            "docker": (
+                "Use for: container operations, Docker management, container deployment, Docker commands. "
+                "Common requests: Docker operations, container management, run container. "
+                "Examples: managing Docker containers, running Docker commands."
+            ),
+            "scaffold": (
+                "Use for: project scaffolding, creating project templates, generating boilerplate, project setup. "
+                "Common requests: create project structure, scaffold project, generate template. "
+                "Examples: scaffolding new projects, creating project templates."
+            ),
         }
 
         return use_case_map.get(tool_name, "")
