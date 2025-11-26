@@ -28,7 +28,7 @@ class ProviderConfig(BaseSettings):
 
     api_key: Optional[str] = None
     base_url: Optional[str] = None
-    timeout: int = 60
+    timeout: int = 300  # 5 minutes - increased for CPU-only inference
     max_retries: int = 3
     organization: Optional[str] = None  # For OpenAI
 

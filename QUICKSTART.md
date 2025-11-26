@@ -21,11 +21,21 @@ docker exec victor-ollama ollama --version
 docker exec victor-ollama ollama pull qwen2.5-coder:1.5b
 ```
 
-## Step 2: Test Victor Interactive Mode
+## Step 2: Initialize Victor Configuration
+
+```bash
+# Initialize Victor (creates profiles.yaml)
+docker-compose run --rm victor victor init
+
+# Verify Ollama connection
+docker-compose run --rm victor victor test-provider ollama
+```
+
+## Step 3: Test Victor Interactive Mode
 
 ```bash
 # Start Victor in interactive mode
-docker-compose run --rm victor victor
+docker-compose run --rm victor victor main
 
 # Inside Victor, try these commands:
 # "Write a Python function to calculate fibonacci numbers"
@@ -33,14 +43,16 @@ docker-compose run --rm victor victor
 # Type 'exit' to quit
 ```
 
-## Step 3: Test One-Shot Command
+## Step 4: Test One-Shot Command
 
 ```bash
 # Run Victor with a one-shot command
-docker-compose run --rm victor victor "Write a Python function to reverse a string"
+docker-compose run --rm victor victor main "Write a Python function to reverse a string"
 ```
 
-## Step 4: Run the FastAPI Demo (Optional)
+**Note**: First inference on CPU may take 30-60 seconds as the model loads. Subsequent requests will be faster.
+
+## Step 5: Run the FastAPI Demo (Optional)
 
 This demo shows Victor building a complete production-ready web application:
 
