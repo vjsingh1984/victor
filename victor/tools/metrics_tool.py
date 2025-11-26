@@ -68,300 +68,279 @@ def _calculate_maintainability_index(code: str) -> float:
 
 
 @tool
-async def metrics_complexity(file: str, threshold: int = 10) -> Dict[str, Any]:
+async def analyze_metrics(
+    path: str,
+    metrics: List[str] = None,
+    file_pattern: str = "*.py",
+    complexity_threshold: int = 10,
+    format: str = "summary"
+) -> Dict[str, Any]:
     """
-    Calculate cyclomatic complexity of code.
+    Comprehensive code metrics and quality analysis.
 
-    Analyzes code structure to determine complexity score.
-    Higher scores indicate more complex, harder to maintain code.
+    Analyzes code quality metrics including complexity, maintainability,
+    technical debt, and code structure. Consolidates multiple metric types
+    into a single unified interface.
 
     Args:
-        file: Path to source file.
-        threshold: Complexity threshold for warnings (default: 10).
+        path: File or directory path to analyze.
+        metrics: List of metrics to calculate. Options: "complexity",
+            "maintainability", "debt", "profile", "all". Defaults to ["all"].
+        file_pattern: Glob pattern for files to analyze (default: *.py).
+        complexity_threshold: Threshold for complexity warnings (default: 10).
+        format: Output format: "summary", "detailed", or "json" (default: summary).
 
     Returns:
         Dictionary containing:
         - success: Whether operation succeeded
-        - complexity: Complexity score
-        - threshold: Threshold value
-        - status: 'ok' or 'warning' based on threshold
-        - message: Interpretation message
+        - metrics_calculated: List of metrics that were calculated
+        - results: Dictionary with results for each metric type
+        - files_analyzed: Number of files analyzed
+        - recommendations: List of improvement recommendations
+        - formatted_report: Human-readable metrics report
         - error: Error message if failed
+
+    Examples:
+        # Analyze complexity only
+        analyze_metrics("./src", metrics=["complexity"])
+
+        # Comprehensive analysis
+        analyze_metrics("./", metrics=["all"])
+
+        # Maintainability and debt
+        analyze_metrics("./src", metrics=["maintainability", "debt"])
+
+        # Detailed report with high complexity threshold
+        analyze_metrics("./", complexity_threshold=15, format="detailed")
     """
-    if not file:
-        return {"success": False, "error": "Missing required parameter: file"}
+    if not path:
+        return {"success": False, "error": "Missing required parameter: path"}
 
-    file_path = Path(file)
-    if not file_path.exists():
-        return {"success": False, "error": f"File not found: {file}"}
+    if metrics is None:
+        metrics = ["all"]
 
-    try:
-        code = file_path.read_text()
-        complexity = _calculate_complexity_score(code)
+    # Expand "all" to all metric types
+    if "all" in metrics:
+        metrics = ["complexity", "maintainability", "debt", "profile"]
 
-        status = "ok" if complexity <= threshold else "warning"
-        message = f"Complexity: {complexity} ({'OK' if status == 'ok' else 'High - consider refactoring'})"
+    path_obj = Path(path)
+    if not path_obj.exists():
+        return {"success": False, "error": f"Path not found: {path}"}
 
+    # Collect files to analyze
+    files_to_analyze = []
+    if path_obj.is_file():
+        if path_obj.suffix == ".py":
+            files_to_analyze = [path_obj]
+    else:
+        files_to_analyze = [f for f in path_obj.rglob(file_pattern) if f.is_file() and f.suffix == ".py"]
+
+    if not files_to_analyze:
         return {
             "success": True,
-            "complexity": complexity,
-            "threshold": threshold,
-            "status": status,
-            "message": message
+            "files_analyzed": 0,
+            "message": f"No Python files found matching pattern '{file_pattern}'"
         }
-    except Exception as e:
-        return {"success": False, "error": f"Failed to analyze: {str(e)}"}
 
+    # Initialize results
+    results = {metric: [] for metric in metrics}
+    total_complexity = 0
+    total_maintainability = 0
+    total_debt_hours = 0
+    total_lines = 0
+    total_functions = 0
+    total_classes = 0
+    files_analyzed = 0
 
-@tool
-async def metrics_maintainability(file: str) -> Dict[str, Any]:
-    """
-    Calculate maintainability index.
+    # Analyze each file
+    for file_path in files_to_analyze:
+        try:
+            code = file_path.read_text()
 
-    Measures how maintainable the code is on a scale of 0-100.
-    Higher scores indicate more maintainable code.
+            # Complexity analysis
+            if "complexity" in metrics:
+                complexity = _calculate_complexity_score(code)
+                status = "ok" if complexity <= complexity_threshold else "warning"
+                results["complexity"].append({
+                    "file": str(file_path),
+                    "complexity": complexity,
+                    "status": status,
+                    "threshold": complexity_threshold
+                })
+                total_complexity += complexity
 
-    Args:
-        file: Path to source file.
+            # Maintainability analysis
+            if "maintainability" in metrics:
+                mi = _calculate_maintainability_index(code)
+                if mi >= 80:
+                    rating = "excellent"
+                elif mi >= 60:
+                    rating = "good"
+                elif mi >= 40:
+                    rating = "fair"
+                else:
+                    rating = "poor"
 
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - maintainability_index: Score 0-100
-        - rating: 'excellent', 'good', 'fair', or 'poor'
-        - message: Interpretation message
-        - error: Error message if failed
-    """
-    if not file:
-        return {"success": False, "error": "Missing required parameter: file"}
+                results["maintainability"].append({
+                    "file": str(file_path),
+                    "maintainability_index": round(mi, 2),
+                    "rating": rating
+                })
+                total_maintainability += mi
 
-    file_path = Path(file)
-    if not file_path.exists():
-        return {"success": False, "error": f"File not found: {file}"}
+            # Technical debt estimation
+            if "debt" in metrics:
+                complexity_score = _calculate_complexity_score(code)
+                mi_score = _calculate_maintainability_index(code)
 
-    try:
-        code = file_path.read_text()
-        mi = _calculate_maintainability_index(code)
+                issues = []
+                debt_hours = 0
 
-        if mi >= 80:
-            rating = "excellent"
-        elif mi >= 60:
-            rating = "good"
-        elif mi >= 40:
-            rating = "fair"
-        else:
-            rating = "poor"
+                if complexity_score > 20:
+                    issues.append("High complexity detected")
+                    debt_hours += 4
+                elif complexity_score > 10:
+                    issues.append("Moderate complexity")
+                    debt_hours += 2
 
-        return {
-            "success": True,
-            "maintainability_index": round(mi, 2),
-            "rating": rating,
-            "message": f"Maintainability: {mi:.2f}/100 ({rating})"
-        }
-    except Exception as e:
-        return {"success": False, "error": f"Failed to analyze: {str(e)}"}
+                if mi_score < 40:
+                    issues.append("Low maintainability")
+                    debt_hours += 8
+                elif mi_score < 60:
+                    issues.append("Below average maintainability")
+                    debt_hours += 4
 
+                debt_level = "low" if debt_hours < 4 else ("medium" if debt_hours < 12 else "high")
 
-@tool
-async def metrics_debt(file: str) -> Dict[str, Any]:
-    """
-    Estimate technical debt.
+                results["debt"].append({
+                    "file": str(file_path),
+                    "debt_hours": debt_hours,
+                    "debt_level": debt_level,
+                    "issues": issues if issues else ["No major issues detected"]
+                })
+                total_debt_hours += debt_hours
 
-    Estimates technical debt based on code quality indicators.
+            # Code profile
+            if "profile" in metrics:
+                tree = ast.parse(code)
+                functions = sum(1 for node in ast.walk(tree) if isinstance(node, ast.FunctionDef))
+                classes = sum(1 for node in ast.walk(tree) if isinstance(node, ast.ClassDef))
+                lines = len([l for l in code.split('\n') if l.strip()])
 
-    Args:
-        file: Path to source file.
+                results["profile"].append({
+                    "file": str(file_path),
+                    "lines": lines,
+                    "functions": functions,
+                    "classes": classes
+                })
+                total_lines += lines
+                total_functions += functions
+                total_classes += classes
 
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - debt_hours: Estimated hours to address issues
-        - debt_level: 'low', 'medium', or 'high'
-        - issues: List of identified issues
-        - error: Error message if failed
-    """
-    if not file:
-        return {"success": False, "error": "Missing required parameter: file"}
+            files_analyzed += 1
 
-    file_path = Path(file)
-    if not file_path.exists():
-        return {"success": False, "error": f"File not found: {file}"}
+        except Exception as e:
+            logger.warning("Failed to analyze %s: %s", file_path, e)
 
-    try:
-        code = file_path.read_text()
-        complexity = _calculate_complexity_score(code)
-        mi = _calculate_maintainability_index(code)
-
-        issues = []
-        debt_hours = 0
-
-        if complexity > 20:
-            issues.append("High complexity detected")
-            debt_hours += 4
-        elif complexity > 10:
-            issues.append("Moderate complexity")
-            debt_hours += 2
-
-        if mi < 40:
-            issues.append("Low maintainability")
-            debt_hours += 8
-        elif mi < 60:
-            issues.append("Below average maintainability")
-            debt_hours += 4
-
-        debt_level = "low" if debt_hours < 4 else ("medium" if debt_hours < 12 else "high")
-
-        return {
-            "success": True,
-            "debt_hours": debt_hours,
-            "debt_level": debt_level,
-            "issues": issues if issues else ["No major issues detected"],
-            "message": f"Technical debt: {debt_hours} hours ({debt_level})"
-        }
-    except Exception as e:
-        return {"success": False, "error": f"Failed to analyze: {str(e)}"}
-
-
-@tool
-async def metrics_profile(file: str) -> Dict[str, Any]:
-    """
-    Profile code performance.
-
-    Basic performance analysis of code structure.
-
-    Args:
-        file: Path to source file.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - lines: Total lines of code
-        - functions: Number of functions
-        - classes: Number of classes
-        - message: Summary message
-        - error: Error message if failed
-    """
-    if not file:
-        return {"success": False, "error": "Missing required parameter: file"}
-
-    file_path = Path(file)
-    if not file_path.exists():
-        return {"success": False, "error": f"File not found: {file}"}
-
-    try:
-        code = file_path.read_text()
-        tree = ast.parse(code)
-
-        functions = sum(1 for node in ast.walk(tree) if isinstance(node, ast.FunctionDef))
-        classes = sum(1 for node in ast.walk(tree) if isinstance(node, ast.ClassDef))
-        lines = len([l for l in code.split('\n') if l.strip()])
-
-        return {
-            "success": True,
-            "lines": lines,
-            "functions": functions,
-            "classes": classes,
-            "message": f"Code profile: {lines} lines, {functions} functions, {classes} classes"
-        }
-    except Exception as e:
-        return {"success": False, "error": f"Failed to profile: {str(e)}"}
-
-
-@tool
-async def metrics_analyze(file: str) -> Dict[str, Any]:
-    """
-    Comprehensive code analysis.
-
-    Performs complete analysis including complexity, maintainability,
-    and technical debt estimation.
-
-    Args:
-        file: Path to source file.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - complexity: Complexity analysis
-        - maintainability: Maintainability analysis
-        - debt: Technical debt analysis
-        - profile: Code profile
-        - formatted_report: Human-readable report
-        - error: Error message if failed
-    """
-    if not file:
-        return {"success": False, "error": "Missing required parameter: file"}
-
-    # Run all analyses
-    complexity_result = await metrics_complexity(file=file)
-    maintainability_result = await metrics_maintainability(file=file)
-    debt_result = await metrics_debt(file=file)
-    profile_result = await metrics_profile(file=file)
-
-    if not all(r.get("success") for r in [complexity_result, maintainability_result, debt_result, profile_result]):
-        return {"success": False, "error": "Analysis failed"}
-
-    # Build report
-    report = []
-    report.append(f"Code Analysis Report: {file}")
-    report.append("=" * 70)
-    report.append("")
-    report.append(f"Complexity: {complexity_result['complexity']} ({complexity_result['status']})")
-    report.append(f"Maintainability: {maintainability_result['maintainability_index']}/100 ({maintainability_result['rating']})")
-    report.append(f"Technical Debt: {debt_result['debt_hours']} hours ({debt_result['debt_level']})")
-    report.append("")
-    report.append(f"Profile: {profile_result['lines']} lines, {profile_result['functions']} functions, {profile_result['classes']} classes")
-
-    if debt_result['issues']:
-        report.append("")
-        report.append("Issues:")
-        for issue in debt_result['issues']:
-            report.append(f"  • {issue}")
-
-    return {
-        "success": True,
-        "complexity": complexity_result,
-        "maintainability": maintainability_result,
-        "debt": debt_result,
-        "profile": profile_result,
-        "formatted_report": "\n".join(report)
-    }
-
-
-@tool
-async def metrics_report(file: str) -> Dict[str, Any]:
-    """
-    Generate quality report.
-
-    Creates a detailed quality report with recommendations.
-
-    Args:
-        file: Path to source file.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - report: Comprehensive quality report
-        - recommendations: List of recommendations
-        - error: Error message if failed
-    """
-    # Use analyze to get data
-    analysis = await metrics_analyze(file=file)
-
-    if not analysis["success"]:
-        return analysis
+    # Calculate averages
+    avg_complexity = total_complexity / files_analyzed if files_analyzed > 0 else 0
+    avg_maintainability = total_maintainability / files_analyzed if files_analyzed > 0 and "maintainability" in metrics else 0
 
     # Generate recommendations
     recommendations = []
+    if "complexity" in metrics and avg_complexity > complexity_threshold:
+        recommendations.append(f"Average complexity ({avg_complexity:.1f}) exceeds threshold ({complexity_threshold}) - consider refactoring")
+    if "maintainability" in metrics and avg_maintainability < 60:
+        recommendations.append(f"Average maintainability ({avg_maintainability:.1f}/100) is below good - improve code quality")
+    if "debt" in metrics and total_debt_hours > 20:
+        recommendations.append(f"Total technical debt ({total_debt_hours} hours) is significant - prioritize refactoring")
+    if "profile" in metrics and total_lines > 10000:
+        recommendations.append(f"Large codebase ({total_lines} lines) - consider modularization")
 
-    complexity = analysis["complexity"]["complexity"]
-    mi = analysis["maintainability"]["maintainability_index"]
+    if not recommendations:
+        recommendations.append("Code quality metrics look good")
 
-    if complexity > 10:
-        recommendations.append("Consider breaking down complex functions")
-    if mi < 60:
-        recommendations.append("Improve code maintainability through refactoring")
-    if analysis["debt"]["debt_hours"] > 8:
-        recommendations.append("Significant technical debt - prioritize refactoring")
+    # Build formatted report
+    report = []
+    report.append("Code Metrics Analysis Report")
+    report.append("=" * 70)
+    report.append("")
+    report.append(f"Path: {path}")
+    report.append(f"Files analyzed: {files_analyzed}")
+    report.append(f"Metrics: {', '.join(metrics)}")
+    report.append("")
+
+    # Complexity section
+    if "complexity" in metrics:
+        report.append("Complexity Analysis:")
+        report.append(f"  Average complexity: {avg_complexity:.2f}")
+        report.append(f"  Threshold: {complexity_threshold}")
+        high_complexity_files = [r for r in results["complexity"] if r["status"] == "warning"]
+        if high_complexity_files:
+            report.append(f"  High complexity files: {len(high_complexity_files)}")
+            for item in high_complexity_files[:5]:
+                report.append(f"    {item['file']}: {item['complexity']}")
+            if len(high_complexity_files) > 5:
+                report.append(f"    ... and {len(high_complexity_files) - 5} more")
+        report.append("")
+
+    # Maintainability section
+    if "maintainability" in metrics:
+        report.append("Maintainability Analysis:")
+        report.append(f"  Average maintainability: {avg_maintainability:.2f}/100")
+        poor_files = [r for r in results["maintainability"] if r["rating"] in ["poor", "fair"]]
+        if poor_files:
+            report.append(f"  Files needing improvement: {len(poor_files)}")
+            for item in poor_files[:5]:
+                report.append(f"    {item['file']}: {item['maintainability_index']} ({item['rating']})")
+            if len(poor_files) > 5:
+                report.append(f"    ... and {len(poor_files) - 5} more")
+        report.append("")
+
+    # Technical debt section
+    if "debt" in metrics:
+        report.append("Technical Debt:")
+        report.append(f"  Total debt: {total_debt_hours} hours")
+        high_debt_files = [r for r in results["debt"] if r["debt_level"] in ["medium", "high"]]
+        if high_debt_files:
+            report.append(f"  Files with debt: {len(high_debt_files)}")
+            for item in high_debt_files[:5]:
+                report.append(f"    {item['file']}: {item['debt_hours']} hours ({item['debt_level']})")
+            if len(high_debt_files) > 5:
+                report.append(f"    ... and {len(high_debt_files) - 5} more")
+        report.append("")
+
+    # Profile section
+    if "profile" in metrics:
+        report.append("Code Profile:")
+        report.append(f"  Total lines: {total_lines}")
+        report.append(f"  Total functions: {total_functions}")
+        report.append(f"  Total classes: {total_classes}")
+        if files_analyzed > 0:
+            report.append(f"  Average per file: {total_lines // files_analyzed} lines, "
+                        f"{total_functions // files_analyzed} functions, "
+                        f"{total_classes // files_analyzed} classes")
+        report.append("")
+
+    # Recommendations section
+    report.append("Recommendations:")
+    for rec in recommendations:
+        report.append(f"  • {rec}")
+
+    return {
+        "success": True,
+        "metrics_calculated": metrics,
+        "results": results,
+        "files_analyzed": files_analyzed,
+        "summary": {
+            "avg_complexity": round(avg_complexity, 2) if "complexity" in metrics else None,
+            "avg_maintainability": round(avg_maintainability, 2) if "maintainability" in metrics else None,
+            "total_debt_hours": total_debt_hours if "debt" in metrics else None,
+            "total_lines": total_lines if "profile" in metrics else None,
+        },
+        "recommendations": recommendations,
+        "formatted_report": "\n".join(report)
+    }
 
     if not recommendations:
         recommendations.append("Code quality is good - maintain current standards")

@@ -100,14 +100,7 @@ from victor.tools.docker_tool import (
     docker_volumes,
     docker_exec,
 )
-from victor.tools.metrics_tool import (
-    metrics_complexity,
-    metrics_maintainability,
-    metrics_debt,
-    metrics_profile,
-    metrics_analyze,
-    metrics_report,
-)
+from victor.tools.metrics_tool import analyze_metrics
 from victor.tools.security_scanner_tool import security_scan
 from victor.tools.documentation_tool import (
     docs_generate_docstrings,
@@ -277,13 +270,8 @@ class AgentOrchestrator:
         self.tools.register(docker_volumes)
         self.tools.register(docker_exec)
 
-        # Register metrics tools
-        self.tools.register(metrics_complexity)
-        self.tools.register(metrics_maintainability)
-        self.tools.register(metrics_debt)
-        self.tools.register(metrics_profile)
-        self.tools.register(metrics_analyze)
-        self.tools.register(metrics_report)
+        # Register metrics tool (consolidated)
+        self.tools.register(analyze_metrics)
 
         # Register security scanner tool (consolidated)
         self.tools.register(security_scan)
@@ -388,7 +376,7 @@ class AgentOrchestrator:
             "review": ["code_review"],
             "web": ["web_search", "web_fetch", "web_summarize"],
             "docker": ["docker_ps", "docker_images", "docker_logs"],
-            "metrics": ["metrics_complexity", "metrics_maintainability", "metrics_analyze"],
+            "metrics": ["analyze_metrics"],
         }
 
         # Keyword matching for tool selection
