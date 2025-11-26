@@ -371,14 +371,14 @@ class SemanticToolSelector:
     def _create_tool_text(tool: Any) -> str:
         """Create semantic description of tool for embedding.
 
-        Combines tool name, description, and parameter names to create
-        a rich semantic representation.
+        Combines tool name, description, parameter names, and use cases to create
+        a rich semantic representation that matches user queries better.
 
         Args:
             tool: Tool object
 
         Returns:
-            Semantic text description
+            Semantic text description enriched with use cases
         """
         # Start with name (important for matching)
         parts = [tool.name.replace("_", " ")]
@@ -394,7 +394,71 @@ class SemanticToolSelector:
                 param_names = ", ".join(params.keys())
                 parts.append(f"Parameters: {param_names}")
 
+        # Enrich with use cases based on tool name (improves semantic matching)
+        use_cases = SemanticToolSelector._get_tool_use_cases(tool.name)
+        if use_cases:
+            parts.append(use_cases)
+
         return ". ".join(parts)
+
+    @staticmethod
+    def _get_tool_use_cases(tool_name: str) -> str:
+        """Get common use cases for a tool to improve semantic matching.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            String describing common use cases
+        """
+        # Map tools to their common use cases for better semantic matching
+        use_case_map = {
+            # File operations
+            "write_file": "Use for: creating Python files, saving code, writing scripts, creating configuration files, saving data, generating files",
+            "read_file": "Use for: reading Python code, loading configuration, reading source files, examining file contents, loading data",
+            "list_directory": "Use for: exploring codebase structure, finding files, listing project contents, browsing directories",
+            "edit_files": "Use for: modifying code, updating files, refactoring, making changes to existing files",
+
+            # Code execution
+            "execute_bash": "Use for: running scripts, executing commands, testing code, installing packages, git operations, file operations",
+            "execute_python_in_sandbox": "Use for: testing Python code, validating functions, running Python scripts, executing code safely, testing implementations",
+
+            # Code intelligence
+            "find_symbol": "Use for: locating function definitions, finding class declarations, searching for variables, code navigation",
+            "find_references": "Use for: finding where code is used, tracking function calls, analyzing dependencies",
+            "rename_symbol": "Use for: refactoring variable names, renaming functions, updating identifiers across codebase",
+
+            # Code quality
+            "code_review": "Use for: analyzing code quality, checking for issues, reviewing implementations, code analysis",
+            "security_scan": "Use for: finding security vulnerabilities, detecting secrets, security analysis, vulnerability scanning",
+            "analyze_metrics": "Use for: measuring code complexity, analyzing code quality metrics, technical debt analysis",
+
+            # Testing
+            "run_tests": "Use for: executing test suites, running pytest, validating code, test automation, checking test coverage",
+
+            # Documentation
+            "generate_docs": "Use for: creating documentation, generating API docs, documenting code, writing README files",
+            "analyze_docs": "Use for: reviewing documentation, checking doc coverage, analyzing documentation quality",
+
+            # Git operations
+            "git": "Use for: version control, committing changes, managing branches, git operations, source control",
+            "git_suggest_commit": "Use for: generating commit messages, analyzing changes, creating commits",
+            "git_create_pr": "Use for: creating pull requests, proposing changes, code review workflow",
+
+            # Refactoring
+            "refactor_extract_function": "Use for: extracting methods, refactoring code, improving code structure",
+            "refactor_inline_variable": "Use for: inlining variables, simplifying code, removing unnecessary variables",
+            "refactor_organize_imports": "Use for: organizing imports, cleaning up dependencies, import management",
+
+            # Web & HTTP
+            "web_search": "Use for: searching documentation, finding examples, looking up information, web research",
+            "web_fetch": "Use for: downloading documentation, fetching web content, retrieving online resources",
+
+            # Workflows
+            "run_workflow": "Use for: executing multi-step tasks, complex operations, automated workflows, orchestration",
+        }
+
+        return use_case_map.get(tool_name, "")
 
     async def close(self) -> None:
         """Close HTTP client."""
