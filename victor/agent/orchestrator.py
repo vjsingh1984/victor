@@ -47,14 +47,7 @@ from victor.tools.git_tool import (
     git_analyze_conflicts,
     set_git_provider,
 )
-from victor.tools.batch_processor_tool import (
-    batch_search,
-    batch_replace,
-    batch_analyze,
-    batch_list_files,
-    batch_transform,
-    set_batch_processor_config,
-)
+from victor.tools.batch_processor_tool import batch, set_batch_processor_config
 from victor.tools.cicd_tool import (
     cicd_generate,
     cicd_validate,
@@ -185,13 +178,9 @@ class AgentOrchestrator:
         self.tools.register(git_create_pr)
         self.tools.register(git_analyze_conflicts)
 
-        # Register batch processor tools
+        # Register batch processor tool (consolidated)
         set_batch_processor_config(max_workers=4)
-        self.tools.register(batch_search)
-        self.tools.register(batch_replace)
-        self.tools.register(batch_analyze)
-        self.tools.register(batch_list_files)
-        self.tools.register(batch_transform)
+        self.tools.register(batch)
 
         # Register CI/CD tools
         self.tools.register(cicd_generate)
@@ -311,6 +300,7 @@ class AgentOrchestrator:
             "web": ["web_search", "web_fetch", "web_summarize"],
             "docker": ["docker"],
             "metrics": ["analyze_metrics"],
+            "batch": ["batch"],
         }
 
         # Keyword matching for tool selection
@@ -336,6 +326,8 @@ class AgentOrchestrator:
             selected_categories.add("docker")
         if any(kw in message_lower for kw in ["complexity", "metrics", "maintainability", "technical debt"]):
             selected_categories.add("metrics")
+        if any(kw in message_lower for kw in ["batch", "bulk", "multiple files", "search files", "replace across"]):
+            selected_categories.add("batch")
 
         # Build selected tool names
         selected_tool_names = core_tool_names.copy()

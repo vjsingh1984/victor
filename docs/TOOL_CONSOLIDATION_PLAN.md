@@ -1,13 +1,14 @@
 # Tool Consolidation Plan
 
-## Current State: 43 Tools (was 86) → Target: 41 Tools (52% reduction)
+## Current State: 38 Tools (was 86) → Target: 32 Tools (63% reduction)
 
-**Progress:** Phase 1-3 COMPLETE (50% reduction achieved)
+**Progress:** Phase 1-4.1 COMPLETE (56% reduction achieved)
 - ✅ Phase 1: Removed duplicate + consolidated 16 tools → 3 tools
 - ✅ Phase 2.1: Consolidated Docker tools (15 → 1)
 - ✅ Phase 2.2: Consolidated File Editor tools (10 → 1)
 - ✅ Phase 2.3: Consolidated Documentation tools (5 → 2)
 - ✅ Phase 3: Consolidated Git tools (9 → 4)
+- ✅ Phase 4.1: Consolidated Batch Processor tools (5 → 1)
 
 ### Problem Statement
 
@@ -263,28 +264,56 @@ git("diff", files=["src/"])
 
 ---
 
-## Priority 4: Keep As-Is (legitimately different)
+## Priority 4: Additional Consolidations ✅ PARTIAL
 
-### Categories to Keep Unchanged
+### 9. Batch Processor: 5 tools → 1 tool ✅ COMPLETE
 
-**Batch Processor (5 tools)** - Each is genuinely different:
-- batch_search - Search across files
-- batch_replace - Replace across files
-- batch_analyze - Analyze multiple files
-- batch_list_files - List files matching criteria
-- batch_transform - Transform file contents
+**Consolidated (1 tool):**
+```python
+batch(
+    operation: str,  # search, replace, analyze, list, transform
+    path: str,
+    file_pattern: str = "*.*",
+    pattern: Optional[str] = None,
+    find: Optional[str] = None,
+    replace: Optional[str] = "",
+    regex: bool = False,
+    dry_run: bool = False,
+    max_files: int = 1000
+) -> Dict[str, Any]
 
-**CI/CD (4 tools)** - Template-based, keep separate:
+# Example usage:
+batch(operation="search", path="./src", pattern="TODO", file_pattern="*.py")
+batch(operation="replace", path="./src", find="old_name", replace="new_name", dry_run=True)
+batch(operation="analyze", path="./src", file_pattern="*.py")
+```
+
+**Benefits:**
+- Single tool call for all batch operations
+- Parallel processing preserved
+- All functionality maintained
+
+---
+
+## Priority 5: Remaining Consolidation Candidates
+
+**CI/CD (4 tools)** - Can be consolidated to 1:
 - cicd_generate - Generate from template
 - cicd_validate - Validate syntax
 - cicd_list_templates - List available templates
 - cicd_create_workflow - Create new workflow
+→ Consolidate to: cicd(operation, template, ...)
 
-**Scaffold (4 tools)** - Different lifecycle stages:
+**Scaffold (4 tools)** - Can be consolidated to 1:
 - scaffold_create - Create new project
 - scaffold_list_templates - List templates
 - scaffold_add_file - Add file to project
 - scaffold_init_git - Initialize git
+→ Consolidate to: scaffold(operation, template, ...)
+
+---
+
+## Priority 6: Keep As-Is (legitimately different)
 
 **Code Intelligence (3 tools)** - Core AST operations:
 - find_symbol - Find definitions
@@ -322,13 +351,13 @@ git("diff", files=["src/"])
 | Documentation | 5 | 2 | -3 |
 | Git | 9 | 4 | -5 |
 | Refactor | 4 | 3 | -1 (duplicate) |
-| Batch | 5 | 5 | 0 |
-| CI/CD | 4 | 4 | 0 |
-| Scaffold | 4 | 4 | 0 |
+| Batch | 5 | 1 | -4 |
+| CI/CD | 4 | 4 | 0 (pending) |
+| Scaffold | 4 | 4 | 0 (pending) |
 | Code Intelligence | 3 | 3 | 0 |
 | Core | 8 | 8 | 0 |
 | Web | 3 | 3 | 0 |
-| **TOTAL** | **86** | **41** | **-45 (52%)** |
+| **TOTAL** | **86** | **38** | **-48 (56%)** |
 
 ---
 
@@ -357,13 +386,21 @@ git("diff", files=["src/"])
 **Target Impact:** 48 → 43 tools (50% reduction)
 **Achieved:** 48 → 43 tools (50% reduction, 1/1 tasks complete)
 
-### Phase 4: Testing & Refinement (Week 5)
+### Phase 4: Additional Consolidations ⏳ IN PROGRESS
+1. ✅ Consolidate Batch Processor: 5 → 1 (43 → 38 tools)
+2. ⏳ Consolidate CI/CD: 4 → 1 (38 → 35 tools)
+3. ⏳ Consolidate Scaffold: 4 → 1 (35 → 32 tools)
+
+**Target Impact:** 43 → 32 tools (63% reduction)
+**Achieved:** 43 → 38 tools (56% reduction, 1/3 tasks complete)
+
+### Phase 5: Testing & Refinement
 1. Update intelligent tool selection logic
 2. Test with small models (qwen2.5-coder:1.5b)
 3. Update documentation
 4. Create migration guide
 
-**Final Impact:** 86 → 41 tools (52% reduction)
+**Final Impact:** 86 → 32 tools (63% reduction)
 
 ---
 
