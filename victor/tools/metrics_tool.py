@@ -25,7 +25,7 @@ Features:
 
 import ast
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 import logging
 
 from victor.tools.decorators import tool

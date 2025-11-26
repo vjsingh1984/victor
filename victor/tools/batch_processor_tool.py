@@ -193,7 +193,7 @@ async def batch(
     max_files: int = 1000,
     options: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """
+    r"""
     Unified batch processing tool for multi-file operations.
 
     Performs parallel batch operations on multiple files including search,
