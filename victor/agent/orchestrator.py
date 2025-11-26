@@ -131,7 +131,6 @@ from victor.tools.code_review_tool import (
     set_code_review_config,
 )
 from victor.tools.refactor_tool import (
-    refactor_rename_symbol,
     refactor_extract_function,
     refactor_inline_variable,
     refactor_organize_imports,
@@ -322,7 +321,7 @@ class AgentOrchestrator:
         self.tools.register(code_review_best_practices)
 
         # Register refactor tools
-        self.tools.register(refactor_rename_symbol)
+        # Note: rename_symbol is in code_intelligence_tool, not here (avoid duplicate)
         self.tools.register(refactor_extract_function)
         self.tools.register(refactor_inline_variable)
         self.tools.register(refactor_organize_imports)
@@ -403,7 +402,7 @@ class AgentOrchestrator:
         tool_categories = {
             "git": ["git_status", "git_diff", "git_stage", "git_commit", "git_log", "git_branch"],
             "testing": ["testing_generate", "testing_run", "testing_coverage"],
-            "refactor": ["refactor_rename_symbol", "refactor_extract_function", "refactor_inline_variable"],
+            "refactor": ["refactor_extract_function", "refactor_inline_variable", "refactor_organize_imports"],
             "security": ["security_scan_secrets", "security_scan_dependencies", "security_scan_all"],
             "docs": ["docs_generate_docstrings", "docs_generate_api", "docs_generate_readme"],
             "review": ["code_review_file", "code_review_directory", "code_review_security"],
