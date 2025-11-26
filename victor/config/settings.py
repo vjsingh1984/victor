@@ -40,6 +40,7 @@ class ProfileConfig(BaseSettings):
     model: str = Field(..., description="Model identifier")
     temperature: float = Field(0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(4096, gt=0)
+    description: Optional[str] = Field(None, description="Optional profile description")
 
 
 class Settings(BaseSettings):
