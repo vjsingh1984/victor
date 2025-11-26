@@ -238,22 +238,28 @@ class AgentOrchestrator:
             await self.semantic_selector.initialize_tool_embeddings(self.tools)
             self._embeddings_initialized = True
 
-        # Determine max tools based on model size
-        is_small_model = False
-        if self.provider.name == "ollama":
-            model_lower = self.model.lower()
-            small_model_indicators = [":0.5b", ":1.5b", ":3b"]
-            is_small_model = any(indicator in model_lower for indicator in small_model_indicators)
-
-        max_tools = 10 if is_small_model else 20
-
-        # Select tools semantically
+        # Select tools semantically (using defaults: max_tools=5, threshold=0.15)
         tools = await self.semantic_selector.select_relevant_tools(
             user_message=user_message,
             tools=self.tools,
-            max_tools=max_tools,
-            similarity_threshold=0.3,
         )
+
+        # Fallback: If 0 tools selected, provide ALL tools to the model
+        # Since we reduced to 31 tools specifically for this fallback,
+        # the model can handle choosing from the full set
+        if not tools:
+            logger.info(
+                "Semantic selection returned 0 tools. "
+                f"Falling back to ALL {len(self.tools.list_tools())} tools."
+            )
+            tools = [
+                ToolDefinition(
+                    name=tool.name,
+                    description=tool.description,
+                    parameters=tool.parameters
+                )
+                for tool in self.tools.list_tools()
+            ]
 
         return tools
 
