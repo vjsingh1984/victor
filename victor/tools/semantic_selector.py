@@ -216,8 +216,8 @@ class SemanticToolSelector:
         self,
         user_message: str,
         tools: ToolRegistry,
-        max_tools: int = 10,
-        similarity_threshold: float = 0.3,
+        max_tools: int = 5,
+        similarity_threshold: float = 0.15,
     ) -> List[ToolDefinition]:
         """Select relevant tools using semantic similarity.
 
