@@ -20,19 +20,30 @@ class CodeExecutionManager:
     Manages a persistent, isolated Docker container for stateful code execution.
     """
 
-    def __init__(self, docker_image: str = "python:3.11-slim"):
+    def __init__(self, docker_image: str = "python:3.11-slim", require_docker: bool = False):
         self.docker_image = docker_image
         self.container: Container | None = None
         self.working_dir = "/app"
+        self.docker_available = False
+        self.docker_client = None
+
         try:
             self.docker_client = docker.from_env()
+            self.docker_available = True
         except DockerException as e:
-            raise RuntimeError(
-                "Docker is not running or not installed. This feature requires Docker."
-            ) from e
+            if require_docker:
+                raise RuntimeError(
+                    "Docker is not running or not installed. This feature requires Docker."
+                ) from e
+            # Docker not available, but not required - continue without it
+            self.docker_client = None
 
     def start(self):
         """Starts the persistent Docker container."""
+        if not self.docker_available:
+            # Docker not available - skip container startup
+            return
+
         if self.container:
             return  # Already started
 
@@ -43,12 +54,7 @@ class CodeExecutionManager:
                 command="sleep infinity",  # Keep the container running
                 detach=True,
                 working_dir=self.working_dir,
-                volumes={
-                    os.path.abspath(self.working_dir): {
-                        "bind": self.working_dir,
-                        "mode": "rw",
-                    }
-                }
+                # No volume mounting needed - we execute code directly
             )
         except Exception as e:
             self.container = None
@@ -56,6 +62,10 @@ class CodeExecutionManager:
 
     def stop(self):
         """Stops and removes the Docker container."""
+        if not self.docker_available:
+            # Docker not available - nothing to stop
+            return
+
         if self.container:
             try:
                 self.container.remove(force=True)
@@ -65,6 +75,13 @@ class CodeExecutionManager:
 
     def execute(self, code: str, timeout: int = 60) -> dict:
         """Executes a block of Python code inside the running container."""
+        if not self.docker_available:
+            return {
+                "exit_code": 1,
+                "stdout": "",
+                "stderr": "Docker is not available. Code execution in containers is disabled.",
+            }
+
         if not self.container:
             raise RuntimeError("Execution session not started. Call start() first.")
 
@@ -84,6 +101,10 @@ class CodeExecutionManager:
 
     def put_files(self, file_paths: List[str]):
         """Copies files from the local filesystem into the container's working dir."""
+        if not self.docker_available:
+            # Docker not available - skip file operations
+            return
+
         if not self.container:
             raise RuntimeError("Execution session not started. Call start() first.")
 
@@ -101,6 +122,10 @@ class CodeExecutionManager:
 
     def get_file(self, remote_path: str) -> bytes:
         """Retrieves a single file from the container."""
+        if not self.docker_available:
+            # Docker not available - return empty bytes
+            return b""
+
         if not self.container:
             raise RuntimeError("Execution session not started. Call start() first.")
 

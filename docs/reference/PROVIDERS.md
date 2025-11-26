@@ -15,6 +15,8 @@ CodingAgent supports all major LLM providers through a unified interface. This g
 | **OpenAI** | ✅ Ready | GPT-4, GPT-3.5, etc. | ✅ Yes | ✅ Yes |
 | **Google** | ✅ Ready | Gemini 1.5 Pro/Flash | ✅ Yes | ✅ Yes |
 | **xAI (Grok)** | ✅ Ready | Grok Beta, Grok Vision | ✅ Yes | ✅ Yes |
+| **LMStudio** | ✅ Ready | Any GGUF model | ✅ Yes | ✅ Yes |
+| **vLLM** | ✅ Ready | HuggingFace models | ✅ Yes | ✅ Yes |
 
 ### 🚧 Coming Soon
 
@@ -22,8 +24,6 @@ CodingAgent supports all major LLM providers through a unified interface. This g
 |----------|--------|-----|
 | **Cohere** | 📋 Planned | v0.3.0 |
 | **Mistral** | 📋 Planned | v0.3.0 |
-| **LMStudio** | 📋 Planned | v0.2.0 |
-| **vLLM** | 📋 Planned | v0.2.0 |
 
 ---
 
@@ -273,6 +273,156 @@ victor --profile grok "Explain quantum computing"
 
 ---
 
+### 6. LMStudio (Local Models)
+
+**No API key needed!** LMStudio uses OpenAI-compatible API.
+
+#### Installation
+
+1. Download from https://lmstudio.ai/
+2. Install the application
+3. Launch LMStudio
+
+#### Download Models
+
+1. Open LMStudio
+2. Go to "Discover" tab
+3. Search for coding models:
+   - **Qwen2.5-Coder-7B-Instruct** (recommended)
+   - **CodeLlama-7B-Instruct**
+   - **DeepSeek-Coder-6.7B-Instruct**
+4. Click "Download"
+
+#### Start Local Server
+
+1. Go to "Local Server" tab
+2. Select your downloaded model
+3. Click "Start Server"
+4. Note the server URL (default: `http://localhost:1234`)
+
+#### Configuration
+
+```bash
+# No API key required, just a placeholder
+export LMSTUDIO_API_KEY="lm-studio"
+```
+
+```yaml
+profiles:
+  lmstudio:
+    provider: openai  # Uses OpenAI-compatible API
+    model: local-model
+    temperature: 0.3
+    max_tokens: 4096
+
+providers:
+  openai:
+    base_url: http://localhost:1234/v1  # LMStudio server
+    api_key: lm-studio  # Placeholder
+    timeout: 300
+```
+
+#### Usage
+
+```bash
+victor --profile lmstudio "Write a Python function"
+```
+
+#### Model Sharing with Ollama
+
+**Save disk space** by sharing GGUF models between Ollama and LMStudio!
+
+```bash
+# Install Gollama
+go install github.com/sammcj/gollama@HEAD
+
+# Link Ollama models to LMStudio
+~/go/bin/gollama -L
+
+# Result: 27 models linked, ~300GB disk space saved!
+```
+
+See [MODEL_SHARING_GUIDE.md](MODEL_SHARING_GUIDE.md) for details.
+
+---
+
+### 7. vLLM (High-Performance Inference)
+
+**No API key needed!** vLLM provides OpenAI-compatible API.
+
+#### Installation
+
+```bash
+# Install vLLM
+pip install vllm
+
+# Or with specific CUDA version:
+pip install vllm --extra-index-url https://download.pytorch.org/whl/cu118
+```
+
+#### Start vLLM Server
+
+```bash
+# Start with a model
+python -m vllm.entrypoints.openai.api_server \
+  --model Qwen/Qwen2.5-Coder-7B-Instruct \
+  --port 8000 \
+  --host 0.0.0.0
+
+# Or for CPU-only (slower):
+python -m vllm.entrypoints.openai.api_server \
+  --model Qwen/Qwen2.5-Coder-7B-Instruct \
+  --port 8000 \
+  --device cpu
+```
+
+#### Recommended Models
+
+- `Qwen/Qwen2.5-Coder-7B-Instruct` - Best for coding
+- `codellama/CodeLlama-7b-Instruct-hf`
+- `deepseek-ai/deepseek-coder-6.7b-instruct`
+
+#### Configuration
+
+```bash
+# No real API key needed
+export VLLM_API_KEY="EMPTY"
+```
+
+```yaml
+profiles:
+  vllm:
+    provider: openai  # Uses OpenAI-compatible API
+    model: Qwen/Qwen2.5-Coder-7B-Instruct
+    temperature: 0.3
+    max_tokens: 4096
+
+providers:
+  openai:
+    base_url: http://localhost:8000/v1  # vLLM server
+    api_key: EMPTY
+    timeout: 300
+```
+
+#### Usage
+
+```bash
+victor --profile vllm "Optimize this code"
+```
+
+#### Performance Tuning
+
+```bash
+# Optimize for GPU memory
+python -m vllm.entrypoints.openai.api_server \
+  --model MODEL_NAME \
+  --gpu-memory-utilization 0.9 \
+  --max-num-batched-tokens 4096 \
+  --max-num-seqs 256
+```
+
+---
+
 ## Provider Comparison
 
 ### Cost (Approximate)
@@ -280,6 +430,8 @@ victor --profile grok "Explain quantum computing"
 | Provider | Input (per 1M tokens) | Output (per 1M tokens) |
 |----------|----------------------|------------------------|
 | **Ollama** | FREE | FREE |
+| **LMStudio** | FREE | FREE |
+| **vLLM** | FREE | FREE |
 | **Claude Sonnet** | $3 | $15 |
 | **GPT-4 Turbo** | $10 | $30 |
 | **GPT-3.5 Turbo** | $0.50 | $1.50 |
@@ -291,6 +443,8 @@ victor --profile grok "Explain quantum computing"
 | Provider | Relative Speed | Best For |
 |----------|---------------|----------|
 | **Ollama** | Depends on hardware | Development, privacy |
+| **LMStudio** | Depends on hardware | GUI model management |
+| **vLLM** | ⚡⚡⚡ Very Fast | High-throughput inference |
 | **GPT-3.5** | ⚡⚡⚡ Very Fast | Quick tasks |
 | **Gemini Flash** | ⚡⚡⚡ Very Fast | Fast responses |
 | **Claude Haiku** | ⚡⚡ Fast | Balanced speed/quality |
@@ -299,13 +453,14 @@ victor --profile grok "Explain quantum computing"
 
 ### Capabilities
 
-| Feature | Ollama | Claude | GPT-4 | Gemini | Grok |
-|---------|--------|--------|-------|--------|------|
-| **Tool Calling** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Streaming** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Vision** | 🔄 Some | ❌ | ✅ | ✅ | ✅ |
-| **Long Context** | 🔄 Varies | ✅ 200K | ✅ 128K | ✅ 1M | ✅ |
-| **Code Focus** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Feature | Ollama | LMStudio | vLLM | Claude | GPT-4 | Gemini | Grok |
+|---------|--------|----------|------|--------|-------|--------|------|
+| **Tool Calling** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Streaming** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Vision** | 🔄 Some | 🔄 Some | 🔄 Some | ❌ | ✅ | ✅ | ✅ |
+| **Long Context** | 🔄 Varies | 🔄 Varies | 🔄 Varies | ✅ 200K | ✅ 128K | ✅ 1M | ✅ |
+| **Code Focus** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Model Sharing** | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 ---
 

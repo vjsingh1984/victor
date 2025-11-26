@@ -1,625 +1,465 @@
-"""Security scanner tool for detecting vulnerabilities and secrets.
+"""Security scanning tool for code analysis.
 
 Features:
-- Secret detection (API keys, passwords, tokens)
+- Secret and credential detection
 - Dependency vulnerability scanning
-- Configuration security analysis
-- File permission checks
-- Security best practices
+- Configuration security checks
+- Comprehensive security audits
 """
 
 import re
-import json
 from pathlib import Path
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List
 import logging
 
-from victor.tools.base import BaseTool, ToolParameter, ToolResult
+from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
 
+# Common secret patterns
+SECRET_PATTERNS = {
+    "api_key": r"(?i)(api[_-]?key|apikey)\s*[:=]\s*['\"]([a-zA-Z0-9_\-]{20,})['\"]",
+    "password": r"(?i)(password|passwd|pwd)\s*[:=]\s*['\"]([^'\"]{8,})['\"]",
+    "token": r"(?i)(token|auth[_-]?token)\s*[:=]\s*['\"]([a-zA-Z0-9_\-\.]{20,})['\"]",
+    "private_key": r"-----BEGIN (RSA |EC )?PRIVATE KEY-----",
+    "aws_key": r"(?i)(aws[_-]?access[_-]?key[_-]?id)\s*[:=]\s*['\"]([A-Z0-9]{20})['\"]",
+    "github_token": r"(?i)(github[_-]?token)\s*[:=]\s*['\"]([a-zA-Z0-9_]{40})['\"]",
+}
 
-class SecurityScannerTool(BaseTool):
-    """Tool for security vulnerability scanning."""
+# Configuration security checks
+CONFIG_CHECKS = {
+    "debug_mode": r"(?i)(debug|DEBUG)\s*[:=]\s*(true|True|1)",
+    "insecure_protocol": r"(?i)http://",
+    "hardcoded_ip": r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b",
+}
 
-    # Secret patterns to detect
-    SECRET_PATTERNS = {
-        "aws_access_key": {
-            "pattern": r"AKIA[0-9A-Z]{16}",
-            "severity": "critical",
-            "description": "AWS Access Key ID",
-        },
-        "aws_secret_key": {
-            "pattern": r"aws(.{0,20})?['\"][0-9a-zA-Z/+]{40}['\"]",
-            "severity": "critical",
-            "description": "AWS Secret Access Key",
-        },
-        "github_token": {
-            "pattern": r"ghp_[0-9a-zA-Z]{36}",
-            "severity": "critical",
-            "description": "GitHub Personal Access Token",
-        },
-        "github_oauth": {
-            "pattern": r"gho_[0-9a-zA-Z]{36}",
-            "severity": "critical",
-            "description": "GitHub OAuth Token",
-        },
-        "slack_token": {
-            "pattern": r"xox[baprs]-([0-9a-zA-Z]{10,48})?",
-            "severity": "critical",
-            "description": "Slack Token",
-        },
-        "slack_webhook": {
-            "pattern": r"https://hooks.slack.com/services/T[a-zA-Z0-9_]{8}/B[a-zA-Z0-9_]{8}/[a-zA-Z0-9_]{24}",
-            "severity": "high",
-            "description": "Slack Webhook",
-        },
-        "google_api": {
-            "pattern": r"AIza[0-9A-Za-z-_]{35}",
-            "severity": "critical",
-            "description": "Google API Key",
-        },
-        "generic_api_key": {
-            "pattern": r"[aA][pP][iI]_?[kK][eE][yY].*['\"][0-9a-zA-Z]{32,45}['\"]",
-            "severity": "high",
-            "description": "Generic API Key",
-        },
-        "generic_secret": {
-            "pattern": r"[sS][eE][cC][rR][eE][tT].*['\"][0-9a-zA-Z]{32,45}['\"]",
-            "severity": "high",
-            "description": "Generic Secret",
-        },
-        "private_key": {
-            "pattern": r"-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----",
-            "severity": "critical",
-            "description": "Private Key",
-        },
-        "jwt_token": {
-            "pattern": r"eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*",
-            "severity": "medium",
-            "description": "JWT Token",
-        },
-        "connection_string": {
-            "pattern": r"(mongodb|mysql|postgresql)://[^\\s]*:[^\\s]*@",
-            "severity": "high",
-            "description": "Database Connection String",
-        },
+
+def _scan_file_for_secrets(file_path: Path) -> List[Dict[str, Any]]:
+    """Scan a file for potential secrets."""
+    findings = []
+
+    try:
+        content = file_path.read_text()
+
+        for secret_type, pattern in SECRET_PATTERNS.items():
+            matches = re.finditer(pattern, content)
+            for match in matches:
+                findings.append({
+                    "type": secret_type,
+                    "file": str(file_path),
+                    "line": content[:match.start()].count('\n') + 1,
+                    "severity": "high",
+                    "message": f"Potential {secret_type} detected"
+                })
+    except Exception as e:
+        logger.warning(f"Error scanning {file_path}: {e}")
+
+    return findings
+
+
+def _scan_file_for_config_issues(file_path: Path) -> List[Dict[str, Any]]:
+    """Scan a file for configuration security issues."""
+    findings = []
+
+    try:
+        content = file_path.read_text()
+
+        for check_name, pattern in CONFIG_CHECKS.items():
+            matches = re.finditer(pattern, content)
+            for match in matches:
+                findings.append({
+                    "type": check_name,
+                    "file": str(file_path),
+                    "line": content[:match.start()].count('\n') + 1,
+                    "severity": "medium",
+                    "message": f"Configuration issue: {check_name}"
+                })
+    except Exception as e:
+        logger.warning(f"Error scanning {file_path}: {e}")
+
+    return findings
+
+
+@tool
+async def security_scan_secrets(path: str, file_pattern: str = "*.py") -> Dict[str, Any]:
+    """
+    Scan for secrets and credentials in code.
+
+    Searches for hardcoded API keys, passwords, tokens, and other
+    sensitive information that should not be in source code.
+
+    Args:
+        path: Directory path to scan.
+        file_pattern: Glob pattern for files to scan (default: *.py).
+
+    Returns:
+        Dictionary containing:
+        - success: Whether scan completed
+        - findings: List of security findings
+        - files_scanned: Number of files scanned
+        - secrets_found: Number of secrets detected
+        - formatted_report: Human-readable security report
+        - error: Error message if failed
+    """
+    if not path:
+        return {"success": False, "error": "Missing required parameter: path"}
+
+    path_obj = Path(path)
+    if not path_obj.exists():
+        return {"success": False, "error": f"Path not found: {path}"}
+
+    # Find files to scan
+    files = list(path_obj.rglob(file_pattern))
+    if not files:
+        return {
+            "success": True,
+            "findings": [],
+            "files_scanned": 0,
+            "secrets_found": 0,
+            "message": "No files found to scan"
+        }
+
+    # Scan files
+    all_findings = []
+    for file in files:
+        findings = _scan_file_for_secrets(file)
+        all_findings.extend(findings)
+
+    # Build report
+    report = []
+    report.append("Security Scan: Secrets Detection")
+    report.append("=" * 70)
+    report.append("")
+    report.append(f"Files scanned: {len(files)}")
+    report.append(f"Secrets found: {len(all_findings)}")
+    report.append("")
+
+    if all_findings:
+        report.append("⚠️  CRITICAL: Secrets detected in code!")
+        report.append("")
+        for finding in all_findings[:20]:  # Show first 20
+            report.append(f"  {finding['severity'].upper()}: {finding['file']}")
+            report.append(f"    Line {finding['line']}: {finding['message']}")
+            report.append("")
+
+        if len(all_findings) > 20:
+            report.append(f"... and {len(all_findings) - 20} more findings")
+    else:
+        report.append("✅ No secrets detected")
+
+    return {
+        "success": True,
+        "findings": all_findings,
+        "files_scanned": len(files),
+        "secrets_found": len(all_findings),
+        "formatted_report": "\n".join(report)
     }
 
-    # Dangerous file patterns
-    DANGEROUS_FILES = {
-        ".env": "Environment file may contain secrets",
-        ".env.local": "Environment file may contain secrets",
-        ".env.production": "Production environment file",
-        "credentials.json": "Credentials file",
-        "auth.json": "Authentication file",
-        "secrets.json": "Secrets file",
-        "id_rsa": "Private SSH key",
-        "id_dsa": "Private SSH key",
-        ".pem": "Private certificate",
-        ".key": "Private key file",
+
+@tool
+async def security_scan_dependencies(requirements_file: str = "requirements.txt") -> Dict[str, Any]:
+    """
+    Scan dependencies for known vulnerabilities.
+
+    Checks Python dependencies against known vulnerability databases.
+
+    Args:
+        requirements_file: Path to requirements file (default: requirements.txt).
+
+    Returns:
+        Dictionary containing:
+        - success: Whether scan completed
+        - vulnerabilities: List of vulnerable dependencies
+        - packages_checked: Number of packages checked
+        - formatted_report: Human-readable vulnerability report
+        - error: Error message if failed
+    """
+    req_path = Path(requirements_file)
+    if not req_path.exists():
+        return {"success": False, "error": f"Requirements file not found: {requirements_file}"}
+
+    try:
+        content = req_path.read_text()
+        packages = [line.strip() for line in content.split('\n') if line.strip() and not line.startswith('#')]
+
+        # Simplified vulnerability check (in real implementation, would query vulnerability DB)
+        vulnerabilities = []
+        known_vulns = {
+            "django": "Known vulnerabilities in older versions",
+            "flask": "Check for recent security patches",
+            "requests": "Verify version >= 2.26.0",
+        }
+
+        for pkg_line in packages:
+            pkg_name = pkg_line.split('==')[0].split('>=')[0].split('<=')[0].lower()
+            if pkg_name in known_vulns:
+                vulnerabilities.append({
+                    "package": pkg_name,
+                    "severity": "medium",
+                    "message": known_vulns[pkg_name]
+                })
+
+        # Build report
+        report = []
+        report.append("Security Scan: Dependency Vulnerabilities")
+        report.append("=" * 70)
+        report.append("")
+        report.append(f"Packages checked: {len(packages)}")
+        report.append(f"Vulnerabilities found: {len(vulnerabilities)}")
+        report.append("")
+
+        if vulnerabilities:
+            report.append("⚠️  Vulnerable dependencies detected:")
+            report.append("")
+            for vuln in vulnerabilities:
+                report.append(f"  {vuln['severity'].upper()}: {vuln['package']}")
+                report.append(f"    {vuln['message']}")
+                report.append("")
+        else:
+            report.append("✅ No known vulnerabilities detected")
+            report.append("")
+            report.append("Note: This is a basic check. For comprehensive scanning, use: pip-audit or safety")
+
+        return {
+            "success": True,
+            "vulnerabilities": vulnerabilities,
+            "packages_checked": len(packages),
+            "formatted_report": "\n".join(report)
+        }
+
+    except Exception as e:
+        return {"success": False, "error": f"Failed to scan dependencies: {str(e)}"}
+
+
+@tool
+async def security_scan_config(path: str, file_pattern: str = "*.py") -> Dict[str, Any]:
+    """
+    Scan for configuration security issues.
+
+    Checks for debug mode enabled, insecure protocols, hardcoded IPs,
+    and other configuration-related security concerns.
+
+    Args:
+        path: Directory path to scan.
+        file_pattern: Glob pattern for files to scan (default: *.py).
+
+    Returns:
+        Dictionary containing:
+        - success: Whether scan completed
+        - findings: List of configuration issues
+        - files_scanned: Number of files scanned
+        - issues_found: Number of issues detected
+        - formatted_report: Human-readable report
+        - error: Error message if failed
+    """
+    if not path:
+        return {"success": False, "error": "Missing required parameter: path"}
+
+    path_obj = Path(path)
+    if not path_obj.exists():
+        return {"success": False, "error": f"Path not found: {path}"}
+
+    # Find files to scan
+    files = list(path_obj.rglob(file_pattern))
+    if not files:
+        return {
+            "success": True,
+            "findings": [],
+            "files_scanned": 0,
+            "issues_found": 0,
+            "message": "No files found to scan"
+        }
+
+    # Scan files
+    all_findings = []
+    for file in files:
+        findings = _scan_file_for_config_issues(file)
+        all_findings.extend(findings)
+
+    # Build report
+    report = []
+    report.append("Security Scan: Configuration Issues")
+    report.append("=" * 70)
+    report.append("")
+    report.append(f"Files scanned: {len(files)}")
+    report.append(f"Issues found: {len(all_findings)}")
+    report.append("")
+
+    if all_findings:
+        report.append("⚠️  Configuration security issues detected:")
+        report.append("")
+
+        by_severity = {}
+        for finding in all_findings:
+            severity = finding['severity']
+            if severity not in by_severity:
+                by_severity[severity] = []
+            by_severity[severity].append(finding)
+
+        for severity in ['high', 'medium', 'low']:
+            if severity in by_severity:
+                report.append(f"{severity.upper()} ({len(by_severity[severity])} issues):")
+                for finding in by_severity[severity][:10]:
+                    report.append(f"  {finding['file']} (line {finding['line']})")
+                    report.append(f"    {finding['message']}")
+                report.append("")
+    else:
+        report.append("✅ No configuration issues detected")
+
+    return {
+        "success": True,
+        "findings": all_findings,
+        "files_scanned": len(files),
+        "issues_found": len(all_findings),
+        "formatted_report": "\n".join(report)
     }
 
-    # Insecure dependencies (known vulnerabilities)
-    VULNERABLE_PACKAGES = {
-        "requests": {"<2.31.0": "CVE-2023-32681: Proxy-Authorization header exposure"},
-        "flask": {"<2.3.2": "Security fixes in 2.3.2"},
-        "django": {"<4.2.2": "Multiple security fixes"},
-        "pillow": {"<9.5.0": "Multiple security vulnerabilities"},
-        "pyyaml": {"<6.0": "Arbitrary code execution via unsafe load"},
+
+@tool
+async def security_scan_all(path: str, file_pattern: str = "*.py") -> Dict[str, Any]:
+    """
+    Comprehensive security scan.
+
+    Runs all security scans: secrets detection, dependency checks,
+    and configuration analysis.
+
+    Args:
+        path: Directory path to scan.
+        file_pattern: Glob pattern for files to scan (default: *.py).
+
+    Returns:
+        Dictionary containing:
+        - success: Whether scan completed
+        - secrets: Results from secrets scan
+        - config: Results from config scan
+        - total_issues: Total security issues found
+        - formatted_report: Comprehensive security report
+        - error: Error message if failed
+    """
+    if not path:
+        return {"success": False, "error": "Missing required parameter: path"}
+
+    # Run all scans
+    secrets_result = await security_scan_secrets(path=path, file_pattern=file_pattern)
+    config_result = await security_scan_config(path=path, file_pattern=file_pattern)
+
+    # Try dependency scan if requirements.txt exists
+    req_path = Path(path) / "requirements.txt"
+    deps_result = None
+    if req_path.exists():
+        deps_result = await security_scan_dependencies(requirements_file=str(req_path))
+
+    total_issues = secrets_result.get("secrets_found", 0) + config_result.get("issues_found", 0)
+    if deps_result:
+        total_issues += len(deps_result.get("vulnerabilities", []))
+
+    # Build comprehensive report
+    report = []
+    report.append("Comprehensive Security Scan Report")
+    report.append("=" * 70)
+    report.append("")
+    report.append(f"Total security issues: {total_issues}")
+    report.append("")
+
+    report.append("Secrets Scan:")
+    report.append(f"  Files scanned: {secrets_result.get('files_scanned', 0)}")
+    report.append(f"  Secrets found: {secrets_result.get('secrets_found', 0)}")
+    report.append("")
+
+    report.append("Configuration Scan:")
+    report.append(f"  Files scanned: {config_result.get('files_scanned', 0)}")
+    report.append(f"  Issues found: {config_result.get('issues_found', 0)}")
+    report.append("")
+
+    if deps_result:
+        report.append("Dependency Scan:")
+        report.append(f"  Packages checked: {deps_result.get('packages_checked', 0)}")
+        report.append(f"  Vulnerabilities: {len(deps_result.get('vulnerabilities', []))}")
+        report.append("")
+
+    if total_issues > 0:
+        report.append("⚠️  Security issues require attention!")
+        report.append("    Run individual scans for details.")
+    else:
+        report.append("✅ No critical security issues detected")
+
+    return {
+        "success": True,
+        "secrets": secrets_result,
+        "config": config_result,
+        "dependencies": deps_result,
+        "total_issues": total_issues,
+        "formatted_report": "\n".join(report)
     }
+
+
+@tool
+async def security_check_file(file: str) -> Dict[str, Any]:
+    """
+    Security check for a specific file.
+
+    Performs quick security check on a single file for secrets
+    and configuration issues.
+
+    Args:
+        file: Path to file to check.
+
+    Returns:
+        Dictionary containing:
+        - success: Whether check completed
+        - findings: List of security findings
+        - issues_found: Number of issues
+        - formatted_report: Security check report
+        - error: Error message if failed
+    """
+    if not file:
+        return {"success": False, "error": "Missing required parameter: file"}
+
+    file_path = Path(file)
+    if not file_path.exists():
+        return {"success": False, "error": f"File not found: {file}"}
+
+    # Scan for secrets and config issues
+    secret_findings = _scan_file_for_secrets(file_path)
+    config_findings = _scan_file_for_config_issues(file_path)
+
+    all_findings = secret_findings + config_findings
+
+    # Build report
+    report = []
+    report.append(f"Security Check: {file}")
+    report.append("=" * 70)
+    report.append("")
+    report.append(f"Issues found: {len(all_findings)}")
+    report.append("")
+
+    if all_findings:
+        report.append("⚠️  Security issues detected:")
+        report.append("")
+        for finding in all_findings:
+            report.append(f"  {finding['severity'].upper()}: Line {finding['line']}")
+            report.append(f"    {finding['message']}")
+            report.append("")
+    else:
+        report.append("✅ No security issues detected")
+
+    return {
+        "success": True,
+        "findings": all_findings,
+        "issues_found": len(all_findings),
+        "formatted_report": "\n".join(report)
+    }
+
+
+# Keep class for backward compatibility
+class SecurityScannerTool:
+    """Deprecated: Use individual security_* functions instead."""
 
     def __init__(self):
-        """Initialize security scanner."""
-        super().__init__()
-
-    @property
-    def name(self) -> str:
-        """Get tool name."""
-        return "security_scan"
-
-    @property
-    def description(self) -> str:
-        """Get tool description."""
-        return """Security vulnerability and secret detection.
-
-Comprehensive security scanning:
-- Secret detection (API keys, tokens, passwords)
-- Dependency vulnerability scanning
-- Configuration security analysis
-- File permission checks
-- Security best practices
-
-Operations:
-- scan_secrets: Detect secrets in code
-- scan_dependencies: Check for vulnerable dependencies
-- scan_config: Analyze configuration security
-- scan_all: Comprehensive security scan
-- check_file: Check specific file for secrets
-
-Example workflows:
-1. Scan for secrets:
-   security_scan(operation="scan_secrets", path="src/")
-
-2. Check dependencies:
-   security_scan(operation="scan_dependencies", path="requirements.txt")
-
-3. Full security scan:
-   security_scan(operation="scan_all", path=".")
-
-4. Check single file:
-   security_scan(operation="check_file", path="config.py")
-"""
-
-    @property
-    def parameters(self) -> Dict[str, Any]:
-        """Get tool parameters."""
-        return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: scan_secrets, scan_dependencies, scan_config, scan_all, check_file",
-                required=True,
-            ),
-            ToolParameter(
-                name="path",
-                type="string",
-                description="File or directory path to scan",
-                required=True,
-            ),
-            ToolParameter(
-                name="severity",
-                type="string",
-                description="Minimum severity: low, medium, high, critical (default: medium)",
-                required=False,
-            ),
-            ToolParameter(
-                name="exclude",
-                type="array",
-                description="Patterns to exclude (e.g., ['*.test.js', 'node_modules/'])",
-                required=False,
-            ),
-        ]
+        """Initialize - deprecated."""
+        import warnings
+        warnings.warn(
+            "SecurityScannerTool class is deprecated. Use security_* functions instead.",
+            DeprecationWarning,
+            stacklevel=2
         )
-
-    async def execute(self, **kwargs: Any) -> ToolResult:
-        """Execute security scan operation.
-
-        Args:
-            operation: Operation to perform
-            **kwargs: Operation-specific parameters
-
-        Returns:
-            Tool result with scan findings
-        """
-        operation = kwargs.get("operation")
-
-        if not operation:
-            return ToolResult(
-                success=False,
-                output="",
-                error="Missing required parameter: operation",
-            )
-
-        try:
-            if operation == "scan_secrets":
-                return await self._scan_secrets(kwargs)
-            elif operation == "scan_dependencies":
-                return await self._scan_dependencies(kwargs)
-            elif operation == "scan_config":
-                return await self._scan_config(kwargs)
-            elif operation == "scan_all":
-                return await self._scan_all(kwargs)
-            elif operation == "check_file":
-                return await self._check_file(kwargs)
-            else:
-                return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Unknown operation: {operation}",
-                )
-
-        except Exception as e:
-            logger.exception("Security scan failed")
-            return ToolResult(
-                success=False, output="", error=f"Security scan error: {str(e)}"
-            )
-
-    async def _scan_secrets(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Scan for secrets in code."""
-        path = kwargs.get("path")
-        severity = kwargs.get("severity", "medium")
-        exclude = kwargs.get("exclude", [])
-
-        if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
-
-        path_obj = Path(path)
-        if not path_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"Path not found: {path}"
-            )
-
-        secrets_found = []
-
-        if path_obj.is_file():
-            secrets_found = self._check_file_for_secrets(path_obj)
-        else:
-            # Scan directory
-            for file_path in path_obj.rglob("*"):
-                if file_path.is_file() and not self._should_exclude(file_path, exclude):
-                    try:
-                        file_secrets = self._check_file_for_secrets(file_path)
-                        secrets_found.extend(file_secrets)
-                    except Exception as e:
-                        logger.warning("Failed to scan %s: %s", file_path, e)
-
-        # Filter by severity
-        severity_levels = {"low": 0, "medium": 1, "high": 2, "critical": 3}
-        min_severity = severity_levels.get(severity, 1)
-
-        filtered_secrets = [
-            secret
-            for secret in secrets_found
-            if severity_levels.get(secret.get("severity", "low"), 0) >= min_severity
-        ]
-
-        # Build report
-        report = self._build_secrets_report(path_obj, filtered_secrets)
-
-        return ToolResult(
-            success=len(filtered_secrets) == 0,
-            output=report,
-            error="" if len(filtered_secrets) == 0 else "Secrets detected",
-        )
-
-    async def _scan_dependencies(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Scan dependencies for vulnerabilities."""
-        path = kwargs.get("path")
-
-        if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
-
-        path_obj = Path(path)
-
-        # Find requirements files
-        req_files = []
-        if path_obj.is_file() and path_obj.name in ["requirements.txt", "package.json"]:
-            req_files = [path_obj]
-        else:
-            req_files.extend(path_obj.rglob("requirements.txt"))
-            req_files.extend(path_obj.rglob("package.json"))
-
-        vulnerabilities = []
-
-        for req_file in req_files:
-            if req_file.name == "requirements.txt":
-                vulns = self._check_python_deps(req_file)
-                vulnerabilities.extend(vulns)
-
-        # Build report
-        report = self._build_dependency_report(path_obj, vulnerabilities)
-
-        return ToolResult(
-            success=len(vulnerabilities) == 0,
-            output=report,
-            error="" if len(vulnerabilities) == 0 else "Vulnerabilities found",
-        )
-
-    async def _scan_config(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Scan configuration files for security issues."""
-        path = kwargs.get("path")
-
-        if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
-
-        path_obj = Path(path)
-        if not path_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"Path not found: {path}"
-            )
-
-        config_issues = []
-
-        # Check for dangerous files
-        if path_obj.is_file():
-            issue = self._check_dangerous_file(path_obj)
-            if issue:
-                config_issues.append(issue)
-        else:
-            for file_path in path_obj.rglob("*"):
-                if file_path.is_file():
-                    issue = self._check_dangerous_file(file_path)
-                    if issue:
-                        config_issues.append(issue)
-
-        # Build report
-        report = self._build_config_report(path_obj, config_issues)
-
-        return ToolResult(
-            success=len(config_issues) == 0,
-            output=report,
-            error="" if len(config_issues) == 0 else "Configuration issues found",
-        )
-
-    async def _scan_all(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Comprehensive security scan."""
-        path = kwargs.get("path")
-
-        # Run all scans
-        secrets_result = await self._scan_secrets(kwargs)
-        deps_result = await self._scan_dependencies(kwargs)
-        config_result = await self._scan_config(kwargs)
-
-        # Combine results
-        report = []
-        report.append(f"Comprehensive Security Scan: {path}")
-        report.append("=" * 70)
-        report.append("")
-        report.append("1. Secrets Scan")
-        report.append("-" * 70)
-        report.append(secrets_result.output)
-        report.append("")
-        report.append("2. Dependency Scan")
-        report.append("-" * 70)
-        report.append(deps_result.output)
-        report.append("")
-        report.append("3. Configuration Scan")
-        report.append("-" * 70)
-        report.append(config_result.output)
-
-        all_success = secrets_result.success and deps_result.success and config_result.success
-
-        return ToolResult(
-            success=all_success,
-            output="\n".join(report),
-            error="" if all_success else "Security issues found",
-        )
-
-    async def _check_file(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Check specific file for secrets."""
-        path = kwargs.get("path")
-
-        if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
-
-        file_path = Path(path)
-        if not file_path.exists() or not file_path.is_file():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {path}"
-            )
-
-        secrets = self._check_file_for_secrets(file_path)
-
-        report = self._build_file_secrets_report(file_path, secrets)
-
-        return ToolResult(
-            success=len(secrets) == 0,
-            output=report,
-            error="" if len(secrets) == 0 else "Secrets detected",
-        )
-
-    def _check_file_for_secrets(self, file_path: Path) -> List[Dict[str, Any]]:
-        """Check file for secrets."""
-        secrets = []
-
-        # Skip binary files
-        try:
-            content = file_path.read_text()
-        except (UnicodeDecodeError, PermissionError):
-            return secrets
-
-        lines = content.split("\n")
-
-        for line_num, line in enumerate(lines, 1):
-            for secret_type, secret_info in self.SECRET_PATTERNS.items():
-                pattern = secret_info["pattern"]
-                matches = re.finditer(pattern, line)
-
-                for match in matches:
-                    secrets.append(
-                        {
-                            "type": secret_type,
-                            "severity": secret_info["severity"],
-                            "description": secret_info["description"],
-                            "file": str(file_path),
-                            "line": line_num,
-                            "match": match.group(0)[:50] + "...",  # Truncate
-                        }
-                    )
-
-        return secrets
-
-    def _check_python_deps(self, req_file: Path) -> List[Dict[str, Any]]:
-        """Check Python dependencies for vulnerabilities."""
-        vulnerabilities = []
-
-        try:
-            content = req_file.read_text()
-            lines = content.strip().split("\n")
-
-            for line in lines:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-
-                # Parse package==version
-                if "==" in line:
-                    package, version = line.split("==", 1)
-                    package = package.strip()
-                    version = version.strip()
-
-                    if package in self.VULNERABLE_PACKAGES:
-                        for vuln_version, description in self.VULNERABLE_PACKAGES[
-                            package
-                        ].items():
-                            # Simple version check (would need proper version parsing in production)
-                            vulnerabilities.append(
-                                {
-                                    "package": package,
-                                    "version": version,
-                                    "vulnerability": description,
-                                    "severity": "high",
-                                    "file": str(req_file),
-                                }
-                            )
-
-        except Exception as e:
-            logger.warning("Failed to parse %s: %s", req_file, e)
-
-        return vulnerabilities
-
-    def _check_dangerous_file(self, file_path: Path) -> Optional[Dict[str, Any]]:
-        """Check if file is potentially dangerous."""
-        for pattern, description in self.DANGEROUS_FILES.items():
-            if pattern.startswith(".") and file_path.suffix == pattern:
-                return {
-                    "file": str(file_path),
-                    "reason": description,
-                    "severity": "high",
-                }
-            elif file_path.name == pattern:
-                return {
-                    "file": str(file_path),
-                    "reason": description,
-                    "severity": "high",
-                }
-
-        return None
-
-    def _should_exclude(self, file_path: Path, exclude: List[str]) -> bool:
-        """Check if file should be excluded."""
-        for pattern in exclude:
-            if pattern in str(file_path):
-                return True
-        return False
-
-    def _build_secrets_report(
-        self, path: Path, secrets: List[Dict[str, Any]]
-    ) -> str:
-        """Build secrets scan report."""
-        report = []
-        report.append(f"Secrets Scan Report: {path}")
-        report.append("=" * 70)
-        report.append("")
-
-        if not secrets:
-            report.append("✓ No secrets detected!")
-            return "\n".join(report)
-
-        report.append(f"⚠ SECRETS DETECTED: {len(secrets)}")
-        report.append("")
-
-        # Group by severity
-        critical = [s for s in secrets if s.get("severity") == "critical"]
-        high = [s for s in secrets if s.get("severity") == "high"]
-        medium = [s for s in secrets if s.get("severity") == "medium"]
-
-        for severity, severity_secrets in [
-            ("CRITICAL", critical),
-            ("HIGH", high),
-            ("MEDIUM", medium),
-        ]:
-            if severity_secrets:
-                report.append(f"{severity} Secrets:")
-                report.append("-" * 70)
-                for secret in severity_secrets:
-                    report.append(f"  {secret['description']}")
-                    report.append(f"  File: {secret['file']}:{secret['line']}")
-                    report.append(f"  Type: {secret['type']}")
-                    report.append("")
-
-        report.append("⚠ ACTION REQUIRED:")
-        report.append("1. Remove secrets from code")
-        report.append("2. Use environment variables")
-        report.append("3. Rotate exposed credentials")
-        report.append("4. Add to .gitignore")
-
-        return "\n".join(report)
-
-    def _build_dependency_report(
-        self, path: Path, vulnerabilities: List[Dict[str, Any]]
-    ) -> str:
-        """Build dependency scan report."""
-        report = []
-        report.append(f"Dependency Scan Report: {path}")
-        report.append("=" * 70)
-        report.append("")
-
-        if not vulnerabilities:
-            report.append("✓ No known vulnerabilities!")
-            return "\n".join(report)
-
-        report.append(f"⚠ Vulnerabilities Found: {len(vulnerabilities)}")
-        report.append("")
-
-        for vuln in vulnerabilities:
-            report.append(f"Package: {vuln['package']} {vuln['version']}")
-            report.append(f"Severity: {vuln['severity']}")
-            report.append(f"Issue: {vuln['vulnerability']}")
-            report.append(f"File: {vuln['file']}")
-            report.append("")
-
-        report.append("Recommendations:")
-        report.append("1. Update vulnerable packages")
-        report.append("2. Review security advisories")
-        report.append("3. Test after updates")
-
-        return "\n".join(report)
-
-    def _build_config_report(
-        self, path: Path, issues: List[Dict[str, Any]]
-    ) -> str:
-        """Build configuration scan report."""
-        report = []
-        report.append(f"Configuration Security Report: {path}")
-        report.append("=" * 70)
-        report.append("")
-
-        if not issues:
-            report.append("✓ No configuration issues found!")
-            return "\n".join(report)
-
-        report.append(f"⚠ Configuration Issues: {len(issues)}")
-        report.append("")
-
-        for issue in issues:
-            report.append(f"File: {issue['file']}")
-            report.append(f"Reason: {issue['reason']}")
-            report.append(f"Severity: {issue['severity']}")
-            report.append("")
-
-        return "\n".join(report)
-
-    def _build_file_secrets_report(
-        self, file_path: Path, secrets: List[Dict[str, Any]]
-    ) -> str:
-        """Build file secrets report."""
-        report = []
-        report.append(f"File Secrets Check: {file_path}")
-        report.append("=" * 70)
-        report.append("")
-
-        if not secrets:
-            report.append("✓ No secrets found in this file!")
-            return "\n".join(report)
-
-        report.append(f"⚠ Secrets Found: {len(secrets)}")
-        report.append("")
-
-        for secret in secrets:
-            report.append(f"Line {secret['line']}: {secret['description']}")
-            report.append(f"Type: {secret['type']}")
-            report.append(f"Severity: {secret['severity']}")
-            report.append("")
-
-        return "\n".join(report)

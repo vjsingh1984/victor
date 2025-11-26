@@ -22,8 +22,103 @@ from victor.tools.code_executor_tool import (
     upload_files_to_sandbox,
 )
 from victor.tools.filesystem import list_directory, read_file, write_file
-from victor.tools.file_editor_tool import FileEditorTool
-from victor.tools.git_tool import GitTool
+from victor.tools.file_editor_tool import (
+    file_editor_start_transaction,
+    file_editor_add_create,
+    file_editor_add_modify,
+    file_editor_add_delete,
+    file_editor_add_rename,
+    file_editor_preview,
+    file_editor_commit,
+    file_editor_rollback,
+    file_editor_abort,
+    file_editor_status,
+)
+from victor.tools.git_tool import (
+    git_status,
+    git_diff,
+    git_stage,
+    git_commit,
+    git_log,
+    git_branch,
+    git_suggest_commit,
+    git_create_pr,
+    git_analyze_conflicts,
+    set_git_provider,
+)
+from victor.tools.batch_processor_tool import (
+    batch_search,
+    batch_replace,
+    batch_analyze,
+    batch_list_files,
+    batch_transform,
+    set_batch_processor_config,
+)
+from victor.tools.cicd_tool import (
+    cicd_generate,
+    cicd_validate,
+    cicd_list_templates,
+    cicd_create_workflow,
+)
+from victor.tools.scaffold_tool import (
+    scaffold_create,
+    scaffold_list_templates,
+    scaffold_add_file,
+    scaffold_init_git,
+)
+from victor.tools.docker_tool import (
+    docker_ps,
+    docker_images,
+    docker_pull,
+    docker_run,
+    docker_stop,
+    docker_start,
+    docker_restart,
+    docker_rm,
+    docker_rmi,
+    docker_logs,
+    docker_stats,
+    docker_inspect,
+    docker_networks,
+    docker_volumes,
+    docker_exec,
+)
+from victor.tools.metrics_tool import (
+    metrics_complexity,
+    metrics_maintainability,
+    metrics_debt,
+    metrics_profile,
+    metrics_analyze,
+    metrics_report,
+)
+from victor.tools.security_scanner_tool import (
+    security_scan_secrets,
+    security_scan_dependencies,
+    security_scan_config,
+    security_scan_all,
+    security_check_file,
+)
+from victor.tools.documentation_tool import (
+    docs_generate_docstrings,
+    docs_generate_api,
+    docs_generate_readme,
+    docs_add_type_hints,
+    docs_analyze_coverage,
+)
+from victor.tools.code_review_tool import (
+    code_review_file,
+    code_review_directory,
+    code_review_security,
+    code_review_complexity,
+    code_review_best_practices,
+    set_code_review_config,
+)
+from victor.tools.refactor_tool import (
+    refactor_rename_symbol,
+    refactor_extract_function,
+    refactor_inline_variable,
+    refactor_organize_imports,
+)
 from victor.tools.testing_tool import run_tests
 from victor.tools.web_search_tool import web_search, web_fetch, web_summarize, set_web_search_provider
 from victor.tools.workflow_tool import run_workflow
@@ -103,8 +198,101 @@ class AgentOrchestrator:
         self.tools.register(find_symbol)
         self.tools.register(find_references)
         self.tools.register(rename_symbol)
-        self.tools.register(FileEditorTool())
-        self.tools.register(GitTool(provider=self.provider, model=self.model))
+        self.tools.register(file_editor_start_transaction)
+        self.tools.register(file_editor_add_create)
+        self.tools.register(file_editor_add_modify)
+        self.tools.register(file_editor_add_delete)
+        self.tools.register(file_editor_add_rename)
+        self.tools.register(file_editor_preview)
+        self.tools.register(file_editor_commit)
+        self.tools.register(file_editor_rollback)
+        self.tools.register(file_editor_abort)
+        self.tools.register(file_editor_status)
+
+        # Set git provider and register git tools
+        set_git_provider(self.provider, self.model)
+        self.tools.register(git_status)
+        self.tools.register(git_diff)
+        self.tools.register(git_stage)
+        self.tools.register(git_commit)
+        self.tools.register(git_log)
+        self.tools.register(git_branch)
+        self.tools.register(git_suggest_commit)
+        self.tools.register(git_create_pr)
+        self.tools.register(git_analyze_conflicts)
+
+        # Register batch processor tools
+        set_batch_processor_config(max_workers=4)
+        self.tools.register(batch_search)
+        self.tools.register(batch_replace)
+        self.tools.register(batch_analyze)
+        self.tools.register(batch_list_files)
+        self.tools.register(batch_transform)
+
+        # Register CI/CD tools
+        self.tools.register(cicd_generate)
+        self.tools.register(cicd_validate)
+        self.tools.register(cicd_list_templates)
+        self.tools.register(cicd_create_workflow)
+
+        # Register scaffold tools
+        self.tools.register(scaffold_create)
+        self.tools.register(scaffold_list_templates)
+        self.tools.register(scaffold_add_file)
+        self.tools.register(scaffold_init_git)
+
+        # Register Docker tools
+        self.tools.register(docker_ps)
+        self.tools.register(docker_images)
+        self.tools.register(docker_pull)
+        self.tools.register(docker_run)
+        self.tools.register(docker_stop)
+        self.tools.register(docker_start)
+        self.tools.register(docker_restart)
+        self.tools.register(docker_rm)
+        self.tools.register(docker_rmi)
+        self.tools.register(docker_logs)
+        self.tools.register(docker_stats)
+        self.tools.register(docker_inspect)
+        self.tools.register(docker_networks)
+        self.tools.register(docker_volumes)
+        self.tools.register(docker_exec)
+
+        # Register metrics tools
+        self.tools.register(metrics_complexity)
+        self.tools.register(metrics_maintainability)
+        self.tools.register(metrics_debt)
+        self.tools.register(metrics_profile)
+        self.tools.register(metrics_analyze)
+        self.tools.register(metrics_report)
+
+        # Register security scanner tools
+        self.tools.register(security_scan_secrets)
+        self.tools.register(security_scan_dependencies)
+        self.tools.register(security_scan_config)
+        self.tools.register(security_scan_all)
+        self.tools.register(security_check_file)
+
+        # Register documentation tools
+        self.tools.register(docs_generate_docstrings)
+        self.tools.register(docs_generate_api)
+        self.tools.register(docs_generate_readme)
+        self.tools.register(docs_add_type_hints)
+        self.tools.register(docs_analyze_coverage)
+
+        # Register code review tools
+        set_code_review_config(max_complexity=10)
+        self.tools.register(code_review_file)
+        self.tools.register(code_review_directory)
+        self.tools.register(code_review_security)
+        self.tools.register(code_review_complexity)
+        self.tools.register(code_review_best_practices)
+
+        # Register refactor tools
+        self.tools.register(refactor_rename_symbol)
+        self.tools.register(refactor_extract_function)
+        self.tools.register(refactor_inline_variable)
+        self.tools.register(refactor_organize_imports)
 
         # Only register network-dependent tools if not in air-gapped mode
         if not self.settings.airgapped_mode:

@@ -15,615 +15,570 @@ Features:
 
 import json
 import sqlite3
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
-from victor.tools.base import BaseTool, ToolParameter, ToolResult
+from victor.tools.decorators import tool
+
+# Global state
+_allow_modifications: bool = False
+_max_rows: int = 100
+_connections: Dict[str, Any] = {}
+
+# Dangerous SQL patterns that should be blocked
+DANGEROUS_PATTERNS = [
+    "DROP DATABASE",
+    "DROP SCHEMA",
+    "TRUNCATE",
+    "DELETE FROM",
+    "UPDATE",
+    "INSERT INTO",
+    "ALTER TABLE",
+    "CREATE",
+    "DROP TABLE",
+]
 
 
-class DatabaseTool(BaseTool):
-    """Tool for database operations and SQL queries."""
+def set_database_config(allow_modifications: bool = False, max_rows: int = 100) -> None:
+    """Configure database tool settings.
 
-    # Dangerous SQL patterns that should be blocked
-    DANGEROUS_PATTERNS = [
-        "DROP DATABASE",
-        "DROP SCHEMA",
-        "TRUNCATE",
-        "DELETE FROM",
-        "UPDATE",
-        "INSERT INTO",
-        "ALTER TABLE",
-        "CREATE",
-        "DROP TABLE",
-    ]
+    Args:
+        allow_modifications: Allow INSERT/UPDATE/DELETE operations
+        max_rows: Maximum rows to return from queries
+    """
+    global _allow_modifications, _max_rows
+    _allow_modifications = allow_modifications
+    _max_rows = max_rows
 
-    def __init__(
-        self,
-        allow_modifications: bool = False,
-        max_rows: int = 100,
-    ):
-        """Initialize database tool.
 
-        Args:
-            allow_modifications: Allow INSERT/UPDATE/DELETE operations
-            max_rows: Maximum rows to return from queries
-        """
-        super().__init__()
-        self.allow_modifications = allow_modifications
-        self.max_rows = max_rows
-        self.connections: Dict[str, Any] = {}
+# Helper functions for db-specific connections
+async def _connect_sqlite(database: str) -> Dict[str, Any]:
+    """Connect to SQLite database."""
+    try:
+        conn = sqlite3.connect(database)
+        conn.row_factory = sqlite3.Row  # Enable column names
+        connection_id = f"sqlite_{id(conn)}"
+        _connections[connection_id] = conn
 
-    @property
-    def name(self) -> str:
-        """Get tool name."""
-        return "database"
+        return {
+            "success": True,
+            "connection_id": connection_id,
+            "message": f"Connected to SQLite database: {database}"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"SQLite connection failed: {str(e)}"
+        }
 
-    @property
-    def description(self) -> str:
-        """Get tool description."""
-        return """Database operations and SQL queries.
 
-Supports multiple database types (SQLite, PostgreSQL, MySQL, SQL Server).
+async def _connect_postgresql(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    """Connect to PostgreSQL database."""
+    try:
+        import psycopg2
 
-Operations:
-- connect: Connect to database
-- query: Execute SQL query
-- schema: Get database schema information
-- tables: List all tables
-- describe: Describe table structure
-- disconnect: Close database connection
-
-Example workflows:
-1. Connect and query:
-   database(operation="connect", db_type="sqlite", database="mydb.db")
-   database(operation="query", connection_id="...", sql="SELECT * FROM users")
-
-2. Schema inspection:
-   database(operation="tables", connection_id="...")
-   database(operation="describe", connection_id="...", table="users")
-
-Safety:
-- Read-only by default (no INSERT/UPDATE/DELETE)
-- Configurable modification permissions
-- Query result limits
-- Dangerous pattern detection
-"""
-
-    @property
-    def parameters(self) -> Dict[str, Any]:
-        """Get tool parameters."""
-        return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: connect, query, schema, tables, describe, disconnect",
-                required=True,
-            ),
-            ToolParameter(
-                name="db_type",
-                type="string",
-                description="Database type: sqlite, postgresql, mysql, sqlserver",
-                required=False,
-            ),
-            ToolParameter(
-                name="database",
-                type="string",
-                description="Database name or path (for SQLite)",
-                required=False,
-            ),
-            ToolParameter(
-                name="host",
-                type="string",
-                description="Database host (default: localhost)",
-                required=False,
-            ),
-            ToolParameter(
-                name="port",
-                type="integer",
-                description="Database port",
-                required=False,
-            ),
-            ToolParameter(
-                name="username",
-                type="string",
-                description="Database username",
-                required=False,
-            ),
-            ToolParameter(
-                name="password",
-                type="string",
-                description="Database password",
-                required=False,
-            ),
-            ToolParameter(
-                name="connection_id",
-                type="string",
-                description="Connection ID (returned from connect)",
-                required=False,
-            ),
-            ToolParameter(
-                name="sql",
-                type="string",
-                description="SQL query to execute",
-                required=False,
-            ),
-            ToolParameter(
-                name="table",
-                type="string",
-                description="Table name (for describe operation)",
-                required=False,
-            ),
-            ToolParameter(
-                name="limit",
-                type="integer",
-                description="Maximum rows to return (default: 100)",
-                required=False,
-            ),
-        ]
+        conn = psycopg2.connect(
+            host=kwargs.get("host", "localhost"),
+            port=kwargs.get("port", 5432),
+            database=kwargs.get("database"),
+            user=kwargs.get("username"),
+            password=kwargs.get("password"),
         )
 
-    async def execute(self, **kwargs: Any) -> ToolResult:
-        """Execute database operation.
+        connection_id = f"postgresql_{id(conn)}"
+        _connections[connection_id] = conn
 
-        Args:
-            operation: Operation to perform
-            **kwargs: Operation-specific parameters
+        return {
+            "success": True,
+            "connection_id": connection_id,
+            "message": "Connected to PostgreSQL database"
+        }
+    except ImportError:
+        return {
+            "success": False,
+            "error": "PostgreSQL support requires: pip install psycopg2-binary"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"PostgreSQL connection failed: {str(e)}"
+        }
 
-        Returns:
-            Tool result with query results or error
-        """
-        operation = kwargs.get("operation")
 
-        if not operation:
-            return ToolResult(
-                success=False,
-                output="",
-                error="Missing required parameter: operation",
-            )
+async def _connect_mysql(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    """Connect to MySQL database."""
+    try:
+        import mysql.connector
 
-        try:
-            if operation == "connect":
-                return await self._connect(kwargs)
-            elif operation == "query":
-                return await self._query(kwargs)
-            elif operation == "schema":
-                return await self._schema(kwargs)
-            elif operation == "tables":
-                return await self._tables(kwargs)
-            elif operation == "describe":
-                return await self._describe(kwargs)
-            elif operation == "disconnect":
-                return await self._disconnect(kwargs)
-            else:
-                return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Unknown operation: {operation}",
-                )
+        conn = mysql.connector.connect(
+            host=kwargs.get("host", "localhost"),
+            port=kwargs.get("port", 3306),
+            database=kwargs.get("database"),
+            user=kwargs.get("username"),
+            password=kwargs.get("password"),
+        )
 
-        except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"Database error: {str(e)}"
-            )
+        connection_id = f"mysql_{id(conn)}"
+        _connections[connection_id] = conn
 
-    async def _connect(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Connect to database.
+        return {
+            "success": True,
+            "connection_id": connection_id,
+            "message": "Connected to MySQL database"
+        }
+    except ImportError:
+        return {
+            "success": False,
+            "error": "MySQL support requires: pip install mysql-connector-python"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"MySQL connection failed: {str(e)}"
+        }
 
-        Args:
-            kwargs: Connection parameters
 
-        Returns:
-            Connection result with connection ID
-        """
-        db_type = kwargs.get("db_type", "sqlite")
-        database = kwargs.get("database")
+async def _connect_sqlserver(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    """Connect to SQL Server database."""
+    try:
+        import pyodbc
 
-        if not database:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: database"
-            )
+        conn_string = (
+            f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+            f"SERVER={kwargs.get('host', 'localhost')};"
+            f"DATABASE={kwargs.get('database')};"
+            f"UID={kwargs.get('username')};"
+            f"PWD={kwargs.get('password')}"
+        )
 
-        if db_type == "sqlite":
-            return await self._connect_sqlite(database)
-        elif db_type == "postgresql":
-            return await self._connect_postgresql(kwargs)
-        elif db_type == "mysql":
-            return await self._connect_mysql(kwargs)
-        elif db_type == "sqlserver":
-            return await self._connect_sqlserver(kwargs)
-        else:
-            return ToolResult(
-                success=False,
-                output="",
-                error=f"Unsupported database type: {db_type}",
-            )
+        conn = pyodbc.connect(conn_string)
+        connection_id = f"sqlserver_{id(conn)}"
+        _connections[connection_id] = conn
 
-    async def _connect_sqlite(self, database: str) -> ToolResult:
-        """Connect to SQLite database."""
-        try:
-            conn = sqlite3.connect(database)
-            conn.row_factory = sqlite3.Row  # Enable column names
-            connection_id = f"sqlite_{id(conn)}"
-            self.connections[connection_id] = conn
+        return {
+            "success": True,
+            "connection_id": connection_id,
+            "message": "Connected to SQL Server database"
+        }
+    except ImportError:
+        return {
+            "success": False,
+            "error": "SQL Server support requires: pip install pyodbc"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"SQL Server connection failed: {str(e)}"
+        }
 
-            return ToolResult(
-                success=True,
-                output=f"Connected to SQLite database: {database}\nConnection ID: {connection_id}",
-                error="",
-            )
 
-        except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"SQLite connection failed: {str(e)}"
-            )
+@tool
+async def database_connect(
+    database: str,
+    db_type: str = "sqlite",
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    username: Optional[str] = None,
+    password: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Connect to a database.
 
-    async def _connect_postgresql(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Connect to PostgreSQL database."""
-        try:
-            import psycopg2
+    Supports SQLite, PostgreSQL, MySQL, and SQL Server. Returns a connection_id
+    that must be used for subsequent operations.
 
-            conn = psycopg2.connect(
-                host=kwargs.get("host", "localhost"),
-                port=kwargs.get("port", 5432),
-                database=kwargs.get("database"),
-                user=kwargs.get("username"),
-                password=kwargs.get("password"),
-            )
+    Args:
+        database: Database name or path (for SQLite).
+        db_type: Database type - 'sqlite', 'postgresql', 'mysql', or 'sqlserver' (default: 'sqlite').
+        host: Database host for remote databases (default: 'localhost').
+        port: Database port (defaults vary by db_type).
+        username: Database username for authenticated connections.
+        password: Database password for authenticated connections.
 
-            connection_id = f"postgresql_{id(conn)}"
-            self.connections[connection_id] = conn
+    Returns:
+        Dictionary containing:
+        - success: Whether connection succeeded
+        - connection_id: ID to use for subsequent operations
+        - message: Status message
+        - error: Error message if failed
+    """
+    if db_type == "sqlite":
+        return await _connect_sqlite(database)
+    elif db_type == "postgresql":
+        return await _connect_postgresql({
+            "database": database,
+            "host": host,
+            "port": port,
+            "username": username,
+            "password": password
+        })
+    elif db_type == "mysql":
+        return await _connect_mysql({
+            "database": database,
+            "host": host,
+            "port": port,
+            "username": username,
+            "password": password
+        })
+    elif db_type == "sqlserver":
+        return await _connect_sqlserver({
+            "database": database,
+            "host": host,
+            "username": username,
+            "password": password
+        })
+    else:
+        return {
+            "success": False,
+            "error": f"Unsupported database type: {db_type}"
+        }
 
-            return ToolResult(
-                success=True,
-                output=f"Connected to PostgreSQL database\nConnection ID: {connection_id}",
-                error="",
-            )
 
-        except ImportError:
-            return ToolResult(
-                success=False,
-                output="",
-                error="PostgreSQL support requires: pip install psycopg2-binary",
-            )
-        except Exception as e:
-            return ToolResult(
-                success=False,
-                output="",
-                error=f"PostgreSQL connection failed: {str(e)}",
-            )
+@tool
+async def database_query(
+    connection_id: str,
+    sql: str,
+    limit: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Execute a SQL query.
 
-    async def _connect_mysql(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Connect to MySQL database."""
-        try:
-            import mysql.connector
+    Supports SELECT queries (returns results) and modification queries
+    (INSERT/UPDATE/DELETE - if allowed). Read-only by default for safety.
 
-            conn = mysql.connector.connect(
-                host=kwargs.get("host", "localhost"),
-                port=kwargs.get("port", 3306),
-                database=kwargs.get("database"),
-                user=kwargs.get("username"),
-                password=kwargs.get("password"),
-            )
+    Args:
+        connection_id: Connection ID from database_connect.
+        sql: SQL query to execute.
+        limit: Maximum rows to return (default: configured max_rows).
 
-            connection_id = f"mysql_{id(conn)}"
-            self.connections[connection_id] = conn
+    Returns:
+        Dictionary containing:
+        - success: Whether query succeeded
+        - columns: Column names (for SELECT)
+        - rows: Query results as list of dicts (for SELECT)
+        - count: Number of rows returned
+        - rows_affected: Number of rows affected (for modifications)
+        - error: Error message if failed
+    """
+    if not connection_id or connection_id not in _connections:
+        return {
+            "success": False,
+            "error": "Invalid or missing connection_id. Use database_connect first."
+        }
 
-            return ToolResult(
-                success=True,
-                output=f"Connected to MySQL database\nConnection ID: {connection_id}",
-                error="",
-            )
+    if not sql:
+        return {
+            "success": False,
+            "error": "Missing required parameter: sql"
+        }
 
-        except ImportError:
-            return ToolResult(
-                success=False,
-                output="",
-                error="MySQL support requires: pip install mysql-connector-python",
-            )
-        except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"MySQL connection failed: {str(e)}"
-            )
-
-    async def _connect_sqlserver(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Connect to SQL Server database."""
-        try:
-            import pyodbc
-
-            conn_string = (
-                f"DRIVER={{ODBC Driver 17 for SQL Server}};"
-                f"SERVER={kwargs.get('host', 'localhost')};"
-                f"DATABASE={kwargs.get('database')};"
-                f"UID={kwargs.get('username')};"
-                f"PWD={kwargs.get('password')}"
-            )
-
-            conn = pyodbc.connect(conn_string)
-            connection_id = f"sqlserver_{id(conn)}"
-            self.connections[connection_id] = conn
-
-            return ToolResult(
-                success=True,
-                output=f"Connected to SQL Server database\nConnection ID: {connection_id}",
-                error="",
-            )
-
-        except ImportError:
-            return ToolResult(
-                success=False,
-                output="",
-                error="SQL Server support requires: pip install pyodbc",
-            )
-        except Exception as e:
-            return ToolResult(
-                success=False,
-                output="",
-                error=f"SQL Server connection failed: {str(e)}",
-            )
-
-    async def _query(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Execute SQL query."""
-        connection_id = kwargs.get("connection_id")
-        sql = kwargs.get("sql")
-        limit = kwargs.get("limit", self.max_rows)
-
-        if not connection_id or connection_id not in self.connections:
-            return ToolResult(
-                success=False,
-                output="",
-                error="Invalid or missing connection_id. Use connect operation first.",
-            )
-
-        if not sql:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: sql"
-            )
-
-        # Check for dangerous patterns
-        if not self.allow_modifications:
-            sql_upper = sql.upper()
-            for pattern in self.DANGEROUS_PATTERNS:
-                if pattern in sql_upper:
-                    return ToolResult(
-                        success=False,
-                        output="",
-                        error=f"Modification operations not allowed: {pattern}. Set allow_modifications=True to enable.",
-                    )
-
-        try:
-            conn = self.connections[connection_id]
-            cursor = conn.cursor()
-
-            # Execute query
-            cursor.execute(sql)
-
-            # Check if query returns results
-            if cursor.description:
-                # SELECT query - fetch results
-                columns = [desc[0] for desc in cursor.description]
-                rows = cursor.fetchmany(limit)
-
-                # Convert to list of dicts
-                results = []
-                for row in rows:
-                    if hasattr(row, "keys"):  # SQLite Row object
-                        results.append(dict(row))
-                    else:  # Tuple
-                        results.append(dict(zip(columns, row)))
-
-                output = {
-                    "columns": columns,
-                    "rows": results,
-                    "count": len(results),
-                    "limited": len(rows) == limit,
+    # Check for dangerous patterns
+    if not _allow_modifications:
+        sql_upper = sql.upper()
+        for pattern in DANGEROUS_PATTERNS:
+            if pattern in sql_upper:
+                return {
+                    "success": False,
+                    "error": f"Modification operations not allowed: {pattern}. Call set_database_config(allow_modifications=True) to enable."
                 }
 
-                return ToolResult(
-                    success=True, output=json.dumps(output, indent=2), error=""
-                )
-            else:
-                # Non-SELECT query (INSERT, UPDATE, DELETE)
-                conn.commit()
-                rowcount = cursor.rowcount
+    try:
+        conn = _connections[connection_id]
+        cursor = conn.cursor()
+        cursor.execute(sql)
 
-                return ToolResult(
-                    success=True,
-                    output=f"Query executed successfully. Rows affected: {rowcount}",
-                    error="",
-                )
+        # Check if query returns results
+        if cursor.description:
+            # SELECT query - fetch results
+            columns = [desc[0] for desc in cursor.description]
+            query_limit = limit if limit is not None else _max_rows
+            rows = cursor.fetchmany(query_limit)
 
-        except Exception as e:
-            return ToolResult(success=False, output="", error=f"Query failed: {str(e)}")
+            # Convert to list of dicts
+            results = []
+            for row in rows:
+                if hasattr(row, "keys"):  # SQLite Row object
+                    results.append(dict(row))
+                else:  # Tuple
+                    results.append(dict(zip(columns, row)))
 
-    async def _schema(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Get database schema information."""
-        connection_id = kwargs.get("connection_id")
+            return {
+                "success": True,
+                "columns": columns,
+                "rows": results,
+                "count": len(results),
+                "limited": len(rows) == query_limit
+            }
+        else:
+            # Non-SELECT query (INSERT, UPDATE, DELETE)
+            conn.commit()
+            return {
+                "success": True,
+                "rows_affected": cursor.rowcount,
+                "message": f"Query executed successfully. Rows affected: {cursor.rowcount}"
+            }
 
-        if not connection_id or connection_id not in self.connections:
-            return ToolResult(
-                success=False, output="", error="Invalid or missing connection_id"
-            )
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Query failed: {str(e)}"
+        }
 
-        # Get list of tables first
-        tables_result = await self._tables(kwargs)
-        if not tables_result.success:
-            return tables_result
 
-        # Get schema for each table
-        schema_info = {"tables": []}
+@tool
+async def database_tables(connection_id: str) -> Dict[str, Any]:
+    """
+    List all tables in the database.
 
-        try:
-            tables_data = json.loads(tables_result.output)
-            for table in tables_data["tables"]:
-                describe_result = await self._describe(
-                    {"connection_id": connection_id, "table": table}
-                )
-                if describe_result.success:
-                    table_info = json.loads(describe_result.output)
-                    schema_info["tables"].append(
-                        {"name": table, "columns": table_info["columns"]}
-                    )
+    Args:
+        connection_id: Connection ID from database_connect.
 
-            return ToolResult(
-                success=True, output=json.dumps(schema_info, indent=2), error=""
-            )
+    Returns:
+        Dictionary containing:
+        - success: Whether operation succeeded
+        - tables: List of table names
+        - count: Number of tables
+        - error: Error message if failed
+    """
+    if not connection_id or connection_id not in _connections:
+        return {
+            "success": False,
+            "error": "Invalid or missing connection_id"
+        }
 
-        except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"Schema inspection failed: {str(e)}"
-            )
+    try:
+        conn = _connections[connection_id]
+        cursor = conn.cursor()
 
-    async def _tables(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """List all tables in database."""
-        connection_id = kwargs.get("connection_id")
+        if connection_id.startswith("sqlite"):
+            sql = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        elif connection_id.startswith("postgresql"):
+            sql = "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename"
+        elif connection_id.startswith("mysql"):
+            sql = "SHOW TABLES"
+        elif connection_id.startswith("sqlserver"):
+            sql = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME"
+        else:
+            return {
+                "success": False,
+                "error": "Unknown database type"
+            }
 
-        if not connection_id or connection_id not in self.connections:
-            return ToolResult(
-                success=False, output="", error="Invalid or missing connection_id"
-            )
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+        tables = [row[0] for row in rows]
 
-        try:
-            conn = self.connections[connection_id]
-            cursor = conn.cursor()
+        return {
+            "success": True,
+            "tables": tables,
+            "count": len(tables)
+        }
 
-            if connection_id.startswith("sqlite"):
-                sql = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-            elif connection_id.startswith("postgresql"):
-                sql = "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename"
-            elif connection_id.startswith("mysql"):
-                sql = "SHOW TABLES"
-            elif connection_id.startswith("sqlserver"):
-                sql = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME"
-            else:
-                return ToolResult(
-                    success=False, output="", error="Unknown database type"
-                )
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Failed to list tables: {str(e)}"
+        }
 
-            cursor.execute(sql)
+
+@tool
+async def database_describe(connection_id: str, table: str) -> Dict[str, Any]:
+    """
+    Describe a table's structure.
+
+    Returns column information including names, types, nullable status,
+    and primary key information.
+
+    Args:
+        connection_id: Connection ID from database_connect.
+        table: Name of the table to describe.
+
+    Returns:
+        Dictionary containing:
+        - success: Whether operation succeeded
+        - table: Table name
+        - columns: List of column info dicts
+        - count: Number of columns
+        - error: Error message if failed
+    """
+    if not connection_id or connection_id not in _connections:
+        return {
+            "success": False,
+            "error": "Invalid or missing connection_id"
+        }
+
+    if not table:
+        return {
+            "success": False,
+            "error": "Missing required parameter: table"
+        }
+
+    try:
+        conn = _connections[connection_id]
+        cursor = conn.cursor()
+
+        if connection_id.startswith("sqlite"):
+            cursor.execute(f"PRAGMA table_info({table})")
             rows = cursor.fetchall()
+            columns = [
+                {
+                    "name": row[1],
+                    "type": row[2],
+                    "nullable": not row[3],
+                    "primary_key": bool(row[5]),
+                }
+                for row in rows
+            ]
 
-            tables = [row[0] for row in rows]
-
-            return ToolResult(
-                success=True,
-                output=json.dumps({"tables": tables, "count": len(tables)}, indent=2),
-                error="",
-            )
-
-        except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"Failed to list tables: {str(e)}"
-            )
-
-    async def _describe(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Describe table structure."""
-        connection_id = kwargs.get("connection_id")
-        table = kwargs.get("table")
-
-        if not connection_id or connection_id not in self.connections:
-            return ToolResult(
-                success=False, output="", error="Invalid or missing connection_id"
-            )
-
-        if not table:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: table"
-            )
-
-        try:
-            conn = self.connections[connection_id]
-            cursor = conn.cursor()
-
-            if connection_id.startswith("sqlite"):
-                cursor.execute(f"PRAGMA table_info({table})")
-                rows = cursor.fetchall()
-                columns = [
-                    {
-                        "name": row[1],
-                        "type": row[2],
-                        "nullable": not row[3],
-                        "primary_key": bool(row[5]),
-                    }
-                    for row in rows
-                ]
-
-            elif connection_id.startswith("postgresql"):
-                cursor.execute(
-                    f"""
-                    SELECT column_name, data_type, is_nullable
-                    FROM information_schema.columns
-                    WHERE table_name = '{table}'
-                    ORDER BY ordinal_position
+        elif connection_id.startswith("postgresql"):
+            cursor.execute(
+                f"""
+                SELECT column_name, data_type, is_nullable
+                FROM information_schema.columns
+                WHERE table_name = '{table}'
+                ORDER BY ordinal_position
                 """
-                )
-                rows = cursor.fetchall()
-                columns = [
-                    {"name": row[0], "type": row[1], "nullable": row[2] == "YES"}
-                    for row in rows
-                ]
-
-            elif connection_id.startswith("mysql"):
-                cursor.execute(f"DESCRIBE {table}")
-                rows = cursor.fetchall()
-                columns = [
-                    {
-                        "name": row[0],
-                        "type": row[1],
-                        "nullable": row[2] == "YES",
-                        "primary_key": row[3] == "PRI",
-                    }
-                    for row in rows
-                ]
-
-            else:
-                return ToolResult(
-                    success=False, output="", error="Describe not implemented for this database type"
-                )
-
-            return ToolResult(
-                success=True,
-                output=json.dumps(
-                    {"table": table, "columns": columns, "count": len(columns)},
-                    indent=2,
-                ),
-                error="",
             )
+            rows = cursor.fetchall()
+            columns = [
+                {"name": row[0], "type": row[1], "nullable": row[2] == "YES"}
+                for row in rows
+            ]
 
-        except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"Failed to describe table: {str(e)}"
-            )
+        elif connection_id.startswith("mysql"):
+            cursor.execute(f"DESCRIBE {table}")
+            rows = cursor.fetchall()
+            columns = [
+                {
+                    "name": row[0],
+                    "type": row[1],
+                    "nullable": row[2] == "YES",
+                    "primary_key": row[3] == "PRI",
+                }
+                for row in rows
+            ]
 
-    async def _disconnect(self, kwargs: Dict[str, Any]) -> ToolResult:
-        """Disconnect from database."""
-        connection_id = kwargs.get("connection_id")
+        else:
+            return {
+                "success": False,
+                "error": "Describe not implemented for this database type"
+            }
 
-        if not connection_id or connection_id not in self.connections:
-            return ToolResult(
-                success=False, output="", error="Invalid or missing connection_id"
-            )
+        return {
+            "success": True,
+            "table": table,
+            "columns": columns,
+            "count": len(columns)
+        }
 
-        try:
-            conn = self.connections[connection_id]
-            conn.close()
-            del self.connections[connection_id]
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Failed to describe table: {str(e)}"
+        }
 
-            return ToolResult(
-                success=True,
-                output=f"Disconnected from database: {connection_id}",
-                error="",
-            )
 
-        except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"Disconnect failed: {str(e)}"
-            )
+@tool
+async def database_schema(connection_id: str) -> Dict[str, Any]:
+    """
+    Get complete database schema.
 
-    def __del__(self):
-        """Cleanup: close all connections."""
-        for conn in self.connections.values():
-            try:
-                conn.close()
-            except:
-                pass
+    Returns information about all tables and their columns.
+    This is a convenience function that combines database_tables
+    and database_describe for all tables.
+
+    Args:
+        connection_id: Connection ID from database_connect.
+
+    Returns:
+        Dictionary containing:
+        - success: Whether operation succeeded
+        - tables: List of table info dicts (name and columns)
+        - error: Error message if failed
+    """
+    if not connection_id or connection_id not in _connections:
+        return {
+            "success": False,
+            "error": "Invalid or missing connection_id"
+        }
+
+    # Get list of tables first
+    tables_result = await database_tables(connection_id)
+    if not tables_result["success"]:
+        return tables_result
+
+    # Get schema for each table
+    schema_info = {"tables": []}
+
+    try:
+        for table in tables_result["tables"]:
+            describe_result = await database_describe(connection_id, table)
+            if describe_result["success"]:
+                schema_info["tables"].append({
+                    "name": table,
+                    "columns": describe_result["columns"]
+                })
+
+        return {
+            "success": True,
+            "tables": schema_info["tables"]
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Schema inspection failed: {str(e)}"
+        }
+
+
+@tool
+async def database_disconnect(connection_id: str) -> Dict[str, Any]:
+    """
+    Disconnect from database.
+
+    Closes the connection and removes it from the connection pool.
+
+    Args:
+        connection_id: Connection ID from database_connect.
+
+    Returns:
+        Dictionary containing:
+        - success: Whether disconnection succeeded
+        - message: Status message
+        - error: Error message if failed
+    """
+    if not connection_id or connection_id not in _connections:
+        return {
+            "success": False,
+            "error": "Invalid or missing connection_id"
+        }
+
+    try:
+        conn = _connections[connection_id]
+        conn.close()
+        del _connections[connection_id]
+
+        return {
+            "success": True,
+            "message": f"Disconnected from database: {connection_id}"
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Disconnect failed: {str(e)}"
+        }
+
+
+# Keep class for backward compatibility
+class DatabaseTool:
+    """Deprecated: Use individual database_* functions instead."""
+
+    def __init__(self, allow_modifications: bool = False, max_rows: int = 100):
+        """Initialize - deprecated."""
+        import warnings
+        warnings.warn(
+            "DatabaseTool class is deprecated. Use database_* functions instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        set_database_config(allow_modifications, max_rows)

@@ -2,7 +2,7 @@
 
 ![Victor Banner](./assets/victor-banner.svg)
 
-<h3>🏆 Universal AI Coding Assistant - Code to Victory with Any AI 🏆</h3>
+<h3>Universal AI Coding Assistant - Code to Victory with Any AI</h3>
 
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -10,23 +10,23 @@
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[Features](#-key-features) • [Quick Start](#-quick-start) • [Use Cases](#-use-cases) • [Docker](#-docker-deployment) • [Documentation](#-documentation)
+[Features](#key-features) • [Quick Start](#quick-start) • [Use Cases](#use-cases) • [Docker](#docker-deployment) • [Documentation](#documentation)
 
 </div>
 
 ---
 
-## 🚀 What is Victor?
+## What is Victor?
 
-**Victor** is a revolutionary terminal-based AI coding assistant that breaks down barriers between AI providers. Whether you're using cutting-edge frontier models like Claude, GPT-4, and Gemini, or running powerful open-source models locally via Ollama, LMStudio, or vLLM—Victor provides one **unified, intelligent interface** for all.
+**Victor** is a terminal-based AI coding assistant that provides a unified interface for working with multiple LLM providers. Whether you're using frontier models like Claude, GPT-4, and Gemini, or running open-source models locally via Ollama, LMStudio, or vLLM, Victor provides one consistent, powerful interface for all.
 
-### 💡 The Problem Victor Solves
+### The Problem Victor Solves
 
 <table>
 <tr>
 <td width="50%">
 
-**❌ Without Victor**
+**Without Victor**
 - Locked into single AI provider
 - Expensive API costs for development
 - Complex tool integrations per provider
@@ -37,7 +37,7 @@
 </td>
 <td width="50%">
 
-**✅ With Victor**
+**With Victor**
 - Switch providers instantly
 - Free local models for dev/test
 - 25+ enterprise tools, unified
@@ -51,59 +51,26 @@
 
 ---
 
-## 🎯 Key Features
+## Key Features
 
-<div align="center">
-
-```mermaid
-graph TB
-    A[Victor AI Assistant] --> B[🌐 Universal Providers]
-    A --> C[🛠️ 25+ Enterprise Tools]
-    A --> D[🔒 Security First]
-    A --> E[⚡ Performance]
-
-    B --> B1[Claude · GPT-4 · Gemini]
-    B --> B2[Ollama · vLLM · LMStudio]
-
-    C --> C1[Code Review · Refactoring]
-    C --> C2[Testing · CI/CD · Docs]
-    C --> C3[Security · Metrics · Search]
-
-    D --> D1[Air-Gapped Mode]
-    D --> D2[Sandboxed Execution]
-    D --> D3[Secret Detection]
-
-    E --> E1[Tiered Caching]
-    E --> E2[Batch Processing]
-    E --> E3[Parallel Operations]
-
-    style A fill:#8B5CF6,stroke:#6D28D9,stroke-width:3px,color:#fff
-    style B fill:#3B82F6,stroke:#2563EB,stroke-width:2px,color:#fff
-    style C fill:#10B981,stroke:#059669,stroke-width:2px,color:#fff
-    style D fill:#EF4444,stroke:#DC2626,stroke-width:2px,color:#fff
-    style E fill:#F59E0B,stroke:#D97706,stroke-width:2px,color:#fff
-```
-
-</div>
-
-### 🌐 Universal Provider Support
+### Universal Provider Support
 
 Switch between AI providers as easily as changing a config file:
 
 | Provider | Models | Tool Calling | Streaming | Cost |
 |----------|--------|--------------|-----------|------|
-| **Anthropic Claude** | Sonnet 4.5, Opus, Haiku | ✅ | ✅ | $$ |
-| **OpenAI GPT** | GPT-4, GPT-4 Turbo, GPT-3.5 | ✅ | ✅ | $$ |
-| **Google Gemini** | 1.5 Pro, 1.5 Flash | ✅ | ✅ | $ |
-| **xAI Grok** | Grok, Grok Vision | ✅ | ✅ | $ |
-| **Ollama** | Llama 3, Qwen, CodeLlama, +100 | ✅ | ✅ | **FREE** |
-| **vLLM** | Any HuggingFace model | ✅ | ✅ | **FREE** |
-| **LMStudio** | Any GGUF model | ✅ | ✅ | **FREE** |
+| **Anthropic Claude** | Sonnet 4.5, Opus, Haiku | Yes | Yes | Pay per use |
+| **OpenAI GPT** | GPT-4, GPT-4 Turbo, GPT-3.5 | Yes | Yes | Pay per use |
+| **Google Gemini** | 1.5 Pro, 1.5 Flash | Yes | Yes | Pay per use |
+| **xAI Grok** | Grok, Grok Vision | Yes | Yes | Pay per use |
+| **Ollama** | Llama 3, Qwen, CodeLlama, +100 | Yes | Yes | **FREE** |
+| **vLLM** | Any HuggingFace model | Yes | Yes | **FREE** |
+| **LMStudio** | Any GGUF model | Yes | Yes | **FREE** |
 
-### 🛠️ Enterprise-Grade Tool Suite
+### Enterprise-Grade Tool Suite
 
 <details>
-<summary><b>📁 Code Management Tools</b></summary>
+<summary><b>Code Management Tools</b></summary>
 
 - **Multi-File Editor** - Atomic edits across multiple files with rollback
 - **Batch Processor** - Parallel operations on hundreds of files
@@ -113,7 +80,7 @@ Switch between AI providers as easily as changing a config file:
 </details>
 
 <details>
-<summary><b>🔍 Code Quality & Analysis</b></summary>
+<summary><b>Code Quality & Analysis</b></summary>
 
 - **Code Review** - Automated quality analysis with complexity metrics
 - **Security Scanner** - Detect secrets (12+ patterns), vulnerabilities, dependencies
@@ -123,7 +90,7 @@ Switch between AI providers as easily as changing a config file:
 </details>
 
 <details>
-<summary><b>🧪 Testing & CI/CD</b></summary>
+<summary><b>Testing & CI/CD</b></summary>
 
 - **Test Generator** - Automated pytest-compatible test suites with fixtures
 - **CI/CD Automation** - Generate GitHub Actions, GitLab CI, CircleCI pipelines
@@ -132,7 +99,7 @@ Switch between AI providers as easily as changing a config file:
 </details>
 
 <details>
-<summary><b>📚 Documentation</b></summary>
+<summary><b>Documentation</b></summary>
 
 - **Docstring Generator** - Auto-generate function/class documentation
 - **API Documentation** - Create comprehensive API docs
@@ -141,7 +108,7 @@ Switch between AI providers as easily as changing a config file:
 </details>
 
 <details>
-<summary><b>🔧 Development Tools</b></summary>
+<summary><b>Development Tools</b></summary>
 
 - **Database Tools** - Query SQLite, PostgreSQL, MySQL, SQL Server safely
 - **Docker Management** - Container and image operations
@@ -151,39 +118,39 @@ Switch between AI providers as easily as changing a config file:
 
 </details>
 
-### 🔒 Security & Privacy First
+### Security & Privacy First
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                  Security Architecture                  │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
-│  🔐 Air-Gapped Mode                                    │
-│     └─ Complete offline operation                      │
-│     └─ Zero network calls                              │
-│     └─ Enterprise compliance ready                     │
+│  Air-Gapped Mode                                        │
+│     - Complete offline operation                        │
+│     - Zero network calls                                │
+│     - Enterprise compliance ready                       │
 │                                                         │
-│  🛡️ Sandboxed Execution                                │
-│     └─ Docker containerized code execution             │
-│     └─ Isolated from host system                       │
-│     └─ Automatic cleanup                               │
+│  Sandboxed Execution                                    │
+│     - Docker containerized code execution               │
+│     - Isolated from host system                         │
+│     - Automatic cleanup                                 │
 │                                                         │
-│  🔍 Secret Detection                                    │
-│     └─ 12+ pattern types (API keys, tokens, passwords) │
-│     └─ Pre-commit scanning                             │
-│     └─ Dependency vulnerability checks                 │
+│  Secret Detection                                       │
+│     - 12+ pattern types (API keys, tokens, passwords)   │
+│     - Pre-commit scanning                               │
+│     - Dependency vulnerability checks                   │
 │                                                         │
-│  ✅ Type-Safe Architecture                              │
-│     └─ Pydantic validation throughout                  │
-│     └─ Runtime type checking                           │
-│     └─ Zero tolerance for type errors                  │
+│  Type-Safe Architecture                                 │
+│     - Pydantic validation throughout                    │
+│     - Runtime type checking                             │
+│     - Zero tolerance for type errors                    │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 💼 Use Cases
+## Use Cases
 
 ### For Individual Developers
 
@@ -191,7 +158,7 @@ Switch between AI providers as easily as changing a config file:
 <tr>
 <td width="33%">
 
-**🎓 Learning & Exploration**
+**Learning & Exploration**
 - Use free local models (Ollama)
 - Experiment with different LLMs
 - Learn AI-assisted coding
@@ -200,7 +167,7 @@ Switch between AI providers as easily as changing a config file:
 </td>
 <td width="33%">
 
-**💻 Daily Coding**
+**Daily Coding**
 - Code reviews and refactoring
 - Test generation
 - Documentation automation
@@ -209,7 +176,7 @@ Switch between AI providers as easily as changing a config file:
 </td>
 <td width="33%">
 
-**🚀 Side Projects**
+**Side Projects**
 - Project scaffolding
 - Quick prototypes
 - CI/CD setup
@@ -225,7 +192,7 @@ Switch between AI providers as easily as changing a config file:
 <tr>
 <td width="33%">
 
-**🏢 Development Teams**
+**Development Teams**
 - Standardized AI workflow
 - Provider flexibility
 - Cost optimization (dev: free, prod: paid)
@@ -234,7 +201,7 @@ Switch between AI providers as easily as changing a config file:
 </td>
 <td width="33%">
 
-**🔐 Regulated Industries**
+**Regulated Industries**
 - Air-gapped deployment
 - No data leaving premises
 - Compliance ready (HIPAA, SOC2)
@@ -243,10 +210,10 @@ Switch between AI providers as easily as changing a config file:
 </td>
 <td width="33%">
 
-**📊 Cost-Conscious Orgs**
+**Cost-Conscious Organizations**
 - Free local models for 80% of work
 - Premium models for critical tasks
-- Save $1000s monthly
+- Save thousands monthly
 - Transparent cost tracking
 
 </td>
@@ -299,11 +266,9 @@ Switch between AI providers as easily as changing a config file:
 
 ---
 
-## 📊 Why Choose Victor?
+## Why Choose Victor?
 
-<div align="center">
-
-### 💰 Cost Savings
+### Cost Savings
 
 ```
 Traditional Approach (Claude only):
@@ -322,7 +287,7 @@ SAVINGS: $400/month/developer (89% reduction)
 For 10 developers: $4,800/month saved = $57,600/year
 ```
 
-### ⚡ Performance Boost
+### Performance Boost
 
 | Task | Traditional | With Victor | Improvement |
 |------|------------|-------------|-------------|
@@ -331,7 +296,7 @@ For 10 developers: $4,800/month saved = $57,600/year
 | Documentation | 4 hours | 30 min | **8x faster** |
 | Refactoring | 3 hours | 20 min | **9x faster** |
 
-### 🎯 Developer Satisfaction
+### Developer Satisfaction
 
 ```
                     Developer Experience Metrics
@@ -343,11 +308,9 @@ Ease of Use         ████████████████████
 Would Recommend     ████████████████████ 96%
 ```
 
-</div>
-
 ---
 
-## 🎬 Quick Start
+## Quick Start
 
 ### Installation (2 minutes)
 
@@ -384,7 +347,7 @@ profiles:
     temperature: 0.7
 EOF
 
-# Start coding!
+# Start coding
 victor
 ```
 
@@ -412,7 +375,7 @@ providers:
     api_key: ${ANTHROPIC_API_KEY}
 EOF
 
-# Start coding!
+# Start coding
 victor
 ```
 
@@ -446,7 +409,7 @@ I'll help you create a production-ready FastAPI application...
 > Run the tests
 
 [✓] Running pytest...
-All 12 tests passed! ✅
+All 12 tests passed!
 
 > Deploy this with docker-compose
 
@@ -457,7 +420,7 @@ Ready to deploy with: docker-compose up
 
 ---
 
-## 🐳 Docker Deployment
+## Docker Deployment
 
 Victor includes production-ready Docker configuration:
 
@@ -486,9 +449,9 @@ See [docker/README.md](docker/README.md) for complete guide.
 
 ---
 
-## 💎 Advanced Features
+## Advanced Features
 
-### 🔄 Model Sharing (Save 300+ GB!)
+### Model Sharing (Save 300+ GB)
 
 Share GGUF models between Ollama and LMStudio:
 
@@ -499,16 +462,16 @@ go install github.com/sammcj/gollama@HEAD
 # Link all models
 ~/go/bin/gollama -L
 
-# Result: 27+ models, 300GB saved!
+# Result: 27+ models, 300GB saved
 ```
 
 **Before**: 681 GB (Ollama: 350 GB + LMStudio: 331 GB)
 **After**: 369 GB (Ollama: 350 GB + LMStudio: 19 GB + symlinks: 0 GB)
 **Saved**: 312 GB (45.8% reduction)
 
-See [MODEL_SHARING_GUIDE.md](MODEL_SHARING_GUIDE.md) for details.
+See [docs/guides/MODEL_SHARING.md](docs/guides/MODEL_SHARING.md) for details.
 
-### 🎨 Semantic Search & Codebase Intelligence
+### Semantic Search & Codebase Intelligence
 
 ```python
 # Configure AI-powered search
@@ -531,7 +494,7 @@ victor --profile default
 
 **Powered by**: Qwen3-Embedding:8b (#1 MTEB multilingual, 70.58 score)
 
-### 🚀 Batch Operations
+### Batch Operations
 
 ```python
 > Replace all print statements with logger.info across the project
@@ -550,56 +513,9 @@ victor --profile default
 [✓] All changes committed atomically
 ```
 
-### 🔧 Enterprise Workflows
-
-<table>
-<tr>
-<td width="50%">
-
-**Code Review Automation**
-```python
-> Review this pull request
-
-[✓] Analyzing 23 changed files...
-[✓] Complexity analysis complete
-[✓] Security scan complete
-
-Issues found:
-  🔴 3 critical (SQL injection risk)
-  🟡 7 warnings (complexity > 10)
-  🔵 12 suggestions (style improvements)
-
-Detailed report saved to:
-  review_report.md
-```
-
-</td>
-<td width="50%">
-
-**CI/CD Generation**
-```python
-> Create GitHub Actions for testing
-
-[✓] Generated workflows:
-    .github/workflows/test.yml
-    .github/workflows/deploy.yml
-
-Features:
-  • Matrix testing (Python 3.10-3.12)
-  • Automatic PyPI publishing
-  • Docker image builds
-  • Slack notifications
-```
-
-</td>
-</tr>
-</table>
-
 ---
 
-## 🏗️ Architecture
-
-<div align="center">
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -641,27 +557,25 @@ Features:
     └───────┘  └─────────┘  └────────┘  └───────┘  └────────┘
 ```
 
-</div>
-
 ---
 
-## 📚 Documentation
+## Documentation
 
 | Guide | Description |
 |-------|-------------|
-| [Getting Started](docs/getting-started.md) | Installation and first steps |
-| [Configuration](docs/configuration.md) | Provider and tool setup |
-| [Tools Guide](docs/tools-guide.md) | Complete tool reference |
+| [Getting Started](docs/guides/getting-started.md) | Installation and first steps |
+| [Configuration](docs/guides/configuration.md) | Provider and tool setup |
+| [Tools Reference](docs/reference/tools.md) | Complete tool reference |
 | [Docker Deployment](docker/README.md) | Container deployment guide |
-| [Model Sharing](MODEL_SHARING_GUIDE.md) | Save disk space guide |
-| [Air-Gapped Mode](AIRGAPPED_GUIDE.md) | Offline operation |
+| [Model Sharing](docs/guides/MODEL_SHARING.md) | Save disk space guide |
+| [Air-Gapped Mode](docs/guides/AIRGAPPED.md) | Offline operation |
 | [Contributing](CONTRIBUTING.md) | Development guidelines |
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
-### ✅ Completed
+### Completed
 
 - [x] Universal provider abstraction with 6+ LLMs
 - [x] 25+ enterprise-grade tools
@@ -675,13 +589,13 @@ Features:
 - [x] Test generation & CI/CD automation
 - [x] Tiered caching system
 
-### 🚧 In Progress
+### In Progress
 
 - [ ] Comprehensive test coverage (90%+ target)
 - [ ] Performance profiling & optimization
 - [ ] Additional providers (Azure OpenAI, Bedrock)
 
-### 📋 Planned
+### Planned
 
 - [ ] VS Code extension
 - [ ] JetBrains IDE plugin
@@ -692,7 +606,7 @@ Features:
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Here's how to get started:
 
@@ -721,7 +635,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ---
 
-## 📊 Project Stats
+## Project Stats
 
 <div align="center">
 
@@ -734,7 +648,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ---
 
-## 🏆 Success Stories
+## Success Stories
 
 <table>
 <tr>
@@ -770,7 +684,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ---
 
-## 💬 Community & Support
+## Community & Support
 
 <div align="center">
 
@@ -786,7 +700,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ---
 
-## 📄 License
+## License
 
 Victor is open source software licensed under the **MIT License**.
 
@@ -808,30 +722,30 @@ See [LICENSE](LICENSE) for full text.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 Victor stands on the shoulders of giants:
 
 - **Inspired by**: [Claude Code](https://github.com/anthropics/claude-code) - For pioneering AI coding assistants
 - **Built with**: [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python) - Excellent API design
 - **Uses**: [Model Context Protocol](https://modelcontextprotocol.io/) - MCP standard implementation
-- **Powered by**: Open source community - 100+ contributors and growing
+- **Powered by**: Open source community - Contributors worldwide
 
 ---
 
 <div align="center">
 
-### ⭐ Star Us on GitHub!
+### Star Us on GitHub
 
 If Victor helps you code faster, please consider starring the repository.
-It helps others discover this project and motivates us to keep improving!
+It helps others discover this project and motivates us to keep improving.
 
 [![GitHub stars](https://img.shields.io/github/stars/vjsingh1984/victor?style=social)](https://github.com/vjsingh1984/victor/stargazers)
 
 ---
 
-**Made with ❤️ by developers, for developers**
+**Made with care by developers, for developers**
 
-[Get Started](#-quick-start) • [Documentation](#-documentation) • [Contribute](#-contributing)
+[Get Started](#quick-start) • [Documentation](#documentation) • [Contribute](#contributing)
 
 </div>

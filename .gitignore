@@ -95,3 +95,40 @@ tmp/
 temp/
 *.tmp
 coverage.json
+
+# Model management tools (external binaries)
+gollama
+llamalink
+
+# Gollama configuration (user-specific)
+.config/gollama/
+
+# Model sharing test files
+test_model_sharing.py
+model_sharing_results.txt
+
+# Internal development and agent documentation
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+BRANDING_OPTIONS.md
+
+# Internal test summaries and results
+*_SUMMARY.md
+*_TEST_RESULTS.md
+*_GUIDE.md
+DOCKER_COMPLETE_SOLUTION.md
+DOCKER_DEPENDENCY_FIX.md
+DOCKER_ENVIRONMENT_SETUP.md
+
+# Internal architecture and design docs (keep in docs/ instead)
+DESIGN.md
+FEATURES.md
+GAP_ANALYSIS.md
+PACKAGE_STRUCTURE.md
+PROGRESS.md
+EMBEDDING_ARCHITECTURE.md
+
+# Root-level test files (should be in tests/ directory)
+/test_*.py
+/script.sh

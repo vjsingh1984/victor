@@ -2,6 +2,7 @@
 from typing import Any, Dict, Optional, List
 from pathlib import Path
 
+from tree_sitter import QueryCursor
 from victor.codebase.tree_sitter_manager import get_parser
 from victor.tools.decorators import tool
 
@@ -45,24 +46,27 @@ async def find_symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, An
 
         for symbol_type in ["function", "class"]:
             query = parser.language.query(PYTHON_QUERIES[symbol_type])
-            captures = query.captures(root_node)
-            
-            for node, _ in captures:
-                if node.text.decode('utf8') == symbol_name:
-                    # We found the name identifier, now get the parent definition node
-                    definition_node = node.parent
-                    start_line = definition_node.start_point[0] + 1
-                    end_line = definition_node.end_point[0] + 1
-                    code_block = definition_node.text.decode('utf8')
-                    
-                    return {
-                        "symbol_name": symbol_name,
-                        "type": symbol_type,
-                        "file_path": file_path,
-                        "start_line": start_line,
-                        "end_line": end_line,
-                        "code": code_block,
-                    }
+            cursor = QueryCursor(query)
+            captures_dict = cursor.captures(root_node)
+
+            # captures_dict is {"function.name": [node1, node2, ...]} or {"class.name": [...]}
+            for capture_name, nodes in captures_dict.items():
+                for node in nodes:
+                    if node.text.decode('utf8') == symbol_name:
+                        # We found the name identifier, now get the parent definition node
+                        definition_node = node.parent
+                        start_line = definition_node.start_point[0] + 1
+                        end_line = definition_node.end_point[0] + 1
+                        code_block = definition_node.text.decode('utf8')
+
+                        return {
+                            "symbol_name": symbol_name,
+                            "type": symbol_type,
+                            "file_path": file_path,
+                            "start_line": start_line,
+                            "end_line": end_line,
+                            "code": code_block,
+                        }
 
         return None  # Symbol not found
 
@@ -98,21 +102,24 @@ async def find_references(symbol_name: str, search_path: str = ".") -> List[Dict
                 content_bytes = f.read()
             
             tree = parser.parse(content_bytes)
-            captures = query.captures(tree.root_node)
-            
+            cursor = QueryCursor(query)
+            captures_dict = cursor.captures(tree.root_node)
+
             # For reading lines for the preview
             content_lines = content_bytes.decode('utf8', errors='ignore').splitlines()
 
-            for node, _ in captures:
-                if node.text.decode('utf8') == symbol_name:
-                    line_number = node.start_point[0] + 1
-                    col_number = node.start_point[1] + 1
-                    references.append({
-                        "file_path": str(file_path),
-                        "line": line_number,
-                        "column": col_number,
-                        "preview": content_lines[line_number - 1].strip()
-                    })
+            # captures_dict is {"name": [node1, node2, ...]}
+            for capture_name, nodes in captures_dict.items():
+                for node in nodes:
+                    if node.text.decode('utf8') == symbol_name:
+                        line_number = node.start_point[0] + 1
+                        col_number = node.start_point[1] + 1
+                        references.append({
+                            "file_path": str(file_path),
+                            "line": line_number,
+                            "column": col_number,
+                            "preview": content_lines[line_number - 1].strip()
+                        })
         except Exception:
             # Ignore files that can't be parsed
             continue
