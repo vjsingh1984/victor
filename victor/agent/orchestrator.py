@@ -108,13 +108,7 @@ from victor.tools.metrics_tool import (
     metrics_analyze,
     metrics_report,
 )
-from victor.tools.security_scanner_tool import (
-    security_scan_secrets,
-    security_scan_dependencies,
-    security_scan_config,
-    security_scan_all,
-    security_check_file,
-)
+from victor.tools.security_scanner_tool import security_scan
 from victor.tools.documentation_tool import (
     docs_generate_docstrings,
     docs_generate_api,
@@ -298,12 +292,8 @@ class AgentOrchestrator:
         self.tools.register(metrics_analyze)
         self.tools.register(metrics_report)
 
-        # Register security scanner tools
-        self.tools.register(security_scan_secrets)
-        self.tools.register(security_scan_dependencies)
-        self.tools.register(security_scan_config)
-        self.tools.register(security_scan_all)
-        self.tools.register(security_check_file)
+        # Register security scanner tool (consolidated)
+        self.tools.register(security_scan)
 
         # Register documentation tools
         self.tools.register(docs_generate_docstrings)
@@ -403,7 +393,7 @@ class AgentOrchestrator:
             "git": ["git_status", "git_diff", "git_stage", "git_commit", "git_log", "git_branch"],
             "testing": ["testing_generate", "testing_run", "testing_coverage"],
             "refactor": ["refactor_extract_function", "refactor_inline_variable", "refactor_organize_imports"],
-            "security": ["security_scan_secrets", "security_scan_dependencies", "security_scan_all"],
+            "security": ["security_scan"],
             "docs": ["docs_generate_docstrings", "docs_generate_api", "docs_generate_readme"],
             "review": ["code_review_file", "code_review_directory", "code_review_security"],
             "web": ["web_search", "web_fetch", "web_summarize"],
