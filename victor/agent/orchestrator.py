@@ -433,8 +433,9 @@ class AgentOrchestrator:
             else:
                 tools = self._select_relevant_tools_keywords(user_message)
 
-        # Stream response
+        # Stream response and collect tool calls
         full_content = ""
+        tool_calls = None
         async for chunk in self.provider.stream(
             messages=self.messages,
             model=self.model,
@@ -443,11 +444,20 @@ class AgentOrchestrator:
             tools=tools,
         ):
             full_content += chunk.content
+
+            # Collect tool calls from chunks
+            if chunk.tool_calls:
+                tool_calls = chunk.tool_calls
+
             yield chunk
 
         # Add to history
         if full_content:
             self.add_message("assistant", full_content)
+
+        # Handle tool calls if present (CRITICAL FIX)
+        if tool_calls:
+            await self._handle_tool_calls(tool_calls)
 
     async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> None:
         """Handle tool calls from the model.
