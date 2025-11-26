@@ -48,12 +48,7 @@ from victor.tools.git_tool import (
     set_git_provider,
 )
 from victor.tools.batch_processor_tool import batch, set_batch_processor_config
-from victor.tools.cicd_tool import (
-    cicd_generate,
-    cicd_validate,
-    cicd_list_templates,
-    cicd_create_workflow,
-)
+from victor.tools.cicd_tool import cicd
 from victor.tools.scaffold_tool import (
     scaffold_create,
     scaffold_list_templates,
@@ -182,11 +177,8 @@ class AgentOrchestrator:
         set_batch_processor_config(max_workers=4)
         self.tools.register(batch)
 
-        # Register CI/CD tools
-        self.tools.register(cicd_generate)
-        self.tools.register(cicd_validate)
-        self.tools.register(cicd_list_templates)
-        self.tools.register(cicd_create_workflow)
+        # Register CI/CD tool (consolidated)
+        self.tools.register(cicd)
 
         # Register scaffold tools
         self.tools.register(scaffold_create)
@@ -301,6 +293,7 @@ class AgentOrchestrator:
             "docker": ["docker"],
             "metrics": ["analyze_metrics"],
             "batch": ["batch"],
+            "cicd": ["cicd"],
         }
 
         # Keyword matching for tool selection
@@ -328,6 +321,8 @@ class AgentOrchestrator:
             selected_categories.add("metrics")
         if any(kw in message_lower for kw in ["batch", "bulk", "multiple files", "search files", "replace across"]):
             selected_categories.add("batch")
+        if any(kw in message_lower for kw in ["ci/cd", "cicd", "pipeline", "github actions", "gitlab ci", "circleci", "workflow"]):
+            selected_categories.add("cicd")
 
         # Build selected tool names
         selected_tool_names = core_tool_names.copy()

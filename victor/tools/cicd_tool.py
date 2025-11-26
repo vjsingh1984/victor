@@ -177,326 +177,315 @@ CIRCLECI_TEMPLATES = {
     },
 }
 
+# Type to template mapping for convenience
+TYPE_MAPPING = {
+    "test": "python-test",
+    "build": "docker-build",
+    "deploy": "docker-build",
+    "release": "python-publish",
+    "publish": "python-publish",
+}
+
 
 @tool
-async def cicd_generate(
+async def cicd(
+    operation: str,
     platform: str = "github",
-    workflow: str = "python-test",
+    workflow: Optional[str] = None,
+    type: Optional[str] = None,
+    file: Optional[str] = None,
     output: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Generate CI/CD configuration file.
+    Unified CI/CD tool for pipeline management.
 
-    Creates a CI/CD pipeline configuration file based on templates.
-    Currently supports GitHub Actions with plans for GitLab CI and CircleCI.
+    Performs CI/CD operations including generating configurations, validating
+    pipelines, and listing available templates. Consolidates all CI/CD
+    functionality into a single interface.
 
     Args:
+        operation: Operation to perform. Options: "generate", "validate", "list".
         platform: CI/CD platform (github, gitlab, circle). Default: github.
-        workflow: Workflow template name (python-test, python-publish, docker-build). Default: python-test.
-        output: Output file path (optional, auto-generated if not provided).
+        workflow: Workflow template name (python-test, python-publish, docker-build).
+        type: Workflow type shorthand (test, build, deploy, release, publish).
+        file: Configuration file path (for validate operation).
+        output: Output file path (for generate operation, auto-generated if not provided).
 
     Returns:
         Dictionary containing:
         - success: Whether operation succeeded
-        - output_file: Path where configuration was written
-        - config: Generated configuration as YAML string
-        - formatted_report: Human-readable generation report
+        - operation: Operation performed
+        - output_file: Path where configuration was written (generate)
+        - config: Generated configuration (generate)
+        - issues: List of issues (validate)
+        - warnings: List of warnings (validate)
+        - templates: Available templates (list)
+        - formatted_report: Human-readable report
         - error: Error message if failed
+
+    Examples:
+        # Generate CI/CD configuration
+        cicd(operation="generate", platform="github", workflow="python-test")
+
+        # Generate using type shorthand
+        cicd(operation="generate", type="test")
+
+        # Validate configuration file
+        cicd(operation="validate", file=".github/workflows/test.yml")
+
+        # List available templates
+        cicd(operation="list")
+
+        # Custom output path
+        cicd(operation="generate", workflow="docker-build", output=".github/workflows/build.yml")
     """
-    if platform != "github":
+    if not operation:
+        return {"success": False, "error": "Missing required parameter: operation"}
+
+    # Generate operation
+    if operation == "generate":
+        # Determine workflow from type or use explicit workflow
+        if type and not workflow:
+            workflow = TYPE_MAPPING.get(type)
+            if not workflow:
+                available = ", ".join(TYPE_MAPPING.keys())
+                return {
+                    "success": False,
+                    "error": f"Unknown workflow type: {type}. Available: {available}"
+                }
+        elif not workflow:
+            return {
+                "success": False,
+                "error": "Either 'workflow' or 'type' parameter required for generate operation"
+            }
+
+        if platform != "github":
+            return {
+                "success": False,
+                "error": f"Platform '{platform}' not yet supported. Use 'github'."
+            }
+
+        # Get template
+        template = GITHUB_ACTIONS_TEMPLATES.get(workflow)
+
+        if not template:
+            available = ", ".join(GITHUB_ACTIONS_TEMPLATES.keys())
+            return {
+                "success": False,
+                "error": f"Workflow template '{workflow}' not found. Available: {available}"
+            }
+
+        # Generate YAML
+        config_yaml = yaml.dump(template, default_flow_style=False, sort_keys=False)
+
+        # Determine output path
+        if not output:
+            output = f".github/workflows/{workflow}.yml"
+
+        # Write file
+        output_file = Path(output)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        output_file.write_text(config_yaml)
+
+        # Build report
+        report = []
+        report.append(f"CI/CD Configuration Generated")
+        report.append("=" * 70)
+        report.append("")
+        report.append(f"Platform: {platform}")
+        report.append(f"Workflow: {workflow}")
+        report.append(f"Output: {output}")
+        report.append("")
+        report.append("Generated configuration:")
+        report.append("-" * 70)
+        report.append(config_yaml)
+        report.append("")
+        report.append("Next steps:")
+        report.append("  1. Review the configuration")
+        report.append("  2. Customize as needed")
+        report.append("  3. Commit to repository")
+        report.append("  4. Push to trigger workflow")
+
         return {
-            "success": False,
-            "error": f"Platform '{platform}' not yet supported. Use 'github'."
+            "success": True,
+            "operation": "generate",
+            "output_file": output,
+            "config": config_yaml,
+            "formatted_report": "\n".join(report)
         }
 
-    # Get template
-    template = GITHUB_ACTIONS_TEMPLATES.get(workflow)
+    # Validate operation
+    elif operation == "validate":
+        if not file:
+            return {
+                "success": False,
+                "error": "Validate operation requires 'file' parameter"
+            }
 
-    if not template:
-        available = ", ".join(GITHUB_ACTIONS_TEMPLATES.keys())
-        return {
-            "success": False,
-            "error": f"Workflow template '{workflow}' not found. Available: {available}"
-        }
+        file_obj = Path(file)
+        if not file_obj.exists():
+            return {
+                "success": False,
+                "error": f"File not found: {file}"
+            }
 
-    # Generate YAML
-    config_yaml = yaml.dump(template, default_flow_style=False, sort_keys=False)
+        # Read and validate YAML
+        try:
+            content = file_obj.read_text()
+            config = yaml.safe_load(content)
+        except yaml.YAMLError as e:
+            return {
+                "success": False,
+                "error": f"Invalid YAML syntax: {e}"
+            }
 
-    # Determine output path
-    if not output:
-        output = f".github/workflows/{workflow}.yml"
+        # Validate structure (basic checks)
+        issues = []
+        warnings = []
 
-    # Write file
-    output_file = Path(output)
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-    output_file.write_text(config_yaml)
+        # Check for required fields (GitHub Actions)
+        if "name" not in config:
+            warnings.append("Missing 'name' field (recommended)")
 
-    # Build report
-    report = []
-    report.append(f"CI/CD Configuration Generated")
-    report.append("=" * 70)
-    report.append("")
-    report.append(f"Platform: {platform}")
-    report.append(f"Workflow: {workflow}")
-    report.append(f"Output: {output}")
-    report.append("")
-    report.append("Generated configuration:")
-    report.append("-" * 70)
-    report.append(config_yaml)
-    report.append("")
-    report.append("Next steps:")
-    report.append("  1. Review the configuration")
-    report.append("  2. Customize as needed")
-    report.append("  3. Commit to repository")
-    report.append("  4. Push to trigger workflow")
+        if "on" not in config:
+            issues.append("Missing 'on' field (required for triggers)")
 
-    return {
-        "success": True,
-        "output_file": output,
-        "config": config_yaml,
-        "formatted_report": "\n".join(report)
-    }
+        if "jobs" not in config:
+            issues.append("Missing 'jobs' field (required)")
 
+        # Check jobs
+        jobs_count = 0
+        if "jobs" in config:
+            jobs_count = len(config["jobs"])
+            for job_name, job in config["jobs"].items():
+                if "runs-on" not in job:
+                    issues.append(f"Job '{job_name}': Missing 'runs-on' field")
 
-@tool
-async def cicd_validate(
-    file: str,
-) -> Dict[str, Any]:
-    """
-    Validate CI/CD configuration file.
+                if "steps" not in job:
+                    issues.append(f"Job '{job_name}': Missing 'steps' field")
 
-    Validates YAML syntax and checks for common issues and best practices
-    in CI/CD configuration files. Currently optimized for GitHub Actions.
-
-    Args:
-        file: Path to configuration file to validate.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether configuration is valid (no critical issues)
-        - issues: List of critical issues found
-        - warnings: List of warnings/recommendations
-        - jobs_count: Number of jobs in configuration
-        - formatted_report: Human-readable validation report
-        - error: Error message if failed to read/parse
-    """
-    if not file:
-        return {
-            "success": False,
-            "error": "Missing required parameter: file"
-        }
-
-    file_obj = Path(file)
-    if not file_obj.exists():
-        return {
-            "success": False,
-            "error": f"File not found: {file}"
-        }
-
-    # Read and validate YAML
-    try:
-        content = file_obj.read_text()
-        config = yaml.safe_load(content)
-    except yaml.YAMLError as e:
-        return {
-            "success": False,
-            "error": f"Invalid YAML syntax: {e}"
-        }
-
-    # Validate structure (basic checks)
-    issues = []
-    warnings = []
-
-    # Check for required fields (GitHub Actions)
-    if "name" not in config:
-        warnings.append("Missing 'name' field (recommended)")
-
-    if "on" not in config:
-        issues.append("Missing 'on' field (required for triggers)")
-
-    if "jobs" not in config:
-        issues.append("Missing 'jobs' field (required)")
-
-    # Check jobs
-    jobs_count = 0
-    if "jobs" in config:
-        jobs_count = len(config["jobs"])
-        for job_name, job in config["jobs"].items():
-            if "runs-on" not in job:
-                issues.append(f"Job '{job_name}': Missing 'runs-on' field")
-
-            if "steps" not in job:
-                issues.append(f"Job '{job_name}': Missing 'steps' field")
-
-            # Check for best practices
-            if "steps" in job:
-                has_checkout = any(
-                    step.get("uses", "").startswith("actions/checkout")
-                    for step in job["steps"]
-                )
-                if not has_checkout:
-                    warnings.append(
-                        f"Job '{job_name}': No checkout step (usually needed)"
+                # Check for best practices
+                if "steps" in job:
+                    has_checkout = any(
+                        step.get("uses", "").startswith("actions/checkout")
+                        for step in job["steps"]
                     )
+                    if not has_checkout:
+                        warnings.append(
+                            f"Job '{job_name}': No checkout step (usually needed)"
+                        )
 
-    # Build report
-    report = []
-    report.append("Configuration Validation")
-    report.append("=" * 70)
-    report.append("")
-    report.append(f"File: {file}")
-    report.append("")
-
-    if not issues and not warnings:
-        report.append("✅ Configuration is valid!")
-        report.append("\nNo issues or warnings found.")
-    else:
-        if issues:
-            report.append(f"❌ {len(issues)} issue(s) found:")
-            for issue in issues:
-                report.append(f"  • {issue}")
-            report.append("")
-
-        if warnings:
-            report.append(f"⚠️  {len(warnings)} warning(s):")
-            for warning in warnings:
-                report.append(f"  • {warning}")
-            report.append("")
-
-    # Configuration summary
-    if "jobs" in config:
-        report.append(f"Jobs: {len(config['jobs'])}")
-        for job_name, job in config["jobs"].items():
-            steps = len(job.get("steps", []))
-            report.append(f"  • {job_name}: {steps} steps")
-
-    success = len(issues) == 0
-
-    return {
-        "success": success,
-        "issues": issues,
-        "warnings": warnings,
-        "jobs_count": jobs_count,
-        "formatted_report": "\n".join(report)
-    }
-
-
-@tool
-async def cicd_list_templates() -> Dict[str, Any]:
-    """
-    List available CI/CD workflow templates.
-
-    Returns a list of all available workflow templates for different
-    CI/CD platforms, along with their descriptions and usage.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - templates: List of template names with details
-        - platforms: Available platforms
-        - formatted_report: Human-readable template listing
-    """
-    templates = []
-
-    report = []
-    report.append("Available CI/CD Templates")
-    report.append("=" * 70)
-    report.append("")
-    report.append("GitHub Actions Templates:")
-    report.append("")
-
-    for name, template in GITHUB_ACTIONS_TEMPLATES.items():
-        template_info = {
-            "name": name,
-            "platform": "github",
-            "display_name": template["name"],
-            "jobs": list(template.get("jobs", {}).keys()),
-            "triggers": list(template.get("on", {}).keys())
-        }
-        templates.append(template_info)
-
-        report.append(f"📋 {name}")
-        report.append(f"   Name: {template['name']}")
-
-        # List jobs
-        if "jobs" in template:
-            jobs = list(template["jobs"].keys())
-            report.append(f"   Jobs: {', '.join(jobs)}")
-
-        # List triggers
-        if "on" in template:
-            triggers = list(template["on"].keys())
-            report.append(f"   Triggers: {', '.join(triggers)}")
-
+        # Build report
+        report = []
+        report.append("Configuration Validation")
+        report.append("=" * 70)
+        report.append("")
+        report.append(f"File: {file}")
         report.append("")
 
-    report.append("Usage:")
-    report.append("  cicd_generate(platform='github', workflow='<name>')")
+        if not issues and not warnings:
+            report.append("✅ Configuration is valid!")
+            report.append("\nNo issues or warnings found.")
+        else:
+            if issues:
+                report.append(f"❌ {len(issues)} issue(s) found:")
+                for issue in issues:
+                    report.append(f"  • {issue}")
+                report.append("")
 
-    return {
-        "success": True,
-        "templates": templates,
-        "platforms": ["github"],
-        "formatted_report": "\n".join(report)
-    }
+            if warnings:
+                report.append(f"⚠️  {len(warnings)} warning(s):")
+                for warning in warnings:
+                    report.append(f"  • {warning}")
+                report.append("")
 
+        # Configuration summary
+        if "jobs" in config:
+            report.append(f"Jobs: {len(config['jobs'])}")
+            for job_name, job in config["jobs"].items():
+                steps = len(job.get("steps", []))
+                report.append(f"  • {job_name}: {steps} steps")
 
-@tool
-async def cicd_create_workflow(
-    type: str = "test",
-    platform: str = "github",
-    output: Optional[str] = None,
-) -> Dict[str, Any]:
-    """
-    Create a specific workflow type.
+        success = len(issues) == 0
 
-    Convenience function to create common workflow types without
-    needing to know the exact template name.
-
-    Args:
-        type: Workflow type (test, build, deploy, release, publish). Default: test.
-        platform: CI/CD platform (github, gitlab, circle). Default: github.
-        output: Output file path (optional, auto-generated if not provided).
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - output_file: Path where configuration was written
-        - config: Generated configuration as YAML string
-        - formatted_report: Human-readable generation report
-        - error: Error message if failed
-    """
-    # Map type to template
-    type_mapping = {
-        "test": "python-test",
-        "build": "docker-build",
-        "deploy": "docker-build",
-        "release": "python-publish",
-        "publish": "python-publish",
-    }
-
-    workflow = type_mapping.get(type)
-
-    if not workflow:
-        available = ", ".join(type_mapping.keys())
         return {
-            "success": False,
-            "error": f"Unknown workflow type: {type}. Available: {available}"
+            "success": success,
+            "operation": "validate",
+            "issues": issues,
+            "warnings": warnings,
+            "jobs_count": jobs_count,
+            "formatted_report": "\n".join(report)
         }
 
-    # Use cicd_generate
-    return await cicd_generate(platform=platform, workflow=workflow, output=output)
+    # List operation
+    elif operation == "list":
+        templates = []
+
+        report = []
+        report.append("Available CI/CD Templates")
+        report.append("=" * 70)
+        report.append("")
+        report.append("GitHub Actions Templates:")
+        report.append("")
+
+        for name, template in GITHUB_ACTIONS_TEMPLATES.items():
+            template_info = {
+                "name": name,
+                "platform": "github",
+                "display_name": template["name"],
+                "jobs": list(template.get("jobs", {}).keys()),
+                "triggers": list(template.get("on", {}).keys())
+            }
+            templates.append(template_info)
+
+            report.append(f"📋 {name}")
+            report.append(f"   Name: {template['name']}")
+
+            # List jobs
+            if "jobs" in template:
+                jobs = list(template["jobs"].keys())
+                report.append(f"   Jobs: {', '.join(jobs)}")
+
+            # List triggers
+            if "on" in template:
+                triggers = list(template["on"].keys())
+                report.append(f"   Triggers: {', '.join(triggers)}")
+
+            report.append("")
+
+        report.append("Type Shortcuts:")
+        for type_name, workflow_name in TYPE_MAPPING.items():
+            report.append(f"  • {type_name} → {workflow_name}")
+        report.append("")
+
+        report.append("Usage:")
+        report.append("  cicd(operation='generate', workflow='<name>')")
+        report.append("  cicd(operation='generate', type='<type>')")
+
+        return {
+            "success": True,
+            "operation": "list",
+            "templates": templates,
+            "platforms": ["github"],
+            "formatted_report": "\n".join(report)
+        }
+
+    else:
+        return {
+            "success": False,
+            "error": f"Unknown operation: {operation}. Valid operations: generate, validate, list"
+        }
 
 
 # Keep class for backward compatibility
 class CICDTool:
-    """Deprecated: Use individual cicd_* functions instead."""
+    """Deprecated: Use cicd function instead."""
 
     def __init__(self):
         """Initialize - deprecated."""
         import warnings
         warnings.warn(
-            "CICDTool class is deprecated. Use cicd_* functions instead.",
+            "CICDTool class is deprecated. Use cicd function instead.",
             DeprecationWarning,
             stacklevel=2
         )
