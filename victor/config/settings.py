@@ -76,7 +76,9 @@ class Settings(BaseSettings):
     airgapped_mode: bool = False
 
     # Tool Selection Strategy
-    use_semantic_tool_selection: bool = False  # Use embeddings instead of keywords
+    use_semantic_tool_selection: bool = True  # Use embeddings instead of keywords (DEFAULT)
+    embedding_provider: str = "sentence-transformers"  # sentence-transformers (local), ollama, vllm, lmstudio
+    embedding_model: str = "all-MiniLM-L6-v2"  # Default: 80MB, 384-dim, ~5ms per embedding
 
     # UI
     theme: str = "monokai"

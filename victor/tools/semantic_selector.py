@@ -44,8 +44,8 @@ class SemanticToolSelector:
 
     def __init__(
         self,
-        embedding_model: str = "nomic-embed-text",
-        embedding_provider: str = "ollama",
+        embedding_model: str = "all-MiniLM-L6-v2",
+        embedding_provider: str = "sentence-transformers",
         ollama_base_url: str = "http://localhost:11434",
         cache_embeddings: bool = True,
         cache_dir: Optional[Path] = None,
@@ -54,8 +54,11 @@ class SemanticToolSelector:
 
         Args:
             embedding_model: Model to use for embeddings
-            embedding_provider: Provider (ollama, openai, sentence-transformers)
-            ollama_base_url: Ollama API base URL
+                - sentence-transformers: "all-MiniLM-L6-v2" (default, 80MB, ~5ms)
+                - ollama: "nomic-embed-text", "qwen3-embedding:8b", etc.
+            embedding_provider: Provider (sentence-transformers, ollama, vllm, lmstudio)
+                Default: "sentence-transformers" (local, fast, bundled)
+            ollama_base_url: Ollama/vLLM/LMStudio API base URL
             cache_embeddings: Cache tool embeddings (recommended)
             cache_dir: Directory to store embedding cache (default: ~/.victor/embeddings/)
         """
@@ -71,7 +74,7 @@ class SemanticToolSelector:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Cache file path (includes model name for version control)
-        cache_filename = f"tool_embeddings_{embedding_model.replace(':', '_')}.pkl"
+        cache_filename = f"tool_embeddings_{embedding_model.replace(':', '_').replace('/', '_')}.pkl"
         self.cache_file = self.cache_dir / cache_filename
 
         # In-memory cache: tool_name → embedding vector
@@ -80,8 +83,13 @@ class SemanticToolSelector:
         # Tool version hash (to detect when tools change)
         self._tools_hash: Optional[str] = None
 
-        # HTTP client for Ollama
-        self._client = httpx.AsyncClient(base_url=ollama_base_url, timeout=30.0)
+        # Sentence-transformers model (loaded on demand)
+        self._sentence_model = None
+
+        # HTTP client for Ollama/vLLM/LMStudio
+        self._client = None
+        if embedding_provider in ["ollama", "vllm", "lmstudio"]:
+            self._client = httpx.AsyncClient(base_url=ollama_base_url, timeout=30.0)
 
     async def initialize_tool_embeddings(self, tools: ToolRegistry) -> None:
         """Pre-compute embeddings for all tools (called once at startup).
@@ -271,13 +279,53 @@ class SemanticToolSelector:
         Returns:
             Embedding vector as numpy array
         """
-        if self.embedding_provider == "ollama":
-            return await self._get_ollama_embedding(text)
+        if self.embedding_provider == "sentence-transformers":
+            return await self._get_sentence_transformer_embedding(text)
+        elif self.embedding_provider in ["ollama", "vllm", "lmstudio"]:
+            return await self._get_api_embedding(text)
         else:
             raise NotImplementedError(f"Provider {self.embedding_provider} not yet supported")
 
-    async def _get_ollama_embedding(self, text: str) -> np.ndarray:
-        """Get embedding from Ollama.
+    async def _get_sentence_transformer_embedding(self, text: str) -> np.ndarray:
+        """Get embedding from sentence-transformers (local, fast).
+
+        Args:
+            text: Text to embed
+
+        Returns:
+            Embedding vector as numpy array
+        """
+        try:
+            # Lazy load sentence-transformers model
+            if self._sentence_model is None:
+                try:
+                    from sentence_transformers import SentenceTransformer
+                    logger.info(f"Loading sentence-transformers model: {self.embedding_model}")
+                    self._sentence_model = SentenceTransformer(self.embedding_model)
+                    logger.info(f"Model loaded successfully (local, ~5ms per embedding)")
+                except ImportError:
+                    raise ImportError(
+                        "sentence-transformers not installed. "
+                        "Install with: pip install sentence-transformers"
+                    )
+
+            # Run in thread pool to avoid blocking event loop
+            import asyncio
+            loop = asyncio.get_event_loop()
+            embedding = await loop.run_in_executor(
+                None,
+                lambda: self._sentence_model.encode(text, convert_to_numpy=True)
+            )
+            return embedding.astype(np.float32)
+
+        except Exception as e:
+            logger.warning(f"Failed to get embedding from sentence-transformers: {e}")
+            # Fall back to random embedding (better than crashing)
+            logger.warning("Falling back to random embedding")
+            return np.random.randn(384).astype(np.float32)
+
+    async def _get_api_embedding(self, text: str) -> np.ndarray:
+        """Get embedding from Ollama/vLLM/LMStudio API.
 
         Args:
             text: Text to embed
@@ -295,7 +343,7 @@ class SemanticToolSelector:
             return np.array(data["embedding"], dtype=np.float32)
 
         except Exception as e:
-            logger.warning(f"Failed to get embedding from Ollama: {e}")
+            logger.warning(f"Failed to get embedding from {self.embedding_provider}: {e}")
             # Fallback to random embedding (better than crashing)
             return np.random.randn(768).astype(np.float32)
 
