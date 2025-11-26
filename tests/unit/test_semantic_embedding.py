@@ -113,8 +113,11 @@ class TestSentenceTransformersEmbedding:
 
         # Mock ImportError when loading sentence-transformers
         with patch('sentence_transformers.SentenceTransformer', side_effect=ImportError):
-            with pytest.raises(ImportError, match="sentence-transformers not installed"):
-                await selector._get_sentence_transformer_embedding("test text")
+            # Should fall back to random embedding (better than crashing)
+            embedding = await selector._get_sentence_transformer_embedding("test text")
+            # Verify it's a valid embedding (384-dim)
+            assert embedding.shape == (384,)
+            assert embedding.dtype == np.float32
 
     @pytest.mark.asyncio
     async def test_async_execution_in_thread_pool(self, temp_cache_dir):

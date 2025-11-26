@@ -28,6 +28,13 @@ from victor.codebase.embeddings.models import (
     EmbeddingModelConfig
 )
 
+# Check if chromadb is available
+try:
+    import chromadb
+    CHROMADB_AVAILABLE = True
+except ImportError:
+    CHROMADB_AVAILABLE = False
+
 
 class TestEmbeddingConfigDefaults:
     """Test that EmbeddingConfig defaults are air-gapped."""
@@ -244,6 +251,10 @@ class TestChromaDBProvider:
             yield Path(tmpdir)
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        not CHROMADB_AVAILABLE,
+        reason="chromadb is an optional dependency (not installed)"
+    )
     async def test_chromadb_initialization_offline(self, temp_dir):
         """Test that ChromaDB initializes without network."""
         config = EmbeddingConfig(
@@ -356,7 +367,7 @@ class TestAirgappedDemo:
                 extra_config={"table_name": "test", "dimension": 384}
             )
 
-            with patch('lancedb.connect') as mock_connect, \
+            with patch('victor.codebase.embeddings.lancedb_provider.lancedb.connect') as mock_connect, \
                  patch('sentence_transformers.SentenceTransformer') as MockST:
 
                 # Mock LanceDB
@@ -368,7 +379,8 @@ class TestAirgappedDemo:
 
                 # Mock sentence-transformers
                 mock_model = MagicMock()
-                mock_model.encode.return_value = np.random.randn(384).astype(np.float32)
+                # Return batch embeddings for batch processing
+                mock_model.encode.return_value = [np.random.randn(384).astype(np.float32)]
                 mock_model.get_sentence_embedding_dimension.return_value = 384
                 MockST.return_value = mock_model
 
@@ -390,8 +402,8 @@ class TestAirgappedDemo:
 
                 await provider.index_documents(documents)
 
-                # Verify documents were added to table
-                mock_table.add.assert_called_once()
+                # Verify documents were added to table (create_table includes first batch)
+                assert mock_db.create_table.called or mock_table.add.called
 
 
 class TestCacheOptimization:
