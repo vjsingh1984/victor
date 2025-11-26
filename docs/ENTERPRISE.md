@@ -45,12 +45,12 @@ This guide covers deploying Victor in enterprise environments with focus on secu
 
 | Requirement | Victor Solution | Status |
 |-------------|----------------|--------|
-| **Compliance** | Air-gapped mode, no data leakage | ✅ HIPAA, SOC2, ISO 27001 |
-| **Security** | Secret scanning, sandboxed execution | ✅ Enterprise-grade |
-| **Cost Control** | Hybrid cloud/local deployment | ✅ 89% savings typical |
-| **Vendor Lock-in** | Multi-provider support | ✅ Zero lock-in |
-| **Audit Trail** | Complete activity logging | ✅ Full auditability |
-| **Support** | Commercial support available | ✅ 24/7 enterprise tier |
+| **Compliance** | Air-gapped mode, no data leakage | Compatible with HIPAA, SOC2, ISO 27001 |
+| **Security** | Secret scanning, sandboxed execution | Enterprise-grade features |
+| **Cost Control** | Hybrid cloud/local deployment | Flexible cost management |
+| **Vendor Lock-in** | Multi-provider support | Zero lock-in |
+| **Audit Trail** | Complete activity logging | Full auditability |
+| **Support** | Commercial support available | Community and paid tiers |
 
 ---
 
@@ -235,20 +235,21 @@ routing:
     - security_analysis
 ```
 
-**Cost Savings:**
+**Potential Cost Model (Theoretical Example):**
 
 ```
-50-person team example:
+50-person team hypothetical:
 
-Traditional (100% Claude):
-├─ $450/month per developer
-└─ Total: $22,500/month ($270k/year)
+Cloud-Only Approach:
+├─ Premium API per developer: $X/month
+└─ Total: Significant expenditure
 
-Hybrid (90% local, 10% cloud):
-├─ $45/month per developer (10% of original)
-└─ Total: $2,250/month ($27k/year)
+Hybrid Approach (local + selective cloud):
+├─ Free local models for routine tasks
+├─ Minimal cloud API for critical work
+└─ Total: Primarily infrastructure costs
 
-Savings: $243k/year (90% reduction)
+Potential Benefit: Cost reduction through selective API usage
 ```
 
 ### 3. Multi-Tenant SaaS Deployment
@@ -380,63 +381,39 @@ VICTOR_AUDIT_PATH=/var/log/victor/audit.log
 
 ## Cost Optimization
 
-### TCO Analysis (3-Year)
+### Cost Considerations
 
-**Scenario: 100-person engineering team**
+**Victor offers flexible deployment models:**
 
-| Solution | Year 1 | Year 2 | Year 3 | Total (3yr) |
-|----------|--------|--------|--------|-------------|
-| **GitHub Copilot** | $120k | $120k | $120k | $360k |
-| **Claude API Only** | $540k | $540k | $540k | $1.62M |
-| **Victor Hybrid** | $60k | $60k | $60k | $180k |
-| **Victor Air-Gapped** | $40k | $10k | $10k | $60k |
+| Approach | Primary Cost | Trade-offs |
+|----------|-------------|------------|
+| **Air-Gapped (Local Only)** | Infrastructure (GPU servers) | One-time setup, no ongoing API costs |
+| **Hybrid (Mixed)** | Infrastructure + selective API | Balance of cost and capability |
+| **Cloud (API Only)** | Pay-per-use API costs | No infrastructure needed |
 
-**Victor Hybrid Savings vs. Copilot:** $180k (50%)
-**Victor Air-Gapped Savings vs. Copilot:** $300k (83%)
+**Cost Factors to Consider:**
+- Infrastructure costs (if using local models)
+- API usage patterns and pricing
+- Team size and usage frequency
+- Compliance requirements
+- Development vs production needs
 
-### Cost Breakdown
-
-```
-Victor Hybrid (100 engineers):
-
-Infrastructure:
-├─ Ollama servers (2x GPU): $20k/year
-├─ Victor hosting: $5k/year
-└─ Cloud API (10% usage): $30k/year
-────────────────────────────────────
-Total: $55k/year
-
-vs. GitHub Copilot: $120k/year
-Savings: $65k/year (54%)
-
-vs. Claude API (100%): $540k/year
-Savings: $485k/year (90%)
-```
-
-### ROI Calculator
+**Example Calculation Framework:**
 
 ```python
-# Calculate your ROI
-team_size = 100
-copilot_cost_per_user_per_month = 10
-victor_hybrid_percentage = 0.10  # 10% cloud usage
+# Estimate your potential costs
 
-# GitHub Copilot cost
-copilot_annual = team_size * copilot_cost_per_user_per_month * 12
-# = $120,000
+# Option 1: Cloud-only
+cloud_api_cost_per_user = X  # Based on your usage
+team_size = Y
+annual_cloud_cost = cloud_api_cost_per_user * team_size * 12
 
-# Victor cost
-victor_infra = 25000  # GPU servers + hosting
-victor_cloud_api = copilot_annual * 3 * victor_hybrid_percentage
-# = $36,000 (10% of what you'd pay for 100% Claude)
-victor_annual = victor_infra + victor_cloud_api
-# = $61,000
+# Option 2: Hybrid
+infrastructure_cost = Z  # One-time + maintenance
+selective_api_cost = W  # For critical tasks only
+annual_hybrid_cost = infrastructure_cost + selective_api_cost
 
-savings = copilot_annual - victor_annual
-# = $59,000/year
-
-roi_percentage = (savings / copilot_annual) * 100
-# = 49% savings
+# Compare based on your specific needs
 ```
 
 ---

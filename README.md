@@ -22,11 +22,11 @@
 
 **Victor** is an **enterprise-ready**, terminal-based AI coding assistant that provides a unified interface for working with multiple LLM providers. Whether you're using frontier models like Claude, GPT-4, and Gemini, or running open-source models locally via Ollama, LMStudio, or vLLM, Victor provides one consistent, powerful interface for all.
 
-**Why Enterprises Choose Victor:**
+**Why Consider Victor:**
 - **Apache 2.0 Licensed** - Patent-protected, safe for commercial use
-- **Air-Gapped Mode** - Complete offline operation for compliance (HIPAA, SOC2)
+- **Air-Gapped Mode** - Complete offline operation for compliance requirements
 - **Production-Grade** - 25+ enterprise tools, comprehensive security scanning
-- **Cost Optimization** - Save up to 89% on AI costs with hybrid cloud/local deployment
+- **Cost Flexibility** - Use free local models or paid APIs based on your needs
 - **Zero Vendor Lock-in** - Switch providers instantly, maintain full control
 
 ### The Problem Victor Solves
@@ -220,28 +220,28 @@ Switch between AI providers as easily as changing a config file:
 <td width="33%">
 
 **Cost-Conscious Organizations**
-- Free local models for 80% of work
+- Free local models for routine tasks
 - Premium models for critical tasks
-- Save thousands monthly
+- Potential for significant cost reduction
 - Transparent cost tracking
 
 </td>
 </tr>
 </table>
 
-### Real-World Scenarios
+### Potential Use Cases
 
 <details>
 <summary><b>Scenario 1: Startup CTO</b></summary>
 
 **Challenge**: Need AI assistance but limited budget
 
-**Solution with Victor**:
+**How Victor Can Help**:
 1. Use Ollama (free) for daily development
 2. Switch to Claude for critical architecture decisions
 3. Use batch processing for codebase migrations
 4. Auto-generate documentation and tests
-5. **Result**: 90% cost savings, 3x productivity
+5. **Potential benefit**: Significant cost reduction with flexible model selection
 
 </details>
 
@@ -250,12 +250,12 @@ Switch between AI providers as easily as changing a config file:
 
 **Challenge**: Cannot send code to cloud APIs (HIPAA compliance)
 
-**Solution with Victor**:
+**How Victor Can Help**:
 1. Deploy in air-gapped mode
 2. Use local models (Ollama/vLLM) exclusively
 3. Full feature access without internet
 4. Sandboxed execution for security
-5. **Result**: Compliant AI assistance, zero data leakage
+5. **Potential benefit**: Compliant AI assistance without data transmission
 
 </details>
 
@@ -264,12 +264,12 @@ Switch between AI providers as easily as changing a config file:
 
 **Challenge**: Maintain multiple projects, limited time
 
-**Solution with Victor**:
+**How Victor Can Help**:
 1. Batch process issues and PRs
 2. Auto-generate changelogs
 3. Refactor across entire codebase
 4. CI/CD pipeline automation
-5. **Result**: 5x more PRs reviewed, better code quality
+5. **Potential benefit**: Increased review capacity and code quality
 
 </details>
 
@@ -277,33 +277,40 @@ Switch between AI providers as easily as changing a config file:
 
 ## Why Choose Victor?
 
-### Cost Savings
+### Potential Cost Optimization
+
+Victor enables hybrid deployment where you can:
 
 ```
-Traditional Approach (Claude only):
-    Development: $200/month/developer
-    Testing: $150/month
-    Documentation: $100/month
-    Total: $450/month/developer
+Example Cost Comparison (Theoretical):
 
-Victor Approach (Hybrid):
-    Development: FREE (Ollama)
-    Testing: FREE (Ollama)
-    Critical tasks: $50/month (Claude)
-    Total: $50/month/developer
+Traditional Cloud-Only Approach:
+    • Premium API usage: $200-500/developer/month
+    • No control over costs
+    • Vendor lock-in
 
-SAVINGS: $400/month/developer (89% reduction)
-For 10 developers: $4,800/month saved = $57,600/year
+Victor Hybrid Approach:
+    • Local models (Ollama): FREE
+    • Cloud APIs (optional): Pay only for what you use
+    • Full cost control and flexibility
+    • Zero vendor lock-in
+
+Potential Savings: Use free local models for development/testing,
+reserve paid APIs for production/critical tasks
 ```
 
-### Performance Boost
+### Capabilities
 
-| Task | Traditional | With Victor | Improvement |
-|------|------------|-------------|-------------|
-| Code Review | 30 min | 5 min | **6x faster** |
-| Test Generation | 2 hours | 15 min | **8x faster** |
-| Documentation | 4 hours | 30 min | **8x faster** |
-| Refactoring | 3 hours | 20 min | **9x faster** |
+Victor provides enterprise-grade tools for:
+
+| Capability | What Victor Offers |
+|------------|-------------------|
+| Code Review | Automated analysis with complexity metrics |
+| Test Generation | Pytest-compatible test suites with fixtures |
+| Documentation | Auto-generate docstrings and API docs |
+| Refactoring | AST-based safe transformations |
+| Security | Secret detection and vulnerability scanning |
+| Batch Operations | Process multiple files in parallel |
 
 ---
 
@@ -691,36 +698,37 @@ Victor is built from the ground up for enterprise deployment with security, comp
 </tr>
 </table>
 
-### Cost Optimization
+### Cost Optimization Potential
 
 ```
-Real Enterprise Savings:
+Example Cost Model (Theoretical):
 
 Scenario: 50-person engineering team
 
-Traditional Approach (Claude API only):
-├─ Development: $10,000/month
-├─ Testing: $7,500/month
-├─ Documentation: $5,000/month
-└─ Total: $22,500/month ($270,000/year)
+Cloud-Only Approach:
+├─ Development: Premium API costs per developer
+├─ Testing: Premium API costs
+├─ Documentation: Premium API costs
+└─ Total: Significant monthly expenditure
 
 Victor Hybrid Approach:
 ├─ Development: FREE (Ollama locally)
 ├─ Testing: FREE (Ollama locally)
-├─ Critical tasks: $2,500/month (Claude for production)
-└─ Total: $2,500/month ($30,000/year)
+├─ Critical tasks: Minimal cloud API usage
+└─ Total: Primarily infrastructure costs
 
-💰 Annual Savings: $240,000 (89% reduction)
+Potential Benefit: Significant cost reduction by using free local models
+for routine tasks and reserving paid APIs for critical work
 ```
 
 ### Deployment Options
 
 | Mode | Use Case | Cost | Compliance |
 |------|----------|------|------------|
-| **Air-Gapped** | Healthcare, Finance, Government | FREE (local) | ✅ HIPAA, SOC2 |
-| **Hybrid** | Startups, Scale-ups | 10% of cloud-only | ✅ Most compliant |
+| **Air-Gapped** | Healthcare, Finance, Government | Infrastructure only | Compatible with strict requirements |
+| **Hybrid** | Startups, Scale-ups | Flexible mix of free/paid | Configurable |
 | **Cloud** | Rapid prototyping | Pay-per-use | Cloud T&Cs apply |
-| **On-Premise** | Enterprise data centers | Infrastructure only | ✅ Full control |
+| **On-Premise** | Enterprise data centers | Infrastructure only | Full control |
 
 ### Enterprise Support Features
 
