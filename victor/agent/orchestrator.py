@@ -49,12 +49,7 @@ from victor.tools.git_tool import (
 )
 from victor.tools.batch_processor_tool import batch, set_batch_processor_config
 from victor.tools.cicd_tool import cicd
-from victor.tools.scaffold_tool import (
-    scaffold_create,
-    scaffold_list_templates,
-    scaffold_add_file,
-    scaffold_init_git,
-)
+from victor.tools.scaffold_tool import scaffold
 from victor.tools.docker_tool import docker
 from victor.tools.metrics_tool import analyze_metrics
 from victor.tools.security_scanner_tool import security_scan
@@ -180,11 +175,8 @@ class AgentOrchestrator:
         # Register CI/CD tool (consolidated)
         self.tools.register(cicd)
 
-        # Register scaffold tools
-        self.tools.register(scaffold_create)
-        self.tools.register(scaffold_list_templates)
-        self.tools.register(scaffold_add_file)
-        self.tools.register(scaffold_init_git)
+        # Register scaffold tool (consolidated)
+        self.tools.register(scaffold)
 
         # Register Docker tool (consolidated)
         self.tools.register(docker)
@@ -294,6 +286,7 @@ class AgentOrchestrator:
             "metrics": ["analyze_metrics"],
             "batch": ["batch"],
             "cicd": ["cicd"],
+            "scaffold": ["scaffold"],
         }
 
         # Keyword matching for tool selection
@@ -323,6 +316,8 @@ class AgentOrchestrator:
             selected_categories.add("batch")
         if any(kw in message_lower for kw in ["ci/cd", "cicd", "pipeline", "github actions", "gitlab ci", "circleci", "workflow"]):
             selected_categories.add("cicd")
+        if any(kw in message_lower for kw in ["scaffold", "template", "boilerplate", "new project", "create project"]):
+            selected_categories.add("scaffold")
 
         # Build selected tool names
         selected_tool_names = core_tool_names.copy()

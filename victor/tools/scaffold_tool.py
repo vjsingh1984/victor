@@ -24,7 +24,7 @@ Features:
 
 import subprocess
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 import logging
 
 from victor.tools.decorators import tool
@@ -340,281 +340,273 @@ API_V1_STR=/api/v1
 
 
 @tool
-async def scaffold_create(
-    template: str,
-    name: str,
+async def scaffold(
+    operation: str,
+    template: Optional[str] = None,
+    name: Optional[str] = None,
+    path: Optional[str] = None,
+    content: str = "",
     force: bool = False,
 ) -> Dict[str, Any]:
     """
-    Create new project from template.
+    Unified project scaffolding tool.
 
-    Generates a complete project structure from predefined templates
-    with best practices, configuration files, and boilerplate code.
+    Performs scaffolding operations including creating projects from templates,
+    listing available templates, adding files, and initializing git repositories.
+    Consolidates all scaffolding functionality into a single interface.
 
     Args:
-        template: Template name (fastapi, flask, python-cli, react-app, microservice).
-        name: Project name (will be used as directory name).
-        force: Overwrite existing directory if it exists (default: False).
+        operation: Operation to perform. Options: "create", "list", "add", "init-git".
+        template: Template name (for create operation: fastapi, flask, python-cli, react-app, microservice).
+        name: Project name (for create operation, used as directory name).
+        path: File path (for add operation).
+        content: File content (for add operation, default: empty string).
+        force: Overwrite existing directory (for create operation, default: False).
 
     Returns:
         Dictionary containing:
         - success: Whether operation succeeded
-        - project_dir: Path to created project directory
-        - files_created: List of created file paths
-        - template_info: Template name and description
-        - next_steps: Recommended next steps
-        - formatted_report: Human-readable creation report
+        - operation: Operation performed
+        - project_dir: Project directory path (create)
+        - files_created: List of created files (create)
+        - file_path: Created file path (add)
+        - templates: Available templates (list)
+        - message: Success message
+        - formatted_report: Human-readable report
         - error: Error message if failed
+
+    Examples:
+        # Create new project from template
+        scaffold(operation="create", template="fastapi", name="my-api")
+
+        # List available templates
+        scaffold(operation="list")
+
+        # Add file to project
+        scaffold(operation="add", path="src/utils.py", content="# Utilities")
+
+        # Initialize git repository
+        scaffold(operation="init-git")
+
+        # Create with force overwrite
+        scaffold(operation="create", template="flask", name="my-app", force=True)
     """
-    if not template:
-        return {
-            "success": False,
-            "error": "Missing required parameter: template"
-        }
+    if not operation:
+        return {"success": False, "error": "Missing required parameter: operation"}
 
-    if not name:
-        return {
-            "success": False,
-            "error": "Missing required parameter: name"
-        }
+    # Create operation
+    if operation == "create":
+        if not template:
+            return {
+                "success": False,
+                "error": "Create operation requires 'template' parameter"
+            }
 
-    if template not in TEMPLATES:
-        available = ", ".join(TEMPLATES.keys())
-        return {
-            "success": False,
-            "error": f"Unknown template: {template}. Available: {available}"
-        }
+        if not name:
+            return {
+                "success": False,
+                "error": "Create operation requires 'name' parameter"
+            }
 
-    # Create project directory
-    project_dir = Path(name)
+        if template not in TEMPLATES:
+            available = ", ".join(TEMPLATES.keys())
+            return {
+                "success": False,
+                "error": f"Unknown template: {template}. Available: {available}"
+            }
 
-    if project_dir.exists() and not force:
-        return {
-            "success": False,
-            "error": f"Directory '{name}' already exists. Use force=True to overwrite"
-        }
+        # Create project directory
+        project_dir = Path(name)
 
-    project_dir.mkdir(parents=True, exist_ok=True)
+        if project_dir.exists() and not force:
+            return {
+                "success": False,
+                "error": f"Directory '{name}' already exists. Use force=True to overwrite"
+            }
 
-    # Get template
-    template_info = TEMPLATES[template]
-    created_files = []
+        project_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create all files
-    for file_path, content_key in template_info["files"]:
-        full_path = project_dir / file_path
+        # Get template
+        template_info = TEMPLATES[template]
+        created_files = []
 
-        # Create parent directories
-        full_path.parent.mkdir(parents=True, exist_ok=True)
+        # Create all files
+        for file_path, content_key in template_info["files"]:
+            full_path = project_dir / file_path
 
-        # Get content
-        if content_key:
-            content = TEMPLATE_CONTENT.get(content_key, "")
-        else:
-            content = ""
+            # Create parent directories
+            full_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Write file
-        try:
-            full_path.write_text(content)
-            created_files.append(str(file_path))
-        except Exception as e:
-            logger.error("Failed to create %s: %s", file_path, e)
+            # Get content
+            if content_key:
+                file_content = TEMPLATE_CONTENT.get(content_key, "")
+            else:
+                file_content = ""
 
-    # Determine next steps
-    next_steps = [f"cd {name}"]
+            # Write file
+            try:
+                full_path.write_text(file_content)
+                created_files.append(str(file_path))
+            except Exception as e:
+                logger.error("Failed to create %s: %s", file_path, e)
 
-    if template in ["fastapi", "flask", "microservice"]:
+        # Determine next steps
+        next_steps = [f"cd {name}"]
+
+        if template in ["fastapi", "flask", "microservice"]:
+            next_steps.extend([
+                "pip install -r requirements.txt",
+                "# Edit .env.example and save as .env"
+            ])
+        elif template == "react-app":
+            next_steps.extend([
+                "npm install",
+                "npm start"
+            ])
+        elif template == "python-cli":
+            next_steps.append("pip install -e .")
+
         next_steps.extend([
-            "pip install -r requirements.txt",
-            "# Edit .env.example and save as .env"
+            "git init",
+            "git add .",
+            "git commit -m 'Initial commit'"
         ])
-    elif template == "react-app":
-        next_steps.extend([
-            "npm install",
-            "npm start"
-        ])
-    elif template == "python-cli":
-        next_steps.append("pip install -e .")
 
-    next_steps.extend([
-        "git init",
-        "git add .",
-        "git commit -m 'Initial commit'"
-    ])
+        # Build report
+        report = []
+        report.append(f"Created project: {name}")
+        report.append(f"Template: {template_info['name']}")
+        report.append(f"Description: {template_info['description']}")
+        report.append("")
+        report.append("Files created:")
+        for file_path in created_files:
+            report.append(f"  ✓ {file_path}")
+        report.append("")
+        report.append("Next steps:")
+        for step in next_steps:
+            report.append(f"  {step}")
 
-    # Build report
-    report = []
-    report.append(f"Created project: {name}")
-    report.append(f"Template: {template_info['name']}")
-    report.append(f"Description: {template_info['description']}")
-    report.append("")
-    report.append("Files created:")
-    for file_path in created_files:
-        report.append(f"  ✓ {file_path}")
-    report.append("")
-    report.append("Next steps:")
-    for step in next_steps:
-        report.append(f"  {step}")
+        return {
+            "success": True,
+            "operation": "create",
+            "project_dir": name,
+            "files_created": created_files,
+            "template_info": {
+                "name": template_info["name"],
+                "description": template_info["description"]
+            },
+            "next_steps": next_steps,
+            "formatted_report": "\n".join(report)
+        }
 
-    return {
-        "success": True,
-        "project_dir": name,
-        "files_created": created_files,
-        "template_info": {
-            "name": template_info["name"],
-            "description": template_info["description"]
-        },
-        "next_steps": next_steps,
-        "formatted_report": "\n".join(report)
-    }
+    # List operation
+    elif operation == "list":
+        templates = []
 
-
-@tool
-async def scaffold_list_templates() -> Dict[str, Any]:
-    """
-    List available project templates.
-
-    Returns information about all available project templates,
-    including names, descriptions, and file counts.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - templates: List of template information dicts
-        - count: Number of templates available
-        - formatted_report: Human-readable template listing
-    """
-    templates = []
-
-    report = []
-    report.append("Available Project Templates:")
-    report.append("=" * 70)
-    report.append("")
-
-    for template_id, template_info in TEMPLATES.items():
-        templates.append({
-            "id": template_id,
-            "name": template_info["name"],
-            "description": template_info["description"],
-            "file_count": len(template_info["files"])
-        })
-
-        report.append(f"• {template_id}")
-        report.append(f"  Name: {template_info['name']}")
-        report.append(f"  Description: {template_info['description']}")
-        report.append(f"  Files: {len(template_info['files'])}")
+        report = []
+        report.append("Available Project Templates:")
+        report.append("=" * 70)
         report.append("")
 
-    report.append("Usage:")
-    report.append("  scaffold_create(template='fastapi', name='my-project')")
+        for template_id, template_info in TEMPLATES.items():
+            templates.append({
+                "id": template_id,
+                "name": template_info["name"],
+                "description": template_info["description"],
+                "file_count": len(template_info["files"])
+            })
 
-    return {
-        "success": True,
-        "templates": templates,
-        "count": len(templates),
-        "formatted_report": "\n".join(report)
-    }
+            report.append(f"• {template_id}")
+            report.append(f"  Name: {template_info['name']}")
+            report.append(f"  Description: {template_info['description']}")
+            report.append(f"  Files: {len(template_info['files'])}")
+            report.append("")
 
-
-@tool
-async def scaffold_add_file(
-    path: str,
-    content: str = "",
-) -> Dict[str, Any]:
-    """
-    Add file to existing project.
-
-    Creates a new file in the current project, creating parent
-    directories as needed.
-
-    Args:
-        path: File path to create.
-        content: File content (default: empty string).
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - file_path: Path to created file
-        - message: Success message
-        - error: Error message if failed
-    """
-    if not path:
-        return {
-            "success": False,
-            "error": "Missing required parameter: path"
-        }
-
-    file_path = Path(path)
-
-    # Create parent directories
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-
-    try:
-        file_path.write_text(content)
-        return {
-            "success": True,
-            "file_path": path,
-            "message": f"Created file: {path}"
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"Failed to create file: {e}"
-        }
-
-
-@tool
-async def scaffold_init_git() -> Dict[str, Any]:
-    """
-    Initialize git repository.
-
-    Initializes a git repository in the current directory and
-    creates an initial commit.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - message: Success message
-        - error: Error message if failed
-    """
-    try:
-        # Initialize git
-        subprocess.run(["git", "init"], check=True, capture_output=True)
-
-        # Create initial commit
-        subprocess.run(["git", "add", "."], check=True, capture_output=True)
-        subprocess.run(
-            ["git", "commit", "-m", "Initial commit"],
-            check=True,
-            capture_output=True,
-        )
+        report.append("Usage:")
+        report.append("  scaffold(operation='create', template='fastapi', name='my-project')")
 
         return {
             "success": True,
-            "message": "Git repository initialized with initial commit"
+            "operation": "list",
+            "templates": templates,
+            "count": len(templates),
+            "formatted_report": "\n".join(report)
         }
 
-    except subprocess.CalledProcessError as e:
+    # Add operation
+    elif operation == "add":
+        if not path:
+            return {
+                "success": False,
+                "error": "Add operation requires 'path' parameter"
+            }
+
+        file_path = Path(path)
+
+        # Create parent directories
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            file_path.write_text(content)
+            return {
+                "success": True,
+                "operation": "add",
+                "file_path": path,
+                "message": f"Created file: {path}"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to create file: {e}"
+            }
+
+    # Init-git operation
+    elif operation == "init-git":
+        try:
+            # Initialize git
+            subprocess.run(["git", "init"], check=True, capture_output=True)
+
+            # Create initial commit
+            subprocess.run(["git", "add", "."], check=True, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "-m", "Initial commit"],
+                check=True,
+                capture_output=True,
+            )
+
+            return {
+                "success": True,
+                "operation": "init-git",
+                "message": "Git repository initialized with initial commit"
+            }
+
+        except subprocess.CalledProcessError as e:
+            return {
+                "success": False,
+                "error": f"Git initialization failed: {e.stderr.decode()}"
+            }
+        except FileNotFoundError:
+            return {
+                "success": False,
+                "error": "Git not found. Please install git first."
+            }
+
+    else:
         return {
             "success": False,
-            "error": f"Git initialization failed: {e.stderr.decode()}"
-        }
-    except FileNotFoundError:
-        return {
-            "success": False,
-            "error": "Git not found. Please install git first."
+            "error": f"Unknown operation: {operation}. Valid operations: create, list, add, init-git"
         }
 
 
 # Keep class for backward compatibility
 class ScaffoldTool:
-    """Deprecated: Use individual scaffold_* functions instead."""
+    """Deprecated: Use scaffold function instead."""
 
     def __init__(self):
         """Initialize - deprecated."""
         import warnings
         warnings.warn(
-            "ScaffoldTool class is deprecated. Use scaffold_* functions instead.",
+            "ScaffoldTool class is deprecated. Use scaffold function instead.",
             DeprecationWarning,
             stacklevel=2
         )
