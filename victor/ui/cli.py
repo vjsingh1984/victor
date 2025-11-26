@@ -15,6 +15,8 @@
 """Command-line interface for Victor - Universal AI Coding Assistant."""
 
 import asyncio
+import logging
+import os
 from typing import Optional
 
 import typer
@@ -26,6 +28,14 @@ from rich.prompt import Prompt
 from victor import __version__
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import load_settings
+
+# Configure logging
+log_level = os.getenv("VICTOR_LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, log_level),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(
     name="victor",

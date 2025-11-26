@@ -15,6 +15,7 @@
 """Ollama provider implementation for local model inference."""
 
 import json
+import logging
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -28,6 +29,8 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class OllamaProvider(BaseProvider):
@@ -154,6 +157,7 @@ class OllamaProvider(BaseProvider):
             ProviderError: If request fails
         """
         try:
+            logger.debug(f"Building request payload for model: {model}")
             payload = self._build_request_payload(
                 messages=messages,
                 model=model,
@@ -163,11 +167,20 @@ class OllamaProvider(BaseProvider):
                 stream=True,
                 **kwargs,
             )
+            logger.debug(f"Payload: {json.dumps(payload, indent=2)}")
 
+            logger.debug(f"Starting streaming request to {self.client.base_url}/api/chat")
             async with self.client.stream("POST", "/api/chat", json=payload) as response:
+                logger.debug(f"Got response status: {response.status_code}")
                 response.raise_for_status()
 
+                logger.debug("Starting to iterate over response lines")
+                line_count = 0
                 async for line in response.aiter_lines():
+                    line_count += 1
+                    if line_count % 10 == 0:
+                        logger.debug(f"Processed {line_count} lines")
+
                     if not line.strip():
                         continue
 
@@ -177,9 +190,10 @@ class OllamaProvider(BaseProvider):
                         yield chunk
 
                         if chunk.is_final:
+                            logger.debug(f"Received final chunk after {line_count} lines")
                             break
-                    except json.JSONDecodeError:
-                        continue
+                    except json.JSONDecodeError as jde:
+                        logger.warning(f"JSON decode error on line: {line[:100]}")
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
