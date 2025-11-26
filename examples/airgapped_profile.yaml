@@ -1,0 +1,153 @@
+# Air-gapped Configuration Profile for Victor
+# ============================================
+#
+# This profile configures Victor for 100% offline operation:
+# - Local LLM via Ollama
+# - Local tool selection embeddings (sentence-transformers)
+# - Local codebase search embeddings (sentence-transformers)
+# - Local vector store (LanceDB)
+#
+# Perfect for:
+# - Privacy-sensitive projects
+# - Offline development
+# - Air-gapped environments
+# - Secure enterprise deployments
+#
+# Setup:
+#   1. Install Ollama: curl https://ollama.ai/install.sh | sh
+#   2. Pull model: ollama pull qwen2.5-coder:7b
+#   3. Install Python deps: pip install lancedb sentence-transformers
+#   4. Copy to ~/.victor/profiles.yaml
+#   5. Run: victor --profile airgapped
+
+profiles:
+  # ========================================
+  # Air-gapped Profile (100% Offline)
+  # ========================================
+  airgapped:
+    provider: ollama
+    model: qwen2.5-coder:7b  # or qwen2.5-coder:1.5b for faster, smaller model
+    temperature: 0.7
+    max_tokens: 4096
+
+  # Alternative: Smaller, faster model
+  airgapped-fast:
+    provider: ollama
+    model: qwen2.5-coder:1.5b  # Faster, less memory
+    temperature: 0.7
+    max_tokens: 4096
+
+  # Alternative: Larger, more capable model
+  airgapped-quality:
+    provider: ollama
+    model: qwen2.5-coder:32b  # Best quality, requires 20GB+ RAM
+    temperature: 0.7
+    max_tokens: 8192
+
+providers:
+  # ========================================
+  # Ollama Configuration (Local LLM)
+  # ========================================
+  ollama:
+    base_url: http://localhost:11434
+    timeout: 300  # 5 minutes for CPU-only inference
+
+# ========================================
+# Victor Settings (Air-gapped Optimized)
+# ========================================
+settings:
+  # Privacy & Security
+  airgapped_mode: true  # Disable all external network calls
+
+  # Tool Selection (Local Embeddings)
+  use_semantic_tool_selection: true
+  embedding_provider: sentence-transformers  # Local, offline
+  embedding_model: all-MiniLM-L6-v2  # 80MB, fast, good for 31 tools
+
+  # Codebase Search (Local Embeddings + Vector Store)
+  codebase_vector_store: lancedb  # Local, disk-based, production-ready
+  codebase_embedding_provider: sentence-transformers  # Local, offline
+  codebase_embedding_model: all-MiniLM-L12-v2  # 120MB, better quality for code
+  codebase_persist_directory: ~/.victor/embeddings/airgapped
+  codebase_dimension: 384
+  codebase_batch_size: 32
+
+  # UI
+  theme: monokai
+  show_token_count: true
+  stream_responses: true
+
+# ========================================
+# Embedding Model Options (All Offline)
+# ========================================
+#
+# For Tool Selection (31 tools, need fast selection):
+#   - all-MiniLM-L6-v2 (RECOMMENDED)
+#     - 80MB, 384-dim, ~5ms per embedding
+#     - Perfect for tool selection
+#
+# For Codebase Search (10K-1M+ snippets, need quality):
+#   - all-MiniLM-L12-v2 (RECOMMENDED - default)
+#     - 120MB, 384-dim, ~8ms per embedding
+#     - Best balance of speed and quality
+#
+#   - all-mpnet-base-v2 (Higher quality, slower)
+#     - 420MB, 768-dim, ~15ms per embedding
+#     - Best semantic understanding
+#
+#   - all-distilroberta-v1 (Alternative)
+#     - 290MB, 768-dim, ~12ms per embedding
+#     - Good multilingual support
+#
+# ========================================
+# Vector Store Options (All Offline)
+# ========================================
+#
+# LanceDB (RECOMMENDED - default):
+#   - Disk-based, low memory footprint
+#   - Scales to billions of vectors
+#   - Fast ANN search with disk indices
+#   - Production-ready (used by Midjourney)
+#   - Best for: Production, large codebases
+#
+# ChromaDB:
+#   - In-memory or persistent
+#   - Easy setup, good for development
+#   - HNSW index for fast search
+#   - Best for: Development, small codebases (<100K docs)
+#
+# ProximaDB:
+#   - Custom implementation (if you've built it)
+#   - Best for: Specialized requirements
+#
+# ========================================
+# Performance Tuning
+# ========================================
+#
+# For faster indexing (more RAM usage):
+#   codebase_batch_size: 64  # or 128
+#
+# For lower memory usage (slower indexing):
+#   codebase_batch_size: 16  # or 8
+#
+# For GPU acceleration (if available):
+#   # sentence-transformers automatically uses CUDA if available
+#   # No configuration needed!
+#
+# ========================================
+# Example Usage
+# ========================================
+#
+# Index your codebase:
+#   python examples/airgapped_codebase_search.py
+#
+# Start Victor with air-gapped profile:
+#   victor --profile airgapped
+#
+# Search your code:
+#   victor> "how to authenticate users?"
+#   # Victor will:
+#   # 1. Select relevant tools (sentence-transformers, ~5ms)
+#   # 2. Search codebase (sentence-transformers + LanceDB, ~8ms)
+#   # 3. Generate response (Ollama local LLM, ~5-30s)
+#   # All 100% offline!

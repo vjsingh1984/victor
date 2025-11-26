@@ -33,28 +33,28 @@ class EmbeddingConfig(BaseModel):
 
     # Vector Store Configuration
     vector_store: str = Field(
-        default="chromadb",
-        description="Vector store provider (chromadb, proximadb, faiss, etc.)"
+        default="lancedb",
+        description="Vector store provider (lancedb, chromadb, proximadb) - LanceDB recommended for performance"
     )
     persist_directory: Optional[str] = Field(
-        default=None, description="Directory to persist vector store"
+        default=None, description="Directory to persist vector store (default: ~/.victor/embeddings/codebase)"
     )
     distance_metric: str = Field(
         default="cosine", description="Distance metric (cosine, euclidean, dot)"
     )
 
-    # Embedding Model Configuration
+    # Embedding Model Configuration (Air-gapped by Default)
     embedding_model_type: str = Field(
         default="sentence-transformers",
-        description="Embedding model type (sentence-transformers, openai, cohere)"
+        description="Embedding model type (sentence-transformers=local/offline, ollama, openai, cohere)"
     )
     embedding_model_name: str = Field(
-        default="all-mpnet-base-v2",
-        description="Specific embedding model name (all-mpnet-base-v2 = best quality local model)"
+        default="all-MiniLM-L12-v2",
+        description="Embedding model name (all-MiniLM-L12-v2 = 384-dim, 120MB, ~8ms, optimal balance)"
     )
     embedding_api_key: Optional[str] = Field(
         default=None,
-        description="API key for cloud embedding providers"
+        description="API key for cloud embedding providers (or Ollama base URL)"
     )
 
     # Provider-specific configuration

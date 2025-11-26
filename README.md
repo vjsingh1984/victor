@@ -25,7 +25,7 @@
 **Why Consider Victor:**
 - **Apache 2.0 Licensed** - Patent-protected, safe for commercial use
 - **Air-Gapped Mode** - Complete offline operation for compliance requirements
-- **Production-Grade** - 25+ enterprise tools, comprehensive security scanning
+- **Production-Grade** - 32 enterprise tools (consolidated from 86), comprehensive security scanning
 - **Cost Flexibility** - Use free local models or paid APIs based on your needs
 - **Zero Vendor Lock-in** - Switch providers instantly, maintain full control
 
@@ -49,7 +49,7 @@
 **With Victor**
 - Switch providers instantly
 - Free local models for dev/test
-- 25+ enterprise tools, unified
+- 32 enterprise tools, unified
 - AI-powered semantic search
 - Full air-gapped mode
 - Single, powerful workflow
@@ -582,7 +582,7 @@ victor --profile default
 ### Completed
 
 - [x] Universal provider abstraction with 6+ LLMs
-- [x] 25+ enterprise-grade tools
+- [x] 32 enterprise-grade tools (consolidated from 86, 63% reduction)
 - [x] MCP protocol (server + client)
 - [x] Multi-file editing with transactions
 - [x] Semantic search & codebase indexing
