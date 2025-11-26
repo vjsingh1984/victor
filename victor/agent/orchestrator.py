@@ -14,12 +14,15 @@
 
 """Agent orchestrator for managing conversations and tool execution."""
 
+import logging
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from rich.console import Console
 from rich.markdown import Markdown
 
 from victor.config.settings import Settings
+
+logger = logging.getLogger(__name__)
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
@@ -317,29 +320,101 @@ class AgentOrchestrator:
 
 
     def _should_use_tools(self) -> bool:
-        """Determine if tools should be sent to the provider based on model capability.
+        """Always return True - tool selection is handled by _select_relevant_tools()."""
+        return True
 
-        Small models (<7B parameters) can be overwhelmed by large tool payloads.
-        Disable tools for these models to prevent hanging.
+    def _select_relevant_tools(self, user_message: str) -> List[ToolDefinition]:
+        """Intelligently select relevant tools based on the user's message.
+
+        For small models (<7B), limit to essential tools to prevent overwhelming.
+        For larger models, send all relevant tools.
+
+        Args:
+            user_message: The user's input message
 
         Returns:
-            True if tools should be used, False otherwise
+            List of relevant ToolDefinition objects
         """
-        # Check if it's an Ollama model
+        all_tools = list(self.tools.list_tools())
+
+        # Core tools that are almost always useful (filesystem, bash, editor)
+        core_tool_names = {
+            "read_file", "write_file", "list_directory",
+            "execute_bash",
+            "file_editor_start_transaction", "file_editor_add_create",
+            "file_editor_add_modify", "file_editor_commit"
+        }
+
+        # Categorize tools by use case
+        tool_categories = {
+            "git": ["git_status", "git_diff", "git_stage", "git_commit", "git_log", "git_branch"],
+            "testing": ["testing_generate", "testing_run", "testing_coverage"],
+            "refactor": ["refactor_rename_symbol", "refactor_extract_function", "refactor_inline_variable"],
+            "security": ["security_scan_secrets", "security_scan_dependencies", "security_scan_all"],
+            "docs": ["docs_generate_docstrings", "docs_generate_api", "docs_generate_readme"],
+            "review": ["code_review_file", "code_review_directory", "code_review_security"],
+            "web": ["web_search", "web_fetch", "web_summarize"],
+            "docker": ["docker_ps", "docker_images", "docker_logs"],
+            "metrics": ["metrics_complexity", "metrics_maintainability", "metrics_analyze"],
+        }
+
+        # Keyword matching for tool selection
+        message_lower = user_message.lower()
+        selected_categories = set()
+
+        # Match keywords to categories
+        if any(kw in message_lower for kw in ["git", "commit", "branch", "merge", "repository"]):
+            selected_categories.add("git")
+        if any(kw in message_lower for kw in ["test", "pytest", "unittest", "coverage"]):
+            selected_categories.add("testing")
+        if any(kw in message_lower for kw in ["refactor", "rename", "extract", "reorganize"]):
+            selected_categories.add("refactor")
+        if any(kw in message_lower for kw in ["security", "vulnerability", "secret", "scan"]):
+            selected_categories.add("security")
+        if any(kw in message_lower for kw in ["document", "docstring", "readme", "api doc"]):
+            selected_categories.add("docs")
+        if any(kw in message_lower for kw in ["review", "analyze code", "check code", "code quality"]):
+            selected_categories.add("review")
+        if any(kw in message_lower for kw in ["search web", "look up", "find online", "search for"]):
+            selected_categories.add("web")
+        if any(kw in message_lower for kw in ["docker", "container", "image"]):
+            selected_categories.add("docker")
+        if any(kw in message_lower for kw in ["complexity", "metrics", "maintainability", "technical debt"]):
+            selected_categories.add("metrics")
+
+        # Build selected tool names
+        selected_tool_names = core_tool_names.copy()
+        for category in selected_categories:
+            selected_tool_names.update(tool_categories.get(category, []))
+
+        # For small models, limit total tools
+        is_small_model = False
         if self.provider.name == "ollama":
-            # Extract parameter size from model name (e.g., "qwen2.5-coder:1.5b" -> 1.5)
             model_lower = self.model.lower()
-
-            # Common small model patterns
             small_model_indicators = [":0.5b", ":1.5b", ":3b"]
-            for indicator in small_model_indicators:
-                if indicator in model_lower:
-                    return False
+            is_small_model = any(indicator in model_lower for indicator in small_model_indicators)
 
-            # Models 7B and above can handle tools
-            # If no size indicator found, assume it can handle tools
+        # Filter tools
+        selected_tools = []
+        for tool in all_tools:
+            if tool.name in selected_tool_names:
+                selected_tools.append(ToolDefinition(
+                    name=tool.name,
+                    description=tool.description,
+                    parameters=tool.parameters,
+                ))
 
-        return True
+        # For small models, limit to max 10 tools (core + most relevant)
+        if is_small_model and len(selected_tools) > 10:
+            # Prioritize core tools, then others
+            core_tools = [t for t in selected_tools if t.name in core_tool_names]
+            other_tools = [t for t in selected_tools if t.name not in core_tool_names]
+            selected_tools = core_tools + other_tools[: max(0, 10 - len(core_tools))]
+
+        tool_names = [t.name for t in selected_tools]
+        logger.info(f"Selected {len(selected_tools)} tools for prompt (small_model={is_small_model}): {', '.join(tool_names)}")
+
+        return selected_tools
 
     def add_message(self, role: str, content: str) -> None:
         """Add a message to conversation history.
@@ -363,17 +438,10 @@ class AgentOrchestrator:
         self.add_message("user", user_message)
 
         # Get tool definitions if provider supports them
-        # For small Ollama models (<7B parameters), disable tools to prevent hanging
+        # Intelligently select relevant tools based on the user's message
         tools = None
-        if self.provider.supports_tools() and self._should_use_tools():
-            tools = [
-                ToolDefinition(
-                    name=tool.name,
-                    description=tool.description,
-                    parameters=tool.parameters,
-                )
-                for tool in self.tools.list_tools()
-            ]
+        if self.provider.supports_tools():
+            tools = self._select_relevant_tools(user_message)
 
         # Get response from provider
         response = await self.provider.chat(
@@ -406,17 +474,10 @@ class AgentOrchestrator:
         self.add_message("user", user_message)
 
         # Get tool definitions
-        # For small Ollama models (<7B parameters), disable tools to prevent hanging
+        # Intelligently select relevant tools based on the user's message
         tools = None
-        if self.provider.supports_tools() and self._should_use_tools():
-            tools = [
-                ToolDefinition(
-                    name=tool.name,
-                    description=tool.description,
-                    parameters=tool.parameters,
-                )
-                for tool in self.tools.list_tools()
-            ]
+        if self.provider.supports_tools():
+            tools = self._select_relevant_tools(user_message)
 
         # Stream response
         full_content = ""
