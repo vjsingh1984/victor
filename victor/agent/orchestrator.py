@@ -104,13 +104,15 @@ class AgentOrchestrator:
         self._system_prompt = (
             "You are a code analyst for this repository. Follow this loop:\n"
             "1) Plan briefly, then call list_directory/read_file to inspect real files (not imagined). "
-            "2) For repo analysis, read a small set of key files (max ~5) before concluding. "
-            "3) Do NOT invent tool outputs—only cite results from tools you actually called. "
-            "4) When asked for web info, use web_search/web_summarize; when asked about repo code, use read_file/analyze_docs/code_review.\n"
+            "2) If the user names multiple files, read ALL of them before proposing or concluding. "
+            "3) Keep issuing tool calls iteratively until the task is complete or the tool budget is exhausted—do not stop after the first tool call. "
+            "4) If the user asks to modify or apply changes, propose a concise plan and then execute write_file/edit_files to apply the edits and show diffs. "
+            "4) Do NOT invent tool outputs—only cite results from tools you actually called. "
+            "5) When asked for web info, use web_search/web_summarize; when asked about repo code, use read_file/analyze_docs/code_review.\n"
             "Always report findings with file paths. Avoid generic advice. Stop once you hit the tool budget."
         )
         self._system_added = False
-        self.tool_budget = getattr(settings, "tool_call_budget", 6)
+        self.tool_budget = getattr(settings, "tool_call_budget", 20)
         self.tool_calls_used = 0
         self.observed_files: List[str] = []
         self.executed_tools: List[str] = []
@@ -495,10 +497,12 @@ class AgentOrchestrator:
         # Get adaptive threshold and max_tools based on model size, query, and context
         threshold, max_tools = self._get_adaptive_threshold(user_message)
 
-        # Select tools semantically with adaptive parameters
-        tools = await self.semantic_selector.select_relevant_tools(
+        # Select tools with context awareness (Phase 2 enhancement)
+        # Pass conversation history for better tool selection across multi-turn tasks
+        tools = await self.semantic_selector.select_relevant_tools_with_context(
             user_message=user_message,
             tools=self.tools,
+            conversation_history=self.conversation_history,  # Phase 2: Add context
             max_tools=max_tools,
             similarity_threshold=threshold,
         )
@@ -780,77 +784,71 @@ class AgentOrchestrator:
         self.add_message("user", user_message)
 
         # Get tool definitions
-        # Intelligently select relevant tools based on the user's message
-        tools = None
-        if self.provider.supports_tools():
-            if self.use_semantic_selection:
-                tools = await self._select_relevant_tools_semantic(user_message)
-            else:
-                tools = self._select_relevant_tools_keywords(user_message)
-            tools = self._prioritize_tools_stage(user_message, tools, stage="initial")
+        # Iteratively stream → run tools → stream follow-up until no tool calls or budget exhausted
+        first_pass = True
+        context_msg = user_message
+        while True:
+            # Select tools for this pass
+            tools = None
+            if self.provider.supports_tools():
+                if self.use_semantic_selection:
+                    tools = await self._select_relevant_tools_semantic(context_msg)
+                else:
+                    tools = self._select_relevant_tools_keywords(context_msg)
+                stage = "initial" if first_pass else ("post_read" if self.observed_files else "post_plan")
+                tools = self._prioritize_tools_stage(context_msg, tools, stage=stage)
 
-        # Stream response and collect tool calls
-        full_content = ""
-        tool_calls = None
-        async for chunk in self.provider.stream(
-            messages=self.messages,
-            model=self.model,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            tools=tools,
-        ):
-            full_content += chunk.content
+            full_content = ""
+            tool_calls = None
+            async for chunk in self.provider.stream(
+                messages=self.messages,
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                tools=tools,
+            ):
+                full_content += chunk.content
+                if chunk.tool_calls:
+                    logger.debug(f"Received tool_calls in chunk: {chunk.tool_calls}")
+                    tool_calls = chunk.tool_calls
+                yield chunk
 
-            # Collect tool calls from chunks
-            if chunk.tool_calls:
-                logger.debug(f"Received tool_calls in chunk: {chunk.tool_calls}")
-                tool_calls = chunk.tool_calls
-
-            yield chunk
-
-        # Fallback: Try to parse tool call from accumulated content
-        # (for models that return tool calls as JSON text in streaming mode)
-        if not tool_calls and full_content:
-            # Import the provider's parser if it's an Ollama provider
-            if hasattr(self.provider, '_parse_json_tool_call_from_content'):
+            # Fallback: parse JSON tool calls from accumulated content
+            if not tool_calls and full_content and hasattr(self.provider, "_parse_json_tool_call_from_content"):
                 parsed_tool_calls = self.provider._parse_json_tool_call_from_content(full_content)
                 if parsed_tool_calls:
                     logger.debug("Parsed tool call from accumulated streaming content (fallback)")
                     tool_calls = parsed_tool_calls
-                    # Clear full_content since it was a tool call, not actual response
                     full_content = ""
 
-        # Add to history
-        if full_content:
-            self.add_message("assistant", full_content)
+            if full_content:
+                self.add_message("assistant", full_content)
 
-        # Handle tool calls if present (CRITICAL FIX)
-        logger.debug(f"After streaming, tool_calls = {tool_calls}")
-        if tool_calls:
-            logger.info(f"Handling {len(tool_calls)} tool call(s)")
+            logger.debug(f"After streaming pass, tool_calls = {tool_calls}")
 
-            # Enforce remaining budget
+            if not tool_calls:
+                # No more tool calls requested; finish
+                yield StreamChunk(content="", is_final=True)
+                break
+
             remaining = max(0, self.tool_budget - self.tool_calls_used)
             if remaining <= 0:
                 yield StreamChunk(content=f"[tool] ⚠ Tool budget reached ({self.tool_budget}); skipping tool calls.\n")
                 yield StreamChunk(content="No tools executed; cannot provide evidence-based answer.\n", is_final=True)
-                return
-            tool_calls = tool_calls[:remaining]
+                break
 
-            # Send status chunks to keep the WebSocket active during tool execution
+            tool_calls = tool_calls[:remaining]
             for tool_call in tool_calls:
                 tool_name = tool_call.get("name", "tool")
                 yield StreamChunk(content=f"[tool] … {tool_name} started\n")
 
             tool_results = await self._handle_tool_calls(tool_calls)
-
             for result in tool_results:
                 tool_name = result.get("name", "tool")
                 elapsed = result.get("elapsed", 0.0)
                 status = "ok" if result.get("success") else "failed"
                 yield StreamChunk(content=f"[tool] ✓ {tool_name} {status} ({elapsed:.1f}s)\n")
 
-            # Signal completion and stream final model response after tool output
             yield StreamChunk(content="Generating final response...\n")
 
             if self.observed_files:
@@ -859,41 +857,8 @@ class AgentOrchestrator:
             else:
                 self.add_message("system", "No files read yet. Avoid file-specific claims; suggest using tools if needed.")
 
-            if self.tool_calls_used == 0:
-                yield StreamChunk(content="No tools executed; cannot provide an evidence-based answer.\n", is_final=True)
-                return
-
-            followup_content = ""
-            # In follow-up, re-select a staged toolset based on current context
-            followup_tools = None
-            if self.provider.supports_tools():
-                context_msg = full_content or user_message
-                if self.use_semantic_selection:
-                    followup_tools = await self._select_relevant_tools_semantic(context_msg)
-                else:
-                    followup_tools = self._select_relevant_tools_keywords(context_msg)
-                stage = "post_plan" if not self.observed_files else "post_read"
-                followup_tools = self._prioritize_tools_stage(context_msg, followup_tools, stage=stage)
-
-            async for follow_chunk in self.provider.stream(
-                messages=self.messages,
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                tools=followup_tools,  # Allow follow-up tool calls (budget-enforced)
-            ):
-                followup_content += follow_chunk.content
-                yield follow_chunk
-
-            if followup_content:
-                self.add_message("assistant", followup_content)
-                # Emit explicit final chunk marker for UI to auto-switch modes
-                yield StreamChunk(content="", is_final=True)
-            else:
-                yield StreamChunk(content="No model response after tools.\n", is_final=True)
-        else:
-            logger.debug("No tool calls to handle")
-            yield StreamChunk(content="No tools executed; cannot provide an evidence-based answer.\n", is_final=True)
+            first_pass = False
+            context_msg = full_content or user_message
 
     async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Handle tool calls from the model.

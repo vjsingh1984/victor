@@ -212,31 +212,313 @@ class SemanticToolSelector:
         except Exception as e:
             logger.warning(f"Failed to save embedding cache: {e}")
 
-    async def select_relevant_tools(
+    # Tool categories for intelligent selection
+    TOOL_CATEGORIES = {
+        "file_ops": ["read_file", "write_file", "edit_files", "list_directory"],
+        "git_ops": ["execute_bash", "git_suggest_commit", "git_create_pr", "git_analyze_conflicts"],
+        "analysis": ["analyze_docs", "analyze_metrics", "code_review", "security_scan"],
+        "refactoring": ["refactor_extract_function", "refactor_inline_variable", "rename_symbol", "refactor_organize_imports"],
+        "generation": ["generate_docs", "code_search", "plan_files", "scaffold"],
+        "execution": ["execute_bash", "execute_python_in_sandbox", "run_tests"],
+        "code_intel": ["find_symbol", "find_references", "code_search"],
+        "web": ["web_search", "web_fetch", "web_summarize"],
+        "workflows": ["run_workflow", "batch", "cicd"],
+    }
+
+    # Mandatory tools for specific keywords (Phase 1)
+    MANDATORY_TOOL_KEYWORDS = {
+        "diff": ["execute_bash"],
+        "show changes": ["execute_bash"],
+        "git diff": ["execute_bash"],
+        "show diff": ["execute_bash"],
+        "compare": ["execute_bash"],
+        "commit": ["git_suggest_commit", "execute_bash"],
+        "pull request": ["git_create_pr"],
+        "pr": ["git_create_pr"],
+        "test": ["execute_bash", "run_tests"],
+        "run": ["execute_bash"],
+        "execute": ["execute_bash"],
+        "install": ["execute_bash"],
+        "search": ["web_search", "code_search"],
+        "find": ["find_symbol", "find_references"],
+        "refactor": ["refactor_extract_function", "refactor_inline_variable", "rename_symbol"],
+        "security": ["security_scan"],
+        "scan": ["security_scan"],
+        "review": ["code_review"],
+        "document": ["generate_docs"],
+        "docs": ["generate_docs", "analyze_docs"],
+    }
+
+    def _get_mandatory_tools(self, query: str) -> List[str]:
+        """Get tools that MUST be included based on keywords.
+
+        Args:
+            query: User query
+
+        Returns:
+            List of tool names that are mandatory for this query
+        """
+        mandatory = []
+        query_lower = query.lower()
+
+        for keyword, tools in self.MANDATORY_TOOL_KEYWORDS.items():
+            if keyword in query_lower:
+                mandatory.extend(tools)
+                logger.debug(f"Mandatory tools for '{keyword}': {tools}")
+
+        return list(set(mandatory))
+
+    def _get_relevant_categories(self, query: str) -> List[str]:
+        """Determine which tool categories are relevant for this query.
+
+        Args:
+            query: User query
+
+        Returns:
+            List of relevant tool names from categories
+        """
+        query_lower = query.lower()
+        relevant_tools = []
+
+        # Multi-step tasks need file_ops and git_ops
+        if any(sep in query for sep in [";", "then", "after", "next", "and then"]):
+            relevant_tools.extend(self.TOOL_CATEGORIES.get("file_ops", []))
+            relevant_tools.extend(self.TOOL_CATEGORIES.get("git_ops", []))
+            logger.debug("Multi-step task detected, including file_ops and git_ops")
+
+        # Analysis keywords
+        if any(kw in query_lower for kw in ["analyze", "review", "check", "scan", "audit"]):
+            relevant_tools.extend(self.TOOL_CATEGORIES.get("analysis", []))
+            logger.debug("Analysis task detected")
+
+        # Editing keywords
+        if any(kw in query_lower for kw in ["edit", "modify", "change", "update", "fix"]):
+            relevant_tools.extend(self.TOOL_CATEGORIES.get("file_ops", []))
+            relevant_tools.extend(self.TOOL_CATEGORIES.get("refactoring", []))
+            logger.debug("Editing task detected")
+
+        # Git/diff keywords
+        if any(kw in query_lower for kw in ["diff", "commit", "pr", "git", "pull request"]):
+            relevant_tools.extend(self.TOOL_CATEGORIES.get("git_ops", []))
+            logger.debug("Git operation detected")
+
+        # Code navigation
+        if any(kw in query_lower for kw in ["find", "locate", "search", "where"]):
+            relevant_tools.extend(self.TOOL_CATEGORIES.get("code_intel", []))
+            logger.debug("Code navigation detected")
+
+        # Generation/creation
+        if any(kw in query_lower for kw in ["create", "generate", "make", "write new"]):
+            relevant_tools.extend(self.TOOL_CATEGORIES.get("file_ops", []))
+            relevant_tools.extend(self.TOOL_CATEGORIES.get("generation", []))
+            logger.debug("Generation task detected")
+
+        # Default: file_ops + execution
+        if not relevant_tools:
+            relevant_tools.extend(self.TOOL_CATEGORIES.get("file_ops", []))
+            relevant_tools.extend(self.TOOL_CATEGORIES.get("execution", []))
+            logger.debug("Using default categories: file_ops + execution")
+
+        return list(set(relevant_tools))
+
+    def _extract_pending_actions(self, conversation_history: List[Dict[str, Any]]) -> List[str]:
+        """Extract actions mentioned in original request but not yet completed.
+
+        Args:
+            conversation_history: List of conversation messages
+
+        Returns:
+            List of pending action types
+        """
+        if not conversation_history:
+            return []
+
+        # Get the original user request (first user message)
+        original_request = None
+        for msg in conversation_history:
+            if msg.get("role") == "user":
+                original_request = msg.get("content", "")
+                break
+
+        if not original_request:
+            return []
+
+        pending = []
+
+        # Action keywords to check
+        action_patterns = {
+            "edit": ["edit", "modify", "change", "update"],
+            "show_diff": ["diff", "show changes", "show diff", "compare"],
+            "read": ["read", "examine", "look at", "check"],
+            "propose": ["propose", "suggest", "recommend"],
+            "create": ["create", "generate", "make"],
+            "test": ["test", "verify", "validate"],
+            "commit": ["commit"],
+            "pr": ["pull request", "pr"],
+        }
+
+        # Check which actions were requested
+        original_lower = original_request.lower()
+        for action_type, keywords in action_patterns.items():
+            if any(kw in original_lower for kw in keywords):
+                # Check if this action was completed by looking at tool results
+                completed = self._was_action_completed(action_type, conversation_history)
+                if not completed:
+                    pending.append(action_type)
+                    logger.debug(f"Pending action detected: {action_type}")
+
+        return pending
+
+    def _was_action_completed(self, action: str, history: List[Dict[str, Any]]) -> bool:
+        """Check if an action was completed based on conversation history.
+
+        Args:
+            action: Action type to check
+            history: Conversation history
+
+        Returns:
+            True if action was completed, False otherwise
+        """
+        # Look for tool results in assistant messages
+        for msg in history:
+            if msg.get("role") == "assistant":
+                content = str(msg.get("content", "")).lower()
+
+                # Check based on action type
+                if action == "show_diff":
+                    if "diff" in content or "git diff" in content:
+                        return True
+                elif action == "edit":
+                    if "modified" in content or "edited" in content or "updated" in content:
+                        # Check if the specific file mentioned was edited
+                        return True
+                elif action == "read":
+                    if "read" in content or "file contents" in content:
+                        return True
+                elif action == "create":
+                    if "created" in content or "written" in content:
+                        return True
+                elif action == "test":
+                    if "test" in content and ("passed" in content or "failed" in content):
+                        return True
+                elif action == "commit":
+                    if "committed" in content or "commit" in content:
+                        return True
+
+        return False
+
+    def _build_contextual_query(
+        self,
+        current_query: str,
+        conversation_history: List[Dict[str, Any]],
+        pending_actions: List[str],
+    ) -> str:
+        """Build enhanced query with conversation context.
+
+        Args:
+            current_query: Current user message
+            conversation_history: Full conversation history
+            pending_actions: List of pending action types
+
+        Returns:
+            Enhanced query with context
+        """
+        # Get last 2 user messages for context
+        recent_context = []
+        for msg in reversed(conversation_history[-6:]):  # Last 6 messages (3 exchanges)
+            if msg.get("role") == "user":
+                recent_context.append(msg.get("content", ""))
+                if len(recent_context) >= 2:
+                    break
+
+        # Build enhanced query
+        context_parts = []
+
+        if recent_context and len(recent_context) > 1:
+            context_parts.append(f"Context: {recent_context[-1]}")  # Previous request
+
+        if pending_actions:
+            context_parts.append(f"Incomplete: {', '.join(pending_actions)}")
+
+        context_parts.append(f"Now: {current_query}")
+
+        enhanced = " | ".join(context_parts)
+        logger.debug(f"Contextual query: {enhanced}")
+        return enhanced
+
+    async def select_relevant_tools_with_context(
         self,
         user_message: str,
         tools: ToolRegistry,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
         max_tools: int = 5,
         similarity_threshold: float = 0.15,
     ) -> List[ToolDefinition]:
-        """Select relevant tools using semantic similarity.
+        """Select tools with full conversation context awareness (Phase 2).
+
+        This method enhances tool selection by:
+        - Tracking pending actions from the original request
+        - Including conversation context in semantic search
+        - Ensuring mandatory tools for pending actions
 
         Args:
-            user_message: User's input message
+            user_message: Current user message
             tools: Tool registry
-            max_tools: Maximum number of tools to return
-            similarity_threshold: Minimum similarity score (0-1)
+            conversation_history: Full conversation history (Phase 2)
+            max_tools: Maximum tools to return
+            similarity_threshold: Minimum similarity score
 
         Returns:
-            List of relevant ToolDefinition objects, sorted by relevance
+            List of relevant tools with context-aware selection
         """
-        # Get embedding for user message
-        query_embedding = await self._get_embedding(user_message)
+        # Phase 2: Extract pending actions
+        pending_actions = []
+        if conversation_history:
+            pending_actions = self._extract_pending_actions(conversation_history)
+            logger.info(f"Pending actions: {pending_actions}")
 
-        # Calculate similarity scores for all tools
+        # Phase 2: Build contextual query
+        enhanced_query = user_message
+        if conversation_history and pending_actions:
+            enhanced_query = self._build_contextual_query(
+                user_message, conversation_history, pending_actions
+            )
+
+        # Phase 1: Get mandatory tools (including those for pending actions)
+        mandatory_tool_names = self._get_mandatory_tools(enhanced_query)
+
+        # Add mandatory tools for pending actions
+        pending_action_tools = {
+            "show_diff": ["execute_bash"],
+            "edit": ["edit_files", "read_file"],
+            "commit": ["git_suggest_commit", "execute_bash"],
+            "pr": ["git_create_pr"],
+            "test": ["execute_bash", "run_tests"],
+        }
+
+        for action in pending_actions:
+            if action in pending_action_tools:
+                mandatory_tool_names.extend(pending_action_tools[action])
+                logger.info(f"Added mandatory tools for pending '{action}': {pending_action_tools[action]}")
+
+        mandatory_tool_names = list(set(mandatory_tool_names))
+        logger.info(f"Total mandatory tools: {mandatory_tool_names}")
+
+        # Phase 1: Get relevant categories
+        category_tools = self._get_relevant_categories(enhanced_query)
+        logger.info(f"Category tools ({len(category_tools)}): {category_tools[:5]}...")
+
+        # Get embedding for enhanced query
+        query_embedding = await self._get_embedding(enhanced_query)
+
+        # Calculate similarity scores for tools in relevant categories
         similarities: List[Tuple[Any, float]] = []
 
         for tool in tools.list_tools():
+            # Skip if not in relevant categories and not mandatory
+            if tool.name not in category_tools and tool.name not in mandatory_tool_names:
+                continue
+
             # Get cached embedding or compute on-demand
             if tool.name in self._tool_embedding_cache:
                 tool_embedding = self._tool_embedding_cache[tool.name]
@@ -247,27 +529,146 @@ class SemanticToolSelector:
             # Cosine similarity
             similarity = self._cosine_similarity(query_embedding, tool_embedding)
 
+            # Boost mandatory tools
+            if tool.name in mandatory_tool_names:
+                similarity = max(similarity, 0.9)  # Ensure mandatory tools rank high
+
             if similarity >= similarity_threshold:
                 similarities.append((tool, similarity))
 
         # Sort by similarity (descending)
         similarities.sort(key=lambda x: x[1], reverse=True)
 
-        # Take top-K
-        top_tools = similarities[:max_tools]
+        # Ensure all mandatory tools are included
+        mandatory_tools = [
+            tool for tool in tools.list_tools() if tool.name in mandatory_tool_names
+        ]
+
+        # Combine mandatory + top semantic matches
+        selected_tools = []
+        selected_names = set()
+
+        # First, add all mandatory tools
+        for tool in mandatory_tools:
+            if tool.name not in selected_names:
+                selected_tools.append((tool, 0.9))
+                selected_names.add(tool.name)
+
+        # Then add top semantic matches
+        for tool, score in similarities:
+            if tool.name not in selected_names and len(selected_tools) < max_tools:
+                selected_tools.append((tool, score))
+                selected_names.add(tool.name)
 
         # Log selection
-        tool_names = [t.name for t, _ in top_tools]
-        scores = [f"{s:.3f}" for _, s in top_tools]
+        tool_names = [t.name for t, _ in selected_tools]
+        scores = [f"{s:.3f}" for _, s in selected_tools]
         logger.info(
-            f"Selected {len(top_tools)} tools by semantic similarity: "
+            f"Context-aware selection: {len(selected_tools)} tools (mandatory={len(mandatory_tools)}, "
+            f"pending_actions={len(pending_actions)}): "
             f"{', '.join(f'{name}({score})' for name, score in zip(tool_names, scores))}"
         )
 
         # Convert to ToolDefinition
         return [
             ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters)
-            for tool, _ in top_tools
+            for tool, _ in selected_tools
+        ]
+
+    async def select_relevant_tools(
+        self,
+        user_message: str,
+        tools: ToolRegistry,
+        max_tools: int = 5,
+        similarity_threshold: float = 0.15,
+    ) -> List[ToolDefinition]:
+        """Select relevant tools using semantic similarity with category filtering.
+
+        Enhanced with Phase 1 features:
+        - Mandatory tool selection for specific keywords
+        - Category-based filtering for better relevance
+
+        Args:
+            user_message: User's input message
+            tools: Tool registry
+            max_tools: Maximum number of tools to return
+            similarity_threshold: Minimum similarity score (0-1)
+
+        Returns:
+            List of relevant ToolDefinition objects, sorted by relevance
+        """
+        # Phase 1: Get mandatory tools (always included)
+        mandatory_tool_names = self._get_mandatory_tools(user_message)
+        logger.info(f"Mandatory tools: {mandatory_tool_names}")
+
+        # Phase 1: Get relevant categories
+        category_tools = self._get_relevant_categories(user_message)
+        logger.info(f"Category tools ({len(category_tools)}): {category_tools[:5]}...")
+
+        # Get embedding for user message
+        query_embedding = await self._get_embedding(user_message)
+
+        # Calculate similarity scores for tools in relevant categories
+        similarities: List[Tuple[Any, float]] = []
+
+        for tool in tools.list_tools():
+            # Skip if not in relevant categories and not mandatory
+            if tool.name not in category_tools and tool.name not in mandatory_tool_names:
+                continue
+
+            # Get cached embedding or compute on-demand
+            if tool.name in self._tool_embedding_cache:
+                tool_embedding = self._tool_embedding_cache[tool.name]
+            else:
+                tool_text = self._create_tool_text(tool)
+                tool_embedding = await self._get_embedding(tool_text)
+
+            # Cosine similarity
+            similarity = self._cosine_similarity(query_embedding, tool_embedding)
+
+            # Boost mandatory tools
+            if tool.name in mandatory_tool_names:
+                similarity = max(similarity, 0.9)  # Ensure mandatory tools rank high
+
+            if similarity >= similarity_threshold:
+                similarities.append((tool, similarity))
+
+        # Sort by similarity (descending)
+        similarities.sort(key=lambda x: x[1], reverse=True)
+
+        # Ensure all mandatory tools are included
+        mandatory_tools = [
+            tool for tool in tools.list_tools() if tool.name in mandatory_tool_names
+        ]
+
+        # Combine mandatory + top semantic matches
+        selected_tools = []
+        selected_names = set()
+
+        # First, add all mandatory tools
+        for tool in mandatory_tools:
+            if tool.name not in selected_names:
+                selected_tools.append((tool, 0.9))
+                selected_names.add(tool.name)
+
+        # Then add top semantic matches
+        for tool, score in similarities:
+            if tool.name not in selected_names and len(selected_tools) < max_tools:
+                selected_tools.append((tool, score))
+                selected_names.add(tool.name)
+
+        # Log selection
+        tool_names = [t.name for t, _ in selected_tools]
+        scores = [f"{s:.3f}" for _, s in selected_tools]
+        logger.info(
+            f"Selected {len(selected_tools)} tools (mandatory={len(mandatory_tools)}): "
+            f"{', '.join(f'{name}({score})' for name, score in zip(tool_names, scores))}"
+        )
+
+        # Convert to ToolDefinition
+        return [
+            ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters)
+            for tool, _ in selected_tools
         ]
 
     async def _get_embedding(self, text: str) -> np.ndarray:
