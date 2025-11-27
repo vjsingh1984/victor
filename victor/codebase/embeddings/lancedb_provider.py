@@ -341,7 +341,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if self.table is not None:
             try:
                 count = self.table.count_rows()
-            except:
+            except (AttributeError, RuntimeError, ValueError):
                 count = 0
 
         return {

@@ -83,7 +83,7 @@ def _find_variable_assignment(tree: ast.AST, name: str) -> Optional[Dict[str, An
                     # Get value as string
                     try:
                         value_str = ast.unparse(node.value)
-                    except:
+                    except (AttributeError, ValueError):
                         value_str = str(node.value)
 
                     return {
@@ -613,7 +613,7 @@ async def refactor_organize_imports(
                 node = ast.parse(line).body[0]
                 if isinstance(node, (ast.Import, ast.ImportFrom)):
                     import_end_line = i + 1
-            except:
+            except (SyntaxError, IndexError, ValueError):
                 if import_end_line > 0:
                     break
 

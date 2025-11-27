@@ -46,7 +46,7 @@ def _calculate_complexity_score(code: str) -> int:
                 complexity += len(node.values) - 1
 
         return complexity
-    except:
+    except (SyntaxError, ValueError, AttributeError):
         return 0
 
 
@@ -63,7 +63,7 @@ def _calculate_maintainability_index(code: str) -> float:
         # Simplified version
         mi = 100 - (complexity * 2) - (lines / 10)
         return max(0, min(100, mi))
-    except:
+    except (SyntaxError, ValueError, ZeroDivisionError):
         return 0.0
 
 

@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import time
 import os
+from contextvars import ContextVar
 from datetime import datetime, timedelta
 from typing import Dict, Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Response, HTTPException
@@ -12,9 +13,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from victor.config.settings import load_settings
 from victor.agent.orchestrator import AgentOrchestrator
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Request ID context variable for tracing requests through logs
+request_id_var: ContextVar[str] = ContextVar("request_id", default="")
+
+
+class RequestIdFilter(logging.Filter):
+    """Logging filter that adds request ID to log records."""
+
+    def filter(self, record):
+        request_id = request_id_var.get()
+        record.request_id = f"[{request_id[:8]}]" if request_id else ""
+        return True
+
+
+# Configure logging with request ID support
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(request_id)s%(message)s'
+)
 logger = logging.getLogger(__name__)
+logger.addFilter(RequestIdFilter())
 
 app = FastAPI(title="Victor AI Assistant API", version="2.0.0")
 
@@ -56,6 +74,9 @@ HEARTBEAT_INTERVAL = 30  # seconds
 SESSION_IDLE_TIMEOUT = 3600  # 1 hour in seconds
 CLEANUP_INTERVAL = 300  # 5 minutes
 MESSAGE_TIMEOUT = 300  # 5 minutes for receive timeout
+
+# Track background tasks for graceful shutdown
+_background_tasks = []
 
 
 def _render_plantuml_svg(source: str) -> str:
@@ -213,46 +234,88 @@ async def heartbeat_loop(websocket: WebSocket, session_id: str):
 
 async def cleanup_idle_sessions():
     """Background task to clean up idle sessions to prevent memory leaks."""
-    while True:
-        try:
-            await asyncio.sleep(CLEANUP_INTERVAL)
+    logger.info("Starting idle session cleanup task")
+    try:
+        while True:
+            try:
+                await asyncio.sleep(CLEANUP_INTERVAL)
 
-            current_time = time.time()
-            sessions_to_remove = []
+                current_time = time.time()
+                sessions_to_remove = []
 
-            async with SESSION_LOCK:
-                for session_id, session_data in SESSION_AGENTS.items():
-                    last_activity = session_data.get("last_activity", 0)
-                    idle_time = current_time - last_activity
+                async with SESSION_LOCK:
+                    for session_id, session_data in SESSION_AGENTS.items():
+                        last_activity = session_data.get("last_activity", 0)
+                        idle_time = current_time - last_activity
 
-                    if idle_time > SESSION_IDLE_TIMEOUT:
-                        sessions_to_remove.append(session_id)
+                        if idle_time > SESSION_IDLE_TIMEOUT:
+                            sessions_to_remove.append(session_id)
 
-                for session_id in sessions_to_remove:
-                    logger.info(f"Cleaning up idle session: {session_id}")
-                    # Cleanup agent resources
-                    try:
-                        agent = SESSION_AGENTS[session_id]["agent"]
-                        if hasattr(agent, 'shutdown'):
-                            agent.shutdown()
-                    except Exception as e:
-                        logger.warning(f"Error shutting down agent for session {session_id}: {e}")
+                    for session_id in sessions_to_remove:
+                        logger.info(f"Cleaning up idle session: {session_id}")
+                        # Cleanup agent resources
+                        try:
+                            agent = SESSION_AGENTS[session_id]["agent"]
+                            if hasattr(agent, 'shutdown'):
+                                agent.shutdown()
+                            # Also try closing provider if available
+                            if hasattr(agent, 'provider'):
+                                await agent.provider.close()
+                        except Exception as e:
+                            logger.warning(f"Error shutting down agent for session {session_id}: {e}")
 
-                    del SESSION_AGENTS[session_id]
+                        del SESSION_AGENTS[session_id]
 
-            if sessions_to_remove:
-                logger.info(f"Cleaned up {len(sessions_to_remove)} idle sessions")
+                if sessions_to_remove:
+                    logger.info(f"Cleaned up {len(sessions_to_remove)} idle sessions")
 
-        except Exception as e:
-            logger.error(f"Error in cleanup task: {e}", exc_info=True)
+            except Exception as e:
+                logger.error(f"Error in cleanup task: {e}", exc_info=True)
+
+    except asyncio.CancelledError:
+        logger.info("Idle session cleanup task cancelled gracefully")
+        raise  # Re-raise to properly handle task cancellation
 
 
 @app.on_event("startup")
 async def startup_event():
     """Start background tasks on server startup."""
     logger.info("Starting background tasks...")
-    asyncio.create_task(cleanup_idle_sessions())
-    logger.info("Server started successfully")
+    task = asyncio.create_task(cleanup_idle_sessions())
+    _background_tasks.append(task)
+    logger.info("Server started successfully with background tasks tracked")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up background tasks and sessions on server shutdown."""
+    logger.info("Shutting down background tasks...")
+
+    # Cancel all background tasks gracefully
+    for task in _background_tasks:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    # Clean up all active sessions
+    async with SESSION_LOCK:
+        for session_id, session_data in list(SESSION_AGENTS.items()):
+            try:
+                agent = session_data.get("agent")
+                if agent:
+                    if hasattr(agent, 'shutdown'):
+                        agent.shutdown()
+                    if hasattr(agent, 'provider'):
+                        await agent.provider.close()
+                    logger.info(f"Closed session {session_id} during shutdown")
+            except Exception as e:
+                logger.error(f"Error closing session {session_id}: {e}")
+
+        SESSION_AGENTS.clear()
+
+    logger.info("Shutdown complete - all tasks and sessions cleaned up")
 
 
 @app.get("/health")
@@ -327,6 +390,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     timeout=MESSAGE_TIMEOUT
                 )
 
+                # Set request ID for this message (for log tracing)
+                msg_request_id = str(uuid.uuid4())
+                request_id_var.set(msg_request_id)
+
                 logger.info(f"Session {session_id}: Received message")
 
                 # Update last activity
@@ -354,6 +421,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     logger.error(f"Session {session_id}: Error during agent response: {e}", exc_info=True)
                     await websocket.send_text(f"[error] An error occurred while processing your request: {str(e)}")
 
+                finally:
+                    # Clear request ID after processing message
+                    request_id_var.set("")
+
             except asyncio.TimeoutError:
                 logger.warning(f"Session {session_id}: Timeout waiting for message")
                 await websocket.send_text("[error] Connection timeout. Please refresh.")
@@ -369,8 +440,8 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.error(f"Session {session_id}: Unexpected error in WebSocket: {e}", exc_info=True)
         try:
             await websocket.send_text(f"[error] Server error: {str(e)}")
-        except:
-            pass
+        except (WebSocketDisconnect, RuntimeError) as send_error:
+            logger.debug(f"Failed to send error message to client: {send_error}")
     finally:
         # Cancel heartbeat task
         if heartbeat_task and not heartbeat_task.done():

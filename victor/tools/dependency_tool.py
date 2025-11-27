@@ -46,7 +46,7 @@ def _parse_version(version: str) -> tuple:
     try:
         parts = re.findall(r'\d+', version)
         return tuple(int(p) for p in parts)
-    except:
+    except (ValueError, TypeError, AttributeError):
         return (0, 0, 0)
 
 

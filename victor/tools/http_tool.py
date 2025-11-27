@@ -105,7 +105,7 @@ async def http_request(
         # Parse response
         try:
             response_json = response.json()
-        except:
+        except (ValueError, TypeError, AttributeError):
             response_json = None
 
         # Build result

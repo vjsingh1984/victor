@@ -378,7 +378,8 @@ async def list_models_async(provider: str) -> None:
                         try:
                             dt = datetime.fromisoformat(modified.replace("Z", "+00:00"))
                             modified = dt.strftime("%Y-%m-%d")
-                        except:
+                        except (ValueError, AttributeError) as e:
+                            logger.debug(f"Failed to parse timestamp '{modified}': {e}")
                             pass
 
                     table.add_row(
