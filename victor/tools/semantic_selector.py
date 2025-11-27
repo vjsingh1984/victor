@@ -507,11 +507,11 @@ class SemanticToolSelector:
             stats["success_count"] += 1
         stats["last_used"] = time.time()
 
-        # Keep last 10 query contexts for semantic matching
+        # Keep last 50 query contexts for semantic matching (better pattern recognition)
         query_summary = query[:100]  # Truncate long queries
         stats["recent_contexts"].append(query_summary)
-        if len(stats["recent_contexts"]) > 10:
-            stats["recent_contexts"] = stats["recent_contexts"][-10:]
+        if len(stats["recent_contexts"]) > 50:
+            stats["recent_contexts"] = stats["recent_contexts"][-50:]
 
         # Save periodically (every 5 uses)
         if sum(s["usage_count"] for s in self._tool_usage_cache.values()) % 5 == 0:
