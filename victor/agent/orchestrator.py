@@ -499,10 +499,12 @@ class AgentOrchestrator:
 
         # Select tools with context awareness (Phase 2 enhancement)
         # Pass conversation history for better tool selection across multi-turn tasks
+        # Convert Message objects to dicts for semantic selector
+        conversation_dicts = [msg.model_dump() for msg in self.messages] if self.messages else None
         tools = await self.semantic_selector.select_relevant_tools_with_context(
             user_message=user_message,
             tools=self.tools,
-            conversation_history=self.conversation_history,  # Phase 2: Add context
+            conversation_history=conversation_dicts,  # Phase 2: Add context
             max_tools=max_tools,
             similarity_threshold=threshold,
         )
