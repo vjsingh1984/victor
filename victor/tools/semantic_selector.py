@@ -91,6 +91,11 @@ class SemanticToolSelector:
         if embedding_provider in ["ollama", "vllm", "lmstudio"]:
             self._client = httpx.AsyncClient(base_url=ollama_base_url, timeout=30.0)
 
+        # Phase 3: Tool usage tracking and learning
+        self._usage_cache_file = self.cache_dir / "tool_usage_stats.pkl"
+        self._tool_usage_cache: Dict[str, Dict[str, Any]] = {}
+        self._load_usage_cache()
+
     async def initialize_tool_embeddings(self, tools: ToolRegistry) -> None:
         """Pre-compute embeddings for all tools (called once at startup).
 
@@ -446,6 +451,132 @@ class SemanticToolSelector:
         logger.debug(f"Contextual query: {enhanced}")
         return enhanced
 
+    # ========================================================================
+    # Phase 3: Tool Usage Tracking and Learning
+    # ========================================================================
+
+    def _load_usage_cache(self) -> None:
+        """Load tool usage statistics from disk cache (Phase 3)."""
+        if not self._usage_cache_file.exists():
+            logger.debug("No usage cache found - starting fresh")
+            return
+
+        try:
+            with open(self._usage_cache_file, "rb") as f:
+                self._tool_usage_cache = pickle.load(f)
+            logger.info(f"Loaded usage stats for {len(self._tool_usage_cache)} tools")
+        except Exception as e:
+            logger.warning(f"Failed to load usage cache: {e}")
+            self._tool_usage_cache = {}
+
+    def _save_usage_cache(self) -> None:
+        """Save tool usage statistics to disk cache (Phase 3)."""
+        try:
+            with open(self._usage_cache_file, "wb") as f:
+                pickle.dump(self._tool_usage_cache, f)
+            logger.debug(f"Saved usage stats for {len(self._tool_usage_cache)} tools")
+        except Exception as e:
+            logger.warning(f"Failed to save usage cache: {e}")
+
+    def _record_tool_usage(
+        self,
+        tool_name: str,
+        query: str,
+        success: bool = True
+    ) -> None:
+        """Record tool usage for learning (Phase 3).
+
+        Args:
+            tool_name: Name of the tool that was used
+            query: The query context where it was used
+            success: Whether the tool was successfully used
+        """
+        import time
+
+        if tool_name not in self._tool_usage_cache:
+            self._tool_usage_cache[tool_name] = {
+                "usage_count": 0,
+                "success_count": 0,
+                "last_used": 0,
+                "recent_contexts": [],
+            }
+
+        stats = self._tool_usage_cache[tool_name]
+        stats["usage_count"] += 1
+        if success:
+            stats["success_count"] += 1
+        stats["last_used"] = time.time()
+
+        # Keep last 10 query contexts for semantic matching
+        query_summary = query[:100]  # Truncate long queries
+        stats["recent_contexts"].append(query_summary)
+        if len(stats["recent_contexts"]) > 10:
+            stats["recent_contexts"] = stats["recent_contexts"][-10:]
+
+        # Save periodically (every 5 uses)
+        if sum(s["usage_count"] for s in self._tool_usage_cache.values()) % 5 == 0:
+            self._save_usage_cache()
+
+    async def _get_usage_boost(self, tool_name: str, query: str) -> float:
+        """Calculate similarity boost based on usage history (Phase 3).
+
+        Args:
+            tool_name: Name of the tool
+            query: Current query
+
+        Returns:
+            Boost value (0.0 to 0.2) to add to similarity score
+        """
+        if tool_name not in self._tool_usage_cache:
+            return 0.0
+
+        stats = self._tool_usage_cache[tool_name]
+
+        # Base boost from usage frequency
+        usage_boost = min(0.05, stats["usage_count"] * 0.01)  # Max 0.05
+
+        # Boost from success rate
+        success_rate = (
+            stats["success_count"] / stats["usage_count"]
+            if stats["usage_count"] > 0
+            else 0
+        )
+        success_boost = success_rate * 0.05  # Max 0.05
+
+        # Boost from recency (tools used recently get slight preference)
+        import time
+        time_since_use = time.time() - stats["last_used"]
+        days_since_use = time_since_use / 86400  # Convert to days
+        recency_boost = max(0, 0.05 - (days_since_use * 0.01))  # Max 0.05
+
+        # Context similarity boost (compare with recent contexts)
+        context_boost = 0.0
+        if stats["recent_contexts"]:
+            try:
+                query_emb = await self._get_embedding(query)
+                context_similarities = []
+
+                for ctx in stats["recent_contexts"][-3:]:  # Check last 3 contexts
+                    ctx_emb = await self._get_embedding(ctx)
+                    sim = self._cosine_similarity(query_emb, ctx_emb)
+                    context_similarities.append(sim)
+
+                if context_similarities:
+                    avg_context_sim = sum(context_similarities) / len(context_similarities)
+                    context_boost = avg_context_sim * 0.05  # Max 0.05
+
+            except Exception as e:
+                logger.debug(f"Context boost calculation failed: {e}")
+
+        total_boost = usage_boost + success_boost + recency_boost + context_boost
+        logger.debug(
+            f"Usage boost for {tool_name}: {total_boost:.3f} "
+            f"(usage={usage_boost:.3f}, success={success_boost:.3f}, "
+            f"recency={recency_boost:.3f}, context={context_boost:.3f})"
+        )
+
+        return min(0.2, total_boost)  # Cap total boost at 0.2
+
     async def select_relevant_tools_with_context(
         self,
         user_message: str,
@@ -533,6 +664,10 @@ class SemanticToolSelector:
             if tool.name in mandatory_tool_names:
                 similarity = max(similarity, 0.9)  # Ensure mandatory tools rank high
 
+            # Phase 3: Apply usage boost based on learning
+            usage_boost = await self._get_usage_boost(tool.name, enhanced_query)
+            similarity += usage_boost
+
             if similarity >= similarity_threshold:
                 similarities.append((tool, similarity))
 
@@ -568,6 +703,10 @@ class SemanticToolSelector:
             f"pending_actions={len(pending_actions)}): "
             f"{', '.join(f'{name}({score})' for name, score in zip(tool_names, scores))}"
         )
+
+        # Phase 3: Record tool usage for learning
+        for tool_name in tool_names:
+            self._record_tool_usage(tool_name, user_message, success=True)
 
         # Convert to ToolDefinition
         return [
@@ -1026,5 +1165,9 @@ class SemanticToolSelector:
         return use_case_map.get(tool_name, "")
 
     async def close(self) -> None:
-        """Close HTTP client."""
-        await self._client.aclose()
+        """Close HTTP client and save usage cache (Phase 3)."""
+        # Phase 3: Save usage statistics before shutdown
+        self._save_usage_cache()
+
+        if self._client:
+            await self._client.aclose()
