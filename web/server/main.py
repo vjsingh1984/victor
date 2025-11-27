@@ -32,7 +32,10 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(request_id)s%(message)s'
 )
 logger = logging.getLogger(__name__)
-logger.addFilter(RequestIdFilter())
+
+# Add filter to root logger so ALL loggers have request_id field
+root_logger = logging.getLogger()
+root_logger.addFilter(RequestIdFilter())
 
 app = FastAPI(title="Victor AI Assistant API", version="2.0.0")
 
