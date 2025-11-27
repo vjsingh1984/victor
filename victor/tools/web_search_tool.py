@@ -24,6 +24,7 @@ This tool provides:
 
 import json
 import re
+import logging
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus
 
@@ -36,6 +37,21 @@ from victor.tools.decorators import tool
 _provider = None
 _model: Optional[str] = None
 _user_agent = "Mozilla/5.0 (compatible; Victor/1.0; +https://github.com/vijaykumar/victor)"
+_config = {
+    "fetch_top": None,
+    "fetch_pool": None,
+    "max_content_length": 5000,
+}
+
+
+def set_web_tool_defaults(fetch_top: Optional[int] = None, fetch_pool: Optional[int] = None, max_content_length: Optional[int] = None) -> None:
+    """Set default behaviors for web_summarize."""
+    if fetch_top is not None:
+        _config["fetch_top"] = fetch_top
+    if fetch_pool is not None:
+        _config["fetch_pool"] = fetch_pool
+    if max_content_length is not None:
+        _config["max_content_length"] = max_content_length
 
 
 def set_web_search_provider(provider, model: Optional[str] = None) -> None:
@@ -160,10 +176,12 @@ async def web_search(
     safe_search: str = "moderate"
 ) -> Dict[str, Any]:
     """
-    Search the web using DuckDuckGo.
+    Web search / online lookup using DuckDuckGo (internet search, find online, lookup docs).
 
-    Provides privacy-focused web search without requiring API keys.
-    Returns formatted search results with titles, URLs, and snippets.
+    Purpose:
+    - Find links, docs, references on the public web.
+    - Return titles, URLs, and snippets for relevance checking.
+    - Ideal when the user says "search the web", "find online", "lookup", "docs", "articles".
 
     Args:
         query: Search query string.
@@ -187,6 +205,8 @@ async def web_search(
     # Map safe search to DuckDuckGo values
     safe_map = {"on": "1", "moderate": "-1", "off": "-2"}
     safe_value = safe_map.get(safe_search, "-1")
+    logger = logging.getLogger(__name__)
+    logger = logging.getLogger(__name__)
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -214,6 +234,10 @@ async def web_search(
 
             # Parse results
             results = _parse_ddg_results(response.text, max_results)
+            logger.info(f"[web_search] query='{query}', max_results={max_results}, parsed_results={len(results)}")
+            if results:
+                sample_urls = [r.get("url", "") for r in results[:5]]
+                logger.info(f"[web_search] top URLs: {sample_urls}")
 
             if not results:
                 return {
@@ -313,13 +337,18 @@ async def web_summarize(
     query: str,
     max_results: int = 5,
     region: str = "wt-wt",
-    safe_search: str = "moderate"
+    safe_search: str = "moderate",
+    fetch_top: Optional[int] = None,
+    fetch_pool: Optional[int] = None,
+    max_content_length: int = 5000
 ) -> Dict[str, Any]:
     """
-    Search the web and summarize results with AI.
+    Search the web AND summarize results with AI (web search + summarization).
 
-    Performs a web search and uses an LLM to summarize the results,
-    providing key information, findings, and source citations.
+    Purpose:
+    - Perform a web search, then produce a concise summary with key findings and cited links.
+    - Use when the user asks to "summarize from the web", "give me top X with pros/cons", or needs synthesized web info.
+    - Returns original results plus AI-written summary.
 
     Args:
         query: Search query string.
@@ -349,6 +378,19 @@ async def web_summarize(
     # Map safe search to DuckDuckGo values
     safe_map = {"on": "1", "moderate": "-1", "off": "-2"}
     safe_value = safe_map.get(safe_search, "-1")
+    logger = logging.getLogger(__name__)
+
+    default_fetch_top = _config.get("fetch_top")
+    default_fetch_pool = _config.get("fetch_pool")
+    default_max_len = _config.get("max_content_length", 5000)
+
+    fetch_top = fetch_top if fetch_top is not None else (default_fetch_top if default_fetch_top is not None else max_results)
+    fetch_pool = fetch_pool if fetch_pool is not None else (default_fetch_pool if default_fetch_pool is not None else max(fetch_top + 2, max_results))
+    max_content_length = max_content_length if max_content_length is not None else default_max_len
+
+    fetch_top = max(0, min(fetch_top, 10))
+    fetch_pool = max(fetch_top, min(fetch_pool, 12))
+    max_content_length = max(500, min(max_content_length, 20000))
 
     try:
         # First, perform search
@@ -375,7 +417,10 @@ async def web_summarize(
                 }
 
             # Parse results
-            results = _parse_ddg_results(response.text, max_results)
+            results = _parse_ddg_results(response.text, fetch_pool)
+            logger.info(f"[web_summarize] search query='{query}', parsed_results={len(results)}")
+            if results:
+                logger.info(f"[web_summarize] top URLs: {[r.get('url','') for r in results[:5]]}")
 
             if not results:
                 return {
@@ -387,13 +432,39 @@ async def web_summarize(
             # Format results
             results_text = _format_results(query, results)
 
+        # Fetch top content for deeper summary (best-effort)
+        fetched_contents = []
+        for result in results[:fetch_pool]:
+            if len(fetched_contents) >= fetch_top:
+                break
+            url = result.get("url")
+            if not url:
+                continue
+            fetch_res = await web_fetch(url=url)
+            if fetch_res.get("success") and fetch_res.get("content"):
+                content = fetch_res["content"][:max_content_length]
+                fetched_contents.append({"url": url, "content": content})
+
+        logger.info(
+            f"[web_summarize] fetch_top={fetch_top}, attempted_pool={fetch_pool}, fetched_ok={len(fetched_contents)}"
+        )
+
         # Prepare prompt for summarization
+        fetch_section = ""
+        if fetched_contents:
+            fetch_section = "\n\nFetched content excerpts:\n"
+            for i, item in enumerate(fetched_contents, 1):
+                fetch_section += f"\n{i}. URL: {item['url']}\nContent (excerpt):\n{item['content']}\n"
+
         prompt = f"""Analyze these web search results and provide a comprehensive summary.
 
 Query: {query}
 
 Search Results:
 {results_text}
+
+Use fetched page excerpts if provided to improve accuracy:
+{fetch_section}
 
 Provide:
 1. A clear summary of the key information
@@ -402,6 +473,11 @@ Provide:
 4. Sources used (include URLs)
 
 Format the response clearly with sections."""
+
+        logger.info(
+            f"[web_summarize] building summary prompt for query='{query}', "
+            f"results_count={len(results)}, prompt_chars={len(prompt)}"
+        )
 
         try:
             from victor.providers.base import Message
@@ -414,6 +490,7 @@ Format the response clearly with sections."""
             )
 
             summary = response.content.strip()
+            logger.info(f"[web_summarize] summarization model='{_model}', summary_len={len(summary)}")
 
             return {
                 "success": True,

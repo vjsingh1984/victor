@@ -119,6 +119,9 @@ async def run_oneshot(
     try:
         agent = await AgentOrchestrator.from_settings(settings, profile)
 
+        # Start background embedding preload to avoid blocking first query
+        agent.start_embedding_preload()
+
         if stream and agent.provider.supports_streaming():
             async for chunk in agent.stream_chat(message):
                 if chunk.content:
@@ -158,6 +161,9 @@ async def run_interactive(
 
         # Create agent
         agent = await AgentOrchestrator.from_settings(settings, profile)
+
+        # Start background embedding preload to avoid blocking first query
+        agent.start_embedding_preload()
 
         # Welcome message
         console.print(

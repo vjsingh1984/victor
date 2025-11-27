@@ -35,7 +35,7 @@ docker-compose run --rm victor
 docker-compose run --rm victor victor main "Write a function to sort arrays"
 
 # Run demo (4 test cases)
-docker-compose run --rm victor bash /app/docker/demo-semantic-tools.sh
+docker-compose run --rm victor bash /app/docker/demos/semantic-tools.sh
 
 # List profiles
 docker-compose run --rm victor victor profiles
@@ -131,12 +131,18 @@ docker-compose run --rm victor victor main "Write hello world"
 ```bash
 docker-compose restart ollama
 docker-compose logs ollama
+
+# Or use shared utility
+docker-compose run --rm victor bash /app/docker/scripts/wait-for-ollama.sh
 ```
 
 ### Model not found
 ```bash
 docker-compose exec ollama ollama list
 docker-compose exec ollama ollama pull qwen2.5-coder:1.5b
+
+# Or use shared utility
+bash docker/scripts/ensure-model.sh qwen2.5-coder:1.5b "1 GB"
 ```
 
 ### Out of memory
@@ -150,7 +156,7 @@ docker-compose run --rm victor victor --profile fast "Task"
 
 ### Tool embeddings cache missing
 ```bash
-docker-compose run --rm victor bash /app/docker/init-victor.sh
+docker-compose run --rm victor bash /app/docker/scripts/init-embeddings.sh
 ```
 
 ## 📝 Examples
@@ -181,8 +187,10 @@ docker-compose run --rm victor \
 
 ## 📚 Documentation
 
-- **Full Guide**: `DOCKER_DEPLOYMENT.md`
-- **Tool Calling**: `AIR_GAPPED_TOOL_CALLING_SOLUTION.md`
+- **Docker Guide**: `docker/README.md` (coming soon)
+- **Embeddings & Air-Gapped**: `docs/embeddings/` directory
+- **Tool Calling**: `docs/embeddings/TOOL_CALLING_FORMATS.md`
+- **Air-Gapped Deployment**: `docs/embeddings/AIRGAPPED.md`
 - **General Docs**: `README.md`
 
 ## ⚙️ Configuration
@@ -192,12 +200,19 @@ docker-compose run --rm victor \
 **Embedding Model**: all-MiniLM-L12-v2 (120MB)
 **Tool Embeddings**: Pre-computed (31 tools)
 
-## 🎓 Demo Script
+## 🎓 Demo Scripts
 
-The demo script runs 4 test cases:
+Victor includes multiple demonstration scripts:
 
 ```bash
-docker-compose run --rm victor bash /app/docker/demo-semantic-tools.sh
+# Semantic tool selection demo (4 test cases)
+docker-compose run --rm victor bash /app/docker/demos/semantic-tools.sh
+
+# Provider features demo (5 demos: chat, streaming, etc.)
+docker-compose run --rm victor python /app/docker/demos/provider-features.py
+
+# FastAPI webapp generation demo
+docker-compose run --rm victor bash /app/docker/demos/fastapi-webapp.sh
 ```
 
 **Demos:**
@@ -275,8 +290,8 @@ docker-compose run --rm victor victor --profile advanced "Task"
 - [ ] Run `./docker-quickstart.sh`
 - [ ] Wait 5 minutes for setup
 - [ ] Test: `docker-compose run --rm victor victor main "test"`
-- [ ] Try demo: `docker-compose run --rm victor bash /app/docker/demo-semantic-tools.sh`
-- [ ] Optional: Pull better models (`ollama pull qwen2.5-coder:7b`)
+- [ ] Try demo: `docker-compose run --rm victor bash /app/docker/demos/semantic-tools.sh`
+- [ ] Optional: Pull better models (`docker-compose exec ollama ollama pull qwen2.5-coder:7b`)
 - [ ] Start coding!
 
 ---

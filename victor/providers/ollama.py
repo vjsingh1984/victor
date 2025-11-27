@@ -16,7 +16,7 @@
 
 import json
 import logging
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional, Union
 
 import httpx
 
@@ -38,20 +38,21 @@ class OllamaProvider(BaseProvider):
 
     def __init__(
         self,
-        base_url: str = "http://localhost:11434",
+        base_url: Union[str, List[str]] = "http://localhost:11434",
         timeout: int = 300,
         **kwargs: Any,
     ):
         """Initialize Ollama provider.
 
         Args:
-            base_url: Ollama server URL
+            base_url: Ollama server URL or list/comma-separated URLs (first reachable is used)
             timeout: Request timeout (longer for local models)
             **kwargs: Additional configuration
         """
-        super().__init__(base_url=base_url, timeout=timeout, **kwargs)
+        chosen_base = self._select_base_url(base_url, timeout)
+        super().__init__(base_url=chosen_base, timeout=timeout, **kwargs)
         self.client = httpx.AsyncClient(
-            base_url=base_url,
+            base_url=chosen_base,
             timeout=httpx.Timeout(timeout),
         )
 
@@ -67,6 +68,43 @@ class OllamaProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         """Ollama supports streaming."""
         return True
+
+    def _select_base_url(self, base_url: Union[str, List[str], None], timeout: int) -> str:
+        """Pick the first reachable Ollama endpoint from a tiered list.
+
+        Priority:
+        1) Explicitly provided list (comma-separated) or URL
+        2) If default localhost was provided, try LAN host 192.168.1.20 first (m4 max), then localhost.
+        """
+        candidates: List[str] = []
+        if base_url is None:
+            base_url = "http://localhost:11434"
+        if isinstance(base_url, (list, tuple)):
+            candidates = [str(u).strip() for u in base_url if str(u).strip()]
+        elif isinstance(base_url, str):
+            if "," in base_url:
+                candidates = [u.strip() for u in base_url.split(",") if u.strip()]
+            else:
+                # Prefer faster LAN host first if user left default
+                if base_url == "http://localhost:11434":
+                    candidates = ["http://192.168.1.20:11434", base_url]
+                else:
+                    candidates = [base_url]
+        else:
+            candidates = [str(base_url)]
+
+        for url in candidates:
+            try:
+                with httpx.Client(base_url=url, timeout=httpx.Timeout(2)) as client:
+                    resp = client.get("/api/tags")
+                    resp.raise_for_status()
+                    logger.info(f"Ollama base URL selected: {url}")
+                    return url
+            except Exception as exc:
+                logger.warning(f"Ollama endpoint {url} not reachable ({exc}); trying next.")
+
+        logger.error(f"No Ollama endpoints reachable from: {candidates}. Falling back to {base_url}")
+        return base_url
 
     async def chat(
         self,

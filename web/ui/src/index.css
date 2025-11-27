@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-gray-800 transition-colors duration-300;
+  }
+  .dark body {
+    @apply bg-gray-900 text-gray-200;
+  }
+}

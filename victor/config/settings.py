@@ -16,7 +16,7 @@
 
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union, List
 
 import yaml
 from pydantic import Field
@@ -27,7 +27,7 @@ class ProviderConfig(BaseSettings):
     """Configuration for a specific provider."""
 
     api_key: Optional[str] = None
-    base_url: Optional[str] = None
+    base_url: Optional[Union[str, List[str]]] = None
     timeout: int = 300  # 5 minutes - increased for CPU-only inference
     max_retries: int = 3
     organization: Optional[str] = None  # For OpenAI
@@ -101,6 +101,11 @@ class Settings(BaseSettings):
     theme: str = "monokai"
     show_token_count: bool = True
     stream_responses: bool = True
+
+    # MCP
+    use_mcp_tools: bool = False
+    mcp_command: Optional[str] = None  # e.g., "python mcp_server.py" or "node mcp-server.js"
+    mcp_prefix: str = "mcp"
 
     @classmethod
     def get_config_dir(cls) -> Path:
@@ -180,6 +185,20 @@ class Settings(BaseSettings):
             print(f"Warning: Failed to load provider config for {provider}: {e}")
 
         return None
+
+    @classmethod
+    def load_tool_config(cls) -> Dict[str, Any]:
+        """Load tool-specific configuration from profiles.yaml (top-level 'tools' key)."""
+        profiles_file = cls.get_config_dir() / "profiles.yaml"
+        if not profiles_file.exists():
+            return {}
+        try:
+            with open(profiles_file, "r") as f:
+                data = yaml.safe_load(f) or {}
+            return data.get("tools", {}) or {}
+        except Exception as e:
+            print(f"Warning: Failed to load tool config: {e}")
+            return {}
 
     def get_provider_settings(self, provider: str) -> Dict[str, Any]:
         """Get settings for a specific provider.

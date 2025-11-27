@@ -15,6 +15,7 @@
 """Agent orchestrator for managing conversations and tool execution."""
 
 import logging
+import time
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from rich.console import Console
@@ -61,7 +62,10 @@ from victor.tools.refactor_tool import (
     refactor_organize_imports,
 )
 from victor.tools.testing_tool import run_tests
-from victor.tools.web_search_tool import web_search, web_fetch, web_summarize, set_web_search_provider
+from victor.tools.web_search_tool import web_search, web_fetch, web_summarize, set_web_search_provider, set_web_tool_defaults
+from victor.tools.plan_tool import plan_files
+from victor.tools.code_search_tool import code_search
+from victor.tools.mcp_bridge_tool import mcp_call, configure_mcp_client, get_mcp_tool_definitions
 from victor.tools.workflow_tool import run_workflow
 from victor.tools.code_intelligence_tool import find_symbol, find_references, rename_symbol
 from victor.tools.semantic_selector import SemanticToolSelector
@@ -97,6 +101,29 @@ class AgentOrchestrator:
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.console = console or Console()
+        self._system_prompt = (
+            "You are a code analyst for this repository. Follow this loop:\n"
+            "1) Plan briefly, then call list_directory/read_file to inspect real files (not imagined). "
+            "2) For repo analysis, read a small set of key files (max ~5) before concluding. "
+            "3) Do NOT invent tool outputs—only cite results from tools you actually called. "
+            "4) When asked for web info, use web_search/web_summarize; when asked about repo code, use read_file/analyze_docs/code_review.\n"
+            "Always report findings with file paths. Avoid generic advice. Stop once you hit the tool budget."
+        )
+        self._system_added = False
+        self.tool_budget = getattr(settings, "tool_call_budget", 6)
+        self.tool_calls_used = 0
+        self.observed_files: List[str] = []
+        self.executed_tools: List[str] = []
+
+        # Tool usage analytics
+        self._tool_usage_stats: Dict[str, Dict[str, Any]] = {}
+        self._tool_selection_stats: Dict[str, int] = {
+            "semantic_selections": 0,
+            "keyword_selections": 0,
+            "fallback_selections": 0,
+            "total_tools_selected": 0,
+            "total_tools_executed": 0,
+        }
 
         # Stateful managers
         self.code_manager = CodeExecutionManager()
@@ -131,13 +158,135 @@ class AgentOrchestrator:
                 ollama_base_url=settings.ollama_base_url,
                 cache_embeddings=True,
             )
-            # Initialize embeddings asynchronously (will be done in first call)
+            # Initialize embeddings asynchronously in background to avoid blocking first query
             self._embeddings_initialized = False
+            self._embedding_preload_task = None
 
     def shutdown(self):
         """Gracefully shut down stateful managers."""
         self.console.print("[dim]Shutting down code execution environment...[/dim]")
         self.code_manager.stop()
+
+    async def _preload_embeddings(self) -> None:
+        """Preload tool embeddings in background to avoid blocking first query.
+
+        This is called asynchronously during initialization if semantic tool
+        selection is enabled. Errors are logged but don't crash the app.
+        """
+        if not self.semantic_selector or self._embeddings_initialized:
+            return
+
+        try:
+            logger.info("Starting background embedding preload...")
+            await self.semantic_selector.initialize_tool_embeddings(self.tools)
+            self._embeddings_initialized = True
+            logger.info("✓ Tool embeddings preloaded successfully in background")
+        except Exception as e:
+            logger.warning(
+                f"Failed to preload embeddings in background: {e}. "
+                "Will load on first query (may add ~5s latency)."
+            )
+
+    def start_embedding_preload(self) -> None:
+        """Start background embedding preload task.
+
+        Should be called after orchestrator initialization to avoid blocking
+        the main thread. Safe to call multiple times (no-op if already started).
+        """
+        if not self.use_semantic_selection or self._embedding_preload_task:
+            return
+
+        import asyncio
+        try:
+            # Create background task for embedding preload
+            loop = asyncio.get_event_loop()
+            self._embedding_preload_task = loop.create_task(self._preload_embeddings())
+            logger.info("Started background task for embedding preload")
+        except RuntimeError:
+            # No event loop available yet, will load on first query
+            logger.debug("No event loop available for background preload, will load on first query")
+
+    def _record_tool_selection(self, method: str, num_tools: int) -> None:
+        """Record tool selection statistics.
+
+        Args:
+            method: Selection method used ('semantic', 'keyword', 'fallback')
+            num_tools: Number of tools selected
+        """
+        if method == "semantic":
+            self._tool_selection_stats["semantic_selections"] += 1
+        elif method == "keyword":
+            self._tool_selection_stats["keyword_selections"] += 1
+        elif method == "fallback":
+            self._tool_selection_stats["fallback_selections"] += 1
+
+        self._tool_selection_stats["total_tools_selected"] += num_tools
+
+        logger.debug(
+            f"Tool selection: method={method}, num_tools={num_tools}, "
+            f"stats={self._tool_selection_stats}"
+        )
+
+    def _record_tool_execution(self, tool_name: str, success: bool, elapsed_ms: float) -> None:
+        """Record tool execution statistics.
+
+        Args:
+            tool_name: Name of the tool executed
+            success: Whether execution succeeded
+            elapsed_ms: Execution time in milliseconds
+        """
+        if tool_name not in self._tool_usage_stats:
+            self._tool_usage_stats[tool_name] = {
+                "total_calls": 0,
+                "successful_calls": 0,
+                "failed_calls": 0,
+                "total_time_ms": 0.0,
+                "avg_time_ms": 0.0,
+                "min_time_ms": float('inf'),
+                "max_time_ms": 0.0,
+            }
+
+        stats = self._tool_usage_stats[tool_name]
+        stats["total_calls"] += 1
+        stats["successful_calls"] += 1 if success else 0
+        stats["failed_calls"] += 0 if success else 1
+        stats["total_time_ms"] += elapsed_ms
+        stats["avg_time_ms"] = stats["total_time_ms"] / stats["total_calls"]
+        stats["min_time_ms"] = min(stats["min_time_ms"], elapsed_ms)
+        stats["max_time_ms"] = max(stats["max_time_ms"], elapsed_ms)
+
+        self._tool_selection_stats["total_tools_executed"] += 1
+
+        logger.debug(
+            f"Tool executed: {tool_name} "
+            f"(success={success}, time={elapsed_ms:.1f}ms, "
+            f"total_calls={stats['total_calls']}, "
+            f"success_rate={stats['successful_calls']/stats['total_calls']*100:.1f}%)"
+        )
+
+    def get_tool_usage_stats(self) -> Dict[str, Any]:
+        """Get comprehensive tool usage statistics.
+
+        Returns:
+            Dictionary with usage analytics including:
+            - Selection stats (semantic/keyword/fallback counts)
+            - Per-tool execution stats (calls, success rate, timing)
+            - Overall metrics
+        """
+        return {
+            "selection_stats": self._tool_selection_stats,
+            "tool_stats": self._tool_usage_stats,
+            "top_tools_by_usage": sorted(
+                [(name, stats["total_calls"]) for name, stats in self._tool_usage_stats.items()],
+                key=lambda x: x[1],
+                reverse=True
+            )[:10],
+            "top_tools_by_time": sorted(
+                [(name, stats["total_time_ms"]) for name, stats in self._tool_usage_stats.items()],
+                key=lambda x: x[1],
+                reverse=True
+            )[:10],
+        }
 
     def _log_tool_call(self, name: str, kwargs: dict) -> None:
         """A hook that logs information before a tool is called."""
@@ -210,14 +359,119 @@ class AgentOrchestrator:
         # Only register network-dependent tools if not in air-gapped mode
         if not self.settings.airgapped_mode:
             set_web_search_provider(self.provider, self.model)
-            self.tools.register(web_search)
-            self.tools.register(web_fetch)
-            self.tools.register(web_summarize)
+            try:
+                tool_config = self.settings.load_tool_config()
+                web_cfg = tool_config.get("web_tools", {}) or tool_config.get("web", {}) or {}
+                set_web_tool_defaults(
+                    fetch_top=web_cfg.get("summarize_fetch_top"),
+                    fetch_pool=web_cfg.get("summarize_fetch_pool"),
+                    max_content_length=web_cfg.get("summarize_max_content_length"),
+                )
+            except Exception as exc:
+                logger.warning(f"Failed to apply web tool defaults: {exc}")
+        self.tools.register(web_search)
+        self.tools.register(web_fetch)
+        self.tools.register(web_summarize)
+        self.tools.register(plan_files)
+        self.tools.register(code_search)
+        self.tools.register(mcp_call)
+
+        # Register MCP tools if configured
+        if getattr(self.settings, "use_mcp_tools", False):
+            if getattr(self.settings, "mcp_command", None):
+                try:
+                    from victor.mcp.client import MCPClient
+
+                    mcp_client = MCPClient()
+                    cmd_parts = self.settings.mcp_command.split()
+                    asyncio.create_task(mcp_client.connect(cmd_parts))
+                    configure_mcp_client(mcp_client, prefix=getattr(self.settings, "mcp_prefix", "mcp"))
+                except Exception as exc:
+                    logger.warning(f"Failed to start MCP client: {exc}")
+
+            for mcp_tool in get_mcp_tool_definitions():
+                self.tools.register_dict(mcp_tool)
 
 
     def _should_use_tools(self) -> bool:
         """Always return True - tool selection is handled by _select_relevant_tools()."""
         return True
+
+    def _get_adaptive_threshold(self, user_message: str) -> tuple[float, int]:
+        """Calculate adaptive similarity threshold and max_tools based on context.
+
+        Adapts based on:
+        1. Model size (smaller models need stricter filtering)
+        2. Query specificity (vague queries need stricter thresholds)
+        3. Conversation depth (deeper conversations can be more permissive)
+
+        Args:
+            user_message: The user's input message
+
+        Returns:
+            Tuple of (similarity_threshold, max_tools)
+        """
+        # Factor 1: Model size
+        model_lower = self.model.lower()
+
+        # Detect model size from common naming patterns
+        if any(size in model_lower for size in [":0.5b", ":1b", ":1.5b", ":3b"]):
+            # Tiny models (0.5B-3B): Very strict
+            base_threshold = 0.35
+            base_max_tools = 5
+        elif any(size in model_lower for size in [":7b", ":8b"]):
+            # Small models (7B-8B): Strict
+            base_threshold = 0.25
+            base_max_tools = 7
+        elif any(size in model_lower for size in [":13b", ":14b", ":15b"]):
+            # Medium models (13B-15B): Moderate
+            base_threshold = 0.20
+            base_max_tools = 10
+        elif any(size in model_lower for size in [":30b", ":32b", ":34b", ":70b", ":72b"]):
+            # Large models (30B+): Permissive
+            base_threshold = 0.15
+            base_max_tools = 12
+        else:
+            # Unknown size or cloud models (Claude, GPT): Moderate-permissive
+            base_threshold = 0.18
+            base_max_tools = 10
+
+        # Factor 2: Query specificity
+        word_count = len(user_message.split())
+
+        if word_count < 5:
+            # Very vague query ("help me", "fix this") → stricter
+            base_threshold += 0.10
+            base_max_tools = max(5, base_max_tools - 2)
+        elif word_count < 10:
+            # Somewhat vague query → slightly stricter
+            base_threshold += 0.05
+        elif word_count > 20:
+            # Detailed query → looser (more context = better matching)
+            base_threshold -= 0.05
+            base_max_tools = min(15, base_max_tools + 2)
+
+        # Factor 3: Conversation depth
+        conversation_depth = len(self.messages)
+
+        if conversation_depth > 15:
+            # Deep conversation → looser (lots of context available)
+            base_threshold -= 0.05
+            base_max_tools = min(15, base_max_tools + 1)
+        elif conversation_depth > 8:
+            # Moderate conversation → slightly looser
+            base_threshold -= 0.03
+
+        # Clamp values to reasonable ranges
+        threshold = max(0.10, min(0.40, base_threshold))
+        max_tools = max(5, min(15, base_max_tools))
+
+        logger.debug(
+            f"Adaptive threshold: {threshold:.2f}, max_tools: {max_tools} "
+            f"(model_size: {model_lower}, words: {word_count}, depth: {conversation_depth})"
+        )
+
+        return threshold, max_tools
 
     async def _select_relevant_tools_semantic(self, user_message: str) -> List[ToolDefinition]:
         """Select tools using embedding-based semantic similarity.
@@ -238,28 +492,86 @@ class AgentOrchestrator:
             await self.semantic_selector.initialize_tool_embeddings(self.tools)
             self._embeddings_initialized = True
 
-        # Select tools semantically (using defaults: max_tools=5, threshold=0.15)
+        # Get adaptive threshold and max_tools based on model size, query, and context
+        threshold, max_tools = self._get_adaptive_threshold(user_message)
+
+        # Select tools semantically with adaptive parameters
         tools = await self.semantic_selector.select_relevant_tools(
             user_message=user_message,
             tools=self.tools,
+            max_tools=max_tools,
+            similarity_threshold=threshold,
         )
 
-        # Fallback: If 0 tools selected, provide ALL tools to the model
-        # Since we reduced to 31 tools specifically for this fallback,
-        # the model can handle choosing from the full set
+        # Blend with keyword-selected tools to avoid missing obvious categories (e.g., web search)
+        keyword_tools = self._select_relevant_tools_keywords(user_message)
+        if keyword_tools:
+            existing = {t.name for t in tools}
+            tools.extend([t for t in keyword_tools if t.name not in existing])
+
+        # If the user explicitly mentions searching the web, ensure web tools are present
+        message_lower = user_message.lower()
+        if any(kw in message_lower for kw in ["search", "web", "online", "lookup", "http", "https"]):
+            must_have = {"web_search", "web_summarize", "web_fetch"}
+            existing = {t.name for t in tools}
+            for tool in self.tools.list_tools():
+                if tool.name in must_have and tool.name not in existing:
+                    tools.append(ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters))
+
+        # Deduplicate in case of overlaps
+        dedup = {}
+        for t in tools:
+            dedup[t.name] = t
+        tools = list(dedup.values())
+
+        logger.info(f"Semantic+keyword tools selected ({len(tools)}): {', '.join(t.name for t in tools)}")
+
+        # Smart Fallback: If 0 tools selected, use core tools + keyword fallback
+        # This prevents overwhelming small models while still providing useful tools
         if not tools:
-            logger.info(
+            logger.warning(
                 "Semantic selection returned 0 tools. "
-                f"Falling back to ALL {len(self.tools.list_tools())} tools."
+                "Using smart fallback: core tools + keyword matching."
             )
-            tools = [
-                ToolDefinition(
-                    name=tool.name,
-                    description=tool.description,
-                    parameters=tool.parameters
-                )
-                for tool in self.tools.list_tools()
-            ]
+            # Core tools that are almost always useful
+            core_tool_names = {
+                "read_file", "write_file", "list_directory",
+                "execute_bash", "edit_files"
+            }
+
+            # Get keyword-based tools as fallback
+            keyword_tools = self._select_relevant_tools_keywords(user_message)
+
+            # Combine core tools with keyword-selected tools
+            all_tools_map = {tool.name: tool for tool in self.tools.list_tools()}
+            tools = []
+
+            # Add core tools first
+            for tool_name in core_tool_names:
+                if tool_name in all_tools_map:
+                    tool = all_tools_map[tool_name]
+                    tools.append(ToolDefinition(
+                        name=tool.name,
+                        description=tool.description,
+                        parameters=tool.parameters
+                    ))
+
+            # Add keyword-selected tools (avoiding duplicates)
+            existing_names = {t.name for t in tools}
+            for keyword_tool in keyword_tools:
+                if keyword_tool.name not in existing_names:
+                    tools.append(keyword_tool)
+
+            logger.info(
+                f"Smart fallback selected {len(tools)} tools: "
+                f"{', '.join(t.name for t in tools)}"
+            )
+
+            # Record fallback selection analytics
+            self._record_tool_selection("fallback", len(tools))
+        else:
+            # Record semantic selection analytics
+            self._record_tool_selection("semantic", len(tools))
 
         return tools
 
@@ -298,6 +610,8 @@ class AgentOrchestrator:
             "batch": ["batch"],
             "cicd": ["cicd"],
             "scaffold": ["scaffold"],
+            "plan": ["plan_files"],
+            "search": ["code_search"],
         }
 
         # Keyword matching for tool selection
@@ -317,7 +631,7 @@ class AgentOrchestrator:
             selected_categories.add("docs")
         if any(kw in message_lower for kw in ["review", "analyze code", "check code", "code quality"]):
             selected_categories.add("review")
-        if any(kw in message_lower for kw in ["search web", "look up", "find online", "search for"]):
+        if any(kw in message_lower for kw in ["search web", "search the web", "look up", "find online", "search for", "web search", "online search"]):
             selected_categories.add("web")
         if any(kw in message_lower for kw in ["docker", "container", "image"]):
             selected_categories.add("docker")
@@ -329,6 +643,10 @@ class AgentOrchestrator:
             selected_categories.add("cicd")
         if any(kw in message_lower for kw in ["scaffold", "template", "boilerplate", "new project", "create project"]):
             selected_categories.add("scaffold")
+        if any(kw in message_lower for kw in ["plan", "which files", "pick files", "where to start"]):
+            selected_categories.add("plan")
+        if any(kw in message_lower for kw in ["search code", "code search", "find file", "locate code", "where is"]):
+            selected_categories.add("search")
 
         # Build selected tool names
         selected_tool_names = core_tool_names.copy()
@@ -364,6 +682,31 @@ class AgentOrchestrator:
 
         return selected_tools
 
+    def _prioritize_tools_stage(self, user_message: str, tools: Optional[List[ToolDefinition]], stage: str) -> Optional[List[ToolDefinition]]:
+        """Stage-aware pruning of tool list to keep it focused per step."""
+        if not tools:
+            return tools
+
+        # Stage definitions
+        planning_tools = {"plan_files", "code_search", "list_directory"}
+        reading_tools = {"read_file", "analyze_docs", "code_review"}
+        web_tools = {"web_search", "web_summarize", "web_fetch"}
+        core = {"write_file", "edit_files"}
+
+        message_lower = user_message.lower()
+        needs_web = any(kw in message_lower for kw in ["http", "https", "web", "online", "search"])
+
+        if stage == "initial":
+            keep = planning_tools | (web_tools if needs_web else set()) | core
+        elif stage == "post_plan":
+            keep = reading_tools | planning_tools | core | (web_tools if needs_web else set())
+        else:  # post_read
+            keep = reading_tools | core | (web_tools if needs_web else set())
+
+        pruned = [t for t in tools if t.name in keep]
+        # If pruning eliminated everything, fall back to original list
+        return pruned or tools
+
     def add_message(self, role: str, content: str) -> None:
         """Add a message to conversation history.
 
@@ -372,6 +715,12 @@ class AgentOrchestrator:
             content: Message content
         """
         self.messages.append(Message(role=role, content=content))
+
+    def _ensure_system_message(self) -> None:
+        """Ensure the system prompt is included once at the start of the conversation."""
+        if not self._system_added:
+            self.messages.append(Message(role="system", content=self._system_prompt))
+            self._system_added = True
 
     async def chat(self, user_message: str) -> CompletionResponse:
         """Send a chat message and get response.
@@ -382,6 +731,7 @@ class AgentOrchestrator:
         Returns:
             CompletionResponse from the model
         """
+        self._ensure_system_message()
         # Add user message to history
         self.add_message("user", user_message)
 
@@ -393,6 +743,7 @@ class AgentOrchestrator:
                 tools = await self._select_relevant_tools_semantic(user_message)
             else:
                 tools = self._select_relevant_tools_keywords(user_message)
+            tools = self._prioritize_tools_stage(user_message, tools, stage="initial")
 
         # Get response from provider
         response = await self.provider.chat(
@@ -421,6 +772,10 @@ class AgentOrchestrator:
         Yields:
             StreamChunk objects with incremental response
         """
+        self._ensure_system_message()
+        self.tool_calls_used = 0
+        self.observed_files = []
+        self.executed_tools = []
         # Add user message to history
         self.add_message("user", user_message)
 
@@ -432,6 +787,7 @@ class AgentOrchestrator:
                 tools = await self._select_relevant_tools_semantic(user_message)
             else:
                 tools = self._select_relevant_tools_keywords(user_message)
+            tools = self._prioritize_tools_stage(user_message, tools, stage="initial")
 
         # Stream response and collect tool calls
         full_content = ""
@@ -472,18 +828,83 @@ class AgentOrchestrator:
         logger.debug(f"After streaming, tool_calls = {tool_calls}")
         if tool_calls:
             logger.info(f"Handling {len(tool_calls)} tool call(s)")
-            await self._handle_tool_calls(tool_calls)
+
+            # Enforce remaining budget
+            remaining = max(0, self.tool_budget - self.tool_calls_used)
+            if remaining <= 0:
+                yield StreamChunk(content=f"[tool] ⚠ Tool budget reached ({self.tool_budget}); skipping tool calls.\n")
+                yield StreamChunk(content="No tools executed; cannot provide evidence-based answer.\n", is_final=True)
+                return
+            tool_calls = tool_calls[:remaining]
+
+            # Send status chunks to keep the WebSocket active during tool execution
+            for tool_call in tool_calls:
+                tool_name = tool_call.get("name", "tool")
+                yield StreamChunk(content=f"[tool] … {tool_name} started\n")
+
+            tool_results = await self._handle_tool_calls(tool_calls)
+
+            for result in tool_results:
+                tool_name = result.get("name", "tool")
+                elapsed = result.get("elapsed", 0.0)
+                status = "ok" if result.get("success") else "failed"
+                yield StreamChunk(content=f"[tool] ✓ {tool_name} {status} ({elapsed:.1f}s)\n")
+
+            # Signal completion and stream final model response after tool output
+            yield StreamChunk(content="Generating final response...\n")
+
+            if self.observed_files:
+                evidence_note = "Evidence files read: " + ", ".join(sorted(set(self.observed_files)))
+                self.add_message("system", evidence_note + " Only cite these or tool outputs; do not invent paths.")
+            else:
+                self.add_message("system", "No files read yet. Avoid file-specific claims; suggest using tools if needed.")
+
+            if self.tool_calls_used == 0:
+                yield StreamChunk(content="No tools executed; cannot provide an evidence-based answer.\n", is_final=True)
+                return
+
+            followup_content = ""
+            # In follow-up, re-select a staged toolset based on current context
+            followup_tools = None
+            if self.provider.supports_tools():
+                context_msg = full_content or user_message
+                if self.use_semantic_selection:
+                    followup_tools = await self._select_relevant_tools_semantic(context_msg)
+                else:
+                    followup_tools = self._select_relevant_tools_keywords(context_msg)
+                stage = "post_plan" if not self.observed_files else "post_read"
+                followup_tools = self._prioritize_tools_stage(context_msg, followup_tools, stage=stage)
+
+            async for follow_chunk in self.provider.stream(
+                messages=self.messages,
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                tools=followup_tools,  # Allow follow-up tool calls (budget-enforced)
+            ):
+                followup_content += follow_chunk.content
+                yield follow_chunk
+
+            if followup_content:
+                self.add_message("assistant", followup_content)
+                # Emit explicit final chunk marker for UI to auto-switch modes
+                yield StreamChunk(content="", is_final=True)
+            else:
+                yield StreamChunk(content="No model response after tools.\n", is_final=True)
         else:
             logger.debug("No tool calls to handle")
+            yield StreamChunk(content="No tools executed; cannot provide an evidence-based answer.\n", is_final=True)
 
-    async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> None:
+    async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Handle tool calls from the model.
 
         Args:
             tool_calls: List of tool call requests
         """
         if not tool_calls:
-            return
+            return []
+
+        results: List[Dict[str, Any]] = []
 
         for tool_call in tool_calls:
             # Validate tool call structure
@@ -496,10 +917,15 @@ class AgentOrchestrator:
                 self.console.print(f"[yellow]⚠ Skipping tool call without name: {tool_call}[/]")
                 continue
 
+            if self.tool_calls_used >= self.tool_budget:
+                self.console.print(f"[yellow]⚠ Tool budget reached ({self.tool_budget}); skipping remaining tool calls.[/]")
+                break
+
             tool_args = tool_call.get("arguments", {})
 
             self.console.print(f"\n[bold cyan]Executing tool:[/] {tool_name}")
 
+            start = time.monotonic()
             try:
                 # Create context for the tool
                 context = {
@@ -512,18 +938,56 @@ class AgentOrchestrator:
                 
                 # Execute tool
                 result = await self.tools.execute(tool_name, context=context, **tool_args)
+                self.tool_calls_used += 1
+                self.executed_tools.append(tool_name)
+                if tool_name == "read_file" and "path" in tool_args:
+                    self.observed_files.append(str(tool_args.get("path")))
+
+                # Calculate execution time
+                elapsed_ms = (time.monotonic() - start) * 1000  # Convert to milliseconds
+
+                # Record tool execution analytics
+                self._record_tool_execution(tool_name, result.success, elapsed_ms)
 
                 if result.success:
-                    self.console.print(f"[green]✓ Tool executed successfully[/]")
+                    self.console.print(f"[green]✓ Tool executed successfully[/] [dim]({elapsed_ms:.0f}ms)[/dim]")
                     # Add tool result to conversation
                     self.add_message(
                         "user",
                         f"Tool '{tool_name}' result: {result.output}",
                     )
+                    results.append(
+                        {
+                            "name": tool_name,
+                            "success": True,
+                            "elapsed": time.monotonic() - start,
+                        }
+                    )
                 else:
-                    self.console.print(f"[red]✗ Tool execution failed: {result.error}[/]")
+                    self.console.print(f"[red]✗ Tool execution failed: {result.error}[/] [dim]({elapsed_ms:.0f}ms)[/dim]")
+                    results.append(
+                        {
+                            "name": tool_name,
+                            "success": False,
+                            "elapsed": time.monotonic() - start,
+                        }
+                    )
             except Exception as e:
-                self.console.print(f"[red]✗ Tool execution error: {e}[/]")
+                elapsed_ms = (time.monotonic() - start) * 1000
+                self.console.print(f"[red]✗ Tool execution error: {e}[/] [dim]({elapsed_ms:.0f}ms)[/dim]")
+
+                # Record failed execution analytics
+                self._record_tool_execution(tool_name or "unknown", False, elapsed_ms)
+
+                results.append(
+                    {
+                        "name": tool_name or "unknown",
+                        "success": False,
+                        "elapsed": time.monotonic() - start,
+                        "error": str(e),
+                    }
+                )
+        return results
 
     def reset_conversation(self) -> None:
         """Clear conversation history."""

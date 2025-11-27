@@ -82,5 +82,7 @@ typing-inspection==0.4.2
 typing_extensions==4.15.0
 uritemplate==4.2.0
 urllib3==2.5.0
--e git+ssh://git@github.com/vjsingh1984/victor.git@5f77ddc4603c9d9f8427ca008facde2376726a76#egg=victor
 wcwidth==0.2.14
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+sentence-transformers==3.3.1

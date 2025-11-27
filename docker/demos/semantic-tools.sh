@@ -4,13 +4,11 @@
 
 set -e
 
-# Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m'
+# Load shared utilities
+source /app/docker/scripts/colors.sh 2>/dev/null || {
+    # Fallback if colors.sh not found
+    GREEN='' BLUE='' YELLOW='' CYAN='' RED='' BOLD='' NC=''
+}
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo -e "${BOLD}${BLUE}Victor Air-Gapped Semantic Tool Selection Demo${NC}"
@@ -25,26 +23,11 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# Wait for Ollama to be ready
-echo -e "${CYAN}⏳ Waiting for Ollama to be ready...${NC}"
-until curl -s http://ollama:11434/api/tags > /dev/null 2>&1; do
-    echo "   Waiting for Ollama..."
-    sleep 2
-done
-echo -e "${GREEN}✓ Ollama is ready${NC}"
-echo ""
+# Wait for Ollama to be ready (using shared utility)
+source /app/docker/scripts/wait-for-ollama.sh || exit 1
 
-# Check if qwen2.5-coder:1.5b is available
-echo -e "${CYAN}📦 Checking for qwen2.5-coder:1.5b model...${NC}"
-if ! curl -s http://ollama:11434/api/tags | grep -q "qwen2.5-coder:1.5b"; then
-    echo -e "${YELLOW}⚠ Model not found. Pulling qwen2.5-coder:1.5b (1 GB)...${NC}"
-    echo "   This should take 1-3 minutes."
-    curl -s http://ollama:11434/api/pull -d '{"name":"qwen2.5-coder:1.5b"}' || true
-    echo""
-else
-    echo -e "${GREEN}✓ Model already available${NC}"
-fi
-echo ""
+# Ensure model is available (using shared utility)
+bash /app/docker/scripts/ensure-model.sh qwen2.5-coder:1.5b "1 GB"
 
 # Demo 1: Simple Function Creation
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
