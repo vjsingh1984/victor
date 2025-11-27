@@ -27,36 +27,32 @@ const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
 const RECONNECT_INTERVAL = 2000; // 2 seconds
 const MAX_RECONNECT_ATTEMPTS = 5;
 
+function loadInitialSessions(): ChatSession[] {
+  try {
+    const saved = localStorage.getItem('chatSessions');
+    if (saved) {
+      const parsed: ChatSession[] = JSON.parse(saved);
+      if (parsed.length) return parsed;
+    }
+  } catch (error) {
+    console.error("Failed to parse chat sessions from localStorage", error);
+  }
+  return [createSession("Session 1")];
+}
+
 function createSession(title?: string): ChatSession {
   const id = crypto.randomUUID();
   return { id, title: title || "New session", messages: [WELCOME] };
 }
 
 function App() {
-  const [sessions, setSessions] = useState<ChatSession[]>(() => {
-    try {
-      const saved = localStorage.getItem('chatSessions');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (error) {
-      console.error("Failed to parse chat sessions from localStorage", error);
-    }
-    return [createSession("Session 1")];
-  });
+  const initialSessionsRef = useRef<ChatSession[] | null>(null);
+  if (!initialSessionsRef.current) {
+    initialSessionsRef.current = loadInitialSessions();
+  }
 
-  const [selectedId, setSelectedId] = useState<string>(() => {
-    const saved = localStorage.getItem('chatSessions');
-    if (saved) {
-      try {
-        const parsed: ChatSession[] = JSON.parse(saved);
-        if (parsed.length) return parsed[0].id;
-      } catch {
-        return "";
-      }
-    }
-    return "";
-  });
+  const [sessions, setSessions] = useState<ChatSession[]>(() => initialSessionsRef.current || []);
+  const [selectedId, setSelectedId] = useState<string>(() => initialSessionsRef.current?.[0]?.id || "");
 
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
   const [isTyping, setIsTyping] = useState(false);
@@ -64,9 +60,11 @@ function App() {
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
 
   const ws = useRef<WebSocket | null>(null);
+  const wsSessionIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messageQueueRef = useRef<string[]>([]);
+  const reconnectAttemptsRef = useRef<number>(0);
 
   const selectedSession = sessions.find((s) => s.id === selectedId) || sessions[0];
   const messages = selectedSession ? selectedSession.messages : [];
@@ -83,12 +81,6 @@ function App() {
       console.error("Failed to save chat sessions to localStorage", error);
     }
   }, [sessions]);
-
-  useEffect(() => {
-    if (!selectedId && sessions.length > 0) {
-      setSelectedId(sessions[0].id);
-    }
-  }, [selectedId, sessions]);
 
   // Online/offline detection
   useEffect(() => {
@@ -117,18 +109,29 @@ function App() {
       return;
     }
 
-    // Clear existing connection
-    if (ws.current) {
+    // Avoid duplicate connections for the same session while one is open/connecting
+    if (
+      ws.current &&
+      wsSessionIdRef.current === selectedSession.id &&
+      (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)
+    ) {
+      return ws.current;
+    }
+
+    // Clear existing connection when switching sessions or after failure
+    if (ws.current && ws.current.readyState !== WebSocket.CLOSED) {
       ws.current.close();
     }
 
     setConnectionStatus('connecting');
     const socket = new WebSocket(`${WS_URL}?session_id=${selectedSession.id}`);
     ws.current = socket;
+    wsSessionIdRef.current = selectedSession.id;
 
     socket.onopen = () => {
       console.log("WebSocket connected", selectedSession.id);
       setConnectionStatus('connected');
+      reconnectAttemptsRef.current = 0;
       setReconnectAttempts(0);
 
       // Process queued messages
@@ -221,18 +224,22 @@ function App() {
       console.log("WebSocket disconnected", selectedSession.id, event.code, event.reason);
       setConnectionStatus('disconnected');
       setIsTyping(false);
+      ws.current = null;
+      wsSessionIdRef.current = null;
 
       // Attempt reconnection if not intentional close
-      if (isOnline && reconnectAttempts < MAX_RECONNECT_ATTEMPTS && event.code !== 1000) {
+      if (isOnline && reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS && event.code !== 1000) {
         setConnectionStatus('reconnecting');
-        const delay = Math.min(RECONNECT_INTERVAL * Math.pow(2, reconnectAttempts), 30000);
-        console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`);
+        const delay = Math.min(RECONNECT_INTERVAL * Math.pow(2, reconnectAttemptsRef.current), 30000);
+        console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${MAX_RECONNECT_ATTEMPTS})`);
 
         reconnectTimeoutRef.current = setTimeout(() => {
-          setReconnectAttempts(prev => prev + 1);
+          reconnectAttemptsRef.current += 1;
+          setReconnectAttempts(reconnectAttemptsRef.current);
+          // Trigger reconnection by calling connectWebSocket
           connectWebSocket();
         }, delay);
-      } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      } else if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
         setSessions((prev) =>
           prev.map((sess) => {
             if (!selectedSession || sess.id !== selectedSession.id) return sess;
@@ -253,7 +260,7 @@ function App() {
     };
 
     return socket;
-  }, [selectedSession?.id, isOnline, reconnectAttempts]);
+  }, [selectedSession?.id, isOnline]);
 
   useEffect(() => {
     const socket = connectWebSocket();
@@ -264,6 +271,8 @@ function App() {
       }
       if (socket) {
         socket.close(1000, "Component unmounting");
+        ws.current = null;
+        wsSessionIdRef.current = null;
       }
     };
   }, [connectWebSocket]);
