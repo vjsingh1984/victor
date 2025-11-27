@@ -5,7 +5,6 @@ import subprocess
 import tempfile
 import time
 import os
-from contextvars import ContextVar
 from datetime import datetime, timedelta
 from typing import Dict, Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Response, HTTPException
@@ -13,29 +12,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from victor.config.settings import load_settings
 from victor.agent.orchestrator import AgentOrchestrator
 
-# Request ID context variable for tracing requests through logs
-request_id_var: ContextVar[str] = ContextVar("request_id", default="")
-
-
-class RequestIdFilter(logging.Filter):
-    """Logging filter that adds request ID to log records."""
-
-    def filter(self, record):
-        request_id = request_id_var.get()
-        record.request_id = f"[{request_id[:8]}]" if request_id else ""
-        return True
-
-
-# Configure logging with request ID support
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(request_id)s%(message)s'
-)
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-# Add filter to root logger so ALL loggers have request_id field
-root_logger = logging.getLogger()
-root_logger.addFilter(RequestIdFilter())
 
 app = FastAPI(title="Victor AI Assistant API", version="2.0.0")
 
@@ -393,10 +372,6 @@ async def websocket_endpoint(websocket: WebSocket):
                     timeout=MESSAGE_TIMEOUT
                 )
 
-                # Set request ID for this message (for log tracing)
-                msg_request_id = str(uuid.uuid4())
-                request_id_var.set(msg_request_id)
-
                 logger.info(f"Session {session_id}: Received message")
 
                 # Update last activity
@@ -423,10 +398,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 except Exception as e:
                     logger.error(f"Session {session_id}: Error during agent response: {e}", exc_info=True)
                     await websocket.send_text(f"[error] An error occurred while processing your request: {str(e)}")
-
-                finally:
-                    # Clear request ID after processing message
-                    request_id_var.set("")
 
             except asyncio.TimeoutError:
                 logger.warning(f"Session {session_id}: Timeout waiting for message")
