@@ -51,6 +51,37 @@ RUN python3 -c "from sentence_transformers import SentenceTransformer; \
     print(f'📊 Model dimension: {model.get_sentence_embedding_dimension()}'); \
     import os; print(f'📂 Cache location: {os.path.expanduser(\"~/.cache\")}')"
 
+# Pre-compute tool embeddings cache for faster startup
+# This creates the pickle cache during build so it's ready immediately
+RUN mkdir -p /root/.victor/embeddings && \
+    python3 -c "import asyncio; \
+    from pathlib import Path; \
+    from victor.config.settings import Settings; \
+    from victor.tools.base import ToolRegistry; \
+    from victor.tools.semantic_selector import SemanticToolSelector; \
+    from victor.tools.filesystem import read_file, write_file, list_directory; \
+    from victor.tools.bash import execute_bash; \
+    from victor.tools.file_editor_tool import edit_files; \
+    async def init(): \
+        print('🧠 Pre-computing tool embeddings cache...'); \
+        settings = Settings(); \
+        selector = SemanticToolSelector( \
+            embedding_model=settings.embedding_model, \
+            embedding_provider=settings.embedding_provider, \
+            cache_embeddings=True \
+        ); \
+        tools = ToolRegistry(); \
+        tools.register(read_file); \
+        tools.register(write_file); \
+        tools.register(list_directory); \
+        tools.register(execute_bash); \
+        tools.register(edit_files); \
+        await selector.initialize_tool_embeddings(tools); \
+        cache_file = Path.home() / '.victor' / 'embeddings' / f'tool_embeddings_{settings.embedding_model}.pkl'; \
+        print(f'✅ Tool embeddings cached: {cache_file}'); \
+        print(f'📊 Cache size: {cache_file.stat().st_size / 1024:.2f} KB'); \
+    asyncio.run(init())" || echo "⚠️  Tool embedding cache will be created at runtime"
+
 # Stage 2: Runtime
 FROM python:3.12-slim
 
@@ -78,6 +109,9 @@ COPY --from=builder /app /app
 # This makes the Docker image 100% offline-capable
 COPY --from=builder /root/.cache /tmp/.cache
 
+# Copy pre-computed tool embeddings cache
+COPY --from=builder /root/.victor /tmp/.victor
+
 # Copy examples and demos
 COPY examples ./examples
 COPY docs ./docs
@@ -85,10 +119,14 @@ COPY docs ./docs
 # Copy docker scripts and config
 COPY docker ./docker
 
-# Create cache directory and copy model to victor's home
-RUN mkdir -p /home/victor/.cache && \
+# Create directories and copy caches to victor's home
+RUN mkdir -p /home/victor/.cache /home/victor/.victor/embeddings && \
     cp -r /tmp/.cache/* /home/victor/.cache/ && \
-    rm -rf /tmp/.cache
+    cp -r /tmp/.victor/* /home/victor/.victor/ 2>/dev/null || true && \
+    rm -rf /tmp/.cache /tmp/.victor
+
+# Copy default profiles for Docker deployment
+RUN cp /app/docker/profiles.yaml /home/victor/.victor/profiles.yaml
 
 # Set ownership
 RUN chown -R victor:victor /app /home/victor
