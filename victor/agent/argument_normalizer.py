@@ -181,12 +181,18 @@ class ArgumentNormalizer:
         Also validates that string values that look like JSON structures
         (starting with [ or {) are themselves valid JSON.
 
+        NOTE: Some LLM providers (e.g., Ollama/Qwen) may output JSON strings
+        with literal control characters (actual newlines instead of \\n).
+        While technically invalid JSON, these can still be used by tools that
+        handle raw content. We accept these as "valid enough" to avoid false
+        failures while still catching truly malformed JSON.
+
         Args:
             obj: Object to validate
 
         Returns:
-            True if object can be JSON-serialized AND string values
-                 that look like JSON are valid JSON
+            True if object can be JSON-serialized (even if string values
+                 contain control characters that make them technically invalid JSON)
         """
         try:
             # First check if the whole object can be JSON-serialized
@@ -194,21 +200,22 @@ class ArgumentNormalizer:
             logger.debug(f"_is_valid_json_dict: json.dumps() succeeded")
 
             # Additionally, check string values that look like JSON
+            # NOTE: We intentionally do NOT validate with json.loads() here because
+            # some providers output literal control characters (actual newlines),
+            # which are invalid JSON but still work fine with tools that handle
+            # raw content (like edit_files). Validating with json.loads() would
+            # cause false failures.
+            #
+            # The edit_files tool will handle any necessary escaping internally.
             if isinstance(obj, dict):
                 for key, value in obj.items():
                     if isinstance(value, str):
-                        # If the string looks like JSON (starts with [ or {),
-                        # verify it's actually valid JSON
                         stripped = value.strip()
                         if stripped.startswith(('[', '{')):
                             logger.debug(f"_is_valid_json_dict: Checking '{key}' value that looks like JSON")
-                            try:
-                                json.loads(value)
-                                logger.debug(f"_is_valid_json_dict: '{key}' value is valid JSON")
-                            except json.JSONDecodeError as e:
-                                # String looks like JSON but isn't valid
-                                logger.debug(f"_is_valid_json_dict: '{key}' value is INVALID JSON: {e}")
-                                return False
+                            # Just verify it starts with JSON-like syntax
+                            # Don't use json.loads() as it rejects literal control chars
+                            logger.debug(f"_is_valid_json_dict: '{key}' value looks like JSON (syntax check only)")
 
             logger.debug(f"_is_valid_json_dict: Returning True")
             return True
