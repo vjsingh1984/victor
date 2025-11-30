@@ -26,8 +26,8 @@ class ToolParameter(BaseModel):
     name: str = Field(..., description="Parameter name")
     type: str = Field(..., description="Parameter type (string, number, boolean, etc.)")
     description: str = Field(..., description="Parameter description")
-    enum: Optional[list[str]] = Field(None, description="Allowed values for enum types")
-    required: bool = Field(True, description="Whether parameter is required")
+    enum: Optional[list[str]] = Field(default=None, description="Allowed values for enum types")
+    required: bool = Field(default=True, description="Whether parameter is required")
 
 
 class ToolResult(BaseModel):
@@ -35,8 +35,8 @@ class ToolResult(BaseModel):
 
     success: bool = Field(..., description="Whether execution succeeded")
     output: Any = Field(..., description="Tool output data")
-    error: Optional[str] = Field(None, description="Error message if failed")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+    error: Optional[str] = Field(default=None, description="Error message if failed")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
 
 
 class BaseTool(ABC):
