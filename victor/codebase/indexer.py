@@ -20,11 +20,14 @@ Supports both keyword search and semantic search (with embeddings).
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import ast
 import asyncio
 
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from victor.codebase.embeddings.base import BaseEmbeddingProvider
 
 
 class Symbol(BaseModel):
@@ -101,7 +104,7 @@ class CodebaseIndex:
 
         # Embedding support (optional)
         self.use_embeddings = use_embeddings
-        self.embedding_provider = None
+        self.embedding_provider: Optional["BaseEmbeddingProvider"] = None
         if use_embeddings:
             self._initialize_embeddings(embedding_config)
 
@@ -140,6 +143,9 @@ class CodebaseIndex:
 
     async def _index_with_embeddings(self) -> None:
         """Index symbols with embeddings for semantic search."""
+        if not self.embedding_provider:
+            return
+
         print("\n🤖 Generating embeddings for semantic search...")
 
         # Initialize provider if needed
@@ -423,7 +429,7 @@ class SymbolVisitor(ast.NodeVisitor):
 
     def __init__(self, metadata: FileMetadata):
         self.metadata = metadata
-        self.current_class = None
+        self.current_class: Optional[str] = None
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Visit class definition."""

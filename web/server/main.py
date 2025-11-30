@@ -122,19 +122,19 @@ def _render_drawio_svg(source: str) -> str:
 
 
 @app.post("/render/plantuml")
-async def render_plantuml(payload: str = Body(..., media_type="text/plain")):
+async def render_plantuml(payload: str = Body(..., media_type="text/plain")) -> Response:
     svg = _render_plantuml_svg(payload)
     return Response(content=svg, media_type="image/svg+xml")
 
 
 @app.post("/render/mermaid")
-async def render_mermaid(payload: str = Body(..., media_type="text/plain")):
+async def render_mermaid(payload: str = Body(..., media_type="text/plain")) -> Response:
     svg = _render_mermaid_svg(payload)
     return Response(content=svg, media_type="image/svg+xml")
 
 
 @app.post("/render/drawio")
-async def render_drawio(payload: str = Body(..., media_type="text/plain")):
+async def render_drawio(payload: str = Body(..., media_type="text/plain")) -> Response:
     svg = _render_drawio_svg(payload)
     return Response(content=svg, media_type="image/svg+xml")
 
@@ -206,7 +206,9 @@ def _render_d2_svg(source: str) -> str:
 
 
 @app.post("/render/graphviz")
-async def render_graphviz(payload: str = Body(..., media_type="text/plain"), engine: str = "dot"):
+async def render_graphviz(
+    payload: str = Body(..., media_type="text/plain"), engine: str = "dot"
+) -> Response:
     """Render Graphviz DOT diagram to SVG.
 
     Query param 'engine' can be: dot (default), neato, fdp, circo, twopi, sfdp
@@ -216,13 +218,13 @@ async def render_graphviz(payload: str = Body(..., media_type="text/plain"), eng
 
 
 @app.post("/render/d2")
-async def render_d2(payload: str = Body(..., media_type="text/plain")):
+async def render_d2(payload: str = Body(..., media_type="text/plain")) -> Response:
     """Render D2 diagram to SVG."""
     svg = _render_d2_svg(payload)
     return Response(content=svg, media_type="image/svg+xml")
 
 
-async def heartbeat_loop(websocket: WebSocket, session_id: str):
+async def heartbeat_loop(websocket: WebSocket, session_id: str) -> None:
     """Send periodic ping messages to keep connection alive and detect dead connections."""
     try:
         while True:
@@ -240,7 +242,7 @@ async def heartbeat_loop(websocket: WebSocket, session_id: str):
         logger.debug(f"Heartbeat loop cancelled for session {session_id}")
 
 
-async def cleanup_idle_sessions():
+async def cleanup_idle_sessions() -> None:
     """Background task to clean up idle sessions to prevent memory leaks."""
     logger.info("Starting idle session cleanup task")
     try:
@@ -288,7 +290,7 @@ async def cleanup_idle_sessions():
 
 
 @app.on_event("startup")
-async def startup_event():
+async def startup_event() -> None:
     """Start background tasks on server startup."""
     logger.info("Starting background tasks...")
     task = asyncio.create_task(cleanup_idle_sessions())
@@ -297,7 +299,7 @@ async def startup_event():
 
 
 @app.on_event("shutdown")
-async def shutdown_event():
+async def shutdown_event() -> None:
     """Clean up background tasks and sessions on server shutdown."""
     logger.info("Shutting down background tasks...")
 
@@ -329,7 +331,7 @@ async def shutdown_event():
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict[str, Any]:
     """Health check endpoint."""
     return {
         "status": "healthy",
@@ -339,7 +341,7 @@ async def health_check():
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket) -> None:
     """Enhanced WebSocket endpoint with heartbeat, timeout, and error handling."""
     session_id = None
     heartbeat_task = None

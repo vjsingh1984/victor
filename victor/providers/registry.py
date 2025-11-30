@@ -18,6 +18,8 @@ from typing import Any, Dict, Type
 
 from victor.providers.base import BaseProvider, ProviderNotFoundError
 
+__all__ = ["ProviderRegistry", "ProviderNotFoundError"]
+
 
 class ProviderRegistry:
     """Registry for LLM provider management."""

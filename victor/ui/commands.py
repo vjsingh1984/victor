@@ -476,9 +476,9 @@ class SlashCommandHandler:
                 if resp.status_code == 200:
                     data = resp.json() or {}
                     models = [
-                        m.get("id") or m.get("model")
+                        str(m.get("id") or m.get("model") or "")
                         for m in data.get("data", [])
-                        if isinstance(m, dict)
+                        if isinstance(m, dict) and (m.get("id") or m.get("model"))
                     ]
             except Exception:
                 pass
@@ -516,17 +516,16 @@ class SlashCommandHandler:
         table.add_column("Description")
         table.add_column("Status", style="green")
 
-        for tool_name in sorted(self.agent.tools.list_tools()):
-            tool = self.agent.tools.get_tool(tool_name)
-            if not tool:
-                continue
+        tools = self.agent.tools.list_tools()
+        for tool in sorted(tools, key=lambda t: t.name):
+            tool_name = tool.name
 
             # Filter by search pattern
             if search and search not in tool_name.lower():
                 continue
 
-            desc = getattr(tool, "description", "")[:60]
-            if len(getattr(tool, "description", "")) > 60:
+            desc = (tool.description or "")[:60]
+            if len(tool.description or "") > 60:
                 desc += "..."
 
             status = "enabled"

@@ -17,10 +17,10 @@
 import asyncio
 import logging
 import os
-from typing import Optional
+from typing import Any, Optional
 
 try:
-    import readline  # type: ignore
+    import readline  # noqa: F401 - readline modifies input() behavior
 
     _history_enabled = True
     readline.set_history_length(1000)
@@ -149,7 +149,7 @@ def main(
 
 async def run_oneshot(
     message: str,
-    settings: any,
+    settings: Any,
     profile: str,
     stream: bool,
     thinking: bool = False,
@@ -190,7 +190,7 @@ async def run_oneshot(
 
 
 async def run_interactive(
-    settings: any,
+    settings: Any,
     profile: str,
     stream: bool,
     thinking: bool = False,
