@@ -51,7 +51,7 @@ class TestDockerAvailability:
     def test_docker_unavailable_graceful_handling(self):
         """Test graceful handling when Docker is not available."""
         # Mock docker.from_env() to raise DockerException
-        with patch('docker.from_env', side_effect=DockerException("Docker not available")):
+        with patch("docker.from_env", side_effect=DockerException("Docker not available")):
             manager = CodeExecutionManager(require_docker=False)
 
             # Should handle unavailability gracefully
@@ -65,7 +65,7 @@ class TestDockerAvailability:
     def test_docker_required_raises_error(self):
         """Test that require_docker=True raises error when Docker unavailable."""
         # Mock docker.from_env() to raise DockerException
-        with patch('docker.from_env', side_effect=DockerException("Docker not available")):
+        with patch("docker.from_env", side_effect=DockerException("Docker not available")):
             with pytest.raises(RuntimeError, match="Docker is not running or not installed"):
                 CodeExecutionManager(require_docker=True)
 
@@ -97,7 +97,7 @@ class TestDockerAvailability:
 
     def test_start_with_docker_unavailable(self):
         """Test starting execution manager with Docker unavailable."""
-        with patch('docker.from_env', side_effect=DockerException("Docker not available")):
+        with patch("docker.from_env", side_effect=DockerException("Docker not available")):
             manager = CodeExecutionManager(require_docker=False)
 
             # Should not raise error when starting without Docker
@@ -108,7 +108,7 @@ class TestDockerAvailability:
 
     def test_execute_with_docker_unavailable(self):
         """Test code execution when Docker is unavailable."""
-        with patch('docker.from_env', side_effect=DockerException("Docker not available")):
+        with patch("docker.from_env", side_effect=DockerException("Docker not available")):
             manager = CodeExecutionManager(require_docker=False)
 
             result = manager.execute("print('Hello')")
@@ -150,7 +150,7 @@ class TestDockerAvailability:
 
     def test_stop_with_docker_unavailable(self):
         """Test stopping manager when Docker is unavailable."""
-        with patch('docker.from_env', side_effect=DockerException("Docker not available")):
+        with patch("docker.from_env", side_effect=DockerException("Docker not available")):
             manager = CodeExecutionManager(require_docker=False)
 
             # Should not raise error
@@ -160,7 +160,7 @@ class TestDockerAvailability:
 
     def test_put_files_with_docker_unavailable(self):
         """Test put_files when Docker is unavailable."""
-        with patch('docker.from_env', side_effect=DockerException("Docker not available")):
+        with patch("docker.from_env", side_effect=DockerException("Docker not available")):
             manager = CodeExecutionManager(require_docker=False)
 
             # Should not raise error
@@ -170,7 +170,7 @@ class TestDockerAvailability:
 
     def test_get_file_with_docker_unavailable(self):
         """Test get_file when Docker is unavailable."""
-        with patch('docker.from_env', side_effect=DockerException("Docker not available")):
+        with patch("docker.from_env", side_effect=DockerException("Docker not available")):
             manager = CodeExecutionManager(require_docker=False)
 
             # Should return empty bytes instead of crashing
@@ -192,9 +192,9 @@ class TestDockerIntegration:
             if not manager.docker_available:
                 pytest.skip("Docker not available for integration test")
 
-            print("\n" + "="*70)
+            print("\n" + "=" * 70)
             print("FULL DOCKER INTEGRATION TEST")
-            print("="*70)
+            print("=" * 70)
 
             # Step 1: Start container
             print("\n1. Starting Docker container...")
@@ -222,7 +222,7 @@ print(f"2 + 2 = {result}")
 
             print(f"   ✓ Execution successful")
             print(f"\n   Output:")
-            for line in result["stdout"].strip().split('\n'):
+            for line in result["stdout"].strip().split("\n"):
                 print(f"   {line}")
 
             # Step 3: Test error handling
@@ -240,9 +240,9 @@ print(f"2 + 2 = {result}")
             manager.stop()
             print(f"   ✓ Container stopped successfully")
 
-            print("\n" + "="*70)
+            print("\n" + "=" * 70)
             print("✅ FULL DOCKER INTEGRATION TEST PASSED")
-            print("="*70)
+            print("=" * 70)
 
         except RuntimeError as e:
             if "Docker" in str(e):

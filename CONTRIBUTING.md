@@ -23,6 +23,11 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
+### 2.5 Repository Layout
+
+- Active code lives under `victor/` (providers, tools, orchestrator, CLI).
+- Prefer `docs/` and `docker/` as canonical homes for documentation.
+
 ### 3. Create a Branch
 
 ```bash

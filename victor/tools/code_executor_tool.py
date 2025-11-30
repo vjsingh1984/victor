@@ -17,16 +17,16 @@ A tool for executing Python code in a secure, stateful Docker container.
 """
 
 import io
-import os
 import tarfile
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import List
 
 # Optional docker import
 try:
     import docker
     from docker.models.containers import Container
     from docker.errors import DockerException
+
     DOCKER_AVAILABLE = True
 except ImportError:
     DOCKER_AVAILABLE = False
@@ -51,9 +51,7 @@ class CodeExecutionManager:
 
         if not DOCKER_AVAILABLE:
             if require_docker:
-                raise RuntimeError(
-                    "Docker package not installed. Install with: pip install docker"
-                )
+                raise RuntimeError("Docker package not installed. Install with: pip install docker")
             # Docker package not available - continue without it
             return
 
@@ -68,7 +66,7 @@ class CodeExecutionManager:
             # Docker not available, but not required - continue without it
             self.docker_client = None
 
-    def start(self):
+    def start(self) -> None:
         """Starts the persistent Docker container."""
         if not self.docker_available:
             # Docker not available - skip container startup
@@ -90,7 +88,7 @@ class CodeExecutionManager:
             self.container = None
             raise RuntimeError(f"Failed to start Docker container: {e}")
 
-    def stop(self):
+    def stop(self) -> None:
         """Stops and removes the Docker container."""
         if not self.docker_available:
             # Docker not available - nothing to stop
@@ -160,10 +158,10 @@ class CodeExecutionManager:
             raise RuntimeError("Execution session not started. Call start() first.")
 
         bits, _ = self.container.get_archive(remote_path)
-        
+
         # Read the tar archive from the bits
         with io.BytesIO(b"".join(bits)) as tar_stream:
-            with tarfile.open(fileobj=tar_stream, mode='r') as tar:
+            with tarfile.open(fileobj=tar_stream, mode="r") as tar:
                 # Assuming the tar contains one file
                 member = tar.getmembers()[0]
                 file_obj = tar.extractfile(member)
@@ -188,13 +186,13 @@ async def execute_python_in_sandbox(code: str, context: dict) -> str:
     manager: CodeExecutionManager = context.get("code_manager")
     if not manager:
         return "Error: CodeExecutionManager not found in context."
-    
+
     result = manager.execute(code)
-    
+
     output = f"Exit Code: {result['exit_code']}\n"
-    if result['stdout']:
+    if result["stdout"]:
         output += f"--- STDOUT ---\n{result['stdout']}\n"
-    if result['stderr']:
+    if result["stderr"]:
         output += f"--- STDERR ---\n{result['stderr']}\n"
     return output
 
@@ -215,10 +213,9 @@ async def upload_files_to_sandbox(file_paths: List[str], context: dict) -> str:
     manager: CodeExecutionManager = context.get("code_manager")
     if not manager:
         return "Error: CodeExecutionManager not found in context."
-    
+
     try:
         manager.put_files(file_paths)
         return f"Successfully uploaded {len(file_paths)} files to the sandbox."
     except Exception as e:
         return f"Error uploading files: {e}"
-

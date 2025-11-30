@@ -41,8 +41,8 @@ async def main():
             "vector_store": "chromadb",
             "embedding_model_type": "sentence-transformers",
             "embedding_model_name": "all-mpnet-base-v2",  # Best quality local model
-            "persist_directory": "~/.victor/embeddings/demo"
-        }
+            "persist_directory": "~/.victor/embeddings/demo",
+        },
     )
 
     # Index the codebase
@@ -72,11 +72,11 @@ async def main():
         "Functions related to HTTP requests",
         "Code for parsing command line arguments",
         "Embedding and vector search implementation",
-        "Tool execution and error handling"
+        "Tool execution and error handling",
     ]
 
     for query in queries:
-        print(f"\n💬 Query: \"{query}\"")
+        print(f'\n💬 Query: "{query}"')
         print("-" * 70)
 
         try:
@@ -99,7 +99,7 @@ async def main():
     print("=" * 70)
 
     test_query = "authentication middleware"
-    print(f"\nQuery: \"{test_query}\"")
+    print(f'\nQuery: "{test_query}"')
 
     print("\n1️⃣ Keyword Search (traditional):")
     keyword_results = await indexer.find_relevant_files(test_query, max_files=3)

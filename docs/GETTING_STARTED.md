@@ -1,6 +1,8 @@
 # Getting Started with Victor
 
-Victor is a universal terminal-based AI coding assistant with 31+ enterprise-grade tools, supporting multiple LLM providers (Claude, GPT, Gemini, Ollama, vLLM, LMStudio) with 100% air-gapped capability.
+> Reality check: semantic tool selection is enabled by default; disable via `profiles.yaml` if desired. Stage pruning falls back to a small core tool set capped by `fallback_max_tools` (default 8) to avoid broadcasting everything. Allowlisted tools are cached (`tool_cache_*` settings) to avoid rerunning pure operations. `security_scan` is regex-only today (no CVE/IaC/package-audit yet). Docker users should prefer `docker/README.md` + `docker/QUICKREF.md`. The active package is `victor/`; the old copy now lives at `archive/victor-legacy/` and should be ignored.
+
+Victor is a universal terminal-based AI coding assistant with 35 consolidated tools, supporting multiple LLM providers (Claude, GPT, Gemini, Ollama, vLLM, LMStudio) with 100% air-gapped capability.
 
 ## Quick Start (5 minutes)
 
@@ -28,8 +30,8 @@ victor main
 
 # Victor will:
 # - Use Ollama as the default provider
-# - Use semantic tool selection (offline, fast)
-# - Load 31 enterprise tools automatically
+# - Use semantic tool selection when embeddings are available (falls back to keywords)
+# - Load 35 tools automatically (editor, git, tests, docker, docs, refactors, web, etc.)
 ```
 
 Example session:
@@ -37,7 +39,7 @@ Example session:
 $ victor main
 🤖 Victor v0.1.0 - Universal AI Coding Assistant
 Provider: ollama (qwen2.5-coder:7b)
-Tools: 31 loaded (semantic selection enabled)
+Tools: 35 loaded (semantic selection enabled)
 
 You: Write a Python function to validate email addresses
 
@@ -141,6 +143,13 @@ EMBEDDING_MODEL=all-MiniLM-L12-v2
 CODEBASE_VECTOR_STORE=lancedb
 CODEBASE_EMBEDDING_PROVIDER=sentence-transformers
 ```
+
+## Reality check (current limits)
+
+- `semantic_code_search` provides embedding-backed search (auto-reindexes when files change); `code_search` remains keyword-based. Install sentence-transformers + lancedb/chromadb for embeddings.
+- `security_scan` currently checks for regex-based secrets and obvious config flags only; dependency/IaC/CVE scanning is not yet integrated.
+- Tool surface: 35 tools ship by default (editor, git, tests, docker, docs, refactors, web). Coverage analysis and rich CI/CD generators are not implemented yet. See `docs/TOOL_CATALOG.md` (generated via `python scripts/generate_tool_catalog.py`) for the live list.
+- Package layout: the `victor/` package is the active code path used by the CLI.
 
 ## Common Use Cases
 

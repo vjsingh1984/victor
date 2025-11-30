@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 # Helper functions for docstring generation
 
+
 def _generate_function_docstring(node: ast.FunctionDef, format: str) -> str:
     """Generate function docstring."""
     func_name = node.name
@@ -115,27 +116,33 @@ def _extract_api_info(tree: ast.AST, module_name: str) -> Dict[str, Any]:
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef):
             if not node.name.startswith("_"):
-                functions.append({
-                    "name": node.name,
-                    "docstring": ast.get_docstring(node) or "No description",
-                    "args": [arg.arg for arg in node.args.args],
-                })
+                functions.append(
+                    {
+                        "name": node.name,
+                        "docstring": ast.get_docstring(node) or "No description",
+                        "args": [arg.arg for arg in node.args.args],
+                    }
+                )
         elif isinstance(node, ast.ClassDef):
             methods = []
             for item in node.body:
                 if isinstance(item, ast.FunctionDef):
                     if not item.name.startswith("_") or item.name in ("__init__", "__str__"):
-                        methods.append({
-                            "name": item.name,
-                            "docstring": ast.get_docstring(item) or "No description",
-                            "args": [arg.arg for arg in item.args.args if arg.arg != "self"],
-                        })
+                        methods.append(
+                            {
+                                "name": item.name,
+                                "docstring": ast.get_docstring(item) or "No description",
+                                "args": [arg.arg for arg in item.args.args if arg.arg != "self"],
+                            }
+                        )
 
-            classes.append({
-                "name": node.name,
-                "docstring": ast.get_docstring(node) or "No description",
-                "methods": methods,
-            })
+            classes.append(
+                {
+                    "name": node.name,
+                    "docstring": ast.get_docstring(node) or "No description",
+                    "methods": methods,
+                }
+            )
 
     return {
         "module": module_name,
@@ -219,7 +226,6 @@ pip install -e ".[dev]"
 - Python 3.10+
 - Dependencies listed in `requirements.txt`
 """,
-
     "usage": """## Usage
 
 ### Quick Start
@@ -256,7 +262,6 @@ result = instance.advanced_method(
 your-command --option value
 ```
 """,
-
     "contributing": """## Contributing
 
 We welcome contributions! Please follow these guidelines:
@@ -301,7 +306,6 @@ black --check .
 
 Please use the GitHub issue tracker to report bugs or request features.
 """,
-
     "features": """## Features
 
 - **Feature 1**: Description of feature 1
@@ -322,7 +326,6 @@ Detailed description of feature 2 with examples.
 
 Detailed description of feature 3 with examples.
 """,
-
     "api": """## API Reference
 
 ### Main Classes
@@ -355,13 +358,14 @@ For complete API documentation, see [API Docs](docs/api.md).
 
 # Consolidated tools
 
+
 @tool
 async def generate_docs(
     path: str,
     doc_types: List[str] = None,
     format: str = "google",
     output: Optional[str] = None,
-    recursive: bool = False
+    recursive: bool = False,
 ) -> Dict[str, Any]:
     """
     Unified documentation generation tool.
@@ -446,10 +450,19 @@ async def generate_docs(
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
                     if not ast.get_docstring(node):
-                        items_to_document.append({"type": "function", "name": node.name, "node": node, "line": node.lineno})
+                        items_to_document.append(
+                            {
+                                "type": "function",
+                                "name": node.name,
+                                "node": node,
+                                "line": node.lineno,
+                            }
+                        )
                 elif isinstance(node, ast.ClassDef):
                     if not ast.get_docstring(node):
-                        items_to_document.append({"type": "class", "name": node.name, "node": node, "line": node.lineno})
+                        items_to_document.append(
+                            {"type": "class", "name": node.name, "node": node, "line": node.lineno}
+                        )
 
             if items_to_document:
                 # Generate and insert docstrings
@@ -485,10 +498,12 @@ async def generate_docs(
         results["docstrings"] = {
             "generated": total_generated,
             "files_processed": processed_files,
-            "format": format
+            "format": format,
         }
 
-        report.append(f"Docstrings: Generated {total_generated} docstrings in {processed_files} files")
+        report.append(
+            f"Docstrings: Generated {total_generated} docstrings in {processed_files} files"
+        )
 
     # Generate API documentation
     if "api" in doc_types:
@@ -524,11 +539,13 @@ async def generate_docs(
             "output_file": output,
             "functions_count": len(api_info["functions"]),
             "classes_count": len(api_info["classes"]),
-            "preview": docs[:500]
+            "preview": docs[:500],
         }
 
         report.append(f"API Docs: Generated documentation at {output}")
-        report.append(f"  Functions: {len(api_info['functions'])}, Classes: {len(api_info['classes'])}")
+        report.append(
+            f"  Functions: {len(api_info['functions'])}, Classes: {len(api_info['classes'])}"
+        )
 
     # Generate README sections
     if "readme" in doc_types:
@@ -536,10 +553,7 @@ async def generate_docs(
         section = "installation"
         template = README_TEMPLATES.get(section)
 
-        results["readme"] = {
-            "section": section,
-            "content": template
-        }
+        results["readme"] = {"section": section, "content": template}
 
         report.append(f"README: Generated {section} section")
 
@@ -552,7 +566,7 @@ async def generate_docs(
             "suggestions": [
                 "Add return type annotations",
                 "Add parameter type hints",
-                "Use typing module for complex types"
+                "Use typing module for complex types",
             ]
         }
 
@@ -562,16 +576,13 @@ async def generate_docs(
         "success": True,
         "doc_types_generated": list(results.keys()),
         "results": results,
-        "formatted_report": "\n".join(report)
+        "formatted_report": "\n".join(report),
     }
 
 
 @tool
 async def analyze_docs(
-    path: str,
-    check_coverage: bool = True,
-    check_quality: bool = False,
-    file_pattern: str = "*.py"
+    path: str, check_coverage: bool = True, check_quality: bool = False, file_pattern: str = "*.py"
 ) -> Dict[str, Any]:
     """
     Analyze documentation coverage and quality.
@@ -650,7 +661,9 @@ async def analyze_docs(
                             documented_functions += 1
                             # Check quality
                             if check_quality and len(docstring) < 20:
-                                quality_issues.append(f"Short docstring in {node.name} at {file_obj}:{node.lineno}")
+                                quality_issues.append(
+                                    f"Short docstring in {node.name} at {file_obj}:{node.lineno}"
+                                )
                         else:
                             missing.append(f"Function: {node.name} ({file_obj}:{node.lineno})")
 
@@ -660,7 +673,9 @@ async def analyze_docs(
                     if docstring:
                         documented_classes += 1
                         if check_quality and len(docstring) < 20:
-                            quality_issues.append(f"Short docstring in {node.name} at {file_obj}:{node.lineno}")
+                            quality_issues.append(
+                                f"Short docstring in {node.name} at {file_obj}:{node.lineno}"
+                            )
                     else:
                         missing.append(f"Class: {node.name} ({file_obj}:{node.lineno})")
 
@@ -679,7 +694,9 @@ async def analyze_docs(
         recommendations.append("Good coverage - maintain quality")
 
     if check_quality and quality_issues:
-        recommendations.append(f"Found {len(quality_issues)} quality issues - improve docstring detail")
+        recommendations.append(
+            f"Found {len(quality_issues)} quality issues - improve docstring detail"
+        )
 
     # Build report
     report = []
@@ -726,7 +743,7 @@ async def analyze_docs(
         "missing": missing,
         "quality_issues": quality_issues if check_quality else None,
         "recommendations": recommendations,
-        "formatted_report": "\n".join(report)
+        "formatted_report": "\n".join(report),
     }
 
 
@@ -737,8 +754,9 @@ class DocumentationTool:
     def __init__(self):
         """Initialize - deprecated."""
         import warnings
+
         warnings.warn(
             "DocumentationTool class is deprecated. Use generate_docs and analyze_docs functions instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )

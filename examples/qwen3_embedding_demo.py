@@ -53,18 +53,16 @@ async def main():
         vector_store="chromadb",
         persist_directory="~/.victor/embeddings/qwen3_demo",
         distance_metric="cosine",
-
         # Embedding Model: Qwen3-Embedding:8b (via Ollama)
         embedding_model_type="ollama",
         embedding_model_name="qwen3-embedding:8b",
         embedding_api_key="http://localhost:11434",  # Ollama server URL
-
         # Extra configuration
         extra_config={
             "collection_name": "qwen3_demo",
             "dimension": 4096,  # Qwen3 produces 4096-dim embeddings
             "batch_size": 8,  # Lower for large model (adjust based on RAM)
-        }
+        },
     )
 
     print("📋 Configuration:")
@@ -102,7 +100,7 @@ async def main():
                 "symbol_name": "authenticate_user",
                 "symbol_type": "function",
                 "line_number": 15,
-            }
+            },
         },
         {
             "id": "database.py:create_connection",
@@ -128,7 +126,7 @@ async def main():
                 "symbol_name": "create_connection",
                 "symbol_type": "function",
                 "line_number": 8,
-            }
+            },
         },
         {
             "id": "cache.py:cache_decorator",
@@ -167,7 +165,7 @@ async def main():
                 "symbol_name": "cache_decorator",
                 "symbol_type": "function",
                 "line_number": 22,
-            }
+            },
         },
         {
             "id": "api.py:get_user_endpoint",
@@ -204,7 +202,7 @@ async def get_user_endpoint(
                 "symbol_name": "get_user_endpoint",
                 "symbol_type": "function",
                 "line_number": 45,
-            }
+            },
         },
         {
             "id": "middleware.py:rate_limit_middleware",
@@ -252,8 +250,8 @@ async def get_user_endpoint(
                 "symbol_name": "rate_limit_middleware",
                 "symbol_type": "function",
                 "line_number": 12,
-            }
-        }
+            },
+        },
     ]
 
     # Index documents
@@ -284,7 +282,7 @@ async def get_user_endpoint(
     print("=" * 80)
 
     for i, query in enumerate(queries, 1):
-        print(f"\n{i}. Query: \"{query}\"")
+        print(f'\n{i}. Query: "{query}"')
         print("-" * 80)
 
         results = await provider.search_similar(query, limit=3)
@@ -296,7 +294,7 @@ async def get_user_endpoint(
             print(f"   Line: {result.line_number}")
 
             # Show snippet of content (first 150 chars)
-            snippet = result.content.split('\n')[0][:150]
+            snippet = result.content.split("\n")[0][:150]
             print(f"   Code: {snippet}...")
 
     print("\n" + "=" * 80)

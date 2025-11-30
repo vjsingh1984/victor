@@ -2,6 +2,8 @@
 
 Complete guide for deploying Victor with air-gapped semantic tool selection in Docker.
 
+> Canonical Docker docs now live in `docker/README.md` (guided) and `docker/QUICKREF.md` (commands-only). This file remains as a deeper reference.
+
 ## Quick Start (5 Minutes)
 
 ```bash

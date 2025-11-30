@@ -37,9 +37,7 @@ class TestRunWorkflow:
         workflow_args = {"arg1": "value1", "arg2": "value2"}
 
         result = await run_workflow(
-            workflow_name="test_workflow",
-            context=context,
-            workflow_args=workflow_args
+            workflow_name="test_workflow", context=context, workflow_args=workflow_args
         )
 
         assert result == {"success": True, "result": "completed"}
@@ -51,9 +49,7 @@ class TestRunWorkflow:
         """Test handling of missing workflow registry."""
         context = {}
         result = await run_workflow(
-            workflow_name="test_workflow",
-            context=context,
-            workflow_args={}
+            workflow_name="test_workflow", context=context, workflow_args={}
         )
 
         assert "error" in result
@@ -67,9 +63,7 @@ class TestRunWorkflow:
 
         context = {"workflow_registry": mock_registry}
         result = await run_workflow(
-            workflow_name="nonexistent_workflow",
-            context=context,
-            workflow_args={}
+            workflow_name="nonexistent_workflow", context=context, workflow_args={}
         )
 
         assert "error" in result
@@ -87,9 +81,7 @@ class TestRunWorkflow:
 
         context = {"workflow_registry": mock_registry}
         result = await run_workflow(
-            workflow_name="failing_workflow",
-            context=context,
-            workflow_args={}
+            workflow_name="failing_workflow", context=context, workflow_args={}
         )
 
         assert "error" in result
@@ -100,11 +92,9 @@ class TestRunWorkflow:
     async def test_run_workflow_with_complex_args(self):
         """Test workflow with complex arguments."""
         mock_workflow = MagicMock()
-        mock_workflow.run = AsyncMock(return_value={
-            "success": True,
-            "files_created": 5,
-            "tests_passed": 10
-        })
+        mock_workflow.run = AsyncMock(
+            return_value={"success": True, "files_created": 5, "tests_passed": 10}
+        )
 
         mock_registry = MagicMock()
         mock_registry.get.return_value = mock_workflow
@@ -114,13 +104,11 @@ class TestRunWorkflow:
             "feature_name": "user_authentication",
             "include_tests": True,
             "database_migration": True,
-            "options": {"strict_mode": True}
+            "options": {"strict_mode": True},
         }
 
         result = await run_workflow(
-            workflow_name="new_feature",
-            context=context,
-            workflow_args=workflow_args
+            workflow_name="new_feature", context=context, workflow_args=workflow_args
         )
 
         assert result["success"] is True

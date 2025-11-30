@@ -57,7 +57,7 @@ def moderate_function(values):
         return []
     return [v for v in values if v > 0]
 '''
-        
+
         file_path = Path(temp_dir) / "code.py"
         file_path.write_text(demo_code)
 
@@ -84,6 +84,7 @@ def moderate_function(values):
         print("  • Maintainability index calculation")
         print("  • Technical debt estimation")
         print("  • Code quality insights")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

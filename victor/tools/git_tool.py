@@ -22,7 +22,6 @@ This tool provides:
 """
 
 import subprocess
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from victor.tools.decorators import tool
@@ -54,12 +53,7 @@ def _run_git(*args: str) -> Tuple[bool, str, str]:
         Tuple of (success, stdout, stderr)
     """
     try:
-        result = subprocess.run(
-            ["git"] + list(args),
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
+        result = subprocess.run(["git"] + list(args), capture_output=True, text=True, timeout=30)
         return result.returncode == 0, result.stdout, result.stderr
     except subprocess.TimeoutExpired:
         return False, "", "Git command timed out"
@@ -75,7 +69,7 @@ async def git(
     branch: Optional[str] = None,
     staged: bool = False,
     limit: int = 10,
-    options: Optional[Dict[str, Any]] = None
+    options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Unified git operations tool.
@@ -146,7 +140,7 @@ async def git(
         return {
             "success": True,
             "output": f"Short status:\n{stdout}\n\nFull status:\n{long_status}",
-            "error": ""
+            "error": "",
         }
 
     # Diff operation
@@ -167,7 +161,7 @@ async def git(
             return {
                 "success": True,
                 "output": "No changes to show" if not staged else "No staged changes",
-                "error": ""
+                "error": "",
             }
 
         return {"success": True, "output": stdout, "error": ""}
@@ -190,7 +184,7 @@ async def git(
         return {
             "success": True,
             "output": f"Files staged successfully\n\nStatus:\n{status}",
-            "error": ""
+            "error": "",
         }
 
     # Commit operation
@@ -199,7 +193,7 @@ async def git(
             return {
                 "success": False,
                 "output": "",
-                "error": "Commit message required. Use message parameter."
+                "error": "Commit message required. Use message parameter.",
             }
 
         # Commit with message
@@ -208,19 +202,12 @@ async def git(
         if not success:
             return {"success": False, "output": "", "error": stderr}
 
-        return {
-            "success": True,
-            "output": f"Committed successfully:\n{stdout}",
-            "error": ""
-        }
+        return {"success": True, "output": f"Committed successfully:\n{stdout}", "error": ""}
 
     # Log operation
     elif operation == "log":
         success, stdout, stderr = _run_git(
-            "log",
-            f"-{limit}",
-            "--pretty=format:%h - %s (%an, %ar)",
-            "--graph"
+            "log", f"-{limit}", "--pretty=format:%h - %s (%an, %ar)", "--graph"
         )
 
         if not success:
@@ -250,7 +237,7 @@ async def git(
     else:
         return {
             "success": False,
-            "error": f"Unknown operation: {operation}. Valid operations: status, diff, stage, commit, log, branch"
+            "error": f"Unknown operation: {operation}. Valid operations: status, diff, stage, commit, log, branch",
         }
 
 
@@ -271,7 +258,7 @@ async def git_suggest_commit() -> Dict[str, Any]:
         return {
             "success": False,
             "output": "",
-            "error": "No LLM provider available for AI generation"
+            "error": "No LLM provider available for AI generation",
         }
 
     # Get staged diff
@@ -281,11 +268,7 @@ async def git_suggest_commit() -> Dict[str, Any]:
         return {"success": False, "output": "", "error": stderr}
 
     if not diff:
-        return {
-            "success": False,
-            "output": "",
-            "error": "No staged changes to analyze"
-        }
+        return {"success": False, "output": "", "error": "No staged changes to analyze"}
 
     # Get list of changed files
     _, files, _ = _run_git("diff", "--staged", "--name-only")
@@ -315,35 +298,25 @@ Generate ONLY the commit message, nothing else."""
             model=_model or "default",
             messages=[Message(role="user", content=prompt)],
             temperature=0.3,  # Lower temperature for consistency
-            max_tokens=200
+            max_tokens=200,
         )
 
         message = response.content.strip()
 
         # Clean up message
-        message = message.replace('"', '').replace("'", "")
+        message = message.replace('"', "").replace("'", "")
         if message.startswith("Commit message:"):
             message = message.replace("Commit message:", "").strip()
 
-        return {
-            "success": True,
-            "output": message,
-            "error": ""
-        }
+        return {"success": True, "output": message, "error": ""}
 
     except Exception as e:
-        return {
-            "success": False,
-            "output": "",
-            "error": f"AI generation failed: {str(e)}"
-        }
+        return {"success": False, "output": "", "error": f"AI generation failed: {str(e)}"}
 
 
 @tool
 async def git_create_pr(
-    pr_title: Optional[str] = None,
-    pr_description: Optional[str] = None,
-    base_branch: str = "main"
+    pr_title: Optional[str] = None, pr_description: Optional[str] = None, base_branch: str = "main"
 ) -> Dict[str, Any]:
     """Create a pull request with auto-generated content.
 
@@ -375,11 +348,7 @@ async def git_create_pr(
 
         if success and diff:
             # Get commit log
-            _, log, _ = _run_git(
-                "log",
-                f"{base_branch}..HEAD",
-                "--pretty=format:- %s"
-            )
+            _, log, _ = _run_git("log", f"{base_branch}..HEAD", "--pretty=format:- %s")
 
             # Generate PR content
             prompt = f"""Generate a pull request title and description for these changes.
@@ -413,7 +382,7 @@ DESCRIPTION:
                     model=_model or "default",
                     messages=[Message(role="user", content=prompt)],
                     temperature=0.5,
-                    max_tokens=500
+                    max_tokens=500,
                 )
 
                 content = response.content.strip()
@@ -441,50 +410,50 @@ DESCRIPTION:
         pr_description = "Automatically generated PR description"
 
     # Push branch first
-    success, stdout, stderr = _run_git(
-        "push", "--set-upstream", "origin", current_branch
-    )
+    success, stdout, stderr = _run_git("push", "--set-upstream", "origin", current_branch)
 
     if not success:
-        return {
-            "success": False,
-            "output": "",
-            "error": f"Failed to push branch: {stderr}"
-        }
+        return {"success": False, "output": "", "error": f"Failed to push branch: {stderr}"}
 
     # Create PR with gh CLI
     try:
         result = subprocess.run(
             [
-                "gh", "pr", "create",
-                "--base", base_branch,
-                "--head", current_branch,
-                "--title", pr_title,
-                "--body", pr_description
+                "gh",
+                "pr",
+                "create",
+                "--base",
+                base_branch,
+                "--head",
+                current_branch,
+                "--title",
+                pr_title,
+                "--body",
+                pr_description,
             ],
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=30,
         )
 
         if result.returncode == 0:
             return {
                 "success": True,
                 "output": f"PR created successfully!\n\n{result.stdout}",
-                "error": ""
+                "error": "",
             }
         else:
             return {
                 "success": False,
                 "output": "",
-                "error": f"Failed to create PR: {result.stderr}"
+                "error": f"Failed to create PR: {result.stderr}",
             }
 
     except FileNotFoundError:
         return {
             "success": False,
             "output": "",
-            "error": "GitHub CLI (gh) not found. Install with: brew install gh"
+            "error": "GitHub CLI (gh) not found. Install with: brew install gh",
         }
 
 
@@ -508,18 +477,10 @@ async def git_analyze_conflicts() -> Dict[str, Any]:
         return {"success": False, "output": "", "error": stderr}
 
     # Find conflicted files (marked with UU)
-    conflicted = [
-        line.split()[-1]
-        for line in status.split("\n")
-        if line.startswith("UU")
-    ]
+    conflicted = [line.split()[-1] for line in status.split("\n") if line.startswith("UU")]
 
     if not conflicted:
-        return {
-            "success": True,
-            "output": "No merge conflicts detected",
-            "error": ""
-        }
+        return {"success": True, "output": "No merge conflicts detected", "error": ""}
 
     # Analyze each conflicted file
     analysis = [f"Found {len(conflicted)} conflicted file(s):\n"]
@@ -542,7 +503,7 @@ async def git_analyze_conflicts() -> Dict[str, Any]:
                 start = content.find("<<<<<<< ")
                 end = content.find(">>>>>>> ", start)
                 if end != -1:
-                    conflict_section = content[start:end+50]
+                    conflict_section = content[start : end + 50]
                     analysis.append(f"   First conflict preview:\n   {conflict_section[:200]}...")
 
         except Exception as e:
@@ -560,11 +521,7 @@ async def git_analyze_conflicts() -> Dict[str, Any]:
     analysis.append("3. Stage resolved files: git add <file>")
     analysis.append("4. Continue: git merge --continue or git rebase --continue")
 
-    return {
-        "success": True,
-        "output": "\n".join(analysis),
-        "error": ""
-    }
+    return {"success": True, "output": "\n".join(analysis), "error": ""}
 
 
 # Keep class for backward compatibility
@@ -578,9 +535,10 @@ class GitTool:
     def __init__(self, provider=None, model: Optional[str] = None):
         """Initialize - deprecated."""
         import warnings
+
         warnings.warn(
             "GitTool class is deprecated. Use git and git_* functions instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
         set_git_provider(provider, model)

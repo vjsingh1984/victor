@@ -37,10 +37,7 @@ class TestDatabaseConnect:
             mock_conn = AsyncMock()
             mock_connect.return_value.__aenter__.return_value = mock_conn
 
-            result = await database_connect(
-                database_type="sqlite",
-                database="test.db"
-            )
+            result = await database_connect(database_type="sqlite", database="test.db")
 
             assert result["success"] is True
             assert "connection_id" in result
@@ -56,10 +53,7 @@ class TestDatabaseConnect:
     @pytest.mark.asyncio
     async def test_connect_unsupported_type(self):
         """Test connection with unsupported database type."""
-        result = await database_connect(
-            database_type="unsupported",
-            database="test.db"
-        )
+        result = await database_connect(database_type="unsupported", database="test.db")
 
         assert result["success"] is False
         assert "Unsupported database type" in result["error"]
@@ -77,7 +71,7 @@ class TestDatabaseConnect:
                 port=5432,
                 database="testdb",
                 user="testuser",
-                password="testpass"
+                password="testpass",
             )
 
             assert result["success"] is True or "error" in result
@@ -95,7 +89,7 @@ class TestDatabaseConnect:
                 port=3306,
                 database="testdb",
                 user="testuser",
-                password="testpass"
+                password="testpass",
             )
 
             assert result["success"] is True or "error" in result
@@ -107,10 +101,7 @@ class TestDatabaseQuery:
     @pytest.mark.asyncio
     async def test_query_no_connection(self):
         """Test query without active connection."""
-        result = await database_query(
-            connection_id="nonexistent",
-            query="SELECT 1"
-        )
+        result = await database_query(connection_id="nonexistent", query="SELECT 1")
 
         assert result["success"] is False
         assert "No active connection" in result["error"]
@@ -118,10 +109,7 @@ class TestDatabaseQuery:
     @pytest.mark.asyncio
     async def test_query_missing_query(self):
         """Test query with missing SQL."""
-        result = await database_query(
-            connection_id="test",
-            query=""
-        )
+        result = await database_query(connection_id="test", query="")
 
         assert result["success"] is False
         assert "Missing required parameter" in result["error"]
@@ -145,10 +133,7 @@ class TestDatabaseDescribe:
     @pytest.mark.asyncio
     async def test_describe_no_connection(self):
         """Test describing table without active connection."""
-        result = await database_describe(
-            connection_id="nonexistent",
-            table="users"
-        )
+        result = await database_describe(connection_id="nonexistent", table="users")
 
         assert result["success"] is False
         assert "No active connection" in result["error"]
@@ -156,10 +141,7 @@ class TestDatabaseDescribe:
     @pytest.mark.asyncio
     async def test_describe_missing_table(self):
         """Test describe with missing table name."""
-        result = await database_describe(
-            connection_id="test",
-            table=""
-        )
+        result = await database_describe(connection_id="test", table="")
 
         assert result["success"] is False
         assert "Missing required parameter" in result["error"]
@@ -209,19 +191,13 @@ class TestDatabaseIntegration:
             mock_cursor.fetchall.return_value = []
 
             # Connect
-            conn_result = await database_connect(
-                database_type="sqlite",
-                database=":memory:"
-            )
+            conn_result = await database_connect(database_type="sqlite", database=":memory:")
 
             if conn_result["success"]:
                 conn_id = conn_result["connection_id"]
 
                 # Query - would fail without real connection, testing error handling
-                query_result = await database_query(
-                    connection_id=conn_id,
-                    query="SELECT 1"
-                )
+                query_result = await database_query(connection_id=conn_id, query="SELECT 1")
 
                 # Check result structure
                 assert "success" in query_result

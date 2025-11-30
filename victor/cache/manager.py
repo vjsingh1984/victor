@@ -17,13 +17,10 @@
 import hashlib
 import json
 import logging
-import pickle
-import time
-from pathlib import Path
 from typing import Any, Optional, Dict
 import threading
 
-from cachetools import TTLCache
+from cachetools import TTLCache  # type: ignore[import-untyped]
 import diskcache
 
 from victor.cache.config import CacheConfig
@@ -56,7 +53,7 @@ class CacheManager:
         self._lock = threading.RLock()
 
         # Statistics
-        self._stats = {
+        self._stats: Dict[str, float | int] = {
             "memory_hits": 0,
             "memory_misses": 0,
             "disk_hits": 0,
@@ -238,8 +235,7 @@ class CacheManager:
                 # Clear specific namespace
                 if self._memory_cache is not None:
                     keys_to_delete = [
-                        k for k in self._memory_cache.keys()
-                        if k.startswith(f"{namespace}:")
+                        k for k in self._memory_cache.keys() if k.startswith(f"{namespace}:")
                     ]
                     for key in keys_to_delete:
                         try:
@@ -249,9 +245,16 @@ class CacheManager:
                             pass
 
                 if self._disk_cache is not None:
-                    # Note: diskcache doesn't have efficient namespace clearing
-                    # Would need to iterate all keys - acceptable for now
-                    pass
+                    # diskcache namespace clear by iteration
+                    to_delete = [
+                        k for k in self._disk_cache.iterkeys() if k.startswith(f"{namespace}:")
+                    ]
+                    for key in to_delete:
+                        try:
+                            del self._disk_cache[key]
+                            count += 1
+                        except Exception:
+                            pass
             else:
                 # Clear all
                 if self._memory_cache is not None:
@@ -281,9 +284,7 @@ class CacheManager:
             stats["memory_hit_rate"] = (
                 stats["memory_hits"] / total_memory if total_memory > 0 else 0
             )
-            stats["disk_hit_rate"] = (
-                stats["disk_hits"] / total_disk if total_disk > 0 else 0
-            )
+            stats["disk_hit_rate"] = stats["disk_hits"] / total_disk if total_disk > 0 else 0
 
             # Add size info
             if self._memory_cache is not None:
@@ -331,7 +332,7 @@ class CacheManager:
         logger.info("Warmed up cache with %d entries", count)
         return count
 
-    def close(self):
+    def close(self) -> None:
         """Close cache connections and cleanup."""
         if self._disk_cache is not None:
             try:
@@ -340,11 +341,16 @@ class CacheManager:
             except Exception as e:
                 logger.warning("Error closing disk cache: %s", e)
 
-    def __enter__(self):
+    def __enter__(self) -> "CacheManager":
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
+    ) -> None:
         """Context manager exit."""
         self.close()
 
@@ -364,9 +370,7 @@ class ResponseCache:
         self.cache = cache_manager or CacheManager()
         self.namespace = "responses"
 
-    def get_response(
-        self, prompt: str, model: str, temperature: float
-    ) -> Optional[str]:
+    def get_response(self, prompt: str, model: str, temperature: float) -> Optional[str]:
         """Get cached response.
 
         Args:

@@ -251,6 +251,7 @@ async def test_chat_with_tools(ollama_provider):
 @pytest.mark.asyncio
 async def test_stream_basic(ollama_provider):
     """Test basic streaming functionality."""
+
     async def mock_aiter_lines():
         yield '{"message":{"content":"Hello"},"done":false}'
         yield '{"message":{"content":" world"},"done":false}'
@@ -294,6 +295,7 @@ async def test_stream_timeout_error(ollama_provider):
 @pytest.mark.asyncio
 async def test_stream_http_error(ollama_provider):
     """Test stream HTTP error handling."""
+
     async def mock_aenter():
         raise httpx.HTTPStatusError(
             "Server error",

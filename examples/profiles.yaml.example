@@ -1,179 +1,57 @@
-# CodingAgent Provider Profiles Configuration
-# Copy this to ~/.codingagent/profiles.yaml and customize
+# Example Victor Configuration
+# Copy to ~/.victor/profiles.yaml to activate
 
 profiles:
-  # Default profile - uses free local Ollama
   default:
-    provider: ollama
-    model: qwen2.5-coder:7b
-    temperature: 0.7
-    max_tokens: 4096
-
-  # Anthropic Claude Sonnet - Best for complex reasoning
-  claude-sonnet:
-    provider: anthropic
-    model: claude-sonnet-4-5
-    temperature: 1.0
-    max_tokens: 8192
-
-  # Anthropic Claude Opus - Most capable
-  claude-opus:
-    provider: anthropic
-    model: claude-3-opus
-    temperature: 1.0
-    max_tokens: 4096
-
-  # OpenAI GPT-4 Turbo
-  gpt4-turbo:
-    provider: openai
-    model: gpt-4-turbo-preview
-    temperature: 0.8
-    max_tokens: 4096
-
-  # OpenAI GPT-3.5 Turbo - Faster and cheaper
-  gpt35:
-    provider: openai
-    model: gpt-3.5-turbo
-    temperature: 0.7
-    max_tokens: 4096
-
-  # Google Gemini Pro
-  gemini-pro:
-    provider: google
-    model: gemini-1.5-pro
-    temperature: 0.9
-    max_tokens: 8192
-
-  # xAI Grok
-  grok:
-    provider: xai
-    model: grok-beta
-    temperature: 0.8
-    max_tokens: 4096
-
-  # xAI Grok with Vision
-  grok-vision:
-    provider: xai
-    model: grok-vision-beta
-    temperature: 0.8
-    max_tokens: 4096
-
-  # Local Models
-  llama3-local:
-    provider: ollama
-    model: llama3:8b
-    temperature: 0.7
-    max_tokens: 4096
-
-  codellama-local:
-    provider: ollama
-    model: codellama:13b
-    temperature: 0.5
-    max_tokens: 4096
-
-  deepseek-coder:
-    provider: ollama
-    model: deepseek-coder:6.7b
-    temperature: 0.6
-    max_tokens: 4096
-
-  # LMStudio
-  lmstudio-default:
     provider: lmstudio
-    model: local-model  # Model loaded in LMStudio
+    model: qwen3-coder:30b
     temperature: 0.7
     max_tokens: 4096
+    description: "Default profile with Qwen 30B coder model (LMStudio)"
 
-  # vLLM Server
-  vllm-mistral:
-    provider: vllm
-    model: mistralai/Mistral-7B-Instruct-v0.2
-    temperature: 0.7
-    max_tokens: 4096
+  quick:
+    provider: lmstudio
+    model: qwen2.5-coder:7b
+    temperature: 0.5
+    max_tokens: 2048
+    description: "Quick responses with lighter sampling on LMStudio"
 
-# Provider-specific settings
 providers:
+  lmstudio:
+    base_url:
+      - http://127.0.0.1:1234      # Primary LMStudio server (localhost)
+      - http://192.168.1.126:1234  # Secondary LMStudio server
+      - http://192.168.1.20:1234   # Tertiary LMStudio server
+    timeout: 300
+
+  ollama:
+    base_url:
+      - http://192.168.1.20:11434  # Primary Ollama server (optional backup)
+      - http://localhost:11434     # Fallback to local
+    timeout: 300
+
   anthropic:
     api_key: ${ANTHROPIC_API_KEY}
     base_url: https://api.anthropic.com
-    timeout: 60
-    max_retries: 3
 
-  openai:
-    api_key: ${OPENAI_API_KEY}
-    organization: ${OPENAI_ORG_ID}  # Optional
-    base_url: https://api.openai.com/v1
-    timeout: 60
-    max_retries: 3
-
-  google:
-    api_key: ${GOOGLE_API_KEY}
-    timeout: 60
-    max_retries: 3
-
-  xai:
-    api_key: ${XAI_API_KEY}
-    base_url: https://api.x.ai/v1
-    timeout: 60
-    max_retries: 3
-
-  ollama:
-    base_url: http://localhost:11434
-    timeout: 300  # Local models can be slow
-    keep_alive: 5m  # Keep model in memory
-
-  lmstudio:
-    base_url: http://localhost:1234
-    timeout: 300
-
-  vllm:
-    base_url: http://localhost:8000
-    timeout: 60
-
-# Tool configuration
+# Tool Configuration
 tools:
-  filesystem:
+  # Disable problematic tools (code_review has aspect validation issues)
+  disabled:
+    - code_review
+
+  # Individual tool configuration (optional)
+  web_search:
     enabled: true
-    # Allowed paths for file operations
-    allowed_paths:
-      - ~/code
-      - ~/projects
-    # Restricted paths (will prompt user)
-    restricted_paths:
-      - ~/.ssh
-      - ~/.aws
-      - ~/.config
 
-  bash:
+  security_scan:
     enabled: true
-    timeout: 60
-    # Dangerous commands that require confirmation
-    dangerous_commands:
-      - rm -rf
-      - dd
-      - mkfs
-      - iptables
 
-  web:
-    enabled: true
-    max_fetch_size: 10485760  # 10MB
-    timeout: 30
+  docker:
+    enabled: false  # Disable if not using Docker
 
-  git:
-    enabled: true
-    auto_commit: false  # Require explicit user confirmation
-
-# UI Preferences
-ui:
-  theme: monokai
-  show_token_count: true
-  stream_responses: true
-  syntax_highlighting: true
-  markdown_rendering: true
-
-# Logging
-logging:
-  level: INFO
-  file: ~/.codingagent/logs/codingagent.log
-  max_size: 10485760  # 10MB
-  backup_count: 5
+# Web tools configuration
+web_tools:
+  summarize_fetch_top: 5
+  summarize_fetch_pool: 10
+  summarize_max_content_length: 50000

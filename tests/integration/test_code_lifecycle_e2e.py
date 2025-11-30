@@ -54,10 +54,7 @@ async def ollama_coding_provider():
         coding_models = [
             m["name"]
             for m in models
-            if any(
-                keyword in m["name"].lower()
-                for keyword in ["coder", "code", "qwen"]
-            )
+            if any(keyword in m["name"].lower() for keyword in ["coder", "code", "qwen"])
         ]
 
         if not coding_models:
@@ -200,7 +197,9 @@ Read the file first, then write the enhanced version."""
 
     # Verify expected output patterns
     output = result.stdout.lower()
-    assert any(char in output for char in ["15", "5", "24"]), "Expected calculation results not found"
+    assert any(
+        char in output for char in ["15", "5", "24"]
+    ), "Expected calculation results not found"
 
     print("\n" + "=" * 70)
     print("✅ FULL LIFECYCLE TEST COMPLETED SUCCESSFULLY")
@@ -285,8 +284,7 @@ and write the corrected version."""
 
         # Check for error handling
         assert any(
-            keyword in fixed_content.lower()
-            for keyword in ["try", "except", "if", "zerodivision"]
+            keyword in fixed_content.lower() for keyword in ["try", "except", "if", "zerodivision"]
         ), "No error handling added"
 
         print(f"\n✓ Bug fixed ({len(fixed_content)} chars)")

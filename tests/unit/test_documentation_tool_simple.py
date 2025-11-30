@@ -72,11 +72,13 @@ class TestDocsGenerateDocstrings:
     async def test_generate_docstrings_with_existing_docs(self, tmp_path):
         """Test file with existing docstrings."""
         test_file = tmp_path / "documented.py"
-        test_file.write_text('''
+        test_file.write_text(
+            '''
 def hello():
     """Already documented."""
     pass
-''')
+'''
+        )
 
         result = await docs_generate_docstrings(file=str(test_file))
 
@@ -272,14 +274,16 @@ class TestDocsAnalyzeCoverage:
     async def test_analyze_coverage_with_mixed_documentation(self, tmp_path):
         """Test analyzing file with mixed documentation."""
         test_file = tmp_path / "test.py"
-        test_file.write_text('''
+        test_file.write_text(
+            '''
 def documented():
     """Has docs."""
     pass
 
 def undocumented():
     pass
-''')
+'''
+        )
 
         result = await docs_analyze_coverage(file=str(test_file))
 
@@ -291,7 +295,8 @@ def undocumented():
     async def test_analyze_coverage_fully_documented(self, tmp_path):
         """Test with fully documented code."""
         test_file = tmp_path / "documented.py"
-        test_file.write_text('''
+        test_file.write_text(
+            '''
 """Module docstring."""
 
 def func1():
@@ -301,7 +306,8 @@ def func1():
 def func2():
     """Function 2."""
     pass
-''')
+'''
+        )
 
         result = await docs_analyze_coverage(file=str(test_file))
 
@@ -313,7 +319,8 @@ def func2():
     async def test_analyze_coverage_no_documentation(self, tmp_path):
         """Test with completely undocumented code."""
         test_file = tmp_path / "undocumented.py"
-        test_file.write_text('''
+        test_file.write_text(
+            """
 def func1():
     pass
 
@@ -323,7 +330,8 @@ def func2():
 class MyClass:
     def method(self):
         pass
-''')
+"""
+        )
 
         result = await docs_analyze_coverage(file=str(test_file))
 

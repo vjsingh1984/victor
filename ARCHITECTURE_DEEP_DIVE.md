@@ -8,6 +8,8 @@
 
 ---
 
+> Status: This document is aspirational and describes the target architecture. Consult README.md (Reality Check) and IMPROVEMENT_PLAN.md for what is currently implemented.
+
 ## Table of Contents
 
 1. [System Overview](#system-overview)

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ game.name }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 1rem; background: #f7f7f7; color: #1f2933; }
+    h1 { margin-bottom: 0.5rem; }
+    a { color: #2563eb; }
+    .board { display: grid; grid-template-columns: repeat(3, 80px); gap: 6px; margin: 1rem 0; }
+    .cell { width: 80px; height: 80px; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 2rem; border-radius: 6px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .cell:hover { background: #e5e7eb; }
+    .panel { background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); margin-bottom: 1rem; }
+    button { padding: 0.5rem 0.75rem; border: none; background: #2563eb; color: #fff; border-radius: 6px; cursor: pointer; }
+    button:hover { background: #1d4ed8; }
+    pre { background: #0b1021; color: #e5e7eb; padding: 0.75rem; border-radius: 8px; overflow: auto; }
+    .flex { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .card { background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); flex: 1 1 320px; min-width: 280px; }
+  </style>
+</head>
+<body>
+  <a href="/">← Back</a>
+  <h1>{{ game.name }}</h1>
+  <p>{{ game.description }}</p>
+
+  {% if game_name == 'tic_tac_toe' %}
+  <div class="card">
+    <h3>Tic Tac Toe</h3>
+    <div id="ttt-board" class="board"></div>
+    <p id="ttt-status"></p>
+    <button onclick="tttNew()">Restart</button>
+  </div>
+  {% elif game_name == 'number_guess' %}
+  <div class="card">
+    <h3>Number Guess</h3>
+    <p id="ng-message"></p>
+    <input id="ng-input" type="number" min="1" max="100" placeholder="1-100" />
+    <button onclick="ngGuess()">Guess</button>
+    <button onclick="ngNew()">Restart</button>
+  </div>
+  {% elif game_name == 'rock_paper_scissors' %}
+  <div class="card">
+    <h3>Rock Paper Scissors</h3>
+    <div class="flex">
+      <button onclick="rpsPlay('rock')">Rock</button>
+      <button onclick="rpsPlay('paper')">Paper</button>
+      <button onclick="rpsPlay('scissors')">Scissors</button>
+    </div>
+    <p id="rps-result"></p>
+    <button onclick="rpsNew()">Reset</button>
+  </div>
+  {% elif game_name == 'memory_game' %}
+  <div class="card">
+    <h3>Memory Game</h3>
+    <div id="mem-board" class="flex"></div>
+    <p id="mem-status"></p>
+    <button onclick="memNew()">Shuffle</button>
+  </div>
+  {% else %}
+  <p>Game not implemented.</p>
+  {% endif %}
+
+<script>
+// Tic Tac Toe
+let tttState = null;
+async function tttNew() {
+  const res = await fetch('/api/tic_tac_toe/new');
+  tttState = await res.json();
+  renderTTT();
+}
+async function tttMove(r, c) {
+  if (!tttState || tttState.winner) return;
+  const res = await fetch('/api/tic_tac_toe/move', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ board: tttState.board, row: r, col: c, player: tttState.current_player })
+  });
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
+  tttState = data;
+  renderTTT();
+}
+function renderTTT() {
+  const board = document.getElementById('ttt-board');
+  const status = document.getElementById('ttt-status');
+  board.innerHTML = '';
+  tttState.board.forEach((row, r) => {
+    row.forEach((cell, c) => {
+      const div = document.createElement('div');
+      div.className = 'cell';
+      div.textContent = cell || '';
+      div.onclick = () => tttMove(r, c);
+      board.appendChild(div);
+    });
+  });
+  status.textContent = tttState.winner ? `Winner: ${tttState.winner}` : `Turn: ${tttState.current_player}`;
+}
+
+// Number Guess
+let ngState = null;
+async function ngNew() {
+  const res = await fetch('/api/number_guess/new');
+  ngState = await res.json();
+  document.getElementById('ng-message').textContent = ngState.message;
+}
+async function ngGuess() {
+  const guessVal = parseInt(document.getElementById('ng-input').value, 10);
+  if (!guessVal) return;
+  const res = await fetch('/api/number_guess/guess', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target: ngState.target, attempts: ngState.attempts, guess: guessVal })
+  });
+  ngState = await res.json();
+  document.getElementById('ng-message').textContent = ngState.message;
+}
+
+// Rock Paper Scissors
+let rpsChoices = [];
+async function rpsNew() {
+  const res = await fetch('/api/rock_paper_scissors/new');
+  const data = await res.json();
+  rpsChoices = data.choices;
+  document.getElementById('rps-result').textContent = 'Make a move!';
+}
+async function rpsPlay(choice) {
+  if (!rpsChoices.length) await rpsNew();
+  const res = await fetch('/api/rock_paper_scissors/play', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ choice })
+  });
+  const data = await res.json();
+  document.getElementById('rps-result').textContent = `You: ${data.player_choice}, Computer: ${data.computer_choice} → ${data.result}`;
+}
+
+// Memory Game
+let memState = null;
+async function memNew() {
+  const res = await fetch('/api/memory_game/new');
+  memState = await res.json();
+  renderMem();
+}
+function renderMem() {
+  const board = document.getElementById('mem-board');
+  const status = document.getElementById('mem-status');
+  board.innerHTML = '';
+  memState.cards.forEach((card, idx) => {
+    const div = document.createElement('div');
+    div.className = 'cell';
+    div.style.width = '60px';
+    div.style.height = '60px';
+    div.textContent = memState.flipped[idx] || memState.matched[idx] ? card : '?';
+    div.onclick = () => memReveal(idx);
+    board.appendChild(div);
+  });
+  status.textContent = memState.matched.every(Boolean) ? 'All matched!' : 'Find all pairs.';
+}
+async function memReveal(idx) {
+  if (memState.flipped[idx] || memState.matched[idx]) return;
+  const res = await fetch('/api/memory_game/reveal', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cards: memState.cards, flipped: memState.flipped, matched: memState.matched, index: idx })
+  });
+  memState = await res.json();
+  renderMem();
+}
+
+// Initialize correct game on load
+{% if game_name == 'tic_tac_toe' %}tttNew();{% endif %}
+{% if game_name == 'number_guess' %}ngNew();{% endif %}
+{% if game_name == 'rock_paper_scissors' %}rpsNew();{% endif %}
+{% if game_name == 'memory_game' %}memNew();{% endif %}
+</script>
+</body>
+</html>

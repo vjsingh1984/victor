@@ -45,10 +45,7 @@ async def lmstudio_provider():
     try:
         # Try to list models to check if LMStudio is running
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "http://localhost:1234/v1/models",
-                timeout=5.0
-            )
+            response = await client.get("http://localhost:1234/v1/models", timeout=5.0)
             if response.status_code != 200:
                 pytest.skip("LMStudio server not responding")
 
@@ -69,10 +66,7 @@ async def test_lmstudio_server_available():
     """Test LMStudio server availability."""
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "http://localhost:1234/v1/models",
-                timeout=5.0
-            )
+            response = await client.get("http://localhost:1234/v1/models", timeout=5.0)
             assert response.status_code == 200
             print(f"\nLMStudio server is running")
     except Exception as e:
@@ -85,10 +79,7 @@ async def test_lmstudio_list_models():
     """Test listing models from LMStudio."""
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "http://localhost:1234/v1/models",
-                timeout=5.0
-            )
+            response = await client.get("http://localhost:1234/v1/models", timeout=5.0)
             assert response.status_code == 200
 
             data = response.json()
@@ -111,9 +102,7 @@ async def test_lmstudio_simple_chat(lmstudio_provider):
         response = await client.get("http://localhost:1234/v1/models", timeout=5.0)
         model_name = response.json()["data"][0]["id"]
 
-    messages = [
-        Message(role="user", content="Say 'Hello from LMStudio' and nothing else.")
-    ]
+    messages = [Message(role="user", content="Say 'Hello from LMStudio' and nothing else.")]
 
     response = await lmstudio_provider.chat(
         messages=messages,
@@ -139,7 +128,10 @@ async def test_lmstudio_code_generation(lmstudio_provider):
 
     messages = [
         Message(role="system", content="You are an expert Python programmer."),
-        Message(role="user", content="Write a simple Python function to add two numbers. Just the function, no explanation.")
+        Message(
+            role="user",
+            content="Write a simple Python function to add two numbers. Just the function, no explanation.",
+        ),
     ]
 
     response = await lmstudio_provider.chat(
@@ -163,9 +155,7 @@ async def test_lmstudio_streaming(lmstudio_provider):
         response = await client.get("http://localhost:1234/v1/models", timeout=5.0)
         model_name = response.json()["data"][0]["id"]
 
-    messages = [
-        Message(role="user", content="Count from 1 to 5, one number per line.")
-    ]
+    messages = [Message(role="user", content="Count from 1 to 5, one number per line.")]
 
     chunks = []
     full_content = ""
@@ -212,9 +202,7 @@ async def test_lmstudio_tool_calling(lmstudio_provider):
         )
     ]
 
-    messages = [
-        Message(role="user", content="What time is it in New York?")
-    ]
+    messages = [Message(role="user", content="What time is it in New York?")]
 
     try:
         response = await lmstudio_provider.chat(
@@ -249,9 +237,7 @@ async def test_lmstudio_multi_turn_conversation(lmstudio_provider):
         model_name = response.json()["data"][0]["id"]
 
     # Turn 1
-    messages = [
-        Message(role="user", content="My name is Bob.")
-    ]
+    messages = [Message(role="user", content="My name is Bob.")]
 
     response1 = await lmstudio_provider.chat(
         messages=messages,
@@ -301,9 +287,7 @@ async def test_lmstudio_with_ollama_shared_model(lmstudio_provider):
             if not ollama_model:
                 pytest.skip("No Ollama-shared model found in LMStudio")
 
-        messages = [
-            Message(role="user", content="Say 'Model sharing works!' and nothing else.")
-        ]
+        messages = [Message(role="user", content="Say 'Model sharing works!' and nothing else.")]
 
         response = await lmstudio_provider.chat(
             messages=messages,
@@ -341,7 +325,11 @@ async def test_lmstudio_with_custom_parameters(lmstudio_provider):
     )
 
     assert response.content
-    assert "def" in response.content or "lambda" in response.content or "double" in response.content.lower()
+    assert (
+        "def" in response.content
+        or "lambda" in response.content
+        or "double" in response.content.lower()
+    )
     print(f"\nLMStudio Custom params response: {response.content}")
 
 
@@ -361,7 +349,12 @@ async def test_lmstudio_large_context(lmstudio_provider):
 
     # Add several exchanges
     for i in range(5):
-        messages.append(Message(role="user", content=f"What is important about code quality aspect {i+1}? One sentence."))
+        messages.append(
+            Message(
+                role="user",
+                content=f"What is important about code quality aspect {i+1}? One sentence.",
+            )
+        )
         messages.append(Message(role="assistant", content=f"Code quality aspect {i+1} matters."))
 
     messages.append(Message(role="user", content="Summarize our discussion in one sentence."))

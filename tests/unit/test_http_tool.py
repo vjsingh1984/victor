@@ -76,9 +76,7 @@ class TestHttpRequest:
 
             headers = {"X-Custom-Header": "value"}
             result = await http_request(
-                method="GET",
-                url="https://api.example.com",
-                headers=headers
+                method="GET", url="https://api.example.com", headers=headers
             )
 
             assert result["success"] is True
@@ -102,9 +100,7 @@ class TestHttpRequest:
             mock_client.return_value = mock_instance
 
             result = await http_request(
-                method="GET",
-                url="https://api.example.com",
-                auth="Bearer token123"
+                method="GET", url="https://api.example.com", auth="Bearer token123"
             )
 
             assert result["success"] is True
@@ -163,9 +159,7 @@ class TestHttpRequest:
 
             json_data = {"name": "test item"}
             result = await http_request(
-                method="POST",
-                url="https://api.example.com/items",
-                json=json_data
+                method="POST", url="https://api.example.com/items", json=json_data
             )
 
             assert result["success"] is True
@@ -190,9 +184,7 @@ class TestHttpTest:
             mock_client.return_value = mock_instance
 
             result = await http_test(
-                method="GET",
-                url="https://api.example.com",
-                expected_status=200
+                method="GET", url="https://api.example.com", expected_status=200
             )
 
             assert result["success"] is True
@@ -223,9 +215,7 @@ class TestHttpTest:
             mock_client.return_value = mock_instance
 
             result = await http_test(
-                method="GET",
-                url="https://api.example.com",
-                expected_status=200
+                method="GET", url="https://api.example.com", expected_status=200
             )
 
             assert result["success"] is False
@@ -249,9 +239,7 @@ class TestHttpTest:
             mock_client.return_value = mock_instance
 
             result = await http_test(
-                method="GET",
-                url="https://api.example.com",
-                auth="Bearer token123"
+                method="GET", url="https://api.example.com", auth="Bearer token123"
             )
 
             assert result["success"] is True

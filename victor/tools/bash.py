@@ -65,7 +65,7 @@ async def execute_bash(
     command: str,
     working_dir: Optional[str] = None,
     timeout: int = 60,
-    allow_dangerous: bool = False
+    allow_dangerous: bool = False,
 ) -> Dict[str, Any]:
     """
     Execute a bash command and return its output.
@@ -86,6 +86,22 @@ async def execute_bash(
         - stderr: Standard error from the command
         - return_code: Exit code of the command
         - success: Whether the command succeeded (return_code == 0)
+
+    Examples:
+        Run tests:
+            await execute_bash("pytest tests/", timeout=120)
+
+        Install dependencies:
+            await execute_bash("pip install -r requirements.txt")
+
+        Check git status:
+            await execute_bash("git status", working_dir="/path/to/repo")
+
+        List Python files:
+            await execute_bash("find . -name '*.py' | head -10")
+
+        Run with longer timeout:
+            await execute_bash("npm install", timeout=300)
     """
     if not command:
         return {

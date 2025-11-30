@@ -59,11 +59,7 @@ async def demo_server():
     # Create MCP server
     print("\n2️⃣ Creating MCP Server...")
     print("-" * 70)
-    server = MCPServer(
-        name="Victor MCP Server",
-        version="1.0.0",
-        tool_registry=tool_registry
-    )
+    server = MCPServer(name="Victor MCP Server", version="1.0.0", tool_registry=tool_registry)
 
     print(f"✓ Server created: {server.name} v{server.version}")
     print(f"  Capabilities:")
@@ -79,20 +75,20 @@ async def demo_server():
             uri="file://./README.md",
             name="Victor README",
             description="Victor project documentation",
-            mime_type="text/markdown"
+            mime_type="text/markdown",
         ),
         MCPResource(
             uri="file://./victor/agent/orchestrator.py",
             name="Agent Orchestrator",
             description="Victor's agent orchestration code",
-            mime_type="text/x-python"
+            mime_type="text/x-python",
         ),
         MCPResource(
             uri="file://./examples/mcp_server_demo.py",
             name="MCP Server Demo",
             description="This demo file",
-            mime_type="text/x-python"
-        )
+            mime_type="text/x-python",
+        ),
     ]
 
     for resource in resources:
@@ -109,12 +105,7 @@ async def demo_server():
         "jsonrpc": "2.0",
         "id": "1",
         "method": "initialize",
-        "params": {
-            "clientInfo": {
-                "name": "Demo Client",
-                "version": "1.0.0"
-            }
-        }
+        "params": {"clientInfo": {"name": "Demo Client", "version": "1.0.0"}},
     }
     response = await server.handle_message(init_msg)
     print(f"✓ Initialized: {response['result']['serverInfo']['name']}")
@@ -127,10 +118,10 @@ async def demo_server():
         "method": "tools/list",
     }
     response = await server.handle_message(list_tools_msg)
-    if 'error' in response:
+    if "error" in response:
         print(f"✗ Error: {response['error']}")
     else:
-        tools = response['result']['tools']
+        tools = response["result"]["tools"]
         print(f"✓ Found {len(tools)} tools:")
         for tool in tools[:3]:  # Show first 3
             print(f"  - {tool['name']}: {tool['description'][:50]}...")
@@ -143,7 +134,7 @@ async def demo_server():
         "method": "resources/list",
     }
     response = await server.handle_message(list_resources_msg)
-    resources_list = response['result']['resources']
+    resources_list = response["result"]["resources"]
     print(f"✓ Found {len(resources_list)} resources:")
     for resource in resources_list:
         print(f"  - {resource['name']}: {resource['uri']}")
@@ -154,18 +145,13 @@ async def demo_server():
         "jsonrpc": "2.0",
         "id": "4",
         "method": "tools/call",
-        "params": {
-            "name": "list_directory",
-            "arguments": {
-                "path": "."
-            }
-        }
+        "params": {"name": "list_directory", "arguments": {"path": "."}},
     }
     response = await server.handle_message(call_tool_msg)
-    result = response['result']
+    result = response["result"]
     print(f"✓ Tool call {'succeeded' if result['success'] else 'failed'}")
-    if result['success']:
-        output = result['result'][:200]
+    if result["success"]:
+        output = result["result"][:200]
         print(f"  Output (preview): {output}...")
 
     # Ping
@@ -197,7 +183,8 @@ async def demo_server():
     print("  ✓ Full MCP specification compliance")
 
     print("\n\n📚 Usage Examples:")
-    print("""
+    print(
+        """
 # Run as stdio server (for MCP clients to connect)
 python examples/mcp_server_demo.py --stdio
 
@@ -208,10 +195,12 @@ python examples/mcp_client_demo.py
 # - Claude Desktop
 # - VS Code with MCP extension
 # - Custom MCP clients
-""")
+"""
+    )
 
     print("\n\n🔌 Integration:")
-    print("""
+    print(
+        """
 Victor can now be used by any MCP-compatible application!
 
 Example with Claude Desktop:
@@ -232,7 +221,8 @@ Example with Claude Desktop:
    - Git commands
    - Bash execution
    - And more!
-""")
+"""
+    )
 
 
 async def run_stdio_server():
@@ -246,11 +236,7 @@ async def run_stdio_server():
     tool_registry.register(GitTool())
 
     # Create and start server
-    server = MCPServer(
-        name="Victor MCP Server",
-        version="1.0.0",
-        tool_registry=tool_registry
-    )
+    server = MCPServer(name="Victor MCP Server", version="1.0.0", tool_registry=tool_registry)
 
     # Register resources
     server.register_resource(
@@ -258,7 +244,7 @@ async def run_stdio_server():
             uri="file://./README.md",
             name="Victor README",
             description="Victor project documentation",
-            mime_type="text/markdown"
+            mime_type="text/markdown",
         )
     )
 
@@ -270,9 +256,7 @@ def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Victor MCP Server Demo")
     parser.add_argument(
-        "--stdio",
-        action="store_true",
-        help="Run as stdio server (for MCP client connections)"
+        "--stdio", action="store_true", help="Run as stdio server (for MCP client connections)"
     )
 
     args = parser.parse_args()

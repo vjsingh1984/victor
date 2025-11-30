@@ -44,7 +44,7 @@ VULN_PACKAGES = {
 def _parse_version(version: str) -> tuple:
     """Parse version string into comparable tuple."""
     try:
-        parts = re.findall(r'\d+', version)
+        parts = re.findall(r"\d+", version)
         return tuple(int(p) for p in parts)
     except (ValueError, TypeError, AttributeError):
         return (0, 0, 0)
@@ -113,14 +113,11 @@ async def dependency_list() -> Dict[str, Any]:
             "success": True,
             "packages": packages,
             "count": len(packages),
-            "formatted_report": "\n".join(report)
+            "formatted_report": "\n".join(report),
         }
 
     except subprocess.CalledProcessError as e:
-        return {
-            "success": False,
-            "error": f"Failed to list packages: {e.stderr}"
-        }
+        return {"success": False, "error": f"Failed to list packages: {e.stderr}"}
 
 
 @tool
@@ -155,7 +152,7 @@ async def dependency_outdated() -> Dict[str, Any]:
                 "success": True,
                 "outdated": [],
                 "count": 0,
-                "message": "✅ All packages are up to date!"
+                "message": "✅ All packages are up to date!",
             }
 
         # Categorize by severity
@@ -209,19 +206,12 @@ async def dependency_outdated() -> Dict[str, Any]:
             "success": True,
             "outdated": outdated,
             "count": len(outdated),
-            "by_severity": {
-                "major": major_updates,
-                "minor": minor_updates,
-                "patch": patch_updates
-            },
-            "formatted_report": "\n".join(report)
+            "by_severity": {"major": major_updates, "minor": minor_updates, "patch": patch_updates},
+            "formatted_report": "\n".join(report),
         }
 
     except subprocess.CalledProcessError as e:
-        return {
-            "success": False,
-            "error": f"Failed to check outdated packages: {e.stderr}"
-        }
+        return {"success": False, "error": f"Failed to check outdated packages: {e.stderr}"}
 
 
 @tool
@@ -261,12 +251,14 @@ async def dependency_security() -> Dict[str, Any]:
             if pkg_name in VULN_PACKAGES:
                 for constraint, cve in VULN_PACKAGES[pkg_name].items():
                     if _version_satisfies(pkg_version, constraint):
-                        vulnerabilities.append({
-                            "package": pkg_name,
-                            "version": pkg_version,
-                            "cve": cve,
-                            "constraint": constraint
-                        })
+                        vulnerabilities.append(
+                            {
+                                "package": pkg_name,
+                                "version": pkg_version,
+                                "cve": cve,
+                                "constraint": constraint,
+                            }
+                        )
 
         # Build report
         report = []
@@ -293,14 +285,11 @@ async def dependency_security() -> Dict[str, Any]:
             "success": True,
             "vulnerabilities": vulnerabilities,
             "count": len(vulnerabilities),
-            "formatted_report": "\n".join(report)
+            "formatted_report": "\n".join(report),
         }
 
     except subprocess.CalledProcessError as e:
-        return {
-            "success": False,
-            "error": f"Security audit failed: {e.stderr}"
-        }
+        return {"success": False, "error": f"Security audit failed: {e.stderr}"}
 
 
 @tool
@@ -331,7 +320,9 @@ async def dependency_generate(output: str = "requirements.txt") -> Dict[str, Any
         )
 
         requirements = result.stdout.strip()
-        package_count = len([line for line in requirements.split('\n') if line and not line.startswith('#')])
+        package_count = len(
+            [line for line in requirements.split("\n") if line and not line.startswith("#")]
+        )
 
         # Write to file
         output_path = Path(output)
@@ -341,19 +332,13 @@ async def dependency_generate(output: str = "requirements.txt") -> Dict[str, Any
             "success": True,
             "file": str(output_path),
             "packages_count": package_count,
-            "message": f"Generated {output} with {package_count} packages"
+            "message": f"Generated {output} with {package_count} packages",
         }
 
     except subprocess.CalledProcessError as e:
-        return {
-            "success": False,
-            "error": f"Failed to generate requirements: {e.stderr}"
-        }
+        return {"success": False, "error": f"Failed to generate requirements: {e.stderr}"}
     except IOError as e:
-        return {
-            "success": False,
-            "error": f"Failed to write file: {str(e)}"
-        }
+        return {"success": False, "error": f"Failed to write file: {str(e)}"}
 
 
 @tool
@@ -376,22 +361,19 @@ async def dependency_update(packages: List[str], dry_run: bool = True) -> Dict[s
         - error: Error message if failed
     """
     if not packages:
-        return {
-            "success": False,
-            "error": "No packages specified for update"
-        }
+        return {"success": False, "error": "No packages specified for update"}
 
     if dry_run:
         return {
             "success": True,
             "would_update": packages,
-            "message": f"Dry run: Would update {len(packages)} packages: {', '.join(packages)}"
+            "message": f"Dry run: Would update {len(packages)} packages: {', '.join(packages)}",
         }
 
     try:
         updated = []
         for package in packages:
-            result = subprocess.run(
+            _ = subprocess.run(
                 ["pip", "install", "--upgrade", package],
                 capture_output=True,
                 text=True,
@@ -402,14 +384,14 @@ async def dependency_update(packages: List[str], dry_run: bool = True) -> Dict[s
         return {
             "success": True,
             "updated": updated,
-            "message": f"Successfully updated {len(updated)} packages"
+            "message": f"Successfully updated {len(updated)} packages",
         }
 
     except subprocess.CalledProcessError as e:
         return {
             "success": False,
             "error": f"Failed to update packages: {e.stderr}",
-            "partially_updated": updated
+            "partially_updated": updated,
         }
 
 
@@ -441,7 +423,7 @@ async def dependency_tree(package: Optional[str] = None) -> Dict[str, Any]:
         if check.returncode != 0:
             return {
                 "success": False,
-                "error": "pipdeptree not installed. Install with: pip install pipdeptree"
+                "error": "pipdeptree not installed. Install with: pip install pipdeptree",
             }
 
         # Run pipdeptree
@@ -456,17 +438,10 @@ async def dependency_tree(package: Optional[str] = None) -> Dict[str, Any]:
             check=True,
         )
 
-        return {
-            "success": True,
-            "tree": result.stdout,
-            "package": package
-        }
+        return {"success": True, "tree": result.stdout, "package": package}
 
     except subprocess.CalledProcessError as e:
-        return {
-            "success": False,
-            "error": f"Failed to show dependency tree: {e.stderr}"
-        }
+        return {"success": False, "error": f"Failed to show dependency tree: {e.stderr}"}
 
 
 @tool
@@ -492,10 +467,7 @@ async def dependency_check(requirements_file: str = "requirements.txt") -> Dict[
         req_path = Path(requirements_file)
 
         if not req_path.exists():
-            return {
-                "success": False,
-                "error": f"Requirements file not found: {requirements_file}"
-            }
+            return {"success": False, "error": f"Requirements file not found: {requirements_file}"}
 
         # Get installed packages
         result = subprocess.run(
@@ -508,18 +480,18 @@ async def dependency_check(requirements_file: str = "requirements.txt") -> Dict[
         installed = {pkg["name"].lower(): pkg["version"] for pkg in json.loads(result.stdout)}
 
         # Parse requirements
-        requirements = req_path.read_text().strip().split('\n')
+        requirements = req_path.read_text().strip().split("\n")
         missing = []
         mismatched = []
         satisfied = []
 
         for req in requirements:
             req = req.strip()
-            if not req or req.startswith('#'):
+            if not req or req.startswith("#"):
                 continue
 
             # Parse requirement
-            match = re.match(r'([a-zA-Z0-9_-]+)(==|>=|<=)?([\d.]+)?', req)
+            match = re.match(r"([a-zA-Z0-9_-]+)(==|>=|<=)?([\d.]+)?", req)
             if not match:
                 continue
 
@@ -530,11 +502,9 @@ async def dependency_check(requirements_file: str = "requirements.txt") -> Dict[
             if pkg_name not in installed:
                 missing.append(req)
             elif operator == "==" and version and installed[pkg_name] != version:
-                mismatched.append({
-                    "package": pkg_name,
-                    "required": version,
-                    "installed": installed[pkg_name]
-                })
+                mismatched.append(
+                    {"package": pkg_name, "required": version, "installed": installed[pkg_name]}
+                )
             else:
                 satisfied.append(pkg_name)
 
@@ -556,7 +526,9 @@ async def dependency_check(requirements_file: str = "requirements.txt") -> Dict[
             if mismatched:
                 report.append(f"⚠️  Version mismatches ({len(mismatched)}):")
                 for mm in mismatched:
-                    report.append(f"  {mm['package']}: required {mm['required']}, installed {mm['installed']}")
+                    report.append(
+                        f"  {mm['package']}: required {mm['required']}, installed {mm['installed']}"
+                    )
                 report.append("")
 
             report.append(f"✅ Satisfied: {len(satisfied)} packages")
@@ -566,19 +538,13 @@ async def dependency_check(requirements_file: str = "requirements.txt") -> Dict[
             "missing": missing,
             "mismatched": mismatched,
             "satisfied_count": len(satisfied),
-            "formatted_report": "\n".join(report)
+            "formatted_report": "\n".join(report),
         }
 
     except subprocess.CalledProcessError as e:
-        return {
-            "success": False,
-            "error": f"Failed to check requirements: {e.stderr}"
-        }
+        return {"success": False, "error": f"Failed to check requirements: {e.stderr}"}
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"Failed to check requirements: {str(e)}"
-        }
+        return {"success": False, "error": f"Failed to check requirements: {str(e)}"}
 
 
 # Keep class for backward compatibility
@@ -588,8 +554,9 @@ class DependencyTool:
     def __init__(self):
         """Initialize - deprecated."""
         import warnings
+
         warnings.warn(
             "DependencyTool class is deprecated. Use dependency_* functions instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )

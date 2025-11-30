@@ -18,7 +18,7 @@ This tool provides transaction-based file editing with diff preview and
 rollback capability to the agent.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from pathlib import Path
 
 from victor.editing import FileEditor
@@ -31,7 +31,7 @@ async def edit_files(
     preview: bool = False,
     auto_commit: bool = True,
     description: str = "",
-    context_lines: int = 3
+    context_lines: int = 3,
 ) -> Dict[str, Any]:
     """
     Unified file editing with transaction support.
@@ -81,6 +81,15 @@ async def edit_files(
         # Queue operations without committing
         edit_files(operations=[...], auto_commit=False)
     """
+    # Allow callers (models) to pass operations as a JSON string; normalize to list[dict]
+    if isinstance(operations, str):
+        import json
+
+        try:
+            operations = json.loads(operations)
+        except json.JSONDecodeError as exc:
+            return {"success": False, "error": f"Invalid JSON for operations: {exc}"}
+
     if not operations:
         return {"success": False, "error": "No operations provided"}
 
@@ -89,33 +98,27 @@ async def edit_files(
         if not isinstance(op, dict):
             return {
                 "success": False,
-                "error": f"Operation {i} must be a dictionary, got {type(op).__name__}"
+                "error": f"Operation {i} must be a dictionary, got {type(op).__name__}",
             }
 
         op_type = op.get("type")
         if not op_type:
-            return {
-                "success": False,
-                "error": f"Operation {i} missing required field: type"
-            }
+            return {"success": False, "error": f"Operation {i} missing required field: type"}
 
         if op_type not in ["create", "modify", "delete", "rename"]:
             return {
                 "success": False,
-                "error": f"Operation {i} has invalid type: {op_type}. Must be create, modify, delete, or rename"
+                "error": f"Operation {i} has invalid type: {op_type}. Must be create, modify, delete, or rename",
             }
 
         if "path" not in op:
-            return {
-                "success": False,
-                "error": f"Operation {i} missing required field: path"
-            }
+            return {"success": False, "error": f"Operation {i} missing required field: path"}
 
         # Validate type-specific requirements
         if op_type == "rename" and "new_path" not in op:
             return {
                 "success": False,
-                "error": f"Rename operation {i} missing required field: new_path"
+                "error": f"Rename operation {i} missing required field: new_path",
             }
 
     # Initialize editor
@@ -143,7 +146,7 @@ async def edit_files(
                 if content is None:
                     return {
                         "success": False,
-                        "error": f"Modify operation for {path} missing content or new_content"
+                        "error": f"Modify operation for {path} missing content or new_content",
                     }
                 editor.add_modify(path, content)
                 by_type["modify"] += 1
@@ -159,10 +162,7 @@ async def edit_files(
 
     except Exception as e:
         editor.abort()
-        return {
-            "success": False,
-            "error": f"Failed to queue operations: {str(e)}"
-        }
+        return {"success": False, "error": f"Failed to queue operations: {str(e)}"}
 
     operations_queued = len(operations)
 
@@ -189,7 +189,7 @@ async def edit_files(
                 "operations_applied": 0,
                 "by_type": by_type,
                 "preview_output": preview_text,
-                "message": f"Preview generated for {operations_queued} operations (not applied)"
+                "message": f"Preview generated for {operations_queued} operations (not applied)",
             }
         else:
             # Preview but still commit
@@ -201,12 +201,12 @@ async def edit_files(
                     "operations_applied": operations_queued,
                     "by_type": by_type,
                     "preview_output": preview_text,
-                    "message": f"Applied {operations_queued} operations successfully"
+                    "message": f"Applied {operations_queued} operations successfully",
                 }
             else:
                 return {
                     "success": False,
-                    "error": "Failed to commit changes. Transaction rolled back."
+                    "error": "Failed to commit changes. Transaction rolled back.",
                 }
 
     # Handle auto_commit
@@ -219,13 +219,10 @@ async def edit_files(
                 "operations_applied": operations_queued,
                 "by_type": by_type,
                 "message": f"Successfully applied {operations_queued} operations",
-                "transaction_id": transaction_id
+                "transaction_id": transaction_id,
             }
         else:
-            return {
-                "success": False,
-                "error": "Failed to commit changes. Transaction rolled back."
-            }
+            return {"success": False, "error": "Failed to commit changes. Transaction rolled back."}
     else:
         # Queue only, don't commit
         editor.abort()  # Abort to clean up, since we're not committing
@@ -234,7 +231,7 @@ async def edit_files(
             "operations_queued": operations_queued,
             "operations_applied": 0,
             "by_type": by_type,
-            "message": f"Queued {operations_queued} operations (not applied, auto_commit=False)"
+            "message": f"Queued {operations_queued} operations (not applied, auto_commit=False)",
         }
 
 
@@ -246,8 +243,9 @@ class FileEditorTool:
     def __init__(self):
         """Initialize - deprecated."""
         import warnings
+
         warnings.warn(
             "FileEditorTool class is deprecated. Use edit_files function instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )

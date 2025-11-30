@@ -46,7 +46,7 @@ async def plan_files(
         return {
             "success": True,
             "files": matches[:limit],
-            "note": "Use these paths with read_file; do not invent other files."
+            "note": "Use these paths with read_file; do not invent other files.",
         }
     except Exception as exc:
         return {"success": False, "error": str(exc)}

@@ -116,7 +116,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
     - Advanced filtering and metadata queries
     """
 
-    def __init__(self, config: EmbeddingConfig, embedding_model: Optional[BaseEmbeddingModel] = None):
+    def __init__(
+        self, config: EmbeddingConfig, embedding_model: Optional[BaseEmbeddingModel] = None
+    ):
         """Initialize ProximaDB provider.
 
         Args:
@@ -127,15 +129,11 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         # ProximaDB-specific config
         self.proximadb_path = config.extra_config.get(
-            "proximadb_path",
-            str(Path.home() / "code/proximaDB")
+            "proximadb_path", str(Path.home() / "code/proximaDB")
         )
         self.proximadb_host = config.extra_config.get("proximadb_host", "localhost")
         self.proximadb_port = config.extra_config.get("proximadb_port", 8000)
-        self.collection_name = config.extra_config.get(
-            "proximadb_collection",
-            "victor_codebase"
-        )
+        self.collection_name = config.extra_config.get("proximadb_collection", "victor_codebase")
 
         # Connection objects (to be implemented)
         self.client = None
@@ -146,7 +144,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         if self._initialized:
             return
 
-        print(f"🔧 Initializing ProximaDB provider")
+        print("🔧 Initializing ProximaDB provider")
         print(f"   Path: {self.proximadb_path}")
         print(f"   Host: {self.proximadb_host}:{self.proximadb_port}")
         print(f"   Collection: {self.collection_name}")
@@ -194,9 +192,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         return await self.embedding_model.embed_batch(texts)
 
-    async def index_document(
-        self, doc_id: str, content: str, metadata: Dict[str, Any]
-    ) -> None:
+    async def index_document(self, doc_id: str, content: str, metadata: Dict[str, Any]) -> None:
         """Index a single document in ProximaDB.
 
         Args:
@@ -208,7 +204,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             await self.initialize()
 
         # Generate embedding
-        embedding = await self.embed_text(content)
+        _ = await self.embed_text(content)
 
         # TODO: Insert into ProximaDB
         # await self.collection.insert(
@@ -238,12 +234,12 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         print(f"📝 Indexing {len(documents)} documents to ProximaDB...")
 
         # Extract data
-        ids = [doc["id"] for doc in documents]
         contents = [doc["content"] for doc in documents]
-        metadatas = [doc.get("metadata", {}) for doc in documents]
+        _ = [doc["id"] for doc in documents]
+        _ = [doc.get("metadata", {}) for doc in documents]
 
         # Batch generate embeddings
-        embeddings = await self.embed_batch(contents)
+        _ = await self.embed_batch(contents)
 
         # TODO: Batch insert into ProximaDB
         # batch_size = self.config.extra_config.get("batch_size", 1000)
@@ -285,7 +281,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             await self.initialize()
 
         # Generate query embedding
-        query_embedding = await self.embed_text(query)
+        _ = await self.embed_text(query)
 
         # TODO: Search in ProximaDB
         # results = await self.collection.search(
@@ -325,9 +321,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         # TODO: Delete from ProximaDB
         # await self.collection.delete(id=doc_id)
 
-        raise NotImplementedError(
-            "ProximaDB integration not yet implemented"
-        )
+        raise NotImplementedError("ProximaDB integration not yet implemented")
 
     async def clear_index(self) -> None:
         """Clear entire ProximaDB collection."""
@@ -340,9 +334,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         # await self.client.delete_collection(self.collection_name)
         # await self.client.create_collection(...)
 
-        raise NotImplementedError(
-            "ProximaDB integration not yet implemented"
-        )
+        raise NotImplementedError("ProximaDB integration not yet implemented")
 
     async def get_stats(self) -> Dict[str, Any]:
         """Get statistics about ProximaDB index.

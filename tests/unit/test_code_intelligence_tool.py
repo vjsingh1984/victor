@@ -32,14 +32,16 @@ class TestFindSymbol:
     async def test_find_function(self, tmp_path):
         """Test finding a function definition."""
         test_file = tmp_path / "test.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 def hello_world():
     print("Hello, World!")
     return True
 
 def another_function():
     pass
-""")
+"""
+        )
 
         result = await find_symbol(file_path=str(test_file), symbol_name="hello_world")
 
@@ -54,14 +56,16 @@ def another_function():
     async def test_find_class(self, tmp_path):
         """Test finding a class definition."""
         test_file = tmp_path / "test.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 class MyClass:
     def __init__(self):
         self.value = 0
 
     def method(self):
         return self.value
-""")
+"""
+        )
 
         result = await find_symbol(file_path=str(test_file), symbol_name="MyClass")
 
@@ -74,10 +78,12 @@ class MyClass:
     async def test_find_symbol_not_found(self, tmp_path):
         """Test searching for non-existent symbol."""
         test_file = tmp_path / "test.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 def existing_function():
     pass
-""")
+"""
+        )
 
         result = await find_symbol(file_path=str(test_file), symbol_name="nonexistent")
 
@@ -105,12 +111,14 @@ def existing_function():
     async def test_find_nested_function(self, tmp_path):
         """Test finding nested function."""
         test_file = tmp_path / "test.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 def outer_function():
     def inner_function():
         return "inner"
     return inner_function()
-""")
+"""
+        )
 
         result = await find_symbol(file_path=str(test_file), symbol_name="inner_function")
 
@@ -122,11 +130,13 @@ def outer_function():
     async def test_find_method_in_class(self, tmp_path):
         """Test finding a method inside a class."""
         test_file = tmp_path / "test.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 class TestClass:
     def test_method(self):
         pass
-""")
+"""
+        )
 
         result = await find_symbol(file_path=str(test_file), symbol_name="test_method")
 
@@ -143,7 +153,10 @@ class TestClass:
         test_file.write_text("def test_func(): pass")
 
         # Mock to raise a generic exception during parsing
-        with patch("victor.tools.code_intelligence_tool.get_parser", side_effect=RuntimeError("Parse error")):
+        with patch(
+            "victor.tools.code_intelligence_tool.get_parser",
+            side_effect=RuntimeError("Parse error"),
+        ):
             result = await find_symbol(file_path=str(test_file), symbol_name="test_func")
 
             assert result is not None
@@ -159,22 +172,23 @@ class TestFindReferences:
         """Test finding references in directory."""
         # Create a directory with Python files
         test_file1 = tmp_path / "file1.py"
-        test_file1.write_text("""
+        test_file1.write_text(
+            """
 def target_function():
     return True
-""")
+"""
+        )
 
         test_file2 = tmp_path / "file2.py"
-        test_file2.write_text("""
+        test_file2.write_text(
+            """
 from file1 import target_function
 
 result = target_function()
-""")
-
-        result = await find_references(
-            symbol_name="target_function",
-            search_path=str(tmp_path)
+"""
         )
+
+        result = await find_references(symbol_name="target_function", search_path=str(tmp_path))
 
         assert isinstance(result, list)
         # May or may not find cross-file references depending on implementation
@@ -183,14 +197,15 @@ result = target_function()
     async def test_find_references_no_matches(self, tmp_path):
         """Test finding references when none exist."""
         test_file = tmp_path / "test.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 def some_function():
     pass
-""")
+"""
+        )
 
         result = await find_references(
-            symbol_name="nonexistent_function",
-            search_path=str(tmp_path)
+            symbol_name="nonexistent_function", search_path=str(tmp_path)
         )
 
         assert isinstance(result, list)
@@ -199,10 +214,7 @@ def some_function():
     @pytest.mark.asyncio
     async def test_find_references_invalid_path(self):
         """Test with invalid search path."""
-        result = await find_references(
-            symbol_name="test",
-            search_path="/nonexistent/path"
-        )
+        result = await find_references(symbol_name="test", search_path="/nonexistent/path")
 
         assert isinstance(result, list)
         # Should handle gracefully, return empty list
@@ -210,10 +222,7 @@ def some_function():
     @pytest.mark.asyncio
     async def test_find_references_empty_directory(self, tmp_path):
         """Test with empty directory."""
-        result = await find_references(
-            symbol_name="test",
-            search_path=str(tmp_path)
-        )
+        result = await find_references(symbol_name="test", search_path=str(tmp_path))
 
         assert isinstance(result, list)
         assert len(result) == 0
@@ -227,17 +236,16 @@ def some_function():
 
         # Create a valid file
         good_file = tmp_path / "good.py"
-        good_file.write_text("""
+        good_file.write_text(
+            """
 def target_function():
     pass
 
 result = target_function()
-""")
-
-        result = await find_references(
-            symbol_name="target_function",
-            search_path=str(tmp_path)
+"""
         )
+
+        result = await find_references(symbol_name="target_function", search_path=str(tmp_path))
 
         # Should still return results from good file
         assert isinstance(result, list)
@@ -254,10 +262,7 @@ result = target_function()
 
         # Mock open to raise an exception for any file
         with patch("builtins.open", side_effect=OSError("File read error")):
-            result = await find_references(
-                symbol_name="target",
-                search_path=str(tmp_path)
-            )
+            result = await find_references(symbol_name="target", search_path=str(tmp_path))
 
             # Should return empty list since all files failed to read
             assert isinstance(result, list)
@@ -271,20 +276,22 @@ class TestRenameSymbol:
     async def test_rename_missing_context(self, tmp_path):
         """Test rename with missing context."""
         test_file = tmp_path / "test.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 def old_function():
     return True
 
 def caller():
     result = old_function()
     return result
-""")
+"""
+        )
 
         result = await rename_symbol(
             symbol_name="old_function",
             new_symbol_name="new_function",
             context={},  # Empty context, no tool_registry
-            search_path=str(tmp_path)
+            search_path=str(tmp_path),
         )
 
         # Should handle missing tool_registry gracefully
@@ -307,7 +314,7 @@ def caller():
             symbol_name="nonexistent",
             new_symbol_name="new_name",
             context={"tool_registry": mock_registry},
-            search_path=str(tmp_path)
+            search_path=str(tmp_path),
         )
 
         # Should indicate no references found
@@ -330,7 +337,7 @@ def caller():
             symbol_name="test",
             new_symbol_name="new_test",
             context={"tool_registry": mock_registry},
-            search_path="."
+            search_path=".",
         )
 
         # Should handle error gracefully
@@ -341,11 +348,7 @@ def caller():
     async def test_rename_basic_structure(self):
         """Test basic structure of rename_symbol function."""
         # Just test that it handles missing context properly
-        result = await rename_symbol(
-            symbol_name="test",
-            new_symbol_name="new_test",
-            context={}
-        )
+        result = await rename_symbol(symbol_name="test", new_symbol_name="new_test", context={})
 
         assert result is not None
         assert isinstance(result, str)
@@ -357,19 +360,23 @@ def caller():
 
         # Create test files
         test_file1 = tmp_path / "file1.py"
-        test_file1.write_text("""
+        test_file1.write_text(
+            """
 def old_name():
     return True
 
 result = old_name()
-""")
+"""
+        )
 
         test_file2 = tmp_path / "file2.py"
-        test_file2.write_text("""
+        test_file2.write_text(
+            """
 from file1 import old_name
 
 value = old_name()
-""")
+"""
+        )
 
         # Create mock tool_registry with proper responses
         mock_registry = MagicMock()
@@ -377,8 +384,13 @@ value = old_name()
         # Mock find_references to return references
         references = [
             {"file_path": str(test_file1), "line": 2, "column": 5, "preview": "def old_name():"},
-            {"file_path": str(test_file1), "line": 5, "column": 10, "preview": "result = old_name()"},
-            {"file_path": str(test_file2), "line": 4, "column": 8, "preview": "value = old_name()"}
+            {
+                "file_path": str(test_file1),
+                "line": 5,
+                "column": 10,
+                "preview": "result = old_name()",
+            },
+            {"file_path": str(test_file2), "line": 4, "column": 8, "preview": "value = old_name()"},
         ]
 
         find_refs_result = MagicMock()
@@ -423,7 +435,7 @@ value = old_name()
             symbol_name="old_name",
             new_symbol_name="new_name",
             context={"tool_registry": mock_registry},
-            search_path=str(tmp_path)
+            search_path=str(tmp_path),
         )
 
         assert result is not None
@@ -462,7 +474,7 @@ value = old_name()
             symbol_name="test",
             new_symbol_name="new_test",
             context={"tool_registry": mock_registry},
-            search_path="."
+            search_path=".",
         )
 
         assert "Error starting transaction" in result
@@ -513,7 +525,7 @@ value = old_name()
             symbol_name="old",
             new_symbol_name="new",
             context={"tool_registry": mock_registry},
-            search_path=str(tmp_path)
+            search_path=str(tmp_path),
         )
 
         assert "No files were modified" in result or "aborted" in result.lower()
@@ -566,7 +578,7 @@ value = old_name()
             symbol_name="old",
             new_symbol_name="new",
             context={"tool_registry": mock_registry},
-            search_path=str(tmp_path)
+            search_path=str(tmp_path),
         )
 
         assert "Error queuing modification" in result
@@ -614,7 +626,7 @@ value = old_name()
             symbol_name="old",
             new_symbol_name="new",
             context={"tool_registry": mock_registry},
-            search_path=str(tmp_path)
+            search_path=str(tmp_path),
         )
 
         assert "Failed to process file" in result

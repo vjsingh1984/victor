@@ -192,15 +192,15 @@ def test_root():
     response = client.get("/api/v1/")
     assert response.status_code == 200
 ''',
-    "fastapi_requirements": '''fastapi>=0.104.0
+    "fastapi_requirements": """fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 python-multipart>=0.0.6
 pytest>=7.4.0
 httpx>=0.25.0
-''',
-    "pyproject_fastapi": '''[tool.black]
+""",
+    "pyproject_fastapi": """[tool.black]
 line-length = 100
 
 [tool.ruff]
@@ -212,8 +212,8 @@ strict = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-''',
-    "readme_fastapi": '''# FastAPI Application
+""",
+    "readme_fastapi": """# FastAPI Application
 
 Production-ready FastAPI application.
 
@@ -238,7 +238,7 @@ pytest
 ## API Documentation
 
 Visit http://localhost:8000/docs for interactive API documentation.
-''',
+""",
     "cli_main": '''"""CLI application."""
 
 import click
@@ -257,7 +257,7 @@ def hello(name):
 if __name__ == '__main__':
     cli()
 ''',
-    "dockerfile": '''FROM python:3.11-slim
+    "dockerfile": """FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -269,8 +269,8 @@ COPY . .
 EXPOSE 8000
 
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
-''',
-    "docker_compose": '''version: '3.8'
+""",
+    "docker_compose": """version: '3.8'
 
 services:
   app:
@@ -281,8 +281,8 @@ services:
       - ENV=development
     volumes:
       - .:/app
-''',
-    "gitignore_python": '''# Python
+""",
+    "gitignore_python": """# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -309,8 +309,8 @@ dist/
 .coverage
 htmlcov/
 .pytest_cache/
-''',
-    "gitignore_node": '''# Dependencies
+""",
+    "gitignore_node": """# Dependencies
 node_modules/
 
 # Production
@@ -328,14 +328,14 @@ dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-''',
-    "env_example": '''# Application
+""",
+    "env_example": """# Application
 PROJECT_NAME=My FastAPI App
 API_V1_STR=/api/v1
 
 # Database (if needed)
 # DATABASE_URL=postgresql://user:password@localhost/dbname
-''',
+""",
 }
 
 
@@ -397,22 +397,16 @@ async def scaffold(
     # Create operation
     if operation == "create":
         if not template:
-            return {
-                "success": False,
-                "error": "Create operation requires 'template' parameter"
-            }
+            return {"success": False, "error": "Create operation requires 'template' parameter"}
 
         if not name:
-            return {
-                "success": False,
-                "error": "Create operation requires 'name' parameter"
-            }
+            return {"success": False, "error": "Create operation requires 'name' parameter"}
 
         if template not in TEMPLATES:
             available = ", ".join(TEMPLATES.keys())
             return {
                 "success": False,
-                "error": f"Unknown template: {template}. Available: {available}"
+                "error": f"Unknown template: {template}. Available: {available}",
             }
 
         # Create project directory
@@ -421,7 +415,7 @@ async def scaffold(
         if project_dir.exists() and not force:
             return {
                 "success": False,
-                "error": f"Directory '{name}' already exists. Use force=True to overwrite"
+                "error": f"Directory '{name}' already exists. Use force=True to overwrite",
             }
 
         project_dir.mkdir(parents=True, exist_ok=True)
@@ -454,23 +448,15 @@ async def scaffold(
         next_steps = [f"cd {name}"]
 
         if template in ["fastapi", "flask", "microservice"]:
-            next_steps.extend([
-                "pip install -r requirements.txt",
-                "# Edit .env.example and save as .env"
-            ])
+            next_steps.extend(
+                ["pip install -r requirements.txt", "# Edit .env.example and save as .env"]
+            )
         elif template == "react-app":
-            next_steps.extend([
-                "npm install",
-                "npm start"
-            ])
+            next_steps.extend(["npm install", "npm start"])
         elif template == "python-cli":
             next_steps.append("pip install -e .")
 
-        next_steps.extend([
-            "git init",
-            "git add .",
-            "git commit -m 'Initial commit'"
-        ])
+        next_steps.extend(["git init", "git add .", "git commit -m 'Initial commit'"])
 
         # Build report
         report = []
@@ -493,10 +479,10 @@ async def scaffold(
             "files_created": created_files,
             "template_info": {
                 "name": template_info["name"],
-                "description": template_info["description"]
+                "description": template_info["description"],
             },
             "next_steps": next_steps,
-            "formatted_report": "\n".join(report)
+            "formatted_report": "\n".join(report),
         }
 
     # List operation
@@ -509,12 +495,14 @@ async def scaffold(
         report.append("")
 
         for template_id, template_info in TEMPLATES.items():
-            templates.append({
-                "id": template_id,
-                "name": template_info["name"],
-                "description": template_info["description"],
-                "file_count": len(template_info["files"])
-            })
+            templates.append(
+                {
+                    "id": template_id,
+                    "name": template_info["name"],
+                    "description": template_info["description"],
+                    "file_count": len(template_info["files"]),
+                }
+            )
 
             report.append(f"• {template_id}")
             report.append(f"  Name: {template_info['name']}")
@@ -530,16 +518,13 @@ async def scaffold(
             "operation": "list",
             "templates": templates,
             "count": len(templates),
-            "formatted_report": "\n".join(report)
+            "formatted_report": "\n".join(report),
         }
 
     # Add operation
     elif operation == "add":
         if not path:
-            return {
-                "success": False,
-                "error": "Add operation requires 'path' parameter"
-            }
+            return {"success": False, "error": "Add operation requires 'path' parameter"}
 
         file_path = Path(path)
 
@@ -552,13 +537,10 @@ async def scaffold(
                 "success": True,
                 "operation": "add",
                 "file_path": path,
-                "message": f"Created file: {path}"
+                "message": f"Created file: {path}",
             }
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Failed to create file: {e}"
-            }
+            return {"success": False, "error": f"Failed to create file: {e}"}
 
     # Init-git operation
     elif operation == "init-git":
@@ -577,24 +559,18 @@ async def scaffold(
             return {
                 "success": True,
                 "operation": "init-git",
-                "message": "Git repository initialized with initial commit"
+                "message": "Git repository initialized with initial commit",
             }
 
         except subprocess.CalledProcessError as e:
-            return {
-                "success": False,
-                "error": f"Git initialization failed: {e.stderr.decode()}"
-            }
+            return {"success": False, "error": f"Git initialization failed: {e.stderr.decode()}"}
         except FileNotFoundError:
-            return {
-                "success": False,
-                "error": "Git not found. Please install git first."
-            }
+            return {"success": False, "error": "Git not found. Please install git first."}
 
     else:
         return {
             "success": False,
-            "error": f"Unknown operation: {operation}. Valid operations: create, list, add, init-git"
+            "error": f"Unknown operation: {operation}. Valid operations: create, list, add, init-git",
         }
 
 
@@ -605,8 +581,9 @@ class ScaffoldTool:
     def __init__(self):
         """Initialize - deprecated."""
         import warnings
+
         warnings.warn(
             "ScaffoldTool class is deprecated. Use scaffold function instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )

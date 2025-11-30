@@ -14,10 +14,11 @@
 
 """Anthropic Claude provider implementation."""
 
+import json
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from anthropic import AsyncAnthropic
-from anthropic.types import ContentBlock, Message as AnthropicMessage, MessageStreamEvent
+from anthropic.types import Message as AnthropicMessage, MessageStreamEvent
 
 from victor.providers.base import (
     BaseProvider,
@@ -51,7 +52,9 @@ class AnthropicProvider(BaseProvider):
             max_retries: Maximum retry attempts
             **kwargs: Additional configuration
         """
-        super().__init__(api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs)
+        super().__init__(
+            api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+        )
         self.client = AsyncAnthropic(
             api_key=api_key,
             base_url=base_url,
@@ -107,10 +110,12 @@ class AnthropicProvider(BaseProvider):
                 if msg.role == "system":
                     system_message = msg.content
                 else:
-                    conversation_messages.append({
-                        "role": msg.role,
-                        "content": msg.content,
-                    })
+                    conversation_messages.append(
+                        {
+                            "role": msg.role,
+                            "content": msg.content,
+                        }
+                    )
 
             # Build request parameters
             request_params = {
@@ -145,22 +150,7 @@ class AnthropicProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
-        """Stream chat completion from Anthropic.
-
-        Args:
-            messages: Conversation messages
-            model: Model name
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            tools: Available tools
-            **kwargs: Additional parameters
-
-        Yields:
-            StreamChunk with incremental content
-
-        Raises:
-            ProviderError: If request fails
-        """
+        """Stream chat completion from Anthropic with tool-use support."""
         try:
             # Separate system messages
             system_message = None
@@ -170,10 +160,12 @@ class AnthropicProvider(BaseProvider):
                 if msg.role == "system":
                     system_message = msg.content
                 else:
-                    conversation_messages.append({
-                        "role": msg.role,
-                        "content": msg.content,
-                    })
+                    conversation_messages.append(
+                        {
+                            "role": msg.role,
+                            "content": msg.content,
+                        }
+                    )
 
             # Build request parameters
             request_params = {
@@ -190,12 +182,73 @@ class AnthropicProvider(BaseProvider):
             if tools:
                 request_params["tools"] = self._convert_tools(tools)
 
-            # Stream response
+            tool_calls: Dict[str, Dict[str, Any]] = {}
+            block_index_to_id: Dict[int, str] = {}
+
             async with self.client.messages.stream(**request_params) as stream:
                 async for event in stream:
-                    chunk = self._parse_stream_event(event)
-                    if chunk:
-                        yield chunk
+                    event_type = getattr(event, "type", "")
+
+                    if event_type == "content_block_start":
+                        block = getattr(event, "content_block", None)
+                        if block and getattr(block, "type", "") == "tool_use":
+                            tc_id = getattr(block, "id", None) or f"tool_{len(tool_calls) + 1}"
+                            tool_calls[tc_id] = {
+                                "id": tc_id,
+                                "name": getattr(block, "name", ""),
+                                "arguments": getattr(block, "input", {}) or {},
+                            }
+                            block_index = getattr(
+                                event, "index", getattr(block, "index", len(block_index_to_id))
+                            )
+                            block_index_to_id[block_index] = tc_id
+
+                    elif event_type == "content_block_delta":
+                        delta = getattr(event, "delta", None)
+                        delta_type = getattr(delta, "type", "")
+                        block_index = getattr(
+                            event, "index", getattr(event, "content_block_index", None)
+                        )
+                        if delta_type == "text_delta" and hasattr(delta, "text"):
+                            yield StreamChunk(content=delta.text or "", is_final=False)
+                        elif delta_type in {"input_json_delta", "input_delta"}:
+                            tc_id = block_index_to_id.get(block_index)
+                            if tc_id:
+                                partial = (
+                                    getattr(delta, "partial_json", None)
+                                    or getattr(delta, "text", "")
+                                    or ""
+                                )
+                                existing_args = tool_calls[tc_id].get("arguments", "")
+                                if existing_args in ({}, None):
+                                    tool_calls[tc_id]["arguments"] = partial
+                                elif isinstance(existing_args, str):
+                                    tool_calls[tc_id]["arguments"] = existing_args + partial
+                                else:
+                                    tool_calls[tc_id]["arguments"] = (
+                                        json.dumps(existing_args) + partial
+                                    )
+
+                    elif event_type == "content_block_stop":
+                        block_index = getattr(
+                            event, "index", getattr(event, "content_block_index", None)
+                        )
+                        tc_id = block_index_to_id.get(block_index)
+                        if tc_id and "arguments" in tool_calls.get(tc_id, {}):
+                            tool_calls[tc_id]["arguments"] = self._parse_json_arguments(
+                                tool_calls[tc_id].get("arguments")
+                            )
+
+                    elif event_type == "message_stop":
+                        for tc in tool_calls.values():
+                            tc["arguments"] = self._parse_json_arguments(tc.get("arguments"))
+
+                        yield StreamChunk(
+                            content="",
+                            tool_calls=list(tool_calls.values()) or None,
+                            stop_reason="stop",
+                            is_final=True,
+                        )
 
         except Exception as e:
             raise self._handle_error(e)
@@ -236,11 +289,13 @@ class AnthropicProvider(BaseProvider):
             if block.type == "text":
                 content += block.text
             elif block.type == "tool_use":
-                tool_calls.append({
-                    "id": block.id,
-                    "name": block.name,
-                    "arguments": block.input,
-                })
+                tool_calls.append(
+                    {
+                        "id": block.id,
+                        "name": block.name,
+                        "arguments": block.input,
+                    }
+                )
 
         # Parse usage
         usage = None
@@ -260,6 +315,20 @@ class AnthropicProvider(BaseProvider):
             model=model,
             raw_response=response.model_dump() if hasattr(response, "model_dump") else None,
         )
+
+    @staticmethod
+    def _parse_json_arguments(raw_args: Any) -> Any:
+        """Best-effort parse of tool-use arguments."""
+        if raw_args is None:
+            return {}
+        if isinstance(raw_args, dict):
+            return raw_args
+        if isinstance(raw_args, str):
+            try:
+                return json.loads(raw_args)
+            except Exception:
+                return raw_args
+        return raw_args
 
     def _parse_stream_event(self, event: MessageStreamEvent) -> Optional[StreamChunk]:
         """Parse streaming event from Anthropic.

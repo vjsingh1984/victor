@@ -1,5 +1,7 @@
 # Docker Scripts & Configuration Optimization Plan
 
+> Canonical Docker usage docs: `docker/README.md` (guided) and `docker/QUICKREF.md` (commands). This plan is historical/for reference.
+
 **Analysis Date**: 2025-11-26
 **Status**: Ready for Implementation
 **Estimated Impact**: 15% reduction (229 lines saved) + better organization

@@ -17,6 +17,7 @@
 import hashlib
 import logging
 import pickle
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -74,7 +75,9 @@ class SemanticToolSelector:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Cache file path (includes model name for version control)
-        cache_filename = f"tool_embeddings_{embedding_model.replace(':', '_').replace('/', '_')}.pkl"
+        cache_filename = (
+            f"tool_embeddings_{embedding_model.replace(':', '_').replace('/', '_')}.pkl"
+        )
         self.cache_file = self.cache_dir / cache_filename
 
         # In-memory cache: tool_name → embedding vector
@@ -222,10 +225,21 @@ class SemanticToolSelector:
         "file_ops": ["read_file", "write_file", "edit_files", "list_directory"],
         "git_ops": ["execute_bash", "git_suggest_commit", "git_create_pr", "git_analyze_conflicts"],
         "analysis": ["analyze_docs", "analyze_metrics", "code_review", "security_scan"],
-        "refactoring": ["refactor_extract_function", "refactor_inline_variable", "rename_symbol", "refactor_organize_imports"],
-        "generation": ["generate_docs", "code_search", "plan_files", "scaffold"],
+        "refactoring": [
+            "refactor_extract_function",
+            "refactor_inline_variable",
+            "rename_symbol",
+            "refactor_organize_imports",
+        ],
+        "generation": [
+            "generate_docs",
+            "semantic_code_search",
+            "code_search",
+            "plan_files",
+            "scaffold",
+        ],
         "execution": ["execute_bash", "execute_python_in_sandbox", "run_tests"],
-        "code_intel": ["find_symbol", "find_references", "code_search"],
+        "code_intel": ["find_symbol", "find_references", "semantic_code_search", "code_search"],
         "web": ["web_search", "web_fetch", "web_summarize"],
         "workflows": ["run_workflow", "batch", "cicd"],
     }
@@ -244,7 +258,8 @@ class SemanticToolSelector:
         "run": ["execute_bash"],
         "execute": ["execute_bash"],
         "install": ["execute_bash"],
-        "search": ["web_search", "code_search"],
+        # Prefer semantic search, but keep keyword search available as a fallback
+        "search": ["web_search", "semantic_code_search", "code_search"],
         "find": ["find_symbol", "find_references"],
         "refactor": ["refactor_extract_function", "refactor_inline_variable", "rename_symbol"],
         "security": ["security_scan"],
@@ -267,7 +282,7 @@ class SemanticToolSelector:
         query_lower = query.lower()
 
         for keyword, tools in self.MANDATORY_TOOL_KEYWORDS.items():
-            if keyword in query_lower:
+            if self._keyword_in_text(query_lower, keyword):
                 mandatory.extend(tools)
                 logger.debug(f"Mandatory tools for '{keyword}': {tools}")
 
@@ -303,7 +318,10 @@ class SemanticToolSelector:
             logger.debug("Editing task detected")
 
         # Git/diff keywords
-        if any(kw in query_lower for kw in ["diff", "commit", "pr", "git", "pull request"]):
+        if any(
+            self._keyword_in_text(query_lower, kw)
+            for kw in ["diff", "commit", "pr", "git", "pull request"]
+        ):
             relevant_tools.extend(self.TOOL_CATEGORIES.get("git_ops", []))
             logger.debug("Git operation detected")
 
@@ -365,7 +383,7 @@ class SemanticToolSelector:
         # Check which actions were requested
         original_lower = original_request.lower()
         for action_type, keywords in action_patterns.items():
-            if any(kw in original_lower for kw in keywords):
+            if any(self._keyword_in_text(original_lower, kw) for kw in keywords):
                 # Check if this action was completed by looking at tool results
                 completed = self._was_action_completed(action_type, conversation_history)
                 if not completed:
@@ -411,6 +429,12 @@ class SemanticToolSelector:
                         return True
 
         return False
+
+    def _keyword_in_text(self, text: str, keyword: str) -> bool:
+        """Return True if keyword is present in text with sane boundaries."""
+        if len(keyword) <= 3:
+            return re.search(rf"\b{re.escape(keyword)}\b", text) is not None
+        return keyword in text
 
     def _build_contextual_query(
         self,
@@ -478,12 +502,7 @@ class SemanticToolSelector:
         except Exception as e:
             logger.warning(f"Failed to save usage cache: {e}")
 
-    def _record_tool_usage(
-        self,
-        tool_name: str,
-        query: str,
-        success: bool = True
-    ) -> None:
+    def _record_tool_usage(self, tool_name: str, query: str, success: bool = True) -> None:
         """Record tool usage for learning (Phase 3).
 
         Args:
@@ -537,14 +556,13 @@ class SemanticToolSelector:
 
         # Boost from success rate
         success_rate = (
-            stats["success_count"] / stats["usage_count"]
-            if stats["usage_count"] > 0
-            else 0
+            stats["success_count"] / stats["usage_count"] if stats["usage_count"] > 0 else 0
         )
         success_boost = success_rate * 0.05  # Max 0.05
 
         # Boost from recency (tools used recently get slight preference)
         import time
+
         time_since_use = time.time() - stats["last_used"]
         days_since_use = time_since_use / 86400  # Convert to days
         recency_boost = max(0, 0.05 - (days_since_use * 0.01))  # Max 0.05
@@ -630,7 +648,9 @@ class SemanticToolSelector:
         for action in pending_actions:
             if action in pending_action_tools:
                 mandatory_tool_names.extend(pending_action_tools[action])
-                logger.info(f"Added mandatory tools for pending '{action}': {pending_action_tools[action]}")
+                logger.info(
+                    f"Added mandatory tools for pending '{action}': {pending_action_tools[action]}"
+                )
 
         mandatory_tool_names = list(set(mandatory_tool_names))
         logger.info(f"Total mandatory tools: {mandatory_tool_names}")
@@ -675,9 +695,7 @@ class SemanticToolSelector:
         similarities.sort(key=lambda x: x[1], reverse=True)
 
         # Ensure all mandatory tools are included
-        mandatory_tools = [
-            tool for tool in tools.list_tools() if tool.name in mandatory_tool_names
-        ]
+        mandatory_tools = [tool for tool in tools.list_tools() if tool.name in mandatory_tool_names]
 
         # Combine mandatory + top semantic matches
         selected_tools = []
@@ -701,7 +719,7 @@ class SemanticToolSelector:
         logger.info(
             f"Context-aware selection: {len(selected_tools)} tools (mandatory={len(mandatory_tools)}, "
             f"pending_actions={len(pending_actions)}): "
-            f"{', '.join(f'{name}({score})' for name, score in zip(tool_names, scores))}"
+            f"{', '.join(f'{name}({score})' for name, score in zip(tool_names, scores, strict=False))}"
         )
 
         # Phase 3: Record tool usage for learning
@@ -776,9 +794,7 @@ class SemanticToolSelector:
         similarities.sort(key=lambda x: x[1], reverse=True)
 
         # Ensure all mandatory tools are included
-        mandatory_tools = [
-            tool for tool in tools.list_tools() if tool.name in mandatory_tool_names
-        ]
+        mandatory_tools = [tool for tool in tools.list_tools() if tool.name in mandatory_tool_names]
 
         # Combine mandatory + top semantic matches
         selected_tools = []
@@ -801,7 +817,7 @@ class SemanticToolSelector:
         scores = [f"{s:.3f}" for _, s in selected_tools]
         logger.info(
             f"Selected {len(selected_tools)} tools (mandatory={len(mandatory_tools)}): "
-            f"{', '.join(f'{name}({score})' for name, score in zip(tool_names, scores))}"
+            f"{', '.join(f'{name}({score})' for name, score in zip(tool_names, scores, strict=False))}"
         )
 
         # Convert to ToolDefinition
@@ -840,9 +856,10 @@ class SemanticToolSelector:
             if self._sentence_model is None:
                 try:
                     from sentence_transformers import SentenceTransformer
+
                     logger.info(f"Loading sentence-transformers model: {self.embedding_model}")
                     self._sentence_model = SentenceTransformer(self.embedding_model)
-                    logger.info(f"Model loaded successfully (local, ~5ms per embedding)")
+                    logger.info("Model loaded successfully (local, ~5ms per embedding)")
                 except ImportError:
                     raise ImportError(
                         "sentence-transformers not installed. "
@@ -851,10 +868,10 @@ class SemanticToolSelector:
 
             # Run in thread pool to avoid blocking event loop
             import asyncio
+
             loop = asyncio.get_event_loop()
             embedding = await loop.run_in_executor(
-                None,
-                lambda: self._sentence_model.encode(text, convert_to_numpy=True)
+                None, lambda: self._sentence_model.encode(text, convert_to_numpy=True)
             )
             return embedding.astype(np.float32)
 
@@ -989,7 +1006,6 @@ class SemanticToolSelector:
                 "Examples: fixing bugs in functions, updating variable names, modifying implementations, "
                 "improving algorithms, refactoring code structure, updating configurations."
             ),
-
             # Code execution
             "execute_bash": (
                 "Use for: running scripts, executing commands, testing code, installing packages, git operations, file operations, running programs. "
@@ -1007,7 +1023,6 @@ class SemanticToolSelector:
                 "Examples: testing functions (factorial, fibonacci, email validation), running algorithms, "
                 "validating implementations, testing calculators, verifying solutions, running Python programs safely."
             ),
-
             # Code intelligence
             "find_symbol": (
                 "Use for: locating function definitions, finding class declarations, searching for variables, code navigation, "
@@ -1030,7 +1045,6 @@ class SemanticToolSelector:
                 "refactor the variable name, rename the class. "
                 "Examples: renaming variables, updating function names, refactoring class names."
             ),
-
             # Code quality
             "code_review": (
                 "Use for: analyzing code quality, checking for issues, reviewing implementations, code analysis, "
@@ -1053,7 +1067,6 @@ class SemanticToolSelector:
                 "calculate complexity, analyze code health. "
                 "Examples: measuring cyclomatic complexity, analyzing code quality."
             ),
-
             # Testing
             "run_tests": (
                 "Use for: executing test suites, running pytest, validating code, test automation, checking test coverage, "
@@ -1062,7 +1075,6 @@ class SemanticToolSelector:
                 "run unit tests, verify tests, execute test cases. "
                 "Examples: running pytest, executing unit tests, checking test coverage."
             ),
-
             # Documentation
             "generate_docs": (
                 "Use for: creating documentation, generating API docs, documenting code, writing README files, "
@@ -1078,7 +1090,6 @@ class SemanticToolSelector:
                 "check if code is documented. "
                 "Examples: reviewing documentation quality, checking doc coverage."
             ),
-
             # Git operations
             "git": (
                 "Use for: version control, committing changes, managing branches, git operations, source control, "
@@ -1097,7 +1108,6 @@ class SemanticToolSelector:
                 "Common requests: create a pull request, create PR, propose changes. "
                 "Examples: creating pull requests for code review."
             ),
-
             # Refactoring
             "refactor_extract_function": (
                 "Use for: extracting methods, refactoring code, improving code structure, extracting functions. "
@@ -1114,7 +1124,6 @@ class SemanticToolSelector:
                 "Common requests: organize imports, clean up imports, sort imports. "
                 "Examples: organizing Python imports, cleaning up dependencies."
             ),
-
             # Web & HTTP
             "web_search": (
                 "Use for: searching documentation, finding examples, looking up information, web research, "
@@ -1129,7 +1138,6 @@ class SemanticToolSelector:
                 "Common requests: fetch this webpage, download documentation, get web content. "
                 "Examples: downloading API documentation, fetching web pages."
             ),
-
             # Workflows
             "run_workflow": (
                 "Use for: executing multi-step tasks, complex operations, automated workflows, orchestration, "
@@ -1137,7 +1145,6 @@ class SemanticToolSelector:
                 "Common requests: run workflow, execute automation, run multi-step process. "
                 "Examples: executing complex workflows, running automation."
             ),
-
             # Additional tools
             "batch": (
                 "Use for: processing multiple files, batch operations, bulk processing, mass operations, "

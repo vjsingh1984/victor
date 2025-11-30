@@ -101,10 +101,13 @@ class TestOllamaEmbeddingModel:
 
         with patch("httpx.AsyncClient") as mock_client_class:
             import httpx
+
             mock_client = AsyncMock()
             mock_response = MagicMock()
             mock_response.status_code = 404
-            http_error = httpx.HTTPStatusError("404 Not Found", request=MagicMock(), response=mock_response)
+            http_error = httpx.HTTPStatusError(
+                "404 Not Found", request=MagicMock(), response=mock_response
+            )
             mock_response.raise_for_status.side_effect = http_error
             mock_client.post.return_value = mock_response
             mock_client_class.return_value = mock_client
@@ -119,6 +122,7 @@ class TestOllamaEmbeddingModel:
 
         with patch("httpx.AsyncClient") as mock_client_class:
             import httpx
+
             mock_client = AsyncMock()
             mock_client.post.side_effect = httpx.ConnectError("Connection refused")
             mock_client_class.return_value = mock_client
@@ -240,7 +244,9 @@ class TestSentenceTransformerModel:
         mock_st_model = MagicMock()
         mock_st_model.get_sentence_embedding_dimension.return_value = 384
 
-        with patch("sentence_transformers.SentenceTransformer", return_value=mock_st_model) as mock_st:
+        with patch(
+            "sentence_transformers.SentenceTransformer", return_value=mock_st_model
+        ) as mock_st:
             with patch("asyncio.get_event_loop") as mock_loop:
                 # run_in_executor returns an awaitable that resolves to the model
                 async def mock_run_in_executor(executor, func, *args):

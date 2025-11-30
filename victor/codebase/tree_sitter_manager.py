@@ -80,4 +80,3 @@ def get_parser(language: str) -> Parser:
 
     _parser_cache[language] = parser
     return parser
-

@@ -54,7 +54,7 @@ def calculate_total(items: list) -> float:
 '''
 
     # Create temporary file for demo
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         temp_file = Path(f.name)
         f.write(sample_code)
 
@@ -69,10 +69,7 @@ def calculate_total(items: list) -> float:
 
     security_tool = SecurityScannerTool()
     print("Running security scan...")
-    security_result = await security_tool.execute(
-        path=str(temp_file),
-        scan_type="secrets"
-    )
+    security_result = await security_tool.execute(path=str(temp_file), scan_type="secrets")
 
     if security_result.success:
         print("✅ Security scan complete!")
@@ -89,10 +86,7 @@ def calculate_total(items: list) -> float:
 
     review_tool = CodeReviewTool()
     print("Running code review...")
-    review_result = await review_tool.execute(
-        file_path=str(temp_file),
-        review_type="quality"
-    )
+    review_result = await review_tool.execute(file_path=str(temp_file), review_type="quality")
 
     if review_result.success:
         print("✅ Code review complete!")
@@ -110,10 +104,7 @@ def calculate_total(items: list) -> float:
 
     testing_tool = TestingTool()
     print("Generating unit tests...")
-    test_result = await testing_tool.execute(
-        action="generate",
-        file_path=str(temp_file)
-    )
+    test_result = await testing_tool.execute(action="generate", file_path=str(temp_file))
 
     if test_result.success:
         print("✅ Test generation complete!")
@@ -131,9 +122,7 @@ def calculate_total(items: list) -> float:
     doc_tool = DocumentationTool()
     print("Generating documentation...")
     doc_result = await doc_tool.execute(
-        action="generate",
-        source_path=str(temp_file),
-        doc_type="api"
+        action="generate", source_path=str(temp_file), doc_type="api"
     )
 
     if doc_result.success:
@@ -166,9 +155,7 @@ jobs:
 """
 
     cicd_result = await cicd_tool.execute(
-        action="validate",
-        platform="github",
-        workflow_content=sample_workflow
+        action="validate", platform="github", workflow_content=sample_workflow
     )
 
     if cicd_result.success:
@@ -184,13 +171,15 @@ jobs:
     print("=" * 70)
     print()
 
-    steps_completed = sum([
-        security_result.success,
-        review_result.success,
-        test_result.success,
-        doc_result.success,
-        cicd_result.success
-    ])
+    steps_completed = sum(
+        [
+            security_result.success,
+            review_result.success,
+            test_result.success,
+            doc_result.success,
+            cicd_result.success,
+        ]
+    )
 
     print(f"Steps completed: {steps_completed}/5")
     print()

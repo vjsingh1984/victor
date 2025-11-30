@@ -67,7 +67,7 @@ class TestDependencyList:
         mock_packages = [
             {"name": "requests", "version": "2.28.0"},
             {"name": "pytest", "version": "7.2.0"},
-            {"name": "aiofiles", "version": "23.1.0"}
+            {"name": "aiofiles", "version": "23.1.0"},
         ]
 
         mock_result = Mock()
@@ -98,7 +98,9 @@ class TestDependencyList:
     @pytest.mark.asyncio
     async def test_dependency_list_error(self):
         """Test error handling in package listing."""
-        with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")):
+        with patch(
+            "subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")
+        ):
             result = await dependency_list()
 
             assert result["success"] is False
@@ -114,7 +116,7 @@ class TestDependencyOutdated:
         mock_outdated = [
             {"name": "requests", "version": "2.25.0", "latest_version": "3.0.0"},
             {"name": "pytest", "version": "7.1.0", "latest_version": "7.2.0"},
-            {"name": "black", "version": "22.10.0", "latest_version": "22.10.1"}
+            {"name": "black", "version": "22.10.0", "latest_version": "22.10.1"},
         ]
 
         mock_result = Mock()
@@ -148,7 +150,9 @@ class TestDependencyOutdated:
     @pytest.mark.asyncio
     async def test_dependency_outdated_error(self):
         """Test error handling in outdated check."""
-        with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")):
+        with patch(
+            "subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")
+        ):
             result = await dependency_outdated()
 
             assert result["success"] is False
@@ -164,7 +168,7 @@ class TestDependencySecurity:
         mock_packages = [
             {"name": "django", "version": "2.2.0"},
             {"name": "pillow", "version": "8.0.0"},
-            {"name": "safe-package", "version": "1.0.0"}
+            {"name": "safe-package", "version": "1.0.0"},
         ]
 
         mock_result = Mock()
@@ -184,7 +188,7 @@ class TestDependencySecurity:
         """Test security check with no vulnerabilities."""
         mock_packages = [
             {"name": "safe-package-1", "version": "1.0.0"},
-            {"name": "safe-package-2", "version": "2.0.0"}
+            {"name": "safe-package-2", "version": "2.0.0"},
         ]
 
         mock_result = Mock()
@@ -200,7 +204,9 @@ class TestDependencySecurity:
     @pytest.mark.asyncio
     async def test_dependency_security_error(self):
         """Test error handling in security check."""
-        with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")):
+        with patch(
+            "subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")
+        ):
             result = await dependency_security()
 
             assert result["success"] is False
@@ -228,7 +234,9 @@ class TestDependencyGenerate:
     @pytest.mark.asyncio
     async def test_dependency_generate_error(self):
         """Test error in generating requirements."""
-        with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")):
+        with patch(
+            "subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")
+        ):
             result = await dependency_generate()
 
             assert result["success"] is False
@@ -272,7 +280,9 @@ class TestDependencyUpdate:
     @pytest.mark.asyncio
     async def test_dependency_update_error(self):
         """Test error handling in package update."""
-        with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")):
+        with patch(
+            "subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")
+        ):
             result = await dependency_update(packages=["invalid-package"], dry_run=False)
 
             assert result["success"] is False
@@ -311,7 +321,9 @@ class TestDependencyTree:
     @pytest.mark.asyncio
     async def test_dependency_tree_error(self):
         """Test error handling in dependency tree."""
-        with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")):
+        with patch(
+            "subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")
+        ):
             result = await dependency_tree()
 
             assert result["success"] is False
@@ -336,7 +348,7 @@ class TestDependencyCheck:
         mock_content = "requests==2.28.0\npytest==7.2.0"
         mock_installed = [
             {"name": "requests", "version": "2.28.0"},
-            {"name": "pytest", "version": "7.2.0"}
+            {"name": "pytest", "version": "7.2.0"},
         ]
 
         mock_result = Mock()

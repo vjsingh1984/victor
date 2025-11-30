@@ -14,7 +14,7 @@
 
 """Provider registry for managing and discovering LLM providers."""
 
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Type
 
 from victor.providers.base import BaseProvider, ProviderNotFoundError
 
@@ -106,6 +106,9 @@ def _register_default_providers() -> None:
     ProviderRegistry.register("ollama", OllamaProvider)
     ProviderRegistry.register("anthropic", AnthropicProvider)
     ProviderRegistry.register("openai", OpenAIProvider)
+    # LMStudio and vLLM use OpenAI-compatible endpoints
+    ProviderRegistry.register("lmstudio", OpenAIProvider)
+    ProviderRegistry.register("vllm", OpenAIProvider)
     ProviderRegistry.register("google", GoogleProvider)
     ProviderRegistry.register("xai", XAIProvider)
     ProviderRegistry.register("grok", XAIProvider)  # Alias for xai

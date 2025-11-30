@@ -26,7 +26,7 @@ Features:
 import ast
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List
 import logging
 
 from victor.tools.decorators import tool
@@ -70,6 +70,7 @@ CODE_SMELLS = {
 
 
 # Helper functions
+
 
 def _check_security(content: str, file_path: Path) -> List[Dict[str, Any]]:
     """Check for security issues."""
@@ -340,9 +341,7 @@ def _build_summary_report(
 
     if by_file:
         report.append("Top Files with Issues:")
-        for file_name, count in sorted(by_file.items(), key=lambda x: x[1], reverse=True)[
-            :10
-        ]:
+        for file_name, count in sorted(by_file.items(), key=lambda x: x[1], reverse=True)[:10]:
             report.append(f"  {Path(file_name).name}: {count} issues")
 
     return "\n".join(report)
@@ -397,14 +396,10 @@ def _build_complexity_report(path: Path, complexity_data: List[Dict[str, Any]]) 
     report.append("")
 
     # Sort by complexity
-    sorted_data = sorted(
-        complexity_data, key=lambda x: x.get("metric", 0), reverse=True
-    )
+    sorted_data = sorted(complexity_data, key=lambda x: x.get("metric", 0), reverse=True)
 
     for item in sorted_data[:20]:  # Top 20
-        report.append(
-            f"  {item['code']} - Complexity: {item.get('metric', 'N/A')}"
-        )
+        report.append(f"  {item['code']} - Complexity: {item.get('metric', 'N/A')}")
         report.append(f"    File: {item['file']}:{item['line']}")
         report.append(f"    Recommendation: {item['recommendation']}")
         report.append("")
@@ -433,9 +428,7 @@ def _build_best_practices_report(path: Path, issues: List[Dict[str, Any]]) -> st
             by_type[issue_type] = []
         by_type[issue_type].append(issue)
 
-    for issue_type, type_issues in sorted(
-        by_type.items(), key=lambda x: len(x[1]), reverse=True
-    ):
+    for issue_type, type_issues in sorted(by_type.items(), key=lambda x: len(x[1]), reverse=True):
         report.append(f"{issue_type}: {len(type_issues)} occurrences")
         report.append(f"  Recommendation: {type_issues[0]['recommendation']}")
         report.append("")
@@ -445,6 +438,7 @@ def _build_best_practices_report(path: Path, issues: List[Dict[str, Any]]) -> st
 
 # Consolidated Tool Function
 
+
 @tool
 async def code_review(
     path: str,
@@ -452,7 +446,7 @@ async def code_review(
     file_pattern: str = "*.py",
     severity: str = "low",
     include_metrics: bool = False,
-    max_issues: int = 50
+    max_issues: int = 50,
 ) -> Dict[str, Any]:
     """
     Comprehensive code review for automated quality analysis.
@@ -465,6 +459,7 @@ async def code_review(
         path: File or directory path to review.
         aspects: List of review aspects to check. Options: "security", "complexity",
             "best_practices", "documentation", "all". Defaults to ["all"].
+            Can be provided as a list or JSON string representation.
         file_pattern: Glob pattern for files to review (default: *.py).
         severity: Minimum severity to report for security issues: "low", "medium",
             "high", "critical". Defaults to "low" (report all).
@@ -498,8 +493,26 @@ async def code_review(
     if not path:
         return {"success": False, "error": "Missing required parameter: path"}
 
+    # Handle aspects parameter (can be list or JSON string)
     if aspects is None:
         aspects = ["all"]
+    elif isinstance(aspects, str):
+        import json
+
+        try:
+            aspects = json.loads(aspects)
+        except json.JSONDecodeError:
+            # Single aspect as string
+            aspects = [aspects]
+
+    # Validate aspects
+    valid_aspects = {"security", "complexity", "best_practices", "documentation", "all"}
+    invalid = [a for a in aspects if a not in valid_aspects]
+    if invalid:
+        return {
+            "success": False,
+            "error": f"Invalid aspect(s): {', '.join(invalid)}. Valid options: {', '.join(sorted(valid_aspects))}",
+        }
 
     # Expand "all" to all aspects
     if "all" in aspects:
@@ -521,7 +534,7 @@ async def code_review(
             "success": True,
             "files_reviewed": 0,
             "total_issues": 0,
-            "message": f"No files found matching pattern '{file_pattern}'"
+            "message": f"No files found matching pattern '{file_pattern}'",
         }
 
     # Initialize results
@@ -607,16 +620,20 @@ async def code_review(
 
     # Security section
     if "security" in aspects:
-        sec_count = results["security"]["count"]
-        sec_filtered = [i for i in results["security"]["issues"]
-                       if severity_levels.get(i.get("severity", "low"), 0) >= min_severity]
+        sec_filtered = [
+            i
+            for i in results["security"]["issues"]
+            if severity_levels.get(i.get("severity", "low"), 0) >= min_severity
+        ]
         report.append("Security Issues:")
         report.append(f"  Found: {len(sec_filtered)}")
         if sec_filtered:
             for issue in sec_filtered[:5]:
-                report.append(f"    {issue.get('severity', 'low').upper()}: {issue.get('file', '')} "
-                            f"(line {issue.get('line', '?')})")
-                report.append(f"      {issue.get('message', '')}")
+                report.append(
+                    f"    {issue.get('severity', 'low').upper()}: {issue.get('file', '')} "
+                    f"(line {issue.get('line', '?')})"
+                )
+                report.append(f"      {issue.get('issue', '')}: {issue.get('recommendation', '')}")
             if len(sec_filtered) > 5:
                 report.append(f"    ... and {len(sec_filtered) - 5} more")
         report.append("")
@@ -628,8 +645,10 @@ async def code_review(
         report.append(f"  High complexity functions: {comp_count}")
         if results["complexity"]["issues"]:
             for issue in results["complexity"]["issues"][:5]:
-                report.append(f"    {issue.get('file', '')} - {issue.get('function', '')} "
-                            f"(complexity: {issue.get('complexity', '?')})")
+                report.append(
+                    f"    {issue.get('file', '')} - {issue.get('code', '')} "
+                    f"(complexity: {issue.get('metric', '?')})"
+                )
             if comp_count > 5:
                 report.append(f"    ... and {comp_count - 5} more")
         report.append("")
@@ -642,7 +661,7 @@ async def code_review(
         if results["best_practices"]["issues"]:
             for issue in results["best_practices"]["issues"][:5]:
                 report.append(f"    {issue.get('file', '')} (line {issue.get('line', '?')})")
-                report.append(f"      {issue.get('message', '')}")
+                report.append(f"      {issue.get('issue', '')}: {issue.get('recommendation', '')}")
             if bp_count > 5:
                 report.append(f"    ... and {bp_count - 5} more")
         report.append("")
@@ -654,8 +673,8 @@ async def code_review(
         report.append(f"  Found: {doc_count}")
         if results["documentation"]["issues"]:
             for issue in results["documentation"]["issues"][:5]:
-                report.append(f"    {issue.get('file', '')} - {issue.get('function', '')}")
-                report.append(f"      {issue.get('message', '')}")
+                report.append(f"    {issue.get('file', '')} - {issue.get('code', '')}")
+                report.append(f"      {issue.get('issue', '')}: {issue.get('recommendation', '')}")
             if doc_count > 5:
                 report.append(f"    ... and {doc_count - 5} more")
         report.append("")
@@ -674,7 +693,7 @@ async def code_review(
         "files_reviewed": files_reviewed,
         "issues_by_severity": issues_by_severity,
         "issues": filtered_issues,
-        "formatted_report": "\n".join(report)
+        "formatted_report": "\n".join(report),
     }
 
 
@@ -685,9 +704,10 @@ class CodeReviewTool:
     def __init__(self, max_complexity: int = 10):
         """Initialize - deprecated."""
         import warnings
+
         warnings.warn(
             "CodeReviewTool class is deprecated. Use code_review_* functions instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
         set_code_review_config(max_complexity=max_complexity)

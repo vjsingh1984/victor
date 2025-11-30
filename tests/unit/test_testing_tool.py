@@ -60,12 +60,16 @@ class TestRunTests:
         mock_process.stderr = ""
         mock_process.returncode = 1  # Some tests failed
 
-        with patch("subprocess.run", return_value=mock_process), \
-             patch("pathlib.Path.exists", return_value=True), \
-             patch("builtins.open", create=True) as mock_open, \
-             patch("pathlib.Path.unlink"):
+        with (
+            patch("subprocess.run", return_value=mock_process),
+            patch("pathlib.Path.exists", return_value=True),
+            patch("builtins.open", create=True) as mock_open,
+            patch("pathlib.Path.unlink"),
+        ):
 
-            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(report_data)
+            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(
+                report_data
+            )
 
             result = await run_tests()
 
@@ -92,12 +96,16 @@ class TestRunTests:
             "tests": [],
         }
 
-        with patch("subprocess.run", return_value=mock_process) as mock_run, \
-             patch("pathlib.Path.exists", return_value=True), \
-             patch("builtins.open", create=True) as mock_open, \
-             patch("pathlib.Path.unlink"):
+        with (
+            patch("subprocess.run", return_value=mock_process) as mock_run,
+            patch("pathlib.Path.exists", return_value=True),
+            patch("builtins.open", create=True) as mock_open,
+            patch("pathlib.Path.unlink"),
+        ):
 
-            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(report_data)
+            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(
+                report_data
+            )
 
             result = await run_tests(path="tests/unit")
 
@@ -123,12 +131,16 @@ class TestRunTests:
             "tests": [],
         }
 
-        with patch("subprocess.run", return_value=mock_process) as mock_run, \
-             patch("pathlib.Path.exists", return_value=True), \
-             patch("builtins.open", create=True) as mock_open, \
-             patch("pathlib.Path.unlink"):
+        with (
+            patch("subprocess.run", return_value=mock_process) as mock_run,
+            patch("pathlib.Path.exists", return_value=True),
+            patch("builtins.open", create=True) as mock_open,
+            patch("pathlib.Path.unlink"),
+        ):
 
-            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(report_data)
+            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(
+                report_data
+            )
 
             result = await run_tests(pytest_args=["-v", "-x"])
 
@@ -163,8 +175,10 @@ class TestRunTests:
         mock_process.stderr = ""
         mock_process.returncode = 0
 
-        with patch("subprocess.run", return_value=mock_process), \
-             patch("pathlib.Path.exists", return_value=False):
+        with (
+            patch("subprocess.run", return_value=mock_process),
+            patch("pathlib.Path.exists", return_value=False),
+        ):
 
             result = await run_tests()
 
@@ -181,10 +195,12 @@ class TestRunTests:
         mock_process.stderr = ""
         mock_process.returncode = 0
 
-        with patch("subprocess.run", return_value=mock_process), \
-             patch("pathlib.Path.exists", return_value=True), \
-             patch("builtins.open", create=True) as mock_open, \
-             patch("pathlib.Path.unlink"):
+        with (
+            patch("subprocess.run", return_value=mock_process),
+            patch("pathlib.Path.exists", return_value=True),
+            patch("builtins.open", create=True) as mock_open,
+            patch("pathlib.Path.unlink"),
+        ):
 
             mock_open.return_value.__enter__.return_value.read.return_value = "invalid json"
 
@@ -217,12 +233,16 @@ class TestRunTests:
             ],
         }
 
-        with patch("subprocess.run", return_value=mock_process), \
-             patch("pathlib.Path.exists", return_value=True), \
-             patch("builtins.open", create=True) as mock_open, \
-             patch("pathlib.Path.unlink"):
+        with (
+            patch("subprocess.run", return_value=mock_process),
+            patch("pathlib.Path.exists", return_value=True),
+            patch("builtins.open", create=True) as mock_open,
+            patch("pathlib.Path.unlink"),
+        ):
 
-            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(report_data)
+            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(
+                report_data
+            )
 
             result = await run_tests()
 
@@ -249,12 +269,16 @@ class TestRunTests:
             "tests": [],
         }
 
-        with patch("subprocess.run", return_value=mock_process), \
-             patch("pathlib.Path.exists", return_value=True), \
-             patch("builtins.open", create=True) as mock_open, \
-             patch("pathlib.Path.unlink"):
+        with (
+            patch("subprocess.run", return_value=mock_process),
+            patch("pathlib.Path.exists", return_value=True),
+            patch("builtins.open", create=True) as mock_open,
+            patch("pathlib.Path.unlink"),
+        ):
 
-            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(report_data)
+            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(
+                report_data
+            )
 
             result = await run_tests()
 

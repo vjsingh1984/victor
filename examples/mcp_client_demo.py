@@ -39,10 +39,7 @@ async def demo_client():
     # Create MCP client
     print("1️⃣ Creating MCP Client...")
     print("-" * 70)
-    client = MCPClient(
-        name="Victor MCP Client",
-        version="1.0.0"
-    )
+    client = MCPClient(name="Victor MCP Client", version="1.0.0")
     print(f"✓ Client created: {client.name} v{client.version}")
 
     # Connect to server
@@ -54,7 +51,7 @@ async def demo_client():
     server_command = [
         sys.executable,  # Use same Python interpreter
         "examples/mcp_server_demo.py",
-        "--stdio"
+        "--stdio",
     ]
 
     success = await client.connect(server_command)
@@ -120,10 +117,7 @@ async def demo_client():
     # Example 2: Read file (if available)
     if client.get_tool_by_name("read_file"):
         print("\nExample 2: Read file")
-        result = await client.call_tool(
-            "read_file",
-            file_path="README.md"
-        )
+        result = await client.call_tool("read_file", file_path="README.md")
         if result.success:
             print(f"✓ Tool call succeeded")
             output = str(result.result)[:200]
@@ -152,7 +146,7 @@ async def demo_client():
     print(f"Connected: {status['connected']}")
     print(f"Tools available: {status['tools_count']}")
     print(f"Resources available: {status['resources_count']}")
-    if status['server']:
+    if status["server"]:
         print(f"Server: {status['server']['name']} v{status['server']['version']}")
 
     # Disconnect
@@ -171,7 +165,8 @@ async def demo_client():
     print("  ✓ Stdio transport support")
 
     print("\n\n📚 Use Cases:")
-    print("""
+    print(
+        """
 1. Extend Victor with external tools:
    - Database query tools
    - API integration tools
@@ -190,10 +185,12 @@ async def demo_client():
 4. Chain multiple MCP servers:
    - Victor + Database MCP + API MCP
    - Compose powerful workflows
-""")
+"""
+    )
 
     print("\n\n🔌 Integration Example:")
-    print("""
+    print(
+        """
 # In Victor's agent orchestrator:
 from victor.mcp import MCPClient
 
@@ -209,7 +206,8 @@ async with MCPClient() as client:
 
     # Use results in agent response
     print(result.result)
-""")
+"""
+    )
 
 
 if __name__ == "__main__":

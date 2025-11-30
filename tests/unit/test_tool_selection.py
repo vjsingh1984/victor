@@ -66,7 +66,7 @@ def orchestrator(mock_provider, mock_settings):
         provider=mock_provider,
         model="test-model",
         temperature=0.7,
-        max_tokens=1000
+        max_tokens=1000,
     )
 
 
@@ -106,10 +106,16 @@ class TestToolCount:
 
         # These should NOT exist (consolidated into unified tools)
         removed = {
-            "batch_search", "batch_replace", "batch_analyze",
-            "cicd_generate", "cicd_validate",
-            "scaffold_create", "scaffold_list_templates",
-            "docker_ps", "docker_run", "docker_stop",
+            "batch_search",
+            "batch_replace",
+            "batch_analyze",
+            "cicd_generate",
+            "cicd_validate",
+            "scaffold_create",
+            "scaffold_list_templates",
+            "docker_ps",
+            "docker_run",
+            "docker_stop",
         }
 
         for tool_name in removed:
@@ -165,6 +171,7 @@ class TestKeywordBasedSelection:
         """Test small models get limited tool set."""
         # Simulate small model by creating a new provider with ollama name
         from unittest.mock import PropertyMock
+
         type(orchestrator.provider).name = PropertyMock(return_value="ollama")
         orchestrator.model = "qwen2.5-coder:1.5b"
 
@@ -254,7 +261,7 @@ class TestConsolidatedToolFunctionality:
 
 @pytest.mark.skipif(
     True,  # Skip by default as it requires Ollama running
-    reason="Requires Ollama with embedding model running"
+    reason="Requires Ollama with embedding model running",
 )
 class TestSemanticToolSelection:
     """Test semantic (embedding-based) tool selection."""
@@ -268,9 +275,7 @@ class TestSemanticToolSelection:
         from victor.tools.semantic_selector import SemanticToolSelector
 
         selector = SemanticToolSelector(
-            embedding_model="nomic-embed-text",
-            embedding_provider="ollama",
-            cache_embeddings=True
+            embedding_model="nomic-embed-text", embedding_provider="ollama", cache_embeddings=True
         )
 
         # Get all tools
@@ -288,8 +293,7 @@ class TestSemanticToolSelection:
         from victor.tools.semantic_selector import SemanticToolSelector
 
         selector = SemanticToolSelector(
-            embedding_model="nomic-embed-text",
-            embedding_provider="ollama"
+            embedding_model="nomic-embed-text", embedding_provider="ollama"
         )
 
         tools = list(orchestrator.tools.list_tools())
@@ -298,9 +302,7 @@ class TestSemanticToolSelection:
         # Query about testing
         message = "verify the authentication module works correctly"
         selected = await selector.select_relevant_tools(
-            message,
-            max_tools=5,
-            similarity_threshold=0.3
+            message, max_tools=5, similarity_threshold=0.3
         )
 
         # Should include testing-related tools
@@ -313,8 +315,7 @@ class TestSemanticToolSelection:
         from victor.tools.semantic_selector import SemanticToolSelector
 
         selector = SemanticToolSelector(
-            embedding_model="nomic-embed-text",
-            embedding_provider="ollama"
+            embedding_model="nomic-embed-text", embedding_provider="ollama"
         )
 
         tools = list(orchestrator.tools.list_tools())
@@ -331,9 +332,7 @@ class TestSemanticToolSelection:
         for query in test_cases:
             keyword_tools = orchestrator._select_relevant_tools_keywords(query)
             semantic_tools = await selector.select_relevant_tools(
-                query,
-                max_tools=10,
-                similarity_threshold=0.3
+                query, max_tools=10, similarity_threshold=0.3
             )
 
             # Both should select at least some tools
@@ -369,7 +368,9 @@ class TestToolDescriptions:
                 desc = tools[tool_name].lower()
                 # At least one keyword should be in description (using substring matching)
                 matches = [kw for kw in keywords if kw in desc]
-                assert len(matches) > 0, f"Tool '{tool_name}' should mention operations in description. Description: {desc[:100]}"
+                assert (
+                    len(matches) > 0
+                ), f"Tool '{tool_name}' should mention operations in description. Description: {desc[:100]}"
 
 
 if __name__ == "__main__":

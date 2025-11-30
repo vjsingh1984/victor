@@ -60,10 +60,7 @@ async def cache_stats() -> Dict[str, Any]:
         - formatted_report: Human-readable statistics report
     """
     if _cache_manager is None:
-        return {
-            "success": False,
-            "error": "Cache manager not initialized"
-        }
+        return {"success": False, "error": "Cache manager not initialized"}
 
     stats = _cache_manager.get_stats()
 
@@ -98,11 +95,7 @@ async def cache_stats() -> Dict[str, Any]:
             volume_mb = stats["disk_volume"] / (1024 * 1024)
             report.append(f"  Volume: {volume_mb:.2f} MB")
 
-    return {
-        "success": True,
-        "stats": stats,
-        "formatted_report": "\n".join(report)
-    }
+    return {"success": True, "stats": stats, "formatted_report": "\n".join(report)}
 
 
 @tool
@@ -124,10 +117,7 @@ async def cache_clear(namespace: Optional[str] = None) -> Dict[str, Any]:
         - message: Human-readable result message
     """
     if _cache_manager is None:
-        return {
-            "success": False,
-            "error": "Cache manager not initialized"
-        }
+        return {"success": False, "error": "Cache manager not initialized"}
 
     try:
         count = _cache_manager.clear(namespace)
@@ -137,18 +127,11 @@ async def cache_clear(namespace: Optional[str] = None) -> Dict[str, Any]:
         else:
             message = f"Cleared all cache ({count} entries)"
 
-        return {
-            "success": True,
-            "cleared_count": count,
-            "message": message
-        }
+        return {"success": True, "cleared_count": count, "message": message}
 
     except Exception as e:
         logger.exception("Failed to clear cache")
-        return {
-            "success": False,
-            "error": f"Failed to clear cache: {str(e)}"
-        }
+        return {"success": False, "error": f"Failed to clear cache: {str(e)}"}
 
 
 @tool
@@ -165,10 +148,7 @@ async def cache_info() -> Dict[str, Any]:
         - formatted_report: Human-readable configuration report
     """
     if _cache_manager is None:
-        return {
-            "success": False,
-            "error": "Cache manager not initialized"
-        }
+        return {"success": False, "error": "Cache manager not initialized"}
 
     config = _cache_manager.config
 
@@ -214,5 +194,5 @@ async def cache_info() -> Dict[str, Any]:
             "disk_ttl": config.disk_ttl,
             "disk_path": str(config.disk_path),
         },
-        "formatted_report": "\n".join(report)
+        "formatted_report": "\n".join(report),
     }

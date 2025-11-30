@@ -1,5 +1,7 @@
 # Quick Start Guide
 
+> Canonical reference: Docker users see `docker/README.md` and `docker/QUICKREF.md`. This guide focuses on local install. Reality check: semantic tool selection is enabled by default and `security_scan` is regex-only (no CVE/IaC).
+
 Get up and running with CodingAgent in minutes!
 
 ## Prerequisites

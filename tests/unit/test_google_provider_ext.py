@@ -456,7 +456,9 @@ async def test_parse_response_no_text(google_provider):
     """Test parsing response without text attribute."""
     # Create a mock without text attribute that will raise AttributeError
     mock_response = MagicMock()
-    type(mock_response).text = property(lambda self: (_ for _ in ()).throw(AttributeError("no text")))
+    type(mock_response).text = property(
+        lambda self: (_ for _ in ()).throw(AttributeError("no text"))
+    )
     mock_response.usage_metadata = None
 
     # Since the code checks `if response.text:`, the AttributeError will propagate

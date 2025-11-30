@@ -23,14 +23,12 @@ import numpy as np
 from victor.codebase.embeddings.base import EmbeddingConfig, SearchResult
 from victor.codebase.embeddings.lancedb_provider import LanceDBProvider
 from victor.codebase.embeddings.chromadb_provider import ChromaDBProvider
-from victor.codebase.embeddings.models import (
-    SentenceTransformerModel,
-    EmbeddingModelConfig
-)
+from victor.codebase.embeddings.models import SentenceTransformerModel, EmbeddingModelConfig
 
 # Check if chromadb is available
 try:
     import chromadb
+
     CHROMADB_AVAILABLE = True
 except ImportError:
     CHROMADB_AVAILABLE = False
@@ -73,25 +71,21 @@ class TestUnifiedEmbeddingModel:
     def test_unified_model_dimensions(self):
         """Test that unified model has 384 dimensions."""
         config = EmbeddingModelConfig(
-            model_type="sentence-transformers",
-            model_name="all-MiniLM-L12-v2",
-            dimension=384
+            model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
         )
         assert config.dimension == 384
 
     @pytest.mark.asyncio
     async def test_unified_model_loads_once(self):
         """Test that unified model is loaded only once and shared."""
-        with patch('sentence_transformers.SentenceTransformer') as MockST:
+        with patch("sentence_transformers.SentenceTransformer") as MockST:
             mock_model = MagicMock()
             mock_model.encode.return_value = np.random.randn(384).astype(np.float32)
             mock_model.get_sentence_embedding_dimension.return_value = 384
             MockST.return_value = mock_model
 
             config = EmbeddingModelConfig(
-                model_type="sentence-transformers",
-                model_name="all-MiniLM-L12-v2",
-                dimension=384
+                model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
             )
 
             model = SentenceTransformerModel(config)
@@ -103,7 +97,7 @@ class TestUnifiedEmbeddingModel:
     @pytest.mark.asyncio
     async def test_unified_model_embedding_shape(self):
         """Test that unified model produces 384-dim embeddings."""
-        with patch('sentence_transformers.SentenceTransformer') as MockST:
+        with patch("sentence_transformers.SentenceTransformer") as MockST:
             mock_model = MagicMock()
             mock_embedding = np.random.randn(384).astype(np.float32)
             mock_model.encode.return_value = mock_embedding
@@ -111,9 +105,7 @@ class TestUnifiedEmbeddingModel:
             MockST.return_value = mock_model
 
             config = EmbeddingModelConfig(
-                model_type="sentence-transformers",
-                model_name="all-MiniLM-L12-v2",
-                dimension=384
+                model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
             )
 
             model = SentenceTransformerModel(config)
@@ -125,7 +117,7 @@ class TestUnifiedEmbeddingModel:
     @pytest.mark.asyncio
     async def test_unified_model_batch_embedding(self):
         """Test that unified model handles batch embeddings efficiently."""
-        with patch('sentence_transformers.SentenceTransformer') as MockST:
+        with patch("sentence_transformers.SentenceTransformer") as MockST:
             mock_model = MagicMock()
             mock_embeddings = np.random.randn(3, 384).astype(np.float32)
             mock_model.encode.return_value = mock_embeddings
@@ -136,7 +128,7 @@ class TestUnifiedEmbeddingModel:
                 model_type="sentence-transformers",
                 model_name="all-MiniLM-L12-v2",
                 dimension=384,
-                batch_size=32
+                batch_size=32,
             )
 
             model = SentenceTransformerModel(config)
@@ -166,11 +158,13 @@ class TestLanceDBProvider:
             embedding_model_type="sentence-transformers",
             embedding_model_name="all-MiniLM-L12-v2",
             persist_directory=str(temp_dir),
-            extra_config={"table_name": "test", "dimension": 384}
+            extra_config={"table_name": "test", "dimension": 384},
         )
 
-        with patch('lancedb.connect') as mock_connect, \
-             patch('sentence_transformers.SentenceTransformer') as MockST:
+        with (
+            patch("lancedb.connect") as mock_connect,
+            patch("sentence_transformers.SentenceTransformer") as MockST,
+        ):
 
             mock_db = MagicMock()
             mock_db.table_names.return_value = []
@@ -195,21 +189,18 @@ class TestLanceDBProvider:
             embedding_model_type="sentence-transformers",
             embedding_model_name="all-MiniLM-L12-v2",
             persist_directory=str(temp_dir),
-            extra_config={"table_name": "test", "dimension": 384}
+            extra_config={"table_name": "test", "dimension": 384},
         )
 
-        with patch('lancedb.connect') as mock_connect, \
-             patch('sentence_transformers.SentenceTransformer') as MockST:
+        with (
+            patch("lancedb.connect") as mock_connect,
+            patch("sentence_transformers.SentenceTransformer") as MockST,
+        ):
 
             # Mock LanceDB
             mock_table = MagicMock()
             mock_table.search.return_value.limit.return_value.to_list.return_value = [
-                {
-                    "id": "doc1",
-                    "content": "test content",
-                    "file_path": "test.py",
-                    "_distance": 0.1
-                }
+                {"id": "doc1", "content": "test content", "file_path": "test.py", "_distance": 0.1}
             ]
 
             mock_db = MagicMock()
@@ -227,11 +218,9 @@ class TestLanceDBProvider:
             await provider.initialize()
 
             # Index document
-            documents = [{
-                "id": "doc1",
-                "content": "test content",
-                "metadata": {"file_path": "test.py"}
-            }]
+            documents = [
+                {"id": "doc1", "content": "test content", "metadata": {"file_path": "test.py"}}
+            ]
             await provider.index_documents(documents)
 
             # Search
@@ -252,8 +241,7 @@ class TestChromaDBProvider:
 
     @pytest.mark.asyncio
     @pytest.mark.skipif(
-        not CHROMADB_AVAILABLE,
-        reason="chromadb is an optional dependency (not installed)"
+        not CHROMADB_AVAILABLE, reason="chromadb is an optional dependency (not installed)"
     )
     async def test_chromadb_initialization_offline(self, temp_dir):
         """Test that ChromaDB initializes without network."""
@@ -262,11 +250,13 @@ class TestChromaDBProvider:
             embedding_model_type="sentence-transformers",
             embedding_model_name="all-MiniLM-L12-v2",
             persist_directory=str(temp_dir),
-            extra_config={"collection_name": "test", "dimension": 384}
+            extra_config={"collection_name": "test", "dimension": 384},
         )
 
-        with patch('chromadb.Client') as MockClient, \
-             patch('sentence_transformers.SentenceTransformer') as MockST:
+        with (
+            patch("chromadb.Client") as MockClient,
+            patch("sentence_transformers.SentenceTransformer") as MockST,
+        ):
 
             mock_client = MagicMock()
             mock_collection = MagicMock()
@@ -291,9 +281,7 @@ class TestMemoryOptimization:
         # Expected: 120MB for all-MiniLM-L12-v2
         # This is 40% less than separate models (80MB + 120MB = 200MB)
         config = EmbeddingModelConfig(
-            model_type="sentence-transformers",
-            model_name="all-MiniLM-L12-v2",
-            dimension=384
+            model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
         )
 
         # Model size is approximately 120MB
@@ -309,16 +297,14 @@ class TestMemoryOptimization:
         """Document that separate models would use 200MB vs 120MB."""
         # Tool selection model
         tool_model = EmbeddingModelConfig(
-            model_type="sentence-transformers",
-            model_name="all-MiniLM-L6-v2",  # 80MB
-            dimension=384
+            model_type="sentence-transformers", model_name="all-MiniLM-L6-v2", dimension=384  # 80MB
         )
 
         # Codebase search model
         codebase_model = EmbeddingModelConfig(
             model_type="sentence-transformers",
             model_name="all-MiniLM-L12-v2",  # 120MB
-            dimension=384
+            dimension=384,
         )
 
         # Separate models = 80MB + 120MB = 200MB
@@ -346,7 +332,7 @@ class TestAirgappedDemo:
                 "table_name": "airgapped_codebase",
                 "dimension": 384,
                 "batch_size": 32,
-            }
+            },
         )
 
         # Verify air-gapped configuration
@@ -364,11 +350,15 @@ class TestAirgappedDemo:
                 persist_directory=tmpdir,
                 embedding_model_type="sentence-transformers",
                 embedding_model_name="all-MiniLM-L12-v2",
-                extra_config={"table_name": "test", "dimension": 384}
+                extra_config={"table_name": "test", "dimension": 384},
             )
 
-            with patch('victor.codebase.embeddings.lancedb_provider.lancedb.connect') as mock_connect, \
-                 patch('sentence_transformers.SentenceTransformer') as MockST:
+            with (
+                patch(
+                    "victor.codebase.embeddings.lancedb_provider.lancedb.connect"
+                ) as mock_connect,
+                patch("sentence_transformers.SentenceTransformer") as MockST,
+            ):
 
                 # Mock LanceDB
                 mock_table = MagicMock()
@@ -395,8 +385,8 @@ class TestAirgappedDemo:
                         "metadata": {
                             "file_path": "src/auth/login.py",
                             "symbol_name": "authenticate_user",
-                            "line_number": 15
-                        }
+                            "line_number": 15,
+                        },
                     }
                 ]
 
@@ -421,8 +411,7 @@ class TestCacheOptimization:
         # - ~50% reduction in page cache pressure
 
         unified_config = EmbeddingModelConfig(
-            model_type="sentence-transformers",
-            model_name="all-MiniLM-L12-v2"  # Shared
+            model_type="sentence-transformers", model_name="all-MiniLM-L12-v2"  # Shared
         )
 
         # Both use cases use same model = same page cache entry
@@ -440,8 +429,7 @@ class TestCacheOptimization:
         # Actual measurement would require performance profiling
 
         unified_config = EmbeddingModelConfig(
-            model_type="sentence-transformers",
-            model_name="all-MiniLM-L12-v2"
+            model_type="sentence-transformers", model_name="all-MiniLM-L12-v2"
         )
 
         assert unified_config.model_name == "all-MiniLM-L12-v2"

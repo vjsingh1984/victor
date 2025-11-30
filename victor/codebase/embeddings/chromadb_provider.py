@@ -27,7 +27,6 @@ For embedding models:
 - OpenAI: pip install openai (requires API key)
 """
 
-import asyncio
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -77,9 +76,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         super().__init__(config)
 
         if not CHROMADB_AVAILABLE:
-            raise ImportError(
-                "ChromaDB not available. Install with: pip install chromadb"
-            )
+            raise ImportError("ChromaDB not available. Install with: pip install chromadb")
 
         self.client: Optional[chromadb.Client] = None
         self.collection: Optional[chromadb.Collection] = None
@@ -94,8 +91,8 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         model_type = self.config.embedding_model_type
         model_name = self.config.embedding_model_name
 
-        print(f"🔧 Initializing ChromaDB provider")
-        print(f"📦 Vector Store: ChromaDB")
+        print("🔧 Initializing ChromaDB provider")
+        print("📦 Vector Store: ChromaDB")
         print(f"🤖 Embedding Model: {model_name} ({model_type})")
 
         # Initialize ChromaDB client
@@ -112,9 +109,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             print(f"📁 Using persistent storage: {persist_dir}")
         else:
             # In-memory mode (good for testing)
-            self.client = chromadb.Client(
-                Settings(anonymized_telemetry=False)
-            )
+            self.client = chromadb.Client(Settings(anonymized_telemetry=False))
             print("💾 Using in-memory storage")
 
         # Get or create collection
@@ -135,7 +130,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             model_name=model_name,
             dimension=self.config.extra_config.get("dimension", 4096),  # Default to 4096 for Qwen3
             api_key=self.config.embedding_api_key,  # For OpenAI/Cohere API key, or Ollama base_url
-            batch_size=self.config.extra_config.get("batch_size", 16),  # Lower batch size for large models
+            batch_size=self.config.extra_config.get(
+                "batch_size", 16
+            ),  # Lower batch size for large models
         )
 
         # Initialize embedding model
@@ -173,9 +170,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
 
         return await self.embedding_model.embed_batch(texts)
 
-    async def index_document(
-        self, doc_id: str, content: str, metadata: Dict[str, Any]
-    ) -> None:
+    async def index_document(self, doc_id: str, content: str, metadata: Dict[str, Any]) -> None:
         """Index a single document.
 
         Args:
@@ -271,7 +266,6 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         search_results = []
         if results["ids"] and results["ids"][0]:
             for i in range(len(results["ids"][0])):
-                doc_id = results["ids"][0][i]
                 content = results["documents"][0][i]
                 metadata = results["metadatas"][0][i]
                 distance = results["distances"][0][i]

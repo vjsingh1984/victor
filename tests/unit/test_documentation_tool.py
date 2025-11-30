@@ -186,10 +186,10 @@ class TestClass:
                 {
                     "name": "test_func",
                     "docstring": "Test function description",
-                    "args": ["arg1", "arg2"]
+                    "args": ["arg1", "arg2"],
                 }
             ],
-            "classes": []
+            "classes": [],
         }
 
         docs = _build_markdown_docs(api_info)
@@ -213,11 +213,11 @@ class TestClass:
                         {
                             "name": "test_method",
                             "docstring": "Method description",
-                            "args": ["param"]
+                            "args": ["param"],
                         }
-                    ]
+                    ],
                 }
-            ]
+            ],
         }
 
         docs = _build_markdown_docs(api_info)
@@ -229,11 +229,7 @@ class TestClass:
 
     def test_build_rst_docs(self):
         """Test building RST documentation."""
-        api_info = {
-            "module": "test_module",
-            "functions": [],
-            "classes": []
-        }
+        api_info = {"module": "test_module", "functions": [], "classes": []}
 
         docs = _build_rst_docs(api_info)
 
@@ -313,11 +309,13 @@ class TestDocsGenerateDocstrings:
     async def test_generate_docstrings_already_documented(self, tmp_path):
         """Test with fully documented file."""
         test_file = tmp_path / "documented.py"
-        test_file.write_text('''
+        test_file.write_text(
+            '''
 def my_function():
     """Already has docstring."""
     pass
-''')
+'''
+        )
 
         result = await docs_generate_docstrings(file=str(test_file))
 
@@ -329,13 +327,15 @@ def my_function():
     async def test_generate_docstrings_success(self, tmp_path):
         """Test successful docstring generation."""
         test_file = tmp_path / "undocumented.py"
-        test_file.write_text('''
+        test_file.write_text(
+            """
 def function_without_docs(arg1, arg2):
     return arg1 + arg2
 
 class ClassWithoutDocs:
     pass
-''')
+"""
+        )
 
         result = await docs_generate_docstrings(file=str(test_file))
 
@@ -352,7 +352,7 @@ class ClassWithoutDocs:
     async def test_generate_docstrings_format_google(self, tmp_path):
         """Test docstring generation with google format."""
         test_file = tmp_path / "test.py"
-        test_file.write_text('def test_func(): pass')
+        test_file.write_text("def test_func(): pass")
 
         result = await docs_generate_docstrings(file=str(test_file), format="google")
 
@@ -394,7 +394,8 @@ class TestDocsGenerateApi:
     async def test_generate_api_success_markdown(self, tmp_path):
         """Test successful API generation with markdown format."""
         test_file = tmp_path / "test_module.py"
-        test_file.write_text('''
+        test_file.write_text(
+            '''
 def public_function(arg1):
     """Public function."""
     pass
@@ -404,16 +405,15 @@ class TestClass:
     def method(self):
         """Method."""
         pass
-''')
+'''
+        )
 
         # Create docs directory
         docs_dir = tmp_path / "docs"
         docs_dir.mkdir()
 
         result = await docs_generate_api(
-            file=str(test_file),
-            output=str(docs_dir / "api.md"),
-            format="markdown"
+            file=str(test_file), output=str(docs_dir / "api.md"), format="markdown"
         )
 
         assert result["success"] is True
@@ -430,10 +430,11 @@ class TestClass:
     async def test_generate_api_default_output(self, tmp_path):
         """Test API generation with default output path."""
         test_file = tmp_path / "test_module.py"
-        test_file.write_text('def func(): pass')
+        test_file.write_text("def func(): pass")
 
         # Change to tmp directory
         import os
+
         original_dir = os.getcwd()
         try:
             os.chdir(tmp_path)
@@ -448,15 +449,13 @@ class TestClass:
     async def test_generate_api_rst_format(self, tmp_path):
         """Test API generation with RST format."""
         test_file = tmp_path / "test.py"
-        test_file.write_text('def func(): pass')
+        test_file.write_text("def func(): pass")
 
         docs_dir = tmp_path / "docs"
         docs_dir.mkdir()
 
         result = await docs_generate_api(
-            file=str(test_file),
-            output=str(docs_dir / "api.rst"),
-            format="rst"
+            file=str(test_file), output=str(docs_dir / "api.rst"), format="rst"
         )
 
         assert result["success"] is True
@@ -541,7 +540,7 @@ class TestDocsAddTypeHints:
     async def test_add_type_hints_success(self, tmp_path):
         """Test successful type hints analysis."""
         test_file = tmp_path / "test.py"
-        test_file.write_text('def func(x): return x')
+        test_file.write_text("def func(x): return x")
 
         result = await docs_add_type_hints(file=str(test_file))
 
@@ -585,7 +584,8 @@ class TestDocsAnalyzeCoverage:
     async def test_analyze_coverage_fully_documented(self, tmp_path):
         """Test with fully documented file."""
         test_file = tmp_path / "documented.py"
-        test_file.write_text('''
+        test_file.write_text(
+            '''
 def my_function():
     """Function docstring."""
     pass
@@ -593,7 +593,8 @@ def my_function():
 class MyClass:
     """Class docstring."""
     pass
-''')
+'''
+        )
 
         result = await docs_analyze_coverage(file=str(test_file))
 
@@ -607,7 +608,8 @@ class MyClass:
     async def test_analyze_coverage_partially_documented(self, tmp_path):
         """Test with partially documented file."""
         test_file = tmp_path / "partial.py"
-        test_file.write_text('''
+        test_file.write_text(
+            '''
 def documented_function():
     """Has docstring."""
     pass
@@ -621,7 +623,8 @@ class DocumentedClass:
 
 class UndocumentedClass:
     pass
-''')
+'''
+        )
 
         result = await docs_analyze_coverage(file=str(test_file))
 
@@ -636,13 +639,15 @@ class UndocumentedClass:
     async def test_analyze_coverage_low_coverage(self, tmp_path):
         """Test with low documentation coverage."""
         test_file = tmp_path / "low_coverage.py"
-        test_file.write_text('''
+        test_file.write_text(
+            """
 def func1(): pass
 def func2(): pass
 def func3(): pass
 def func4(): pass
 class Class1: pass
-''')
+"""
+        )
 
         result = await docs_analyze_coverage(file=str(test_file))
 
@@ -654,14 +659,16 @@ class Class1: pass
     async def test_analyze_coverage_private_functions_skipped(self, tmp_path):
         """Test that private functions are skipped."""
         test_file = tmp_path / "private.py"
-        test_file.write_text('''
+        test_file.write_text(
+            '''
 def public_function():
     """Public."""
     pass
 
 def _private_function():
     pass
-''')
+'''
+        )
 
         result = await docs_analyze_coverage(file=str(test_file))
 
@@ -711,7 +718,9 @@ class TestEdgeCaseCoverage:
         """Test generating more than 10 docstrings to trigger truncation message."""
         test_file = tmp_path / "many_undocumented.py"
         # Create a file with 12 undocumented functions
-        functions = "\n\n".join([f"def func{i}(arg1, arg2):\n    return arg1 + arg2" for i in range(12)])
+        functions = "\n\n".join(
+            [f"def func{i}(arg1, arg2):\n    return arg1 + arg2" for i in range(12)]
+        )
         test_file.write_text(functions)
 
         result = await docs_generate_docstrings(file=str(test_file))
@@ -727,7 +736,8 @@ class TestEdgeCaseCoverage:
         # Create a file with many functions to generate long documentation
         functions = []
         for i in range(20):
-            functions.append(f'''
+            functions.append(
+                f'''
 def function_{i}(param1, param2, param3, param4):
     """
     This is function {i} with a detailed docstring.
@@ -745,16 +755,15 @@ def function_{i}(param1, param2, param3, param4):
         A complex result that needs explanation
     """
     return param1 + param2 + param3 + param4
-''')
+'''
+            )
         test_file.write_text("\n".join(functions))
 
         docs_dir = tmp_path / "docs"
         docs_dir.mkdir()
 
         result = await docs_generate_api(
-            file=str(test_file),
-            output=str(docs_dir / "api.md"),
-            format="markdown"
+            file=str(test_file), output=str(docs_dir / "api.md"), format="markdown"
         )
 
         assert result["success"] is True

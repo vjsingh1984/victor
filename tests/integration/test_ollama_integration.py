@@ -165,9 +165,7 @@ async def test_ollama_tool_calling(ollama_provider):
         )
     ]
 
-    messages = [
-        Message(role="user", content="What's the weather in San Francisco?")
-    ]
+    messages = [Message(role="user", content="What's the weather in San Francisco?")]
 
     try:
         response = await ollama_provider.chat(
@@ -289,9 +287,7 @@ async def test_ollama_custom_options(ollama_provider):
     models = await ollama_provider.list_models()
     model_name = models[0]["name"]
 
-    messages = [
-        Message(role="user", content="Say hello")
-    ]
+    messages = [Message(role="user", content="Say hello")]
 
     # Test with custom options
     response = await ollama_provider.chat(
@@ -299,7 +295,7 @@ async def test_ollama_custom_options(ollama_provider):
         model=model_name,
         temperature=0.1,
         max_tokens=50,
-        options={"seed": 42, "top_k": 40}  # Additional Ollama options
+        options={"seed": 42, "top_k": 40},  # Additional Ollama options
     )
 
     assert response.content
@@ -314,9 +310,7 @@ async def test_ollama_streaming_empty_lines(ollama_provider):
     models = await ollama_provider.list_models()
     model_name = models[0]["name"]
 
-    messages = [
-        Message(role="user", content="Count to 3")
-    ]
+    messages = [Message(role="user", content="Count to 3")]
 
     chunks = []
     async for chunk in ollama_provider.stream(
@@ -349,9 +343,7 @@ async def test_ollama_usage_statistics(ollama_provider):
     models = await ollama_provider.list_models()
     model_name = models[0]["name"]
 
-    messages = [
-        Message(role="user", content="Hi")
-    ]
+    messages = [Message(role="user", content="Hi")]
 
     response = await ollama_provider.chat(
         messages=messages,

@@ -20,7 +20,7 @@ Supports both keyword search and semantic search (with embeddings).
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 import ast
 import asyncio
 
@@ -69,7 +69,7 @@ class CodebaseIndex:
         root_path: str,
         ignore_patterns: Optional[List[str]] = None,
         use_embeddings: bool = False,
-        embedding_config: Optional[Dict[str, Any]] = None
+        embedding_config: Optional[Dict[str, Any]] = None,
     ):
         """Initialize codebase indexer.
 
@@ -120,9 +120,7 @@ class CodebaseIndex:
 
         # Find all Python files
         python_files = [
-            f
-            for f in self.root.rglob("*.py")
-            if f.is_file() and not self.should_ignore(f)
+            f for f in self.root.rglob("*.py") if f.is_file() and not self.should_ignore(f)
         ]
 
         print(f"Found {len(python_files)} Python files")
@@ -142,7 +140,7 @@ class CodebaseIndex:
 
     async def _index_with_embeddings(self) -> None:
         """Index symbols with embeddings for semantic search."""
-        print(f"\n🤖 Generating embeddings for semantic search...")
+        print("\n🤖 Generating embeddings for semantic search...")
 
         # Initialize provider if needed
         if not self.embedding_provider._initialized:
@@ -160,7 +158,7 @@ class CodebaseIndex:
                         "symbol_name": symbol.name,
                         "symbol_type": symbol.type,
                         "line_number": symbol.line_number,
-                    }
+                    },
                 }
                 documents.append(doc)
 
@@ -204,7 +202,7 @@ class CodebaseIndex:
 
     def _build_dependency_graph(self) -> None:
         """Build dependency graph between files."""
-        for file_path, metadata in self.files.items():
+        for _file_path, metadata in self.files.items():
             for imp in metadata.imports:
                 # Try to resolve import to file path
                 # This is a simplified version - full implementation would be more robust
@@ -218,9 +216,7 @@ class CodebaseIndex:
                         metadata.dependencies.append(possible_path)
                         break
 
-    async def find_relevant_files(
-        self, query: str, max_files: int = 10
-    ) -> List[FileMetadata]:
+    async def find_relevant_files(self, query: str, max_files: int = 10) -> List[FileMetadata]:
         """Find files relevant to a query.
 
         This is a simplified version. Full implementation would use:
@@ -277,7 +273,7 @@ class CodebaseIndex:
             Symbol if found, None otherwise
         """
         # Search all files
-        for key, symbol in self.symbols.items():
+        for _key, symbol in self.symbols.items():
             if symbol.name == symbol_name:
                 return symbol
         return None
@@ -300,9 +296,7 @@ class CodebaseIndex:
             "file": metadata,
             "symbols": metadata.symbols,
             "imports": metadata.imports,
-            "dependencies": [
-                self.files[dep] for dep in metadata.dependencies if dep in self.files
-            ],
+            "dependencies": [self.files[dep] for dep in metadata.dependencies if dep in self.files],
             "dependents": self._find_dependents(file_path),
         }
 
@@ -344,13 +338,17 @@ class CodebaseIndex:
                 vector_store=config.get("vector_store", "chromadb"),
                 embedding_model_type=config.get("embedding_model_type", "sentence-transformers"),
                 embedding_model_name=config.get("embedding_model_name", "all-mpnet-base-v2"),
-                persist_directory=config.get("persist_directory", str(Path.home() / ".victor/embeddings")),
-                extra_config=config.get("extra_config", {})
+                persist_directory=config.get(
+                    "persist_directory", str(Path.home() / ".victor/embeddings")
+                ),
+                extra_config=config.get("extra_config", {}),
             )
 
             # Create embedding provider
             self.embedding_provider = EmbeddingRegistry.create(embedding_config)
-            print(f"✓ Embeddings enabled: {embedding_config.embedding_model_name} + {embedding_config.vector_store}")
+            print(
+                f"✓ Embeddings enabled: {embedding_config.embedding_model_name} + {embedding_config.vector_store}"
+            )
 
         except ImportError as e:
             print(f"⚠️  Warning: Embeddings not available: {e}")
@@ -359,10 +357,7 @@ class CodebaseIndex:
             self.embedding_provider = None
 
     async def semantic_search(
-        self,
-        query: str,
-        max_results: int = 10,
-        filter_metadata: Optional[Dict[str, Any]] = None
+        self, query: str, max_results: int = 10, filter_metadata: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """Perform semantic search using embeddings.
 
@@ -383,9 +378,7 @@ class CodebaseIndex:
 
         # Search using embedding provider
         results = await self.embedding_provider.search_similar(
-            query=query,
-            limit=max_results,
-            filter_metadata=filter_metadata
+            query=query, limit=max_results, filter_metadata=filter_metadata
         )
 
         # Convert to dict format
@@ -396,7 +389,7 @@ class CodebaseIndex:
                 "content": result.content,
                 "score": result.score,
                 "line_number": result.line_number,
-                "metadata": result.metadata
+                "metadata": result.metadata,
             }
             for result in results
         ]

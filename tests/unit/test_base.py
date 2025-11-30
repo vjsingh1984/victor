@@ -30,11 +30,7 @@ class TestToolParameter:
 
     def test_tool_parameter_creation(self):
         """Test creating a ToolParameter."""
-        param = ToolParameter(
-            name="test_param",
-            type="string",
-            description="A test parameter"
-        )
+        param = ToolParameter(name="test_param", type="string", description="A test parameter")
 
         assert param.name == "test_param"
         assert param.type == "string"
@@ -49,7 +45,7 @@ class TestToolParameter:
             type="string",
             description="A choice parameter",
             enum=["option1", "option2", "option3"],
-            required=False
+            required=False,
         )
 
         assert param.enum == ["option1", "option2", "option3"]
@@ -61,10 +57,7 @@ class TestToolResult:
 
     def test_tool_result_success(self):
         """Test successful ToolResult."""
-        result = ToolResult(
-            success=True,
-            output={"data": "test"}
-        )
+        result = ToolResult(success=True, output={"data": "test"})
 
         assert result.success is True
         assert result.output == {"data": "test"}
@@ -74,10 +67,7 @@ class TestToolResult:
     def test_tool_result_failure(self):
         """Test failed ToolResult."""
         result = ToolResult(
-            success=False,
-            output=None,
-            error="Test error",
-            metadata={"exception": "ValueError"}
+            success=False, output=None, error="Test error", metadata={"exception": "ValueError"}
         )
 
         assert result.success is False
@@ -97,9 +87,9 @@ class ConcreteTool(BaseTool):
             "type": "object",
             "properties": {
                 "param1": {"type": "string", "description": "First param"},
-                "param2": {"type": "number", "description": "Second param"}
+                "param2": {"type": "number", "description": "Second param"},
             },
-            "required": ["param1"]
+            "required": ["param1"],
         }
 
     @property
@@ -119,10 +109,7 @@ class ConcreteTool(BaseTool):
 
     async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
         """Execute the tool."""
-        return ToolResult(
-            success=True,
-            output=kwargs
-        )
+        return ToolResult(success=True, output=kwargs)
 
 
 class TestBaseTool:
@@ -132,7 +119,7 @@ class TestBaseTool:
         """Test converting parameters to JSON schema."""
         params = [
             ToolParameter(name="param1", type="string", description="First", required=True),
-            ToolParameter(name="param2", type="number", description="Second", required=False)
+            ToolParameter(name="param2", type="number", description="Second", required=False),
         ]
 
         schema = BaseTool.convert_parameters_to_schema(params)
@@ -152,7 +139,7 @@ class TestBaseTool:
                 type="string",
                 description="A choice",
                 enum=["a", "b", "c"],
-                required=True
+                required=True,
             )
         ]
 
@@ -162,9 +149,7 @@ class TestBaseTool:
 
     def test_convert_parameters_to_schema_no_required(self):
         """Test schema with no required parameters."""
-        params = [
-            ToolParameter(name="opt1", type="string", description="Optional", required=False)
-        ]
+        params = [ToolParameter(name="opt1", type="string", description="Optional", required=False)]
 
         schema = BaseTool.convert_parameters_to_schema(params)
 

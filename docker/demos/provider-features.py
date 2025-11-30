@@ -11,7 +11,7 @@ from pathlib import Path
 from datetime import datetime
 
 # Add victor to path
-sys.path.insert(0, '/app')
+sys.path.insert(0, "/app")
 
 from victor.providers.ollama import OllamaProvider
 from victor.providers.base import Message
@@ -32,8 +32,7 @@ async def wait_for_ollama(max_retries=30, delay=2):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{os.getenv('OLLAMA_HOST', 'http://ollama:11434')}/api/tags",
-                    timeout=5.0
+                    f"{os.getenv('OLLAMA_HOST', 'http://ollama:11434')}/api/tags", timeout=5.0
                 )
                 if response.status_code == 200:
                     console.print("[green]✓ Ollama is ready![/green]")
@@ -50,18 +49,13 @@ async def wait_for_ollama(max_retries=30, delay=2):
 
 async def demo_simple_chat():
     """Demo 1: Simple chat completion."""
-    console.print(Panel.fit(
-        "[bold cyan]Demo 1: Simple Chat Completion[/bold cyan]",
-        border_style="cyan"
-    ))
-
-    provider = OllamaProvider(
-        base_url=os.getenv('OLLAMA_HOST', 'http://ollama:11434')
+    console.print(
+        Panel.fit("[bold cyan]Demo 1: Simple Chat Completion[/bold cyan]", border_style="cyan")
     )
 
-    messages = [
-        Message(role="user", content="Explain what Victor is in one sentence.")
-    ]
+    provider = OllamaProvider(base_url=os.getenv("OLLAMA_HOST", "http://ollama:11434"))
+
+    messages = [Message(role="user", content="Explain what Victor is in one sentence.")]
 
     console.print("\n[bold]Prompt:[/bold]", messages[0].content)
     console.print("\n[bold]Response:[/bold]")
@@ -81,18 +75,16 @@ async def demo_simple_chat():
 
 async def demo_code_generation():
     """Demo 2: Code generation."""
-    console.print(Panel.fit(
-        "[bold cyan]Demo 2: Code Generation[/bold cyan]",
-        border_style="cyan"
-    ))
+    console.print(Panel.fit("[bold cyan]Demo 2: Code Generation[/bold cyan]", border_style="cyan"))
 
-    provider = OllamaProvider(
-        base_url=os.getenv('OLLAMA_HOST', 'http://ollama:11434')
-    )
+    provider = OllamaProvider(base_url=os.getenv("OLLAMA_HOST", "http://ollama:11434"))
 
     messages = [
         Message(role="system", content="You are an expert Python programmer."),
-        Message(role="user", content="Write a Python function to calculate the Fibonacci sequence. Include docstring.")
+        Message(
+            role="user",
+            content="Write a Python function to calculate the Fibonacci sequence. Include docstring.",
+        ),
     ]
 
     console.print("\n[bold]Prompt:[/bold] Write a Fibonacci function")
@@ -113,14 +105,11 @@ async def demo_code_generation():
 
 async def demo_streaming():
     """Demo 3: Streaming responses."""
-    console.print(Panel.fit(
-        "[bold cyan]Demo 3: Streaming Responses[/bold cyan]",
-        border_style="cyan"
-    ))
-
-    provider = OllamaProvider(
-        base_url=os.getenv('OLLAMA_HOST', 'http://ollama:11434')
+    console.print(
+        Panel.fit("[bold cyan]Demo 3: Streaming Responses[/bold cyan]", border_style="cyan")
     )
+
+    provider = OllamaProvider(base_url=os.getenv("OLLAMA_HOST", "http://ollama:11434"))
 
     messages = [
         Message(role="user", content="List 5 benefits of using AI coding assistants. Be concise.")
@@ -146,19 +135,14 @@ async def demo_streaming():
 
 async def demo_multi_turn():
     """Demo 4: Multi-turn conversation."""
-    console.print(Panel.fit(
-        "[bold cyan]Demo 4: Multi-Turn Conversation[/bold cyan]",
-        border_style="cyan"
-    ))
-
-    provider = OllamaProvider(
-        base_url=os.getenv('OLLAMA_HOST', 'http://ollama:11434')
+    console.print(
+        Panel.fit("[bold cyan]Demo 4: Multi-Turn Conversation[/bold cyan]", border_style="cyan")
     )
 
+    provider = OllamaProvider(base_url=os.getenv("OLLAMA_HOST", "http://ollama:11434"))
+
     # Turn 1
-    messages = [
-        Message(role="user", content="I'm working on a Python web API.")
-    ]
+    messages = [Message(role="user", content="I'm working on a Python web API.")]
 
     console.print("\n[bold blue]User:[/bold blue]", messages[0].content)
 
@@ -192,16 +176,11 @@ async def demo_multi_turn():
 
 async def demo_tool_calling():
     """Demo 5: Tool calling."""
-    console.print(Panel.fit(
-        "[bold cyan]Demo 5: Tool Calling[/bold cyan]",
-        border_style="cyan"
-    ))
+    console.print(Panel.fit("[bold cyan]Demo 5: Tool Calling[/bold cyan]", border_style="cyan"))
 
     from victor.providers.base import ToolDefinition
 
-    provider = OllamaProvider(
-        base_url=os.getenv('OLLAMA_HOST', 'http://ollama:11434')
-    )
+    provider = OllamaProvider(base_url=os.getenv("OLLAMA_HOST", "http://ollama:11434"))
 
     tools = [
         ToolDefinition(
@@ -218,9 +197,7 @@ async def demo_tool_calling():
         )
     ]
 
-    messages = [
-        Message(role="user", content="What's the weather in San Francisco?")
-    ]
+    messages = [Message(role="user", content="What's the weather in San Francisco?")]
 
     console.print("\n[bold]Prompt:[/bold]", messages[0].content)
     console.print("[bold]Available Tools:[/bold] get_weather")
@@ -246,7 +223,7 @@ async def demo_tool_calling():
 
 async def save_demo_report():
     """Save demonstration report."""
-    output_dir = Path(os.getenv('DEMO_OUTPUT_DIR', '/output'))
+    output_dir = Path(os.getenv("DEMO_OUTPUT_DIR", "/output"))
     output_dir.mkdir(parents=True, exist_ok=True)
 
     report_file = output_dir / f"demo_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
@@ -292,8 +269,9 @@ All demonstrations completed successfully! Victor is fully operational in Docker
 
 async def main():
     """Run all demonstrations."""
-    console.print(Panel.fit(
-        """[bold magenta]
+    console.print(
+        Panel.fit(
+            """[bold magenta]
 ╦  ╦╦╔═╗╔╦╗╔═╗╦═╗
 ╚╗╔╝║║   ║ ║ ║╠╦╝
  ╚╝ ╩╚═╝ ╩ ╚═╝╩╚═
@@ -301,8 +279,9 @@ async def main():
 [cyan]Universal AI Coding Assistant[/cyan]
 [dim]Docker Demo Suite[/dim]
         """,
-        border_style="magenta"
-    ))
+            border_style="magenta",
+        )
+    )
 
     # Wait for Ollama
     if not await wait_for_ollama():
@@ -311,18 +290,16 @@ async def main():
 
     # Ensure model is available
     console.print("[yellow]Pulling model (if needed)...[/yellow]")
-    provider = OllamaProvider(
-        base_url=os.getenv('OLLAMA_HOST', 'http://ollama:11434')
-    )
+    provider = OllamaProvider(base_url=os.getenv("OLLAMA_HOST", "http://ollama:11434"))
 
     try:
         models = await provider.list_models()
-        model_names = [m['name'] for m in models]
+        model_names = [m["name"] for m in models]
 
-        if not any('qwen2.5-coder:1.5b' in name for name in model_names):
+        if not any("qwen2.5-coder:1.5b" in name for name in model_names):
             console.print("[yellow]Pulling qwen2.5-coder:1.5b...[/yellow]")
-            async for progress in provider.pull_model('qwen2.5-coder:1.5b'):
-                if 'status' in progress:
+            async for progress in provider.pull_model("qwen2.5-coder:1.5b"):
+                if "status" in progress:
                     console.print(f"\r{progress['status']}", end="")
             console.print()
 
@@ -355,11 +332,13 @@ async def main():
     # Save report
     await save_demo_report()
 
-    console.print(Panel.fit(
-        "[bold green]All demonstrations completed![/bold green]\n"
-        "[cyan]Victor is ready for production use.[/cyan]",
-        border_style="green"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold green]All demonstrations completed![/bold green]\n"
+            "[cyan]Victor is ready for production use.[/cyan]",
+            border_style="green",
+        )
+    )
 
     return 0
 

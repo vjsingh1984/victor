@@ -91,9 +91,7 @@ async def test_vllm_models_endpoint():
 @pytest.mark.integration
 async def test_vllm_simple_chat(vllm_provider):
     """Test simple chat completion with vLLM."""
-    messages = [
-        Message(role="user", content="Say 'Hello from vLLM' and nothing else.")
-    ]
+    messages = [Message(role="user", content="Say 'Hello from vLLM' and nothing else.")]
 
     response = await vllm_provider.chat(
         messages=messages,
@@ -114,7 +112,9 @@ async def test_vllm_code_generation(vllm_provider):
     """Test code generation with vLLM."""
     messages = [
         Message(role="system", content="You are an expert Python programmer."),
-        Message(role="user", content="Write a Python function to calculate factorial. Keep it simple.")
+        Message(
+            role="user", content="Write a Python function to calculate factorial. Keep it simple."
+        ),
     ]
 
     response = await vllm_provider.chat(
@@ -133,9 +133,7 @@ async def test_vllm_code_generation(vllm_provider):
 @pytest.mark.integration
 async def test_vllm_streaming(vllm_provider):
     """Test streaming responses from vLLM."""
-    messages = [
-        Message(role="user", content="Count from 1 to 5, one number per line.")
-    ]
+    messages = [Message(role="user", content="Count from 1 to 5, one number per line.")]
 
     chunks = []
     full_content = ""
@@ -181,9 +179,7 @@ async def test_vllm_tool_calling(vllm_provider):
         )
     ]
 
-    messages = [
-        Message(role="user", content="What's the weather in San Francisco?")
-    ]
+    messages = [Message(role="user", content="What's the weather in San Francisco?")]
 
     response = await vllm_provider.chat(
         messages=messages,
@@ -213,9 +209,7 @@ async def test_vllm_tool_calling(vllm_provider):
 async def test_vllm_multi_turn_conversation(vllm_provider):
     """Test multi-turn conversation with vLLM."""
     # Turn 1
-    messages = [
-        Message(role="user", content="My favorite programming language is Python.")
-    ]
+    messages = [Message(role="user", content="My favorite programming language is Python.")]
 
     response1 = await vllm_provider.chat(
         messages=messages,
@@ -273,10 +267,14 @@ async def test_vllm_large_context(vllm_provider):
 
     # Add several exchanges
     for i in range(5):
-        messages.append(Message(role="user", content=f"Tell me about Python feature {i+1} in one sentence."))
+        messages.append(
+            Message(role="user", content=f"Tell me about Python feature {i+1} in one sentence.")
+        )
         messages.append(Message(role="assistant", content=f"Python feature {i+1} is important."))
 
-    messages.append(Message(role="user", content="Now summarize what we discussed in one sentence."))
+    messages.append(
+        Message(role="user", content="Now summarize what we discussed in one sentence.")
+    )
 
     response = await vllm_provider.chat(
         messages=messages,
@@ -295,7 +293,7 @@ async def test_vllm_system_message(vllm_provider):
     """Test vLLM with system messages."""
     messages = [
         Message(role="system", content="You are a Python expert who gives concise answers."),
-        Message(role="user", content="What is a list comprehension? One sentence only.")
+        Message(role="user", content="What is a list comprehension? One sentence only."),
     ]
 
     response = await vllm_provider.chat(
@@ -314,9 +312,7 @@ async def test_vllm_system_message(vllm_provider):
 @pytest.mark.integration
 async def test_vllm_token_usage(vllm_provider):
     """Test that vLLM returns token usage information."""
-    messages = [
-        Message(role="user", content="Say 'hi'")
-    ]
+    messages = [Message(role="user", content="Say 'hi'")]
 
     response = await vllm_provider.chat(
         messages=messages,
@@ -338,9 +334,7 @@ async def test_vllm_token_usage(vllm_provider):
 @pytest.mark.integration
 async def test_vllm_temperature_variations(vllm_provider):
     """Test vLLM with different temperature settings."""
-    messages = [
-        Message(role="user", content="Say hello")
-    ]
+    messages = [Message(role="user", content="Say hello")]
 
     # Test with very low temperature (deterministic)
     response_low = await vllm_provider.chat(
@@ -368,9 +362,7 @@ async def test_vllm_temperature_variations(vllm_provider):
 @pytest.mark.integration
 async def test_vllm_max_tokens_limiting(vllm_provider):
     """Test that vLLM respects max_tokens limit."""
-    messages = [
-        Message(role="user", content="Write a very long story about a cat.")
-    ]
+    messages = [Message(role="user", content="Write a very long story about a cat.")]
 
     response = await vllm_provider.chat(
         messages=messages,
@@ -390,9 +382,7 @@ async def test_vllm_max_tokens_limiting(vllm_provider):
 @pytest.mark.integration
 async def test_vllm_top_p_sampling(vllm_provider):
     """Test vLLM with top_p (nucleus sampling)."""
-    messages = [
-        Message(role="user", content="Say hello in a creative way.")
-    ]
+    messages = [Message(role="user", content="Say hello in a creative way.")]
 
     response = await vllm_provider.chat(
         messages=messages,
@@ -411,9 +401,7 @@ async def test_vllm_top_p_sampling(vllm_provider):
 @pytest.mark.integration
 async def test_vllm_response_metadata(vllm_provider):
     """Test that vLLM returns proper response metadata."""
-    messages = [
-        Message(role="user", content="Hi")
-    ]
+    messages = [Message(role="user", content="Hi")]
 
     response = await vllm_provider.chat(
         messages=messages,
@@ -427,16 +415,16 @@ async def test_vllm_response_metadata(vllm_provider):
     assert response.role == "assistant"
     assert response.model == "Qwen/Qwen2.5-Coder-1.5B-Instruct"
     assert response.stop_reason in ["stop", "length", None]
-    print(f"\nvLLM Response metadata: role={response.role}, model={response.model}, stop_reason={response.stop_reason}")
+    print(
+        f"\nvLLM Response metadata: role={response.role}, model={response.model}, stop_reason={response.stop_reason}"
+    )
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_vllm_empty_content_handling(vllm_provider):
     """Test vLLM handling of minimal input."""
-    messages = [
-        Message(role="user", content="Hi")
-    ]
+    messages = [Message(role="user", content="Hi")]
 
     response = await vllm_provider.chat(
         messages=messages,
@@ -454,9 +442,7 @@ async def test_vllm_empty_content_handling(vllm_provider):
 @pytest.mark.integration
 async def test_vllm_streaming_with_tool_support(vllm_provider):
     """Test that streaming works with tools parameter (even if not used)."""
-    messages = [
-        Message(role="user", content="Count to 3")
-    ]
+    messages = [Message(role="user", content="Count to 3")]
 
     tools = [
         ToolDefinition(
@@ -492,16 +478,16 @@ async def test_vllm_provider_features(vllm_provider):
     assert vllm_provider.supports_streaming() is True
     assert vllm_provider.supports_tools() is True
     assert vllm_provider.name == "openai"
-    print(f"\nvLLM Provider: name={vllm_provider.name}, streaming={vllm_provider.supports_streaming()}, tools={vllm_provider.supports_tools()}")
+    print(
+        f"\nvLLM Provider: name={vllm_provider.name}, streaming={vllm_provider.supports_streaming()}, tools={vllm_provider.supports_tools()}"
+    )
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_vllm_empty_response_handling(vllm_provider):
     """Test vLLM handling of minimal responses."""
-    messages = [
-        Message(role="user", content=".")
-    ]
+    messages = [Message(role="user", content=".")]
 
     response = await vllm_provider.chat(
         messages=messages,
@@ -519,9 +505,7 @@ async def test_vllm_empty_response_handling(vllm_provider):
 @pytest.mark.integration
 async def test_vllm_streaming_final_chunk(vllm_provider):
     """Test that vLLM streaming properly marks final chunks."""
-    messages = [
-        Message(role="user", content="Hi")
-    ]
+    messages = [Message(role="user", content="Hi")]
 
     chunks = []
     final_count = 0
@@ -545,9 +529,7 @@ async def test_vllm_streaming_final_chunk(vllm_provider):
 @pytest.mark.integration
 async def test_vllm_stop_reason_verification(vllm_provider):
     """Test that vLLM returns appropriate stop reasons."""
-    messages = [
-        Message(role="user", content="Say hello")
-    ]
+    messages = [Message(role="user", content="Say hello")]
 
     response = await vllm_provider.chat(
         messages=messages,

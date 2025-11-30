@@ -33,10 +33,7 @@ async def test_file_editor_tool():
 
         # Test 1: Start transaction
         print("\n1️⃣ Starting transaction...")
-        result = await tool.execute(
-            operation="start_transaction",
-            description="Test transaction"
-        )
+        result = await tool.execute(operation="start_transaction", description="Test transaction")
         assert result.success, f"Start failed: {result.error}"
         print(f"✓ {result.output}")
 
@@ -45,7 +42,7 @@ async def test_file_editor_tool():
         result = await tool.execute(
             operation="add_create",
             path=str(test_file),
-            content="def hello():\n    print('Hello, World!')\n"
+            content="def hello():\n    print('Hello, World!')\n",
         )
         assert result.success, f"Add create failed: {result.error}"
         print(f"✓ {result.output}")
@@ -76,17 +73,12 @@ async def test_file_editor_tool():
 
         # Test 6: Modify file
         print("\n6️⃣ Modifying file...")
-        result = await tool.execute(
-            operation="start_transaction",
-            description="Modify test file"
-        )
+        result = await tool.execute(operation="start_transaction", description="Modify test file")
         assert result.success
 
         new_content = "def hello():\n    print('Hello, Victor!')\n"
         result = await tool.execute(
-            operation="add_modify",
-            path=str(test_file),
-            new_content=new_content
+            operation="add_modify", path=str(test_file), new_content=new_content
         )
         assert result.success, f"Add modify failed: {result.error}"
 
@@ -100,16 +92,11 @@ async def test_file_editor_tool():
 
         # Test 7: Dry run
         print("\n7️⃣ Testing dry run...")
-        result = await tool.execute(
-            operation="start_transaction",
-            description="Dry run test"
-        )
+        result = await tool.execute(operation="start_transaction", description="Dry run test")
         assert result.success
 
         result = await tool.execute(
-            operation="add_modify",
-            path=str(test_file),
-            new_content="# This won't be applied\n"
+            operation="add_modify", path=str(test_file), new_content="# This won't be applied\n"
         )
         assert result.success
 
@@ -123,16 +110,10 @@ async def test_file_editor_tool():
 
         # Test 8: Abort transaction
         print("\n8️⃣ Testing abort...")
-        result = await tool.execute(
-            operation="start_transaction",
-            description="Test abort"
-        )
+        result = await tool.execute(operation="start_transaction", description="Test abort")
         assert result.success
 
-        result = await tool.execute(
-            operation="add_delete",
-            path=str(test_file)
-        )
+        result = await tool.execute(operation="add_delete", path=str(test_file))
         assert result.success
 
         result = await tool.execute(operation="abort")

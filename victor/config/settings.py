@@ -19,8 +19,9 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union, List
 
 import yaml
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from victor.config.model_capabilities import _default_tool_calling_models
 
 
 class ProviderConfig(BaseSettings):
@@ -36,11 +37,69 @@ class ProviderConfig(BaseSettings):
 class ProfileConfig(BaseSettings):
     """Configuration for a model profile."""
 
+    model_config = SettingsConfigDict(extra="allow")
+
     provider: str = Field(..., description="Provider name (ollama, anthropic, openai, google)")
     model: str = Field(..., description="Model identifier")
     temperature: float = Field(0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(4096, gt=0)
     description: Optional[str] = Field(None, description="Optional profile description")
+    tool_selection: Optional[Dict[str, Any]] = Field(
+        None, description="Tool selection configuration for adaptive thresholds"
+    )
+
+    @field_validator("tool_selection")
+    @classmethod
+    def validate_tool_selection(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Validate tool_selection configuration.
+
+        Args:
+            v: Tool selection configuration dictionary
+
+        Returns:
+            Validated configuration with expanded tier shortcuts
+
+        Raises:
+            ValueError: If configuration is invalid
+        """
+        if v is None:
+            return None
+
+        # Predefined model size tiers for convenience
+        TIER_PRESETS = {
+            "tiny": {"base_threshold": 0.35, "base_max_tools": 5},  # 0.5B-3B
+            "small": {"base_threshold": 0.25, "base_max_tools": 7},  # 7B-8B
+            "medium": {"base_threshold": 0.20, "base_max_tools": 10},  # 13B-15B
+            "large": {"base_threshold": 0.15, "base_max_tools": 12},  # 30B+
+            "cloud": {"base_threshold": 0.18, "base_max_tools": 10},  # Claude/GPT
+        }
+
+        # Expand tier shortcuts
+        if "model_size_tier" in v:
+            tier = v["model_size_tier"]
+            if tier in TIER_PRESETS:
+                # Apply preset values, but allow manual overrides
+                preset = TIER_PRESETS[tier].copy()
+                preset.update(v)  # Manual values override preset
+                v = preset
+
+        # Validate base_threshold
+        if "base_threshold" in v:
+            threshold = v["base_threshold"]
+            if not isinstance(threshold, (int, float)):
+                raise ValueError(f"base_threshold must be a number, got {type(threshold)}")
+            if not (0.0 <= threshold <= 1.0):
+                raise ValueError(f"base_threshold must be between 0.0 and 1.0, got {threshold}")
+
+        # Validate base_max_tools
+        if "base_max_tools" in v:
+            max_tools = v["base_max_tools"]
+            if not isinstance(max_tools, int):
+                raise ValueError(f"base_max_tools must be an integer, got {type(max_tools)}")
+            if max_tools < 1:
+                raise ValueError(f"base_max_tools must be positive, got {max_tools}")
+
+        return v
 
 
 class Settings(BaseSettings):
@@ -53,9 +112,9 @@ class Settings(BaseSettings):
         extra="allow",
     )
 
-    # Default provider settings
+    # Default provider settings (LMStudio by default for local observability)
     default_provider: str = "ollama"
-    default_model: str = "qwen2.5-coder:7b"
+    default_model: str = "qwen3-coder:30b"
     default_temperature: float = 0.7
     default_max_tokens: int = 4096
 
@@ -66,7 +125,12 @@ class Settings(BaseSettings):
 
     # Local server URLs
     ollama_base_url: str = "http://localhost:11434"
-    lmstudio_base_url: str = "http://localhost:1234"
+    # LMStudio tiered endpoints (try in order)
+    lmstudio_base_urls: List[str] = [
+        "http://127.0.0.1:1234",
+        "http://192.168.1.126:1234",
+        "http://192.168.1.20:1234",
+    ]
     vllm_base_url: str = "http://localhost:8000"
 
     # Logging
@@ -86,7 +150,9 @@ class Settings(BaseSettings):
 
     # Tool Selection Strategy
     use_semantic_tool_selection: bool = True  # Use embeddings instead of keywords (DEFAULT)
-    embedding_provider: str = "sentence-transformers"  # sentence-transformers (local), ollama, vllm, lmstudio
+    embedding_provider: str = (
+        "sentence-transformers"  # sentence-transformers (local), ollama, vllm, lmstudio
+    )
     embedding_model: str = unified_embedding_model  # Shared with codebase search
 
     # Codebase Semantic Search (Air-gapped by Default)
@@ -106,6 +172,201 @@ class Settings(BaseSettings):
     use_mcp_tools: bool = False
     mcp_command: Optional[str] = None  # e.g., "python mcp_server.py" or "node mcp-server.js"
     mcp_prefix: str = "mcp"
+
+    # Tool Execution Settings
+    tool_call_budget: int = (
+        300  # Maximum tool calls per session (increased from 20 for long operations)
+    )
+    tool_call_budget_warning_threshold: int = 250  # Warn when approaching budget limit
+
+    # Models known to support structured tool calls per provider
+    tool_calling_models: Dict[str, list[str]] = Field(default_factory=_default_tool_calling_models)
+
+    # Tool Retry Settings
+    tool_retry_enabled: bool = True  # Enable automatic retry for failed tool executions
+    tool_retry_max_attempts: int = 3  # Maximum retry attempts per tool call
+    tool_retry_base_delay: float = 1.0  # Base delay in seconds for exponential backoff
+    tool_retry_max_delay: float = 10.0  # Maximum delay in seconds between retries
+
+    # Tool selection fallback
+    fallback_max_tools: int = 8  # Cap tool list when stage pruning removes everything
+
+    # Tool result caching (opt-in per tool)
+    tool_cache_enabled: bool = True
+    tool_cache_ttl: int = 600  # seconds
+    tool_cache_dir: str = "~/.victor/cache"
+    tool_cache_allowlist: List[str] = [
+        "code_search",
+        "semantic_code_search",
+        "list_directory",
+        "plan_files",
+    ]
+
+    # Security scan extensions
+    security_dependency_scan: bool = False
+    security_iac_scan: bool = False
+
+    # LMStudio resource guard
+    lmstudio_max_vram_gb: Optional[float] = (
+        48.0  # Cap model selection to this budget (GB); override via env/config
+    )
+
+    # Exploration Loop Settings (prevents endless exploration without output)
+    # Higher values = more thorough exploration, slower responses
+    max_exploration_iterations: int = 8  # Max consecutive read-only tool calls with minimal output
+    max_exploration_iterations_action: int = (
+        12  # More lenient for action tasks (create, write, etc.)
+    )
+    max_exploration_iterations_analysis: int = (
+        50  # Very lenient for analysis tasks (uses loop detection instead)
+    )
+    min_content_threshold: int = 150  # Minimum chars to consider "substantial" output
+    max_research_iterations: int = 6  # Force synthesis after N consecutive web searches
+
+    # Analytics
+    analytics_enabled: bool = True
+    analytics_log_file: str = "~/.victor/logs/usage.jsonl"
+
+    @staticmethod
+    def _estimate_model_vram_gb(model_id: str) -> Optional[float]:
+        """Rough VRAM requirement (GB) by model name heuristic."""
+        requirements = [
+            ("70b", 64.0),
+            ("65b", 60.0),
+            ("33b", 40.0),
+            ("32b", 36.0),
+            ("30b", 34.0),
+            ("34b", 34.0),
+            ("14b", 18.0),
+            ("13b", 16.0),
+            ("12b", 14.0),
+            ("8x7b", 40.0),  # Mixture
+            ("8b", 10.0),
+            ("7b", 8.0),
+            ("6.7b", 8.0),
+            ("3b", 6.0),
+            ("1.5b", 4.0),
+        ]
+        m = model_id.lower()
+        for key, vram in requirements:
+            if key in m:
+                return vram
+        return None
+
+    @staticmethod
+    def _detect_vram_gb() -> Optional[float]:
+        """Detect available GPU VRAM in GB (best-effort)."""
+        try:
+            import subprocess
+
+            # Try NVIDIA GPUs
+            cmd = [
+                "nvidia-smi",
+                "--query-gpu=memory.total",
+                "--format=csv,noheader,nounits",
+            ]
+            output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True)
+            values = [float(x.strip()) for x in output.splitlines() if x.strip()]
+            if values:
+                return max(values) / 1024.0
+        except Exception:
+            pass
+
+        # macOS: try system_profiler for VRAM
+        try:
+            import subprocess
+
+            output = subprocess.check_output(
+                ["system_profiler", "SPDisplaysDataType"],
+                stderr=subprocess.DEVNULL,
+                text=True,
+            )
+            for line in output.splitlines():
+                if "VRAM" in line and "Total" in line:
+                    # e.g., "      Total VRAM (Dynamic, Max): 4096 MB"
+                    parts = line.split()
+                    for i, part in enumerate(parts):
+                        if (
+                            part.replace(",", "").isdigit()
+                            and i + 1 < len(parts)
+                            and parts[i + 1].upper().startswith("MB")
+                        ):
+                            return float(part.replace(",", "")) / 1024.0
+        except Exception:
+            pass
+
+        return None
+
+    @classmethod
+    def _choose_default_lmstudio_model(
+        cls, urls: list[str], max_vram_gb: Optional[float] = None
+    ) -> str:
+        """Pick a sane default model from reachable LMStudio servers.
+
+        Preference order favors small coder models for latency, then falls
+        back to the first advertised model from the first reachable server.
+        """
+        preferred_models = [
+            "qwen2.5-coder:7b",
+            "qwen2.5-coder:14b",
+            "qwen2.5-coder:32b",
+            "qwen2.5:7b",
+            "llama-3.1-8b-instruct",
+        ]
+
+        detected_vram = cls._detect_vram_gb()
+        max_vram = (
+            max_vram_gb if max_vram_gb is not None else getattr(cls, "lmstudio_max_vram_gb", None)
+        )
+        available_vram = None
+        if detected_vram and max_vram:
+            available_vram = min(detected_vram, max_vram)
+        else:
+            available_vram = detected_vram or max_vram
+
+        try:
+            import httpx  # Local network call only; safe in airgapped mode
+        except Exception:
+            return preferred_models[0]
+
+        for url in urls:
+            try:
+                resp = httpx.get(f"{url}/v1/models", timeout=1.0)
+                if resp.status_code != 200:
+                    continue
+                data = resp.json() or {}
+                models = [
+                    m.get("id") or m.get("model")
+                    for m in data.get("data", [])
+                    if isinstance(m, dict)
+                ]
+                if not models:
+                    continue
+
+                # If VRAM is known, choose the most capable coder/instruct model that fits
+                if available_vram:
+                    candidates = []
+                    for m_id in models:
+                        if not m_id:
+                            continue
+                        requirement = cls._estimate_model_vram_gb(m_id or "")
+                        if requirement and requirement <= available_vram:
+                            # Prefer coder/ instruct models
+                            is_coder = "coder" in m_id.lower()
+                            candidates.append((requirement, is_coder, m_id))
+                    if candidates:
+                        # Choose largest VRAM within budget; coder preferred
+                        candidates.sort(key=lambda t: (t[0], t[1], t[2]), reverse=True)
+                        return str(candidates[0][2])
+
+                for pref in preferred_models:
+                    if pref in models:
+                        return pref
+                return str(models[0])
+            except Exception:
+                continue
+
+        return str(preferred_models[0])
 
     @classmethod
     def get_config_dir(cls) -> Path:
@@ -128,13 +389,23 @@ class Settings(BaseSettings):
         profiles_file = cls.get_config_dir() / "profiles.yaml"
 
         if not profiles_file.exists():
+            urls = getattr(cls, "lmstudio_base_urls", []) or [
+                "http://192.168.1.126:1234",
+                "http://192.168.1.20:1234",
+                "http://localhost:1234",
+            ]
+            default_model = cls._choose_default_lmstudio_model(
+                urls, max_vram_gb=cls().lmstudio_max_vram_gb
+            )
             # Return default profiles
             return {
                 "default": ProfileConfig(
-                    provider="ollama",
-                    model="qwen2.5-coder:7b",
+                    provider="lmstudio",
+                    model=default_model,
                     temperature=0.7,
                     max_tokens=4096,
+                    description=None,
+                    tool_selection=None,
                 )
             }
 
@@ -232,7 +503,29 @@ class Settings(BaseSettings):
             settings.setdefault("base_url", self.ollama_base_url)
 
         elif provider == "lmstudio":
-            settings.setdefault("base_url", self.lmstudio_base_url)
+            urls = getattr(self, "lmstudio_base_urls", []) or []
+            # If provider config supplied a list, merge/override
+            if "base_url" in settings:
+                cfg_url = settings["base_url"]
+                if isinstance(cfg_url, list):
+                    urls = cfg_url
+                elif isinstance(cfg_url, str):
+                    urls = [cfg_url]
+            chosen = None
+            try:
+                import httpx
+
+                for url in urls:
+                    try:
+                        resp = httpx.get(f"{url}/v1/models", timeout=1.5)
+                        if resp.status_code == 200:
+                            chosen = url
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+            settings["base_url"] = f"{(chosen or urls[0]).rstrip('/')}/v1"
 
         elif provider == "vllm":
             settings.setdefault("base_url", self.vllm_base_url)

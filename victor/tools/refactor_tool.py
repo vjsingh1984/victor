@@ -25,7 +25,7 @@ Features:
 import ast
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 import logging
 
 from victor.tools.decorators import tool
@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 # Helper functions
+
 
 def _find_symbol(tree: ast.AST, name: str) -> Optional[Dict[str, Any]]:
     """Find symbol in AST."""
@@ -68,7 +69,11 @@ def _find_function_insert_point(lines: List[str], current_line: int) -> int:
     """Find best location to insert extracted function."""
     # Simple heuristic: insert at the beginning of file (after imports)
     for i, line in enumerate(lines):
-        if line.strip() and not line.strip().startswith("import") and not line.strip().startswith("from"):
+        if (
+            line.strip()
+            and not line.strip().startswith("import")
+            and not line.strip().startswith("from")
+        ):
             return max(0, i - 1)
 
     return 0
@@ -98,12 +103,43 @@ def _is_stdlib(module_name: str) -> bool:
     """Check if module is from standard library."""
     # Common stdlib modules
     stdlib_modules = {
-        "abc", "ast", "asyncio", "collections", "concurrent", "contextlib",
-        "copy", "dataclasses", "datetime", "decimal", "enum", "functools",
-        "hashlib", "io", "itertools", "json", "logging", "math", "os",
-        "pathlib", "pickle", "re", "shutil", "socket", "sqlite3", "string",
-        "subprocess", "sys", "tempfile", "threading", "time", "typing",
-        "unittest", "urllib", "uuid", "warnings", "weakref",
+        "abc",
+        "ast",
+        "asyncio",
+        "collections",
+        "concurrent",
+        "contextlib",
+        "copy",
+        "dataclasses",
+        "datetime",
+        "decimal",
+        "enum",
+        "functools",
+        "hashlib",
+        "io",
+        "itertools",
+        "json",
+        "logging",
+        "math",
+        "os",
+        "pathlib",
+        "pickle",
+        "re",
+        "shutil",
+        "socket",
+        "sqlite3",
+        "string",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "threading",
+        "time",
+        "typing",
+        "unittest",
+        "urllib",
+        "uuid",
+        "warnings",
+        "weakref",
     }
 
     # Get top-level module
@@ -112,6 +148,7 @@ def _is_stdlib(module_name: str) -> bool:
 
 
 # Tool functions
+
 
 @tool
 async def refactor_rename_symbol(
@@ -144,10 +181,7 @@ async def refactor_rename_symbol(
         - error: Error message if failed
     """
     if not file or not old_name or not new_name:
-        return {
-            "success": False,
-            "error": "Missing required parameters: file, old_name, new_name"
-        }
+        return {"success": False, "error": "Missing required parameters: file, old_name, new_name"}
 
     file_obj = Path(file)
     if not file_obj.exists():
@@ -166,10 +200,7 @@ async def refactor_rename_symbol(
     symbol_info = _find_symbol(tree, old_name)
 
     if not symbol_info:
-        return {
-            "success": False,
-            "error": f"Symbol '{old_name}' not found in {file}"
-        }
+        return {"success": False, "error": f"Symbol '{old_name}' not found in {file}"}
 
     # Perform rename
     lines = content.split("\n")
@@ -180,15 +211,17 @@ async def refactor_rename_symbol(
         modified_line = line
 
         # Use word boundaries for safe replacement
-        pattern = r'\b' + re.escape(old_name) + r'\b'
+        pattern = r"\b" + re.escape(old_name) + r"\b"
 
         if re.search(pattern, line):
             modified_line = re.sub(pattern, new_name, line)
-            changes.append({
-                "line": line_num,
-                "old": line,
-                "new": modified_line,
-            })
+            changes.append(
+                {
+                    "line": line_num,
+                    "old": line,
+                    "new": modified_line,
+                }
+            )
 
         modified_lines.append(modified_line)
 
@@ -229,7 +262,7 @@ async def refactor_rename_symbol(
         "changes_count": len(changes),
         "changes": changes,
         "preview_text": new_content if preview else None,
-        "formatted_report": "\n".join(report)
+        "formatted_report": "\n".join(report),
     }
 
 
@@ -265,7 +298,7 @@ async def refactor_extract_function(
     if not file or not start_line or not end_line or not function_name:
         return {
             "success": False,
-            "error": "Missing required parameters: file, start_line, end_line, function_name"
+            "error": "Missing required parameters: file, start_line, end_line, function_name",
         }
 
     file_obj = Path(file)
@@ -278,13 +311,10 @@ async def refactor_extract_function(
 
     # Validate line numbers
     if start_line < 1 or end_line > len(lines) or start_line > end_line:
-        return {
-            "success": False,
-            "error": f"Invalid line range: {start_line}-{end_line}"
-        }
+        return {"success": False, "error": f"Invalid line range: {start_line}-{end_line}"}
 
     # Extract code block (0-indexed)
-    extracted_lines = lines[start_line - 1:end_line]
+    extracted_lines = lines[start_line - 1 : end_line]
     code_block = "\n".join(extracted_lines)
 
     # Determine indentation
@@ -321,7 +351,7 @@ async def refactor_extract_function(
         new_function += f"{base_indent}    return {returns_str}\n"
 
     # Build modified content
-    modified_lines = lines[:start_line - 1]  # Before extraction
+    modified_lines = lines[: start_line - 1]  # Before extraction
 
     # Add function call
     call_indent = " " * indent
@@ -373,7 +403,7 @@ async def refactor_extract_function(
         "success": True,
         "new_function": new_function,
         "parameters": variables.get("params", []),
-        "formatted_report": "\n".join(report)
+        "formatted_report": "\n".join(report),
     }
 
 
@@ -403,10 +433,7 @@ async def refactor_inline_variable(
         - error: Error message if failed
     """
     if not file or not variable_name:
-        return {
-            "success": False,
-            "error": "Missing required parameters: file, variable_name"
-        }
+        return {"success": False, "error": "Missing required parameters: file, variable_name"}
 
     file_obj = Path(file)
     if not file_obj.exists():
@@ -425,10 +452,7 @@ async def refactor_inline_variable(
     assignment = _find_variable_assignment(tree, variable_name)
 
     if not assignment:
-        return {
-            "success": False,
-            "error": f"Simple assignment for '{variable_name}' not found"
-        }
+        return {"success": False, "error": f"Simple assignment for '{variable_name}' not found"}
 
     lines = content.split("\n")
 
@@ -443,23 +467,27 @@ async def refactor_inline_variable(
     for line_num, line in enumerate(lines, 1):
         if line_num == assignment_line:
             # Skip assignment line
-            changes.append({
-                "line": line_num,
-                "action": "removed",
-                "content": line,
-            })
+            changes.append(
+                {
+                    "line": line_num,
+                    "action": "removed",
+                    "content": line,
+                }
+            )
             continue
 
         # Replace variable usage
-        pattern = r'\b' + re.escape(variable_name) + r'\b'
+        pattern = r"\b" + re.escape(variable_name) + r"\b"
         if re.search(pattern, line):
             modified_line = re.sub(pattern, value_expr, line)
-            changes.append({
-                "line": line_num,
-                "action": "modified",
-                "old": line,
-                "new": modified_line,
-            })
+            changes.append(
+                {
+                    "line": line_num,
+                    "action": "modified",
+                    "old": line,
+                    "new": modified_line,
+                }
+            )
             modified_lines.append(modified_line)
         else:
             modified_lines.append(line)
@@ -504,7 +532,7 @@ async def refactor_inline_variable(
         "success": True,
         "changes_count": len(changes),
         "value": value_expr,
-        "formatted_report": "\n".join(report)
+        "formatted_report": "\n".join(report),
     }
 
 
@@ -682,7 +710,7 @@ async def refactor_organize_imports(
         "stdlib_count": len(stdlib_imports),
         "third_party_count": len(third_party_imports),
         "local_count": len(local_imports),
-        "formatted_report": "\n".join(report)
+        "formatted_report": "\n".join(report),
     }
 
 
@@ -693,8 +721,9 @@ class RefactorTool:
     def __init__(self):
         """Initialize - deprecated."""
         import warnings
+
         warnings.warn(
             "RefactorTool class is deprecated. Use refactor_* functions instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )

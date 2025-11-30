@@ -77,7 +77,7 @@ def create_session(user_id: int) -> str:
     \"\"\"
     import secrets
     return secrets.token_hex(32)
-"""
+""",
         )
 
         editor.add_create(
@@ -102,7 +102,7 @@ def test_create_session():
     \"\"\"Test session creation.\"\"\"
     session = create_session(123)
     assert len(session) == 64  # 32 bytes hex = 64 chars
-"""
+""",
         )
 
         # Preview changes
@@ -181,10 +181,7 @@ def create_session(user_id: int) -> str:
     return secrets.token_hex(32)
 """
 
-        editor.add_modify(
-            path=str(tmpdir / "auth.py"),
-            new_content=new_auth_content
-        )
+        editor.add_modify(path=str(tmpdir / "auth.py"), new_content=new_auth_content)
 
         # Preview diff
         editor.preview_diff()
@@ -203,14 +200,11 @@ def create_session(user_id: int) -> str:
         editor.start_transaction("Add logging to auth module")
 
         logged_content = new_auth_content.replace(
-            'import secrets',
-            'import secrets\nimport logging\n\nlogger = logging.getLogger(__name__)'
+            "import secrets",
+            "import secrets\nimport logging\n\nlogger = logging.getLogger(__name__)",
         )
 
-        editor.add_modify(
-            path=str(tmpdir / "auth.py"),
-            new_content=logged_content
-        )
+        editor.add_modify(path=str(tmpdir / "auth.py"), new_content=logged_content)
 
         editor.preview_diff()
 
@@ -230,8 +224,7 @@ def create_session(user_id: int) -> str:
         editor.start_transaction("Attempt problematic changes")
 
         editor.add_modify(
-            path=str(tmpdir / "auth.py"),
-            new_content="# This change will be rolled back\n"
+            path=str(tmpdir / "auth.py"), new_content="# This change will be rolled back\n"
         )
 
         # Simulate manual rollback (in practice, this happens automatically on errors)
@@ -267,7 +260,7 @@ def hash_password(password: str, salt: bytes = None) -> tuple[str, bytes]:
 
     hashed = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
     return hashed.hex(), salt
-"""
+""",
         )
 
         # Update main auth file to import from utils
@@ -291,10 +284,7 @@ def create_session(user_id: int) -> str:
     return secrets.token_hex(32)
 """
 
-        editor.add_modify(
-            path=str(tmpdir / "auth.py"),
-            new_content=refactored_auth
-        )
+        editor.add_modify(path=str(tmpdir / "auth.py"), new_content=refactored_auth)
 
         # Update tests
         updated_tests = """\"\"\"Tests for authentication module.\"\"\"
@@ -327,10 +317,7 @@ def test_hash_password():
     assert len(salt) == 32
 """
 
-        editor.add_modify(
-            path=str(tmpdir / "auth_test.py"),
-            new_content=updated_tests
-        )
+        editor.add_modify(path=str(tmpdir / "auth_test.py"), new_content=updated_tests)
 
         # Preview all changes
         editor.preview_diff()
@@ -341,7 +328,7 @@ def test_hash_password():
         print(f"   ID: {summary['id']}")
         print(f"   Total operations: {summary['operations']}")
         print(f"   By type:")
-        for op_type, count in summary['by_type'].items():
+        for op_type, count in summary["by_type"].items():
             if count > 0:
                 print(f"     - {op_type}: {count}")
 
@@ -359,8 +346,7 @@ def test_hash_password():
         editor.start_transaction("Rename utils to helpers")
 
         editor.add_rename(
-            old_path=str(tmpdir / "auth_utils.py"),
-            new_path=str(tmpdir / "auth_helpers.py")
+            old_path=str(tmpdir / "auth_utils.py"), new_path=str(tmpdir / "auth_helpers.py")
         )
 
         editor.preview_diff()

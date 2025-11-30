@@ -2,6 +2,8 @@
 
 The security of your code and data is a top priority for Victor. This document outlines the security model, data handling practices, and the measures taken to ensure a safe and private user experience, especially when using the "air-gapped" mode.
 
+> Reality check: `security_scan` currently performs regex-based secret/config checks and a small dependency hint list only. There is no CVE/IaC/package-audit integration yet; treat results as lightweight hygiene, not a full security review.
+
 ## Code Execution Sandboxing
 
 **Problem:** Allowing a Large Language Model (LLM) to generate and execute code on your local machine is inherently risky. A malicious or flawed code suggestion could potentially access sensitive files, modify your system, or make unwanted network requests.

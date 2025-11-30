@@ -384,6 +384,7 @@ def function_{i}():
         tool = BatchProcessorTool(max_workers=8)
 
         import time
+
         start = time.time()
 
         result = await tool.execute(

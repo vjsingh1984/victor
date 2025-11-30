@@ -74,7 +74,7 @@ async def docker(
     operation: str,
     resource_id: Optional[str] = None,
     resource_type: str = "container",
-    options: Dict[str, Any] = None
+    options: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
     """
     Unified Docker operations for container and image management.
@@ -167,7 +167,7 @@ async def docker(
         return {
             "success": True,
             "result": {"containers": containers, "count": len(containers)},
-            "message": f"Found {len(containers)} container(s)"
+            "message": f"Found {len(containers)} container(s)",
         }
 
     elif operation in ["start", "stop", "restart", "rm"]:
@@ -185,7 +185,7 @@ async def docker(
         return {
             "success": True,
             "result": {"container_id": resource_id},
-            "message": f"Container {operation} successful: {resource_id}"
+            "message": f"Container {operation} successful: {resource_id}",
         }
 
     elif operation == "logs":
@@ -207,7 +207,7 @@ async def docker(
         return {
             "success": True,
             "result": {"logs": stdout, "stderr": stderr},
-            "message": f"Retrieved logs for {resource_id}"
+            "message": f"Retrieved logs for {resource_id}",
         }
 
     elif operation == "stats":
@@ -230,7 +230,7 @@ async def docker(
         return {
             "success": True,
             "result": {"stats": stats, "count": len(stats)},
-            "message": f"Retrieved stats for {len(stats)} container(s)"
+            "message": f"Retrieved stats for {len(stats)} container(s)",
         }
 
     elif operation == "exec":
@@ -250,7 +250,9 @@ async def docker(
         return {
             "success": success,
             "result": {"stdout": stdout, "stderr": stderr},
-            "message": f"Executed command in {resource_id}" if success else f"Exec failed: {stderr}"
+            "message": (
+                f"Executed command in {resource_id}" if success else f"Exec failed: {stderr}"
+            ),
         }
 
     elif operation == "inspect":
@@ -268,7 +270,7 @@ async def docker(
             return {
                 "success": True,
                 "result": {"data": inspect_data},
-                "message": f"Inspected {resource_id}"
+                "message": f"Inspected {resource_id}",
             }
         except json.JSONDecodeError:
             return {"success": False, "error": "Failed to parse inspect output"}
@@ -292,12 +294,15 @@ async def docker(
         return {
             "success": True,
             "result": {"images": images, "count": len(images)},
-            "message": f"Found {len(images)} image(s)"
+            "message": f"Found {len(images)} image(s)",
         }
 
     elif operation == "pull":
         if not resource_id:
-            return {"success": False, "error": "resource_id (image name) required for pull operation"}
+            return {
+                "success": False,
+                "error": "resource_id (image name) required for pull operation",
+            }
 
         args = ["pull", resource_id]
         if "platform" in options:
@@ -311,12 +316,15 @@ async def docker(
         return {
             "success": True,
             "result": {"image": resource_id},
-            "message": f"Pulled image: {resource_id}"
+            "message": f"Pulled image: {resource_id}",
         }
 
     elif operation == "rmi":
         if not resource_id:
-            return {"success": False, "error": "resource_id (image name) required for rmi operation"}
+            return {
+                "success": False,
+                "error": "resource_id (image name) required for rmi operation",
+            }
 
         args = ["rmi", resource_id]
         if options.get("force"):
@@ -330,7 +338,7 @@ async def docker(
         return {
             "success": True,
             "result": {"image": resource_id},
-            "message": f"Removed image: {resource_id}"
+            "message": f"Removed image: {resource_id}",
         }
 
     # Network operations
@@ -352,7 +360,7 @@ async def docker(
         return {
             "success": True,
             "result": {"networks": networks, "count": len(networks)},
-            "message": f"Found {len(networks)} network(s)"
+            "message": f"Found {len(networks)} network(s)",
         }
 
     # Volume operations
@@ -374,11 +382,11 @@ async def docker(
         return {
             "success": True,
             "result": {"volumes": volumes, "count": len(volumes)},
-            "message": f"Found {len(volumes)} volume(s)"
+            "message": f"Found {len(volumes)} volume(s)",
         }
 
     else:
         return {
             "success": False,
-            "error": f"Unknown operation: {operation}. Supported: ps, start, stop, restart, rm, logs, stats, exec, inspect, images, pull, rmi, networks, volumes"
+            "error": f"Unknown operation: {operation}. Supported: ps, start, stop, restart, rm, logs, stats, exec, inspect, images, pull, rmi, networks, volumes",
         }

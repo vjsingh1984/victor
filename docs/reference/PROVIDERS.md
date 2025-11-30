@@ -310,17 +310,35 @@ export LMSTUDIO_API_KEY="lm-studio"
 ```yaml
 profiles:
   lmstudio:
-    provider: openai  # Uses OpenAI-compatible API
+    provider: lmstudio  # Uses OpenAI-compatible API
     model: local-model
     temperature: 0.3
     max_tokens: 4096
 
 providers:
-  openai:
-    base_url: http://localhost:1234/v1  # LMStudio server
-    api_key: lm-studio  # Placeholder
+  lmstudio:
+    base_url:
+      - http://192.168.1.126:1234  # Primary LMStudio server
+      - http://192.168.1.20:1234   # Secondary LMStudio server
+      - http://127.0.0.1:1234      # Tertiary LMStudio server (localhost fallback)
+    api_key: lm-studio  # Placeholder; LMStudio ignores it but OpenAI client requires a token
     timeout: 300
 ```
+
+If `~/.victor/profiles.yaml` does not exist, Victor will probe the LMStudio tiered URLs above, list their models via `/v1/models`, and choose a sensible default (prefers `qwen2.5-coder` family, otherwise first available).
+
+Connectivity check:
+```bash
+python scripts/check_lmstudio.py
+```
+Shows which LMStudio endpoint is reachable, which models it exposes, and (if VRAM is detected) recommends the most capable model that fits your GPU.
+You can cap selection with `lmstudio_max_vram_gb` in settings (default 48 GB) to keep under a target budget.
+
+Interactive (inside Victor):
+```
+/lmstudio
+```
+Probes the tiered endpoints and shows a VRAM-aware recommendation.
 
 #### Usage
 

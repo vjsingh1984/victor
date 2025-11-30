@@ -43,6 +43,7 @@ class TestCodeExecutionManager:
     def test_init_docker_not_available(self):
         """Test initialization fails when Docker is not available."""
         from docker.errors import DockerException
+
         with patch("docker.from_env", side_effect=DockerException("Docker not found")):
             with pytest.raises(RuntimeError, match="Docker is not running"):
                 CodeExecutionManager()
@@ -118,6 +119,7 @@ class TestCodeExecutionManager:
         """Test stopping when container is already gone."""
         with patch("docker.from_env") as mock_docker:
             import docker.errors
+
             mock_client = MagicMock()
             mock_docker.return_value = mock_client
             mock_container = MagicMock()
@@ -344,7 +346,9 @@ class TestUploadFilesToSandbox:
         mock_manager.put_files = MagicMock()
 
         context = {"code_manager": mock_manager}
-        result = await upload_files_to_sandbox(file_paths=["file1.txt", "file2.txt"], context=context)
+        result = await upload_files_to_sandbox(
+            file_paths=["file1.txt", "file2.txt"], context=context
+        )
 
         assert "Successfully uploaded 2 files" in result
         mock_manager.put_files.assert_called_once_with(["file1.txt", "file2.txt"])

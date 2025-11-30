@@ -4,6 +4,8 @@
 **Status**: ✅ VERIFIED
 **Test Duration**: 15 minutes
 
+> Canonical Docker docs: `docker/README.md` (guided) and `docker/QUICKREF.md` (commands). This file records a historical test run.
+
 ## Executive Summary
 
 All Docker optimizations have been successfully implemented and tested. The Victor Docker image builds correctly, embeddings system works flawlessly, and all shared utilities function as designed.

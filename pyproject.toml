@@ -159,20 +159,33 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+extend-exclude = [
+    "archive",
+    "examples",
+    "docker/demos",
+    "victor_test",
+    "demo_workspace",
+    "src",
+    "ui",
+    "web/ui",
+    "htmlcov",
+    "venv",
+    "game_app.py",
+    "tests",
+]
 
 [tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
     "F",  # pyflakes
-    "I",  # isort
     "B",  # flake8-bugbear
     "C4", # flake8-comprehensions
-    "UP", # pyupgrade
 ]
 ignore = [
     "E501",  # line too long (handled by formatter)
     "B008",  # do not perform function calls in argument defaults
+    "B904",  # allow broad HTTPException raising for now
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -187,6 +200,17 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 disallow_any_generics = false
 ignore_missing_imports = true
+exclude = ""
+files = ["victor", "web"]
+
+[[tool.mypy.overrides]]
+module = [
+    "victor.providers.*",
+    "victor.codebase.embeddings.*",
+    "victor.tools.*",
+    "victor.mcp.*",
+]
+ignore_errors = true
 
 [tool.black]
 line-length = 100

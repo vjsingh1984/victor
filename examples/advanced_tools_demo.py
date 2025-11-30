@@ -44,11 +44,7 @@ async def demo_database_tool():
     try:
         # Connect
         print("\n1️⃣ Connecting to SQLite database...")
-        result = await db_tool.execute(
-            operation="connect",
-            db_type="sqlite",
-            database=db_path
-        )
+        result = await db_tool.execute(operation="connect", db_type="sqlite", database=db_path)
         print(result.output if result.success else f"Error: {result.error}")
 
         if not result.success:
@@ -62,7 +58,7 @@ async def demo_database_tool():
         result = await db_tool.execute(
             operation="query",
             connection_id=conn_id,
-            sql="CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT)"
+            sql="CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT)",
         )
         print(result.output if result.success else f"Error: {result.error}")
 
@@ -71,42 +67,30 @@ async def demo_database_tool():
         result = await db_tool.execute(
             operation="query",
             connection_id=conn_id,
-            sql="INSERT INTO users (name, email) VALUES ('Alice', 'alice@example.com'), ('Bob', 'bob@example.com')"
+            sql="INSERT INTO users (name, email) VALUES ('Alice', 'alice@example.com'), ('Bob', 'bob@example.com')",
         )
         print(result.output if result.success else f"Error: {result.error}")
 
         # Query data
         print("\n4️⃣ Querying data...")
         result = await db_tool.execute(
-            operation="query",
-            connection_id=conn_id,
-            sql="SELECT * FROM users"
+            operation="query", connection_id=conn_id, sql="SELECT * FROM users"
         )
         print(result.output if result.success else f"Error: {result.error}")
 
         # List tables
         print("\n5️⃣ Listing tables...")
-        result = await db_tool.execute(
-            operation="tables",
-            connection_id=conn_id
-        )
+        result = await db_tool.execute(operation="tables", connection_id=conn_id)
         print(result.output if result.success else f"Error: {result.error}")
 
         # Describe table
         print("\n6️⃣ Describing table structure...")
-        result = await db_tool.execute(
-            operation="describe",
-            connection_id=conn_id,
-            table="users"
-        )
+        result = await db_tool.execute(operation="describe", connection_id=conn_id, table="users")
         print(result.output if result.success else f"Error: {result.error}")
 
         # Disconnect
         print("\n7️⃣ Disconnecting...")
-        result = await db_tool.execute(
-            operation="disconnect",
-            connection_id=conn_id
-        )
+        result = await db_tool.execute(operation="disconnect", connection_id=conn_id)
         print(result.output if result.success else f"Error: {result.error}")
 
     finally:
@@ -180,9 +164,7 @@ async def demo_http_tool():
     # Simple GET request
     print("\n1️⃣ GET request to GitHub API...")
     result = await http_request(
-        method="GET",
-        url="https://api.github.com/users/octocat",
-        timeout=15
+        method="GET", url="https://api.github.com/users/octocat", timeout=15
     )
     if result.get("success"):
         print(f"Status: {result['status_code']}")
@@ -197,12 +179,12 @@ async def demo_http_tool():
         method="GET",
         url="https://api.github.com/search/repositories",
         params={"q": "language:python", "sort": "stars", "per_page": 3},
-        timeout=15
+        timeout=15,
     )
     if result.get("success"):
         print(f"Status: {result['status_code']}")
         print(f"Duration: {result['duration_ms']}ms")
-        if isinstance(result['body'], dict):
+        if isinstance(result["body"], dict):
             print(f"Total count: {result['body'].get('total_count', 'N/A')}")
     else:
         print(f"Error: {result.get('error')}")
@@ -210,10 +192,7 @@ async def demo_http_tool():
     # API testing with validation
     print("\n3️⃣ API testing with validation...")
     result = await http_test(
-        method="GET",
-        url="https://api.github.com",
-        expected_status=200,
-        timeout=15
+        method="GET", url="https://api.github.com", expected_status=200, timeout=15
     )
     if result.get("success"):
         print(f"Test passed: {result['all_passed']}")
@@ -229,7 +208,7 @@ async def demo_http_tool():
         url="https://httpbin.org/post",
         headers={"Content-Type": "application/json"},
         json={"key": "value", "test": True},
-        timeout=15
+        timeout=15,
     )
     if result.get("success"):
         print(f"Status: {result['status_code']}")

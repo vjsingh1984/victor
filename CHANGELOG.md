@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha] - 2025-02-27
+
+### Added
+- GitHub Actions CI matrix (3.10–3.12) running black, ruff, mypy, pytest (unit-only), and a CLI smoke test.
+- Security workflow with gitleaks secret scan and pip-audit dependency check.
+- Support policy (`SUPPORT.md`) and archive notice clarifying `archive/victor-legacy/` is frozen.
+
+### Changed
+- Scoped Ruff to active packages and cleaned up outstanding lint errors in core modules.
+- Updated onboarding guidance to point at `docs/guides/QUICKSTART.md` and flagged aspirational docs with “planned” status notes.
+- Expanded `.gitignore` for local artifacts (debug logs, demo workspace, .victor metadata).
+
+### Fixed
+- Addressed formatting/lint issues across tooling modules (imports, f-strings, abstract methods).
+- Stabilized dynamic tool discovery imports and tightened legacy boundaries in documentation.
+
 ### Added
 - Comprehensive community documentation (CONTRIBUTING.md, CODE_OF_CONDUCT.md)
 - GitHub issue templates (bug report, feature request, question)

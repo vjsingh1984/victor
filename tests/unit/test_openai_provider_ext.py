@@ -214,9 +214,7 @@ async def test_chat_with_tools(openai_provider):
                 description="Get weather for a location",
                 parameters={
                     "type": "object",
-                    "properties": {
-                        "location": {"type": "string"}
-                    },
+                    "properties": {"location": {"type": "string"}},
                 },
             )
         ]
@@ -648,6 +646,65 @@ async def test_parse_stream_chunk_no_choices(openai_provider):
     chunk = openai_provider._parse_stream_chunk(mock_chunk)
 
     assert chunk is None
+
+
+@pytest.mark.asyncio
+async def test_parse_stream_chunk_merges_tool_calls_across_deltas(openai_provider):
+    """Tool call parts across deltas should merge using tool_call indices."""
+    accumulator = {}
+    index_map = {}
+
+    # First delta: announces tool call index with partial args
+    first_delta_tc = MagicMock()
+    first_delta_tc.id = None
+    first_delta_tc.index = 0
+    first_delta_tc.function = MagicMock()
+    first_delta_tc.function.name = "list_directory"
+    first_delta_tc.function.arguments = '{"path":"'
+
+    first_delta = MagicMock()
+    first_delta.content = None
+    first_delta.tool_calls = [first_delta_tc]
+
+    first_choice = MagicMock()
+    first_choice.delta = first_delta
+    first_choice.finish_reason = None
+
+    first_chunk = MagicMock()
+    first_chunk.choices = [first_choice]
+
+    # Process first chunk (should not emit tool_calls yet)
+    chunk = openai_provider._parse_stream_chunk(first_chunk, accumulator, index_map)
+    assert chunk is not None
+    assert chunk.tool_calls is None
+
+    # Second delta: same index, completes arguments, marks stream end
+    second_delta_tc = MagicMock()
+    second_delta_tc.id = None
+    second_delta_tc.index = 0
+    second_delta_tc.function = MagicMock()
+    second_delta_tc.function.name = None  # Name streamed earlier
+    second_delta_tc.function.arguments = '.","recursive":false}'
+
+    second_delta = MagicMock()
+    second_delta.content = None
+    second_delta.tool_calls = [second_delta_tc]
+
+    second_choice = MagicMock()
+    second_choice.delta = second_delta
+    second_choice.finish_reason = "stop"  # triggers flush
+
+    second_chunk = MagicMock()
+    second_chunk.choices = [second_choice]
+
+    chunk = openai_provider._parse_stream_chunk(second_chunk, accumulator, index_map)
+    assert chunk is not None
+    assert chunk.tool_calls is not None
+    assert len(chunk.tool_calls) == 1
+    tool_call = chunk.tool_calls[0]
+    assert tool_call["name"] == "list_directory"
+    # Combined arguments string should include both fragments
+    assert tool_call["arguments"] == '{"path":".","recursive":false}'
 
 
 @pytest.mark.asyncio

@@ -23,7 +23,6 @@ Features:
 - Performance metrics
 """
 
-import json
 import time
 from typing import Any, Dict, Optional
 
@@ -42,7 +41,7 @@ async def http_request(
     data: Optional[Dict[str, Any]] = None,
     auth: Optional[str] = None,
     follow_redirects: bool = True,
-    timeout: int = 30
+    timeout: int = 30,
 ) -> Dict[str, Any]:
     """
     Make an HTTP request to a URL.
@@ -73,10 +72,7 @@ async def http_request(
         - error: Error message if failed
     """
     if not url:
-        return {
-            "success": False,
-            "error": "Missing required parameter: url"
-        }
+        return {"success": False, "error": "Missing required parameter: url"}
 
     method = method.upper()
     request_headers = headers or {}
@@ -120,15 +116,9 @@ async def http_request(
         }
 
     except httpx.TimeoutException:
-        return {
-            "success": False,
-            "error": f"Request timed out after {timeout} seconds"
-        }
+        return {"success": False, "error": f"Request timed out after {timeout} seconds"}
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"Request failed: {str(e)}"
-        }
+        return {"success": False, "error": f"Request failed: {str(e)}"}
 
 
 @tool
@@ -142,7 +132,7 @@ async def http_test(
     data: Optional[Dict[str, Any]] = None,
     auth: Optional[str] = None,
     follow_redirects: bool = True,
-    timeout: int = 30
+    timeout: int = 30,
 ) -> Dict[str, Any]:
     """
     Test an API endpoint with validation.
@@ -176,10 +166,7 @@ async def http_test(
     # Make request first using http_request
     # We need to call the underlying logic directly to avoid double decoration
     if not url:
-        return {
-            "success": False,
-            "error": "Missing required parameter: url"
-        }
+        return {"success": False, "error": "Missing required parameter: url"}
 
     method_upper = method.upper()
     request_headers = headers or {}
@@ -213,12 +200,14 @@ async def http_test(
         if expected_status is not None:
             passed = response.status_code == expected_status
             all_passed = all_passed and passed
-            validations.append({
-                "test": "Status code",
-                "expected": expected_status,
-                "actual": response.status_code,
-                "passed": passed,
-            })
+            validations.append(
+                {
+                    "test": "Status code",
+                    "expected": expected_status,
+                    "actual": response.status_code,
+                    "passed": passed,
+                }
+            )
 
         # Build test result
         return {
@@ -229,16 +218,10 @@ async def http_test(
             "duration_ms": int(duration * 1000),
             "validations": validations,
             "all_passed": all_passed,
-            "error": "" if all_passed else "Some validations failed"
+            "error": "" if all_passed else "Some validations failed",
         }
 
     except httpx.TimeoutException:
-        return {
-            "success": False,
-            "error": f"Request timed out after {timeout} seconds"
-        }
+        return {"success": False, "error": f"Request timed out after {timeout} seconds"}
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"Request failed: {str(e)}"
-        }
+        return {"success": False, "error": f"Request failed: {str(e)}"}

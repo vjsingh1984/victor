@@ -43,19 +43,17 @@ async def main():
         vector_store="lancedb",
         persist_directory="~/.victor/embeddings/airgapped_demo",
         distance_metric="cosine",
-
         # Embedding Model: sentence-transformers (local, offline)
         embedding_model_type="sentence-transformers",
         embedding_model_name="all-MiniLM-L12-v2",  # 384-dim, 120MB, ~8ms
         # Alternative fast option: "all-MiniLM-L6-v2"  # 384-dim, 80MB, ~5ms
         # Alternative quality option: "all-mpnet-base-v2"  # 768-dim, 420MB, ~15ms
-
         # LanceDB-specific configuration
         extra_config={
             "table_name": "airgapped_codebase",
             "dimension": 384,  # Match model dimension
             "batch_size": 32,  # Adjust based on available RAM
-        }
+        },
     )
 
     print(f"📦 Vector Store: {config.vector_store}")
@@ -100,8 +98,8 @@ def authenticate_user(username: str, password: str) -> Optional[User]:
                 "file_path": "src/auth/login.py",
                 "symbol_name": "authenticate_user",
                 "line_number": 15,
-                "language": "python"
-            }
+                "language": "python",
+            },
         },
         {
             "id": "auth_jwt",
@@ -126,8 +124,8 @@ def create_jwt_token(user_id: int, expires_delta: timedelta = None) -> str:
                 "file_path": "src/auth/jwt.py",
                 "symbol_name": "create_jwt_token",
                 "line_number": 8,
-                "language": "python"
-            }
+                "language": "python",
+            },
         },
         {
             "id": "db_connection",
@@ -159,8 +157,8 @@ async def get_database_connection(pool: ConnectionPool) -> AsyncConnection:
                 "file_path": "src/database/connection.py",
                 "symbol_name": "get_database_connection",
                 "line_number": 22,
-                "language": "python"
-            }
+                "language": "python",
+            },
         },
         {
             "id": "cache_decorator",
@@ -191,8 +189,8 @@ def cache_result(ttl: int = 3600):
                 "file_path": "src/utils/cache.py",
                 "symbol_name": "cache_result",
                 "line_number": 5,
-                "language": "python"
-            }
+                "language": "python",
+            },
         },
         {
             "id": "api_handler",
@@ -229,9 +227,9 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)) -> User:
                 "file_path": "src/api/users.py",
                 "symbol_name": "create_user",
                 "line_number": 12,
-                "language": "python"
-            }
-        }
+                "language": "python",
+            },
+        },
     ]
 
     # Index documents (batch operation)

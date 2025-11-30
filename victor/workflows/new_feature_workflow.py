@@ -33,18 +33,18 @@ class NewFeatureWorkflow(BaseWorkflow):
     def description(self) -> str:
         return "Creates a new git branch and placeholder source/test files for a new feature."
 
-    async def run(self, context: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    async def run(self, context: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
         feature_name = kwargs.get("feature_name")
         if not feature_name:
             return {"error": "Missing required argument: feature_name"}
 
-        tool_registry: ToolRegistry = context.get("tool_registry")
-        if not tool_registry:
+        tool_registry = context.get("tool_registry")
+        if not isinstance(tool_registry, ToolRegistry):
             return {"error": "ToolRegistry not found in context."}
 
         # 1. Sanitize feature name into a branch name
         branch_name = self._sanitize_branch_name(feature_name)
-        
+
         # 2. Create a new git branch
         branch_result = await tool_registry.execute(
             "git", context, operation="branch", branch=branch_name
@@ -89,7 +89,7 @@ def test_{source_filename.replace(".py", "")}():
         )
         if not write_test_result.success:
             return {"error": f"Failed to create test file '{test_filename}'."}
-        
+
         return {
             "success": True,
             "message": "Successfully created new feature setup.",
@@ -101,7 +101,6 @@ def test_{source_filename.replace(".py", "")}():
     def _sanitize_branch_name(self, name: str) -> str:
         """Converts a feature name into a git-friendly branch name."""
         name = name.lower()
-        name = re.sub(r'\s+', '-', name)      # Replace spaces with hyphens
-        name = re.sub(r'[^a-z0-9-]', '', name) # Remove non-alphanumeric chars except hyphens
+        name = re.sub(r"\s+", "-", name)  # Replace spaces with hyphens
+        name = re.sub(r"[^a-z0-9-]", "", name)  # Remove non-alphanumeric chars except hyphens
         return f"feature/{name}"
-

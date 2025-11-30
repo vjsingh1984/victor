@@ -16,11 +16,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
-# Forward-reference ToolRegistry to avoid circular import
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from victor.tools.base import ToolRegistry
-
 
 class BaseWorkflow(ABC):
     """
@@ -32,16 +27,16 @@ class BaseWorkflow(ABC):
     @abstractmethod
     def name(self) -> str:
         """The unique name of the workflow."""
-        pass
+        raise NotImplementedError
 
     @property
     @abstractmethod
     def description(self) -> str:
         """A short description of what the workflow does."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
-    async def run(self, context: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    async def run(self, context: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
         """
         Executes the workflow.
 
@@ -52,16 +47,16 @@ class BaseWorkflow(ABC):
         Returns:
             A dictionary containing the results of the workflow execution.
         """
-        pass
+        raise NotImplementedError
 
 
 class WorkflowRegistry:
     """A registry for discovering and managing available workflows."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._workflows: Dict[str, BaseWorkflow] = {}
 
-    def register(self, workflow: BaseWorkflow):
+    def register(self, workflow: BaseWorkflow) -> None:
         """Registers a workflow instance."""
         if workflow.name in self._workflows:
             raise ValueError(f"Workflow '{workflow.name}' is already registered.")
@@ -74,4 +69,3 @@ class WorkflowRegistry:
     def list_workflows(self) -> list[BaseWorkflow]:
         """Returns a list of all registered workflows."""
         return list(self._workflows.values())
-

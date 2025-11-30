@@ -33,25 +33,13 @@ from pydantic import BaseModel, Field
 class EmbeddingModelConfig(BaseModel):
     """Configuration for embedding model."""
 
-    model_type: str = Field(
-        description="Model type (sentence-transformers, openai, cohere, etc.)"
-    )
-    model_name: str = Field(
-        default="all-MiniLM-L6-v2",
-        description="Specific model name"
-    )
+    model_type: str = Field(description="Model type (sentence-transformers, openai, cohere, etc.)")
+    model_name: str = Field(default="all-MiniLM-L6-v2", description="Specific model name")
     dimension: int = Field(
-        default=384,
-        description="Embedding dimension (auto-detected if possible)"
+        default=384, description="Embedding dimension (auto-detected if possible)"
     )
-    api_key: Optional[str] = Field(
-        default=None,
-        description="API key for cloud providers"
-    )
-    batch_size: int = Field(
-        default=32,
-        description="Batch size for embedding generation"
-    )
+    api_key: Optional[str] = Field(default=None, description="API key for cloud providers")
+    batch_size: int = Field(default=32, description="Batch size for embedding generation")
 
 
 class BaseEmbeddingModel(ABC):
@@ -108,6 +96,7 @@ class BaseEmbeddingModel(ABC):
         """
         pass
 
+    @abstractmethod
     async def close(self) -> None:
         """Clean up resources."""
         pass
@@ -152,9 +141,7 @@ class SentenceTransformerModel(BaseEmbeddingModel):
 
         # Load model in executor (CPU-bound operation)
         loop = asyncio.get_event_loop()
-        self.model = await loop.run_in_executor(
-            None, SentenceTransformer, self.config.model_name
-        )
+        self.model = await loop.run_in_executor(None, SentenceTransformer, self.config.model_name)
 
         self._initialized = True
         print(f"✅ Model loaded! Dimension: {self.get_dimension()}")
@@ -165,9 +152,7 @@ class SentenceTransformerModel(BaseEmbeddingModel):
             await self.initialize()
 
         loop = asyncio.get_event_loop()
-        embedding = await loop.run_in_executor(
-            None, self.model.encode, text
-        )
+        embedding = await loop.run_in_executor(None, self.model.encode, text)
         return embedding.tolist()
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -179,10 +164,8 @@ class SentenceTransformerModel(BaseEmbeddingModel):
         embeddings = await loop.run_in_executor(
             None,
             lambda: self.model.encode(
-                texts,
-                batch_size=self.config.batch_size,
-                show_progress_bar=len(texts) > 100
-            )
+                texts, batch_size=self.config.batch_size, show_progress_bar=len(texts) > 100
+            ),
         )
         return [emb.tolist() for emb in embeddings]
 
@@ -224,9 +207,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         try:
             from openai import AsyncOpenAI
         except ImportError:
-            raise ImportError(
-                "openai not installed. Install with: pip install openai"
-            )
+            raise ImportError("openai not installed. Install with: pip install openai")
 
         if not self.config.api_key:
             raise ValueError("OpenAI API key required")
@@ -241,10 +222,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         if not self._initialized:
             await self.initialize()
 
-        response = await self.client.embeddings.create(
-            model=self.config.model_name,
-            input=text
-        )
+        response = await self.client.embeddings.create(model=self.config.model_name, input=text)
         return response.data[0].embedding
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -253,10 +231,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             await self.initialize()
 
         # OpenAI API handles batching internally (up to 2048 texts per request)
-        response = await self.client.embeddings.create(
-            model=self.config.model_name,
-            input=texts
-        )
+        response = await self.client.embeddings.create(model=self.config.model_name, input=texts)
         return [item.embedding for item in response.data]
 
     def get_dimension(self) -> int:
@@ -299,9 +274,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
         try:
             import cohere
         except ImportError:
-            raise ImportError(
-                "cohere not installed. Install with: pip install cohere"
-            )
+            raise ImportError("cohere not installed. Install with: pip install cohere")
 
         if not self.config.api_key:
             raise ValueError("Cohere API key required")
@@ -316,10 +289,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
         if not self._initialized:
             await self.initialize()
 
-        response = await self.client.embed(
-            texts=[text],
-            model=self.config.model_name
-        )
+        response = await self.client.embed(texts=[text], model=self.config.model_name)
         return response.embeddings[0]
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -327,10 +297,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
         if not self._initialized:
             await self.initialize()
 
-        response = await self.client.embed(
-            texts=texts,
-            model=self.config.model_name
-        )
+        response = await self.client.embed(texts=texts, model=self.config.model_name)
         return response.embeddings
 
     def get_dimension(self) -> int:
@@ -376,7 +343,9 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
     def __init__(self, config: EmbeddingModelConfig):
         """Initialize Ollama embedding model."""
         super().__init__(config)
-        self.base_url = config.api_key or "http://localhost:11434"  # Reuse api_key field for base_url
+        self.base_url = (
+            config.api_key or "http://localhost:11434"
+        )  # Reuse api_key field for base_url
         self.client = None
 
     async def initialize(self) -> None:
@@ -387,14 +356,11 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
         try:
             import httpx
         except ImportError:
-            raise ImportError(
-                "httpx not installed. Install with: pip install httpx"
-            )
+            raise ImportError("httpx not installed. Install with: pip install httpx")
 
         # Create async HTTP client
         self.client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=120.0  # Longer timeout for large models
+            base_url=self.base_url, timeout=120.0  # Longer timeout for large models
         )
 
         print(f"🤖 Initializing Ollama embedding model: {self.config.model_name}")
@@ -403,8 +369,7 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
         # Verify model is available by testing with a small prompt
         try:
             response = await self.client.post(
-                "/api/embeddings",
-                json={"model": self.config.model_name, "prompt": "test"}
+                "/api/embeddings", json={"model": self.config.model_name, "prompt": "test"}
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
@@ -441,8 +406,7 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
 
         try:
             response = await self.client.post(
-                "/api/embeddings",
-                json={"model": self.config.model_name, "prompt": text}
+                "/api/embeddings", json={"model": self.config.model_name, "prompt": text}
             )
             response.raise_for_status()
             result = response.json()
@@ -483,18 +447,15 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
             "qwen3-embedding:8b": 4096,
             "qwen3-embedding:4b": 2560,  # User-definable 32-2560
             "qwen3-embedding:0.6b": 4096,
-
             # High-dimensional instruction-tuned models
             "gte-Qwen2-7B-instruct": 3584,
             "gte-qwen2-7b-instruct": 3584,
-
             # Other high-quality models
             "snowflake-arctic-embed2": 1024,
             "bge-m3": 1024,
             "mxbai-embed-large": 1024,
             "nomic-embed-text": 768,
             "nomic-embed-text:v1.5": 768,
-
             # Smaller models
             "all-minilm": 384,
             "all-minilm:l6-v2": 384,
@@ -545,8 +506,7 @@ def create_embedding_model(config: EmbeddingModelConfig) -> BaseEmbeddingModel:
     if not model_class:
         available = ", ".join(_embedding_models.keys())
         raise ValueError(
-            f"Unknown embedding model type: {config.model_type}. "
-            f"Available: {available}"
+            f"Unknown embedding model type: {config.model_type}. " f"Available: {available}"
         )
 
     return model_class(config)

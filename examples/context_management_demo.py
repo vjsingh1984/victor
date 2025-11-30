@@ -35,7 +35,7 @@ def main():
         max_tokens=128000,
         reserved_tokens=4096,
         pruning_strategy=PruningStrategy.SMART,
-        prune_threshold=0.85  # Prune at 85% usage
+        prune_threshold=0.85,  # Prune at 85% usage
     )
 
     print(f"Max context: {ctx.max_tokens:,} tokens")
@@ -47,7 +47,7 @@ def main():
     ctx.add_message(
         role="system",
         content="You are Victor, a helpful coding assistant.",
-        priority=10  # High priority - keep always
+        priority=10,  # High priority - keep always
     )
     print_stats(ctx)
 
@@ -56,11 +56,7 @@ def main():
     with open("victor/providers/base.py", "r") as f:
         content = f.read()
 
-    ctx.add_file(
-        path="victor/providers/base.py",
-        content=content,
-        relevance_score=0.9
-    )
+    ctx.add_file(path="victor/providers/base.py", content=content, relevance_score=0.9)
     print_stats(ctx)
 
     # Simulate conversation
@@ -120,7 +116,7 @@ def main():
             max_tokens=1000,  # Small window for demo
             reserved_tokens=100,
             pruning_strategy=strategy,
-            prune_threshold=0.7
+            prune_threshold=0.7,
         )
 
         # Add messages until pruning kicks in

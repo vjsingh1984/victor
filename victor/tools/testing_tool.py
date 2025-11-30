@@ -21,7 +21,9 @@ from victor.tools.decorators import tool
 
 
 @tool
-async def run_tests(path: Optional[str] = None, pytest_args: Optional[List[str]] = None) -> Dict[str, Any]:
+async def run_tests(
+    path: Optional[str] = None, pytest_args: Optional[List[str]] = None
+) -> Dict[str, Any]:
     """
     Runs tests using pytest and returns a structured summary of the results.
 
@@ -43,7 +45,7 @@ async def run_tests(path: Optional[str] = None, pytest_args: Optional[List[str]]
 
     if path:
         command.append(path)
-    
+
     if pytest_args:
         command.extend(pytest_args)
 
@@ -84,7 +86,7 @@ def _summarize_report(report: Dict[str, Any]) -> Dict[str, Any]:
     total = summary.get("total", 0)
     passed = summary.get("passed", 0)
     failed_count = summary.get("failed", 0)
-    
+
     failures = []
     if failed_count > 0:
         for test in report.get("tests", []):
@@ -93,16 +95,18 @@ def _summarize_report(report: Dict[str, Any]) -> Dict[str, Any]:
                 long_repr = call.get("longrepr", "")
                 # Ensure long_repr is a string before splitting
                 if isinstance(long_repr, str):
-                    error_lines = long_repr.split('\n')
+                    error_lines = long_repr.split("\n")
                     error_message = error_lines[-1] if error_lines else "No error message captured."
                 else:
                     error_message = "Error representation was not a string."
 
-                failures.append({
-                    "test_name": test.get("nodeid"),
-                    "error_message": error_message,
-                    "full_error": long_repr,
-                })
+                failures.append(
+                    {
+                        "test_name": test.get("nodeid"),
+                        "error_message": error_message,
+                        "full_error": long_repr,
+                    }
+                )
 
     return {
         "summary": {

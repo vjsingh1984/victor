@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import time
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +13,7 @@ from victor.config.settings import load_settings
 from victor.agent.orchestrator import AgentOrchestrator
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Victor AI Assistant API", version="2.0.0")
@@ -45,6 +45,7 @@ try:
 except Exception as e:
     logger.critical(f"FATAL: Failed to load settings: {e}")
     import sys
+
     sys.exit(1)  # Fail fast - don't start with broken config
 
 # Session management with metadata
@@ -72,14 +73,18 @@ def _render_plantuml_svg(source: str) -> str:
         )
         return proc.stdout.decode()
     except subprocess.CalledProcessError as exc:
-        raise HTTPException(status_code=500, detail=f"PlantUML render failed: {exc.stderr.decode()}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"PlantUML render failed: {exc.stderr.decode()}"
+        ) from exc
 
 
 def _render_mermaid_svg(source: str) -> str:
     """Render Mermaid text to SVG using local mmdc CLI."""
     try:
-        with tempfile.NamedTemporaryFile(mode="w+", suffix=".mmd", delete=True) as fin, \
-                tempfile.NamedTemporaryFile(mode="r", suffix=".svg", delete=True) as fout:
+        with (
+            tempfile.NamedTemporaryFile(mode="w+", suffix=".mmd", delete=True) as fin,
+            tempfile.NamedTemporaryFile(mode="r", suffix=".svg", delete=True) as fout,
+        ):
             fin.write(source)
             fin.flush()
             cmd = ["mmdc", "-i", fin.name, "-o", fout.name]
@@ -87,14 +92,18 @@ def _render_mermaid_svg(source: str) -> str:
             fout.seek(0)
             return fout.read()
     except subprocess.CalledProcessError as exc:
-        raise HTTPException(status_code=500, detail=f"Mermaid render failed: {exc.stderr.decode()}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Mermaid render failed: {exc.stderr.decode()}"
+        ) from exc
 
 
 def _render_drawio_svg(source: str) -> str:
     """Render Draw.io (or Lucid-style XML) to SVG using local drawio CLI."""
     try:
-        with tempfile.NamedTemporaryFile(mode="w+", suffix=".drawio", delete=True) as fin, \
-                tempfile.NamedTemporaryFile(mode="r", suffix=".svg", delete=True) as fout:
+        with (
+            tempfile.NamedTemporaryFile(mode="w+", suffix=".drawio", delete=True) as fin,
+            tempfile.NamedTemporaryFile(mode="r", suffix=".svg", delete=True) as fout,
+        ):
             fin.write(source)
             fin.flush()
             # drawio CLI flags: -x (export), -f svg (format), -o output
@@ -103,9 +112,13 @@ def _render_drawio_svg(source: str) -> str:
             fout.seek(0)
             return fout.read()
     except FileNotFoundError:
-        raise HTTPException(status_code=500, detail="drawio CLI not found. Please install draw.io desktop/CLI.") from None
+        raise HTTPException(
+            status_code=500, detail="drawio CLI not found. Please install draw.io desktop/CLI."
+        ) from None
     except subprocess.CalledProcessError as exc:
-        raise HTTPException(status_code=500, detail=f"Draw.io render failed: {exc.stderr.decode()}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Draw.io render failed: {exc.stderr.decode()}"
+        ) from exc
 
 
 @app.post("/render/plantuml")
@@ -139,7 +152,10 @@ def _render_graphviz_svg(source: str, engine: str = "dot") -> str:
     """
     valid_engines = {"dot", "neato", "fdp", "circo", "twopi", "sfdp"}
     if engine not in valid_engines:
-        raise HTTPException(status_code=400, detail=f"Invalid engine '{engine}'. Must be one of: {', '.join(valid_engines)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid engine '{engine}'. Must be one of: {', '.join(valid_engines)}",
+        )
 
     try:
         proc = subprocess.run(
@@ -150,9 +166,14 @@ def _render_graphviz_svg(source: str, engine: str = "dot") -> str:
         )
         return proc.stdout.decode()
     except FileNotFoundError:
-        raise HTTPException(status_code=500, detail=f"Graphviz engine '{engine}' not found. Install: brew install graphviz (macOS) or apt-get install graphviz (Linux)")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Graphviz engine '{engine}' not found. Install: brew install graphviz (macOS) or apt-get install graphviz (Linux)",
+        )
     except subprocess.CalledProcessError as exc:
-        raise HTTPException(status_code=500, detail=f"Graphviz render failed: {exc.stderr.decode()}")
+        raise HTTPException(
+            status_code=500, detail=f"Graphviz render failed: {exc.stderr.decode()}"
+        )
 
 
 def _render_d2_svg(source: str) -> str:
@@ -165,8 +186,10 @@ def _render_d2_svg(source: str) -> str:
     - Connections and relationships
     """
     try:
-        with tempfile.NamedTemporaryFile(mode="w+", suffix=".d2", delete=True) as fin, \
-                tempfile.NamedTemporaryFile(mode="r", suffix=".svg", delete=True) as fout:
+        with (
+            tempfile.NamedTemporaryFile(mode="w+", suffix=".d2", delete=True) as fin,
+            tempfile.NamedTemporaryFile(mode="r", suffix=".svg", delete=True) as fout,
+        ):
             fin.write(source)
             fin.flush()
             cmd = ["d2", fin.name, fout.name]
@@ -174,7 +197,10 @@ def _render_d2_svg(source: str) -> str:
             fout.seek(0)
             return fout.read()
     except FileNotFoundError:
-        raise HTTPException(status_code=500, detail="d2 CLI not found. Install: curl -fsSL https://d2lang.com/install.sh | sh -s --")
+        raise HTTPException(
+            status_code=500,
+            detail="d2 CLI not found. Install: curl -fsSL https://d2lang.com/install.sh | sh -s --",
+        )
     except subprocess.CalledProcessError as exc:
         raise HTTPException(status_code=500, detail=f"D2 render failed: {exc.stderr.decode()}")
 
@@ -238,13 +264,15 @@ async def cleanup_idle_sessions():
                         # Cleanup agent resources
                         try:
                             agent = SESSION_AGENTS[session_id]["agent"]
-                            if hasattr(agent, 'shutdown'):
+                            if hasattr(agent, "shutdown"):
                                 agent.shutdown()
                             # Also try closing provider if available
-                            if hasattr(agent, 'provider'):
+                            if hasattr(agent, "provider"):
                                 await agent.provider.close()
                         except Exception as e:
-                            logger.warning(f"Error shutting down agent for session {session_id}: {e}")
+                            logger.warning(
+                                f"Error shutting down agent for session {session_id}: {e}"
+                            )
 
                         del SESSION_AGENTS[session_id]
 
@@ -287,9 +315,9 @@ async def shutdown_event():
             try:
                 agent = session_data.get("agent")
                 if agent:
-                    if hasattr(agent, 'shutdown'):
+                    if hasattr(agent, "shutdown"):
                         agent.shutdown()
-                    if hasattr(agent, 'provider'):
+                    if hasattr(agent, "provider"):
                         await agent.provider.close()
                     logger.info(f"Closed session {session_id} during shutdown")
             except Exception as e:
@@ -306,7 +334,7 @@ async def health_check():
     return {
         "status": "healthy",
         "active_sessions": len(SESSION_AGENTS),
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
 
@@ -337,7 +365,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 agent = session_data["agent"]
                 session_data["last_activity"] = time.time()
                 session_data["connection_count"] = session_data.get("connection_count", 0) + 1
-                logger.info(f"Reusing existing agent for session {session_id} (connection #{session_data['connection_count']})")
+                logger.info(
+                    f"Reusing existing agent for session {session_id} (connection #{session_data['connection_count']})"
+                )
                 session_initialized = True  # Mark as initialized
             else:
                 try:
@@ -352,7 +382,9 @@ async def websocket_endpoint(websocket: WebSocket):
                         "last_activity": time.time(),
                         "connection_count": 1,
                     }
-                    logger.info(f"Created new AgentOrchestrator for session {session_id} with preload started.")
+                    logger.info(
+                        f"Created new AgentOrchestrator for session {session_id} with preload started."
+                    )
                     session_initialized = True  # Mark as initialized
                 except Exception as e:
                     logger.error(f"Failed to create AgentOrchestrator: {e}", exc_info=True)
@@ -368,8 +400,7 @@ async def websocket_endpoint(websocket: WebSocket):
             try:
                 # Receive message with timeout to prevent hanging
                 user_message = await asyncio.wait_for(
-                    websocket.receive_text(),
-                    timeout=MESSAGE_TIMEOUT
+                    websocket.receive_text(), timeout=MESSAGE_TIMEOUT
                 )
 
                 logger.info(f"Session {session_id}: Received message")
@@ -396,8 +427,12 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_text("")
 
                 except Exception as e:
-                    logger.error(f"Session {session_id}: Error during agent response: {e}", exc_info=True)
-                    await websocket.send_text(f"[error] An error occurred while processing your request: {str(e)}")
+                    logger.error(
+                        f"Session {session_id}: Error during agent response: {e}", exc_info=True
+                    )
+                    await websocket.send_text(
+                        f"[error] An error occurred while processing your request: {str(e)}"
+                    )
 
             except asyncio.TimeoutError:
                 logger.warning(f"Session {session_id}: Timeout waiting for message")
@@ -432,6 +467,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     current_count = SESSION_AGENTS[session_id].get("connection_count", 1)
                     new_count = max(0, current_count - 1)  # Prevent negative counts
                     SESSION_AGENTS[session_id]["connection_count"] = new_count
-                    logger.debug(f"Session {session_id}: Connection count decremented to {new_count}")
+                    logger.debug(
+                        f"Session {session_id}: Connection count decremented to {new_count}"
+                    )
 
         logger.info(f"Session {session_id}: WebSocket connection closed and cleaned up.")

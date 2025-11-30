@@ -22,10 +22,12 @@ Features:
 - Best practices enforcement
 """
 
-import yaml
+import logging
+import subprocess
 from pathlib import Path
 from typing import Any, Dict, Optional
-import logging
+
+import yaml
 
 from victor.tools.decorators import tool
 
@@ -42,9 +44,7 @@ GITHUB_ACTIONS_TEMPLATES = {
         "jobs": {
             "test": {
                 "runs-on": "ubuntu-latest",
-                "strategy": {
-                    "matrix": {"python-version": ["3.10", "3.11", "3.12"]}
-                },
+                "strategy": {"matrix": {"python-version": ["3.10", "3.11", "3.12"]}},
                 "steps": [
                     {"uses": "actions/checkout@v4"},
                     {
@@ -96,7 +96,10 @@ GITHUB_ACTIONS_TEMPLATES = {
                     {"name": "Build package", "run": "python -m build"},
                     {
                         "name": "Publish to PyPI",
-                        "env": {"TWINE_USERNAME": "__token__", "TWINE_PASSWORD": "${{ secrets.PYPI_TOKEN }}"},
+                        "env": {
+                            "TWINE_USERNAME": "__token__",
+                            "TWINE_PASSWORD": "${{ secrets.PYPI_TOKEN }}",
+                        },
                         "run": "twine upload dist/*",
                     },
                 ],
@@ -195,6 +198,7 @@ async def cicd(
     type: Optional[str] = None,
     file: Optional[str] = None,
     output: Optional[str] = None,
+    validate_command: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Unified CI/CD tool for pipeline management.
@@ -251,18 +255,18 @@ async def cicd(
                 available = ", ".join(TYPE_MAPPING.keys())
                 return {
                     "success": False,
-                    "error": f"Unknown workflow type: {type}. Available: {available}"
+                    "error": f"Unknown workflow type: {type}. Available: {available}",
                 }
         elif not workflow:
             return {
                 "success": False,
-                "error": "Either 'workflow' or 'type' parameter required for generate operation"
+                "error": "Either 'workflow' or 'type' parameter required for generate operation",
             }
 
         if platform != "github":
             return {
                 "success": False,
-                "error": f"Platform '{platform}' not yet supported. Use 'github'."
+                "error": f"Platform '{platform}' not yet supported. Use 'github'.",
             }
 
         # Get template
@@ -272,7 +276,7 @@ async def cicd(
             available = ", ".join(GITHUB_ACTIONS_TEMPLATES.keys())
             return {
                 "success": False,
-                "error": f"Workflow template '{workflow}' not found. Available: {available}"
+                "error": f"Workflow template '{workflow}' not found. Available: {available}",
             }
 
         # Generate YAML
@@ -289,7 +293,7 @@ async def cicd(
 
         # Build report
         report = []
-        report.append(f"CI/CD Configuration Generated")
+        report.append("CI/CD Configuration Generated")
         report.append("=" * 70)
         report.append("")
         report.append(f"Platform: {platform}")
@@ -311,33 +315,24 @@ async def cicd(
             "operation": "generate",
             "output_file": output,
             "config": config_yaml,
-            "formatted_report": "\n".join(report)
+            "formatted_report": "\n".join(report),
         }
 
     # Validate operation
     elif operation == "validate":
         if not file:
-            return {
-                "success": False,
-                "error": "Validate operation requires 'file' parameter"
-            }
+            return {"success": False, "error": "Validate operation requires 'file' parameter"}
 
         file_obj = Path(file)
         if not file_obj.exists():
-            return {
-                "success": False,
-                "error": f"File not found: {file}"
-            }
+            return {"success": False, "error": f"File not found: {file}"}
 
         # Read and validate YAML
         try:
             content = file_obj.read_text()
             config = yaml.safe_load(content)
         except yaml.YAMLError as e:
-            return {
-                "success": False,
-                "error": f"Invalid YAML syntax: {e}"
-            }
+            return {"success": False, "error": f"Invalid YAML syntax: {e}"}
 
         # Validate structure (basic checks)
         issues = []
@@ -367,13 +362,23 @@ async def cicd(
                 # Check for best practices
                 if "steps" in job:
                     has_checkout = any(
-                        step.get("uses", "").startswith("actions/checkout")
-                        for step in job["steps"]
+                        step.get("uses", "").startswith("actions/checkout") for step in job["steps"]
                     )
                     if not has_checkout:
-                        warnings.append(
-                            f"Job '{job_name}': No checkout step (usually needed)"
-                        )
+                        warnings.append(f"Job '{job_name}': No checkout step (usually needed)")
+
+        external_output = None
+        if validate_command:
+            try:
+                proc = subprocess.run(
+                    validate_command.split(),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                external_output = proc.stdout.strip()
+            except subprocess.CalledProcessError as exc:
+                issues.append(f"External validator failed: {exc.stderr.strip()}")
 
         # Build report
         report = []
@@ -406,6 +411,11 @@ async def cicd(
                 steps = len(job.get("steps", []))
                 report.append(f"  • {job_name}: {steps} steps")
 
+        if external_output:
+            report.append("")
+            report.append("External validation output:")
+            report.append(external_output)
+
         success = len(issues) == 0
 
         return {
@@ -414,7 +424,8 @@ async def cicd(
             "issues": issues,
             "warnings": warnings,
             "jobs_count": jobs_count,
-            "formatted_report": "\n".join(report)
+            "external_output": external_output,
+            "formatted_report": "\n".join(report),
         }
 
     # List operation
@@ -434,7 +445,7 @@ async def cicd(
                 "platform": "github",
                 "display_name": template["name"],
                 "jobs": list(template.get("jobs", {}).keys()),
-                "triggers": list(template.get("on", {}).keys())
+                "triggers": list(template.get("on", {}).keys()),
             }
             templates.append(template_info)
 
@@ -467,13 +478,13 @@ async def cicd(
             "operation": "list",
             "templates": templates,
             "platforms": ["github"],
-            "formatted_report": "\n".join(report)
+            "formatted_report": "\n".join(report),
         }
 
     else:
         return {
             "success": False,
-            "error": f"Unknown operation: {operation}. Valid operations: generate, validate, list"
+            "error": f"Unknown operation: {operation}. Valid operations: generate, validate, list",
         }
 
 
@@ -484,8 +495,9 @@ class CICDTool:
     def __init__(self):
         """Initialize - deprecated."""
         import warnings
+
         warnings.warn(
             "CICDTool class is deprecated. Use cicd function instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )

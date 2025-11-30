@@ -3,7 +3,7 @@
 
 **Version**: 1.0
 **Date**: 2025-11-26
-**Status**: 📋 Design Phase
+**Status**: 📋 Design only — not implemented in the current codebase (no auth routes, DB, or JWT handling yet)
 **Target Completion**: 2-3 weeks
 
 ---

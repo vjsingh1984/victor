@@ -19,6 +19,14 @@ import logging
 import os
 from typing import Optional
 
+try:
+    import readline  # type: ignore
+
+    _history_enabled = True
+    readline.set_history_length(1000)
+except Exception:
+    _history_enabled = False
+
 import typer
 from rich.console import Console
 from rich.markdown import Markdown
@@ -28,13 +36,9 @@ from rich.prompt import Prompt
 from victor import __version__
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import load_settings
+from victor.ui.commands import SlashCommandHandler
 
-# Configure logging
-log_level = os.getenv("VICTOR_LOG_LEVEL", "INFO").upper()
-logging.basicConfig(
-    level=getattr(logging, log_level),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+# Configure default logging (can be overridden by CLI argument)
 logger = logging.getLogger(__name__)
 
 app = typer.Typer(
@@ -70,6 +74,18 @@ def main(
         "--stream/--no-stream",
         help="Stream responses",
     ),
+    log_level: str = typer.Option(
+        None,
+        "--log-level",
+        "-l",
+        help="Set logging level (DEBUG, INFO, WARN, ERROR). Defaults to INFO or VICTOR_LOG_LEVEL env var.",
+        case_sensitive=False,
+    ),
+    thinking: bool = typer.Option(
+        False,
+        "--thinking/--no-thinking",
+        help="Enable extended thinking/reasoning mode (Claude models). Shows model's reasoning process.",
+    ),
     version: Optional[bool] = typer.Option(
         None,
         "--version",
@@ -90,16 +106,45 @@ def main(
 
         # Use specific profile
         victor --profile claude "Explain how async/await works"
+
+        # Enable debug logging
+        victor --log-level DEBUG "help me debug this code"
+
+        # Enable thinking mode (shows reasoning process)
+        victor --thinking "Explain the best way to implement a caching layer"
     """
+    # Configure logging based on CLI argument or environment variable
+    if log_level is None:
+        log_level = os.getenv("VICTOR_LOG_LEVEL", "INFO")
+
+    log_level = log_level.upper()
+    valid_levels = ["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"]
+
+    if log_level not in valid_levels:
+        console.print(
+            f"[bold red]Error:[/] Invalid log level '{log_level}'. Valid options: {', '.join(valid_levels)}"
+        )
+        raise typer.Exit(1)
+
+    # Map WARN to WARNING for Python logging compatibility
+    if log_level == "WARN":
+        log_level = "WARNING"
+
+    logging.basicConfig(
+        level=getattr(logging, log_level),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        force=True,  # Override any existing configuration
+    )
+
     # Load settings
     settings = load_settings()
 
     if message:
         # One-shot mode
-        asyncio.run(run_oneshot(message, settings, profile, stream))
+        asyncio.run(run_oneshot(message, settings, profile, stream, thinking))
     else:
         # Interactive REPL mode
-        asyncio.run(run_interactive(settings, profile, stream))
+        asyncio.run(run_interactive(settings, profile, stream, thinking))
 
 
 async def run_oneshot(
@@ -107,6 +152,7 @@ async def run_oneshot(
     settings: any,
     profile: str,
     stream: bool,
+    thinking: bool = False,
 ) -> None:
     """Run a single message and exit.
 
@@ -115,9 +161,14 @@ async def run_oneshot(
         settings: Application settings
         profile: Profile name
         stream: Whether to stream response
+        thinking: Whether to enable thinking mode
     """
     try:
-        agent = await AgentOrchestrator.from_settings(settings, profile)
+        # Create agent with thinking mode if requested
+        agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
+
+        if thinking:
+            logger.info("Extended thinking mode enabled (for supported models like Claude)")
 
         # Start background embedding preload to avoid blocking first query
         agent.start_embedding_preload()
@@ -142,6 +193,7 @@ async def run_interactive(
     settings: any,
     profile: str,
     stream: bool,
+    thinking: bool = False,
 ) -> None:
     """Run interactive REPL mode.
 
@@ -149,6 +201,7 @@ async def run_interactive(
         settings: Application settings
         profile: Profile name
         stream: Whether to stream responses
+        thinking: Whether to enable thinking mode
     """
     try:
         # Load profile info
@@ -159,21 +212,35 @@ async def run_interactive(
             console.print(f"[bold red]Error:[/] Profile '{profile}' not found")
             raise typer.Exit(1)
 
-        # Create agent
-        agent = await AgentOrchestrator.from_settings(settings, profile)
+        # Create agent with thinking mode if requested
+        agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
+
+        if thinking:
+            logger.info("Extended thinking mode enabled (for supported models like Claude)")
 
         # Start background embedding preload to avoid blocking first query
         agent.start_embedding_preload()
 
+        # Initialize slash command handler
+        cmd_handler = SlashCommandHandler(console, settings, agent)
+
+        # Check for project context
+        context_status = ""
+        if agent.project_context.content:
+            context_status = f"\nContext: [green].victor.md loaded[/]"
+        else:
+            context_status = f"\nContext: [dim]none (run /init to create)[/]"
+
         # Welcome message
         console.print(
             Panel(
-                f"[bold]CodingAgent v{__version__}[/]\n\n"
+                f"[bold]Victor v{__version__}[/]\n\n"
                 f"Provider: [cyan]{profile_config.provider}[/]\n"
-                f"Model: [cyan]{profile_config.model}[/]\n\n"
+                f"Model: [cyan]{profile_config.model}[/]"
+                f"{context_status}\n\n"
                 f"Type your message and press Enter to chat.\n"
-                f"Type [bold]exit[/] or [bold]quit[/] to leave.\n"
-                f"Type [bold]clear[/] to reset conversation.",
+                f"Type [bold]/help[/] for available commands.\n"
+                f"Type [bold]exit[/] or [bold]quit[/] to leave.",
                 title="Welcome",
                 border_style="blue",
             )
@@ -182,20 +249,35 @@ async def run_interactive(
         # REPL loop
         while True:
             try:
-                # Get user input
-                user_input = Prompt.ask("\n[bold green]You[/]")
+                # Get user input (with shell history if readline is available)
+                if _history_enabled:
+                    console.print("\n[bold green]You[/] ", end="")
+                    user_input = input()
+                    if user_input:
+                        try:
+                            readline.add_history(user_input)
+                        except Exception:
+                            pass
+                else:
+                    user_input = Prompt.ask("\n[bold green]You[/]")
 
-                # Handle special commands
+                # Handle exit commands
                 if user_input.lower() in ["exit", "quit"]:
                     console.print("[dim]Goodbye![/]")
                     break
 
+                if not user_input.strip():
+                    continue
+
+                # Handle slash commands
+                if cmd_handler.is_command(user_input):
+                    await cmd_handler.execute(user_input)
+                    continue
+
+                # Handle legacy clear command (also available as /clear)
                 if user_input.lower() == "clear":
                     agent.reset_conversation()
                     console.print("[dim]Conversation cleared[/]")
-                    continue
-
-                if not user_input.strip():
                     continue
 
                 # Send message and get response
@@ -222,6 +304,7 @@ async def run_interactive(
     except Exception as e:
         console.print(f"[bold red]Error:[/] {str(e)}")
         import traceback
+
         console.print(traceback.format_exc())
         raise typer.Exit(1)
 
@@ -321,9 +404,7 @@ def profiles_cmd() -> None:
         )
 
     console.print(table)
-    console.print(
-        f"\n[dim]Config file: {settings.get_config_dir() / 'profiles.yaml'}[/]"
-    )
+    console.print(f"\n[dim]Config file: {settings.get_config_dir() / 'profiles.yaml'}[/]")
 
 
 @app.command()
@@ -375,6 +456,7 @@ async def list_models_async(provider: str) -> None:
                     if modified:
                         # Format timestamp
                         from datetime import datetime
+
                         try:
                             dt = datetime.fromisoformat(modified.replace("Z", "+00:00"))
                             modified = dt.strftime("%Y-%m-%d")
@@ -389,9 +471,7 @@ async def list_models_async(provider: str) -> None:
                     )
 
                 console.print(table)
-                console.print(
-                    f"\n[dim]Use a model with: [bold]victor --profile <profile>[/dim]"
-                )
+                console.print(f"\n[dim]Use a model with: [bold]victor --profile <profile>[/dim]")
 
                 await ollama.close()
 
@@ -401,9 +481,7 @@ async def list_models_async(provider: str) -> None:
 
         else:
             console.print(f"[yellow]Model listing not yet implemented for {provider}[/]")
-            console.print(
-                "Currently only Ollama supports model listing via CLI"
-            )
+            console.print("Currently only Ollama supports model listing via CLI")
 
     except Exception as e:
         console.print(f"[red]Error:[/] {e}")

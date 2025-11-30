@@ -74,7 +74,8 @@ class TestMetricsComplexity:
     async def test_complexity_complex_function(self, tmp_path):
         """Test complexity of complex function."""
         test_file = tmp_path / "complex.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 def complex_func(a, b, c):
     if a:
         if b:
@@ -83,7 +84,8 @@ def complex_func(a, b, c):
             return 2
         return 3
     return 4
-""")
+"""
+        )
 
         result = await metrics_complexity(file=str(test_file))
 
@@ -146,13 +148,15 @@ class TestMetricsMaintainability:
     async def test_maintainability_well_documented(self, tmp_path):
         """Test maintainability of well-documented code."""
         test_file = tmp_path / "documented.py"
-        test_file.write_text('''
+        test_file.write_text(
+            '''
 """Module docstring."""
 
 def documented_func():
     """Well documented function."""
     return 42
-''')
+'''
+        )
 
         result = await metrics_maintainability(file=str(test_file))
 
@@ -205,7 +209,8 @@ class TestMetricsDebt:
     async def test_debt_complex_code(self, tmp_path):
         """Test debt estimation for complex code."""
         test_file = tmp_path / "complex.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 def complex_function(a, b, c, d):
     if a:
         if b:
@@ -216,7 +221,8 @@ def complex_function(a, b, c, d):
 
 def another_complex():
     pass
-""")
+"""
+        )
 
         result = await metrics_debt(file=str(test_file))
 
@@ -271,7 +277,8 @@ class TestMetricsProfile:
     async def test_profile_multiple_items(self, tmp_path):
         """Test profiling file with multiple functions and classes."""
         test_file = tmp_path / "test.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 def func1():
     pass
 
@@ -287,7 +294,8 @@ class Class1:
 
 class Class2:
     pass
-""")
+"""
+        )
 
         result = await metrics_profile(file=str(test_file))
 
@@ -343,7 +351,8 @@ class TestMetricsAnalyze:
     async def test_analyze_complete_module(self, tmp_path):
         """Test comprehensive analysis of complete module."""
         test_file = tmp_path / "module.py"
-        test_file.write_text('''
+        test_file.write_text(
+            '''
 """Module docstring."""
 
 def function1(x, y):
@@ -361,7 +370,8 @@ class MyClass:
     def method(self, data):
         """Method."""
         return data * 2
-''')
+'''
+        )
 
         result = await metrics_analyze(file=str(test_file))
 
@@ -413,7 +423,8 @@ class TestMetricsReport:
     async def test_report_complex_file(self, tmp_path):
         """Test quality report for complex file."""
         test_file = tmp_path / "complex.py"
-        test_file.write_text('''
+        test_file.write_text(
+            """
 def complex_function(a, b, c):
     if a > 0:
         if b > 0:
@@ -429,7 +440,8 @@ class Calculator:
 
     def multiply(self, x, y):
         return x * y
-''')
+"""
+        )
 
         result = await metrics_report(file=str(test_file))
 

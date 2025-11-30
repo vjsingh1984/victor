@@ -69,6 +69,7 @@ logs/
 # Distribution
 *.tar.gz
 *.whl
+archive/victor-legacy/
 
 # Documentation builds
 docs/_build/
@@ -95,6 +96,10 @@ tmp/
 temp/
 *.tmp
 coverage.json
+victor_debug.log
+demo_workspace/
+.victor.md
+.victor.md.backup
 
 # Model management tools (external binaries)
 gollama

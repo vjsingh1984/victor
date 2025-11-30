@@ -5,6 +5,10 @@
 
 ---
 
+### Reality Check
+- `security_scan` is regex-only (secrets/config flags) with a minimal dependency hint list; no CVE/IaC scanning wired in.
+- `cicd` provides template generation/validation stubs; rich pipeline/coverage analysis is not implemented yet.
+
 ## Executive Summary
 
 ✅ **Successfully configured Victor with optimized tool calling models**

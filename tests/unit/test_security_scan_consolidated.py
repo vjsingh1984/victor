@@ -29,16 +29,11 @@ async def test_security_scan_secrets():
         # Create a test file with a secret
         test_file = Path(tmpdir) / "test.py"
         test_file.write_text(
-            'api_key = "sk-1234567890abcdef1234567890abcdef"\n'
-            'password = "SuperSecret123"\n'
+            'api_key = "sk-1234567890abcdef1234567890abcdef"\n' 'password = "SuperSecret123"\n'
         )
 
         # Run secrets scan
-        result = await security_scan(
-            path=tmpdir,
-            scan_types=["secrets"],
-            file_pattern="*.py"
-        )
+        result = await security_scan(path=tmpdir, scan_types=["secrets"], file_pattern="*.py")
 
         assert result["success"] is True
         assert "secrets" in result["results"]
@@ -54,17 +49,11 @@ async def test_security_scan_config():
         # Create a test file with config issues
         test_file = Path(tmpdir) / "config.py"
         test_file.write_text(
-            'DEBUG = True\n'
-            'API_URL = "http://insecure-api.com"\n'
-            'SERVER_IP = "192.168.1.100"\n'
+            "DEBUG = True\n" 'API_URL = "http://insecure-api.com"\n' 'SERVER_IP = "192.168.1.100"\n'
         )
 
         # Run config scan
-        result = await security_scan(
-            path=tmpdir,
-            scan_types=["config"],
-            file_pattern="*.py"
-        )
+        result = await security_scan(path=tmpdir, scan_types=["config"], file_pattern="*.py")
 
         assert result["success"] is True
         assert "config" in result["results"]
@@ -78,17 +67,11 @@ async def test_security_scan_dependencies():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a requirements file with vulnerable packages
         req_file = Path(tmpdir) / "requirements.txt"
-        req_file.write_text(
-            'django==2.2.0\n'
-            'flask==1.0.0\n'
-            'requests==2.25.0\n'
-        )
+        req_file.write_text("django==2.2.0\n" "flask==1.0.0\n" "requests==2.25.0\n")
 
         # Run dependency scan
         result = await security_scan(
-            path=tmpdir,
-            scan_types=["dependencies"],
-            requirements_file=str(req_file)
+            path=tmpdir, scan_types=["dependencies"], requirements_file=str(req_file)
         )
 
         assert result["success"] is True
@@ -104,7 +87,7 @@ async def test_security_scan_all():
         # Create test file with multiple issues
         test_file = Path(tmpdir) / "app.py"
         test_file.write_text(
-            'DEBUG = True\n'
+            "DEBUG = True\n"
             'api_key = "sk-1234567890abcdef1234567890abcdef"\n'
             'password = "SuperSecret123"\n'
             'API_URL = "http://insecure-api.com"\n'
@@ -112,13 +95,11 @@ async def test_security_scan_all():
 
         # Create requirements file
         req_file = Path(tmpdir) / "requirements.txt"
-        req_file.write_text('django==2.2.0\n')
+        req_file.write_text("django==2.2.0\n")
 
         # Run all scans
         result = await security_scan(
-            path=tmpdir,
-            scan_types=["all"],
-            requirements_file=str(req_file)
+            path=tmpdir, scan_types=["all"], requirements_file=str(req_file)
         )
 
         assert result["success"] is True
@@ -138,16 +119,12 @@ async def test_security_scan_severity_threshold():
         test_file = Path(tmpdir) / "test.py"
         test_file.write_text(
             'api_key = "sk-1234567890abcdef1234567890abcdef"\n'  # high
-            'DEBUG = True\n'  # medium
+            "DEBUG = True\n"  # medium
             'SERVER_IP = "192.168.1.100"\n'  # medium
         )
 
         # Scan with high threshold
-        result = await security_scan(
-            path=tmpdir,
-            scan_types=["all"],
-            severity_threshold="high"
-        )
+        result = await security_scan(path=tmpdir, scan_types=["all"], severity_threshold="high")
 
         assert result["success"] is True
         # Should only report high severity issues
@@ -163,10 +140,7 @@ async def test_security_scan_single_file():
         test_file.write_text('api_key = "sk-1234567890abcdef1234567890abcdef"\n')
 
         # Scan single file
-        result = await security_scan(
-            path=str(test_file),
-            scan_types=["secrets"]
-        )
+        result = await security_scan(path=str(test_file), scan_types=["secrets"])
 
         assert result["success"] is True
         assert result["results"]["secrets"]["files_scanned"] == 1
@@ -175,10 +149,7 @@ async def test_security_scan_single_file():
 @pytest.mark.asyncio
 async def test_security_scan_nonexistent_path():
     """Test scanning nonexistent path."""
-    result = await security_scan(
-        path="/nonexistent/path",
-        scan_types=["all"]
-    )
+    result = await security_scan(path="/nonexistent/path", scan_types=["all"])
 
     assert result["success"] is False
     assert "error" in result
@@ -191,16 +162,10 @@ async def test_security_scan_no_issues():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create clean test file
         test_file = Path(tmpdir) / "test.py"
-        test_file.write_text(
-            'def hello():\n'
-            '    return "Hello, World!"\n'
-        )
+        test_file.write_text("def hello():\n" '    return "Hello, World!"\n')
 
         # Run all scans
-        result = await security_scan(
-            path=tmpdir,
-            scan_types=["secrets", "config"]
-        )
+        result = await security_scan(path=tmpdir, scan_types=["secrets", "config"])
 
         assert result["success"] is True
         assert result["total_issues"] == 0

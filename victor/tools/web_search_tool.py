@@ -22,11 +22,9 @@ This tool provides:
 5. Context injection for LLM
 """
 
-import json
 import re
 import logging
 from typing import Any, Dict, List, Optional
-from urllib.parse import quote_plus
 
 import httpx
 from bs4 import BeautifulSoup
@@ -44,7 +42,11 @@ _config = {
 }
 
 
-def set_web_tool_defaults(fetch_top: Optional[int] = None, fetch_pool: Optional[int] = None, max_content_length: Optional[int] = None) -> None:
+def set_web_tool_defaults(
+    fetch_top: Optional[int] = None,
+    fetch_pool: Optional[int] = None,
+    max_content_length: Optional[int] = None,
+) -> None:
     """Set default behaviors for web_summarize."""
     if fetch_top is not None:
         _config["fetch_top"] = fetch_top
@@ -76,30 +78,26 @@ def _parse_ddg_results(html: str, max_results: int) -> List[Dict[str, str]]:
     Returns:
         List of result dictionaries
     """
-    soup = BeautifulSoup(html, 'html.parser')
+    soup = BeautifulSoup(html, "html.parser")
     results = []
 
     # Find result divs
-    for result in soup.find_all('div', class_='result', limit=max_results):
+    for result in soup.find_all("div", class_="result", limit=max_results):
         try:
             # Extract title
-            title_elem = result.find('a', class_='result__a')
+            title_elem = result.find("a", class_="result__a")
             if not title_elem:
                 continue
 
             title = title_elem.get_text(strip=True)
-            url = title_elem.get('href', '')
+            url = title_elem.get("href", "")
 
             # Extract snippet
-            snippet_elem = result.find('a', class_='result__snippet')
+            snippet_elem = result.find("a", class_="result__snippet")
             snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
 
             if title and url:
-                results.append({
-                    "title": title,
-                    "url": url,
-                    "snippet": snippet
-                })
+                results.append({"title": title, "url": url, "snippet": snippet})
 
         except Exception:
             continue
@@ -123,7 +121,7 @@ def _format_results(query: str, results: List[Dict[str, str]]) -> str:
     for i, result in enumerate(results, 1):
         output.append(f"\n{i}. {result['title']}")
         output.append(f"   URL: {result['url']}")
-        if result['snippet']:
+        if result["snippet"]:
             output.append(f"   {result['snippet']}")
 
     output.append(f"\nFound {len(results)} result(s)")
@@ -141,7 +139,7 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
     Returns:
         Extracted text content
     """
-    soup = BeautifulSoup(html, 'html.parser')
+    soup = BeautifulSoup(html, "html.parser")
 
     # Remove script and style elements
     for script in soup(["script", "style", "nav", "footer", "header"]):
@@ -149,18 +147,18 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
 
     # Try to find main content area
     content_areas = [
-        soup.find('main'),
-        soup.find('article'),
-        soup.find('div', class_=re.compile('content|main|article', re.I)),
-        soup.find('body')
+        soup.find("main"),
+        soup.find("article"),
+        soup.find("div", class_=re.compile("content|main|article", re.I)),
+        soup.find("body"),
     ]
 
     for area in content_areas:
         if area:
-            text = area.get_text(separator='\n', strip=True)
+            text = area.get_text(separator="\n", strip=True)
             # Clean up whitespace
-            text = re.sub(r'\n\s*\n', '\n\n', text)
-            text = re.sub(r' +', ' ', text)
+            text = re.sub(r"\n\s*\n", "\n\n", text)
+            text = re.sub(r" +", " ", text)
 
             if len(text) > 100:  # Minimum content length
                 return text[:max_length]
@@ -170,10 +168,7 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
 
 @tool
 async def web_search(
-    query: str,
-    max_results: int = 5,
-    region: str = "wt-wt",
-    safe_search: str = "moderate"
+    query: str, max_results: int = 5, region: str = "wt-wt", safe_search: str = "moderate"
 ) -> Dict[str, Any]:
     """
     Web search / online lookup using DuckDuckGo (internet search, find online, lookup docs).
@@ -197,10 +192,7 @@ async def web_search(
         - error: Error message if failed
     """
     if not query:
-        return {
-            "success": False,
-            "error": "Missing required parameter: query"
-        }
+        return {"success": False, "error": "Missing required parameter: query"}
 
     # Map safe search to DuckDuckGo values
     safe_map = {"on": "1", "moderate": "-1", "off": "-2"}
@@ -213,58 +205,39 @@ async def web_search(
             # DuckDuckGo HTML search
             search_url = "https://html.duckduckgo.com/html/"
 
-            data = {
-                "q": query,
-                "kl": region,
-                "p": safe_value
-            }
+            data = {"q": query, "kl": region, "p": safe_value}
 
             response = await client.post(
-                search_url,
-                data=data,
-                headers={"User-Agent": _user_agent},
-                follow_redirects=True
+                search_url, data=data, headers={"User-Agent": _user_agent}, follow_redirects=True
             )
 
             if response.status_code != 200:
                 return {
                     "success": False,
-                    "error": f"Search failed with status {response.status_code}"
+                    "error": f"Search failed with status {response.status_code}",
                 }
 
             # Parse results
             results = _parse_ddg_results(response.text, max_results)
-            logger.info(f"[web_search] query='{query}', max_results={max_results}, parsed_results={len(results)}")
+            logger.info(
+                f"[web_search] query='{query}', max_results={max_results}, parsed_results={len(results)}"
+            )
             if results:
                 sample_urls = [r.get("url", "") for r in results[:5]]
                 logger.info(f"[web_search] top URLs: {sample_urls}")
 
             if not results:
-                return {
-                    "success": True,
-                    "results": "No results found",
-                    "result_count": 0
-                }
+                return {"success": True, "results": "No results found", "result_count": 0}
 
             # Format results
             output = _format_results(query, results)
 
-            return {
-                "success": True,
-                "results": output,
-                "result_count": len(results)
-            }
+            return {"success": True, "results": output, "result_count": len(results)}
 
     except httpx.TimeoutException:
-        return {
-            "success": False,
-            "error": "Search request timed out"
-        }
+        return {"success": False, "error": "Search request timed out"}
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"Search failed: {str(e)}"
-        }
+        return {"success": False, "error": f"Search failed: {str(e)}"}
 
 
 @tool
@@ -286,50 +259,32 @@ async def web_fetch(url: str) -> Dict[str, Any]:
         - error: Error message if failed
     """
     if not url:
-        return {
-            "success": False,
-            "error": "Missing required parameter: url"
-        }
+        return {"success": False, "error": "Missing required parameter: url"}
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.get(
-                url,
-                headers={"User-Agent": _user_agent},
-                follow_redirects=True
+                url, headers={"User-Agent": _user_agent}, follow_redirects=True
             )
 
             if response.status_code != 200:
                 return {
                     "success": False,
-                    "error": f"Failed to fetch URL (status {response.status_code})"
+                    "error": f"Failed to fetch URL (status {response.status_code})",
                 }
 
             # Extract text content
             content = _extract_content(response.text)
 
             if not content:
-                return {
-                    "success": False,
-                    "error": "No content could be extracted from URL"
-                }
+                return {"success": False, "error": "No content could be extracted from URL"}
 
-            return {
-                "success": True,
-                "content": content,
-                "url": url
-            }
+            return {"success": True, "content": content, "url": url}
 
     except httpx.TimeoutException:
-        return {
-            "success": False,
-            "error": "Request timed out"
-        }
+        return {"success": False, "error": "Request timed out"}
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"Failed to fetch URL: {str(e)}"
-        }
+        return {"success": False, "error": f"Failed to fetch URL: {str(e)}"}
 
 
 @tool
@@ -340,7 +295,7 @@ async def web_summarize(
     safe_search: str = "moderate",
     fetch_top: Optional[int] = None,
     fetch_pool: Optional[int] = None,
-    max_content_length: int = 5000
+    max_content_length: int = 5000,
 ) -> Dict[str, Any]:
     """
     Search the web AND summarize results with AI (web search + summarization).
@@ -364,16 +319,10 @@ async def web_summarize(
         - error: Error message if failed
     """
     if not _provider:
-        return {
-            "success": False,
-            "error": "No LLM provider available for summarization"
-        }
+        return {"success": False, "error": "No LLM provider available for summarization"}
 
     if not query:
-        return {
-            "success": False,
-            "error": "Missing required parameter: query"
-        }
+        return {"success": False, "error": "Missing required parameter: query"}
 
     # Map safe search to DuckDuckGo values
     safe_map = {"on": "1", "moderate": "-1", "off": "-2"}
@@ -384,8 +333,20 @@ async def web_summarize(
     default_fetch_pool = _config.get("fetch_pool")
     default_max_len = _config.get("max_content_length", 5000)
 
-    fetch_top = fetch_top if fetch_top is not None else (default_fetch_top if default_fetch_top is not None else max_results)
-    fetch_pool = fetch_pool if fetch_pool is not None else (default_fetch_pool if default_fetch_pool is not None else max(fetch_top + 2, max_results))
+    fetch_top = (
+        fetch_top
+        if fetch_top is not None
+        else (default_fetch_top if default_fetch_top is not None else max_results)
+    )
+    fetch_pool = (
+        fetch_pool
+        if fetch_pool is not None
+        else (
+            default_fetch_pool
+            if default_fetch_pool is not None
+            else max(fetch_top + 2, max_results)
+        )
+    )
     max_content_length = max_content_length if max_content_length is not None else default_max_len
 
     fetch_top = max(0, min(fetch_top, 10))
@@ -397,23 +358,16 @@ async def web_summarize(
         async with httpx.AsyncClient(timeout=15.0) as client:
             search_url = "https://html.duckduckgo.com/html/"
 
-            data = {
-                "q": query,
-                "kl": region,
-                "p": safe_value
-            }
+            data = {"q": query, "kl": region, "p": safe_value}
 
             response = await client.post(
-                search_url,
-                data=data,
-                headers={"User-Agent": _user_agent},
-                follow_redirects=True
+                search_url, data=data, headers={"User-Agent": _user_agent}, follow_redirects=True
             )
 
             if response.status_code != 200:
                 return {
                     "success": False,
-                    "error": f"Search failed with status {response.status_code}"
+                    "error": f"Search failed with status {response.status_code}",
                 }
 
             # Parse results
@@ -426,7 +380,7 @@ async def web_summarize(
                 return {
                     "success": True,
                     "summary": "No results found to summarize",
-                    "original_results": ""
+                    "original_results": "",
                 }
 
             # Format results
@@ -454,7 +408,9 @@ async def web_summarize(
         if fetched_contents:
             fetch_section = "\n\nFetched content excerpts:\n"
             for i, item in enumerate(fetched_contents, 1):
-                fetch_section += f"\n{i}. URL: {item['url']}\nContent (excerpt):\n{item['content']}\n"
+                fetch_section += (
+                    f"\n{i}. URL: {item['url']}\nContent (excerpt):\n{item['content']}\n"
+                )
 
         prompt = f"""Analyze these web search results and provide a comprehensive summary.
 
@@ -486,33 +442,25 @@ Format the response clearly with sections."""
                 model=_model or "default",
                 messages=[Message(role="user", content=prompt)],
                 temperature=0.5,
-                max_tokens=1000
+                max_tokens=1000,
             )
 
             summary = response.content.strip()
-            logger.info(f"[web_summarize] summarization model='{_model}', summary_len={len(summary)}")
+            logger.info(
+                f"[web_summarize] summarization model='{_model}', summary_len={len(summary)}"
+            )
 
-            return {
-                "success": True,
-                "summary": summary,
-                "original_results": results_text
-            }
+            return {"success": True, "summary": summary, "original_results": results_text}
 
         except Exception as e:
             # Fallback to just search results
             return {
                 "success": True,
                 "summary": f"AI summarization failed: {e}",
-                "original_results": results_text
+                "original_results": results_text,
             }
 
     except httpx.TimeoutException:
-        return {
-            "success": False,
-            "error": "Search request timed out"
-        }
+        return {"success": False, "error": "Search request timed out"}
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"Search failed: {str(e)}"
-        }
+        return {"success": False, "error": f"Search failed: {str(e)}"}

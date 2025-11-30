@@ -65,8 +65,7 @@ async def main():
     # Initialize semantic selector
     print("🤖 Loading sentence-transformer model...")
     selector = SemanticToolSelector(
-        embedding_provider="sentence-transformers",
-        embedding_model="all-MiniLM-L12-v2"
+        embedding_provider="sentence-transformers", embedding_model="all-MiniLM-L12-v2"
     )
 
     # Initialize tool embeddings
@@ -76,23 +75,15 @@ async def main():
 
     # Test queries
     test_queries = [
-        ("I need to review this code for security vulnerabilities",
-         ["security_scanner", "code_review"]),
-
-        ("Generate unit tests for my Python functions",
-         ["testing", "code_review"]),
-
-        ("Refactor this function to improve readability",
-         ["refactor", "code_review"]),
-
-        ("Create API documentation from my code",
-         ["documentation"]),
-
-        ("Commit these changes to git with a descriptive message",
-         ["git"]),
-
-        ("Read the configuration file and parse it",
-         ["read_file"]),
+        (
+            "I need to review this code for security vulnerabilities",
+            ["security_scanner", "code_review"],
+        ),
+        ("Generate unit tests for my Python functions", ["testing", "code_review"]),
+        ("Refactor this function to improve readability", ["refactor", "code_review"]),
+        ("Create API documentation from my code", ["documentation"]),
+        ("Commit these changes to git with a descriptive message", ["git"]),
+        ("Read the configuration file and parse it", ["read_file"]),
     ]
 
     print("=" * 60)
@@ -106,10 +97,7 @@ async def main():
 
         # Select relevant tools
         selected = await selector.select_relevant_tools(
-            query,
-            registry,
-            max_tools=3,
-            similarity_threshold=0.3
+            query, registry, max_tools=3, similarity_threshold=0.3
         )
 
         # Display results

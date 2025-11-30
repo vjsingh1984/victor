@@ -47,5 +47,6 @@ async def run_workflow(
         result = await workflow.run(context, **workflow_args)
         return result
     except Exception as e:
-        return {"error": f"An unexpected error occurred while running workflow '{workflow_name}': {e}"}
-
+        return {
+            "error": f"An unexpected error occurred while running workflow '{workflow_name}': {e}"
+        }

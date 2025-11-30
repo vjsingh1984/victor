@@ -7,23 +7,35 @@ common argument formatting issues, particularly Python-style syntax (single quot
 being used instead of JSON (double quotes).
 """
 
-from typing import Any, Dict, Optional, Tuple
-import json
 import ast
-import re
+import json
 import logging
 from enum import Enum
+from typing import Any, Dict, Optional, Tuple, TypedDict
 
 logger = logging.getLogger(__name__)
 
 
+class ToolStats(TypedDict):
+    calls: int
+    normalizations: int
+
+
+class NormalizationStats(TypedDict):
+    total_calls: int
+    normalizations: Dict[str, int]
+    failures: int
+    by_tool: Dict[str, ToolStats]
+
+
 class NormalizationStrategy(Enum):
     """Strategies for normalizing malformed arguments."""
-    DIRECT = "direct"              # Valid JSON, no changes needed
-    PYTHON_AST = "python_ast"      # Python syntax → JSON via ast.literal_eval
+
+    DIRECT = "direct"  # Valid JSON, no changes needed
+    PYTHON_AST = "python_ast"  # Python syntax → JSON via ast.literal_eval
     REGEX_QUOTES = "regex_quotes"  # Simple quote replacement
     MANUAL_REPAIR = "manual_repair"  # Tool-specific repairs
-    FAILED = "failed"              # All strategies failed
+    FAILED = "failed"  # All strategies failed
 
 
 class ArgumentNormalizer:
@@ -54,17 +66,15 @@ class ArgumentNormalizer:
         """
         self.provider_name = provider_name
         self.config = config or {}
-        self.stats = {
+        self.stats: NormalizationStats = {
             "total_calls": 0,
             "normalizations": {strategy.value: 0 for strategy in NormalizationStrategy},
             "failures": 0,
-            "by_tool": {}  # Track which tools need normalization most
+            "by_tool": {},
         }
 
     def normalize_arguments(
-        self,
-        arguments: Dict[str, Any],
-        tool_name: str
+        self, arguments: Dict[str, Any], tool_name: str
     ) -> Tuple[Dict[str, Any], NormalizationStrategy]:
         """
         Normalize tool call arguments through multi-layer pipeline.
@@ -80,31 +90,35 @@ class ArgumentNormalizer:
 
         # Track per-tool stats
         if tool_name not in self.stats["by_tool"]:
-            self.stats["by_tool"][tool_name] = {
-                "calls": 0,
-                "normalizations": 0
-            }
+            self.stats["by_tool"][tool_name] = {"calls": 0, "normalizations": 0}
         self.stats["by_tool"][tool_name]["calls"] += 1
 
         # AGGRESSIVE APPROACH: Check if any values look like JSON and try normalization FIRST
         # This ensures we catch malformed JSON even if basic validation passes
         has_json_like_strings = any(
-            isinstance(v, str) and v.strip().startswith(('[', '{'))
-            for v in arguments.values()
+            isinstance(v, str) and v.strip().startswith(("[", "{")) for v in arguments.values()
         )
-        logger.debug(f"[{self.provider_name}] {tool_name}: has_json_like_strings={has_json_like_strings}")
+        logger.debug(
+            f"[{self.provider_name}] {tool_name}: has_json_like_strings={has_json_like_strings}"
+        )
 
         if has_json_like_strings:
             # Try AST normalization preemptively for JSON-like strings
             try:
-                logger.debug(f"[{self.provider_name}] {tool_name}: Trying preemptive AST normalization")
+                logger.debug(
+                    f"[{self.provider_name}] {tool_name}: Trying preemptive AST normalization"
+                )
                 normalized = self._normalize_via_ast(arguments)
                 changed = normalized != arguments
-                logger.debug(f"[{self.provider_name}] {tool_name}: AST normalization changed={changed}")
+                logger.debug(
+                    f"[{self.provider_name}] {tool_name}: AST normalization changed={changed}"
+                )
                 # Verify normalization actually changed something or improved validity
                 if changed:
                     is_valid = self._is_valid_json_dict(normalized)
-                    logger.debug(f"[{self.provider_name}] {tool_name}: Normalized version is_valid={is_valid}")
+                    logger.debug(
+                        f"[{self.provider_name}] {tool_name}: Normalized version is_valid={is_valid}"
+                    )
                     if is_valid:
                         self.stats["normalizations"][NormalizationStrategy.PYTHON_AST.value] += 1
                         self.stats["by_tool"][tool_name]["normalizations"] += 1
@@ -113,7 +127,9 @@ class ArgumentNormalizer:
                         )
                         return normalized, NormalizationStrategy.PYTHON_AST
             except Exception as e:
-                logger.debug(f"Preemptive AST normalization failed for {tool_name}: {e}", exc_info=True)
+                logger.debug(
+                    f"Preemptive AST normalization failed for {tool_name}: {e}", exc_info=True
+                )
 
         # Layer 1: Check if already valid (fast path - most cases after preemptive normalization)
         logger.debug(f"[{self.provider_name}] {tool_name}: Layer 1 - Checking if already valid")
@@ -124,7 +140,10 @@ class ArgumentNormalizer:
                 self.stats["normalizations"][NormalizationStrategy.DIRECT.value] += 1
                 return arguments, NormalizationStrategy.DIRECT
         except Exception as e:
-            logger.error(f"[{self.provider_name}] {tool_name}: Layer 1 validation threw exception: {e}", exc_info=True)
+            logger.error(
+                f"[{self.provider_name}] {tool_name}: Layer 1 validation threw exception: {e}",
+                exc_info=True,
+            )
 
         # Not valid - need normalization
         self.stats["by_tool"][tool_name]["normalizations"] += 1
@@ -147,9 +166,7 @@ class ArgumentNormalizer:
             normalized = self._normalize_via_regex(arguments)
             if self._is_valid_json_dict(normalized):
                 self.stats["normalizations"][NormalizationStrategy.REGEX_QUOTES.value] += 1
-                logger.info(
-                    f"[{self.provider_name}] Normalized {tool_name} arguments via regex"
-                )
+                logger.info(f"[{self.provider_name}] Normalized {tool_name} arguments via regex")
                 return normalized, NormalizationStrategy.REGEX_QUOTES
         except Exception as e:
             logger.debug(f"Regex normalization failed for {tool_name}: {e}")
@@ -197,7 +214,7 @@ class ArgumentNormalizer:
         try:
             # First check if the whole object can be JSON-serialized
             json.dumps(obj)
-            logger.debug(f"_is_valid_json_dict: json.dumps() succeeded")
+            logger.debug("_is_valid_json_dict: json.dumps() succeeded")
 
             # Additionally, check string values that look like JSON
             # NOTE: We intentionally do NOT validate with json.loads() here because
@@ -211,16 +228,22 @@ class ArgumentNormalizer:
                 for key, value in obj.items():
                     if isinstance(value, str):
                         stripped = value.strip()
-                        if stripped.startswith(('[', '{')):
-                            logger.debug(f"_is_valid_json_dict: Checking '{key}' value that looks like JSON")
+                        if stripped.startswith(("[", "{")):
+                            logger.debug(
+                                "_is_valid_json_dict: Checking '%s' value that looks like JSON",
+                                key,
+                            )
                             # Just verify it starts with JSON-like syntax
                             # Don't use json.loads() as it rejects literal control chars
-                            logger.debug(f"_is_valid_json_dict: '{key}' value looks like JSON (syntax check only)")
+                            logger.debug(
+                                "_is_valid_json_dict: '%s' value looks like JSON (syntax check only)",
+                                key,
+                            )
 
-            logger.debug(f"_is_valid_json_dict: Returning True")
+            logger.debug("_is_valid_json_dict: Returning True")
             return True
         except (TypeError, ValueError) as e:
-            logger.debug(f"_is_valid_json_dict: Exception in validation: {e}")
+            logger.debug("_is_valid_json_dict: Exception in validation: %s", e)
             return False
 
     def _normalize_via_ast(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -246,12 +269,12 @@ class ArgumentNormalizer:
         Returns:
             Normalized arguments with valid JSON strings or coerced types
         """
-        normalized = {}
+        normalized: Dict[str, Any] = {}
         for key, value in arguments.items():
             if isinstance(value, str):
                 # First, check if the string LOOKS like JSON but may need normalization
                 stripped = value.strip()
-                if stripped.startswith(('[', '{')):
+                if stripped.startswith(("[", "{")):
                     # Aggressively normalize: try Python AST first, then verify with json.loads
                     try:
                         # Use ast.literal_eval (SAFE - no code execution)
@@ -316,9 +339,7 @@ class ArgumentNormalizer:
         return normalized
 
     def _normalize_via_manual_repair(
-        self,
-        arguments: Dict[str, Any],
-        tool_name: str
+        self, arguments: Dict[str, Any], tool_name: str
     ) -> Dict[str, Any]:
         """
         Tool-specific manual repairs for known patterns.
@@ -365,7 +386,7 @@ class ArgumentNormalizer:
                     # Try AST first (most robust)
                     python_obj = ast.literal_eval(ops)
                     arguments["operations"] = json.dumps(python_obj)
-                except:
+                except Exception:
                     # Fallback to regex
                     # This is a last resort for very malformed input
                     pass
@@ -379,8 +400,7 @@ class ArgumentNormalizer:
             Dictionary with normalization metrics
         """
         success_rate = (
-            (self.stats["total_calls"] - self.stats["failures"])
-            / max(self.stats["total_calls"], 1)
+            (self.stats["total_calls"] - self.stats["failures"]) / max(self.stats["total_calls"], 1)
         ) * 100
 
         return {
@@ -389,19 +409,19 @@ class ArgumentNormalizer:
             "normalizations": self.stats["normalizations"],
             "failures": self.stats["failures"],
             "success_rate": round(success_rate, 2),
-            "by_tool": self.stats["by_tool"]
+            "by_tool": self.stats["by_tool"],
         }
 
-    def reset_stats(self):
+    def reset_stats(self) -> None:
         """Reset statistics (useful for testing)."""
         self.stats = {
             "total_calls": 0,
             "normalizations": {strategy.value: 0 for strategy in NormalizationStrategy},
             "failures": 0,
-            "by_tool": {}
+            "by_tool": {},
         }
 
-    def log_stats(self):
+    def log_stats(self) -> None:
         """Log current statistics."""
         stats = self.get_stats()
         logger.info(f"Argument normalization stats: {stats}")

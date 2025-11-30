@@ -36,7 +36,7 @@ class TestProviderConfig:
 
         assert config.api_key is None
         assert config.base_url is None
-        assert config.timeout == 60
+        assert config.timeout == 300
         assert config.max_retries == 3
         assert config.organization is None
 
@@ -47,7 +47,7 @@ class TestProviderConfig:
             base_url="https://api.example.com",
             timeout=120,
             max_retries=5,
-            organization="test_org"
+            organization="test_org",
         )
 
         assert config.api_key == "test_key"
@@ -62,12 +62,9 @@ class TestProfileConfig:
 
     def test_profile_config_creation(self):
         """Test creating a ProfileConfig."""
-        config = ProfileConfig(
-            provider="ollama",
-            model="qwen2.5-coder:7b"
-        )
+        config = ProfileConfig(provider="lmstudio", model="qwen2.5-coder:7b")
 
-        assert config.provider == "ollama"
+        assert config.provider == "lmstudio"
         assert config.model == "qwen2.5-coder:7b"
         assert config.temperature == 0.7
         assert config.max_tokens == 4096
@@ -78,7 +75,7 @@ class TestProfileConfig:
             provider="anthropic",
             model="claude-3-5-sonnet-20241022",
             temperature=0.5,
-            max_tokens=8192
+            max_tokens=8192,
         )
 
         assert config.provider == "anthropic"
@@ -94,8 +91,8 @@ class TestSettings:
         """Test Settings with default values."""
         settings = Settings()
 
-        assert settings.default_provider == "ollama"
-        assert settings.default_model == "qwen2.5-coder:7b"
+        assert settings.default_provider == "lmstudio"
+        assert settings.default_model == "qwen3-coder:30b"
         assert settings.default_temperature == 0.7
         assert settings.default_max_tokens == 4096
         assert settings.log_level == "INFO"
@@ -125,7 +122,7 @@ class TestSettings:
             profiles = Settings.load_profiles()
 
             assert "default" in profiles
-            assert profiles["default"].provider == "ollama"
+            assert profiles["default"].provider == "lmstudio"
             assert profiles["default"].model == "qwen2.5-coder:7b"
 
     def test_load_profiles_with_file(self):
@@ -284,17 +281,78 @@ providers:
         """Test getting settings for Ollama provider."""
         settings = Settings(ollama_base_url="http://localhost:11434")
 
-        provider_settings = settings.get_provider_settings("ollama")
+        with patch.object(Settings, "load_provider_config", return_value=None):
+            provider_settings = settings.get_provider_settings("ollama")
 
         assert provider_settings["base_url"] == "http://localhost:11434"
 
+    def test_choose_default_lmstudio_model_prefers_available(self):
+        """Pick preferred model if advertised by reachable LMStudio server."""
+        urls = ["http://192.168.1.126:1234"]
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "data": [{"id": "random-model"}, {"id": "qwen2.5-coder:14b"}]
+        }
+
+        with patch("httpx.get", return_value=mock_response):
+            model = Settings._choose_default_lmstudio_model(urls)
+
+        assert model == "qwen2.5-coder:14b"
+
+    def test_choose_default_lmstudio_model_respects_vram(self):
+        """Select most capable model within detected VRAM budget."""
+        urls = ["http://127.0.0.1:1234"]
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "data": [
+                {"id": "qwen3-coder-30b"},
+                {"id": "qwen2.5-coder-7b"},
+            ]
+        }
+
+        with patch("httpx.get", return_value=mock_response):
+            with patch.object(Settings, "_detect_vram_gb", return_value=12.0):
+                model = Settings._choose_default_lmstudio_model(urls)
+        assert model == "qwen2.5-coder-7b"
+
+        with patch("httpx.get", return_value=mock_response):
+            with patch.object(Settings, "_detect_vram_gb", return_value=48.0):
+                model = Settings._choose_default_lmstudio_model(urls)
+        # Picks most capable coder model within budget
+        assert model == "qwen3-coder-30b"
+
+    def test_choose_default_lmstudio_model_respects_config_cap(self):
+        """Use configured max_vram cap when larger GPUs are available."""
+        urls = ["http://127.0.0.1:1234"]
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "data": [
+                {"id": "qwen3-coder-30b"},
+                {"id": "qwen2.5-coder-7b"},
+            ]
+        }
+
+        with patch("httpx.get", return_value=mock_response):
+            with patch.object(Settings, "_detect_vram_gb", return_value=48.0):
+                model = Settings._choose_default_lmstudio_model(urls, max_vram_gb=10.0)
+
+        # Cap forces smaller model when budget is limited
+        assert model == "qwen2.5-coder-7b"
+
     def test_get_provider_settings_lmstudio(self):
         """Test getting settings for LMStudio provider."""
-        settings = Settings(lmstudio_base_url="http://localhost:1234")
+        settings = Settings(lmstudio_base_urls=["http://localhost:1234"])
 
-        provider_settings = settings.get_provider_settings("lmstudio")
+        with patch.object(Settings, "load_provider_config", return_value=None):
+            provider_settings = settings.get_provider_settings("lmstudio")
 
-        assert provider_settings["base_url"] == "http://localhost:1234"
+        assert provider_settings["base_url"].startswith("http://localhost:1234")
 
     def test_get_provider_settings_vllm(self):
         """Test getting settings for vLLM provider."""
@@ -337,4 +395,4 @@ class TestLoadSettings:
         settings = load_settings()
 
         assert isinstance(settings, Settings)
-        assert settings.default_provider == "ollama"
+        assert settings.default_provider == "lmstudio"

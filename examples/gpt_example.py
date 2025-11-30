@@ -50,13 +50,13 @@ async def main():
     print("\n📝 Example 1: Code Review")
     print("-" * 60)
 
-    code_to_review = '''
+    code_to_review = """
 def calculate_total(items):
     total = 0
     for item in items:
         total = total + item['price'] * item['qty']
     return total
-'''
+"""
 
     response = await agent.chat(
         f"Review this Python code and suggest improvements:\n\n{code_to_review}"

@@ -53,7 +53,9 @@ class OpenAIProvider(BaseProvider):
             max_retries: Maximum retry attempts
             **kwargs: Additional configuration
         """
-        super().__init__(api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs)
+        super().__init__(
+            api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+        )
         self.client = AsyncOpenAI(
             api_key=api_key,
             organization=organization,
@@ -103,10 +105,7 @@ class OpenAIProvider(BaseProvider):
         """
         try:
             # Convert messages to OpenAI format
-            openai_messages = [
-                {"role": msg.role, "content": msg.content}
-                for msg in messages
-            ]
+            openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
             # Build request parameters
             request_params = {
@@ -157,10 +156,7 @@ class OpenAIProvider(BaseProvider):
         """
         try:
             # Convert messages
-            openai_messages = [
-                {"role": msg.role, "content": msg.content}
-                for msg in messages
-            ]
+            openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
             # Build request parameters
             request_params = {
@@ -176,11 +172,17 @@ class OpenAIProvider(BaseProvider):
                 request_params["tools"] = self._convert_tools(tools)
                 request_params["tool_choice"] = "auto"
 
+            # Accumulate tool calls across streaming deltas to avoid emitting partial JSON
+            tool_call_accumulator: Dict[str, Dict[str, Any]] = {}
+            tool_call_indices: Dict[int, str] = {}
+
             # Stream response
             stream = await self.client.chat.completions.create(**request_params)
 
             async for chunk in stream:
-                parsed_chunk = self._parse_stream_chunk(chunk)
+                parsed_chunk = self._parse_stream_chunk(
+                    chunk, tool_call_accumulator, tool_call_indices
+                )
                 if parsed_chunk:
                     yield parsed_chunk
 
@@ -252,11 +254,18 @@ class OpenAIProvider(BaseProvider):
             raw_response=response.model_dump() if hasattr(response, "model_dump") else None,
         )
 
-    def _parse_stream_chunk(self, chunk: ChatCompletionChunk) -> Optional[StreamChunk]:
+    def _parse_stream_chunk(
+        self,
+        chunk: ChatCompletionChunk,
+        tool_call_accumulator: Optional[Dict[str, Dict[str, Any]]] = None,
+        tool_call_indices: Optional[Dict[int, str]] = None,
+    ) -> Optional[StreamChunk]:
         """Parse streaming chunk from OpenAI.
 
         Args:
             chunk: Stream chunk
+            tool_call_accumulator: Aggregates partial tool calls across deltas
+            tool_call_indices: Tracks mapping of tool call indices to IDs
 
         Returns:
             StreamChunk or None
@@ -268,11 +277,58 @@ class OpenAIProvider(BaseProvider):
         delta = choice.delta
 
         content = delta.content or ""
-        is_final = choice.finish_reason is not None
+        finish_reason = choice.finish_reason
+        is_final = finish_reason is not None
+        tool_calls: Optional[List[Dict[str, Any]]] = None
+
+        # Aggregate tool call deltas so the orchestrator receives complete JSON
+        if getattr(delta, "tool_calls", None):
+            if tool_call_accumulator is None:
+                tool_call_accumulator = {}
+            if tool_call_indices is None:
+                tool_call_indices = {}
+
+            for tc in delta.tool_calls or []:
+                tc_index = getattr(tc, "index", None)
+                tc_id = tc.id
+                if tc_id:
+                    if tc_index is not None:
+                        tool_call_indices[tc_index] = tc_id
+                else:
+                    if tc_index is not None and tc_index in tool_call_indices:
+                        tc_id = tool_call_indices[tc_index]
+                    else:
+                        tc_id = (
+                            f"tool_call_{tc_index}"
+                            if tc_index is not None
+                            else f"tool_call_{len(tool_call_accumulator) + 1}"
+                        )
+                        if tc_index is not None:
+                            tool_call_indices[tc_index] = tc_id
+
+                function = getattr(tc, "function", None)
+                name = getattr(function, "name", None)
+                arguments = getattr(function, "arguments", "") or ""
+
+                accumulated = tool_call_accumulator.setdefault(
+                    tc_id, {"id": tc_id, "name": name or "", "arguments": ""}
+                )
+                # Keep latest name in case it streams late
+                if name:
+                    accumulated["name"] = name
+                if arguments:
+                    accumulated["arguments"] += arguments
+
+        # Emit tool calls once the model signals completion
+        if is_final and tool_call_accumulator:
+            tool_calls = list(tool_call_accumulator.values())
+        elif finish_reason == "tool_calls" and tool_call_accumulator:
+            tool_calls = list(tool_call_accumulator.values())
 
         return StreamChunk(
             content=content,
-            stop_reason=choice.finish_reason,
+            tool_calls=tool_calls,
+            stop_reason=finish_reason,
             is_final=is_final,
         )
 

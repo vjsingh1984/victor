@@ -197,10 +197,12 @@ class GoogleProvider(BaseProvider):
                 # Last message is sent separately
                 latest_message = msg.content
             else:
-                history.append({
-                    "role": role,
-                    "parts": [msg.content],
-                })
+                history.append(
+                    {
+                        "role": role,
+                        "parts": [msg.content],
+                    }
+                )
 
         return history, latest_message
 
@@ -249,9 +251,12 @@ class GoogleProvider(BaseProvider):
             content = chunk.text
 
         # Check if this is the final chunk
-        is_final = hasattr(chunk, "candidates") and chunk.candidates and \
-                   hasattr(chunk.candidates[0], "finish_reason") and \
-                   chunk.candidates[0].finish_reason is not None
+        is_final = (
+            hasattr(chunk, "candidates")
+            and chunk.candidates
+            and hasattr(chunk.candidates[0], "finish_reason")
+            and chunk.candidates[0].finish_reason is not None
+        )
 
         return StreamChunk(
             content=content,

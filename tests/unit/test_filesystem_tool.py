@@ -25,7 +25,7 @@ from victor.tools.filesystem import read_file, write_file, list_directory
 async def test_read_file_success():
     """Test successful file reading."""
     # Create temporary file
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write("Hello, World!")
         temp_path = f.name
 
@@ -62,13 +62,13 @@ async def test_read_file_exception_handling():
     from unittest.mock import patch, AsyncMock
 
     # Create a real file
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write("test")
         temp_path = f.name
 
     try:
         # Mock aiofiles.open to raise an exception
-        with patch('aiofiles.open', side_effect=PermissionError("Access denied")):
+        with patch("aiofiles.open", side_effect=PermissionError("Access denied")):
             result = await read_file(path=temp_path)
 
             assert "An unexpected error occurred" in result
@@ -92,7 +92,7 @@ async def test_write_file_success():
 
         # Verify file was actually written
         assert os.path.exists(file_path)
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             written_content = f.read()
             assert written_content == content
 
@@ -117,7 +117,7 @@ async def test_write_file_creates_directories():
 @pytest.mark.asyncio
 async def test_write_file_overwrites_existing():
     """Test that write_file overwrites existing files."""
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write("Original content")
         temp_path = f.name
 
@@ -128,7 +128,7 @@ async def test_write_file_overwrites_existing():
         assert "Successfully wrote" in result
 
         # Verify content was overwritten
-        with open(temp_path, 'r') as f:
+        with open(temp_path, "r") as f:
             assert f.read() == new_content
     finally:
         if os.path.exists(temp_path):
@@ -144,7 +144,7 @@ async def test_write_file_exception_handling():
         file_path = os.path.join(tmpdir, "test.txt")
 
         # Mock aiofiles.open to raise an exception
-        with patch('aiofiles.open', side_effect=PermissionError("Write denied")):
+        with patch("aiofiles.open", side_effect=PermissionError("Write denied")):
             result = await write_file(path=file_path, content="test content")
 
             assert "An unexpected error occurred" in result
@@ -160,9 +160,9 @@ async def test_list_directory_success():
         file2 = os.path.join(tmpdir, "file2.txt")
         subdir = os.path.join(tmpdir, "subdir")
 
-        with open(file1, 'w') as f:
+        with open(file1, "w") as f:
             f.write("test")
-        with open(file2, 'w') as f:
+        with open(file2, "w") as f:
             f.write("test")
         os.mkdir(subdir)
 
@@ -191,9 +191,9 @@ async def test_list_directory_recursive():
         file1 = os.path.join(tmpdir, "file1.txt")
         file2 = os.path.join(subdir, "file2.txt")
 
-        with open(file1, 'w') as f:
+        with open(file1, "w") as f:
             f.write("test")
-        with open(file2, 'w') as f:
+        with open(file2, "w") as f:
             f.write("test")
 
         result = await list_directory(path=tmpdir, recursive=True)
@@ -215,7 +215,7 @@ async def test_list_directory_not_found():
 @pytest.mark.asyncio
 async def test_list_directory_not_a_directory():
     """Test listing a file path."""
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as f:
         temp_path = f.name
 
     try:

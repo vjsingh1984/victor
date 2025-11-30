@@ -20,9 +20,12 @@ This module separates concerns:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from victor.codebase.embeddings.models import BaseEmbeddingModel
 
 
 class EmbeddingConfig(BaseModel):
@@ -34,10 +37,11 @@ class EmbeddingConfig(BaseModel):
     # Vector Store Configuration
     vector_store: str = Field(
         default="lancedb",
-        description="Vector store provider (lancedb, chromadb, proximadb) - LanceDB recommended for performance"
+        description="Vector store provider (lancedb, chromadb, proximadb) - LanceDB recommended for performance",
     )
     persist_directory: Optional[str] = Field(
-        default=None, description="Directory to persist vector store (default: ~/.victor/embeddings/codebase)"
+        default=None,
+        description="Directory to persist vector store (default: ~/.victor/embeddings/codebase)",
     )
     distance_metric: str = Field(
         default="cosine", description="Distance metric (cosine, euclidean, dot)"
@@ -46,15 +50,14 @@ class EmbeddingConfig(BaseModel):
     # Embedding Model Configuration (Air-gapped by Default)
     embedding_model_type: str = Field(
         default="sentence-transformers",
-        description="Embedding model type (sentence-transformers=local/offline, ollama, openai, cohere)"
+        description="Embedding model type (sentence-transformers=local/offline, ollama, openai, cohere)",
     )
     embedding_model_name: str = Field(
         default="all-MiniLM-L12-v2",
-        description="Embedding model name (all-MiniLM-L12-v2 = 384-dim, 120MB, ~8ms, optimal balance)"
+        description="Embedding model name (all-MiniLM-L12-v2 = 384-dim, 120MB, ~8ms, optimal balance)",
     )
     embedding_api_key: Optional[str] = Field(
-        default=None,
-        description="API key for cloud embedding providers (or Ollama base URL)"
+        default=None, description="API key for cloud embedding providers (or Ollama base URL)"
     )
 
     # Provider-specific configuration
@@ -90,7 +93,9 @@ class BaseEmbeddingProvider(ABC):
     - Cohere embeddings + ChromaDB storage
     """
 
-    def __init__(self, config: EmbeddingConfig, embedding_model: Optional["BaseEmbeddingModel"] = None):
+    def __init__(
+        self, config: EmbeddingConfig, embedding_model: Optional["BaseEmbeddingModel"] = None
+    ):
         """Initialize provider with configuration.
 
         Args:
@@ -140,9 +145,7 @@ class BaseEmbeddingProvider(ABC):
         pass
 
     @abstractmethod
-    async def index_document(
-        self, doc_id: str, content: str, metadata: Dict[str, Any]
-    ) -> None:
+    async def index_document(self, doc_id: str, content: str, metadata: Dict[str, Any]) -> None:
         """Index a single document.
 
         Args:
@@ -210,6 +213,7 @@ class BaseEmbeddingProvider(ABC):
         """
         pass
 
+    @abstractmethod
     async def close(self) -> None:
         """Clean up resources (close connections, etc.).
 
@@ -219,4 +223,6 @@ class BaseEmbeddingProvider(ABC):
 
     def __repr__(self) -> str:
         """String representation."""
-        return f"{self.__class__.__name__}(provider={self.config.provider}, model={self.config.model})"
+        return (
+            f"{self.__class__.__name__}(provider={self.config.provider}, model={self.config.model})"
+        )

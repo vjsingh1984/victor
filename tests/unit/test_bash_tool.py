@@ -84,7 +84,7 @@ async def test_execute_bash_timeout():
         result = await execute_bash(command="sleep 100", timeout=1)
 
         assert result["success"] is False
-        assert ("timed out" in result["error"] or "Failed to execute" in result["error"])
+        assert "timed out" in result["error"] or "Failed to execute" in result["error"]
 
 
 @pytest.mark.asyncio

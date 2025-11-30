@@ -55,8 +55,7 @@ async def main():
     agent.reset_conversation()
 
     response = await agent.chat(
-        "Explain the differences between REST and GraphQL APIs. "
-        "Give a code example for each."
+        "Explain the differences between REST and GraphQL APIs. " "Give a code example for each."
     )
     print(f"Grok: {response.content}")
 
@@ -95,9 +94,7 @@ async def main():
     print(f"User: I'm getting a 'list index out of range' error in Python. What could cause this?")
     print(f"Grok: {response1.content[:200]}...")
 
-    response2 = await agent.chat(
-        "The error happens when I do: result = my_list[len(my_list)]"
-    )
+    response2 = await agent.chat("The error happens when I do: result = my_list[len(my_list)]")
     print(f"\nUser: The error happens when I do: result = my_list[len(my_list)]")
     print(f"Grok: {response2.content}")
 

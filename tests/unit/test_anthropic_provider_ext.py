@@ -173,9 +173,7 @@ async def test_chat_with_tools(anthropic_provider):
                 description="Get weather for a location",
                 parameters={
                     "type": "object",
-                    "properties": {
-                        "location": {"type": "string"}
-                    },
+                    "properties": {"location": {"type": "string"}},
                 },
             )
         ]

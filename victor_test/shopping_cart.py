@@ -13,6 +13,7 @@ class ShoppingCartItem:
         price: Price per unit
         quantity: Number of units
     """
+
     name: str
     price: float
     quantity: int
@@ -77,7 +78,7 @@ class ShoppingCart:
         total = self.get_total()
         discount = (total / 100) * percent
         discounted_total = round(total - discount, 2)
-        print(f'Applied {percent}% discount. Total: ${total:.2f} -> ${discounted_total:.2f}')
+        print(f"Applied {percent}% discount. Total: ${total:.2f} -> ${discounted_total:.2f}")
         return discounted_total
 
     def get_items(self) -> List[ShoppingCartItem]:
@@ -94,17 +95,19 @@ def main():
     cart = ShoppingCart()
 
     # Add items
-    cart.add_item('Apple', 1.00, 5)
-    cart.add_item('Banana', 0.50, 10)
-    cart.add_item('Orange', 2.00, 7)
+    cart.add_item("Apple", 1.00, 5)
+    cart.add_item("Banana", 0.50, 10)
+    cart.add_item("Orange", 2.00, 7)
 
-    print(f'Total price before discount: ${cart.get_total()}')
+    print(f"Total price before discount: ${cart.get_total()}")
     cart.apply_discount(10)
 
-    print('\nItems in cart:')
+    print("\nItems in cart:")
     for item in cart.get_items():
-        print(f'  {item.name}: {item.quantity} x ${item.price:.2f} = ${item.price * item.quantity:.2f}')
+        print(
+            f"  {item.name}: {item.quantity} x ${item.price:.2f} = ${item.price * item.quantity:.2f}"
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

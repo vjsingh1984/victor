@@ -1,5 +1,7 @@
 # Quick Start Guide
 
+Canonical quickstart lives in `docs/guides/QUICKSTART.md` and `docker/README.md`; this file is retained for convenience.
+
 This guide helps you test drive Victor with Docker in under 5 minutes.
 
 ## Prerequisites
@@ -85,6 +87,67 @@ lsof -i :11434
 # Use a smaller model
 docker exec victor-ollama ollama pull qwen2.5-coder:0.5b
 ```
+
+### Debugging and Logging
+
+Victor supports runtime logging control for debugging:
+
+```bash
+# Enable debug logging for detailed troubleshooting
+victor --log-level DEBUG main "your query"
+
+# Set logging level to INFO (default)
+victor --log-level INFO main "your query"
+
+# Only show warnings and errors
+victor --log-level WARN main "your query"
+
+# Only show errors
+victor --log-level ERROR main "your query"
+```
+
+You can also set the default logging level via environment variable:
+
+```bash
+# Set default logging level
+export VICTOR_LOG_LEVEL=DEBUG
+victor main "your query"
+
+# CLI argument overrides environment variable
+victor --log-level INFO main "your query"  # Uses INFO, not DEBUG
+```
+
+Valid logging levels: `DEBUG`, `INFO`, `WARN`, `WARNING`, `ERROR`, `CRITICAL`
+
+### Extended Thinking Mode
+
+Victor supports extended thinking/reasoning mode for compatible models (like Claude):
+
+```bash
+# Enable thinking mode for complex reasoning tasks
+victor --thinking main "Design a distributed caching system with fault tolerance"
+
+# Combine with logging to see reasoning process
+victor --thinking --log-level DEBUG main "your complex query"
+
+# Works in interactive mode too
+victor --thinking
+```
+
+**What it does:**
+- Enables the model's extended reasoning capabilities (Claude's thinking mode)
+- Shows the model's step-by-step reasoning process
+- Useful for complex tasks requiring careful analysis
+- Allocates additional compute budget for deeper reasoning (10,000 tokens)
+
+**When to use:**
+- Complex architectural decisions
+- Multi-step problem solving
+- Code review requiring deep analysis
+- Design pattern selection
+- Performance optimization strategies
+
+**Note:** Currently supported by Anthropic Claude models. Other providers will ignore this flag gracefully.
 
 ## Next Steps
 

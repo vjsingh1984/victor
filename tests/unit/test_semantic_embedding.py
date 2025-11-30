@@ -77,7 +77,7 @@ class TestSentenceTransformersEmbedding:
         assert selector._sentence_model is None
 
         # Mock sentence-transformers import (patch the import path)
-        with patch('sentence_transformers.SentenceTransformer') as MockST:
+        with patch("sentence_transformers.SentenceTransformer") as MockST:
             mock_model = MagicMock()
             mock_model.encode.return_value = np.random.randn(384).astype(np.float32)
             MockST.return_value = mock_model
@@ -95,7 +95,7 @@ class TestSentenceTransformersEmbedding:
         """Test that embeddings have correct dimensions."""
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
-        with patch('sentence_transformers.SentenceTransformer') as MockST:
+        with patch("sentence_transformers.SentenceTransformer") as MockST:
             mock_model = MagicMock()
             mock_model.encode.return_value = np.random.randn(384).astype(np.float32)
             MockST.return_value = mock_model
@@ -112,7 +112,7 @@ class TestSentenceTransformersEmbedding:
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
         # Mock ImportError when loading sentence-transformers
-        with patch('sentence_transformers.SentenceTransformer', side_effect=ImportError):
+        with patch("sentence_transformers.SentenceTransformer", side_effect=ImportError):
             # Should fall back to random embedding (better than crashing)
             embedding = await selector._get_sentence_transformer_embedding("test text")
             # Verify it's a valid embedding (384-dim)
@@ -124,7 +124,7 @@ class TestSentenceTransformersEmbedding:
         """Test that sentence-transformers runs in thread pool (non-blocking)."""
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
-        with patch('sentence_transformers.SentenceTransformer') as MockST:
+        with patch("sentence_transformers.SentenceTransformer") as MockST:
             mock_model = MagicMock()
             mock_model.encode.return_value = np.random.randn(384).astype(np.float32)
             MockST.return_value = mock_model
@@ -143,8 +143,7 @@ class TestOllamaAPIEmbedding:
     async def test_ollama_provider_initialization(self):
         """Test Ollama provider initializes HTTP client."""
         selector = SemanticToolSelector(
-            embedding_provider="ollama",
-            embedding_model="nomic-embed-text"
+            embedding_provider="ollama", embedding_model="nomic-embed-text"
         )
 
         assert selector.embedding_provider == "ollama"
@@ -156,16 +155,14 @@ class TestOllamaAPIEmbedding:
         selector = SemanticToolSelector(
             embedding_provider="ollama",
             embedding_model="nomic-embed-text",
-            cache_dir=temp_cache_dir
+            cache_dir=temp_cache_dir,
         )
 
         # Mock httpx response
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "embedding": [0.1] * 768  # nomic-embed-text is 768-dim
-        }
+        mock_response.json.return_value = {"embedding": [0.1] * 768}  # nomic-embed-text is 768-dim
 
-        with patch.object(selector._client, 'post', return_value=mock_response) as mock_post:
+        with patch.object(selector._client, "post", return_value=mock_response) as mock_post:
             mock_post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
             mock_post.return_value.__aexit__ = AsyncMock()
 
@@ -182,7 +179,7 @@ class TestOllamaAPIEmbedding:
         selector = SemanticToolSelector(
             embedding_provider="vllm",
             embedding_model="BAAI/bge-large-en-v1.5",
-            ollama_base_url="http://localhost:8000"
+            ollama_base_url="http://localhost:8000",
         )
 
         assert selector.embedding_provider == "vllm"
@@ -196,8 +193,7 @@ class TestEmbeddingCaching:
     async def test_cache_file_naming(self, temp_cache_dir):
         """Test cache file uses correct naming convention."""
         selector = SemanticToolSelector(
-            embedding_model="all-MiniLM-L6-v2",
-            cache_dir=temp_cache_dir
+            embedding_model="all-MiniLM-L6-v2", cache_dir=temp_cache_dir
         )
 
         expected_filename = "tool_embeddings_all-MiniLM-L6-v2.pkl"
@@ -207,8 +203,7 @@ class TestEmbeddingCaching:
     async def test_cache_file_naming_with_special_chars(self, temp_cache_dir):
         """Test cache file naming handles special characters."""
         selector = SemanticToolSelector(
-            embedding_model="qwen3-embedding:8b",
-            cache_dir=temp_cache_dir
+            embedding_model="qwen3-embedding:8b", cache_dir=temp_cache_dir
         )
 
         # Colons and slashes should be replaced
@@ -222,9 +217,7 @@ class TestProviderFallback:
     @pytest.mark.asyncio
     async def test_unsupported_provider_raises_error(self):
         """Test that unsupported provider raises NotImplementedError."""
-        selector = SemanticToolSelector(
-            embedding_provider="openai"  # Not yet implemented
-        )
+        selector = SemanticToolSelector(embedding_provider="openai")  # Not yet implemented
 
         with pytest.raises(NotImplementedError, match="openai not yet supported"):
             await selector._get_embedding("test text")
@@ -234,7 +227,7 @@ class TestProviderFallback:
         """Test fallback to random embedding on error."""
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
-        with patch('sentence_transformers.SentenceTransformer') as MockST:
+        with patch("sentence_transformers.SentenceTransformer") as MockST:
             mock_model = MagicMock()
             mock_model.encode.side_effect = Exception("Model error")
             MockST.return_value = mock_model
@@ -250,12 +243,15 @@ class TestToolSelectionWithEmbeddings:
     """Test end-to-end tool selection with embeddings."""
 
     @pytest.mark.asyncio
-    async def test_tool_selection_with_sentence_transformers(self, mock_tool_registry, temp_cache_dir):
+    async def test_tool_selection_with_sentence_transformers(
+        self, mock_tool_registry, temp_cache_dir
+    ):
         """Test complete tool selection flow with sentence-transformers."""
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
-        with patch('sentence_transformers.SentenceTransformer') as MockST:
+        with patch("sentence_transformers.SentenceTransformer") as MockST:
             mock_model = MagicMock()
+
             # Return different embeddings for different inputs
             def mock_encode(text, convert_to_numpy=False):
                 if "mock" in text.lower():
@@ -271,10 +267,7 @@ class TestToolSelectionWithEmbeddings:
 
             # Select tools
             selected_tools = await selector.select_relevant_tools(
-                "use the mock tool",
-                mock_tool_registry,
-                max_tools=5,
-                similarity_threshold=0.3
+                "use the mock tool", mock_tool_registry, max_tools=5, similarity_threshold=0.3
             )
 
             # Should select mock_tool due to high similarity

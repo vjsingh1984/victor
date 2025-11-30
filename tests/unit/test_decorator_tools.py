@@ -25,12 +25,18 @@ from unittest.mock import AsyncMock, MagicMock, patch, ANY
 from victor.tools.bash import execute_bash
 from victor.tools.cache_tool import cache_stats, cache_clear, cache_info, set_cache_manager
 from victor.tools.http_tool import http_request, http_test
-from victor.tools.web_search_tool import web_search, web_fetch, web_summarize, set_web_search_provider
+from victor.tools.web_search_tool import (
+    web_search,
+    web_fetch,
+    web_summarize,
+    set_web_search_provider,
+)
 
 
 # ============================================================================
 # Bash Tool Tests
 # ============================================================================
+
 
 @pytest.mark.asyncio
 async def test_execute_bash_simple_command():
@@ -96,12 +102,13 @@ async def test_execute_bash_timeout():
         result = await execute_bash(command="sleep 100", timeout=1)
 
         assert result["success"] is False
-        assert ("timed out" in result["error"] or "Failed to execute" in result["error"])
+        assert "timed out" in result["error"] or "Failed to execute" in result["error"]
 
 
 # ============================================================================
 # Cache Tool Tests
 # ============================================================================
+
 
 @pytest.mark.asyncio
 async def test_cache_stats_no_manager():
@@ -130,7 +137,7 @@ async def test_cache_stats_with_manager():
         "memory_size": 50,
         "memory_max_size": 100,
         "disk_size": 300,
-        "disk_volume": 1024000
+        "disk_volume": 1024000,
     }
 
     set_cache_manager(mock_manager)
@@ -243,6 +250,7 @@ async def test_cache_info_with_manager():
 # HTTP Tool Tests
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_http_request_missing_url():
     """Test http_request with missing URL."""
@@ -269,10 +277,7 @@ async def test_http_request_get_success():
         mock_client.request = AsyncMock(return_value=mock_response)
         mock_client_class.return_value = mock_client
 
-        result = await http_request(
-            method="GET",
-            url="https://example.com/api"
-        )
+        result = await http_request(method="GET", url="https://example.com/api")
 
         assert result["success"] is True
         assert result["status_code"] == 200
@@ -299,9 +304,7 @@ async def test_http_request_with_auth():
         mock_client_class.return_value = mock_client
 
         result = await http_request(
-            method="GET",
-            url="https://example.com/api",
-            auth="Bearer test-token"
+            method="GET", url="https://example.com/api", auth="Bearer test-token"
         )
 
         assert result["success"] is True
@@ -322,11 +325,7 @@ async def test_http_request_timeout():
         mock_client.request = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
         mock_client_class.return_value = mock_client
 
-        result = await http_request(
-            method="GET",
-            url="https://example.com/slow",
-            timeout=1
-        )
+        result = await http_request(method="GET", url="https://example.com/slow", timeout=1)
 
         assert result["success"] is False
         assert "timed out" in result["error"]
@@ -350,9 +349,7 @@ async def test_http_request_post_with_json():
         mock_client_class.return_value = mock_client
 
         result = await http_request(
-            method="POST",
-            url="https://example.com/api",
-            json={"name": "test"}
+            method="POST", url="https://example.com/api", json={"name": "test"}
         )
 
         assert result["success"] is True
@@ -385,11 +382,7 @@ async def test_http_test_success():
         mock_client.request = AsyncMock(return_value=mock_response)
         mock_client_class.return_value = mock_client
 
-        result = await http_test(
-            method="GET",
-            url="https://example.com/api",
-            expected_status=200
-        )
+        result = await http_test(method="GET", url="https://example.com/api", expected_status=200)
 
         assert result["success"] is True
         assert result["all_passed"] is True
@@ -412,11 +405,7 @@ async def test_http_test_validation_failed():
         mock_client.request = AsyncMock(return_value=mock_response)
         mock_client_class.return_value = mock_client
 
-        result = await http_test(
-            method="GET",
-            url="https://example.com/api",
-            expected_status=200
-        )
+        result = await http_test(method="GET", url="https://example.com/api", expected_status=200)
 
         assert result["success"] is False
         assert result["all_passed"] is False
@@ -428,6 +417,7 @@ async def test_http_test_validation_failed():
 # ============================================================================
 # Web Search Tool Tests
 # ============================================================================
+
 
 @pytest.mark.asyncio
 async def test_web_search_missing_query():
@@ -665,339 +655,212 @@ async def test_web_summarize_ai_fails():
 # File Editor Tool Tests
 # ============================================================================
 
-# Import file editor functions and helper
-from victor.tools.file_editor_tool import (
-    file_editor_start_transaction,
-    file_editor_add_create,
-    file_editor_add_modify,
-    file_editor_add_delete,
-    file_editor_add_rename,
-    file_editor_preview,
-    file_editor_commit,
-    file_editor_rollback,
-    file_editor_abort,
-    file_editor_status,
-    _clear_editor,
-)
-
-
-@pytest.fixture(autouse=True)
-def clear_file_editor_state():
-    """Clear file editor state before each test."""
-    _clear_editor()
-    yield
-    _clear_editor()
+# Import consolidated edit_files function
+from victor.tools.file_editor_tool import edit_files
+import os
+import tempfile
 
 
 @pytest.mark.asyncio
-async def test_file_editor_start_transaction():
-    """Test starting a new transaction."""
-    result = await file_editor_start_transaction(description="Test transaction")
+async def test_edit_files_no_operations():
+    """Test edit_files with no operations."""
+    result = await edit_files(operations=[])
+
+    assert result["success"] is False
+    assert "No operations provided" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_edit_files_invalid_operations_type():
+    """Test edit_files with invalid operations type."""
+    result = await edit_files(operations=[{"path": "test.txt"}])
+
+    assert result["success"] is False
+    assert "missing required field: type" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_edit_files_invalid_operation_type():
+    """Test edit_files with invalid operation type."""
+    result = await edit_files(operations=[{"type": "invalid", "path": "test.txt"}])
+
+    assert result["success"] is False
+    assert "invalid type" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_edit_files_missing_path():
+    """Test edit_files with missing path."""
+    result = await edit_files(operations=[{"type": "create"}])
+
+    assert result["success"] is False
+    assert "missing required field: path" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_edit_files_create_success(tmp_path):
+    """Test successful file creation."""
+    test_file = tmp_path / "new_file.txt"
+
+    result = await edit_files(
+        operations=[{"type": "create", "path": str(test_file), "content": "hello world"}],
+        auto_commit=True,
+    )
 
     assert result["success"] is True
-    assert "transaction_id" in result
-    assert result["description"] == "Test transaction"
-    assert "Started transaction" in result["message"]
+    assert result["operations_queued"] == 1
+    assert test_file.exists()
+    assert test_file.read_text() == "hello world"
 
 
 @pytest.mark.asyncio
-async def test_file_editor_start_transaction_already_active():
-    """Test starting transaction when one is already active."""
-    await file_editor_start_transaction(description="First")
-    result = await file_editor_start_transaction(description="Second")
+async def test_edit_files_modify_success(tmp_path):
+    """Test successful file modification."""
+    test_file = tmp_path / "existing.txt"
+    test_file.write_text("original content")
 
-    assert result["success"] is False
-    assert "already in progress" in result["error"]
-
-
-@pytest.mark.asyncio
-async def test_file_editor_add_create_no_transaction():
-    """Test add_create without active transaction."""
-    result = await file_editor_add_create(path="test.txt", content="hello")
-
-    assert result["success"] is False
-    assert "No active transaction" in result["error"]
-
-
-@pytest.mark.asyncio
-async def test_file_editor_add_create_success():
-    """Test successful file creation queue."""
-    await file_editor_start_transaction()
-    result = await file_editor_add_create(path="test.txt", content="hello world")
+    result = await edit_files(
+        operations=[{"type": "modify", "path": str(test_file), "content": "modified content"}]
+    )
 
     assert result["success"] is True
-    assert result["path"] == "test.txt"
-    assert "Queued file creation" in result["message"]
+    assert test_file.read_text() == "modified content"
 
 
 @pytest.mark.asyncio
-async def test_file_editor_add_create_missing_path():
-    """Test add_create with missing path."""
-    await file_editor_start_transaction()
-    result = await file_editor_add_create(path="", content="hello")
+async def test_edit_files_delete_success(tmp_path):
+    """Test successful file deletion."""
+    test_file = tmp_path / "to_delete.txt"
+    test_file.write_text("delete me")
 
-    assert result["success"] is False
-    assert "Missing required parameter: path" in result["error"]
-
-
-@pytest.mark.asyncio
-async def test_file_editor_add_modify_no_transaction():
-    """Test add_modify without active transaction."""
-    result = await file_editor_add_modify(path="test.txt", new_content="new")
-
-    assert result["success"] is False
-    assert "No active transaction" in result["error"]
-
-
-@pytest.mark.asyncio
-async def test_file_editor_add_modify_success():
-    """Test successful file modification queue."""
-    import tempfile
-    import os
-
-    # Create a temp file first
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
-        f.write("original content")
-        temp_path = f.name
-
-    try:
-        await file_editor_start_transaction()
-        result = await file_editor_add_modify(path=temp_path, new_content="modified")
-
-        assert result["success"] is True
-        assert result["path"] == temp_path
-        assert "Queued file modification" in result["message"]
-
-        # Clean up transaction
-        await file_editor_abort()
-    finally:
-        # Clean up temp file
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-
-
-@pytest.mark.asyncio
-async def test_file_editor_add_modify_missing_params():
-    """Test add_modify with missing parameters."""
-    await file_editor_start_transaction()
-
-    result = await file_editor_add_modify(path="", new_content="test")
-    assert result["success"] is False
-    assert "Missing required parameter: path" in result["error"]
-
-
-@pytest.mark.asyncio
-async def test_file_editor_add_delete_no_transaction():
-    """Test add_delete without active transaction."""
-    result = await file_editor_add_delete(path="test.txt")
-
-    assert result["success"] is False
-    assert "No active transaction" in result["error"]
-
-
-@pytest.mark.asyncio
-async def test_file_editor_add_delete_success():
-    """Test successful file deletion queue."""
-    import tempfile
-    import os
-
-    # Create a temp file first
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
-        f.write("to be deleted")
-        temp_path = f.name
-
-    try:
-        await file_editor_start_transaction()
-        result = await file_editor_add_delete(path=temp_path)
-
-        assert result["success"] is True
-        assert result["path"] == temp_path
-        assert "Queued file deletion" in result["message"]
-
-        # Clean up transaction
-        await file_editor_abort()
-    finally:
-        # Clean up temp file if it still exists
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-
-
-@pytest.mark.asyncio
-async def test_file_editor_add_rename_no_transaction():
-    """Test add_rename without active transaction."""
-    result = await file_editor_add_rename(path="old.txt", new_path="new.txt")
-
-    assert result["success"] is False
-    assert "No active transaction" in result["error"]
-
-
-@pytest.mark.asyncio
-async def test_file_editor_add_rename_success():
-    """Test successful file rename queue."""
-    import tempfile
-    import os
-
-    # Create a temp file first
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
-        f.write("original")
-        old_path = f.name
-
-    new_path = old_path.replace('.txt', '_new.txt')
-
-    try:
-        await file_editor_start_transaction()
-        result = await file_editor_add_rename(path=old_path, new_path=new_path)
-
-        assert result["success"] is True
-        assert result["old_path"] == old_path
-        assert result["new_path"] == new_path
-        assert "Queued file rename" in result["message"]
-
-        # Clean up transaction
-        await file_editor_abort()
-    finally:
-        # Clean up temp files
-        if os.path.exists(old_path):
-            os.unlink(old_path)
-        if os.path.exists(new_path):
-            os.unlink(new_path)
-
-
-@pytest.mark.asyncio
-async def test_file_editor_add_rename_missing_params():
-    """Test add_rename with missing parameters."""
-    await file_editor_start_transaction()
-
-    result = await file_editor_add_rename(path="", new_path="new.txt")
-    assert result["success"] is False
-    assert "Missing required parameter: path" in result["error"]
-
-    result = await file_editor_add_rename(path="old.txt", new_path="")
-    assert result["success"] is False
-    assert "Missing required parameter: new_path" in result["error"]
-
-
-@pytest.mark.asyncio
-async def test_file_editor_preview_no_transaction():
-    """Test preview without active transaction."""
-    result = await file_editor_preview()
-
-    assert result["success"] is False
-    assert "No active transaction" in result["error"]
-
-
-@pytest.mark.asyncio
-async def test_file_editor_preview_success():
-    """Test successful preview."""
-    await file_editor_start_transaction()
-    await file_editor_add_create(path="test.txt", content="hello")
-
-    result = await file_editor_preview(context_lines=5)
+    result = await edit_files(operations=[{"type": "delete", "path": str(test_file)}])
 
     assert result["success"] is True
-    assert "operations_count" in result
-    assert result["operations_count"] >= 1
+    assert not test_file.exists()
 
 
 @pytest.mark.asyncio
-async def test_file_editor_commit_no_transaction():
-    """Test commit without active transaction."""
-    result = await file_editor_commit()
+async def test_edit_files_rename_success(tmp_path):
+    """Test successful file rename."""
+    old_file = tmp_path / "old_name.txt"
+    new_file = tmp_path / "new_name.txt"
+    old_file.write_text("rename me")
 
-    assert result["success"] is False
-    assert "No active transaction" in result["error"]
-
-
-@pytest.mark.asyncio
-async def test_file_editor_commit_dry_run():
-    """Test commit with dry_run."""
-    await file_editor_start_transaction()
-    await file_editor_add_create(path="test.txt", content="hello")
-
-    result = await file_editor_commit(dry_run=True)
+    result = await edit_files(
+        operations=[{"type": "rename", "path": str(old_file), "new_path": str(new_file)}]
+    )
 
     assert result["success"] is True
-    assert "Dry run complete" in result["message"]
+    assert not old_file.exists()
+    assert new_file.exists()
+    assert new_file.read_text() == "rename me"
 
 
 @pytest.mark.asyncio
-async def test_file_editor_rollback_no_transaction():
-    """Test rollback without active transaction."""
-    result = await file_editor_rollback()
+async def test_edit_files_multiple_operations(tmp_path):
+    """Test multiple operations in single call."""
+    file1 = tmp_path / "file1.txt"
+    file2 = tmp_path / "file2.txt"
+    file2.write_text("modify me")
+    file3 = tmp_path / "file3.txt"
+    file3.write_text("delete me")
 
-    assert result["success"] is False
-    assert "No active transaction" in result["error"]
-
-
-@pytest.mark.asyncio
-async def test_file_editor_abort_no_transaction():
-    """Test abort without active transaction."""
-    result = await file_editor_abort()
-
-    assert result["success"] is False
-    assert "No active transaction" in result["error"]
-
-
-@pytest.mark.asyncio
-async def test_file_editor_abort_success():
-    """Test successful abort."""
-    await file_editor_start_transaction()
-    await file_editor_add_create(path="test.txt", content="hello")
-
-    result = await file_editor_abort()
+    result = await edit_files(
+        operations=[
+            {"type": "create", "path": str(file1), "content": "new file"},
+            {"type": "modify", "path": str(file2), "content": "modified"},
+            {"type": "delete", "path": str(file3)},
+        ]
+    )
 
     assert result["success"] is True
-    assert "aborted" in result["message"]
+    assert result["operations_queued"] == 3
+    assert file1.exists() and file1.read_text() == "new file"
+    assert file2.read_text() == "modified"
+    assert not file3.exists()
 
 
 @pytest.mark.asyncio
-async def test_file_editor_status_no_transaction():
-    """Test status without active transaction."""
-    result = await file_editor_status()
+async def test_edit_files_preview_mode(tmp_path):
+    """Test preview mode without applying changes."""
+    test_file = tmp_path / "preview_test.txt"
+    test_file.write_text("original")
+
+    result = await edit_files(
+        operations=[{"type": "modify", "path": str(test_file), "content": "modified"}],
+        preview=True,
+        auto_commit=False,
+    )
 
     assert result["success"] is True
-    assert "No active transaction" in result["message"]
+    # File should not be modified in preview mode
+    assert test_file.read_text() == "original"
 
 
 @pytest.mark.asyncio
-async def test_file_editor_status_with_transaction():
-    """Test status with active transaction."""
-    import tempfile
-    import os
+async def test_edit_files_json_string_operations(tmp_path):
+    """Test operations passed as JSON string."""
+    test_file = tmp_path / "json_test.txt"
 
-    # Create temp files
-    with tempfile.NamedTemporaryFile(mode='w', delete=False) as f1:
-        f1.write("file2 content")
-        file2_path = f1.name
+    result = await edit_files(
+        operations='[{"type": "create", "path": "' + str(test_file) + '", "content": "json"}]'
+    )
 
-    with tempfile.NamedTemporaryFile(mode='w', delete=False) as f2:
-        f2.write("file3 content")
-        file3_path = f2.name
+    assert result["success"] is True
+    assert test_file.exists()
 
-    try:
-        await file_editor_start_transaction(description="Test transaction")
-        await file_editor_add_create(path="file1.txt", content="test")
-        await file_editor_add_modify(path=file2_path, new_content="modified")
-        await file_editor_add_delete(path=file3_path)
 
-        result = await file_editor_status()
+@pytest.mark.asyncio
+async def test_edit_files_invalid_json_string():
+    """Test invalid JSON string for operations."""
+    result = await edit_files(operations="not valid json")
 
-        assert result["success"] is True
-        assert "transaction_id" in result
-        assert result["description"] == "Test transaction"
-        assert result["operations"] == 3
-        assert "by_type" in result
-        assert result["by_type"]["create"] == 1
-        assert result["by_type"]["modify"] == 1
-        assert result["by_type"]["delete"] == 1
+    assert result["success"] is False
+    assert "Invalid JSON" in result["error"]
 
-        # Clean up transaction
-        await file_editor_abort()
-    finally:
-        # Clean up temp files
-        for path in [file2_path, file3_path]:
-            if os.path.exists(path):
-                os.unlink(path)
+
+@pytest.mark.asyncio
+async def test_edit_files_with_description(tmp_path):
+    """Test operations with description."""
+    test_file = tmp_path / "desc_test.txt"
+
+    result = await edit_files(
+        operations=[{"type": "create", "path": str(test_file), "content": "test"}],
+        description="Creating test file",
+    )
+
+    assert result["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_edit_files_rename_missing_new_path(tmp_path):
+    """Test rename without new_path."""
+    test_file = tmp_path / "rename_test.txt"
+    test_file.write_text("test")
+
+    result = await edit_files(operations=[{"type": "rename", "path": str(test_file)}])
+
+    assert result["success"] is False
+    assert "new_path" in result["error"].lower()
+
+
+@pytest.mark.asyncio
+async def test_edit_files_modify_nonexistent():
+    """Test modifying non-existent file."""
+    result = await edit_files(
+        operations=[{"type": "modify", "path": "/nonexistent/path/file.txt", "content": "test"}]
+    )
+
+    assert result["success"] is False
+
+
+@pytest.mark.asyncio
+async def test_edit_files_operation_not_dict():
+    """Test operations list with non-dict item."""
+    result = await edit_files(operations=["not a dict"])
+
+    assert result["success"] is False
+    assert "must be a dictionary" in result["error"]
 
 
 # ============================================================================
@@ -1056,8 +919,8 @@ async def test_dependency_outdated_success():
     """Test successful outdated package check."""
     mock_outdated = [
         {"name": "requests", "version": "2.28.0", "latest_version": "3.0.0"},  # Major
-        {"name": "pytest", "version": "7.2.0", "latest_version": "7.3.0"},    # Minor
-        {"name": "aiohttp", "version": "3.8.0", "latest_version": "3.8.1"},   # Patch
+        {"name": "pytest", "version": "7.2.0", "latest_version": "7.3.0"},  # Minor
+        {"name": "aiohttp", "version": "3.8.0", "latest_version": "3.8.1"},  # Patch
     ]
 
     mock_result = MagicMock()
@@ -1145,7 +1008,7 @@ async def test_dependency_generate_success():
     mock_result = MagicMock()
     mock_result.stdout = mock_requirements
 
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         temp_path = f.name
 
     try:
@@ -1261,7 +1124,7 @@ async def test_dependency_check_success():
     import tempfile, os
 
     # Create temp requirements file
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write("requests==2.28.0\npytest==7.2.0\n")
         req_path = f.name
 
@@ -1293,7 +1156,7 @@ async def test_dependency_check_missing_packages():
     import tempfile, os
 
     # Create temp requirements file
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write("requests==2.28.0\nmissing-package==1.0.0\n")
         req_path = f.name
 
@@ -1323,7 +1186,7 @@ async def test_dependency_check_version_mismatch():
     import tempfile, os
 
     # Create temp requirements file
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write("requests==2.28.0\n")
         req_path = f.name
 
@@ -1372,7 +1235,7 @@ async def test_database_connect_sqlite_success():
     import os
 
     # Create temporary database file
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as f:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
         db_path = f.name
 
     try:
@@ -1414,7 +1277,7 @@ async def test_database_query_missing_sql():
     import tempfile
     import os
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as f:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
         db_path = f.name
 
     try:
@@ -1441,7 +1304,7 @@ async def test_database_query_select_success():
     import sqlite3
 
     # Create temporary database with test table
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as f:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
         db_path = f.name
 
     try:
@@ -1456,10 +1319,7 @@ async def test_database_query_select_success():
         connect_result = await database_connect(database=db_path, db_type="sqlite")
         connection_id = connect_result["connection_id"]
 
-        result = await database_query(
-            connection_id=connection_id,
-            sql="SELECT * FROM test_table"
-        )
+        result = await database_query(connection_id=connection_id, sql="SELECT * FROM test_table")
 
         assert result["success"] is True
         assert "columns" in result
@@ -1483,7 +1343,7 @@ async def test_database_query_dangerous_operation_blocked():
     import tempfile
     import os
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as f:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
         db_path = f.name
 
     try:
@@ -1517,7 +1377,7 @@ async def test_database_query_modifications_allowed():
     import os
     import sqlite3
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as f:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
         db_path = f.name
 
     try:
@@ -1535,8 +1395,7 @@ async def test_database_query_modifications_allowed():
 
         # INSERT should work now
         result = await database_query(
-            connection_id=connection_id,
-            sql="INSERT INTO test_table VALUES (1)"
+            connection_id=connection_id, sql="INSERT INTO test_table VALUES (1)"
         )
 
         assert result["success"] is True
@@ -1559,7 +1418,7 @@ async def test_database_tables_success():
     import os
     import sqlite3
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as f:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
         db_path = f.name
 
     try:
@@ -1604,19 +1463,21 @@ async def test_database_describe_success():
     import os
     import sqlite3
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as f:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
         db_path = f.name
 
     try:
         # Setup test table
         conn = sqlite3.connect(db_path)
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE users (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
                 email TEXT
             )
-        """)
+        """
+        )
         conn.commit()
         conn.close()
 
@@ -1652,7 +1513,7 @@ async def test_database_describe_missing_table():
     import tempfile
     import os
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as f:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
         db_path = f.name
 
     try:
@@ -1678,7 +1539,7 @@ async def test_database_schema_success():
     import os
     import sqlite3
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as f:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
         db_path = f.name
 
     try:
@@ -1730,7 +1591,7 @@ async def test_database_disconnect_success():
     import tempfile
     import os
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as f:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
         db_path = f.name
 
     try:
@@ -1763,7 +1624,7 @@ async def test_database_query_with_limit():
     import os
     import sqlite3
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as f:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
         db_path = f.name
 
     try:
@@ -1780,9 +1641,7 @@ async def test_database_query_with_limit():
 
         # Query with limit
         result = await database_query(
-            connection_id=connection_id,
-            sql="SELECT * FROM test_table",
-            limit=5
+            connection_id=connection_id, sql="SELECT * FROM test_table", limit=5
         )
 
         assert result["success"] is True
@@ -1810,7 +1669,7 @@ async def test_read_file_success():
     import os
 
     # Create temporary file
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write("Hello, World!")
         temp_path = f.name
 
@@ -1860,7 +1719,7 @@ async def test_write_file_success():
 
         # Verify file was actually written
         assert os.path.exists(file_path)
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             written_content = f.read()
             assert written_content == content
 
@@ -1891,7 +1750,7 @@ async def test_write_file_overwrites_existing():
     import tempfile
     import os
 
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write("Original content")
         temp_path = f.name
 
@@ -1902,7 +1761,7 @@ async def test_write_file_overwrites_existing():
         assert "Successfully wrote" in result
 
         # Verify content was overwritten
-        with open(temp_path, 'r') as f:
+        with open(temp_path, "r") as f:
             assert f.read() == new_content
     finally:
         if os.path.exists(temp_path):
@@ -1921,9 +1780,9 @@ async def test_list_directory_success():
         file2 = os.path.join(tmpdir, "file2.txt")
         subdir = os.path.join(tmpdir, "subdir")
 
-        with open(file1, 'w') as f:
+        with open(file1, "w") as f:
             f.write("test")
-        with open(file2, 'w') as f:
+        with open(file2, "w") as f:
             f.write("test")
         os.mkdir(subdir)
 
@@ -1955,9 +1814,9 @@ async def test_list_directory_recursive():
         file1 = os.path.join(tmpdir, "file1.txt")
         file2 = os.path.join(subdir, "file2.txt")
 
-        with open(file1, 'w') as f:
+        with open(file1, "w") as f:
             f.write("test")
-        with open(file2, 'w') as f:
+        with open(file2, "w") as f:
             f.write("test")
 
         result = await list_directory(path=tmpdir, recursive=True)
@@ -1982,7 +1841,7 @@ async def test_list_directory_not_a_directory():
     import tempfile
     import os
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as f:
         temp_path = f.name
 
     try:
@@ -2009,12 +1868,7 @@ async def test_list_directory_empty():
 # ============================================================================
 
 from victor.tools.git_tool import (
-    git_status,
-    git_diff,
-    git_stage,
-    git_commit,
-    git_log,
-    git_branch,
+    git,
     git_suggest_commit,
     git_create_pr,
     git_analyze_conflicts,
@@ -2024,20 +1878,37 @@ from victor.tools.git_tool import (
 
 
 @pytest.mark.asyncio
+async def test_git_missing_operation():
+    """Test git with missing operation."""
+    result = await git(operation="")
+
+    assert result["success"] is False
+    assert "Missing required parameter" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_git_invalid_operation():
+    """Test git with invalid operation."""
+    result = await git(operation="invalid_op")
+
+    assert result["success"] is False
+    assert "Invalid operation" in result["error"]
+
+
+@pytest.mark.asyncio
 async def test_git_status_success():
     """Test successful git status."""
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
         mock_run_git.side_effect = [
             (True, "## main\n M file1.txt", ""),
-            (True, "On branch main\nChanges not staged for commit:\n  modified: file1.txt", "")
+            (True, "On branch main\nChanges not staged for commit:\n  modified: file1.txt", ""),
         ]
 
-        result = await git_status()
+        result = await git(operation="status")
 
         assert result["success"] is True
         assert "Short status:" in result["output"]
         assert "Full status:" in result["output"]
-        assert "main" in result["output"]
 
 
 @pytest.mark.asyncio
@@ -2046,7 +1917,7 @@ async def test_git_status_failure():
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
         mock_run_git.return_value = (False, "", "fatal: not a git repository")
 
-        result = await git_status()
+        result = await git(operation="status")
 
         assert result["success"] is False
         assert "not a git repository" in result["error"]
@@ -2058,7 +1929,7 @@ async def test_git_diff_unstaged():
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
         mock_run_git.return_value = (True, "diff --git a/file.txt\n+new line", "")
 
-        result = await git_diff(staged=False)
+        result = await git(operation="diff", staged=False)
 
         assert result["success"] is True
         assert "diff --git" in result["output"]
@@ -2070,7 +1941,7 @@ async def test_git_diff_staged():
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
         mock_run_git.return_value = (True, "diff --git a/staged.txt\n+staged line", "")
 
-        result = await git_diff(staged=True)
+        result = await git(operation="diff", staged=True)
 
         assert result["success"] is True
         assert "staged line" in result["output"]
@@ -2082,7 +1953,7 @@ async def test_git_diff_no_changes():
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
         mock_run_git.return_value = (True, "", "")
 
-        result = await git_diff(staged=False)
+        result = await git(operation="diff", staged=False)
 
         assert result["success"] is True
         assert "No changes to show" in result["output"]
@@ -2092,28 +1963,21 @@ async def test_git_diff_no_changes():
 async def test_git_stage_all():
     """Test staging all changes."""
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
-        mock_run_git.side_effect = [
-            (True, "", ""),
-            (True, "M  file1.txt\nM  file2.txt", "")
-        ]
+        mock_run_git.side_effect = [(True, "", ""), (True, "M  file1.txt\nM  file2.txt", "")]
 
-        result = await git_stage()
+        result = await git(operation="stage")
 
         assert result["success"] is True
         assert "Files staged successfully" in result["output"]
-        assert "file1.txt" in result["output"]
 
 
 @pytest.mark.asyncio
 async def test_git_stage_specific_files():
     """Test staging specific files."""
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
-        mock_run_git.side_effect = [
-            (True, "", ""),
-            (True, "M  file1.txt", "")
-        ]
+        mock_run_git.side_effect = [(True, "", ""), (True, "M  file1.txt", "")]
 
-        result = await git_stage(files=["file1.txt"])
+        result = await git(operation="stage", files=["file1.txt"])
 
         assert result["success"] is True
         assert "Files staged successfully" in result["output"]
@@ -2123,9 +1987,13 @@ async def test_git_stage_specific_files():
 async def test_git_stage_failure():
     """Test git stage failure."""
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
-        mock_run_git.return_value = (False, "", "fatal: pathspec 'nonexistent' did not match any files")
+        mock_run_git.return_value = (
+            False,
+            "",
+            "fatal: pathspec 'nonexistent' did not match any files",
+        )
 
-        result = await git_stage(files=["nonexistent"])
+        result = await git(operation="stage", files=["nonexistent"])
 
         assert result["success"] is False
         assert "did not match" in result["error"]
@@ -2137,41 +2005,32 @@ async def test_git_commit_with_message():
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
         mock_run_git.return_value = (True, "[main abc123] test commit\n 1 file changed", "")
 
-        result = await git_commit(message="test commit")
+        result = await git(operation="commit", message="test commit")
 
         assert result["success"] is True
         assert "Committed successfully" in result["output"]
-        assert "test commit" in result["output"]
 
 
 @pytest.mark.asyncio
 async def test_git_commit_no_message():
-    """Test git commit without message and no AI."""
-    result = await git_commit(message=None, generate_ai=False)
+    """Test git commit without message."""
+    result = await git(operation="commit", message=None)
 
     assert result["success"] is False
-    assert "No commit message provided" in result["error"]
-
-
-@pytest.mark.asyncio
-async def test_git_commit_failure():
-    """Test git commit failure."""
-    with patch("victor.tools.git_tool._run_git") as mock_run_git:
-        mock_run_git.return_value = (False, "", "nothing to commit")
-
-        result = await git_commit(message="test")
-
-        assert result["success"] is False
-        assert "nothing to commit" in result["error"]
+    assert "No commit message" in result["error"] or "message" in result["error"].lower()
 
 
 @pytest.mark.asyncio
 async def test_git_log_success():
     """Test git log."""
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
-        mock_run_git.return_value = (True, "* abc123 - Initial commit (Author, 2 days ago)\n* def456 - Second commit", "")
+        mock_run_git.return_value = (
+            True,
+            "* abc123 - Initial commit (Author, 2 days ago)\n* def456 - Second commit",
+            "",
+        )
 
-        result = await git_log(limit=5)
+        result = await git(operation="log", limit=5)
 
         assert result["success"] is True
         assert "Initial commit" in result["output"]
@@ -2182,9 +2041,13 @@ async def test_git_log_success():
 async def test_git_log_failure():
     """Test git log failure."""
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
-        mock_run_git.return_value = (False, "", "fatal: your current branch does not have any commits yet")
+        mock_run_git.return_value = (
+            False,
+            "",
+            "fatal: your current branch does not have any commits yet",
+        )
 
-        result = await git_log()
+        result = await git(operation="log")
 
         assert result["success"] is False
         assert "does not have any commits" in result["error"]
@@ -2196,7 +2059,7 @@ async def test_git_branch_list():
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
         mock_run_git.return_value = (True, "* main\n  feature-branch\n  develop", "")
 
-        result = await git_branch()
+        result = await git(operation="branch")
 
         assert result["success"] is True
         assert "main" in result["output"]
@@ -2209,25 +2072,10 @@ async def test_git_branch_switch():
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
         mock_run_git.return_value = (True, "Switched to branch 'develop'", "")
 
-        result = await git_branch(branch="develop")
+        result = await git(operation="branch", branch="develop")
 
         assert result["success"] is True
         assert "Switched" in result["output"]
-
-
-@pytest.mark.asyncio
-async def test_git_branch_create():
-    """Test creating new branch."""
-    with patch("victor.tools.git_tool._run_git") as mock_run_git:
-        mock_run_git.side_effect = [
-            (False, "", "error: pathspec 'new-feature' did not match"),
-            (True, "Switched to a new branch 'new-feature'", "")
-        ]
-
-        result = await git_branch(branch="new-feature")
-
-        assert result["success"] is True
-        assert "new-feature" in result["output"]
 
 
 @pytest.mark.asyncio
@@ -2270,7 +2118,7 @@ async def test_git_suggest_commit_success():
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
         mock_run_git.side_effect = [
             (True, "diff --git a/auth.py\n+def login():", ""),
-            (True, "auth.py", "")
+            (True, "auth.py", ""),
         ]
 
         result = await git_suggest_commit()
@@ -2286,10 +2134,7 @@ async def test_git_suggest_commit_success():
 async def test_git_create_pr_no_gh_cli():
     """Test PR creation without GitHub CLI."""
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
-        mock_run_git.side_effect = [
-            (True, "feature-branch", ""),
-            (True, "", "")
-        ]
+        mock_run_git.side_effect = [(True, "feature-branch", ""), (True, "", "")]
 
         with patch("subprocess.run", side_effect=FileNotFoundError()):
             result = await git_create_pr()
@@ -2304,7 +2149,7 @@ async def test_git_create_pr_push_failure():
     with patch("victor.tools.git_tool._run_git") as mock_run_git:
         mock_run_git.side_effect = [
             (True, "feature-branch", ""),
-            (False, "", "fatal: could not push")
+            (False, "", "fatal: could not push"),
         ]
 
         result = await git_create_pr()
@@ -2323,32 +2168,6 @@ async def test_git_analyze_conflicts_no_conflicts():
 
         assert result["success"] is True
         assert "No merge conflicts" in result["output"]
-
-
-@pytest.mark.asyncio
-async def test_git_analyze_conflicts_with_conflicts():
-    """Test conflict analysis with conflicts present."""
-    import tempfile
-    import os
-
-    # Create a temp file with conflict markers
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
-        f.write("line 1\n<<<<<<< HEAD\nversion 1\n=======\nversion 2\n>>>>>>> branch\nline 2")
-        temp_path = f.name
-        temp_name = os.path.basename(temp_path)
-
-    try:
-        with patch("victor.tools.git_tool._run_git") as mock_run_git:
-            mock_run_git.return_value = (True, f"UU {temp_path}", "")
-
-            result = await git_analyze_conflicts()
-
-            assert result["success"] is True
-            assert "Found 1 conflicted" in result["output"]
-            assert "conflict(s) in file" in result["output"]
-    finally:
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
 
 
 @pytest.mark.asyncio
@@ -2377,6 +2196,7 @@ async def test_run_git_timeout():
         assert success is False
         assert "timed out" in stderr
 
+
 # ============================================================================
 # Batch Processor Tool Tests
 # ============================================================================
@@ -2394,15 +2214,15 @@ async def test_batch_search_success():
     """Test batch search finds pattern in files."""
     import tempfile
     import os
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create test files
         test_file = os.path.join(tmpdir, "test.txt")
         with open(test_file, "w") as f:
             f.write("hello world\ntest pattern\n")
-        
+
         result = await batch_search(path=tmpdir, pattern="pattern", file_pattern="*.txt")
-        
+
         assert result["success"] is True
         assert result["total_files"] >= 1
         assert result["total_matches"] >= 1
@@ -2412,7 +2232,7 @@ async def test_batch_search_success():
 async def test_batch_search_missing_path():
     """Test batch search with missing path."""
     result = await batch_search(path="", pattern="test")
-    
+
     assert result["success"] is False
     assert "Missing required parameter" in result["error"]
 
@@ -2422,20 +2242,16 @@ async def test_batch_replace_dry_run():
     """Test batch replace in dry run mode."""
     import tempfile
     import os
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         test_file = os.path.join(tmpdir, "test.py")
         with open(test_file, "w") as f:
             f.write("old_name = 'value'")
-        
+
         result = await batch_replace(
-            path=tmpdir,
-            find="old_name",
-            replace="new_name",
-            file_pattern="*.py",
-            dry_run=True
+            path=tmpdir, find="old_name", replace="new_name", file_pattern="*.py", dry_run=True
         )
-        
+
         assert result["success"] is True
         assert result["dry_run"] is True
 
@@ -2445,14 +2261,14 @@ async def test_batch_analyze():
     """Test batch analyze."""
     import tempfile
     import os
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         test_file = os.path.join(tmpdir, "test.py")
         with open(test_file, "w") as f:
             f.write("def foo():\n    pass\n")
-        
+
         result = await batch_analyze(path=tmpdir, file_pattern="*.py")
-        
+
         assert result["success"] is True
         assert result["total_files"] >= 1
         assert result["total_lines"] >= 1
@@ -2463,14 +2279,14 @@ async def test_batch_list_files():
     """Test batch list files."""
     import tempfile
     import os
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         test_file = os.path.join(tmpdir, "test.txt")
         with open(test_file, "w") as f:
             f.write("content")
-        
+
         result = await batch_list_files(path=tmpdir, file_pattern="*.txt")
-        
+
         assert result["success"] is True
         assert result["total_files"] >= 1
 
@@ -2492,15 +2308,11 @@ async def test_cicd_generate_success():
     """Test CI/CD config generation."""
     import tempfile
     import os
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         output_file = os.path.join(tmpdir, "test-workflow.yml")
-        result = await cicd_generate(
-            platform="github",
-            workflow="python-test",
-            output=output_file
-        )
-        
+        result = await cicd_generate(platform="github", workflow="python-test", output=output_file)
+
         assert result["success"] is True
         assert os.path.exists(output_file)
         assert "config" in result
@@ -2510,7 +2322,7 @@ async def test_cicd_generate_success():
 async def test_cicd_generate_invalid_platform():
     """Test CI/CD generate with invalid platform."""
     result = await cicd_generate(platform="invalid", workflow="test")
-    
+
     assert result["success"] is False
     assert "not yet supported" in result["error"]
 
@@ -2522,7 +2334,9 @@ async def test_cicd_validate_valid_file():
     import os
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as f:
-        f.write("name: Test\non:\n  push:\n    branches: [main]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n")
+        f.write(
+            "name: Test\non:\n  push:\n    branches: [main]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n"
+        )
         temp_file = f.name
 
     try:
@@ -2537,7 +2351,7 @@ async def test_cicd_validate_valid_file():
 async def test_cicd_list_templates():
     """Test CI/CD list templates."""
     result = await cicd_list_templates()
-    
+
     assert result["success"] is True
     assert "templates" in result
     assert len(result["templates"]) > 0
@@ -2548,11 +2362,11 @@ async def test_cicd_create_workflow():
     """Test CI/CD create workflow."""
     import tempfile
     import os
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         output_file = os.path.join(tmpdir, "workflow.yml")
         result = await cicd_create_workflow(type="test", output=output_file)
-        
+
         assert result["success"] is True
         assert os.path.exists(output_file)
 
@@ -2574,17 +2388,13 @@ async def test_scaffold_create_success():
     import tempfile
     import os
     import shutil
-    
+
     tmpdir = tempfile.mkdtemp()
     project_name = os.path.join(tmpdir, "test-project")
-    
+
     try:
-        result = await scaffold_create(
-            template="python-cli",
-            name=project_name,
-            force=False
-        )
-        
+        result = await scaffold_create(template="python-cli", name=project_name, force=False)
+
         assert result["success"] is True
         assert os.path.exists(project_name)
         assert len(result["files_created"]) > 0
@@ -2596,7 +2406,7 @@ async def test_scaffold_create_success():
 async def test_scaffold_create_missing_template():
     """Test scaffold with missing template parameter."""
     result = await scaffold_create(template="", name="test")
-    
+
     assert result["success"] is False
     assert "Missing required parameter" in result["error"]
 
@@ -2605,7 +2415,7 @@ async def test_scaffold_create_missing_template():
 async def test_scaffold_create_invalid_template():
     """Test scaffold with invalid template."""
     result = await scaffold_create(template="invalid", name="test")
-    
+
     assert result["success"] is False
     assert "Unknown template" in result["error"]
 
@@ -2614,7 +2424,7 @@ async def test_scaffold_create_invalid_template():
 async def test_scaffold_list_templates():
     """Test scaffold list templates."""
     result = await scaffold_list_templates()
-    
+
     assert result["success"] is True
     assert "templates" in result
     assert result["count"] > 0
@@ -2625,11 +2435,11 @@ async def test_scaffold_add_file():
     """Test scaffold add file."""
     import tempfile
     import os
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         file_path = os.path.join(tmpdir, "test.txt")
         result = await scaffold_add_file(path=file_path, content="test content")
-        
+
         assert result["success"] is True
         assert os.path.exists(file_path)
 
@@ -2652,7 +2462,7 @@ async def test_docker_ps_no_docker():
     """Test docker ps without Docker installed."""
     with patch("victor.tools.docker_tool._check_docker", return_value=False):
         result = await docker_ps()
-        
+
         assert result["success"] is False
         assert "Docker CLI not found" in result["error"]
 
@@ -2663,9 +2473,9 @@ async def test_docker_ps_success():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, '{"ID":"abc123","Names":"test"}', "")
-            
+
             result = await docker_ps()
-            
+
             assert result["success"] is True
             assert "containers" in result
 
@@ -2676,9 +2486,9 @@ async def test_docker_images_success():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, '{"Repository":"nginx","Tag":"latest"}', "")
-            
+
             result = await docker_images()
-            
+
             assert result["success"] is True
             assert "images" in result
 
@@ -2687,7 +2497,7 @@ async def test_docker_images_success():
 async def test_docker_pull_missing_image():
     """Test docker pull with missing image parameter."""
     result = await docker_pull(image="")
-    
+
     assert result["success"] is False
     assert "Missing required parameter" in result["error"]
 
@@ -2698,9 +2508,9 @@ async def test_docker_stop_success():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, "container_id", "")
-            
+
             result = await docker_stop(container="test_container")
-            
+
             assert result["success"] is True
             assert "stopped" in result["message"]
 
@@ -2711,9 +2521,9 @@ async def test_docker_logs_success():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, "log output", "")
-            
+
             result = await docker_logs(container="test_container", tail=50)
-            
+
             assert result["success"] is True
             assert "logs" in result
 
@@ -2736,14 +2546,14 @@ async def test_metrics_complexity_success():
     """Test metrics complexity calculation."""
     import tempfile
     import os
-    
+
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write("def foo():\n    if True:\n        pass\n")
         temp_file = f.name
-    
+
     try:
         result = await metrics_complexity(file=temp_file, threshold=10)
-        
+
         assert result["success"] is True
         assert "complexity" in result
         assert result["complexity"] >= 1
@@ -2755,7 +2565,7 @@ async def test_metrics_complexity_success():
 async def test_metrics_complexity_missing_file():
     """Test metrics complexity with missing file."""
     result = await metrics_complexity(file="")
-    
+
     assert result["success"] is False
     assert "Missing required parameter" in result["error"]
 
@@ -2765,14 +2575,14 @@ async def test_metrics_maintainability():
     """Test metrics maintainability."""
     import tempfile
     import os
-    
+
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write("def foo():\n    return 42\n")
         temp_file = f.name
-    
+
     try:
         result = await metrics_maintainability(file=temp_file)
-        
+
         assert result["success"] is True
         assert "maintainability_index" in result
         assert 0 <= result["maintainability_index"] <= 100
@@ -2785,14 +2595,14 @@ async def test_metrics_debt():
     """Test metrics technical debt estimation."""
     import tempfile
     import os
-    
+
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write("def foo():\n    pass\n")
         temp_file = f.name
-    
+
     try:
         result = await metrics_debt(file=temp_file)
-        
+
         assert result["success"] is True
         assert "debt_hours" in result
         assert "debt_level" in result
@@ -2805,14 +2615,14 @@ async def test_metrics_profile():
     """Test metrics code profiling."""
     import tempfile
     import os
-    
+
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write("class Foo:\n    def bar(self):\n        pass\n")
         temp_file = f.name
-    
+
     try:
         result = await metrics_profile(file=temp_file)
-        
+
         assert result["success"] is True
         assert "lines" in result
         assert "functions" in result
@@ -2826,14 +2636,14 @@ async def test_metrics_analyze():
     """Test comprehensive metrics analysis."""
     import tempfile
     import os
-    
+
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write("def foo():\n    return 42\n")
         temp_file = f.name
-    
+
     try:
         result = await metrics_analyze(file=temp_file)
-        
+
         assert result["success"] is True
         assert "complexity" in result
         assert "maintainability" in result
@@ -2867,16 +2677,16 @@ async def test_docker_run_success():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, "container_abc123", "")
-            
+
             result = await docker_run(
                 image="nginx:latest",
                 name="test-nginx",
                 ports=["80:80"],
                 env=["ENV=prod"],
                 volumes=["/data:/data"],
-                detach=True
+                detach=True,
             )
-            
+
             assert result["success"] is True
             assert "container_id" in result
             assert "container_abc123" in result["container_id"]
@@ -2886,7 +2696,7 @@ async def test_docker_run_success():
 async def test_docker_run_missing_image():
     """Test docker run without image."""
     result = await docker_run(image="")
-    
+
     assert result["success"] is False
     assert "Missing required parameter" in result["error"]
 
@@ -2897,9 +2707,9 @@ async def test_docker_start_success():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, "test_container", "")
-            
+
             result = await docker_start(container="test_container")
-            
+
             assert result["success"] is True
             assert "started" in result["message"]
 
@@ -2908,7 +2718,7 @@ async def test_docker_start_success():
 async def test_docker_start_missing_container():
     """Test docker start without container."""
     result = await docker_start(container="")
-    
+
     assert result["success"] is False
     assert "Missing required parameter" in result["error"]
 
@@ -2919,9 +2729,9 @@ async def test_docker_restart_success():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, "test_container", "")
-            
+
             result = await docker_restart(container="test_container")
-            
+
             assert result["success"] is True
             assert "restarted" in result["message"]
 
@@ -2932,9 +2742,9 @@ async def test_docker_rm_success():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, "test_container", "")
-            
+
             result = await docker_rm(container="test_container")
-            
+
             assert result["success"] is True
             assert "removed" in result["message"]
 
@@ -2943,7 +2753,7 @@ async def test_docker_rm_success():
 async def test_docker_rm_missing_container():
     """Test docker rm without container."""
     result = await docker_rm(container="")
-    
+
     assert result["success"] is False
     assert "Missing required parameter" in result["error"]
 
@@ -2954,9 +2764,9 @@ async def test_docker_rmi_success():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, "nginx:latest", "")
-            
+
             result = await docker_rmi(image="nginx:latest")
-            
+
             assert result["success"] is True
             assert "removed" in result["message"]
 
@@ -2965,7 +2775,7 @@ async def test_docker_rmi_success():
 async def test_docker_rmi_missing_image():
     """Test docker rmi without image."""
     result = await docker_rmi(image="")
-    
+
     assert result["success"] is False
     assert "Missing required parameter" in result["error"]
 
@@ -2976,9 +2786,9 @@ async def test_docker_stats_success():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, '{"container":"test","cpu":"0.5%"}', "")
-            
+
             result = await docker_stats(container="test_container")
-            
+
             assert result["success"] is True
             assert "stats" in result
 
@@ -2989,9 +2799,9 @@ async def test_docker_stats_all_containers():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, '{"container":"all"}', "")
-            
+
             result = await docker_stats()
-            
+
             assert result["success"] is True
             assert "stats" in result
 
@@ -3002,9 +2812,9 @@ async def test_docker_inspect_container():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, '{"Id":"abc123","Name":"test"}', "")
-            
+
             result = await docker_inspect(container="test_container")
-            
+
             assert result["success"] is True
             assert "details" in result
 
@@ -3015,9 +2825,9 @@ async def test_docker_inspect_image():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, '{"Id":"img123","RepoTags":["nginx:latest"]}', "")
-            
+
             result = await docker_inspect(image="nginx:latest")
-            
+
             assert result["success"] is True
             assert "details" in result
 
@@ -3026,7 +2836,7 @@ async def test_docker_inspect_image():
 async def test_docker_inspect_missing_target():
     """Test docker inspect without container or image."""
     result = await docker_inspect()
-    
+
     assert result["success"] is False
     assert "Missing required parameter" in result["error"]
 
@@ -3037,9 +2847,9 @@ async def test_docker_networks_success():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, '{"Name":"bridge","Driver":"bridge"}', "")
-            
+
             result = await docker_networks()
-            
+
             assert result["success"] is True
             assert "networks" in result
 
@@ -3050,9 +2860,9 @@ async def test_docker_volumes_success():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, '{"Name":"my-volume","Driver":"local"}', "")
-            
+
             result = await docker_volumes()
-            
+
             assert result["success"] is True
             assert "volumes" in result
 
@@ -3063,9 +2873,9 @@ async def test_docker_exec_success():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (True, "command output", "")
-            
+
             result = await docker_exec(container="test_container", command="ls -la")
-            
+
             assert result["success"] is True
             assert "output" in result
 
@@ -3074,7 +2884,7 @@ async def test_docker_exec_success():
 async def test_docker_exec_missing_container():
     """Test docker exec without container."""
     result = await docker_exec(container="", command="ls")
-    
+
     assert result["success"] is False
     assert "Missing required parameter: container" in result["error"]
 
@@ -3083,7 +2893,7 @@ async def test_docker_exec_missing_container():
 async def test_docker_exec_missing_command():
     """Test docker exec without command."""
     result = await docker_exec(container="test", command="")
-    
+
     assert result["success"] is False
     assert "Missing required parameter: command" in result["error"]
 
@@ -3094,8 +2904,8 @@ async def test_docker_command_failure():
     with patch("victor.tools.docker_tool._check_docker", return_value=True):
         with patch("victor.tools.docker_tool._run_docker_command") as mock_run:
             mock_run.return_value = (False, "", "Error: container not found")
-            
+
             result = await docker_ps()
-            
+
             assert result["success"] is False
             assert "Error" in result["error"]

@@ -37,9 +37,7 @@ class EmbeddingRegistry:
     _providers: Dict[str, Type[BaseEmbeddingProvider]] = {}
 
     @classmethod
-    def register(
-        cls, name: str, provider_class: Type[BaseEmbeddingProvider]
-    ) -> None:
+    def register(cls, name: str, provider_class: Type[BaseEmbeddingProvider]) -> None:
         """Register an embedding provider.
 
         Args:
@@ -47,9 +45,7 @@ class EmbeddingRegistry:
             provider_class: Provider class (must inherit from BaseEmbeddingProvider)
         """
         if not issubclass(provider_class, BaseEmbeddingProvider):
-            raise TypeError(
-                f"{provider_class} must inherit from BaseEmbeddingProvider"
-            )
+            raise TypeError(f"{provider_class} must inherit from BaseEmbeddingProvider")
 
         cls._providers[name] = provider_class
         print(f"Registered embedding provider: {name}")

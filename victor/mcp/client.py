@@ -18,7 +18,6 @@ Connects to external MCP servers to access their tools and resources,
 extending Victor's capabilities with third-party integrations.
 """
 
-import asyncio
 import json
 import subprocess
 import uuid
@@ -205,9 +204,7 @@ class MCPClient:
         if not self.initialized:
             return None
 
-        response = await self._send_request(
-            MCPMessageType.READ_RESOURCE, {"uri": uri}
-        )
+        response = await self._send_request(MCPMessageType.READ_RESOURCE, {"uri": uri})
 
         if response and "result" in response:
             return response["result"].get("content")

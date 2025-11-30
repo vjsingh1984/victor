@@ -103,7 +103,9 @@ class OllamaProvider(BaseProvider):
             except Exception as exc:
                 logger.warning(f"Ollama endpoint {url} not reachable ({exc}); trying next.")
 
-        logger.error(f"No Ollama endpoints reachable from: {candidates}. Falling back to {base_url}")
+        logger.error(
+            f"No Ollama endpoints reachable from: {candidates}. Falling back to {base_url}"
+        )
         return base_url
 
     async def chat(
@@ -230,7 +232,7 @@ class OllamaProvider(BaseProvider):
                         if chunk.is_final:
                             logger.debug(f"Received final chunk after {line_count} lines")
                             break
-                    except json.JSONDecodeError as jde:
+                    except json.JSONDecodeError:
                         logger.warning(f"JSON decode error on line: {line[:100]}")
 
         except httpx.TimeoutException as e:
@@ -278,10 +280,7 @@ class OllamaProvider(BaseProvider):
         """
         payload: Dict[str, Any] = {
             "model": model,
-            "messages": [
-                {"role": msg.role, "content": msg.content}
-                for msg in messages
-            ],
+            "messages": [{"role": msg.role, "content": msg.content} for msg in messages],
             "stream": stream,
             "options": {
                 "temperature": temperature,
@@ -310,7 +309,9 @@ class OllamaProvider(BaseProvider):
         payload.update(kwargs)
         return payload
 
-    def _normalize_tool_calls(self, tool_calls: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
+    def _normalize_tool_calls(
+        self, tool_calls: Optional[List[Dict[str, Any]]]
+    ) -> Optional[List[Dict[str, Any]]]:
         """Normalize tool calls from Ollama's OpenAI-compatible format.
 
         Ollama returns tool calls in OpenAI format:
@@ -330,14 +331,13 @@ class OllamaProvider(BaseProvider):
 
         normalized = []
         for call in tool_calls:
-            if isinstance(call, dict) and 'function' in call:
+            if isinstance(call, dict) and "function" in call:
                 # OpenAI format
-                function = call.get('function', {})
-                normalized.append({
-                    'name': function.get('name'),
-                    'arguments': function.get('arguments', {})
-                })
-            elif isinstance(call, dict) and 'name' in call:
+                function = call.get("function", {})
+                normalized.append(
+                    {"name": function.get("name"), "arguments": function.get("arguments", {})}
+                )
+            elif isinstance(call, dict) and "name" in call:
                 # Already normalized
                 normalized.append(call)
             else:
@@ -375,10 +375,7 @@ class OllamaProvider(BaseProvider):
                 arguments = data.get("arguments") or data.get("parameters", {})
 
                 # Convert to normalized format
-                return [{
-                    "name": data.get("name"),
-                    "arguments": arguments
-                }]
+                return [{"name": data.get("name"), "arguments": arguments}]
         except (json.JSONDecodeError, ValueError):
             # Not JSON or invalid format
             pass
@@ -447,7 +444,9 @@ class OllamaProvider(BaseProvider):
             parsed_tool_calls = self._parse_json_tool_call_from_content(content)
             if parsed_tool_calls:
                 model = chunk_data.get("model", "unknown")
-                logger.debug(f"Parsed tool call from streaming content (fallback for model: {model})")
+                logger.debug(
+                    f"Parsed tool call from streaming content (fallback for model: {model})"
+                )
                 tool_calls = parsed_tool_calls
                 # Clear content since it was a tool call, not actual text response
                 content = ""

@@ -34,10 +34,12 @@ class TestSecurityScanSecrets:
     async def test_scan_secrets_finds_api_key(self, tmp_path):
         """Test detecting API keys in code."""
         test_file = tmp_path / "config.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 API_KEY = "sk_test_1234567890abcdefghijklmnop"
 api_key = "1234567890abcdefghijklmnopqrstuvwxyz"
-""")
+"""
+        )
 
         result = await security_scan_secrets(path=str(tmp_path))
 
@@ -49,10 +51,12 @@ api_key = "1234567890abcdefghijklmnopqrstuvwxyz"
     async def test_scan_secrets_finds_password(self, tmp_path):
         """Test detecting passwords in code."""
         test_file = tmp_path / "auth.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 password = "MySecretPassword123"
 PASSWORD = "AnotherPassword456"
-""")
+"""
+        )
 
         result = await security_scan_secrets(path=str(tmp_path))
 
@@ -64,10 +68,12 @@ PASSWORD = "AnotherPassword456"
     async def test_scan_secrets_finds_token(self, tmp_path):
         """Test detecting tokens in code."""
         test_file = tmp_path / "api.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 auth_token = "ghp_1234567890abcdefghijklmnopqrstuvwxyz1234"
 TOKEN = "Bearer_1234567890abcdefghijklmnopqrstuvwxyz"
-""")
+"""
+        )
 
         result = await security_scan_secrets(path=str(tmp_path))
 
@@ -78,11 +84,13 @@ TOKEN = "Bearer_1234567890abcdefghijklmnopqrstuvwxyz"
     async def test_scan_secrets_finds_private_key(self, tmp_path):
         """Test detecting private keys."""
         test_file = tmp_path / "keys.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 private_key = '''-----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC
 -----END PRIVATE KEY-----'''
-""")
+"""
+        )
 
         result = await security_scan_secrets(path=str(tmp_path))
 
@@ -94,11 +102,13 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC
     async def test_scan_secrets_no_secrets_found(self, tmp_path):
         """Test scanning clean code with no secrets."""
         test_file = tmp_path / "clean.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 def hello_world():
     print("Hello, World!")
     return True
-""")
+"""
+        )
 
         result = await security_scan_secrets(path=str(tmp_path))
 
@@ -188,12 +198,14 @@ class TestSecurityScanDependencies:
     async def test_scan_dependencies_success(self, tmp_path):
         """Test scanning requirements file."""
         req_file = tmp_path / "requirements.txt"
-        req_file.write_text("""
+        req_file.write_text(
+            """
 django==3.2.0
 flask==1.1.2
 requests==2.25.0
 pytest==6.2.0
-""")
+"""
+        )
 
         result = await security_scan_dependencies(requirements_file=str(req_file))
 
@@ -204,11 +216,13 @@ pytest==6.2.0
     async def test_scan_dependencies_with_vulnerabilities(self, tmp_path):
         """Test detecting known vulnerable packages."""
         req_file = tmp_path / "requirements.txt"
-        req_file.write_text("""
+        req_file.write_text(
+            """
 django==2.0.0
 flask==0.12.0
 requests==2.20.0
-""")
+"""
+        )
 
         result = await security_scan_dependencies(requirements_file=str(req_file))
 
@@ -228,12 +242,14 @@ requests==2.20.0
     async def test_scan_dependencies_with_comments(self, tmp_path):
         """Test scanning requirements with comments."""
         req_file = tmp_path / "requirements.txt"
-        req_file.write_text("""
+        req_file.write_text(
+            """
 # Production dependencies
 django==3.2.0
 # Testing dependencies
 pytest==6.2.0
-""")
+"""
+        )
 
         result = await security_scan_dependencies(requirements_file=str(req_file))
 
@@ -245,11 +261,13 @@ pytest==6.2.0
         """Test scanning with packages that have no known vulnerabilities."""
         req_file = tmp_path / "requirements.txt"
         # Use very recent or less common packages that likely have no known vulns
-        req_file.write_text("""
+        req_file.write_text(
+            """
 pytest==7.4.0
 black==23.7.0
 mypy==1.4.1
-""")
+"""
+        )
 
         result = await security_scan_dependencies(requirements_file=str(req_file))
 
@@ -284,10 +302,12 @@ class TestSecurityScanConfig:
     async def test_scan_config_finds_debug_mode(self, tmp_path):
         """Test detecting debug mode enabled."""
         test_file = tmp_path / "settings.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 DEBUG = True
 debug = true
-""")
+"""
+        )
 
         result = await security_scan_config(path=str(tmp_path))
 
@@ -299,10 +319,12 @@ debug = true
     async def test_scan_config_finds_insecure_protocol(self, tmp_path):
         """Test detecting insecure HTTP protocol."""
         test_file = tmp_path / "api.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 API_URL = "http://api.example.com/data"
 BASE_URL = "http://insecure-site.com"
-""")
+"""
+        )
 
         result = await security_scan_config(path=str(tmp_path))
 
@@ -313,10 +335,12 @@ BASE_URL = "http://insecure-site.com"
     async def test_scan_config_finds_hardcoded_ip(self, tmp_path):
         """Test detecting hardcoded IP addresses."""
         test_file = tmp_path / "config.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 DATABASE_HOST = "192.168.1.100"
 API_SERVER = "10.0.0.1"
-""")
+"""
+        )
 
         result = await security_scan_config(path=str(tmp_path))
 
@@ -327,11 +351,13 @@ API_SERVER = "10.0.0.1"
     async def test_scan_config_clean_file(self, tmp_path):
         """Test scanning secure configuration."""
         test_file = tmp_path / "secure.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 DEBUG = False
 API_URL = "https://secure-api.example.com"
 DATABASE_HOST = "database.example.com"
-""")
+"""
+        )
 
         result = await security_scan_config(path=str(tmp_path))
 
@@ -374,7 +400,7 @@ DATABASE_HOST = "database.example.com"
 
         # Create a valid file
         test_file = tmp_path / "test.py"
-        test_file.write_text('DEBUG = True')
+        test_file.write_text("DEBUG = True")
 
         # Mock open to raise an exception
         with patch("builtins.open", side_effect=PermissionError("Access denied")):
@@ -392,11 +418,13 @@ class TestSecurityScanAll:
         """Test comprehensive security scan."""
         # Create test files
         py_file = tmp_path / "app.py"
-        py_file.write_text("""
+        py_file.write_text(
+            """
 api_key = "sk_test_1234567890abcdefghijklmnop"
 DEBUG = True
 API_URL = "http://insecure.com"
-""")
+"""
+        )
 
         req_file = tmp_path / "requirements.txt"
         req_file.write_text("django==3.2.0\nflask==1.1.2")
@@ -412,10 +440,12 @@ API_URL = "http://insecure.com"
     async def test_scan_all_clean_project(self, tmp_path):
         """Test scanning a clean project."""
         clean_file = tmp_path / "clean.py"
-        clean_file.write_text("""
+        clean_file.write_text(
+            """
 def hello():
     return "Hello, World!"
-""")
+"""
+        )
 
         result = await security_scan_all(path=str(tmp_path))
 
@@ -437,10 +467,12 @@ class TestSecurityCheckFile:
     async def test_check_file_with_secrets(self, tmp_path):
         """Test checking file with secrets."""
         test_file = tmp_path / "test.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 api_key = "sk_test_1234567890abcdefghijklmnop"
 password = "MySecretPassword123"
-""")
+"""
+        )
 
         result = await security_check_file(file=str(test_file))
 
@@ -451,10 +483,12 @@ password = "MySecretPassword123"
     async def test_check_file_with_config_issues(self, tmp_path):
         """Test checking file with config issues."""
         test_file = tmp_path / "settings.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 DEBUG = True
 API_URL = "http://insecure.com"
-""")
+"""
+        )
 
         result = await security_check_file(file=str(test_file))
 
@@ -465,10 +499,12 @@ API_URL = "http://insecure.com"
     async def test_check_file_clean(self, tmp_path):
         """Test checking clean file."""
         test_file = tmp_path / "clean.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 def calculate(x, y):
     return x + y
-""")
+"""
+        )
 
         result = await security_check_file(file=str(test_file))
 

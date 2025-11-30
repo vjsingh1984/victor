@@ -23,12 +23,13 @@ Features:
 - Dry-run mode
 """
 
-import asyncio
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
 
 from victor.tools.decorators import tool
 
@@ -50,10 +51,11 @@ def set_batch_processor_config(max_workers: int = 4) -> None:
 
 # Helper functions for parallel processing
 
+
 async def _parallel_search(
     files: List[Path], pattern: str, use_regex: bool
 ) -> List[Dict[str, Any]]:
-    """Search files in parallel."""
+    """Search files in parallel with progress indication."""
     results = []
 
     def search_file(file_path: Path) -> Optional[Dict[str, Any]]:
@@ -64,15 +66,11 @@ async def _parallel_search(
             if use_regex:
                 for line_num, line in enumerate(content.split("\n"), 1):
                     if re.search(pattern, line):
-                        matches.append(
-                            {"line": line_num, "text": line.strip()[:100]}
-                        )
+                        matches.append({"line": line_num, "text": line.strip()[:100]})
             else:
                 for line_num, line in enumerate(content.split("\n"), 1):
                     if pattern in line:
-                        matches.append(
-                            {"line": line_num, "text": line.strip()[:100]}
-                        )
+                        matches.append({"line": line_num, "text": line.strip()[:100]})
 
             if matches:
                 return {"file": str(file_path), "matches": matches}
@@ -82,14 +80,24 @@ async def _parallel_search(
 
         return None
 
-    # Execute in parallel
-    with ThreadPoolExecutor(max_workers=_max_workers) as executor:
-        futures = {executor.submit(search_file, f): f for f in files}
+    # Execute in parallel with progress tracking
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeRemainingColumn(),
+    ) as progress:
+        task = progress.add_task(f"Searching {len(files)} files...", total=len(files))
 
-        for future in as_completed(futures):
-            result = future.result()
-            if result:
-                results.append(result)
+        with ThreadPoolExecutor(max_workers=_max_workers) as executor:
+            futures = {executor.submit(search_file, f): f for f in files}
+
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    results.append(result)
+                progress.update(task, advance=1)
 
     return results
 
@@ -101,7 +109,7 @@ async def _parallel_replace(
     use_regex: bool,
     dry_run: bool,
 ) -> List[Dict[str, Any]]:
-    """Replace in files in parallel."""
+    """Replace in files in parallel with progress indication."""
     results = []
 
     def replace_in_file(file_path: Path) -> Optional[Dict[str, Any]]:
@@ -115,8 +123,10 @@ async def _parallel_replace(
                 new_content = content.replace(find_text, replace_text)
 
             if new_content != original:
-                count = content.count(find_text) if not use_regex else len(
-                    re.findall(find_text, content)
+                count = (
+                    content.count(find_text)
+                    if not use_regex
+                    else len(re.findall(find_text, content))
                 )
 
                 if not dry_run:
@@ -134,20 +144,31 @@ async def _parallel_replace(
 
         return None
 
-    # Execute in parallel
-    with ThreadPoolExecutor(max_workers=_max_workers) as executor:
-        futures = {executor.submit(replace_in_file, f): f for f in files}
+    # Execute in parallel with progress tracking
+    mode = "DRY RUN" if dry_run else "REPLACING"
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeRemainingColumn(),
+    ) as progress:
+        task = progress.add_task(f"{mode} in {len(files)} files...", total=len(files))
 
-        for future in as_completed(futures):
-            result = future.result()
-            if result:
-                results.append(result)
+        with ThreadPoolExecutor(max_workers=_max_workers) as executor:
+            futures = {executor.submit(replace_in_file, f): f for f in files}
+
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    results.append(result)
+                progress.update(task, advance=1)
 
     return results
 
 
 async def _parallel_analyze(files: List[Path]) -> List[Dict[str, Any]]:
-    """Analyze files in parallel."""
+    """Analyze files in parallel with progress indication."""
     results = []
 
     def analyze_file(file_path: Path) -> Dict[str, Any]:
@@ -169,13 +190,23 @@ async def _parallel_analyze(files: List[Path]) -> List[Dict[str, Any]]:
                 "error": str(e),
             }
 
-    # Execute in parallel
-    with ThreadPoolExecutor(max_workers=_max_workers) as executor:
-        futures = {executor.submit(analyze_file, f): f for f in files}
+    # Execute in parallel with progress tracking
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeRemainingColumn(),
+    ) as progress:
+        task = progress.add_task(f"Analyzing {len(files)} files...", total=len(files))
 
-        for future in as_completed(futures):
-            result = future.result()
-            results.append(result)
+        with ThreadPoolExecutor(max_workers=_max_workers) as executor:
+            futures = {executor.submit(analyze_file, f): f for f in files}
+
+            for future in as_completed(futures):
+                result = future.result()
+                results.append(result)
+                progress.update(task, advance=1)
 
     return results
 
@@ -191,7 +222,7 @@ async def batch(
     regex: bool = False,
     dry_run: bool = False,
     max_files: int = 1000,
-    options: Optional[Dict[str, Any]] = None
+    options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     r"""
     Unified batch processing tool for multi-file operations.
@@ -259,7 +290,7 @@ async def batch(
             "success": True,
             "operation": operation,
             "results": [],
-            "message": f"No files matching pattern '{file_pattern}' found"
+            "message": f"No files matching pattern '{file_pattern}' found",
         }
 
     # Search operation
@@ -279,7 +310,11 @@ async def batch(
         report.append("")
 
         for result in results[:20]:
-            rel_path = Path(result["file"]).relative_to(path_obj) if path_obj.is_dir() else Path(result["file"]).name
+            rel_path = (
+                Path(result["file"]).relative_to(path_obj)
+                if path_obj.is_dir()
+                else Path(result["file"]).name
+            )
             report.append(f"{rel_path}")
             for match in result["matches"][:5]:
                 report.append(f"  Line {match['line']}: {match['text']}")
@@ -296,7 +331,7 @@ async def batch(
             "results": results,
             "total_files": len(results),
             "total_matches": total_matches,
-            "formatted_report": "\n".join(report)
+            "formatted_report": "\n".join(report),
         }
 
     # Replace operation
@@ -317,12 +352,18 @@ async def batch(
         report.append("")
 
         for result in results[:30]:
-            rel_path = Path(result["file"]).relative_to(path_obj) if path_obj.is_dir() else Path(result["file"]).name
+            rel_path = (
+                Path(result["file"]).relative_to(path_obj)
+                if path_obj.is_dir()
+                else Path(result["file"]).name
+            )
             if "error" in result:
                 report.append(f"❌ {rel_path}: {result['error']}")
             else:
                 status = "Preview" if dry_run else "Modified"
-                report.append(f"✓ {rel_path}: {result.get('replacements', 0)} replacements ({status})")
+                report.append(
+                    f"✓ {rel_path}: {result.get('replacements', 0)} replacements ({status})"
+                )
 
         if dry_run:
             report.append("")
@@ -336,7 +377,7 @@ async def batch(
             "total_files": len(results),
             "total_replacements": total_replacements,
             "dry_run": dry_run,
-            "formatted_report": "\n".join(report)
+            "formatted_report": "\n".join(report),
         }
 
     # Analyze operation
@@ -369,7 +410,9 @@ async def batch(
         report.append("")
         report.append("By file type:")
         for ext, stats in sorted(by_ext.items(), key=lambda x: x[1]["count"], reverse=True):
-            report.append(f"  {ext}: {stats['count']} files, {stats['lines']:,} lines, {stats['size'] / 1024:.2f} KB")
+            report.append(
+                f"  {ext}: {stats['count']} files, {stats['lines']:,} lines, {stats['size'] / 1024:.2f} KB"
+            )
 
         return {
             "success": True,
@@ -379,7 +422,7 @@ async def batch(
             "total_lines": total_lines,
             "total_size": total_size,
             "by_extension": by_ext,
-            "formatted_report": "\n".join(report)
+            "formatted_report": "\n".join(report),
         }
 
     # List operation
@@ -411,20 +454,17 @@ async def batch(
             "operation": "list",
             "files": file_info,
             "total_files": len(files),
-            "formatted_report": "\n".join(report)
+            "formatted_report": "\n".join(report),
         }
 
     # Transform operation (placeholder)
     elif operation == "transform":
-        return {
-            "success": False,
-            "error": "Transform operation not yet implemented"
-        }
+        return {"success": False, "error": "Transform operation not yet implemented"}
 
     else:
         return {
             "success": False,
-            "error": f"Unknown operation: {operation}. Valid operations: search, replace, analyze, list, transform"
+            "error": f"Unknown operation: {operation}. Valid operations: search, replace, analyze, list, transform",
         }
 
 
@@ -435,9 +475,10 @@ class BatchProcessorTool:
     def __init__(self, max_workers: int = 4):
         """Initialize - deprecated."""
         import warnings
+
         warnings.warn(
             "BatchProcessorTool class is deprecated. Use batch function instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
         set_batch_processor_config(max_workers)

@@ -27,6 +27,7 @@ class TestToolDecorator:
 
     def test_tool_decorator_basic_function(self):
         """Test @tool decorator on a basic function."""
+
         @tool
         def simple_function(param1: str, param2: int = 5):
             """A simple test function.
@@ -38,7 +39,7 @@ class TestToolDecorator:
             return f"{param1}-{param2}"
 
         # Check that decorator creates Tool attribute (which is an instance)
-        assert hasattr(simple_function, 'Tool')
+        assert hasattr(simple_function, "Tool")
         assert isinstance(simple_function.Tool, BaseTool)
 
         # Function should still be callable
@@ -47,6 +48,7 @@ class TestToolDecorator:
 
     def test_tool_decorator_with_context(self):
         """Test @tool decorator with context parameter."""
+
         @tool
         async def function_with_context(context: Dict[str, Any], value: str):
             """Function that uses context.
@@ -57,10 +59,11 @@ class TestToolDecorator:
             """
             return {"context_used": context is not None, "value": value}
 
-        assert hasattr(function_with_context, 'Tool')
+        assert hasattr(function_with_context, "Tool")
 
     def test_tool_decorator_preserves_metadata(self):
         """Test that decorator preserves function metadata."""
+
         @tool
         def metadata_function(param: str):
             """Test function for metadata.
@@ -76,6 +79,7 @@ class TestToolDecorator:
     @pytest.mark.asyncio
     async def test_tool_execution_success(self):
         """Test successful tool execution."""
+
         @tool
         async def async_tool(value: int):
             """Async tool function.
@@ -99,6 +103,7 @@ class TestToolDecorator:
     @pytest.mark.asyncio
     async def test_tool_execution_with_exception(self):
         """Test tool execution with exception."""
+
         @tool
         async def failing_tool(value: int):
             """Tool that raises exception.
@@ -120,6 +125,7 @@ class TestToolDecorator:
     @pytest.mark.asyncio
     async def test_tool_execution_sync_function(self):
         """Test tool execution with synchronous function."""
+
         @tool
         def sync_tool(value: str):
             """Synchronous tool function.
@@ -139,6 +145,7 @@ class TestToolDecorator:
     @pytest.mark.asyncio
     async def test_tool_execution_with_context_injection(self):
         """Test that context is injected when function has context parameter."""
+
         @tool
         async def context_aware_tool(context: Dict[str, Any], value: str):
             """Tool that uses context.
@@ -159,6 +166,7 @@ class TestToolDecorator:
 
     def test_tool_properties(self):
         """Test that tool properties are accessible."""
+
         @tool
         def property_test_tool(param1: str, param2: int = 10):
             """A tool for testing properties.
@@ -194,12 +202,8 @@ class TestCreateToolClass:
 
     def test_create_tool_class_with_typed_parameters(self):
         """Test creating tool class with type annotations."""
-        def typed_function(
-            str_param: str,
-            int_param: int,
-            float_param: float,
-            bool_param: bool
-        ):
+
+        def typed_function(str_param: str, int_param: int, float_param: float, bool_param: bool):
             """Function with typed parameters.
 
             Args:
@@ -220,6 +224,7 @@ class TestCreateToolClass:
 
     def test_create_tool_class_with_no_docstring(self):
         """Test creating tool class with no docstring."""
+
         def no_docstring_function(param):
             return param
 
@@ -229,6 +234,7 @@ class TestCreateToolClass:
 
     def test_create_tool_class_with_var_args(self):
         """Test creating tool class with *args and **kwargs parameters."""
+
         def var_args_function(*args, **kwargs):
             """Function with variable arguments.
 
@@ -247,6 +253,7 @@ class TestCreateToolClass:
 
     def test_create_tool_class_with_keyword_only_params(self):
         """Test creating tool class with keyword-only parameters."""
+
         def keyword_only_function(normal_param: str, *, keyword_only: int):
             """Function with keyword-only parameter.
 
@@ -264,6 +271,7 @@ class TestCreateToolClass:
 
     def test_create_tool_class_inherits_base_tool(self):
         """Test that created tool instance is a BaseTool."""
+
         def test_function(param: str):
             """Test function.
 
@@ -278,6 +286,7 @@ class TestCreateToolClass:
 
     def test_create_tool_class_to_json_schema(self):
         """Test that tool can be converted to JSON schema."""
+
         def schema_test_function(param: str):
             """Schema test function.
 

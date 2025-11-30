@@ -2,6 +2,8 @@
 
 This Docker image includes **pre-downloaded embedding models** for 100% offline operation.
 
+**If you only need commands, see `docker/QUICKREF.md`. For a guided setup, see `docs/guides/QUICKSTART.md`.**
+
 ## Features
 
 ✅ **Air-gapped Capable**: Works without internet after build
@@ -12,7 +14,14 @@ This Docker image includes **pre-downloaded embedding models** for 100% offline 
 
 ## Quick Start
 
-### Build Air-gapped Image
+### Fast Path (recommended)
+
+```bash
+# Build, pull defaults, and smoke test
+./docker-quickstart.sh
+```
+
+### Build Air-gapped Image (manual)
 
 ```bash
 # Build Docker image with embedded model

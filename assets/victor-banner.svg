@@ -47,7 +47,7 @@
 
   <!-- Tagline -->
   <text x="200" y="155" font-family="Arial, sans-serif" font-size="20"
-        fill="#94A3B8" letter-spacing="2">CODE TO VICTORY WITH ANY AI</text>
+        fill="#94A3B8" letter-spacing="2">ENTERPRISE-READY AI CODING ASSISTANT FOR SECURE, HYBRID SOFTWARE &amp; DATA DELIVERY</text>
 
   <!-- Terminal Cursor -->
   <rect x="730" y="135" width="4" height="25" fill="#3B82F6">

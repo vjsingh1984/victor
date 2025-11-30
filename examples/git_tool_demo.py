@@ -37,13 +37,7 @@ from victor.tools.git_tool import GitTool
 
 def run_command(cmd: str, cwd: Path = None) -> str:
     """Run shell command and return output."""
-    result = subprocess.run(
-        cmd,
-        shell=True,
-        capture_output=True,
-        text=True,
-        cwd=cwd
-    )
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=cwd)
     return result.stdout
 
 
@@ -67,6 +61,7 @@ async def main():
 
         # Change to temp directory for git operations
         import os
+
         original_dir = os.getcwd()
         os.chdir(tmpdir)
 
@@ -75,7 +70,8 @@ async def main():
             git_tool = GitTool(provider=None)
 
             # Create some files
-            (tmpdir / "README.md").write_text("""# Demo Project
+            (tmpdir / "README.md").write_text(
+                """# Demo Project
 
 This is a demo project for testing Victor's git tool.
 
@@ -83,14 +79,17 @@ This is a demo project for testing Victor's git tool.
 - Git integration
 - AI-powered commit messages
 - Smart operations
-""")
+"""
+            )
 
-            (tmpdir / "main.py").write_text("""def main():
+            (tmpdir / "main.py").write_text(
+                """def main():
     print("Hello, World!")
 
 if __name__ == "__main__":
     main()
-""")
+"""
+            )
 
             # Test 1: Git status
             print("\n2️⃣ Git Status")
@@ -101,10 +100,7 @@ if __name__ == "__main__":
             # Test 2: Stage files
             print("\n3️⃣ Staging Files")
             print("-" * 70)
-            result = await git_tool.execute(
-                operation="stage",
-                files=["README.md", "main.py"]
-            )
+            result = await git_tool.execute(operation="stage", files=["README.md", "main.py"])
             print(result.output if result.success else f"Error: {result.error}")
 
             # Test 3: Show diff
@@ -122,7 +118,7 @@ if __name__ == "__main__":
             result = await git_tool.execute(
                 operation="commit",
                 message="Initial commit: Add README and main.py\n\nThis is a demo commit showing Victor's git tool capabilities.",
-                generate_ai=False  # No AI provider in demo
+                generate_ai=False,  # No AI provider in demo
             )
             print(result.output if result.success else f"Error: {result.error}")
 
@@ -141,20 +137,20 @@ if __name__ == "__main__":
             # Test 7: Make more changes
             print("\n8️⃣ Making More Changes")
             print("-" * 70)
-            (tmpdir / "tests.py").write_text("""import pytest
+            (tmpdir / "tests.py").write_text(
+                """import pytest
 
 def test_main():
     assert True
-""")
+"""
+            )
 
             result = await git_tool.execute(operation="stage", files=["tests.py"])
             print(result.output if result.success else f"Error: {result.error}")
 
             # Test 8: Commit with manual message
             result = await git_tool.execute(
-                operation="commit",
-                message="test: Add basic test file",
-                generate_ai=False
+                operation="commit", message="test: Add basic test file", generate_ai=False
             )
             print(f"\nCommit result: {result.output if result.success else result.error}")
 
@@ -173,15 +169,15 @@ def test_main():
             # Test 11: Make changes on main
             print("\n1️⃣1️⃣ Making Changes on Main Branch")
             print("-" * 70)
-            (tmpdir / "utils.py").write_text("""def helper():
+            (tmpdir / "utils.py").write_text(
+                """def helper():
     return "Helper function"
-""")
+"""
+            )
 
             result = await git_tool.execute(operation="stage")
             result = await git_tool.execute(
-                operation="commit",
-                message="feat: Add utility functions",
-                generate_ai=False
+                operation="commit", message="feat: Add utility functions", generate_ai=False
             )
             print(result.output if result.success else f"Error: {result.error}")
 
@@ -209,7 +205,8 @@ def test_main():
             print("  • Smart file grouping for related changes")
 
             print("\n\n📚 Example with AI (requires provider):")
-            print("""
+            print(
+                """
 # In agent conversation:
 User: "Commit my changes"
 
@@ -230,7 +227,8 @@ User: "Yes"
 
 [Commits with AI-generated message]
 Victor: ✓ Changes committed successfully!
-""")
+"""
+            )
 
         finally:
             # Restore original directory

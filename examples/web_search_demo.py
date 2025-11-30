@@ -40,10 +40,7 @@ async def main():
     print("-" * 70)
     print("Query: Python async programming best practices")
 
-    result = await web_search(
-        query="Python async programming best practices",
-        max_results=3
-    )
+    result = await web_search(query="Python async programming best practices", max_results=3)
 
     if result.get("success"):
         print(result.get("results"))
@@ -55,10 +52,7 @@ async def main():
     print("-" * 70)
     print("Query: Victor AI coding assistant features")
 
-    result = await web_search(
-        query="AI coding assistant features comparison",
-        max_results=3
-    )
+    result = await web_search(query="AI coding assistant features comparison", max_results=3)
 
     if result.get("success"):
         print(result.get("results"))
@@ -70,9 +64,7 @@ async def main():
     print("-" * 70)
     print("URL: https://www.python.org")
 
-    result = await web_fetch(
-        url="https://www.python.org"
-    )
+    result = await web_fetch(url="https://www.python.org")
 
     if result.get("success"):
         # Show first 500 chars of content
@@ -87,10 +79,7 @@ async def main():
     print("-" * 70)
     print("Query: machine learning tutorials")
 
-    result = await web_search(
-        query="machine learning tutorials for beginners",
-        max_results=5
-    )
+    result = await web_search(query="machine learning tutorials for beginners", max_results=5)
 
     if result.get("success"):
         print(result.get("results"))
@@ -103,9 +92,7 @@ async def main():
     print("Query: local AI meetups (US region)")
 
     result = await web_search(
-        query="AI and machine learning meetups",
-        max_results=3,
-        region="us-en"
+        query="AI and machine learning meetups", max_results=3, region="us-en"
     )
 
     if result.get("success"):
@@ -131,7 +118,8 @@ async def main():
     print("  • Query refinement suggestions")
 
     print("\n\n📚 Example with AI (requires provider):")
-    print("""
+    print(
+        """
 # In agent conversation:
 User: "What are the latest developments in AI coding assistants?"
 
@@ -163,7 +151,8 @@ Sources:
 - GitHub Blog: "The Future of Code Assistance" (url)
 
 Would you like me to dig deeper into any specific area?
-""")
+"""
+    )
 
     print("\n\n🔍 Search Tips:")
     print("  • Use specific queries for better results")

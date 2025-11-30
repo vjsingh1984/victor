@@ -27,7 +27,6 @@ Features:
 - Safe query execution with validation
 """
 
-import json
 import sqlite3
 from typing import Any, Dict, Optional
 
@@ -76,13 +75,10 @@ async def _connect_sqlite(database: str) -> Dict[str, Any]:
         return {
             "success": True,
             "connection_id": connection_id,
-            "message": f"Connected to SQLite database: {database}"
+            "message": f"Connected to SQLite database: {database}",
         }
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"SQLite connection failed: {str(e)}"
-        }
+        return {"success": False, "error": f"SQLite connection failed: {str(e)}"}
 
 
 async def _connect_postgresql(kwargs: Dict[str, Any]) -> Dict[str, Any]:
@@ -104,18 +100,15 @@ async def _connect_postgresql(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "success": True,
             "connection_id": connection_id,
-            "message": "Connected to PostgreSQL database"
+            "message": "Connected to PostgreSQL database",
         }
     except ImportError:
         return {
             "success": False,
-            "error": "PostgreSQL support requires: pip install psycopg2-binary"
+            "error": "PostgreSQL support requires: pip install psycopg2-binary",
         }
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"PostgreSQL connection failed: {str(e)}"
-        }
+        return {"success": False, "error": f"PostgreSQL connection failed: {str(e)}"}
 
 
 async def _connect_mysql(kwargs: Dict[str, Any]) -> Dict[str, Any]:
@@ -137,18 +130,15 @@ async def _connect_mysql(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "success": True,
             "connection_id": connection_id,
-            "message": "Connected to MySQL database"
+            "message": "Connected to MySQL database",
         }
     except ImportError:
         return {
             "success": False,
-            "error": "MySQL support requires: pip install mysql-connector-python"
+            "error": "MySQL support requires: pip install mysql-connector-python",
         }
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"MySQL connection failed: {str(e)}"
-        }
+        return {"success": False, "error": f"MySQL connection failed: {str(e)}"}
 
 
 async def _connect_sqlserver(kwargs: Dict[str, Any]) -> Dict[str, Any]:
@@ -171,18 +161,12 @@ async def _connect_sqlserver(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "success": True,
             "connection_id": connection_id,
-            "message": "Connected to SQL Server database"
+            "message": "Connected to SQL Server database",
         }
     except ImportError:
-        return {
-            "success": False,
-            "error": "SQL Server support requires: pip install pyodbc"
-        }
+        return {"success": False, "error": "SQL Server support requires: pip install pyodbc"}
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"SQL Server connection failed: {str(e)}"
-        }
+        return {"success": False, "error": f"SQL Server connection failed: {str(e)}"}
 
 
 @tool
@@ -192,7 +176,7 @@ async def database_connect(
     host: Optional[str] = None,
     port: Optional[int] = None,
     username: Optional[str] = None,
-    password: Optional[str] = None
+    password: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Connect to a database.
@@ -218,40 +202,36 @@ async def database_connect(
     if db_type == "sqlite":
         return await _connect_sqlite(database)
     elif db_type == "postgresql":
-        return await _connect_postgresql({
-            "database": database,
-            "host": host,
-            "port": port,
-            "username": username,
-            "password": password
-        })
+        return await _connect_postgresql(
+            {
+                "database": database,
+                "host": host,
+                "port": port,
+                "username": username,
+                "password": password,
+            }
+        )
     elif db_type == "mysql":
-        return await _connect_mysql({
-            "database": database,
-            "host": host,
-            "port": port,
-            "username": username,
-            "password": password
-        })
+        return await _connect_mysql(
+            {
+                "database": database,
+                "host": host,
+                "port": port,
+                "username": username,
+                "password": password,
+            }
+        )
     elif db_type == "sqlserver":
-        return await _connect_sqlserver({
-            "database": database,
-            "host": host,
-            "username": username,
-            "password": password
-        })
+        return await _connect_sqlserver(
+            {"database": database, "host": host, "username": username, "password": password}
+        )
     else:
-        return {
-            "success": False,
-            "error": f"Unsupported database type: {db_type}"
-        }
+        return {"success": False, "error": f"Unsupported database type: {db_type}"}
 
 
 @tool
 async def database_query(
-    connection_id: str,
-    sql: str,
-    limit: Optional[int] = None
+    connection_id: str, sql: str, limit: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Execute a SQL query.
@@ -276,14 +256,11 @@ async def database_query(
     if not connection_id or connection_id not in _connections:
         return {
             "success": False,
-            "error": "Invalid or missing connection_id. Use database_connect first."
+            "error": "Invalid or missing connection_id. Use database_connect first.",
         }
 
     if not sql:
-        return {
-            "success": False,
-            "error": "Missing required parameter: sql"
-        }
+        return {"success": False, "error": "Missing required parameter: sql"}
 
     # Check for dangerous patterns
     if not _allow_modifications:
@@ -292,7 +269,7 @@ async def database_query(
             if pattern in sql_upper:
                 return {
                     "success": False,
-                    "error": f"Modification operations not allowed: {pattern}. Call set_database_config(allow_modifications=True) to enable."
+                    "error": f"Modification operations not allowed: {pattern}. Call set_database_config(allow_modifications=True) to enable.",
                 }
 
     try:
@@ -313,14 +290,14 @@ async def database_query(
                 if hasattr(row, "keys"):  # SQLite Row object
                     results.append(dict(row))
                 else:  # Tuple
-                    results.append(dict(zip(columns, row)))
+                    results.append(dict(zip(columns, row, strict=False)))
 
             return {
                 "success": True,
                 "columns": columns,
                 "rows": results,
                 "count": len(results),
-                "limited": len(rows) == query_limit
+                "limited": len(rows) == query_limit,
             }
         else:
             # Non-SELECT query (INSERT, UPDATE, DELETE)
@@ -328,14 +305,11 @@ async def database_query(
             return {
                 "success": True,
                 "rows_affected": cursor.rowcount,
-                "message": f"Query executed successfully. Rows affected: {cursor.rowcount}"
+                "message": f"Query executed successfully. Rows affected: {cursor.rowcount}",
             }
 
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"Query failed: {str(e)}"
-        }
+        return {"success": False, "error": f"Query failed: {str(e)}"}
 
 
 @tool
@@ -354,10 +328,7 @@ async def database_tables(connection_id: str) -> Dict[str, Any]:
         - error: Error message if failed
     """
     if not connection_id or connection_id not in _connections:
-        return {
-            "success": False,
-            "error": "Invalid or missing connection_id"
-        }
+        return {"success": False, "error": "Invalid or missing connection_id"}
 
     try:
         conn = _connections[connection_id]
@@ -372,26 +343,16 @@ async def database_tables(connection_id: str) -> Dict[str, Any]:
         elif connection_id.startswith("sqlserver"):
             sql = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME"
         else:
-            return {
-                "success": False,
-                "error": "Unknown database type"
-            }
+            return {"success": False, "error": "Unknown database type"}
 
         cursor.execute(sql)
         rows = cursor.fetchall()
         tables = [row[0] for row in rows]
 
-        return {
-            "success": True,
-            "tables": tables,
-            "count": len(tables)
-        }
+        return {"success": True, "tables": tables, "count": len(tables)}
 
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"Failed to list tables: {str(e)}"
-        }
+        return {"success": False, "error": f"Failed to list tables: {str(e)}"}
 
 
 @tool
@@ -415,16 +376,10 @@ async def database_describe(connection_id: str, table: str) -> Dict[str, Any]:
         - error: Error message if failed
     """
     if not connection_id or connection_id not in _connections:
-        return {
-            "success": False,
-            "error": "Invalid or missing connection_id"
-        }
+        return {"success": False, "error": "Invalid or missing connection_id"}
 
     if not table:
-        return {
-            "success": False,
-            "error": "Missing required parameter: table"
-        }
+        return {"success": False, "error": "Missing required parameter: table"}
 
     try:
         conn = _connections[connection_id]
@@ -454,8 +409,7 @@ async def database_describe(connection_id: str, table: str) -> Dict[str, Any]:
             )
             rows = cursor.fetchall()
             columns = [
-                {"name": row[0], "type": row[1], "nullable": row[2] == "YES"}
-                for row in rows
+                {"name": row[0], "type": row[1], "nullable": row[2] == "YES"} for row in rows
             ]
 
         elif connection_id.startswith("mysql"):
@@ -472,23 +426,12 @@ async def database_describe(connection_id: str, table: str) -> Dict[str, Any]:
             ]
 
         else:
-            return {
-                "success": False,
-                "error": "Describe not implemented for this database type"
-            }
+            return {"success": False, "error": "Describe not implemented for this database type"}
 
-        return {
-            "success": True,
-            "table": table,
-            "columns": columns,
-            "count": len(columns)
-        }
+        return {"success": True, "table": table, "columns": columns, "count": len(columns)}
 
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"Failed to describe table: {str(e)}"
-        }
+        return {"success": False, "error": f"Failed to describe table: {str(e)}"}
 
 
 @tool
@@ -510,10 +453,7 @@ async def database_schema(connection_id: str) -> Dict[str, Any]:
         - error: Error message if failed
     """
     if not connection_id or connection_id not in _connections:
-        return {
-            "success": False,
-            "error": "Invalid or missing connection_id"
-        }
+        return {"success": False, "error": "Invalid or missing connection_id"}
 
     # Get list of tables first
     tables_result = await database_tables(connection_id)
@@ -527,21 +467,12 @@ async def database_schema(connection_id: str) -> Dict[str, Any]:
         for table in tables_result["tables"]:
             describe_result = await database_describe(connection_id, table)
             if describe_result["success"]:
-                schema_info["tables"].append({
-                    "name": table,
-                    "columns": describe_result["columns"]
-                })
+                schema_info["tables"].append({"name": table, "columns": describe_result["columns"]})
 
-        return {
-            "success": True,
-            "tables": schema_info["tables"]
-        }
+        return {"success": True, "tables": schema_info["tables"]}
 
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"Schema inspection failed: {str(e)}"
-        }
+        return {"success": False, "error": f"Schema inspection failed: {str(e)}"}
 
 
 @tool
@@ -561,26 +492,17 @@ async def database_disconnect(connection_id: str) -> Dict[str, Any]:
         - error: Error message if failed
     """
     if not connection_id or connection_id not in _connections:
-        return {
-            "success": False,
-            "error": "Invalid or missing connection_id"
-        }
+        return {"success": False, "error": "Invalid or missing connection_id"}
 
     try:
         conn = _connections[connection_id]
         conn.close()
         del _connections[connection_id]
 
-        return {
-            "success": True,
-            "message": f"Disconnected from database: {connection_id}"
-        }
+        return {"success": True, "message": f"Disconnected from database: {connection_id}"}
 
     except Exception as e:
-        return {
-            "success": False,
-            "error": f"Disconnect failed: {str(e)}"
-        }
+        return {"success": False, "error": f"Disconnect failed: {str(e)}"}
 
 
 # Keep class for backward compatibility
@@ -590,9 +512,10 @@ class DatabaseTool:
     def __init__(self, allow_modifications: bool = False, max_rows: int = 100):
         """Initialize - deprecated."""
         import warnings
+
         warnings.warn(
             "DatabaseTool class is deprecated. Use database_* functions instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
         set_database_config(allow_modifications, max_rows)

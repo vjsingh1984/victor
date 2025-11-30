@@ -22,6 +22,8 @@ Features:
 """
 
 import re
+import subprocess
+import json
 from pathlib import Path
 from typing import Any, Dict, List
 import logging
@@ -58,13 +60,15 @@ def _scan_file_for_secrets(file_path: Path) -> List[Dict[str, Any]]:
         for secret_type, pattern in SECRET_PATTERNS.items():
             matches = re.finditer(pattern, content)
             for match in matches:
-                findings.append({
-                    "type": secret_type,
-                    "file": str(file_path),
-                    "line": content[:match.start()].count('\n') + 1,
-                    "severity": "high",
-                    "message": f"Potential {secret_type} detected"
-                })
+                findings.append(
+                    {
+                        "type": secret_type,
+                        "file": str(file_path),
+                        "line": content[: match.start()].count("\n") + 1,
+                        "severity": "high",
+                        "message": f"Potential {secret_type} detected",
+                    }
+                )
     except Exception as e:
         logger.warning(f"Error scanning {file_path}: {e}")
 
@@ -81,13 +85,15 @@ def _scan_file_for_config_issues(file_path: Path) -> List[Dict[str, Any]]:
         for check_name, pattern in CONFIG_CHECKS.items():
             matches = re.finditer(pattern, content)
             for match in matches:
-                findings.append({
-                    "type": check_name,
-                    "file": str(file_path),
-                    "line": content[:match.start()].count('\n') + 1,
-                    "severity": "medium",
-                    "message": f"Configuration issue: {check_name}"
-                })
+                findings.append(
+                    {
+                        "type": check_name,
+                        "file": str(file_path),
+                        "line": content[: match.start()].count("\n") + 1,
+                        "severity": "medium",
+                        "message": f"Configuration issue: {check_name}",
+                    }
+                )
     except Exception as e:
         logger.warning(f"Error scanning {file_path}: {e}")
 
@@ -100,7 +106,9 @@ async def security_scan(
     scan_types: List[str] = None,
     file_pattern: str = "*.py",
     severity_threshold: str = "low",
-    requirements_file: str = "requirements.txt"
+    requirements_file: str = "requirements.txt",
+    dependency_scan: bool = False,
+    iac_scan: bool = False,
 ) -> Dict[str, Any]:
     """
     Comprehensive security scanning for code analysis.
@@ -160,11 +168,7 @@ async def security_scan(
     if "secrets" in scan_types:
         if path_obj.is_file():
             findings = _scan_file_for_secrets(path_obj)
-            results["secrets"] = {
-                "files_scanned": 1,
-                "findings": findings,
-                "count": len(findings)
-            }
+            results["secrets"] = {"files_scanned": 1, "findings": findings, "count": len(findings)}
             all_findings.extend(findings)
         else:
             files = list(path_obj.rglob(file_pattern))
@@ -174,7 +178,7 @@ async def security_scan(
             results["secrets"] = {
                 "files_scanned": len(files),
                 "findings": findings,
-                "count": len(findings)
+                "count": len(findings),
             }
             all_findings.extend(findings)
 
@@ -182,11 +186,7 @@ async def security_scan(
     if "config" in scan_types:
         if path_obj.is_file():
             findings = _scan_file_for_config_issues(path_obj)
-            results["config"] = {
-                "files_scanned": 1,
-                "findings": findings,
-                "count": len(findings)
-            }
+            results["config"] = {"files_scanned": 1, "findings": findings, "count": len(findings)}
             all_findings.extend(findings)
         else:
             files = list(path_obj.rglob(file_pattern))
@@ -196,63 +196,102 @@ async def security_scan(
             results["config"] = {
                 "files_scanned": len(files),
                 "findings": findings,
-                "count": len(findings)
+                "count": len(findings),
             }
             all_findings.extend(findings)
 
-    # Dependency scan
-    if "dependencies" in scan_types:
+    # Dependency scan (optional external tool)
+    if "dependencies" in scan_types and dependency_scan:
         req_path = Path(requirements_file)
         if not req_path.is_absolute():
-            req_path = path_obj / requirements_file if path_obj.is_dir() else path_obj.parent / requirements_file
+            req_path = (
+                path_obj / requirements_file
+                if path_obj.is_dir()
+                else path_obj.parent / requirements_file
+            )
 
         if req_path.exists():
             try:
-                content = req_path.read_text()
-                packages = [line.strip() for line in content.split('\n')
-                           if line.strip() and not line.startswith('#')]
-
-                vulnerabilities = []
-                known_vulns = {
-                    "django": "Known vulnerabilities in older versions",
-                    "flask": "Check for recent security patches",
-                    "requests": "Verify version >= 2.26.0",
-                }
-
-                for pkg_line in packages:
-                    pkg_name = pkg_line.split('==')[0].split('>=')[0].split('<=')[0].lower()
-                    if pkg_name in known_vulns:
-                        vulnerabilities.append({
-                            "type": "dependency_vulnerability",
-                            "package": pkg_name,
-                            "file": str(req_path),
-                            "severity": "medium",
-                            "message": known_vulns[pkg_name]
-                        })
-
+                proc = subprocess.run(
+                    ["pip-audit", "-r", str(req_path), "-f", "json"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                audit = json.loads(proc.stdout)
+                vulns = []
+                for item in audit.get("dependencies", []):
+                    for vuln in item.get("vulns", []):
+                        vulns.append(
+                            {
+                                "type": "dependency_vulnerability",
+                                "package": item.get("name"),
+                                "version": item.get("version"),
+                                "id": vuln.get("id"),
+                                "fix_versions": vuln.get("fix_versions"),
+                                "severity": vuln.get("severity", "medium"),
+                                "message": vuln.get("description", "Vulnerability detected"),
+                            }
+                        )
                 results["dependencies"] = {
-                    "packages_checked": len(packages),
-                    "vulnerabilities": vulnerabilities,
-                    "count": len(vulnerabilities)
+                    "packages_checked": len(audit.get("dependencies", [])),
+                    "vulnerabilities": vulns,
+                    "count": len(vulns),
                 }
-                all_findings.extend(vulnerabilities)
-            except Exception as e:
+                all_findings.extend(vulns)
+            except FileNotFoundError:
                 results["dependencies"] = {
-                    "error": f"Failed to scan dependencies: {str(e)}",
-                    "count": 0
+                    "error": "pip-audit not installed. Install with: pip install pip-audit",
+                    "count": 0,
                 }
+            except subprocess.CalledProcessError as exc:
+                results["dependencies"] = {"error": f"pip-audit failed: {exc.stderr}", "count": 0}
         else:
             results["dependencies"] = {
                 "error": f"Requirements file not found: {req_path}",
-                "count": 0
+                "count": 0,
             }
+
+    # IaC scan (optional, semgrep or bandit)
+    if "config" in scan_types and iac_scan:
+        try:
+            proc = subprocess.run(
+                ["bandit", "-r", str(path_obj), "-f", "json"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            bandit = json.loads(proc.stdout)
+            findings = []
+            for res in bandit.get("results", []):
+                findings.append(
+                    {
+                        "type": "iac_issue",
+                        "file": res.get("filename"),
+                        "line": res.get("line_number"),
+                        "severity": res.get("issue_severity", "medium").lower(),
+                        "message": res.get("issue_text"),
+                        "test_id": res.get("test_id"),
+                    }
+                )
+            results.setdefault("config", {"findings": [], "count": 0})
+            results["config"]["findings"].extend(findings)
+            results["config"]["count"] = len(results["config"]["findings"])
+            all_findings.extend(findings)
+        except FileNotFoundError:
+            results.setdefault("config", {})
+            results["config"]["error"] = "bandit not installed. Install with: pip install bandit"
+        except subprocess.CalledProcessError as exc:
+            results.setdefault("config", {})
+            results["config"]["error"] = f"bandit failed: {exc.stderr}"
 
     # Filter by severity threshold
     severity_levels = {"low": 0, "medium": 1, "high": 2}
     threshold_level = severity_levels.get(severity_threshold, 0)
 
     filtered_findings = [
-        f for f in all_findings
+        f
+        for f in all_findings
         if severity_levels.get(f.get("severity", "low"), 0) >= threshold_level
     ]
 
@@ -280,8 +319,11 @@ async def security_scan(
     if "secrets" in results:
         report.append("Secrets Detection:")
         report.append(f"  Files scanned: {results['secrets']['files_scanned']}")
-        secrets_filtered = [f for f in results['secrets']['findings']
-                           if severity_levels.get(f.get("severity", "low"), 0) >= threshold_level]
+        secrets_filtered = [
+            f
+            for f in results["secrets"]["findings"]
+            if severity_levels.get(f.get("severity", "low"), 0) >= threshold_level
+        ]
         report.append(f"  Secrets found: {len(secrets_filtered)}")
         if secrets_filtered:
             report.append("  Critical: Hardcoded secrets detected!")
@@ -295,8 +337,11 @@ async def security_scan(
     if "config" in results:
         report.append("Configuration Issues:")
         report.append(f"  Files scanned: {results['config']['files_scanned']}")
-        config_filtered = [f for f in results['config']['findings']
-                          if severity_levels.get(f.get("severity", "low"), 0) >= threshold_level]
+        config_filtered = [
+            f
+            for f in results["config"]["findings"]
+            if severity_levels.get(f.get("severity", "low"), 0) >= threshold_level
+        ]
         report.append(f"  Issues found: {len(config_filtered)}")
         if config_filtered:
             for finding in config_filtered[:5]:
@@ -317,7 +362,9 @@ async def security_scan(
                 for vuln in results["dependencies"]["vulnerabilities"][:5]:
                     report.append(f"    {vuln['package']}: {vuln['message']}")
                 if len(results["dependencies"]["vulnerabilities"]) > 5:
-                    report.append(f"    ... and {len(results['dependencies']['vulnerabilities']) - 5} more")
+                    report.append(
+                        f"    ... and {len(results['dependencies']['vulnerabilities']) - 5} more"
+                    )
         report.append("")
 
     # Summary
@@ -333,7 +380,7 @@ async def security_scan(
         "total_issues": len(filtered_findings),
         "issues_by_severity": issues_by_severity,
         "findings": filtered_findings,
-        "formatted_report": "\n".join(report)
+        "formatted_report": "\n".join(report),
     }
 
 
@@ -344,8 +391,9 @@ class SecurityScannerTool:
     def __init__(self):
         """Initialize - deprecated."""
         import warnings
+
         warnings.warn(
             "SecurityScannerTool class is deprecated. Use security_* functions instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )

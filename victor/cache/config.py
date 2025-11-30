@@ -37,7 +37,7 @@ class CacheConfig:
     enable_disk: bool = True  # Enable L2 disk cache
     auto_evict: bool = True  # Auto-evict old entries
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Set default cache path if not provided."""
         if self.disk_path is None:
             self.disk_path = Path.home() / ".victor" / "cache"

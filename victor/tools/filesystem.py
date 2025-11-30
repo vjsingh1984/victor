@@ -32,6 +32,16 @@ async def read_file(path: str) -> str:
 
     Returns:
         The content of the file as a string.
+
+    Examples:
+        Read a Python source file:
+            await read_file("src/main.py")
+
+        Read a configuration file:
+            await read_file("~/.victor/profiles.yaml")
+
+        Read a requirements file:
+            await read_file("requirements.txt")
     """
     try:
         file_path = Path(path).expanduser().resolve()
@@ -59,6 +69,16 @@ async def write_file(path: str, content: str) -> str:
 
     Returns:
         A confirmation message upon success.
+
+    Examples:
+        Create a new Python module:
+            await write_file("src/utils.py", "def helper():\\n    pass")
+
+        Save configuration:
+            await write_file("config.yaml", "debug: true\\nport: 8000")
+
+        Create a README:
+            await write_file("README.md", "# Project Title\\n\\nDescription here")
     """
     try:
         file_path = Path(path).expanduser().resolve()
@@ -84,6 +104,16 @@ async def list_directory(path: str, recursive: bool = False) -> List[Dict[str, A
 
     Returns:
         A list of dictionaries, where each dictionary represents a file or directory.
+
+    Examples:
+        List files in current directory:
+            await list_directory(".")
+
+        List all Python files recursively in src/:
+            await list_directory("src", recursive=True)
+
+        Explore project structure:
+            await list_directory("/Users/username/project")
     """
     try:
         dir_path = Path(path).expanduser().resolve()
@@ -114,4 +144,3 @@ async def list_directory(path: str, recursive: bool = False) -> List[Dict[str, A
     except Exception as e:
         # Let the decorator handle the exception and format it
         raise e
-

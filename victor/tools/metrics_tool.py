@@ -25,7 +25,7 @@ Features:
 
 import ast
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import logging
 
 from victor.tools.decorators import tool
@@ -53,8 +53,8 @@ def _calculate_complexity_score(code: str) -> int:
 def _calculate_maintainability_index(code: str) -> float:
     """Calculate maintainability index (0-100)."""
     try:
-        tree = ast.parse(code)
-        lines = len([l for l in code.split('\n') if l.strip()])
+        ast.parse(code)
+        lines = len([line for line in code.split("\n") if line.strip()])
 
         # Simplified maintainability calculation
         complexity = _calculate_complexity_score(code)
@@ -73,7 +73,7 @@ async def analyze_metrics(
     metrics: List[str] = None,
     file_pattern: str = "*.py",
     complexity_threshold: int = 10,
-    format: str = "summary"
+    format: str = "summary",
 ) -> Dict[str, Any]:
     """
     Comprehensive code metrics and quality analysis.
@@ -133,13 +133,15 @@ async def analyze_metrics(
         if path_obj.suffix == ".py":
             files_to_analyze = [path_obj]
     else:
-        files_to_analyze = [f for f in path_obj.rglob(file_pattern) if f.is_file() and f.suffix == ".py"]
+        files_to_analyze = [
+            f for f in path_obj.rglob(file_pattern) if f.is_file() and f.suffix == ".py"
+        ]
 
     if not files_to_analyze:
         return {
             "success": True,
             "files_analyzed": 0,
-            "message": f"No Python files found matching pattern '{file_pattern}'"
+            "message": f"No Python files found matching pattern '{file_pattern}'",
         }
 
     # Initialize results
@@ -161,12 +163,14 @@ async def analyze_metrics(
             if "complexity" in metrics:
                 complexity = _calculate_complexity_score(code)
                 status = "ok" if complexity <= complexity_threshold else "warning"
-                results["complexity"].append({
-                    "file": str(file_path),
-                    "complexity": complexity,
-                    "status": status,
-                    "threshold": complexity_threshold
-                })
+                results["complexity"].append(
+                    {
+                        "file": str(file_path),
+                        "complexity": complexity,
+                        "status": status,
+                        "threshold": complexity_threshold,
+                    }
+                )
                 total_complexity += complexity
 
             # Maintainability analysis
@@ -181,11 +185,13 @@ async def analyze_metrics(
                 else:
                     rating = "poor"
 
-                results["maintainability"].append({
-                    "file": str(file_path),
-                    "maintainability_index": round(mi, 2),
-                    "rating": rating
-                })
+                results["maintainability"].append(
+                    {
+                        "file": str(file_path),
+                        "maintainability_index": round(mi, 2),
+                        "rating": rating,
+                    }
+                )
                 total_maintainability += mi
 
             # Technical debt estimation
@@ -212,12 +218,14 @@ async def analyze_metrics(
 
                 debt_level = "low" if debt_hours < 4 else ("medium" if debt_hours < 12 else "high")
 
-                results["debt"].append({
-                    "file": str(file_path),
-                    "debt_hours": debt_hours,
-                    "debt_level": debt_level,
-                    "issues": issues if issues else ["No major issues detected"]
-                })
+                results["debt"].append(
+                    {
+                        "file": str(file_path),
+                        "debt_hours": debt_hours,
+                        "debt_level": debt_level,
+                        "issues": issues if issues else ["No major issues detected"],
+                    }
+                )
                 total_debt_hours += debt_hours
 
             # Code profile
@@ -225,14 +233,16 @@ async def analyze_metrics(
                 tree = ast.parse(code)
                 functions = sum(1 for node in ast.walk(tree) if isinstance(node, ast.FunctionDef))
                 classes = sum(1 for node in ast.walk(tree) if isinstance(node, ast.ClassDef))
-                lines = len([l for l in code.split('\n') if l.strip()])
+                lines = len([line for line in code.split("\n") if line.strip()])
 
-                results["profile"].append({
-                    "file": str(file_path),
-                    "lines": lines,
-                    "functions": functions,
-                    "classes": classes
-                })
+                results["profile"].append(
+                    {
+                        "file": str(file_path),
+                        "lines": lines,
+                        "functions": functions,
+                        "classes": classes,
+                    }
+                )
                 total_lines += lines
                 total_functions += functions
                 total_classes += classes
@@ -244,16 +254,26 @@ async def analyze_metrics(
 
     # Calculate averages
     avg_complexity = total_complexity / files_analyzed if files_analyzed > 0 else 0
-    avg_maintainability = total_maintainability / files_analyzed if files_analyzed > 0 and "maintainability" in metrics else 0
+    avg_maintainability = (
+        total_maintainability / files_analyzed
+        if files_analyzed > 0 and "maintainability" in metrics
+        else 0
+    )
 
     # Generate recommendations
     recommendations = []
     if "complexity" in metrics and avg_complexity > complexity_threshold:
-        recommendations.append(f"Average complexity ({avg_complexity:.1f}) exceeds threshold ({complexity_threshold}) - consider refactoring")
+        recommendations.append(
+            f"Average complexity ({avg_complexity:.1f}) exceeds threshold ({complexity_threshold}) - consider refactoring"
+        )
     if "maintainability" in metrics and avg_maintainability < 60:
-        recommendations.append(f"Average maintainability ({avg_maintainability:.1f}/100) is below good - improve code quality")
+        recommendations.append(
+            f"Average maintainability ({avg_maintainability:.1f}/100) is below good - improve code quality"
+        )
     if "debt" in metrics and total_debt_hours > 20:
-        recommendations.append(f"Total technical debt ({total_debt_hours} hours) is significant - prioritize refactoring")
+        recommendations.append(
+            f"Total technical debt ({total_debt_hours} hours) is significant - prioritize refactoring"
+        )
     if "profile" in metrics and total_lines > 10000:
         recommendations.append(f"Large codebase ({total_lines} lines) - consider modularization")
 
@@ -292,7 +312,9 @@ async def analyze_metrics(
         if poor_files:
             report.append(f"  Files needing improvement: {len(poor_files)}")
             for item in poor_files[:5]:
-                report.append(f"    {item['file']}: {item['maintainability_index']} ({item['rating']})")
+                report.append(
+                    f"    {item['file']}: {item['maintainability_index']} ({item['rating']})"
+                )
             if len(poor_files) > 5:
                 report.append(f"    ... and {len(poor_files) - 5} more")
         report.append("")
@@ -305,7 +327,9 @@ async def analyze_metrics(
         if high_debt_files:
             report.append(f"  Files with debt: {len(high_debt_files)}")
             for item in high_debt_files[:5]:
-                report.append(f"    {item['file']}: {item['debt_hours']} hours ({item['debt_level']})")
+                report.append(
+                    f"    {item['file']}: {item['debt_hours']} hours ({item['debt_level']})"
+                )
             if len(high_debt_files) > 5:
                 report.append(f"    ... and {len(high_debt_files) - 5} more")
         report.append("")
@@ -317,9 +341,11 @@ async def analyze_metrics(
         report.append(f"  Total functions: {total_functions}")
         report.append(f"  Total classes: {total_classes}")
         if files_analyzed > 0:
-            report.append(f"  Average per file: {total_lines // files_analyzed} lines, "
-                        f"{total_functions // files_analyzed} functions, "
-                        f"{total_classes // files_analyzed} classes")
+            report.append(
+                f"  Average per file: {total_lines // files_analyzed} lines, "
+                f"{total_functions // files_analyzed} functions, "
+                f"{total_classes // files_analyzed} classes"
+            )
         report.append("")
 
     # Recommendations section
@@ -334,22 +360,14 @@ async def analyze_metrics(
         "files_analyzed": files_analyzed,
         "summary": {
             "avg_complexity": round(avg_complexity, 2) if "complexity" in metrics else None,
-            "avg_maintainability": round(avg_maintainability, 2) if "maintainability" in metrics else None,
+            "avg_maintainability": (
+                round(avg_maintainability, 2) if "maintainability" in metrics else None
+            ),
             "total_debt_hours": total_debt_hours if "debt" in metrics else None,
             "total_lines": total_lines if "profile" in metrics else None,
         },
         "recommendations": recommendations,
-        "formatted_report": "\n".join(report)
-    }
-
-    if not recommendations:
-        recommendations.append("Code quality is good - maintain current standards")
-
-    return {
-        "success": True,
-        "report": analysis["formatted_report"],
-        "recommendations": recommendations,
-        "formatted_report": analysis["formatted_report"] + "\n\nRecommendations:\n" + "\n".join(f"  • {r}" for r in recommendations)
+        "formatted_report": "\n".join(report),
     }
 
 
@@ -360,8 +378,9 @@ class MetricsTool:
     def __init__(self):
         """Initialize - deprecated."""
         import warnings
+
         warnings.warn(
             "MetricsTool class is deprecated. Use metrics_* functions instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )

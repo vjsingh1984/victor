@@ -43,9 +43,7 @@ class TestEditOperation:
     def test_create_operation(self):
         """Test creating an EditOperation."""
         op = EditOperation(
-            type=OperationType.CREATE,
-            path="/test/file.txt",
-            new_content="Hello World"
+            type=OperationType.CREATE, path="/test/file.txt", new_content="Hello World"
         )
 
         assert op.type == OperationType.CREATE
@@ -56,10 +54,7 @@ class TestEditOperation:
     def test_modify_operation(self):
         """Test modify operation."""
         op = EditOperation(
-            type=OperationType.MODIFY,
-            path="/test/file.txt",
-            old_content="Old",
-            new_content="New"
+            type=OperationType.MODIFY, path="/test/file.txt", old_content="Old", new_content="New"
         )
 
         assert op.type == OperationType.MODIFY
@@ -72,10 +67,7 @@ class TestEditTransaction:
 
     def test_transaction_creation(self):
         """Test creating an EditTransaction."""
-        tx = EditTransaction(
-            id="tx_123",
-            description="Test transaction"
-        )
+        tx = EditTransaction(id="tx_123", description="Test transaction")
 
         assert tx.id == "tx_123"
         assert tx.description == "Test transaction"

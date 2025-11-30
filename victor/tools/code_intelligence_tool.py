@@ -13,12 +13,15 @@
 # limitations under the License.
 
 
-from typing import Any, Dict, Optional, List
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from pathlib import Path
 
 from tree_sitter import QueryCursor
 from victor.codebase.tree_sitter_manager import get_parser
 from victor.tools.decorators import tool
+
+if TYPE_CHECKING:
+    from victor.tools.base import ToolRegistry
 
 
 # Tree-sitter queries to find function and class definitions in Python
@@ -33,8 +36,9 @@ PYTHON_QUERIES = {
     """,
     "identifier": """
     (identifier) @name
-    """
+    """,
 }
+
 
 @tool
 async def find_symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
@@ -51,7 +55,7 @@ async def find_symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, An
     """
     try:
         parser = get_parser("python")
-        
+
         with open(file_path, "rb") as f:
             content = f.read()
 
@@ -64,14 +68,14 @@ async def find_symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, An
             captures_dict = cursor.captures(root_node)
 
             # captures_dict is {"function.name": [node1, node2, ...]} or {"class.name": [...]}
-            for capture_name, nodes in captures_dict.items():
-                for node in nodes:
-                    if node.text.decode('utf8') == symbol_name:
+        for _capture_name, nodes in captures_dict.items():
+            for node in nodes:
+                if node.text.decode("utf8") == symbol_name:
                         # We found the name identifier, now get the parent definition node
                         definition_node = node.parent
                         start_line = definition_node.start_point[0] + 1
                         end_line = definition_node.end_point[0] + 1
-                        code_block = definition_node.text.decode('utf8')
+                        code_block = definition_node.text.decode("utf8")
 
                         return {
                             "symbol_name": symbol_name,
@@ -105,7 +109,7 @@ async def find_references(symbol_name: str, search_path: str = ".") -> List[Dict
     references = []
     parser = get_parser("python")
     query = parser.language.query(PYTHON_QUERIES["identifier"])
-    
+
     root_path = Path(search_path)
     if not root_path.is_dir():
         return [{"error": f"Invalid search path: {search_path} is not a directory."}]
@@ -114,30 +118,32 @@ async def find_references(symbol_name: str, search_path: str = ".") -> List[Dict
         try:
             with open(file_path, "rb") as f:
                 content_bytes = f.read()
-            
+
             tree = parser.parse(content_bytes)
             cursor = QueryCursor(query)
             captures_dict = cursor.captures(tree.root_node)
 
             # For reading lines for the preview
-            content_lines = content_bytes.decode('utf8', errors='ignore').splitlines()
+            content_lines = content_bytes.decode("utf8", errors="ignore").splitlines()
 
             # captures_dict is {"name": [node1, node2, ...]}
-            for capture_name, nodes in captures_dict.items():
+            for _capture_name, nodes in captures_dict.items():
                 for node in nodes:
-                    if node.text.decode('utf8') == symbol_name:
+                    if node.text.decode("utf8") == symbol_name:
                         line_number = node.start_point[0] + 1
                         col_number = node.start_point[1] + 1
-                        references.append({
-                            "file_path": str(file_path),
-                            "line": line_number,
-                            "column": col_number,
-                            "preview": content_lines[line_number - 1].strip()
-                        })
+                        references.append(
+                            {
+                                "file_path": str(file_path),
+                                "line": line_number,
+                                "column": col_number,
+                                "preview": content_lines[line_number - 1].strip(),
+                            }
+                        )
         except Exception:
             # Ignore files that can't be parsed
             continue
-            
+
     return references
 
 
@@ -172,7 +178,7 @@ async def rename_symbol(
 
     if not references_result.success:
         return f"Error finding references: {references_result.error}"
-    
+
     references = references_result.output
     if not references:
         return f"No references found for symbol '{symbol_name}'."
@@ -186,9 +192,7 @@ async def rename_symbol(
         files_to_modify[file_path].append(ref)
 
     # 2. Start a file editing transaction
-    transaction_description = (
-        f"Rename symbol '{symbol_name}' to '{new_symbol_name}'."
-    )
+    transaction_description = f"Rename symbol '{symbol_name}' to '{new_symbol_name}'."
     start_transaction_result = await tool_registry.execute(
         "file_editor", context, operation="start_transaction", description=transaction_description
     )
@@ -197,26 +201,24 @@ async def rename_symbol(
 
     # 3. Queue modifications for each file
     modified_files_count = 0
-    for file_path, refs in files_to_modify.items():
+    for file_path, _refs in files_to_modify.items():
         try:
             # Read current content
-            read_result = await tool_registry.execute(
-                "read_file", context, path=file_path
-            )
+            read_result = await tool_registry.execute("read_file", context, path=file_path)
             if not read_result.success:
                 print(f"Warning: Could not read {file_path}. Skipping.")
                 continue
-            
+
             original_content = read_result.output
             lines = original_content.splitlines()
-            
+
             # Perform replacements. Iterate through lines and replace
             # This is a basic text replacement; for true AST safety,
             # an AST transformer would be needed here.
             # However, `find_references` gives us line/col, which helps
             # in targeted replacement within a line.
             new_lines = []
-            for i, line in enumerate(lines):
+            for _i, line in enumerate(lines):
                 # Check if this line contains a reference for the current symbol
                 # This is a simplified check. A more robust solution would
                 # use the column information from `refs` to ensure exact match.
@@ -224,18 +226,19 @@ async def rename_symbol(
                     new_lines.append(line.replace(symbol_name, new_symbol_name))
                 else:
                     new_lines.append(line)
-            
+
             new_content = "\n".join(new_lines)
 
             # Add modification to the transaction
             add_modify_result = await tool_registry.execute(
-                "file_editor", context, operation="add_modify", path=file_path, new_content=new_content
+                "file_editor",
+                context,
+                operation="add_modify",
+                path=file_path,
+                new_content=new_content,
             )
             if not add_modify_result.success:
-                return (
-                    f"Error queuing modification for {file_path}: "
-                    f"{add_modify_result.error}"
-                )
+                return f"Error queuing modification for {file_path}: " f"{add_modify_result.error}"
             modified_files_count += 1
 
         except Exception as e:
@@ -253,4 +256,3 @@ async def rename_symbol(
         f"tool to review changes, then `file_editor(operation='commit')` or "
         f"`file_editor(operation='rollback')`."
     )
-

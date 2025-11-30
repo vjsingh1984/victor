@@ -47,6 +47,8 @@ def tool(func: Callable) -> Callable:
         # This wrapper is what gets called if the decorated function is called directly
         return func(*args, **kwargs)
 
+    # Mark as tool for dynamic discovery
+    wrapper._is_tool = True  # type: ignore[attr-defined]
     # We will attach a class to the wrapper that is the actual tool
     wrapper.Tool = _create_tool_class(func)
 
@@ -78,7 +80,7 @@ def _create_tool_class(func: Callable) -> type:
         if param.annotation != inspect.Parameter.empty:
             if param.annotation in (int, float):
                 param_type = "number"
-            elif param.annotation == bool:
+            elif param.annotation is bool:
                 param_type = "boolean"
 
         properties[name] = {

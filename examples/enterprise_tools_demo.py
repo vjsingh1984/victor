@@ -41,7 +41,8 @@ async def demo_code_review():
 
     # Create sample code with issues
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-        f.write("""
+        f.write(
+            """
 import os
 import random
 
@@ -90,7 +91,8 @@ class MyClass:
     # Missing docstring (documentation issue)
     def method_without_docs(self):
         return "No documentation"
-""")
+"""
+        )
         test_file = f.name
 
     print("\n1️⃣ Review single file for all issues...")
@@ -134,11 +136,7 @@ async def demo_project_scaffolding():
         project_path = Path(tmpdir) / "demo-api"
 
         print("\n2️⃣ Create FastAPI project...")
-        result = await tool.execute(
-            operation="create",
-            template="fastapi",
-            name=str(project_path)
-        )
+        result = await tool.execute(operation="create", template="fastapi", name=str(project_path))
         print(result.output)
 
         # Verify files created
@@ -151,9 +149,7 @@ async def demo_project_scaffolding():
         print("\n4️⃣ Add custom file...")
         custom_file = project_path / "app" / "utils" / "helpers.py"
         result = await tool.execute(
-            operation="add_file",
-            path=str(custom_file),
-            content="def helper():\n    pass\n"
+            operation="add_file", path=str(custom_file), content="def helper():\n    pass\n"
         )
         print(result.output)
 
@@ -178,7 +174,8 @@ async def demo_security_scanner():
 
         # Create file with secrets
         secrets_file = tmpdir_path / "config.py"
-        secrets_file.write_text("""
+        secrets_file.write_text(
+            """
 # Configuration with exposed secrets
 AWS_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE"
 AWS_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
@@ -187,17 +184,20 @@ DATABASE_URL = "postgresql://user:password123@localhost/db"
 
 # Google API key
 GOOGLE_API_KEY = "AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI"
-""")
+"""
+        )
 
         # Create requirements.txt with vulnerable packages
         req_file = tmpdir_path / "requirements.txt"
-        req_file.write_text("""
+        req_file.write_text(
+            """
 requests==2.25.0
 flask==2.0.0
 django==3.2.0
 pillow==8.0.0
 pyyaml==5.4
-""")
+"""
+        )
 
         # Create .env file (dangerous file)
         env_file = tmpdir_path / ".env"
@@ -205,32 +205,20 @@ pyyaml==5.4
 
         print("\n1️⃣ Scan for secrets...")
         result = await tool.execute(
-            operation="scan_secrets",
-            path=str(tmpdir_path),
-            severity="high"
+            operation="scan_secrets", path=str(tmpdir_path), severity="high"
         )
         print(result.output)
 
         print("\n2️⃣ Check dependencies for vulnerabilities...")
-        result = await tool.execute(
-            operation="scan_dependencies",
-            path=str(tmpdir_path)
-        )
+        result = await tool.execute(operation="scan_dependencies", path=str(tmpdir_path))
         print(result.output)
 
         print("\n3️⃣ Scan configuration files...")
-        result = await tool.execute(
-            operation="scan_config",
-            path=str(tmpdir_path)
-        )
+        result = await tool.execute(operation="scan_config", path=str(tmpdir_path))
         print(result.output)
 
         print("\n4️⃣ Comprehensive security scan...")
-        result = await tool.execute(
-            operation="scan_all",
-            path=str(tmpdir_path),
-            severity="medium"
-        )
+        result = await tool.execute(operation="scan_all", path=str(tmpdir_path), severity="medium")
         if not result.success:
             print("⚠ Security issues detected!")
             print("\nRecommendations:")

@@ -66,9 +66,7 @@ async def main():
     agent.reset_conversation()
     print("Claude: ", end="", flush=True)
 
-    async for chunk in agent.stream_chat(
-        "Write a haiku about programming."
-    ):
+    async for chunk in agent.stream_chat("Write a haiku about programming."):
         if chunk.content:
             print(chunk.content, end="", flush=True)
     print()

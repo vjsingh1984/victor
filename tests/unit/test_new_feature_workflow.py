@@ -88,11 +88,7 @@ class TestNewFeatureWorkflow:
 
         # Mock git branch creation to fail
         mock_tool_registry.execute = AsyncMock(
-            return_value=ToolResult(
-                success=False,
-                output=None,
-                error="Git error"
-            )
+            return_value=ToolResult(success=False, output=None, error="Git error")
         )
 
         result = await workflow.run(context, feature_name="test feature")

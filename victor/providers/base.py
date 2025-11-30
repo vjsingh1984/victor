@@ -25,11 +25,13 @@ class Message(BaseModel):
 
     role: str = Field(..., description="Message role: system, user, or assistant")
     content: str = Field(..., description="Message content")
-    name: Optional[str] = Field(None, description="Optional name for the message sender")
+    name: Optional[str] = Field(default=None, description="Optional name for the message sender")
     tool_calls: Optional[List[Dict[str, Any]]] = Field(
-        None, description="Tool calls requested by the assistant"
+        default=None, description="Tool calls requested by the assistant"
     )
-    tool_call_id: Optional[str] = Field(None, description="ID of the tool call being responded to")
+    tool_call_id: Optional[str] = Field(
+        default=None, description="ID of the tool call being responded to"
+    )
 
 
 class ToolDefinition(BaseModel):
@@ -37,9 +39,7 @@ class ToolDefinition(BaseModel):
 
     name: str = Field(..., description="Tool name")
     description: str = Field(..., description="What the tool does")
-    parameters: Dict[str, Any] = Field(
-        ..., description="JSON Schema for tool parameters"
-    )
+    parameters: Dict[str, Any] = Field(..., description="JSON Schema for tool parameters")
 
 
 class CompletionResponse(BaseModel):
@@ -47,15 +47,11 @@ class CompletionResponse(BaseModel):
 
     content: str = Field(..., description="Generated content")
     role: str = Field(default="assistant", description="Response role")
-    tool_calls: Optional[List[Dict[str, Any]]] = Field(
-        None, description="Tool calls requested"
-    )
+    tool_calls: Optional[List[Dict[str, Any]]] = Field(None, description="Tool calls requested")
     stop_reason: Optional[str] = Field(None, description="Why generation stopped")
     usage: Optional[Dict[str, int]] = Field(None, description="Token usage stats")
     model: Optional[str] = Field(None, description="Model used")
-    raw_response: Optional[Dict[str, Any]] = Field(
-        None, description="Raw provider response"
-    )
+    raw_response: Optional[Dict[str, Any]] = Field(None, description="Raw provider response")
 
 
 class StreamChunk(BaseModel):
@@ -155,7 +151,10 @@ class BaseProvider(ABC):
         Raises:
             ProviderError: If the request fails
         """
-        pass
+        # Abstract async generator - yield needed for mypy to recognize as generator
+        if False:
+            yield StreamChunk()
+        raise NotImplementedError
 
     @abstractmethod
     def supports_tools(self) -> bool:
@@ -211,6 +210,7 @@ class BaseProvider(ABC):
         # Simple estimation: ~4 characters per token
         return len(text) // 4
 
+    @abstractmethod
     async def close(self) -> None:
         """Close any open connections or resources."""
         pass

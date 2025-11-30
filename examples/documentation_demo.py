@@ -309,7 +309,7 @@ async def demo_real_world_workflow():
         temp_path = Path(temp_dir)
 
         # Create realistic undocumented code
-        demo_code = '''
+        demo_code = """
 import logging
 from typing import List, Dict, Optional
 
@@ -366,7 +366,7 @@ def format_currency(amount, currency='USD'):
     symbols = {'USD': '$', 'EUR': '€', 'GBP': '£'}
     symbol = symbols.get(currency, currency)
     return f"{symbol}{amount:.2f}"
-'''
+"""
         file_path = setup_demo_file(temp_path, "payment.py", demo_code.strip())
 
         tool = DocumentationTool()

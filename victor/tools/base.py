@@ -15,7 +15,7 @@
 """Base tool framework for CodingAgent."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -74,7 +74,7 @@ class BaseTool(ABC):
         required = []
 
         for param in parameters:
-            param_schema = {
+            param_schema: Dict[str, Any] = {
                 "type": param.type,
                 "description": param.description,
             }
@@ -162,7 +162,7 @@ class BaseTool(ABC):
         Returns:
             True if types match
         """
-        type_mapping = {
+        type_mapping: Dict[str, Union[type[Any], tuple[type[Any], ...]]] = {
             "string": str,
             "number": (int, float),
             "integer": int,
@@ -184,8 +184,9 @@ class ToolRegistry:
     def __init__(self) -> None:
         """Initialize tool registry."""
         self._tools: Dict[str, BaseTool] = {}
-        self._before_hooks: list = []
-        self._after_hooks: list = []
+        self._tool_enabled: Dict[str, bool] = {}  # Track enabled/disabled state
+        self._before_hooks: List[Callable[[str, Dict[str, Any]], None]] = []
+        self._after_hooks: List[Callable[[ToolResult], None]] = []
 
     def register_before_hook(self, hook: Callable[[str, Dict[str, Any]], None]) -> None:
         """Register a hook to be called before a tool is executed."""
@@ -195,22 +196,65 @@ class ToolRegistry:
         """Register a hook to be called after a tool is executed."""
         self._after_hooks.append(hook)
 
-
-    def register(self, tool: Any) -> None:
+    def register(self, tool: Any, enabled: bool = True) -> None:
         """Register a tool.
 
         Can register a BaseTool instance or a function decorated with @tool.
 
         Args:
             tool: Tool instance or decorated function to register
+            enabled: Whether the tool is enabled by default (default: True)
         """
         if hasattr(tool, "Tool"):  # It's a decorated function
             tool_instance = tool.Tool
             self._tools[tool_instance.name] = tool_instance
+            self._tool_enabled[tool_instance.name] = enabled
         elif isinstance(tool, BaseTool):  # It's a class instance
             self._tools[tool.name] = tool
+            self._tool_enabled[tool.name] = enabled
         else:
-            raise TypeError("Can only register BaseTool instances or functions decorated with @tool")
+            raise TypeError(
+                "Can only register BaseTool instances or functions decorated with @tool"
+            )
+
+    def register_dict(self, tool_dict: Dict[str, Any], enabled: bool = True) -> None:
+        """Register a tool from a dictionary definition.
+
+        Used primarily for MCP tool definitions that come as dictionaries.
+
+        Args:
+            tool_dict: Dictionary with 'name', 'description', and 'parameters' keys
+            enabled: Whether the tool is enabled by default (default: True)
+        """
+        name = tool_dict.get("name", "")
+        description = tool_dict.get("description", "")
+        parameters = tool_dict.get("parameters", {"type": "object", "properties": {}})
+
+        # Create a wrapper tool that stores the dictionary definition
+        # This is a placeholder - actual execution is handled by mcp_call
+        class DictTool(BaseTool):
+            @property
+            def name(self) -> str:
+                return name
+
+            @property
+            def description(self) -> str:
+                return description
+
+            @property
+            def parameters(self) -> Dict[str, Any]:
+                return parameters
+
+            async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
+                # MCP tools are executed via mcp_call, not directly
+                return ToolResult(
+                    success=False,
+                    output=None,
+                    error="MCP tools should be called via mcp_call",
+                )
+
+        self._tools[name] = DictTool()
+        self._tool_enabled[name] = enabled
 
     def unregister(self, name: str) -> None:
         """Unregister a tool.
@@ -219,6 +263,64 @@ class ToolRegistry:
             name: Tool name to unregister
         """
         self._tools.pop(name, None)
+        self._tool_enabled.pop(name, None)
+
+    def enable_tool(self, name: str) -> bool:
+        """Enable a tool by name.
+
+        Args:
+            name: Tool name to enable
+
+        Returns:
+            True if tool exists and was enabled, False otherwise
+        """
+        if name in self._tools:
+            self._tool_enabled[name] = True
+            return True
+        return False
+
+    def disable_tool(self, name: str) -> bool:
+        """Disable a tool by name.
+
+        Args:
+            name: Tool name to disable
+
+        Returns:
+            True if tool exists and was disabled, False otherwise
+        """
+        if name in self._tools:
+            self._tool_enabled[name] = False
+            return True
+        return False
+
+    def is_tool_enabled(self, name: str) -> bool:
+        """Check if a tool is enabled.
+
+        Args:
+            name: Tool name
+
+        Returns:
+            True if tool is enabled, False otherwise
+        """
+        return self._tool_enabled.get(name, False)
+
+    def set_tool_states(self, tool_states: Dict[str, bool]) -> None:
+        """Set enabled/disabled states for multiple tools.
+
+        Args:
+            tool_states: Dictionary mapping tool names to enabled state
+        """
+        for name, enabled in tool_states.items():
+            if name in self._tools:
+                self._tool_enabled[name] = enabled
+
+    def get_tool_states(self) -> Dict[str, bool]:
+        """Get enabled/disabled states for all tools.
+
+        Returns:
+            Dictionary mapping tool names to enabled state
+        """
+        return self._tool_enabled.copy()
 
     def get(self, name: str) -> Optional[BaseTool]:
         """Get a tool by name.
@@ -231,20 +333,36 @@ class ToolRegistry:
         """
         return self._tools.get(name)
 
-    def list_tools(self) -> list[BaseTool]:
+    def list_tools(self, only_enabled: bool = True) -> list[BaseTool]:
         """List all registered tools.
+
+        Args:
+            only_enabled: If True, only return enabled tools (default: True)
 
         Returns:
             List of tool instances
         """
+        if only_enabled:
+            return [
+                tool for name, tool in self._tools.items() if self._tool_enabled.get(name, False)
+            ]
         return list(self._tools.values())
 
-    def get_tool_schemas(self) -> list[Dict[str, Any]]:
+    def get_tool_schemas(self, only_enabled: bool = True) -> list[Dict[str, Any]]:
         """Get JSON schemas for all tools.
+
+        Args:
+            only_enabled: If True, only return schemas for enabled tools (default: True)
 
         Returns:
             List of tool JSON schemas
         """
+        if only_enabled:
+            return [
+                tool.to_json_schema()
+                for name, tool in self._tools.items()
+                if self._tool_enabled.get(name, False)
+            ]
         return [tool.to_json_schema() for tool in self._tools.values()]
 
     async def execute(self, name: str, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
@@ -268,12 +386,21 @@ class ToolRegistry:
                 success=False,
                 output=None,
                 error=f"Tool '{name}' not found",
+                metadata=None,
+            )
+        elif not self.is_tool_enabled(name):
+            result = ToolResult(
+                success=False,
+                output=None,
+                error=f"Tool '{name}' is disabled",
+                metadata=None,
             )
         elif not tool.validate_parameters(**kwargs):
             result = ToolResult(
                 success=False,
                 output=None,
                 error=f"Invalid parameters for tool '{name}'",
+                metadata=None,
             )
         else:
             try:

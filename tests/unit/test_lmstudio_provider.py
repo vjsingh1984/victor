@@ -132,7 +132,9 @@ class TestLMStudioBasicChat:
                 max_tokens=2048,
             )
 
-            assert response.content == "Here's a Python function:\n\ndef add(a, b):\n    return a + b"
+            assert (
+                response.content == "Here's a Python function:\n\ndef add(a, b):\n    return a + b"
+            )
             assert response.role == "assistant"
             assert response.stop_reason == "stop"
             assert response.usage["prompt_tokens"] == 15
@@ -142,7 +144,9 @@ class TestLMStudioBasicChat:
     async def test_lmstudio_chat_coding_task(self, lmstudio_provider):
         """Test LMStudio with coding task."""
         mock_message = MagicMock()
-        mock_message.content = "```python\nclass Calculator:\n    def add(self, a, b):\n        return a + b\n```"
+        mock_message.content = (
+            "```python\nclass Calculator:\n    def add(self, a, b):\n        return a + b\n```"
+        )
         mock_message.tool_calls = None
 
         mock_choice = MagicMock()
@@ -178,7 +182,9 @@ class TestLMStudioBasicChat:
     async def test_lmstudio_low_temperature(self, lmstudio_provider):
         """Test LMStudio with low temperature for deterministic output."""
         mock_message = MagicMock()
-        mock_message.content = "def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n-1)"
+        mock_message.content = (
+            "def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n-1)"
+        )
         mock_message.tool_calls = None
 
         mock_choice = MagicMock()
@@ -220,10 +226,9 @@ class TestLMStudioToolCalling:
         mock_tool_call.id = "call_local_123"
         mock_tool_call.function = MagicMock()
         mock_tool_call.function.name = "write_file"
-        mock_tool_call.function.arguments = json.dumps({
-            "file_path": "/tmp/test.py",
-            "content": "print('Hello')"
-        })
+        mock_tool_call.function.arguments = json.dumps(
+            {"file_path": "/tmp/test.py", "content": "print('Hello')"}
+        )
 
         mock_message = MagicMock()
         mock_message.content = None
@@ -550,10 +555,9 @@ class TestVLLMToolCalling:
         mock_tool_call.id = "call_vllm_123"
         mock_tool_call.function = MagicMock()
         mock_tool_call.function.name = "execute_code"
-        mock_tool_call.function.arguments = json.dumps({
-            "language": "python",
-            "code": "print('Hello from vLLM')"
-        })
+        mock_tool_call.function.arguments = json.dumps(
+            {"language": "python", "code": "print('Hello from vLLM')"}
+        )
 
         mock_message = MagicMock()
         mock_message.content = None
@@ -715,7 +719,9 @@ class TestVLLMStreaming:
     async def test_vllm_streaming_with_tools(self, vllm_provider):
         """Test vLLM streaming with tools."""
         mock_chunk = MagicMock()
-        mock_chunk.choices = [MagicMock(delta=MagicMock(content="analyzing..."), finish_reason=None)]
+        mock_chunk.choices = [
+            MagicMock(delta=MagicMock(content="analyzing..."), finish_reason=None)
+        ]
 
         async def async_iter():
             yield mock_chunk

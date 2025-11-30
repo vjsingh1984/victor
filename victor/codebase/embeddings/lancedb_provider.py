@@ -28,12 +28,12 @@ For embedding models:
 - OpenAI: pip install openai (requires API key)
 """
 
-import asyncio
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 try:
     import lancedb
+
     LANCEDB_AVAILABLE = True
 except ImportError:
     LANCEDB_AVAILABLE = False
@@ -80,9 +80,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         super().__init__(config)
 
         if not LANCEDB_AVAILABLE:
-            raise ImportError(
-                "LanceDB not available. Install with: pip install lancedb"
-            )
+            raise ImportError("LanceDB not available. Install with: pip install lancedb")
 
         self.db = None
         self.table = None
@@ -114,7 +112,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         await self.embedding_model.initialize()
 
         print("🔧 Initializing LanceDB provider")
-        print(f"📦 Vector Store: LanceDB")
+        print("📦 Vector Store: LanceDB")
         print(f"🤖 Embedding Model: {model_name} ({model_type})")
 
         # Setup LanceDB
@@ -211,9 +209,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         else:
             self.table.add([document])
 
-    async def index_documents(
-        self, documents: List[Dict[str, Any]]
-    ) -> None:
+    async def index_documents(self, documents: List[Dict[str, Any]]) -> None:
         """Index multiple documents in batch.
 
         Args:
@@ -231,7 +227,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Prepare documents for insertion
         lance_docs = []
-        for doc, embedding in zip(documents, embeddings):
+        for doc, embedding in zip(documents, embeddings, strict=False):
             lance_doc = {
                 "id": doc["id"],
                 "vector": embedding,

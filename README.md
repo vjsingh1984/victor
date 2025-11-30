@@ -2,7 +2,7 @@
 
 ![Victor Banner](./assets/victor-banner.svg)
 
-<h3>Enterprise-Ready Universal AI Coding Assistant</h3>
+<h3>Enterprise-Ready AI Coding Assistant for Secure, Hybrid Software & Data Delivery</h3>
 <p><strong>Production-grade • Patent-protected • Apache 2.0 Licensed</strong></p>
 
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -18,6 +18,18 @@
 
 ---
 
+## Project Status: Alpha
+
+**Victor is currently in an alpha state.** The project has a comprehensive and ambitious roadmap, but the current implementation is a foundational subset of the full vision.
+
+Much of the documentation, especially `ARCHITECTURE_DEEP_DIVE.md`, describes the target architecture and features that are under active development. For a detailed breakdown of the current state and the plan to bridge this gap, please see our **[IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md)**.
+
+We welcome contributors who are excited to help us build the future of this project.
+
+**Docs + Onboarding:** use `docs/guides/QUICKSTART.md` as the canonical setup guide and treat other longform docs as aspirational unless explicitly labeled “Current State.” The active code lives in `victor/`; `archive/victor-legacy/` is frozen for historical reference.
+
+---
+
 ## What is Victor?
 
 **Victor** is an **enterprise-ready**, terminal-based AI coding assistant that provides a unified interface for working with multiple LLM providers. Whether you're using frontier models like Claude, GPT-4, and Gemini, or running open-source models locally via Ollama, LMStudio, or vLLM, Victor provides one consistent, powerful interface for all.
@@ -25,7 +37,7 @@
 **Why Consider Victor:**
 - **Apache 2.0 Licensed** - Patent-protected, safe for commercial use
 - **Air-Gapped Mode** - Complete offline operation for compliance requirements
-- **Production-Grade** - 32 enterprise tools (consolidated from 86), comprehensive security scanning
+- **Production-Grade** - A solid foundation with a clear roadmap for hardening.
 - **Cost Flexibility** - Use free local models or paid APIs based on your needs
 - **Zero Vendor Lock-in** - Switch providers instantly, maintain full control
 
@@ -156,6 +168,27 @@ Switch between AI providers as easily as changing a config file:
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Reality Check (Current Implementation)
+
+- **Tooling surface**: 53 tools dynamically registered (editor, git, tests, Docker, docs, refactors, cache/database/http, basic CI/CD stub). Coverage analysis and rich pipeline generators are not implemented yet.
+- **Tool selection & budgets**: Semantic tool selection is on by default; tool call budget/loop-guarding is enforced by the orchestrator. If stage pruning removes everything, Victor falls back to a small core set capped by `fallback_max_tools` (default 8) to avoid broadcasting all tools. Disable semantic selection via `profiles.yaml` → `tools` config if you want keyword-only.
+- **Tool cache**: Allowlisted tools (defaults: code_search, semantic_code_search, list_directory, plan_files) are cached for `tool_cache_ttl` seconds to avoid rerunning pure/idempotent operations. Configure via `tool_cache_*` settings.
+- **Planning scaffold**: A minimal dependency graph is registered for search→read→analyze flows; deeper auto-planning is a future enhancement.
+- **Code search**: Use `semantic_code_search` for embedding-backed search (auto-reindexes on file changes); `code_search` remains keyword-only. Requires embedding deps (sentence-transformers + lancedb/chromadb).
+- **Security scan**: Current `security_scan` detects secrets and obvious config flags via regex only; no dependency/IaC/CVE scanning is wired in yet.
+- **Docs**: Prefer `docs/guides/QUICKSTART.md` for setup and `docker/README.md` for containers. Embedding/air-gapped material is being consolidated under `docs/embeddings/` (see consolidation plan).
+- **Package layout**: The active package lives at `victor/`.
+- **Tool catalog**: See `docs/TOOL_CATALOG.md` (generated via `python scripts/generate_tool_catalog.py`) for the exact tool surface registered today.
+
+| Area | Implemented now | Planned/Gap |
+| --- | --- | --- |
+| Code search | Keyword `code_search` + new `semantic_code_search` (embeddings required) | Improve CLI UX (progress, cache stats), add selective reindex |
+| Security | Regex secret/config checks | Dependency/IaC/CVE scanning |
+| CI/CD & coverage | Basic `cicd` stub, no coverage tool | Rich pipeline/coverage analyzers |
+| Package layout | Active: `victor/` | ✅ Completed |
 
 ---
 
@@ -320,42 +353,62 @@ Victor provides enterprise-grade tools for:
 
 ```bash
 # Clone Victor
-git clone https://github.com/vjsingh1984/victor.git
-cd victor
+ git clone https://github.com/vjsingh1984/victor.git
+ cd victor
 
 # Install
-pip install -e ".[dev]"
+ pip install -e ".[dev]"
 
 # Initialize
-victor init
+ victor init
 ```
 
 ### Setup Provider (1 minute)
 
 <details open>
-<summary><b>Option 1: Free Local Model (Recommended for beginners)</b></summary>
+<summary><b>Option 1: Free Local Model (LMStudio default)</b></summary>
 
 ```bash
-# Install Ollama
-curl https://ollama.ai/install.sh | sh
+# Install LMStudio (download from https://lmstudio.ai)
+# Launch LMStudio → Local Server tab → start qwen2.5-coder:7b
 
-# Pull a coding model
-ollama pull qwen2.5-coder:7b
-
-# Configure Victor
+# Configure Victor (tiered LMStudio endpoints: primary 192.168.1.126, secondary 192.168.1.20, fallback localhost)
 cat > ~/.victor/profiles.yaml <<EOF
 profiles:
   default:
-    provider: ollama
+    provider: lmstudio
     model: qwen2.5-coder:7b
     temperature: 0.7
+
+providers:
+  lmstudio:
+    base_url:
+      - http://192.168.1.126:1234  # Primary
+      - http://192.168.1.20:1234   # Secondary
+      - http://127.0.0.1:1234      # Tertiary (localhost fallback)
+    timeout: 300
 EOF
 
-# Start coding
+# Start coding (no API key required)
 victor
 ```
 
 **Cost**: FREE | **Speed**: Fast | **Privacy**: 100% local
+
+Tip: If `~/.victor/profiles.yaml` is missing, Victor will probe the LMStudio tiered endpoints above, list their available models, and pick a preferred coder model it finds (prefers `qwen2.5-coder:7b/14b/32b`, then first available).
+
+Connectivity check:
+```bash
+python scripts/check_lmstudio.py
+```
+Shows which LMStudio endpoint is reachable, which models it exposes, and (if VRAM is detected) recommends the most capable model that fits your GPU.
+You can also cap selection via `lmstudio_max_vram_gb` in settings (default 48 GB) if you want to stay under a target budget.
+
+Interactive command:
+```
+/lmstudio
+```
+From inside Victor’s REPL, probes LMStudio endpoints and shows a VRAM-aware recommendation.
 
 </details>
 
@@ -364,10 +417,10 @@ victor
 
 ```bash
 # Set API key
-export ANTHROPIC_API_KEY="your-key"
+ export ANTHROPIC_API_KEY="your-key"
 
 # Configure Victor
-cat > ~/.victor/profiles.yaml <<EOF
+ cat > ~/.victor/profiles.yaml <<EOF
 profiles:
   default:
     provider: anthropic
@@ -380,7 +433,7 @@ providers:
 EOF
 
 # Start coding
-victor
+ victor
 ```
 
 **Cost**: Pay per use | **Speed**: Very fast | **Privacy**: Cloud-based
@@ -430,16 +483,16 @@ Victor includes production-ready Docker configuration:
 
 ```bash
 # Quick setup
-bash docker/scripts/setup.sh
+ bash docker/scripts/setup.sh
 
 # Start Ollama (local LLM)
-docker-compose --profile ollama up -d
+ docker-compose --profile ollama up -d
 
 # Or full stack (Ollama + vLLM + Jupyter)
-docker-compose --profile full up -d
+ docker-compose --profile full up -d
 
 # Run automated demos
-docker-compose --profile demo up
+ docker-compose --profile demo up
 ```
 
 **Service Profiles**:
@@ -461,10 +514,10 @@ Share GGUF models between Ollama and LMStudio:
 
 ```bash
 # Install Gollama
-go install github.com/sammcj/gollama@HEAD
+ go install github.com/sammcj/gollama@HEAD
 
 # Link all models
-~/go/bin/gollama -L
+ ~/go/bin/gollama -L
 
 # Result: 27+ models, 300GB saved
 ```
@@ -479,7 +532,7 @@ See [docs/guides/MODEL_SHARING.md](docs/guides/MODEL_SHARING.md) for details.
 
 ```python
 # Configure AI-powered search
-victor --profile default
+ victor --profile default
 
 > Index this codebase with semantic search
 
@@ -579,6 +632,8 @@ victor --profile default
 
 ## Roadmap
 
+This roadmap provides a high-level overview of the project's future direction. For a detailed breakdown of the current implementation and a concrete development plan, please see our **[IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md)**.
+
 ### Completed
 
 - [x] Universal provider abstraction with 6+ LLMs
@@ -614,25 +669,27 @@ victor --profile default
 
 We welcome contributions! Here's how to get started:
 
+See `CONTRIBUTING.md` for detailed guidelines and `SUPPORT.md` for how to raise questions or issues.
+
 ```bash
 # Fork and clone
 git clone https://github.com/yourusername/victor.git
 cd victor
 
 # Create virtual environment
-python -m venv venv
-source venv/bin/activate
+ python -m venv venv
+ source venv/bin/activate
 
 # Install dev dependencies
-pip install -e ".[dev]"
+ pip install -e ".[dev]"
 
 # Run tests
-pytest
+ pytest
 
 # Submit PR
-git checkout -b feature/amazing-feature
-git commit -m "Add amazing feature"
-git push origin feature/amazing-feature
+ git checkout -b feature/amazing-feature
+ git commit -m "Add amazing feature"
+ git push origin feature/amazing-feature
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
