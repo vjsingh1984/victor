@@ -183,7 +183,7 @@ GITHUB_TOKEN = "ghp_abcd1234efgh5678ijkl90mnopqr123456"
 DATABASE_URL = "postgresql://user:password123@localhost/db"
 
 # Google API key
-GOOGLE_API_KEY = "AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI"
+GOOGLE_API_KEY = "XXXXX"
 """
         )
 
