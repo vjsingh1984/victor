@@ -17,7 +17,6 @@
 Demonstrates automated documentation generation:
 - Generate docstrings for functions and classes
 - Create API documentation
-- Generate README sections
 - Analyze documentation coverage
 
 Usage:
@@ -27,7 +26,8 @@ Usage:
 import asyncio
 import tempfile
 from pathlib import Path
-from victor.tools.documentation_tool import DocumentationTool
+
+from victor.tools.documentation_tool import generate_docs, analyze_docs
 
 
 def setup_demo_file(temp_dir: Path, filename: str, content: str) -> Path:
@@ -85,20 +85,18 @@ class ShoppingCart:
 """
         file_path = setup_demo_file(temp_path, "cart.py", demo_code.strip())
 
-        tool = DocumentationTool()
-
         print("\n1️⃣ Original code (no docstrings):")
         print(demo_code[:400] + "...")
 
         print("\n2️⃣ Generate docstrings...")
-        result = await tool.execute(
-            operation="generate_docstrings",
-            file=str(file_path),
+        result = await generate_docs(
+            path=str(file_path),
+            doc_types=["docstrings"],
             format="google",
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
         print("\n3️⃣ Updated code with docstrings:")
         updated_code = file_path.read_text()
@@ -113,7 +111,7 @@ async def demo_generate_api_docs():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
 
-        # Create API code
+        # Create API code with docstrings
         demo_code = '''
 """API module for user management."""
 
@@ -193,18 +191,19 @@ class UserManager:
 '''
         file_path = setup_demo_file(temp_path, "api.py", demo_code.strip())
 
-        tool = DocumentationTool()
-
         print("\n1️⃣ Generate API documentation from code...")
-        result = await tool.execute(
-            operation="generate_api_docs",
-            file=str(file_path),
-            output=str(temp_path / "api_docs.md"),
+        result = await generate_docs(
+            path=str(file_path),
+            doc_types=["api"],
             format="markdown",
+            output=str(temp_path / "api_docs.md"),
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
+            api_result = result.get("results", {}).get("api", {})
+            print(f"\nGenerated documentation preview:")
+            print(api_result.get("preview", ""))
 
 
 async def demo_analyze_coverage():
@@ -252,51 +251,11 @@ def another_function(x, y):
 '''
         file_path = setup_demo_file(temp_path, "processor.py", demo_code.strip())
 
-        tool = DocumentationTool()
-
         print("\n1️⃣ Analyze documentation coverage...")
-        result = await tool.execute(
-            operation="analyze_docs",
-            file=str(file_path),
-        )
+        result = await analyze_docs(path=str(file_path))
 
-        if result.success:
-            print(result.output)
-
-
-async def demo_generate_readme():
-    """Demo generating README sections."""
-    print("\n\n📄 Generate README Sections Demo")
-    print("=" * 70)
-
-    tool = DocumentationTool()
-
-    print("\n1️⃣ Generate Installation section...")
-    result = await tool.execute(
-        operation="generate_readme",
-        section="installation",
-    )
-
-    if result.success:
-        print(result.output)
-
-    print("\n\n2️⃣ Generate Usage section...")
-    result = await tool.execute(
-        operation="generate_readme",
-        section="usage",
-    )
-
-    if result.success:
-        print(result.output[:500] + "...")
-
-    print("\n\n3️⃣ Generate Contributing section...")
-    result = await tool.execute(
-        operation="generate_readme",
-        section="contributing",
-    )
-
-    if result.success:
-        print(result.output[:500] + "...")
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
 
 async def demo_real_world_workflow():
@@ -369,50 +328,44 @@ def format_currency(amount, currency='USD'):
 """
         file_path = setup_demo_file(temp_path, "payment.py", demo_code.strip())
 
-        tool = DocumentationTool()
-
         print("\n1️⃣ STEP 1: Analyze current documentation coverage...")
-        result = await tool.execute(
-            operation="analyze_docs",
-            file=str(file_path),
-        )
-        if result.success:
+        result = await analyze_docs(path=str(file_path))
+        if result["success"]:
             print("✓ Coverage analyzed")
-            print(result.output[:400] + "...")
+            report = result.get("formatted_report", "")
+            print(report[:400] + "..." if len(report) > 400 else report)
 
         print("\n\n2️⃣ STEP 2: Generate missing docstrings...")
-        result = await tool.execute(
-            operation="generate_docstrings",
-            file=str(file_path),
+        result = await generate_docs(
+            path=str(file_path),
+            doc_types=["docstrings"],
         )
-        if result.success:
+        if result["success"]:
             print("✓ Docstrings generated")
-            print(result.output[:400] + "...")
+            print(result.get("formatted_report", ""))
 
         print("\n\n3️⃣ STEP 3: Generate API documentation...")
-        result = await tool.execute(
-            operation="generate_api_docs",
-            file=str(file_path),
+        result = await generate_docs(
+            path=str(file_path),
+            doc_types=["api"],
             output=str(temp_path / "payment_api.md"),
         )
-        if result.success:
+        if result["success"]:
             print("✓ API docs generated")
 
         print("\n\n4️⃣ STEP 4: Verify final coverage...")
-        result = await tool.execute(
-            operation="analyze_docs",
-            file=str(file_path),
-        )
-        if result.success:
+        result = await analyze_docs(path=str(file_path))
+        if result["success"]:
             print("✓ Final coverage verified")
-            print(result.output[:300] + "...")
+            report = result.get("formatted_report", "")
+            print(report[:300] + "..." if len(report) > 300 else report)
 
         print("\n\n📊 Documentation Workflow Complete!")
         print("\nWhat we accomplished:")
         print("  • Analyzed initial coverage (likely low)")
         print("  • Generated comprehensive docstrings")
         print("  • Created API documentation")
-        print("  • Verified 100% coverage")
+        print("  • Verified improved coverage")
         print("")
         print("Files created:")
         print("  • payment.py (with complete docstrings)")
@@ -474,7 +427,6 @@ async def main():
     await demo_generate_docstrings()
     await demo_generate_api_docs()
     await demo_analyze_coverage()
-    await demo_generate_readme()
     await demo_real_world_workflow()
     await demo_documentation_benefits()
 
@@ -482,7 +434,6 @@ async def main():
     print("\nVictor's Documentation Tool provides:")
     print("  • Automated docstring generation")
     print("  • API documentation creation")
-    print("  • README section templates")
     print("  • Documentation coverage analysis")
     print("  • Multiple documentation formats")
     print("")

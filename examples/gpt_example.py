@@ -18,6 +18,7 @@ import asyncio
 import os
 
 from victor.agent.orchestrator import AgentOrchestrator
+from victor.config.settings import Settings
 from victor.providers.openai_provider import OpenAIProvider
 
 
@@ -36,13 +37,15 @@ async def main():
     # Create OpenAI provider
     provider = OpenAIProvider(api_key=api_key)
 
-    # Example with GPT-4 Turbo
-    print("\n💎 Using GPT-4 Turbo")
+    # Example with GPT-4o
+    print("\n💎 Using GPT-4o")
     print("-" * 60)
 
+    settings = Settings()
     agent = AgentOrchestrator(
+        settings=settings,
         provider=provider,
-        model="gpt-4-turbo-preview",
+        model="gpt-4o",
         temperature=0.7,
     )
 
@@ -61,7 +64,7 @@ def calculate_total(items):
     response = await agent.chat(
         f"Review this Python code and suggest improvements:\n\n{code_to_review}"
     )
-    print(f"GPT-4: {response.content}")
+    print(f"GPT-4o: {response.content}")
 
     # Example 2: Creative writing
     print("\n\n✍️ Example 2: Creative Writing")
@@ -71,20 +74,21 @@ def calculate_total(items):
     response = await agent.chat(
         "Write a creative product name and tagline for an AI coding assistant that works with any LLM."
     )
-    print(f"GPT-4: {response.content}")
+    print(f"GPT-4o: {response.content}")
 
-    # Example with GPT-3.5 Turbo (faster, cheaper)
-    print("\n\n⚡ Using GPT-3.5 Turbo (faster)")
+    # Example with GPT-4o mini (faster, cheaper)
+    print("\n\n⚡ Using GPT-4o mini (faster)")
     print("-" * 60)
 
     provider2 = OpenAIProvider(api_key=api_key)
     agent2 = AgentOrchestrator(
+        settings=settings,
         provider=provider2,
-        model="gpt-3.5-turbo",
+        model="gpt-4o-mini",
         temperature=0.5,
     )
 
-    print("\nGPT-3.5: ", end="", flush=True)
+    print("\nGPT-4o mini: ", end="", flush=True)
     async for chunk in agent2.stream_chat("List 5 Python best practices in one sentence each."):
         if chunk.content:
             print(chunk.content, end="", flush=True)
@@ -99,14 +103,14 @@ def calculate_total(items):
         "I have a list of 1 million integers. I need to find the top 10 largest numbers efficiently. "
         "What's the best approach and why?"
     )
-    print(f"GPT-4: {response.content}")
+    print(f"GPT-4o: {response.content}")
 
     # Clean up
     await provider.close()
     await provider2.close()
 
     print("\n\n✅ Examples completed!")
-    print("\n💡 Tip: Use GPT-3.5 for quick tasks, GPT-4 for complex reasoning")
+    print("\n💡 Tip: Use GPT-4o mini for quick tasks, GPT-4o for complex reasoning")
 
 
 if __name__ == "__main__":

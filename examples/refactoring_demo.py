@@ -27,7 +27,13 @@ Usage:
 import asyncio
 import tempfile
 from pathlib import Path
-from victor.tools.refactor_tool import RefactorTool
+
+from victor.tools.refactor_tool import (
+    refactor_rename_symbol,
+    refactor_extract_function,
+    refactor_inline_variable,
+    refactor_organize_imports,
+)
 
 
 def setup_demo_file(temp_dir: Path, filename: str, content: str) -> Path:
@@ -62,34 +68,32 @@ def main():
 """
         file_path = setup_demo_file(temp_path, "app.py", demo_code.strip())
 
-        tool = RefactorTool()
-
         print("\n1️⃣ Original code:")
         print(demo_code)
 
         print("\n2️⃣ Preview: Rename 'process_data' to 'transform_items'...")
-        result = await tool.execute(
-            operation="rename",
+        result = await refactor_rename_symbol(
             file=str(file_path),
             old_name="process_data",
             new_name="transform_items",
             preview=True,
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
+        else:
+            print(f"❌ Error: {result.get('error', '')}")
 
         print("\n3️⃣ Execute: Rename 'process_data' to 'transform_items'...")
-        result = await tool.execute(
-            operation="rename",
+        result = await refactor_rename_symbol(
             file=str(file_path),
             old_name="process_data",
             new_name="transform_items",
             preview=False,
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
         print("\n4️⃣ Modified code:")
         print(file_path.read_text())
@@ -124,14 +128,11 @@ def process_user_data(users):
 """
         file_path = setup_demo_file(temp_path, "users.py", demo_code.strip())
 
-        tool = RefactorTool()
-
         print("\n1️⃣ Original code:")
         print(demo_code)
 
         print("\n2️⃣ Extract validation logic (lines 6-11) into 'validate_user' function...")
-        result = await tool.execute(
-            operation="extract_function",
+        result = await refactor_extract_function(
             file=str(file_path),
             start_line=6,
             end_line=11,
@@ -139,8 +140,10 @@ def process_user_data(users):
             preview=True,
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
+        else:
+            print(f"❌ Error: {result.get('error', '')}")
 
 
 async def demo_inline_variable():
@@ -165,32 +168,30 @@ def calculate_total(items):
 """
         file_path = setup_demo_file(temp_path, "calc.py", demo_code.strip())
 
-        tool = RefactorTool()
-
         print("\n1️⃣ Original code:")
         print(demo_code)
 
-        print("\n2️⃣ Inline 'tax_rate' variable...")
-        result = await tool.execute(
-            operation="inline_variable",
+        print("\n2️⃣ Inline 'tax_rate' variable (preview)...")
+        result = await refactor_inline_variable(
             file=str(file_path),
-            old_name="tax_rate",
+            variable_name="tax_rate",
             preview=True,
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
+        else:
+            print(f"❌ Error: {result.get('error', '')}")
 
         print("\n3️⃣ Execute inlining...")
-        result = await tool.execute(
-            operation="inline_variable",
+        result = await refactor_inline_variable(
             file=str(file_path),
-            old_name="tax_rate",
+            variable_name="tax_rate",
             preview=False,
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
         print("\n4️⃣ Modified code:")
         print(file_path.read_text())
@@ -225,30 +226,28 @@ class DataProcessor:
 '''
         file_path = setup_demo_file(temp_path, "processor.py", demo_code.strip())
 
-        tool = RefactorTool()
-
         print("\n1️⃣ Original imports (messy):")
         print(demo_code[:300] + "...")
 
         print("\n2️⃣ Preview: Organize imports...")
-        result = await tool.execute(
-            operation="organize_imports",
+        result = await refactor_organize_imports(
             file=str(file_path),
             preview=True,
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
+        else:
+            print(f"❌ Error: {result.get('error', '')}")
 
         print("\n3️⃣ Execute: Organize imports...")
-        result = await tool.execute(
-            operation="organize_imports",
+        result = await refactor_organize_imports(
             file=str(file_path),
             preview=False,
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
         print("\n4️⃣ Organized code:")
         print(file_path.read_text()[:400] + "...")
@@ -285,73 +284,65 @@ def main():
 """
         file_path = setup_demo_file(temp_path, "legacy.py", demo_code.strip())
 
-        tool = RefactorTool()
-
         print("\n1️⃣ Original legacy code:")
         print(demo_code)
 
         print("\n2️⃣ STEP 1: Organize imports...")
-        result = await tool.execute(
-            operation="organize_imports",
+        result = await refactor_organize_imports(
             file=str(file_path),
             preview=False,
         )
-        if result.success:
+        if result["success"]:
             print("✓ Imports organized")
 
         print("\n3️⃣ STEP 2: Rename 'proc' to 'filter_active_items'...")
-        result = await tool.execute(
-            operation="rename",
+        result = await refactor_rename_symbol(
             file=str(file_path),
             old_name="proc",
             new_name="filter_active_items",
             preview=False,
         )
-        if result.success:
+        if result["success"]:
             print("✓ Function renamed")
 
         print("\n4️⃣ STEP 3: Rename 'd' to 'items'...")
-        result = await tool.execute(
-            operation="rename",
+        result = await refactor_rename_symbol(
             file=str(file_path),
             old_name="d",
             new_name="items",
             preview=False,
         )
-        if result.success:
+        if result["success"]:
             print("✓ Parameter renamed")
 
         print("\n5️⃣ STEP 4: Rename 'x' to 'active_items'...")
-        result = await tool.execute(
-            operation="rename",
+        result = await refactor_rename_symbol(
             file=str(file_path),
             old_name="x",
             new_name="active_items",
             preview=False,
         )
-        if result.success:
+        if result["success"]:
             print("✓ Variable renamed")
 
         print("\n6️⃣ STEP 5: Rename 'i' to 'item'...")
-        result = await tool.execute(
-            operation="rename",
+        result = await refactor_rename_symbol(
             file=str(file_path),
             old_name="i",
             new_name="item",
             preview=False,
         )
-        if result.success:
+        if result["success"]:
             print("✓ Loop variable renamed")
 
         print("\n7️⃣ STEP 6: Rename 'r' to 'filtered_data'...")
-        result = await tool.execute(
-            operation="rename",
+        result = await refactor_rename_symbol(
             file=str(file_path),
             old_name="r",
             new_name="filtered_data",
             preview=False,
         )
-        if result.success:
+        if result["success"]:
             print("✓ Result variable renamed")
 
         print("\n📊 Final refactored code:")
@@ -380,41 +371,36 @@ def calculate(a, b):
 """
         file_path = setup_demo_file(temp_path, "safe.py", demo_code.strip())
 
-        tool = RefactorTool()
-
         print("\n1️⃣ Try to rename non-existent symbol...")
-        result = await tool.execute(
-            operation="rename",
+        result = await refactor_rename_symbol(
             file=str(file_path),
             old_name="nonexistent",
             new_name="something",
         )
 
-        if not result.success:
-            print(f"❌ Expected error: {result.error}")
+        if not result["success"]:
+            print(f"❌ Expected error: {result.get('error', '')}")
 
         print("\n2️⃣ Try to refactor non-existent file...")
-        result = await tool.execute(
-            operation="rename",
+        result = await refactor_rename_symbol(
             file="/tmp/does_not_exist.py",
             old_name="foo",
             new_name="bar",
         )
 
-        if not result.success:
-            print(f"❌ Expected error: {result.error}")
+        if not result["success"]:
+            print(f"❌ Expected error: {result.get('error', '')}")
 
         print("\n3️⃣ Try extract with invalid line range...")
-        result = await tool.execute(
-            operation="extract_function",
+        result = await refactor_extract_function(
             file=str(file_path),
             start_line=10,
             end_line=20,
             function_name="test",
         )
 
-        if not result.success:
-            print(f"❌ Expected error: {result.error}")
+        if not result["success"]:
+            print(f"❌ Expected error: {result.get('error', '')}")
 
         print("\n✅ All safety checks working correctly!")
 

@@ -243,12 +243,33 @@ providers:
 
 ### 3. Explore Examples
 
+Victor includes many working example demos:
+
 ```bash
 # Check out the examples directory
 ls examples/
 
-# Run the simple chat example
+# Run the simple chat example (uses Ollama)
 python examples/simple_chat.py
+
+# Local/Free demos (no API keys required):
+python examples/caching_demo.py           # Tiered caching system
+python examples/context_management_demo.py # Context window management
+python examples/multi_file_editing_demo.py # Atomic multi-file operations
+python examples/codebase_indexing_demo.py  # Code symbol indexing
+python examples/batch_processing_demo.py   # Multi-file search/replace
+python examples/git_tool_demo.py           # Git operations
+python examples/testing_demo.py            # Pytest integration
+python examples/cicd_demo.py               # CI/CD workflow generation
+python examples/refactoring_demo.py        # Code refactoring
+python examples/dependency_demo.py         # Dependency management
+python examples/documentation_demo.py      # Docstring generation
+python examples/enterprise_tools_demo.py   # Code review, scaffolding, security
+python examples/metrics_demo.py            # Code metrics analysis
+
+# Semantic search (uses local sentence-transformers):
+python examples/airgapped_codebase_search.py  # 100% offline semantic search
+python examples/qwen3_embedding_demo.py       # Qwen3 embeddings with Ollama
 ```
 
 ### 4. Contribute
@@ -304,17 +325,26 @@ victor "Analyze the test failures in test_results.txt and fix the issues"
 - **Issues**: Open an issue on GitHub
 - **Examples**: Look at `examples/` directory
 
-## What's Next?
+## What's Implemented
 
-The project roadmap includes:
-- [ ] Anthropic Claude integration
-- [ ] OpenAI GPT integration
-- [ ] Google Gemini integration
-- [ ] LMStudio and vLLM support
-- [ ] MCP (Model Context Protocol) support
-- [ ] Multi-agent collaboration
-- [ ] Context caching
+Victor already includes these features:
+- [x] **Anthropic Claude integration** - Claude 3.5 Sonnet/Opus/Haiku
+- [x] **OpenAI GPT integration** - GPT-4o, GPT-4o-mini
+- [x] **Google Gemini integration** - Gemini 2.5 Pro with configurable safety settings
+- [x] **xAI Grok integration** - Grok Beta and Vision
+- [x] **LMStudio and vLLM support** - OpenAI-compatible API
+- [x] **MCP (Model Context Protocol)** - Client and server support
+- [x] **Context caching** - Tiered memory + disk caching
+- [x] **50+ Enterprise tools** - File ops, git, testing, CI/CD, refactoring, security
+- [x] **Semantic code search** - Air-gapped mode with local embeddings
+- [x] **Multi-file editing** - Atomic transactions with rollback
+
+## Roadmap
+
+Planned features:
 - [ ] Web UI
+- [ ] Multi-agent collaboration
+- [ ] More provider integrations (Cohere, Mistral)
 
 Contributions are welcome!
 

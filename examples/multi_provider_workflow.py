@@ -18,6 +18,7 @@ import asyncio
 import os
 
 from victor.agent.orchestrator import AgentOrchestrator
+from victor.config.settings import Settings
 from victor.providers.ollama import OllamaProvider
 from victor.providers.anthropic_provider import AnthropicProvider
 from victor.providers.openai_provider import OpenAIProvider
@@ -35,6 +36,7 @@ async def main():
     print("\n📝 Step 1: Brainstorming (Using Ollama - FREE)")
     print("-" * 60)
 
+    settings = Settings()
     ollama = OllamaProvider()
     try:
         models = await ollama.list_models()
@@ -46,6 +48,7 @@ async def main():
             model_name = models[0]["name"]
 
             agent_ollama = AgentOrchestrator(
+                settings=settings,
                 provider=ollama,
                 model=model_name,
                 temperature=0.8,
@@ -63,28 +66,29 @@ async def main():
         ollama_available = False
         chosen_name = "validate_email_format"
 
-    # Step 2: Implement with GPT-3.5 (CHEAP & FAST)
-    print("\n\n💻 Step 2: Implementation (Using GPT-3.5 - Fast & Cheap)")
+    # Step 2: Implement with GPT-4o mini (CHEAP & FAST)
+    print("\n\n💻 Step 2: Implementation (Using GPT-4o mini - Fast & Cheap)")
     print("-" * 60)
 
     openai_key = os.getenv("OPENAI_API_KEY")
     if openai_key:
-        gpt35 = OpenAIProvider(api_key=openai_key)
-        agent_gpt35 = AgentOrchestrator(
-            provider=gpt35,
-            model="gpt-3.5-turbo",
+        gpt4o_mini = OpenAIProvider(api_key=openai_key)
+        agent_gpt4o_mini = AgentOrchestrator(
+            settings=settings,
+            provider=gpt4o_mini,
+            model="gpt-4o-mini",
             temperature=0.5,
         )
 
-        response = await agent_gpt35.chat(
+        response = await agent_gpt4o_mini.chat(
             f"Write a Python function called {chosen_name} that validates email addresses. "
             "Use regex, include docstring, handle edge cases."
         )
-        print(f"GPT-3.5: {response.content[:500]}...")
+        print(f"GPT-4o mini: {response.content[:500]}...")
         implementation = response.content
-        await gpt35.close()
+        await gpt4o_mini.close()
     else:
-        print("⚠️  OPENAI_API_KEY not set. Skipping GPT-3.5 step.")
+        print("⚠️  OPENAI_API_KEY not set. Skipping GPT-4o mini step.")
         implementation = "# Implementation would go here"
 
     # Step 3: Review with Claude (BEST QUALITY)
@@ -95,6 +99,7 @@ async def main():
     if anthropic_key:
         claude = AnthropicProvider(api_key=anthropic_key)
         agent_claude = AgentOrchestrator(
+            settings=settings,
             provider=claude,
             model="claude-sonnet-4-5",
             temperature=0.7,
@@ -126,7 +131,7 @@ async def main():
     print("\n\n📊 Workflow Summary")
     print("-" * 60)
     print("✅ Step 1: Brainstorm with Ollama (FREE)")
-    print("✅ Step 2: Implement with GPT-3.5 ($0.0005 per 1K tokens)")
+    print("✅ Step 2: Implement with GPT-4o mini ($0.15 per 1M input tokens)")
     print("✅ Step 3: Review with Claude ($0.003 per 1K tokens)")
     print("✅ Step 4: Generate tests with Ollama (FREE)")
     print("\n💰 Total cost: ~$0.01 vs. using GPT-4 for everything: ~$0.10")
@@ -134,7 +139,7 @@ async def main():
 
     print("\n\n💡 Key Takeaways:")
     print("- Use Ollama for brainstorming and simple tasks (FREE)")
-    print("- Use GPT-3.5 for quick implementations (CHEAP)")
+    print("- Use GPT-4o mini for quick implementations (CHEAP)")
     print("- Use Claude for critical reviews (QUALITY)")
     print("- Mix and match for optimal cost/quality balance")
 

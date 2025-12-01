@@ -17,6 +17,7 @@
 import asyncio
 
 from victor.agent.orchestrator import AgentOrchestrator
+from victor.config.settings import Settings
 from victor.providers.ollama import OllamaProvider
 
 
@@ -25,8 +26,10 @@ async def main():
     # Create Ollama provider
     provider = OllamaProvider(base_url="http://localhost:11434")
 
-    # Create agent orchestrator
+    # Create settings and agent orchestrator
+    settings = Settings()
     agent = AgentOrchestrator(
+        settings=settings,
         provider=provider,
         model="qwen2.5-coder:7b",  # Change to your preferred model
         temperature=0.7,

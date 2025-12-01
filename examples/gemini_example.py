@@ -18,6 +18,7 @@ import asyncio
 import os
 
 from victor.agent.orchestrator import AgentOrchestrator
+from victor.config.settings import Settings
 from victor.providers.google_provider import GoogleProvider
 
 
@@ -33,13 +34,16 @@ async def main():
     print("🤖 Google Gemini Example\n")
     print("=" * 60)
 
-    # Create Gemini provider
-    provider = GoogleProvider(api_key=api_key)
+    # Create Gemini provider with safety filters disabled for code generation
+    # Available safety_level options: "block_none", "block_few", "block_some", "block_most"
+    provider = GoogleProvider(api_key=api_key, safety_level="block_none")
 
-    # Create agent with Gemini Pro
+    # Create settings and agent with Gemini Pro
+    settings = Settings()
     agent = AgentOrchestrator(
+        settings=settings,
         provider=provider,
-        model="gemini-1.5-pro",  # 1M token context!
+        model="gemini-2.5-pro",  # Latest Gemini model
         temperature=0.9,
     )
 

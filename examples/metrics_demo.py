@@ -21,7 +21,8 @@ Usage:
 import asyncio
 import tempfile
 from pathlib import Path
-from victor.tools.metrics_tool import MetricsTool
+
+from victor.tools.metrics_tool import analyze_metrics
 
 
 async def main():
@@ -61,28 +62,55 @@ def moderate_function(values):
         file_path = Path(temp_dir) / "code.py"
         file_path.write_text(demo_code)
 
-        tool = MetricsTool()
-
         print("\n📊 Complexity Analysis")
         print("=" * 70)
-        result = await tool.execute(operation="complexity", file=str(file_path))
-        print(result.output)
+        result = await analyze_metrics(
+            path=str(file_path),
+            metrics=["complexity"],
+        )
+        if result["success"]:
+            print(result.get("formatted_report", ""))
+        else:
+            print(f"❌ Error: {result.get('error', 'Unknown error')}")
 
         print("\n\n📈 Maintainability Index")
         print("=" * 70)
-        result = await tool.execute(operation="maintainability", file=str(file_path))
-        print(result.output)
+        result = await analyze_metrics(
+            path=str(file_path),
+            metrics=["maintainability"],
+        )
+        if result["success"]:
+            print(result.get("formatted_report", ""))
+        else:
+            print(f"❌ Error: {result.get('error', 'Unknown error')}")
 
-        print("\n\n💰 Technical Debt")
+        print("\n\n💰 Technical Debt Analysis")
         print("=" * 70)
-        result = await tool.execute(operation="debt", file=str(file_path))
-        print(result.output)
+        result = await analyze_metrics(
+            path=str(file_path),
+            metrics=["debt"],
+        )
+        if result["success"]:
+            print(result.get("formatted_report", ""))
+        else:
+            print(f"❌ Error: {result.get('error', 'Unknown error')}")
+
+        print("\n\n📋 Comprehensive Analysis")
+        print("=" * 70)
+        result = await analyze_metrics(
+            path=str(file_path),
+            metrics=["all"],
+        )
+        if result["success"]:
+            print(result.get("formatted_report", ""))
+        else:
+            print(f"❌ Error: {result.get('error', 'Unknown error')}")
 
         print("\n\n✨ Demo Complete!")
         print("\nVictor's Metrics Tool provides:")
         print("  • Cyclomatic complexity analysis")
         print("  • Maintainability index calculation")
-        print("  • Technical debt estimation")
+        print("  • Lines of code metrics")
         print("  • Code quality insights")
 
 

@@ -17,7 +17,7 @@
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import google.generativeai as genai
-from google.generativeai.types import GenerateContentResponse
+from google.generativeai.types import GenerateContentResponse, HarmBlockThreshold, HarmCategory
 
 from victor.providers.base import (
     BaseProvider,
@@ -28,14 +28,35 @@ from victor.providers.base import (
     ToolDefinition,
 )
 
+# Safety threshold levels (from most to least restrictive)
+SAFETY_LEVELS = {
+    "block_none": HarmBlockThreshold.BLOCK_NONE,
+    "block_few": HarmBlockThreshold.BLOCK_ONLY_HIGH,
+    "block_some": HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    "block_most": HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+}
+
 
 class GoogleProvider(BaseProvider):
-    """Provider for Google Gemini models."""
+    """Provider for Google Gemini models.
+
+    Safety Settings:
+        The `safety_level` parameter controls content filtering:
+        - "block_none": No blocking (least restrictive, for development)
+        - "block_few": Block only high probability harmful content
+        - "block_some": Block medium and above (default)
+        - "block_most": Block low and above (most restrictive)
+
+    Example:
+        # For code generation without safety blocks
+        provider = GoogleProvider(api_key=key, safety_level="block_none")
+    """
 
     def __init__(
         self,
         api_key: str,
         timeout: int = 60,
+        safety_level: str = "block_none",
         **kwargs: Any,
     ):
         """Initialize Google provider.
@@ -43,10 +64,21 @@ class GoogleProvider(BaseProvider):
         Args:
             api_key: Google API key
             timeout: Request timeout in seconds
+            safety_level: Safety filter level - "block_none", "block_few",
+                         "block_some", or "block_most" (default: "block_none")
             **kwargs: Additional configuration
         """
         super().__init__(api_key=api_key, timeout=timeout, **kwargs)
         genai.configure(api_key=api_key)
+
+        # Configure safety settings
+        threshold = SAFETY_LEVELS.get(safety_level, HarmBlockThreshold.BLOCK_NONE)
+        self.safety_settings = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: threshold,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: threshold,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: threshold,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: threshold,
+        }
 
     @property
     def name(self) -> str:
@@ -88,14 +120,14 @@ class GoogleProvider(BaseProvider):
             ProviderError: If request fails
         """
         try:
-            # Initialize model
+            # Initialize model with safety settings
             model_instance = genai.GenerativeModel(
                 model_name=model,
                 generation_config={
                     "temperature": temperature,
                     "max_output_tokens": max_tokens,
-                    **kwargs,
                 },
+                safety_settings=self.safety_settings,
             )
 
             # Convert messages to Gemini format
@@ -111,6 +143,8 @@ class GoogleProvider(BaseProvider):
 
             return self._parse_response(response, model)
 
+        except ProviderError:
+            raise
         except Exception as e:
             raise ProviderError(
                 message=f"Google API error: {str(e)}",
@@ -145,14 +179,14 @@ class GoogleProvider(BaseProvider):
             ProviderError: If request fails
         """
         try:
-            # Initialize model
+            # Initialize model with safety settings
             model_instance = genai.GenerativeModel(
                 model_name=model,
                 generation_config={
                     "temperature": temperature,
                     "max_output_tokens": max_tokens,
-                    **kwargs,
                 },
+                safety_settings=self.safety_settings,
             )
 
             # Convert messages
@@ -172,6 +206,8 @@ class GoogleProvider(BaseProvider):
                 if parsed_chunk:
                     yield parsed_chunk
 
+        except ProviderError:
+            raise
         except Exception as e:
             raise ProviderError(
                 message=f"Google streaming error: {str(e)}",
@@ -217,11 +253,46 @@ class GoogleProvider(BaseProvider):
 
         Returns:
             Normalized CompletionResponse
+
+        Raises:
+            ProviderError: If response was blocked by safety filters
         """
-        # Extract text content
+        # Check for blocked responses (safety filters, recitation, etc.)
+        if response.candidates:
+            candidate = response.candidates[0]
+            finish_reason = getattr(candidate, "finish_reason", None)
+            # finish_reason values: 1=STOP, 2=SAFETY, 3=MAX_TOKENS, 4=RECITATION, 5=OTHER
+            if finish_reason == 2:  # SAFETY
+                safety_ratings = getattr(candidate, "safety_ratings", [])
+                blocked_categories = [
+                    f"{r.category.name}: {r.probability.name}"
+                    for r in safety_ratings
+                    if hasattr(r, "blocked") and r.blocked
+                ]
+                raise ProviderError(
+                    message=f"Response blocked by safety filters. Categories: {blocked_categories or 'unknown'}",
+                    provider=self.name,
+                )
+            elif finish_reason == 4:  # RECITATION
+                raise ProviderError(
+                    message="Response blocked due to potential recitation of copyrighted content",
+                    provider=self.name,
+                )
+
+        # Extract text content safely
         content = ""
-        if response.text:
-            content = response.text
+        try:
+            if response.text:
+                content = response.text
+        except ValueError:
+            # response.text raises ValueError if no valid parts
+            # Try to extract from candidates directly
+            if response.candidates and response.candidates[0].content.parts:
+                content = "".join(
+                    part.text
+                    for part in response.candidates[0].content.parts
+                    if hasattr(part, "text")
+                )
 
         # Parse usage (if available)
         usage = None
@@ -247,10 +318,28 @@ class GoogleProvider(BaseProvider):
 
         Returns:
             StreamChunk or None
+
+        Raises:
+            ProviderError: If chunk was blocked by safety filters
         """
+        # Check for safety blocks in streaming
+        if hasattr(chunk, "candidates") and chunk.candidates:
+            candidate = chunk.candidates[0]
+            finish_reason = getattr(candidate, "finish_reason", None)
+            if finish_reason == 2:  # SAFETY
+                raise ProviderError(
+                    message="Streaming response blocked by safety filters",
+                    provider=self.name,
+                )
+
+        # Extract content safely
         content = ""
-        if hasattr(chunk, "text"):
-            content = chunk.text
+        try:
+            if hasattr(chunk, "text") and chunk.text:
+                content = chunk.text
+        except ValueError:
+            # Ignore ValueError when text is not available
+            pass
 
         # Check if this is the final chunk
         is_final = (

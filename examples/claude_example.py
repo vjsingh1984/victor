@@ -18,6 +18,7 @@ import asyncio
 import os
 
 from victor.agent.orchestrator import AgentOrchestrator
+from victor.config.settings import Settings
 from victor.providers.anthropic_provider import AnthropicProvider
 
 
@@ -36,8 +37,10 @@ async def main():
     # Create Claude provider
     provider = AnthropicProvider(api_key=api_key)
 
-    # Create agent
+    # Create settings and agent
+    settings = Settings()
     agent = AgentOrchestrator(
+        settings=settings,
         provider=provider,
         model="claude-sonnet-4-5",  # or claude-3-opus, claude-3-sonnet
         temperature=1.0,

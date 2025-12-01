@@ -27,7 +27,8 @@ Usage:
 import asyncio
 import tempfile
 from pathlib import Path
-from victor.tools.cicd_tool import CICDTool
+
+from victor.tools.cicd_tool import cicd
 
 
 async def demo_list_templates():
@@ -35,15 +36,13 @@ async def demo_list_templates():
     print("\n\n📋 List Templates Demo")
     print("=" * 70)
 
-    tool = CICDTool()
-
     print("\n1️⃣ List all available CI/CD templates...")
-    result = await tool.execute(
-        operation="list_templates",
-    )
+    result = await cicd(operation="list")
 
-    if result.success:
-        print(result.output)
+    if result["success"]:
+        print(result.get("formatted_report", ""))
+    else:
+        print(f"❌ Error: {result.get('error', 'Unknown error')}")
 
 
 async def demo_generate_test_workflow():
@@ -54,18 +53,18 @@ async def demo_generate_test_workflow():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
 
-        tool = CICDTool()
-
         print("\n1️⃣ Generate GitHub Actions test workflow...")
-        result = await tool.execute(
+        result = await cicd(
             operation="generate",
             platform="github",
             workflow="python-test",
             output=str(temp_path / ".github/workflows/test.yml"),
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
+        else:
+            print(f"❌ Error: {result.get('error', 'Unknown error')}")
 
 
 async def demo_generate_publish_workflow():
@@ -76,18 +75,18 @@ async def demo_generate_publish_workflow():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
 
-        tool = CICDTool()
-
         print("\n1️⃣ Generate GitHub Actions publish workflow...")
-        result = await tool.execute(
+        result = await cicd(
             operation="generate",
             platform="github",
             workflow="python-publish",
             output=str(temp_path / ".github/workflows/publish.yml"),
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
+        else:
+            print(f"❌ Error: {result.get('error', 'Unknown error')}")
 
 
 async def demo_generate_docker_workflow():
@@ -98,18 +97,72 @@ async def demo_generate_docker_workflow():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
 
-        tool = CICDTool()
-
         print("\n1️⃣ Generate GitHub Actions Docker workflow...")
-        result = await tool.execute(
+        result = await cicd(
             operation="generate",
             platform="github",
             workflow="docker-build",
             output=str(temp_path / ".github/workflows/docker.yml"),
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
+        else:
+            print(f"❌ Error: {result.get('error', 'Unknown error')}")
+
+
+async def demo_generate_by_type():
+    """Demo generating workflows by type shorthand."""
+    print("\n\n🔨 Generate Workflow by Type Demo")
+    print("=" * 70)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        print("\n1️⃣ Create test workflow using type='test'...")
+        result = await cicd(
+            operation="generate",
+            type="test",
+            platform="github",
+            output=str(temp_path / ".github/workflows/test.yml"),
+        )
+
+        if result["success"]:
+            print("✓ Test workflow created")
+            config = result.get("config", "")
+            print(config[:500] + "..." if len(config) > 500 else config)
+        else:
+            print(f"❌ Error: {result.get('error', 'Unknown error')}")
+
+        print("\n\n2️⃣ Create release workflow using type='release'...")
+        result = await cicd(
+            operation="generate",
+            type="release",
+            platform="github",
+            output=str(temp_path / ".github/workflows/release.yml"),
+        )
+
+        if result["success"]:
+            print("✓ Release workflow created")
+            config = result.get("config", "")
+            print(config[:500] + "..." if len(config) > 500 else config)
+        else:
+            print(f"❌ Error: {result.get('error', 'Unknown error')}")
+
+        print("\n\n3️⃣ Create build workflow using type='build'...")
+        result = await cicd(
+            operation="generate",
+            type="build",
+            platform="github",
+            output=str(temp_path / ".github/workflows/build.yml"),
+        )
+
+        if result["success"]:
+            print("✓ Build workflow created")
+            config = result.get("config", "")
+            print(config[:500] + "..." if len(config) > 500 else config)
+        else:
+            print(f"❌ Error: {result.get('error', 'Unknown error')}")
 
 
 async def demo_validate_config():
@@ -120,12 +173,10 @@ async def demo_validate_config():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
 
-        tool = CICDTool()
-
         # Create a valid config
         print("\n1️⃣ Generate a valid configuration first...")
         workflow_path = temp_path / ".github/workflows/test.yml"
-        await tool.execute(
+        await cicd(
             operation="generate",
             platform="github",
             workflow="python-test",
@@ -133,13 +184,15 @@ async def demo_validate_config():
         )
 
         print("\n2️⃣ Validate the generated configuration...")
-        result = await tool.execute(
+        result = await cicd(
             operation="validate",
             file=str(workflow_path),
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
+        else:
+            print(f"Validation result: {result.get('formatted_report', result.get('error', ''))}")
 
         # Create an invalid config
         print("\n\n3️⃣ Test validation with invalid configuration...")
@@ -156,59 +209,12 @@ jobs:
         invalid_path.parent.mkdir(parents=True, exist_ok=True)
         invalid_path.write_text(invalid_config.strip())
 
-        result = await tool.execute(
+        result = await cicd(
             operation="validate",
             file=str(invalid_path),
         )
 
-        print(result.output)
-
-
-async def demo_create_workflow():
-    """Demo creating workflows by type."""
-    print("\n\n🔨 Create Workflow by Type Demo")
-    print("=" * 70)
-
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_path = Path(temp_dir)
-
-        tool = CICDTool()
-
-        print("\n1️⃣ Create test workflow...")
-        result = await tool.execute(
-            operation="create_workflow",
-            type="test",
-            platform="github",
-            output=str(temp_path / ".github/workflows/test.yml"),
-        )
-
-        if result.success:
-            print("✓ Test workflow created")
-            print(result.output[:500] + "...")
-
-        print("\n\n2️⃣ Create release workflow...")
-        result = await tool.execute(
-            operation="create_workflow",
-            type="release",
-            platform="github",
-            output=str(temp_path / ".github/workflows/release.yml"),
-        )
-
-        if result.success:
-            print("✓ Release workflow created")
-            print(result.output[:500] + "...")
-
-        print("\n\n3️⃣ Create build workflow...")
-        result = await tool.execute(
-            operation="create_workflow",
-            type="build",
-            platform="github",
-            output=str(temp_path / ".github/workflows/build.yml"),
-        )
-
-        if result.success:
-            print("✓ Build workflow created")
-            print(result.output[:500] + "...")
+        print(result.get("formatted_report", ""))
 
 
 async def demo_real_world_setup():
@@ -220,41 +226,47 @@ async def demo_real_world_setup():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
 
-        tool = CICDTool()
-
         print("\n1️⃣ STEP 1: List available templates...")
-        result = await tool.execute(operation="list_templates")
-        if result.success:
+        result = await cicd(operation="list")
+        if result["success"]:
             print("✓ Templates available")
 
         print("\n2️⃣ STEP 2: Create test workflow...")
         test_path = temp_path / ".github/workflows/test.yml"
-        result = await tool.execute(
-            operation="create_workflow",
+        result = await cicd(
+            operation="generate",
             type="test",
             output=str(test_path),
         )
-        if result.success:
+        if result["success"]:
             print("✓ Test workflow created")
+        else:
+            print(f"⚠ {result.get('error', 'Error creating workflow')}")
 
         print("\n3️⃣ STEP 3: Create release workflow...")
         release_path = temp_path / ".github/workflows/release.yml"
-        result = await tool.execute(
-            operation="create_workflow",
+        result = await cicd(
+            operation="generate",
             type="release",
             output=str(release_path),
         )
-        if result.success:
+        if result["success"]:
             print("✓ Release workflow created")
+        else:
+            print(f"⚠ {result.get('error', 'Error creating workflow')}")
 
         print("\n4️⃣ STEP 4: Validate all configurations...")
         for workflow_file in [test_path, release_path]:
-            result = await tool.execute(
-                operation="validate",
-                file=str(workflow_file),
-            )
-            if result.success:
-                print(f"✓ {workflow_file.name} is valid")
+            if workflow_file.exists():
+                result = await cicd(
+                    operation="validate",
+                    file=str(workflow_file),
+                )
+                if result["success"] and not result.get("issues"):
+                    print(f"✓ {workflow_file.name} is valid")
+                else:
+                    issues = result.get("issues", [])
+                    print(f"⚠ {workflow_file.name}: {len(issues)} issue(s)")
 
         print("\n\n📊 Project CI/CD Setup Complete!")
         print("\nCreated workflows:")
@@ -343,8 +355,8 @@ async def main():
     await demo_generate_test_workflow()
     await demo_generate_publish_workflow()
     await demo_generate_docker_workflow()
+    await demo_generate_by_type()
     await demo_validate_config()
-    await demo_create_workflow()
     await demo_real_world_setup()
     await demo_workflow_features()
 

@@ -26,8 +26,10 @@ Usage:
 
 import asyncio
 import tempfile
+import time
 from pathlib import Path
-from victor.tools.batch_processor_tool import BatchProcessorTool
+
+from victor.tools.batch_processor_tool import batch, set_batch_processor_config
 
 
 def setup_demo_files(temp_dir: Path) -> None:
@@ -116,43 +118,43 @@ async def demo_batch_search():
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
 
-        tool = BatchProcessorTool(max_workers=4)
+        set_batch_processor_config(max_workers=4)
 
         print("\n1️⃣ Search for 'TODO' comments across all files...")
-        result = await tool.execute(
+        result = await batch(
             operation="search",
             path=str(temp_path),
             pattern="TODO",
             file_pattern="**/*.py",
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
         else:
-            print(f"❌ Error: {result.error}")
+            print(f"❌ Error: {result['error']}")
 
         print("\n2️⃣ Search for 'print' statements (code smell)...")
-        result = await tool.execute(
+        result = await batch(
             operation="search",
             path=str(temp_path),
-            pattern="print\\(",
+            pattern=r"print\(",
             file_pattern="*.py",
             regex=True,
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
         print("\n3️⃣ Search in specific file pattern...")
-        result = await tool.execute(
+        result = await batch(
             operation="search",
             path=str(temp_path),
             pattern="def ",
             file_pattern="**/test_*.py",
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
 
 async def demo_batch_replace():
@@ -164,10 +166,10 @@ async def demo_batch_replace():
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
 
-        tool = BatchProcessorTool(max_workers=4)
+        set_batch_processor_config(max_workers=4)
 
         print("\n1️⃣ DRY RUN: Preview replacing 'print' with 'logger.info'...")
-        result = await tool.execute(
+        result = await batch(
             operation="replace",
             path=str(temp_path),
             find="print",
@@ -176,11 +178,11 @@ async def demo_batch_replace():
             dry_run=True,
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
         print("\n2️⃣ EXECUTE: Replace 'TODO' with 'FIXME'...")
-        result = await tool.execute(
+        result = await batch(
             operation="replace",
             path=str(temp_path),
             find="TODO",
@@ -189,22 +191,22 @@ async def demo_batch_replace():
             dry_run=False,
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
         print("\n3️⃣ Verify changes with search...")
-        result = await tool.execute(
+        result = await batch(
             operation="search",
             path=str(temp_path),
             pattern="FIXME",
             file_pattern="**/*.py",
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
-        print("\n4️⃣ Regex replace: Fix function definitions...")
-        result = await tool.execute(
+        print("\n4️⃣ Regex replace: Fix function definitions (dry run)...")
+        result = await batch(
             operation="replace",
             path=str(temp_path),
             find=r"def (\w+)\(([^)]*)\):",
@@ -214,8 +216,8 @@ async def demo_batch_replace():
             dry_run=True,
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
 
 async def demo_batch_analyze():
@@ -227,27 +229,27 @@ async def demo_batch_analyze():
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
 
-        tool = BatchProcessorTool(max_workers=4)
+        set_batch_processor_config(max_workers=4)
 
         print("\n1️⃣ Analyze all Python files...")
-        result = await tool.execute(
+        result = await batch(
             operation="analyze",
             path=str(temp_path),
             file_pattern="**/*.py",
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
         print("\n2️⃣ Analyze all files (including config)...")
-        result = await tool.execute(
+        result = await batch(
             operation="analyze",
             path=str(temp_path),
             file_pattern="*.*",
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
 
 async def demo_list_files():
@@ -259,27 +261,27 @@ async def demo_list_files():
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
 
-        tool = BatchProcessorTool(max_workers=4)
+        set_batch_processor_config(max_workers=4)
 
         print("\n1️⃣ List all Python files...")
-        result = await tool.execute(
+        result = await batch(
             operation="list",
             path=str(temp_path),
             file_pattern="**/*.py",
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
         print("\n2️⃣ List only test files...")
-        result = await tool.execute(
+        result = await batch(
             operation="list",
             path=str(temp_path),
             file_pattern="**/test_*.py",
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
 
 async def demo_real_world_workflow():
@@ -292,22 +294,22 @@ async def demo_real_world_workflow():
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
 
-        tool = BatchProcessorTool(max_workers=4)
+        set_batch_processor_config(max_workers=4)
 
         print("\n1️⃣ STEP 1: Find all print statements...")
-        result = await tool.execute(
+        result = await batch(
             operation="search",
             path=str(temp_path),
-            pattern="print\\(",
+            pattern=r"print\(",
             file_pattern="**/*.py",
             regex=True,
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
         print("\n2️⃣ STEP 2: Preview the replacement...")
-        result = await tool.execute(
+        result = await batch(
             operation="replace",
             path=str(temp_path),
             find="print(",
@@ -316,11 +318,11 @@ async def demo_real_world_workflow():
             dry_run=True,
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
         print("\n3️⃣ STEP 3: Execute the replacement...")
-        result = await tool.execute(
+        result = await batch(
             operation="replace",
             path=str(temp_path),
             find="print(",
@@ -329,32 +331,33 @@ async def demo_real_world_workflow():
             dry_run=False,
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
         print("\n4️⃣ STEP 4: Verify no print statements remain...")
-        result = await tool.execute(
+        result = await batch(
             operation="search",
             path=str(temp_path),
-            pattern="print\\(",
+            pattern=r"print\(",
             file_pattern="**/*.py",
             regex=True,
         )
 
-        if result.success:
-            if "Found in 0 files" in result.output:
+        if result["success"]:
+            report = result.get("formatted_report", "")
+            if result.get("total_files", 0) == 0:
                 print("✅ SUCCESS: All print statements replaced with logger.info!")
-            print(result.output)
+            print(report)
 
         print("\n5️⃣ STEP 5: Analyze final state...")
-        result = await tool.execute(
+        result = await batch(
             operation="analyze",
             path=str(temp_path),
             file_pattern="**/*.py",
         )
 
-        if result.success:
-            print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
 
 async def demo_performance():
@@ -381,13 +384,11 @@ def function_{i}():
         print("✓ Created 100 files")
 
         print("\n2️⃣ Searching across all files with parallel processing...")
-        tool = BatchProcessorTool(max_workers=8)
-
-        import time
+        set_batch_processor_config(max_workers=8)
 
         start = time.time()
 
-        result = await tool.execute(
+        result = await batch(
             operation="search",
             path=str(temp_path),
             pattern="TODO",
@@ -396,10 +397,10 @@ def function_{i}():
 
         elapsed = time.time() - start
 
-        if result.success:
+        if result["success"]:
             print(f"\n⏱️  Processed 100 files in {elapsed:.3f} seconds")
             print(f"📈 Throughput: {100/elapsed:.1f} files/second")
-            print(f"\n{result.output}")
+            print(f"\n{result.get('formatted_report', '')}")
 
 
 async def main():

@@ -18,6 +18,7 @@ import asyncio
 import os
 
 from victor.agent.orchestrator import AgentOrchestrator
+from victor.config.settings import Settings
 from victor.providers.xai_provider import XAIProvider
 
 
@@ -36,8 +37,10 @@ async def main():
     # Create Grok provider
     provider = XAIProvider(api_key=api_key)
 
-    # Create agent
+    # Create settings and agent
+    settings = Settings()
     agent = AgentOrchestrator(
+        settings=settings,
         provider=provider,
         model="grok-beta",
         temperature=0.8,

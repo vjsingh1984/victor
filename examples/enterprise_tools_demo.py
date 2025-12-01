@@ -27,17 +27,15 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from victor.tools.code_review_tool import CodeReviewTool
-from victor.tools.scaffold_tool import ScaffoldTool
-from victor.tools.security_scanner_tool import SecurityScannerTool
+from victor.tools.code_review_tool import code_review
+from victor.tools.scaffold_tool import scaffold
+from victor.tools.security_scanner_tool import security_scan
 
 
 async def demo_code_review():
     """Demo code review tool."""
     print("\n📋 Code Review Tool Demo")
     print("=" * 70)
-
-    tool = CodeReviewTool(max_complexity=10)
 
     # Create sample code with issues
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
@@ -96,17 +94,30 @@ class MyClass:
         test_file = f.name
 
     print("\n1️⃣ Review single file for all issues...")
-    result = await tool.execute(operation="review_file", path=test_file, include_metrics=True)
-    print(result.output)
+    result = await code_review(path=test_file, aspects=["all"], include_metrics=True)
+    if result["success"]:
+        print(result.get("formatted_report", ""))
+    else:
+        print(f"❌ Error: {result.get('error', 'Unknown error')}")
 
-    print("\n2️⃣ Security-focused scan...")
-    result = await tool.execute(operation="review_file", path=test_file)
-    if not result.success:
-        print("⚠ Security issues detected!")
+    print("\n2️⃣ Security-focused review...")
+    result = await code_review(path=test_file, aspects=["security"])
+    if result["success"]:
+        security_result = result.get("results", {}).get("security", {})
+        issues = security_result.get("issues", [])
+        if issues:
+            print(f"⚠ Found {len(issues)} security issues:")
+            for issue in issues[:5]:
+                print(f"  • {issue.get('message', issue)}")
+    else:
+        print(f"❌ Error: {result.get('error', 'Unknown error')}")
 
-    print("\n3️⃣ Complexity analysis...")
-    result = await tool.execute(operation="complexity", path=test_file)
-    print(result.output)
+    print("\n3️⃣ Complexity review...")
+    result = await code_review(path=test_file, aspects=["complexity"])
+    if result["success"]:
+        complexity_result = result.get("results", {}).get("complexity", {})
+        print(f"Complexity analysis complete")
+        print(f"  Total issues: {result.get('total_issues', 0)}")
 
     # Cleanup
     Path(test_file).unlink()
@@ -124,34 +135,34 @@ async def demo_project_scaffolding():
     print("\n\n🏗️  Project Scaffolding Tool Demo")
     print("=" * 70)
 
-    tool = ScaffoldTool()
-
     # List available templates
     print("\n1️⃣ List available project templates...")
-    result = await tool.execute(operation="list")
-    print(result.output)
+    result = await scaffold(operation="list")
+    if result["success"]:
+        print(result.get("formatted_report", ""))
 
     # Create FastAPI project
     with tempfile.TemporaryDirectory() as tmpdir:
         project_path = Path(tmpdir) / "demo-api"
 
         print("\n2️⃣ Create FastAPI project...")
-        result = await tool.execute(operation="create", template="fastapi", name=str(project_path))
-        print(result.output)
+        result = await scaffold(
+            operation="create",
+            template="fastapi",
+            name=str(project_path),
+        )
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
         # Verify files created
         print("\n3️⃣ Verify project structure...")
-        for file_path in project_path.rglob("*"):
-            if file_path.is_file():
-                rel_path = file_path.relative_to(project_path)
-                print(f"  ✓ {rel_path}")
-
-        print("\n4️⃣ Add custom file...")
-        custom_file = project_path / "app" / "utils" / "helpers.py"
-        result = await tool.execute(
-            operation="add_file", path=str(custom_file), content="def helper():\n    pass\n"
-        )
-        print(result.output)
+        if project_path.exists():
+            for file_path in project_path.rglob("*"):
+                if file_path.is_file():
+                    rel_path = file_path.relative_to(project_path)
+                    print(f"  ✓ {rel_path}")
+        else:
+            print("  Project created (check formatted_report for details)")
 
     print("\n✅ Project Scaffolding Tool Features:")
     print("  ✓ Multiple project templates (FastAPI, Flask, React, CLI)")
@@ -165,8 +176,6 @@ async def demo_security_scanner():
     """Demo security scanner tool."""
     print("\n\n🔒 Security Scanner Tool Demo")
     print("=" * 70)
-
-    tool = SecurityScannerTool()
 
     # Create files with security issues
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -187,7 +196,7 @@ GOOGLE_API_KEY = "XXXXX"
 """
         )
 
-        # Create requirements.txt with vulnerable packages
+        # Create requirements.txt with potentially vulnerable packages
         req_file = tmpdir_path / "requirements.txt"
         req_file.write_text(
             """
@@ -204,28 +213,36 @@ pyyaml==5.4
         env_file.write_text("SECRET_KEY=production_key_12345")
 
         print("\n1️⃣ Scan for secrets...")
-        result = await tool.execute(
-            operation="scan_secrets", path=str(tmpdir_path), severity="high"
+        result = await security_scan(
+            path=str(tmpdir_path),
+            scan_types=["secrets"],
         )
-        print(result.output)
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
         print("\n2️⃣ Check dependencies for vulnerabilities...")
-        result = await tool.execute(operation="scan_dependencies", path=str(tmpdir_path))
-        print(result.output)
+        result = await security_scan(
+            path=str(tmpdir_path),
+            scan_types=["dependencies"],
+        )
+        if result["success"]:
+            print(result.get("formatted_report", ""))
 
-        print("\n3️⃣ Scan configuration files...")
-        result = await tool.execute(operation="scan_config", path=str(tmpdir_path))
-        print(result.output)
-
-        print("\n4️⃣ Comprehensive security scan...")
-        result = await tool.execute(operation="scan_all", path=str(tmpdir_path), severity="medium")
-        if not result.success:
-            print("⚠ Security issues detected!")
-            print("\nRecommendations:")
-            print("  1. Remove all hardcoded secrets")
-            print("  2. Use environment variables")
-            print("  3. Update vulnerable dependencies")
-            print("  4. Add .env to .gitignore")
+        print("\n3️⃣ Comprehensive security scan...")
+        result = await security_scan(
+            path=str(tmpdir_path),
+            scan_types=["secrets", "dependencies", "config"],
+        )
+        if result["success"]:
+            vulnerabilities = result.get("total_vulnerabilities", 0)
+            if vulnerabilities > 0:
+                print(f"⚠ Found {vulnerabilities} security issues!")
+                print("\nRecommendations:")
+                print("  1. Remove all hardcoded secrets")
+                print("  2. Use environment variables")
+                print("  3. Update vulnerable dependencies")
+                print("  4. Add .env to .gitignore")
+            print(result.get("formatted_report", ""))
 
     print("\n✅ Security Scanner Tool Features:")
     print("  ✓ Secret detection (API keys, tokens, passwords)")

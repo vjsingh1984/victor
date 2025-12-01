@@ -155,7 +155,7 @@ echo "OPENAI_API_KEY=sk-..." >> .env
 profiles:
   gpt4:
     provider: openai
-    model: gpt-4-turbo-preview
+    model: gpt-4o
     temperature: 0.8
     max_tokens: 4096
 
@@ -168,9 +168,9 @@ providers:
 
 #### Available Models
 
-- `gpt-4-turbo-preview` - Latest GPT-4 Turbo
-- `gpt-4` - Standard GPT-4
-- `gpt-3.5-turbo` - Fast and affordable
+- `gpt-4o` - Latest GPT-4 Omni (recommended)
+- `gpt-4o-mini` - Fast and affordable (replaces GPT-3.5 Turbo)
+- `gpt-4-turbo` - GPT-4 Turbo
 
 #### Usage
 
@@ -203,7 +203,7 @@ echo "GOOGLE_API_KEY=..." >> .env
 profiles:
   gemini:
     provider: google
-    model: gemini-1.5-pro
+    model: gemini-2.5-pro
     temperature: 0.9
     max_tokens: 8192
 
@@ -215,8 +215,26 @@ providers:
 
 #### Available Models
 
-- `gemini-1.5-pro` - Most capable, multimodal
+- `gemini-2.5-pro` - Latest and most capable
+- `gemini-1.5-pro` - Multimodal, 1M context window
 - `gemini-1.5-flash` - Fast and efficient
+
+#### Safety Settings
+
+The Google provider supports configurable safety filters for code generation:
+
+```python
+from victor.providers.google_provider import GoogleProvider
+
+# Default: No blocking (best for code generation)
+provider = GoogleProvider(api_key=key, safety_level="block_none")
+
+# Available levels (least to most restrictive):
+# - "block_none"  - No content filtering (default, recommended for coding)
+# - "block_few"   - Block only high probability harmful content
+# - "block_some"  - Block medium and above
+# - "block_most"  - Most restrictive
+```
 
 #### Usage
 
@@ -451,9 +469,9 @@ python -m vllm.entrypoints.openai.api_server \
 | **LMStudio** | FREE | FREE |
 | **vLLM** | FREE | FREE |
 | **Claude Sonnet** | $3 | $15 |
-| **GPT-4 Turbo** | $10 | $30 |
-| **GPT-3.5 Turbo** | $0.50 | $1.50 |
-| **Gemini Pro** | $0.50 | $1.50 |
+| **GPT-4o** | $2.50 | $10 |
+| **GPT-4o mini** | $0.15 | $0.60 |
+| **Gemini 2.5 Pro** | $1.25 | $5 |
 | **Grok** | TBD | TBD |
 
 ### Speed
@@ -463,11 +481,11 @@ python -m vllm.entrypoints.openai.api_server \
 | **Ollama** | Depends on hardware | Development, privacy |
 | **LMStudio** | Depends on hardware | GUI model management |
 | **vLLM** | ⚡⚡⚡ Very Fast | High-throughput inference |
-| **GPT-3.5** | ⚡⚡⚡ Very Fast | Quick tasks |
+| **GPT-4o mini** | ⚡⚡⚡ Very Fast | Quick tasks |
 | **Gemini Flash** | ⚡⚡⚡ Very Fast | Fast responses |
 | **Claude Haiku** | ⚡⚡ Fast | Balanced speed/quality |
 | **Claude Sonnet** | ⚡ Moderate | Best quality |
-| **GPT-4** | ⚡ Moderate | Complex reasoning |
+| **GPT-4o** | ⚡⚡ Fast | Complex reasoning |
 
 ### Capabilities
 
@@ -511,7 +529,7 @@ victor --profile prod
 profiles:
   quick:
     provider: openai
-    model: gpt-3.5-turbo
+    model: gpt-4o-mini
 
   complex:
     provider: anthropic
@@ -519,7 +537,7 @@ profiles:
 
   vision:
     provider: google
-    model: gemini-1.5-pro
+    model: gemini-2.5-pro
 ```
 
 ### Strategy 3: Cost Optimization
@@ -529,7 +547,7 @@ profiles:
 victor --profile ollama "Draft initial implementation"
 
 # Refine with cheaper cloud model
-victor --profile gpt35 "Improve the code"
+victor --profile gpt4o-mini "Improve the code"
 
 # Final review with best model
 victor --profile claude-sonnet "Review and polish"
@@ -683,7 +701,7 @@ A: Not yet - coming in v0.3.0. Currently restart with different profile.
 A: Yes! All implemented providers support tool/function calling.
 
 **Q: Which is the cheapest?**
-A: Ollama (free), then GPT-3.5 Turbo or Gemini Flash.
+A: Ollama (free), then GPT-4o mini or Gemini Flash.
 
 **Q: Which is the best for coding?**
 A: Claude Sonnet, GPT-4, or local Qwen2.5-Coder are all excellent.

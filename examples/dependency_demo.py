@@ -26,7 +26,16 @@ Usage:
 """
 
 import asyncio
-from victor.tools.dependency_tool import DependencyTool
+import tempfile
+from pathlib import Path
+
+from victor.tools.dependency_tool import (
+    dependency_list,
+    dependency_outdated,
+    dependency_security,
+    dependency_generate,
+    dependency_check,
+)
 
 
 async def demo_list_packages():
@@ -34,15 +43,14 @@ async def demo_list_packages():
     print("\n\n📦 List Installed Packages Demo")
     print("=" * 70)
 
-    tool = DependencyTool()
-
     print("\n1️⃣ List all installed packages...")
-    result = await tool.execute(
-        operation="list",
-    )
+    result = await dependency_list()
 
-    if result.success:
-        print(result.output)
+    if result["success"]:
+        print(result.get("formatted_report", ""))
+        print(f"\nTotal: {result.get('count', 0)} packages installed")
+    else:
+        print(f"❌ Error: {result.get('error', 'Unknown error')}")
 
 
 async def demo_check_outdated():
@@ -50,17 +58,16 @@ async def demo_check_outdated():
     print("\n\n🔄 Check Outdated Packages Demo")
     print("=" * 70)
 
-    tool = DependencyTool()
-
     print("\n1️⃣ Check for outdated packages...")
-    result = await tool.execute(
-        operation="outdated",
-    )
+    result = await dependency_outdated()
 
-    if result.success:
-        print(result.output)
+    if result["success"]:
+        if result.get("message"):
+            print(result["message"])
+        else:
+            print(result.get("formatted_report", ""))
     else:
-        print(f"Note: {result.error}")
+        print(f"Note: {result.get('error', 'Unknown error')}")
 
 
 async def demo_security_audit():
@@ -68,15 +75,13 @@ async def demo_security_audit():
     print("\n\n🔒 Security Audit Demo")
     print("=" * 70)
 
-    tool = DependencyTool()
-
     print("\n1️⃣ Run security audit...")
-    result = await tool.execute(
-        operation="security",
-    )
+    result = await dependency_security()
 
-    if result.success:
-        print(result.output)
+    if result["success"]:
+        print(result.get("formatted_report", ""))
+    else:
+        print(f"❌ Error: {result.get('error', 'Unknown error')}")
 
 
 async def demo_generate_requirements():
@@ -84,17 +89,24 @@ async def demo_generate_requirements():
     print("\n\n📝 Generate Requirements Demo")
     print("=" * 70)
 
-    tool = DependencyTool()
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        output_file = temp_path / "requirements.txt"
 
-    print("\n1️⃣ Generate requirements.txt (freeze format)...")
-    result = await tool.execute(
-        operation="generate",
-        output="requirements.txt",
-        format="freeze",
-    )
+        print("\n1️⃣ Generate requirements.txt (freeze format)...")
+        result = await dependency_generate(output=str(output_file))
 
-    if result.success:
-        print(result.output)
+        if result["success"]:
+            print(f"✓ {result.get('message', 'Requirements generated')}")
+            print(f"\nPreview of generated file:")
+            content = output_file.read_text()
+            lines = content.split("\n")[:10]
+            for line in lines:
+                print(f"  {line}")
+            if len(content.split("\n")) > 10:
+                print(f"  ... and {len(content.split(chr(10))) - 10} more packages")
+        else:
+            print(f"❌ Error: {result.get('error', 'Unknown error')}")
 
 
 async def demo_check_requirements():
@@ -102,17 +114,21 @@ async def demo_check_requirements():
     print("\n\n✅ Check Requirements Demo")
     print("=" * 70)
 
-    tool = DependencyTool()
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        req_file = temp_path / "requirements.txt"
 
-    print("\n1️⃣ Check if requirements match installed...")
-    result = await tool.execute(
-        operation="check",
-    )
+        # First generate a requirements file
+        print("\n1️⃣ Generate requirements file first...")
+        await dependency_generate(output=str(req_file))
 
-    if result.success:
-        print(result.output)
-    else:
-        print(f"Note: {result.error}")
+        print("\n2️⃣ Check if requirements match installed...")
+        result = await dependency_check(requirements_file=str(req_file))
+
+        if result["success"]:
+            print(result.get("formatted_report", ""))
+        else:
+            print(f"Note: {result.get('error', 'Unknown error')}")
 
 
 async def demo_best_practices():
