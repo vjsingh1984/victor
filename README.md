@@ -2,17 +2,16 @@
 
 ![Victor Banner](./assets/victor-banner.png)
 
-<h3>Enterprise-Ready AI Coding Assistant for Secure, Hybrid Software & Data Delivery</h3>
-<p><strong>Production-grade • Patent-protected • Apache 2.0 Licensed</strong></p>
+<h3>Community-Built AI Coding Assistant for Secure, Hybrid Software & Data Delivery</h3>
+<p><strong>Free & Open Source • Apache 2.0 Licensed</strong></p>
 
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Enterprise Ready](https://img.shields.io/badge/Enterprise-Ready-success.svg)](docs/ENTERPRISE.md)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[Features](#key-features) • [Quick Start](#quick-start) • [Enterprise](#enterprise-features) • [Commercial Support](#commercial-support) • [Use Cases](#use-cases) • [Documentation](#documentation)
+[Features](#key-features) • [Quick Start](#quick-start) • [Use Cases](#use-cases) • [Documentation](#documentation) • [Contribute](#contributing)
 
 </div>
 
@@ -24,7 +23,7 @@
 
 Much of the documentation, especially `docs/ARCHITECTURE_DEEP_DIVE.md`, describes the target architecture and features that are under active development. For a detailed breakdown of the current state and action items, please see our **[Codebase Analysis Report](docs/CODEBASE_ANALYSIS_REPORT.md)**.
 
-We welcome contributors who are excited to help us build the future of this project.
+We share Victor freely for anyone to use, learn from, and improve—there are no paid tiers or monetization plans. We welcome contributors who are excited to help us build the future of this project.
 
 **Docs + Onboarding:** use `docs/guides/QUICKSTART.md` as the canonical setup guide and treat other longform docs as aspirational unless explicitly labeled “Current State.” The active code lives in `victor/`; `archive/victor-legacy/` is frozen for historical reference.
 
@@ -32,7 +31,7 @@ We welcome contributors who are excited to help us build the future of this proj
 
 ## What is Victor?
 
-**Victor** is an **enterprise-ready**, terminal-based AI coding assistant where **multiple LLMs can work together**—generating, critiquing, and refining code collaboratively. Instead of being locked into one provider's ecosystem, Victor lets you orchestrate Claude Opus 4.5, GPT-5, Gemini 3, and local models like Qwen3 or Llama as a unified team.
+**Victor** is a **community-driven**, terminal-based AI coding assistant where **multiple LLMs can work together**—generating, critiquing, and refining code collaboratively. Instead of being locked into one provider's ecosystem, Victor lets you orchestrate Claude Opus 4.5, GPT-5, Gemini 3, and local models like Qwen3 or Llama as a unified team.
 
 ### Why This Matters Now
 
@@ -208,117 +207,10 @@ Switch between AI providers as easily as changing a config file:
 
 ## Use Cases
 
-### For Individual Developers
-
-<table>
-<tr>
-<td width="33%">
-
-**Learning & Exploration**
-- Use free local models (Ollama)
-- Experiment with different LLMs
-- Learn AI-assisted coding
-- Zero API costs
-
-</td>
-<td width="33%">
-
-**Daily Coding**
-- Code reviews and refactoring
-- Test generation
-- Documentation automation
-- Git workflow enhancement
-
-</td>
-<td width="33%">
-
-**Side Projects**
-- Project scaffolding
-- Quick prototypes
-- CI/CD setup
-- Full-stack development
-
-</td>
-</tr>
-</table>
-
-### For Teams & Enterprises
-
-<table>
-<tr>
-<td width="33%">
-
-**Development Teams**
-- Standardized AI workflow
-- Provider flexibility
-- Cost optimization (dev: free, prod: paid)
-- Team collaboration
-
-</td>
-<td width="33%">
-
-**Regulated Industries**
-- Air-gapped deployment
-- No data leaving premises
-- Compliance ready (HIPAA, SOC2)
-- Full audit trails
-
-</td>
-<td width="33%">
-
-**Cost-Conscious Organizations**
-- Free local models for routine tasks
-- Premium models for critical tasks
-- Potential for significant cost reduction
-- Transparent cost tracking
-
-</td>
-</tr>
-</table>
-
-### Potential Use Cases
-
-<details>
-<summary><b>Scenario 1: Startup CTO</b></summary>
-
-**Challenge**: Need AI assistance but limited budget
-
-**How Victor Can Help**:
-1. Use Ollama (free) for daily development
-2. Switch to Claude for critical architecture decisions
-3. Use batch processing for codebase migrations
-4. Auto-generate documentation and tests
-5. **Potential benefit**: Significant cost reduction with flexible model selection
-
-</details>
-
-<details>
-<summary><b>Scenario 2: Healthcare Company</b></summary>
-
-**Challenge**: Cannot send code to cloud APIs (HIPAA compliance)
-
-**How Victor Can Help**:
-1. Deploy in air-gapped mode
-2. Use local models (Ollama/vLLM) exclusively
-3. Full feature access without internet
-4. Sandboxed execution for security
-5. **Potential benefit**: Compliant AI assistance without data transmission
-
-</details>
-
-<details>
-<summary><b>Scenario 3: Open Source Maintainer</b></summary>
-
-**Challenge**: Maintain multiple projects, limited time
-
-**How Victor Can Help**:
-1. Batch process issues and PRs
-2. Auto-generate changelogs
-3. Refactor across entire codebase
-4. CI/CD pipeline automation
-5. **Potential benefit**: Increased review capacity and code quality
-
-</details>
+- Share workflows for code review, refactoring, and test authoring across multiple models.
+- Run everything locally for privacy or mix in cloud models when you choose.
+- Automate docs, scaffolding, CI helpers, and batch edits for personal or team projects.
+- Experiment with new providers quickly and contribute improvements back to the community.
 
 ---
 
@@ -726,188 +618,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 ![Stars](https://img.shields.io/github/stars/vjsingh1984/victor?style=for-the-badge)
 
 </div>
-
----
-
----
-
-## Enterprise Features
-
-Victor is built from the ground up for enterprise deployment with security, compliance, and cost optimization as core priorities.
-
-### Security & Compliance
-
-<table>
-<tr>
-<td width="50%">
-
-**Air-Gapped Deployment**
-- Zero external network calls
-- Complete offline operation
-- Local model inference only
-- HIPAA, SOC2, ISO 27001 ready
-- Perfect for regulated industries
-
-**Patent Protection**
-- Apache 2.0 license includes explicit patent grant
-- Safe for commercial use and modification
-- No patent litigation risk
-- Enterprise legal teams approve this license
-
-</td>
-<td width="50%">
-
-**Security Scanning**
-- 12+ secret detection patterns
-- Dependency vulnerability scanning
-- Code security analysis
-- Pre-commit hook integration
-- Automated security reports
-
-**Sandboxed Execution**
-- Docker-isolated code execution
-- No host system access
-- Automatic cleanup
-- Resource limits enforced
-- Safe for untrusted code
-
-</td>
-</tr>
-</table>
-
-### Cost Optimization Potential
-
-```
-Example Cost Model (Theoretical):
-
-Scenario: 50-person engineering team
-
-Cloud-Only Approach:
-├─ Development: Premium API costs per developer
-├─ Testing: Premium API costs
-├─ Documentation: Premium API costs
-└─ Total: Significant monthly expenditure
-
-Victor Hybrid Approach:
-├─ Development: FREE (Ollama locally)
-├─ Testing: FREE (Ollama locally)
-├─ Critical tasks: Minimal cloud API usage
-└─ Total: Primarily infrastructure costs
-
-Potential Benefit: Significant cost reduction by using free local models
-for routine tasks and reserving paid APIs for critical work
-```
-
-### Deployment Options
-
-| Mode | Use Case | Cost | Compliance |
-|------|----------|------|------------|
-| **Air-Gapped** | Healthcare, Finance, Government | Infrastructure only | Compatible with strict requirements |
-| **Hybrid** | Startups, Scale-ups | Flexible mix of free/paid | Configurable |
-| **Cloud** | Rapid prototyping | Pay-per-use | Cloud T&Cs apply |
-| **On-Premise** | Enterprise data centers | Infrastructure only | Full control |
-
-### Enterprise Support Features
-
-- **Multi-tenancy ready** - Isolated workspaces per team
-- **Audit logging** - Complete activity trails
-- **SSO integration** - SAML, OAuth, LDAP support (roadmap)
-- **Custom model deployment** - Private fine-tuned models
-- **SLA guarantees** - With commercial support contracts
-- **Dedicated support** - Priority response times
-- **Custom integrations** - Tailored to your infrastructure
-
-See [docs/ENTERPRISE.md](docs/ENTERPRISE.md) for detailed enterprise deployment guide.
-
----
-
-## Commercial Support
-
-Victor is open source (Apache 2.0), but commercial support and services are available for enterprises requiring:
-
-### Support Tiers
-
-<table>
-<tr>
-<td width="33%">
-
-**Community**
-
-FREE
-
-- GitHub Issues
-- Community discussions
-- Documentation
-- Best-effort support
-
-Perfect for: Individuals, startups, evaluation
-
-</td>
-<td width="33%">
-
-**Professional**
-
-Contact for pricing
-
-- Email support (24hr response)
-- Bug fix priority
-- Security updates
-- Quarterly reviews
-- Migration assistance
-
-Perfect for: Growing teams (10-50 engineers)
-
-</td>
-<td width="33%">
-
-**Enterprise**
-
-Contact for pricing
-
-- 24/7 support
-- SLA guarantees (99.9%)
-- Custom integrations
-- On-site training
-- Dedicated account manager
-- Private Slack channel
-
-Perfect for: Large organizations (50+ engineers)
-
-</td>
-</tr>
-</table>
-
-### Professional Services
-
-Beyond support, we offer:
-
-- **Implementation Services** - Full deployment and integration ($150-250/hr)
-- **Custom Development** - Enterprise-specific features and integrations
-- **Training Programs** - On-site or virtual training for your teams
-- **Architecture Review** - Optimize your Victor deployment
-- **Migration Services** - Migrate from Copilot, Cursor, or other tools
-- **Compliance Consulting** - HIPAA, SOC2, ISO 27001 assistance
-
-### Why Choose Commercial Support?
-
-While Victor is a new project, commercial support provides:
-- Faster deployment and configuration
-- Custom integrations for your infrastructure
-- Priority bug fixes and feature development
-- Training and best practices for your team
-- Peace of mind with SLA guarantees
-
-### Get in Touch
-
-**For commercial inquiries:**
-- Email: **singhvjd@gmail.com**
-- Subject: "Victor Commercial Support - [Your Company]"
-- Include: Company size, use case, requirements
-
-**Or schedule a call:**
-- 30-minute consultation (FREE)
-- Discuss your needs and deployment options
-- Get pricing and timeline estimates
 
 ---
 
