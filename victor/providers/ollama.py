@@ -40,6 +40,7 @@ class OllamaProvider(BaseProvider):
         self,
         base_url: Union[str, List[str]] = "http://localhost:11434",
         timeout: int = 300,
+        _skip_discovery: bool = False,
         **kwargs: Any,
     ):
         """Initialize Ollama provider.
@@ -47,14 +48,46 @@ class OllamaProvider(BaseProvider):
         Args:
             base_url: Ollama server URL or list/comma-separated URLs (first reachable is used)
             timeout: Request timeout (longer for local models)
+            _skip_discovery: Skip endpoint discovery (for async factory)
             **kwargs: Additional configuration
         """
-        chosen_base = self._select_base_url(base_url, timeout)
+        if _skip_discovery:
+            # Used by async factory, base_url is already resolved
+            chosen_base = (
+                base_url
+                if isinstance(base_url, str)
+                else str(base_url[0]) if base_url else "http://localhost:11434"
+            )
+        else:
+            chosen_base = self._select_base_url(base_url, timeout)
         super().__init__(base_url=chosen_base, timeout=timeout, **kwargs)
+        self._raw_base_urls = base_url
         self.client = httpx.AsyncClient(
             base_url=chosen_base,
             timeout=httpx.Timeout(timeout),
         )
+
+    @classmethod
+    async def create(
+        cls,
+        base_url: Union[str, List[str]] = "http://localhost:11434",
+        timeout: int = 300,
+        **kwargs: Any,
+    ) -> "OllamaProvider":
+        """Async factory to create OllamaProvider with async endpoint discovery.
+
+        Preferred over __init__ for non-blocking initialization.
+
+        Args:
+            base_url: Ollama server URL or list/comma-separated URLs
+            timeout: Request timeout (longer for local models)
+            **kwargs: Additional configuration
+
+        Returns:
+            Initialized OllamaProvider with best available endpoint
+        """
+        chosen_base = await cls._select_base_url_async(base_url, timeout)
+        return cls(base_url=chosen_base, timeout=timeout, _skip_discovery=True, **kwargs)
 
     @property
     def name(self) -> str:
@@ -73,25 +106,36 @@ class OllamaProvider(BaseProvider):
         """Pick the first reachable Ollama endpoint from a tiered list.
 
         Priority:
-        1) Explicitly provided list (comma-separated) or URL
-        2) If default localhost was provided, try LAN host 192.168.1.20 first (m4 max), then localhost.
+        1) OLLAMA_ENDPOINTS env var (comma-separated) if set
+        2) Explicitly provided list (comma-separated) or URL
+        3) Default localhost
+
+        Set OLLAMA_ENDPOINTS="http://<your-server>:11434,http://localhost:11434"
+        to prioritize LAN servers.
         """
+        import os
+
         candidates: List[str] = []
+
+        # Check environment variable first
+        env_endpoints = os.environ.get("OLLAMA_ENDPOINTS", "")
+        if env_endpoints:
+            candidates = [u.strip() for u in env_endpoints.split(",") if u.strip()]
+
         if base_url is None:
             base_url = "http://localhost:11434"
-        if isinstance(base_url, (list, tuple)):
-            candidates = [str(u).strip() for u in base_url if str(u).strip()]
-        elif isinstance(base_url, str):
-            if "," in base_url:
-                candidates = [u.strip() for u in base_url.split(",") if u.strip()]
-            else:
-                # Prefer faster LAN host first if user left default
-                if base_url == "http://localhost:11434":
-                    candidates = ["http://192.168.1.20:11434", base_url]
+
+        # Only process base_url if no env var candidates
+        if not candidates:
+            if isinstance(base_url, (list, tuple)):
+                candidates = [str(u).strip() for u in base_url if str(u).strip()]
+            elif isinstance(base_url, str):
+                if "," in base_url:
+                    candidates = [u.strip() for u in base_url.split(",") if u.strip()]
                 else:
                     candidates = [base_url]
-        else:
-            candidates = [str(base_url)]
+            else:
+                candidates = [str(base_url)]
 
         for url in candidates:
             try:
@@ -107,6 +151,59 @@ class OllamaProvider(BaseProvider):
             f"No Ollama endpoints reachable from: {candidates}. Falling back to {base_url}"
         )
         return base_url
+
+    @classmethod
+    async def _select_base_url_async(
+        cls, base_url: Union[str, List[str], None], timeout: int
+    ) -> str:
+        """Async version of _select_base_url for non-blocking endpoint discovery.
+
+        Priority:
+        1) OLLAMA_ENDPOINTS env var (comma-separated) if set
+        2) Explicitly provided list (comma-separated) or URL
+        3) Default localhost
+
+        Set OLLAMA_ENDPOINTS="http://<your-server>:11434,http://localhost:11434"
+        to prioritize LAN servers.
+        """
+        import os
+
+        candidates: List[str] = []
+
+        # Check environment variable first
+        env_endpoints = os.environ.get("OLLAMA_ENDPOINTS", "")
+        if env_endpoints:
+            candidates = [u.strip() for u in env_endpoints.split(",") if u.strip()]
+
+        if base_url is None:
+            base_url = "http://localhost:11434"
+
+        # Only process base_url if no env var candidates
+        if not candidates:
+            if isinstance(base_url, (list, tuple)):
+                candidates = [str(u).strip() for u in base_url if str(u).strip()]
+            elif isinstance(base_url, str):
+                if "," in base_url:
+                    candidates = [u.strip() for u in base_url.split(",") if u.strip()]
+                else:
+                    candidates = [base_url]
+            else:
+                candidates = [str(base_url)]
+
+        for url in candidates:
+            try:
+                async with httpx.AsyncClient(base_url=url, timeout=httpx.Timeout(2)) as client:
+                    resp = await client.get("/api/tags")
+                    resp.raise_for_status()
+                    logger.info(f"Ollama base URL selected (async): {url}")
+                    return url
+            except Exception as exc:
+                logger.warning(f"Ollama endpoint {url} not reachable ({exc}); trying next.")
+
+        logger.error(
+            f"No Ollama endpoints reachable from: {candidates}. Falling back to {base_url}"
+        )
+        return base_url if isinstance(base_url, str) else str(base_url)
 
     async def chat(
         self,
@@ -145,7 +242,10 @@ class OllamaProvider(BaseProvider):
                 **kwargs,
             )
 
-            response = await self.client.post("/api/chat", json=payload)
+            # Make API call with circuit breaker protection
+            response = await self._execute_with_circuit_breaker(
+                self.client.post, "/api/chat", json=payload
+            )
             response.raise_for_status()
 
             result = response.json()

@@ -1,322 +1,256 @@
-# CodingAgent Roadmap
+# Victor Feature Roadmap
 
-## Current Status: v0.1.0 (MVP Complete)
+Prioritized feature roadmap based on comparison with Claude Code, Aider, Continue.dev, Cline, OpenHands, Gemini CLI, and Codex CLI.
 
-✅ Core infrastructure and Ollama integration complete
-🚧 Additional providers in progress
-📋 Advanced features planned
+## Current Status
 
----
-
-## Phase 1: Foundation (v0.1.0) ✅ COMPLETE
-
-### Core Architecture
-- [x] Provider abstraction layer
-- [x] Base provider interface
-- [x] Message and response normalization
-- [x] Streaming support
-- [x] Error handling framework
-
-### Ollama Integration
-- [x] Full Ollama provider implementation
-- [x] Chat completion support
-- [x] Streaming responses
-- [x] Tool calling integration
-- [x] Model management (list, pull)
-
-### Tool System
-- [x] Tool registry and execution framework
-- [x] File operations (read, write, list)
-- [x] Bash command execution
-- [x] Safety checks for dangerous commands
-- [x] Tool result handling
-
-### Configuration
-- [x] YAML-based profiles
-- [x] Environment variable support
-- [x] Provider-specific settings
-- [x] Configuration management
-
-### CLI & UI
-- [x] Typer-based CLI
-- [x] Interactive REPL mode
-- [x] One-shot command mode
-- [x] Rich terminal formatting
-- [x] Streaming display
-
-### Testing & CI
-- [x] Unit test framework
-- [x] Provider tests
-- [x] GitHub Actions CI
-- [x] Code quality tools (ruff, mypy)
-
-### Documentation
-- [x] Comprehensive README
-- [x] Design document
-- [x] Contributing guide
-- [x] Quick start guide
-- [x] Example scripts
+### Implemented Features
+- Multi-provider support (6 providers: Anthropic, OpenAI, Ollama, Google, xAI, LMStudio/vLLM)
+- 54 enterprise tools
+- MCP Protocol (client + server)
+- Semantic tool selection (embedding-based)
+- Air-gapped mode with local LLMs
+- Session persistence (save/load conversations)
+- Safety checker with confirmation dialogs
+- Workspace snapshots (create/restore/diff)
+- Auto-commit with conventional commits
+- Browser automation (Playwright-based)
+- 28 slash commands (Claude Code parity)
 
 ---
 
-## Phase 2: Multi-Provider Support (v0.2.0) 🚧 IN PROGRESS
+## Priority 1: Critical for Developer Trust
 
-### Priority 1: Anthropic Claude
-- [ ] Anthropic provider implementation
-- [ ] Messages API integration
-- [ ] Tool use support
-- [ ] Prompt caching
-- [ ] Vision support (future)
-- [ ] Test suite
+### 1.1 Headless/CI Mode
+Non-interactive mode for automation pipelines.
 
-**Estimated**: 1 week
+```bash
+victor --headless "task description"
+victor --headless --json "review code" > result.json
+victor --headless --dry-run "refactor module"
+```
 
-### Priority 2: OpenAI GPT
-- [ ] OpenAI provider implementation
-- [ ] Chat completions API
-- [ ] Function calling support
-- [ ] Vision support
-- [ ] Streaming responses
-- [ ] Test suite
+**Flags:**
+- `--headless` - Run without interactive UI
+- `--json` - Output structured JSON
+- `--quiet` - Only output errors
+- `--dry-run` - Preview changes without applying
+- `--max-changes N` - Limit file modifications
+- `--timeout M` - Maximum runtime in minutes
 
-**Estimated**: 1 week
+**Exit codes:** 0=success, 1=error, 2=partial
 
-### Priority 3: Google Gemini
-- [ ] Google provider implementation
-- [ ] Gemini API integration
-- [ ] Function calling support
-- [ ] Multimodal support
-- [ ] Test suite
+**Reference:** Continue.dev, Gemini CLI, OpenHands
 
-**Estimated**: 1 week
+### 1.2 Repository Map
+Build semantic map of codebase structure for better LLM context.
 
-### Priority 4: Local Model Servers
-- [ ] LMStudio provider
-- [ ] vLLM provider
-- [ ] OpenAI-compatible endpoint wrapper
-- [ ] Unified local model support
+```python
+class RepositoryMap:
+    def build_map(self, root: Path) -> CodebaseMap
+    def get_context_for_file(self, file: Path) -> str
+    def find_related_files(self, file: Path) -> List[Path]
+```
 
-**Estimated**: 3 days
+Extracts: functions, classes, imports, dependencies, call graphs.
 
-### Provider Registry
-- [ ] Dynamic provider discovery
-- [ ] Provider capability detection
-- [ ] Automatic fallback mechanisms
-- [ ] Provider health checks
+**Reference:** Aider (repo map feature)
 
-**Estimated**: 3 days
+### 1.3 Auto Lint/Test Integration
+Run linters and tests after each edit, auto-fix issues.
 
----
+```python
+# After successful edit:
+1. Create snapshot
+2. Apply edit
+3. Run linters (black, ruff, mypy)
+4. If lint fails: auto-fix or restore snapshot
+5. Run tests if configured
+6. If tests fail: restore snapshot, report error
+```
 
-## Phase 3: Advanced Tool System (v0.3.0) 📋 PLANNED
+**Reference:** Aider, Continue.dev
 
-### MCP Integration
-- [ ] Model Context Protocol support
-- [ ] MCP server discovery
-- [ ] Standard MCP tools
-- [ ] Custom MCP server integration
+### 1.4 JSON Output Mode
+Structured output for scripting and CI integration.
 
-**Estimated**: 2 weeks
-
-### Enhanced Tools
-- [ ] Code analysis tools (AST parsing, linting)
-- [ ] Git operations (commit, branch, merge)
-- [ ] Web search and documentation fetch
-- [ ] Database query tools
-- [ ] API testing tools
-- [ ] Screenshot and vision tools
-
-**Estimated**: 2 weeks
-
-### Tool Security
-- [ ] Permission system
-- [ ] Sandboxed execution
-- [ ] User confirmation prompts
-- [ ] Audit logging
-- [ ] Rate limiting
-
-**Estimated**: 1 week
+```json
+{
+  "success": true,
+  "files_modified": ["src/api.py"],
+  "changes": [...],
+  "tokens_used": 1500,
+  "duration_ms": 3200
+}
+```
 
 ---
 
-## Phase 4: Advanced Features (v0.4.0) 📋 PLANNED
+## Priority 2: Enhanced Developer Experience
 
-### Context Management
-- [ ] Automatic context optimization
-- [ ] Smart context pruning
-- [ ] Context caching
-- [ ] Long-term memory
-- [ ] Conversation persistence
+### 2.1 Chat Modes
+Distinct operational modes for different tasks.
 
-**Estimated**: 2 weeks
+| Mode | Description | Tools Enabled |
+|------|-------------|---------------|
+| `/mode plan` | Research and planning | Read-only |
+| `/mode ask` | Q&A about code | Read-only |
+| `/mode code` | Full coding (default) | All |
+| `/mode review` | Suggestions only | Read + suggest |
 
-### Multi-Agent System
-- [ ] Agent coordination
-- [ ] Task delegation
-- [ ] Parallel execution
-- [ ] Agent specialization
-- [ ] Result aggregation
+**Reference:** Aider (architect/ask/code), Continue.dev (4 modes)
 
-**Estimated**: 3 weeks
+### 2.2 Integrate Snapshots into Edit Flow
+Auto-snapshot before each AI edit operation.
 
-### Code Understanding
-- [ ] Repository indexing
-- [ ] Semantic code search
-- [ ] Dependency analysis
-- [ ] Symbol resolution
-- [ ] Cross-file refactoring
+```
+User: "refactor auth module"
+Victor: [auto-snapshot] → [edit] → [verify] → [optional commit]
+```
 
-**Estimated**: 2 weeks
+### 2.3 Integrate Auto-Commit into Edit Flow
+Optional auto-commit after successful edits.
 
----
+```yaml
+# .victor.md or config
+auto_commit: true
+commit_style: conventional  # feat:, fix:, etc.
+```
 
-## Phase 5: User Experience (v0.5.0) 📋 PLANNED
+### 2.4 Image/Screenshot Context
+Add images to conversation for visual debugging.
 
-### Enhanced CLI
-- [ ] Autocomplete support
-- [ ] Command history
-- [ ] Session management
-- [ ] Profile switching
-- [ ] Better error messages
+```
+/image screenshot.png
+Victor: "I see a React component with a broken layout..."
+```
 
-**Estimated**: 1 week
+**Reference:** Aider, Cline
 
-### TUI (Terminal UI)
-- [ ] Textual-based TUI
-- [ ] Split-pane view
-- [ ] File browser
-- [ ] Interactive tool approval
-- [ ] Visual diff display
+### 2.5 Voice Input
+Speech-to-text for prompts.
 
-**Estimated**: 2 weeks
-
-### Web UI (Optional)
-- [ ] Web-based interface
-- [ ] Real-time streaming
-- [ ] File management
-- [ ] Conversation history
-- [ ] Settings panel
-
-**Estimated**: 3 weeks
+**Reference:** Aider
 
 ---
 
-## Phase 6: Production Ready (v1.0.0) 📋 PLANNED
+## Priority 3: Enterprise Features
 
-### Performance
-- [ ] Response time optimization
-- [ ] Concurrent request handling
-- [ ] Connection pooling
-- [ ] Request batching
-- [ ] Caching strategies
+### 3.1 Custom Slash Commands
+User-defined commands from markdown files.
 
-**Estimated**: 2 weeks
+```
+~/.victor/commands/
+├── review-pr.md      → /review-pr [number]
+├── add-tests.md      → /add-tests [file]
+└── deploy.md         → /deploy [env]
+```
 
-### Reliability
-- [ ] Comprehensive error handling
-- [ ] Retry mechanisms
-- [ ] Circuit breakers
-- [ ] Graceful degradation
-- [ ] Health monitoring
+**Reference:** Claude Code (`.claude/commands/`)
 
-**Estimated**: 2 weeks
+### 3.2 Batch Processing
+Process multiple files/tasks in parallel.
 
-### Documentation
-- [ ] Full API documentation
-- [ ] Video tutorials
-- [ ] Architecture deep-dive
-- [ ] Best practices guide
-- [ ] Troubleshooting guide
+```bash
+victor --batch tasks.json
+victor --headless "add docstrings" --files "src/**/*.py"
+```
 
-**Estimated**: 1 week
+**Reference:** Continue.dev
 
-### Distribution
-- [ ] PyPI package
-- [ ] Docker images
-- [ ] Homebrew formula
-- [ ] Binary distributions
-- [ ] Auto-update mechanism
+### 3.3 Pull Request Integration
+Automated PR workflows.
 
-**Estimated**: 1 week
+- Summarize PR changes
+- Apply reviewer feedback
+- Fix failing tests
+- Generate PR descriptions
 
----
+**Reference:** OpenHands
 
-## Future Considerations
+### 3.4 Multi-Agent Coordination
+Multiple specialized agents working on subtasks.
 
-### Advanced Features
-- [ ] Voice input/output
-- [ ] Screenshot/screen recording
-- [ ] IDE plugins (VS Code, PyCharm)
-- [ ] Jupyter notebook integration
-- [ ] Collaborative editing
-- [ ] Cloud sync
+```python
+class AgentCoordinator:
+    async def delegate(self, task: str, agent_type: str)
+    async def merge_results(self, results: List[AgentResult])
 
-### Enterprise Features
-- [ ] SSO authentication
-- [ ] Team management
-- [ ] Usage analytics
-- [ ] Cost tracking
-- [ ] Compliance logging
-- [ ] Custom model deployment
+# Agent types: research, implement, test, review, docs
+```
 
-### Integrations
-- [ ] GitHub/GitLab integration
-- [ ] Jira/Linear integration
-- [ ] Slack/Discord bots
-- [ ] CI/CD pipeline integration
-- [ ] Cloud provider CLIs
+**Reference:** OpenHands
+
+### 3.5 Dependency/Security Scanning
+CVE detection, outdated dependencies, license compliance.
 
 ---
 
-## Contributing to the Roadmap
+## Priority 4: Advanced Capabilities
 
-We welcome community input on priorities! To suggest features:
+### 4.1 IDE Plugin
+VS Code and JetBrains integration.
 
-1. **Open an Issue**: Describe the feature and use case
-2. **Join Discussions**: Participate in roadmap discussions
-3. **Submit PRs**: Implement features from this roadmap
-4. **Provide Feedback**: Share your experience and needs
+**Reference:** Continue.dev, Cline
 
-### High-Priority Community Requests
+### 4.2 Metrics Dashboard
+Usage analytics, cost tracking, success rates.
 
-Track community-requested features here:
-- [ ] TBD based on user feedback
+### 4.3 Team Collaboration
+Shared sessions, handoffs between team members.
 
----
-
-## Version History
-
-- **v0.1.0** (2025-11-24): Initial release with Ollama support
-- **v0.2.0** (TBD): Multi-provider support
-- **v0.3.0** (TBD): Advanced tools and MCP
-- **v0.4.0** (TBD): Advanced features
-- **v0.5.0** (TBD): Enhanced UX
-- **v1.0.0** (TBD): Production ready
+### 4.4 Fine-tuning Support
+Use fine-tuned models for specific codebases.
 
 ---
 
-## Timeline Estimates
+## Feature Comparison Matrix
 
-Based on current development pace:
-
-- **v0.2.0**: 1 month (multi-provider support)
-- **v0.3.0**: 1.5 months (tools and MCP)
-- **v0.4.0**: 2 months (advanced features)
-- **v0.5.0**: 1 month (UX improvements)
-- **v1.0.0**: 2 months (production polish)
-
-**Total to v1.0.0**: ~7-8 months with active development
+| Feature | Victor | Claude Code | Aider | Continue.dev | Cline |
+|---------|--------|-------------|-------|--------------|-------|
+| Multi-provider | Yes | No | Yes | Yes | Yes |
+| MCP Protocol | Yes | Yes | No | Yes | Yes |
+| Air-gapped | Yes | No | Yes | Yes | No |
+| Semantic tools | Yes | No | No | No | No |
+| Repo map | No | No | Yes | No | No |
+| Headless/CI | No | Yes | No | Yes | No |
+| Auto-commit | Yes | Yes | Yes | No | No |
+| Snapshots | Yes | No | No | No | Yes |
+| Browser | Yes | No | No | No | Yes |
+| Chat modes | Partial | No | Yes | Yes | No |
+| Voice input | No | No | Yes | No | No |
+| Multi-agent | No | No | No | No | No |
 
 ---
 
-## Get Involved
+## Implementation Order
 
-Want to help build the future of CodingAgent?
+```
+Week 1-2:   Headless mode + JSON output
+Week 3-4:   Repository map
+Week 5-6:   Auto lint/test integration
+Week 7-8:   Chat modes
+Week 9-10:  Custom slash commands
+Week 11-12: Batch processing
+Month 4:    PR integration, multi-agent
+Month 5+:   IDE plugin, advanced features
+```
 
-- 🐛 **Report Bugs**: Open issues on GitHub
-- 💡 **Suggest Features**: Share your ideas
-- 🔧 **Contribute Code**: Check CONTRIBUTING.md
-- 📖 **Improve Docs**: Documentation PRs welcome
-- 🧪 **Test Features**: Try new releases and provide feedback
+---
 
-Let's build something amazing together! 🚀
+## Contributing
+
+1. Pick a feature from this roadmap
+2. Create feature branch: `git checkout -b feature/headless-mode`
+3. Implement with tests
+4. Run checks: `black . && ruff check . && mypy victor && pytest`
+5. Submit PR referencing this roadmap
+
+## References
+
+- [Claude Code](https://claude.ai/code)
+- [Aider](https://aider.chat/)
+- [Continue.dev](https://continue.dev/)
+- [Cline](https://cline.bot/)
+- [OpenHands](https://openhands.dev/)
+- [Gemini CLI](https://github.com/google-gemini/gemini-cli)

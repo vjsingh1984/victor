@@ -15,9 +15,14 @@
 """Base provider interface for LLM providers."""
 
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
 from pydantic import BaseModel, Field
+
+from victor.providers.circuit_breaker import (
+    CircuitBreaker,
+    CircuitBreakerRegistry,
+)
 
 
 class Message(BaseModel):
@@ -63,6 +68,55 @@ class StreamChunk(BaseModel):
     is_final: bool = Field(default=False, description="Is this the final chunk")
 
 
+# Provider error classes - defined before BaseProvider so they can be referenced
+class ProviderError(Exception):
+    """Base exception for provider-related errors."""
+
+    def __init__(
+        self,
+        message: str,
+        provider: Optional[str] = None,
+        status_code: Optional[int] = None,
+        raw_error: Optional[Any] = None,
+    ):
+        """Initialize error.
+
+        Args:
+            message: Error message
+            provider: Provider name
+            status_code: HTTP status code if applicable
+            raw_error: Raw error from provider
+        """
+        super().__init__(message)
+        self.provider = provider
+        self.status_code = status_code
+        self.raw_error = raw_error
+
+
+class ProviderNotFoundError(ProviderError):
+    """Raised when a provider is not found."""
+
+    pass
+
+
+class ProviderAuthenticationError(ProviderError):
+    """Raised when authentication fails."""
+
+    pass
+
+
+class ProviderRateLimitError(ProviderError):
+    """Raised when rate limit is exceeded."""
+
+    pass
+
+
+class ProviderTimeoutError(ProviderError):
+    """Raised when request times out."""
+
+    pass
+
+
 class BaseProvider(ABC):
     """Abstract base class for all LLM providers."""
 
@@ -72,6 +126,9 @@ class BaseProvider(ABC):
         base_url: Optional[str] = None,
         timeout: int = 60,
         max_retries: int = 3,
+        use_circuit_breaker: bool = True,
+        circuit_breaker_failure_threshold: int = 5,
+        circuit_breaker_recovery_timeout: float = 30.0,
         **kwargs: Any,
     ):
         """Initialize provider.
@@ -81,6 +138,9 @@ class BaseProvider(ABC):
             base_url: Base URL for API endpoints
             timeout: Request timeout in seconds
             max_retries: Maximum number of retry attempts
+            use_circuit_breaker: Whether to enable circuit breaker protection
+            circuit_breaker_failure_threshold: Failures before opening circuit
+            circuit_breaker_recovery_timeout: Seconds before testing recovery
             **kwargs: Additional provider-specific options
         """
         self.api_key = api_key
@@ -88,6 +148,28 @@ class BaseProvider(ABC):
         self.timeout = timeout
         self.max_retries = max_retries
         self.extra_config = kwargs
+
+        # Circuit breaker for resilience
+        self._use_circuit_breaker = use_circuit_breaker
+        self._circuit_breaker: Optional[CircuitBreaker] = None
+        if use_circuit_breaker:
+            self._circuit_breaker = CircuitBreakerRegistry.get_or_create(
+                name=f"provider_{self.__class__.__name__}",
+                failure_threshold=circuit_breaker_failure_threshold,
+                recovery_timeout=circuit_breaker_recovery_timeout,
+                excluded_exceptions=(ProviderAuthenticationError,),
+            )
+
+    @property
+    def circuit_breaker(self) -> Optional[CircuitBreaker]:
+        """Get the circuit breaker for this provider."""
+        return self._circuit_breaker
+
+    def get_circuit_breaker_stats(self) -> Optional[Dict[str, Any]]:
+        """Get circuit breaker statistics for monitoring."""
+        if self._circuit_breaker:
+            return self._circuit_breaker.get_stats()
+        return None
 
     @property
     @abstractmethod
@@ -174,30 +256,6 @@ class BaseProvider(ABC):
         """
         pass
 
-    def normalize_messages(self, messages: List[Message]) -> List[Dict[str, Any]]:
-        """Convert standard messages to provider-specific format.
-
-        Args:
-            messages: List of standard Message objects
-
-        Returns:
-            List of provider-specific message dictionaries
-        """
-        # Default implementation returns messages as dicts
-        return [msg.model_dump(exclude_none=True) for msg in messages]
-
-    def normalize_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
-        """Convert standard tool definitions to provider-specific format.
-
-        Args:
-            tools: List of standard ToolDefinition objects
-
-        Returns:
-            List of provider-specific tool dictionaries
-        """
-        # Default implementation returns tools as dicts
-        return [tool.model_dump(exclude_none=True) for tool in tools]
-
     async def count_tokens(self, text: str) -> int:
         """Estimate token count for given text.
 
@@ -215,50 +273,43 @@ class BaseProvider(ABC):
         """Close any open connections or resources."""
         pass
 
+    def is_circuit_open(self) -> bool:
+        """Check if the circuit breaker is open (failing fast).
 
-class ProviderError(Exception):
-    """Base exception for provider-related errors."""
+        Returns:
+            True if circuit is open and requests will be rejected
+        """
+        if self._circuit_breaker:
+            return self._circuit_breaker.is_open
+        return False
 
-    def __init__(
+    async def _execute_with_circuit_breaker(
         self,
-        message: str,
-        provider: Optional[str] = None,
-        status_code: Optional[int] = None,
-        raw_error: Optional[Any] = None,
-    ):
-        """Initialize error.
+        func: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """Execute a function with circuit breaker protection.
+
+        Use this method in subclass implementations to protect API calls.
 
         Args:
-            message: Error message
-            provider: Provider name
-            status_code: HTTP status code if applicable
-            raw_error: Raw error from provider
+            func: Async function to execute
+            *args: Positional arguments for func
+            **kwargs: Keyword arguments for func
+
+        Returns:
+            Result from func
+
+        Raises:
+            CircuitBreakerError: If circuit is open
+            Exception: If func raises and circuit records failure
         """
-        super().__init__(message)
-        self.provider = provider
-        self.status_code = status_code
-        self.raw_error = raw_error
+        if self._circuit_breaker:
+            return await self._circuit_breaker.execute(func, *args, **kwargs)
+        return await func(*args, **kwargs)
 
-
-class ProviderNotFoundError(ProviderError):
-    """Raised when a provider is not found."""
-
-    pass
-
-
-class ProviderAuthenticationError(ProviderError):
-    """Raised when authentication fails."""
-
-    pass
-
-
-class ProviderRateLimitError(ProviderError):
-    """Raised when rate limit is exceeded."""
-
-    pass
-
-
-class ProviderTimeoutError(ProviderError):
-    """Raised when request times out."""
-
-    pass
+    def reset_circuit_breaker(self) -> None:
+        """Manually reset the circuit breaker to closed state."""
+        if self._circuit_breaker:
+            self._circuit_breaker.reset()

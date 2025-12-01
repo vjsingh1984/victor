@@ -31,6 +31,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
 
+from victor.tools.base import CostTier
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
@@ -211,7 +212,7 @@ async def _parallel_analyze(files: List[Path]) -> List[Dict[str, Any]]:
     return results
 
 
-@tool
+@tool(cost_tier=CostTier.HIGH)
 async def batch(
     operation: str,
     path: str,

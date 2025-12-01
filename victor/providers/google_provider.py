@@ -104,8 +104,10 @@ class GoogleProvider(BaseProvider):
             # Start chat
             chat = model_instance.start_chat(history=history)
 
-            # Generate response
-            response = await chat.send_message_async(latest_message)
+            # Generate response with circuit breaker protection
+            response = await self._execute_with_circuit_breaker(
+                chat.send_message_async, latest_message
+            )
 
             return self._parse_response(response, model)
 

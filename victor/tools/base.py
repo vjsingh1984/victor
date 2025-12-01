@@ -15,9 +15,40 @@
 """Base tool framework for CodingAgent."""
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
+
+
+class CostTier(Enum):
+    """Cost tier for tools.
+
+    Used for cost-aware tool selection to deprioritize expensive tools
+    when cheaper alternatives exist.
+
+    Tiers:
+        FREE: Local operations with no external costs (filesystem, bash, git)
+        LOW: Compute-only operations (code review, refactoring analysis)
+        MEDIUM: External API calls (web search, web fetch)
+        HIGH: Resource-intensive operations (batch processing 100+ files)
+    """
+
+    FREE = "free"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+    @property
+    def weight(self) -> float:
+        """Return numeric weight for cost comparison."""
+        weights = {
+            CostTier.FREE: 0.0,
+            CostTier.LOW: 1.0,
+            CostTier.MEDIUM: 2.0,
+            CostTier.HIGH: 3.0,
+        }
+        return weights[self]
 
 
 class ToolParameter(BaseModel):
@@ -59,6 +90,23 @@ class BaseTool(ABC):
     def parameters(self) -> Dict[str, Any]:
         """JSON Schema for tool parameters."""
         pass
+
+    @property
+    def cost_tier(self) -> CostTier:
+        """Cost tier for the tool.
+
+        Override this property in subclasses to specify the appropriate tier.
+
+        Tiers:
+            FREE: Local operations (filesystem, bash, git) - default
+            LOW: Compute-only operations (code review, refactoring)
+            MEDIUM: External API calls (web search, fetch)
+            HIGH: Resource-intensive (batch processing 100+ files)
+
+        Returns:
+            CostTier enum value
+        """
+        return CostTier.FREE  # Default: local operations are free
 
     @staticmethod
     def convert_parameters_to_schema(parameters: List[ToolParameter]) -> Dict[str, Any]:
@@ -364,6 +412,49 @@ class ToolRegistry:
                 if self._tool_enabled.get(name, False)
             ]
         return [tool.to_json_schema() for tool in self._tools.values()]
+
+    def get_tool_cost(self, name: str) -> Optional[CostTier]:
+        """Get the cost tier for a tool.
+
+        Args:
+            name: Tool name
+
+        Returns:
+            CostTier enum value or None if tool not found
+        """
+        tool = self.get(name)
+        if tool:
+            return tool.cost_tier
+        return None
+
+    def get_tools_by_cost(
+        self, max_tier: CostTier = CostTier.HIGH, only_enabled: bool = True
+    ) -> List[BaseTool]:
+        """Get tools filtered by maximum cost tier.
+
+        Args:
+            max_tier: Maximum cost tier to include
+            only_enabled: If True, only return enabled tools
+
+        Returns:
+            List of tools at or below the specified cost tier
+        """
+        tools = self.list_tools(only_enabled=only_enabled)
+        return [t for t in tools if t.cost_tier.weight <= max_tier.weight]
+
+    def get_cost_summary(self, only_enabled: bool = True) -> Dict[str, List[str]]:
+        """Get a summary of tools grouped by cost tier.
+
+        Args:
+            only_enabled: If True, only include enabled tools
+
+        Returns:
+            Dictionary mapping cost tier names to lists of tool names
+        """
+        summary: Dict[str, List[str]] = {tier.value: [] for tier in CostTier}
+        for tool in self.list_tools(only_enabled=only_enabled):
+            summary[tool.cost_tier.value].append(tool.name)
+        return summary
 
     async def execute(self, name: str, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
         """Execute a tool by name.

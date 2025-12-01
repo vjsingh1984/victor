@@ -357,16 +357,27 @@ class MCPServer:
         This allows the server to communicate via stdin/stdout,
         which is the standard MCP transport mechanism.
         """
+        import asyncio
         import sys
 
         print("MCP Server started on stdio", file=sys.stderr)
         print(f"Server: {self.name} v{self.version}", file=sys.stderr)
         print("Waiting for messages...", file=sys.stderr)
 
+        loop = asyncio.get_event_loop()
+
         while True:
             try:
-                # Read JSON-RPC message from stdin
-                line = sys.stdin.readline()
+                # Read JSON-RPC message from stdin using run_in_executor to avoid blocking
+                try:
+                    line = await asyncio.wait_for(
+                        loop.run_in_executor(None, sys.stdin.readline),
+                        timeout=300.0,  # 5 minute timeout for server idle
+                    )
+                except asyncio.TimeoutError:
+                    # No message received, continue waiting
+                    continue
+
                 if not line:
                     break
 
@@ -397,3 +408,107 @@ class MCPServer:
             "tools_count": len(self.tool_registry.list_tools()),
             "resources_count": len(self.resources),
         }
+
+    def get_tool_definitions(self) -> List[Dict[str, Any]]:
+        """Get all tool definitions in MCP format.
+
+        Returns:
+            List of MCP tool definitions as dictionaries
+        """
+        tools = []
+        for tool in self.tool_registry.list_tools():
+            mcp_tool = self._tool_to_mcp(tool)
+            tools.append(mcp_tool.model_dump())
+        return tools
+
+    @classmethod
+    def create_with_default_tools(cls, name: str = "Victor MCP Server") -> "MCPServer":
+        """Create MCP server with Victor's default tools.
+
+        Args:
+            name: Server name
+
+        Returns:
+            Configured MCPServer instance
+        """
+        from victor.config.settings import Settings
+
+        # Create minimal orchestrator to get tools
+        Settings()
+        registry = ToolRegistry()
+
+        # We need to register tools manually without full orchestrator
+        # This is a simplified version for MCP exposure
+        server = cls(name=name, tool_registry=registry)
+        return server
+
+
+def create_mcp_server_from_orchestrator(
+    orchestrator: "AgentOrchestrator",
+    name: str = "Victor MCP Server",
+) -> MCPServer:
+    """Create MCP server from an existing orchestrator.
+
+    This allows exposing the orchestrator's registered tools via MCP.
+
+    Args:
+        orchestrator: AgentOrchestrator instance
+        name: Server name
+
+    Returns:
+        Configured MCPServer
+    """
+    return MCPServer(
+        name=name,
+        version="1.0.0",
+        tool_registry=orchestrator.tools,
+    )
+
+
+async def run_mcp_server_stdio() -> None:
+    """Run MCP server in stdio mode.
+
+    This is the main entry point for running Victor as an MCP server.
+    Can be invoked via: python -m victor.mcp.server
+    """
+    import sys
+
+    from victor.config.settings import Settings
+    from victor.tools.base import ToolRegistry
+
+    # Import and register default tools
+    Settings()
+    registry = ToolRegistry()
+
+    # Create and register default tools
+    # Import each tool module to trigger registration
+    try:
+        from victor.tools import filesystem
+
+        # Register filesystem tools
+        if hasattr(filesystem, "read_file") and hasattr(filesystem.read_file, "Tool"):
+            registry.register(filesystem.read_file.Tool)
+        if hasattr(filesystem, "write_file") and hasattr(filesystem.write_file, "Tool"):
+            registry.register(filesystem.write_file.Tool)
+        if hasattr(filesystem, "list_directory") and hasattr(filesystem.list_directory, "Tool"):
+            registry.register(filesystem.list_directory.Tool)
+
+        # Add more tools as needed...
+
+    except Exception as e:
+        print(f"Warning: Could not load all tools: {e}", file=sys.stderr)
+
+    server = MCPServer(
+        name="Victor MCP Server",
+        version="1.0.0",
+        tool_registry=registry,
+    )
+
+    print(f"Starting MCP server with {len(registry.list_tools())} tools", file=sys.stderr)
+    await server.start_stdio_server()
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(run_mcp_server_stdio())

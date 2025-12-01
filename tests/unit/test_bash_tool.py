@@ -58,7 +58,7 @@ async def test_execute_bash_allow_dangerous():
         mock_process.communicate = AsyncMock(return_value=(b"", b""))
         mock_subprocess.return_value = mock_process
 
-        result = await execute_bash(command="rm -rf test", allow_dangerous=True)
+        await execute_bash(command="rm -rf test", allow_dangerous=True)
 
         # Should attempt to execute
         mock_subprocess.assert_called_once()

@@ -28,10 +28,11 @@ from typing import Any, Dict, Optional
 
 import httpx
 
+from victor.tools.base import CostTier
 from victor.tools.decorators import tool
 
 
-@tool
+@tool(cost_tier=CostTier.MEDIUM)
 async def http_request(
     method: str,
     url: str,

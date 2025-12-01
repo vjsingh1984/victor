@@ -16,8 +16,7 @@
 
 import json
 import subprocess
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -31,7 +30,7 @@ class TestRunTests:
     async def test_run_tests_success_with_report(self, tmp_path):
         """Test successful test execution with valid report."""
         # Create a mock report file
-        report_file = tmp_path / ".pytest_report.json"
+        tmp_path / ".pytest_report.json"
         report_data = {
             "summary": {
                 "total": 10,
@@ -142,7 +141,7 @@ class TestRunTests:
                 report_data
             )
 
-            result = await run_tests(pytest_args=["-v", "-x"])
+            await run_tests(pytest_args=["-v", "-x"])
 
             # Verify subprocess was called with correct args
             call_args = mock_run.call_args[0][0]

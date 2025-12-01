@@ -68,9 +68,9 @@ async def find_symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, An
             captures_dict = cursor.captures(root_node)
 
             # captures_dict is {"function.name": [node1, node2, ...]} or {"class.name": [...]}
-        for _capture_name, nodes in captures_dict.items():
-            for node in nodes:
-                if node.text.decode("utf8") == symbol_name:
+            for _capture_name, nodes in captures_dict.items():
+                for node in nodes:
+                    if node.text.decode("utf8") == symbol_name:
                         # We found the name identifier, now get the parent definition node
                         definition_node = node.parent
                         start_line = definition_node.start_point[0] + 1

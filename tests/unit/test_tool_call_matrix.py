@@ -36,7 +36,9 @@ def test_matrix_wildcard_matching():
     assert matrix.is_tool_call_supported("ollama", "qwen3-coder:30b")
     assert matrix.is_tool_call_supported("ollama", "qwen3-coder:70b")
     assert matrix.is_tool_call_supported("ollama", "llama3.1:8b-q4")
-    assert not matrix.is_tool_call_supported("ollama", "mistral:7b")
+    # Note: mistral:7b is in default manifest, so it IS supported
+    # Test with a model that's NOT in defaults to verify negative case
+    assert not matrix.is_tool_call_supported("ollama", "unsupported-model:latest")
 
 
 def test_orchestrator_uses_profile_provider_name():

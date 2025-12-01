@@ -24,6 +24,7 @@ This tool provides:
 import subprocess
 from typing import Any, Dict, List, Optional, Tuple
 
+from victor.config.timeouts import ProcessTimeouts
 from victor.tools.decorators import tool
 
 # Global state for AI provider
@@ -53,7 +54,12 @@ def _run_git(*args: str) -> Tuple[bool, str, str]:
         Tuple of (success, stdout, stderr)
     """
     try:
-        result = subprocess.run(["git"] + list(args), capture_output=True, text=True, timeout=30)
+        result = subprocess.run(
+            ["git"] + list(args),
+            capture_output=True,
+            text=True,
+            timeout=ProcessTimeouts.GIT,
+        )
         return result.returncode == 0, result.stdout, result.stderr
     except subprocess.TimeoutExpired:
         return False, "", "Git command timed out"

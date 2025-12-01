@@ -159,7 +159,7 @@ async def test_chat_with_system_message(openai_provider):
             Message(role="system", content="You are a helpful assistant"),
             Message(role="user", content="Hello"),
         ]
-        response = await openai_provider.chat(
+        await openai_provider.chat(
             messages=messages,
             model="gpt-4-turbo",
         )
@@ -495,7 +495,7 @@ async def test_stream_error(openai_provider):
         messages = [Message(role="user", content="Hello")]
 
         with pytest.raises(ProviderError):
-            async for chunk in openai_provider.stream(
+            async for _chunk in openai_provider.stream(
                 messages=messages,
                 model="gpt-4",
             ):
@@ -743,7 +743,7 @@ async def test_chat_with_custom_kwargs(openai_provider):
         mock_create.return_value = mock_response
 
         messages = [Message(role="user", content="Hello")]
-        response = await openai_provider.chat(
+        await openai_provider.chat(
             messages=messages,
             model="gpt-4",
             top_p=0.9,
@@ -787,7 +787,7 @@ async def test_message_conversion(openai_provider):
             Message(role="user", content="User"),
             Message(role="assistant", content="Assistant"),
         ]
-        response = await openai_provider.chat(
+        await openai_provider.chat(
             messages=messages,
             model="gpt-4",
         )

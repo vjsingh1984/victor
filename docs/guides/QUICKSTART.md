@@ -1,8 +1,14 @@
+<div align="center">
+
+![Victor Banner](../../assets/victor-banner.png)
+
 # Quick Start Guide
+
+</div>
 
 > Canonical reference: Docker users see `docker/README.md` and `docker/QUICKREF.md`. This guide focuses on local install. Reality check: semantic tool selection is enabled by default and `security_scan` is regex-only (no CVE/IaC).
 
-Get up and running with CodingAgent in minutes!
+Get up and running with Victor in minutes!
 
 ## Prerequisites
 
@@ -21,7 +27,7 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-### Step 2: Install CodingAgent
+### Step 2: Install Victor
 
 ```bash
 # Install in editable mode with all dependencies
@@ -314,4 +320,4 @@ Contributions are welcome!
 
 ---
 
-Happy coding with CodingAgent! 🤖
+Happy coding with Victor! 🤖

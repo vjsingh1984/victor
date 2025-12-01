@@ -11,3 +11,45 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""LLM Provider abstraction layer."""
+
+from victor.providers.base import (
+    BaseProvider,
+    Message,
+    CompletionResponse,
+    StreamChunk,
+    ProviderError,
+    ProviderNotFoundError,
+    ProviderAuthenticationError,
+    ProviderRateLimitError,
+    ProviderTimeoutError,
+)
+from victor.providers.circuit_breaker import (
+    CircuitBreaker,
+    CircuitBreakerError,
+    CircuitBreakerRegistry,
+    CircuitState,
+)
+from victor.providers.registry import ProviderRegistry
+
+__all__ = [
+    # Base classes
+    "BaseProvider",
+    "Message",
+    "CompletionResponse",
+    "StreamChunk",
+    # Error classes
+    "ProviderError",
+    "ProviderNotFoundError",
+    "ProviderAuthenticationError",
+    "ProviderRateLimitError",
+    "ProviderTimeoutError",
+    # Circuit breaker
+    "CircuitBreaker",
+    "CircuitBreakerError",
+    "CircuitBreakerRegistry",
+    "CircuitState",
+    # Registry
+    "ProviderRegistry",
+]

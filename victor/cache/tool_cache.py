@@ -84,3 +84,22 @@ class ToolCache:
                 self.cache.delete(key, namespace=ns)
         for p in paths:
             self._path_index.pop(str(p), None)
+
+    def invalidate_by_tool(self, tool_name: str) -> None:
+        """Invalidate all cached results for a specific tool.
+
+        Args:
+            tool_name: Name of the tool whose cache should be cleared
+        """
+        self.cache.clear(namespace=tool_name)
+        # Clean up path index entries for this tool
+        keys_to_remove = []
+        for path, key_refs in self._path_index.items():
+            updated_refs = {ref for ref in key_refs if not ref.startswith(f"{tool_name}:")}
+            if updated_refs != key_refs:
+                if updated_refs:
+                    self._path_index[path] = updated_refs
+                else:
+                    keys_to_remove.append(path)
+        for path in keys_to_remove:
+            del self._path_index[path]

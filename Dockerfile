@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Victor - Universal AI Coding Assistant
+# Victor - Enterprise-Ready AI Coding Assistant
 # Multi-stage build for optimized image size
 
 # Stage 1: Builder
 FROM python:3.12-slim as builder
 
 LABEL maintainer="Vijaykumar Singh <singhvjd@gmail.com>"
-LABEL description="Universal terminal-based AI coding assistant"
+LABEL description="Enterprise-Ready AI Coding Assistant"
 LABEL version="0.1.0"
 
 # Install system dependencies

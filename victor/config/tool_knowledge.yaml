@@ -1,0 +1,399 @@
+# Tool Knowledge Configuration
+#
+# This file contains semantic knowledge about tools to improve
+# embedding-based tool selection. Each tool has use cases, keywords,
+# and examples that help the semantic selector match user requests.
+
+# File Operations
+write_file:
+  use_cases:
+    - creating Python files
+    - saving code
+    - writing scripts
+    - creating configuration files
+    - generating files
+  keywords:
+    - write
+    - create
+    - save
+    - implement
+    - generate
+  examples:
+    - writing functions (factorial, fibonacci, email validation)
+    - creating classes (User, Product)
+    - saving scripts (data processing, automation)
+
+read_file:
+  use_cases:
+    - reading Python code
+    - loading configuration
+    - examining file contents
+    - viewing code
+  keywords:
+    - read
+    - show
+    - load
+    - view
+    - examine
+    - check
+  examples:
+    - reading Python modules
+    - loading config files
+    - examining source code
+
+list_directory:
+  use_cases:
+    - exploring codebase structure
+    - finding files
+    - listing project contents
+    - browsing directories
+  keywords:
+    - list
+    - explore
+    - find
+    - show files
+    - browse
+  examples:
+    - exploring project layout
+    - finding Python modules
+    - viewing directory tree
+
+edit_files:
+  use_cases:
+    - modifying code
+    - updating files
+    - refactoring
+    - fixing bugs
+  keywords:
+    - edit
+    - modify
+    - update
+    - fix
+    - change
+    - improve
+  examples:
+    - fixing bugs in functions
+    - updating variable names
+    - modifying implementations
+
+# Code Execution
+execute_bash:
+  use_cases:
+    - running scripts
+    - executing commands
+    - testing code
+    - installing packages
+    - git operations
+  keywords:
+    - run
+    - execute
+    - test
+    - install
+    - command
+  examples:
+    - running Python scripts
+    - executing shell commands
+    - installing dependencies
+
+execute_python_in_sandbox:
+  use_cases:
+    - testing Python code
+    - validating functions
+    - running Python scripts safely
+    - verifying code works
+  keywords:
+    - test
+    - validate
+    - execute
+    - verify
+    - run python
+  examples:
+    - testing functions
+    - validating implementations
+    - running algorithms safely
+
+# Code Intelligence
+find_symbol:
+  use_cases:
+    - locating function definitions
+    - finding class declarations
+    - searching for variables
+  keywords:
+    - find
+    - locate
+    - where
+    - definition
+    - search
+  examples:
+    - finding function definitions
+    - locating class declarations
+
+find_references:
+  use_cases:
+    - finding where code is used
+    - tracking function calls
+    - analyzing dependencies
+  keywords:
+    - references
+    - usages
+    - where used
+    - calls
+  examples:
+    - finding function calls
+    - tracking variable usage
+
+rename_symbol:
+  use_cases:
+    - refactoring variable names
+    - renaming functions
+    - updating identifiers
+  keywords:
+    - rename
+    - change name
+    - refactor name
+  examples:
+    - renaming variables
+    - updating function names
+
+# Code Quality
+code_review:
+  use_cases:
+    - analyzing code quality
+    - checking for issues
+    - reviewing implementations
+  keywords:
+    - review
+    - analyze
+    - check quality
+    - find issues
+  examples:
+    - reviewing implementations
+    - checking code quality
+
+security_scan:
+  use_cases:
+    - finding security vulnerabilities
+    - detecting secrets
+    - security analysis
+  keywords:
+    - security
+    - vulnerabilities
+    - secrets
+    - scan
+    - audit
+  examples:
+    - finding SQL injection
+    - detecting hardcoded passwords
+
+analyze_metrics:
+  use_cases:
+    - measuring code complexity
+    - analyzing code quality metrics
+    - technical debt analysis
+  keywords:
+    - complexity
+    - metrics
+    - quality
+    - analyze
+  examples:
+    - measuring cyclomatic complexity
+
+# Testing
+run_tests:
+  use_cases:
+    - executing test suites
+    - running pytest
+    - validating code
+  keywords:
+    - test
+    - pytest
+    - unittest
+    - coverage
+  examples:
+    - running pytest
+    - executing unit tests
+
+# Documentation
+generate_docs:
+  use_cases:
+    - creating documentation
+    - generating API docs
+    - writing README files
+  keywords:
+    - document
+    - docs
+    - readme
+    - docstring
+  examples:
+    - generating API documentation
+    - writing docstrings
+
+analyze_docs:
+  use_cases:
+    - reviewing documentation
+    - checking doc coverage
+  keywords:
+    - documentation
+    - doc coverage
+    - review docs
+  examples:
+    - reviewing documentation quality
+
+# Git Operations
+git:
+  use_cases:
+    - version control
+    - committing changes
+    - managing branches
+  keywords:
+    - git
+    - commit
+    - branch
+    - push
+    - pull
+  examples:
+    - committing changes
+    - creating branches
+
+git_suggest_commit:
+  use_cases:
+    - generating commit messages
+    - analyzing changes
+  keywords:
+    - commit message
+    - suggest commit
+  examples:
+    - generating commit messages
+
+git_create_pr:
+  use_cases:
+    - creating pull requests
+    - proposing changes
+  keywords:
+    - pull request
+    - pr
+    - merge request
+  examples:
+    - creating pull requests
+
+# Refactoring
+refactor_extract_function:
+  use_cases:
+    - extracting methods
+    - refactoring code
+  keywords:
+    - extract
+    - refactor
+    - method
+  examples:
+    - extracting code into functions
+
+refactor_inline_variable:
+  use_cases:
+    - inlining variables
+    - simplifying code
+  keywords:
+    - inline
+    - simplify
+  examples:
+    - inlining temporary variables
+
+refactor_organize_imports:
+  use_cases:
+    - organizing imports
+    - cleaning up dependencies
+  keywords:
+    - imports
+    - organize
+    - sort
+  examples:
+    - organizing Python imports
+
+# Web & HTTP
+web_search:
+  use_cases:
+    - searching documentation
+    - finding examples
+    - looking up information
+  keywords:
+    - search
+    - find
+    - look up
+    - documentation
+  examples:
+    - searching Python documentation
+    - finding code examples
+
+web_fetch:
+  use_cases:
+    - downloading documentation
+    - fetching web content
+  keywords:
+    - fetch
+    - download
+    - get
+    - webpage
+  examples:
+    - downloading API documentation
+
+# Workflows & Batch
+run_workflow:
+  use_cases:
+    - executing multi-step tasks
+    - complex operations
+    - automated workflows
+  keywords:
+    - workflow
+    - automation
+    - multi-step
+  examples:
+    - executing complex workflows
+
+batch:
+  use_cases:
+    - processing multiple files
+    - batch operations
+    - bulk processing
+  keywords:
+    - batch
+    - bulk
+    - multiple files
+    - mass
+  examples:
+    - batch processing files
+
+cicd:
+  use_cases:
+    - CI/CD operations
+    - pipeline management
+    - continuous integration
+  keywords:
+    - ci/cd
+    - pipeline
+    - github actions
+    - deployment
+  examples:
+    - setting up GitHub Actions
+
+docker:
+  use_cases:
+    - container operations
+    - Docker management
+  keywords:
+    - docker
+    - container
+    - image
+  examples:
+    - managing Docker containers
+
+scaffold:
+  use_cases:
+    - project scaffolding
+    - creating project templates
+  keywords:
+    - scaffold
+    - template
+    - boilerplate
+    - new project
+  examples:
+    - scaffolding new projects

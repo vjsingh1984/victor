@@ -67,7 +67,11 @@ class CodeExecutionManager:
             self.docker_client = None
 
     def start(self) -> None:
-        """Starts the persistent Docker container."""
+        """Starts the persistent Docker container.
+
+        If Docker fails to start, the code executor will continue in
+        degraded mode (no container execution available).
+        """
         if not self.docker_available:
             # Docker not available - skip container startup
             return
@@ -85,8 +89,17 @@ class CodeExecutionManager:
                 # No volume mounting needed - we execute code directly
             )
         except Exception as e:
+            # Log the error but don't crash Victor
+            # Docker container execution will be unavailable
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"Docker container startup failed: {e}. "
+                "Code execution in containers will be unavailable."
+            )
             self.container = None
-            raise RuntimeError(f"Failed to start Docker container: {e}")
+            self.docker_available = False  # Mark Docker as unavailable
 
     def stop(self) -> None:
         """Stops and removes the Docker container."""

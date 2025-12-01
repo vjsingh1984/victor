@@ -14,10 +14,7 @@
 
 """Tests for refactor_tool module."""
 
-import tempfile
-from pathlib import Path
 import pytest
-from unittest.mock import MagicMock, patch, mock_open
 
 from victor.tools.refactor_tool import (
     refactor_rename_symbol,

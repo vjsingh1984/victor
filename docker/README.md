@@ -1,4 +1,10 @@
+<div align="center">
+
+![Victor Banner](../assets/victor-banner.png)
+
 # Victor Docker - Air-gapped Deployment
+
+</div>
 
 This Docker image includes **pre-downloaded embedding models** for 100% offline operation.
 

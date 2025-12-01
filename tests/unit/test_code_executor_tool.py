@@ -17,7 +17,7 @@
 import io
 import tarfile
 import pytest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 from victor.tools.code_executor_tool import (
     CodeExecutionManager,
@@ -41,12 +41,12 @@ class TestCodeExecutionManager:
             mock_docker.assert_called_once()
 
     def test_init_docker_not_available(self):
-        """Test initialization fails when Docker is not available."""
+        """Test initialization fails when Docker is not available and required."""
         from docker.errors import DockerException
 
         with patch("docker.from_env", side_effect=DockerException("Docker not found")):
             with pytest.raises(RuntimeError, match="Docker is not running"):
-                CodeExecutionManager()
+                CodeExecutionManager(require_docker=True)
 
     def test_start_container(self):
         """Test starting a new container."""
@@ -78,17 +78,19 @@ class TestCodeExecutionManager:
             mock_client.containers.run.assert_not_called()
 
     def test_start_failure(self):
-        """Test handling of container start failure."""
+        """Test handling of container start failure - should log warning and continue."""
         with patch("docker.from_env") as mock_docker:
             mock_client = MagicMock()
             mock_docker.return_value = mock_client
             mock_client.containers.run.side_effect = Exception("Container start failed")
 
             manager = CodeExecutionManager()
-            with pytest.raises(RuntimeError, match="Failed to start Docker container"):
-                manager.start()
+            # Should NOT raise - instead logs warning and continues
+            manager.start()
 
             assert manager.container is None
+            # Docker should be marked as unavailable after failure
+            assert manager.docker_available is False
 
     def test_stop_container(self):
         """Test stopping and removing a container."""

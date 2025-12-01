@@ -15,8 +15,6 @@
 """Tests for editing/editor.py module."""
 
 import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 from victor.editing.editor import (
     OperationType,

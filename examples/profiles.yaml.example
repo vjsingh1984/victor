@@ -20,14 +20,15 @@ providers:
   lmstudio:
     base_url:
       - http://127.0.0.1:1234      # Primary LMStudio server (localhost)
-      - http://192.168.1.126:1234  # Secondary LMStudio server
-      - http://192.168.1.20:1234   # Tertiary LMStudio server
+      # Add LAN servers as needed:
+      # - http://your-lan-server:1234
     timeout: 300
 
   ollama:
     base_url:
-      - http://192.168.1.20:11434  # Primary Ollama server (optional backup)
-      - http://localhost:11434     # Fallback to local
+      - http://localhost:11434     # Primary Ollama server
+      # Add LAN servers as needed:
+      # - http://your-lan-server:11434
     timeout: 300
 
   anthropic:

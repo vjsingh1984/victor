@@ -41,25 +41,22 @@ async def test_read_file_success():
 @pytest.mark.asyncio
 async def test_read_file_not_found():
     """Test reading non-existent file."""
-    result = await read_file(path="/nonexistent/path/file.txt")
-
-    assert "Error: File not found" in result
+    with pytest.raises(FileNotFoundError):
+        await read_file(path="/nonexistent/path/file.txt")
 
 
 @pytest.mark.asyncio
 async def test_read_file_not_a_file():
     """Test reading a directory path."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        result = await read_file(path=tmpdir)
-
-        assert "Error: Path" in result
-        assert "is not a file" in result
+        with pytest.raises(IsADirectoryError):
+            await read_file(path=tmpdir)
 
 
 @pytest.mark.asyncio
 async def test_read_file_exception_handling():
-    """Test exception handling in read_file."""
-    from unittest.mock import patch, AsyncMock
+    """Test exception handling in read_file (permission error)."""
+    from unittest.mock import patch
 
     # Create a real file
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
@@ -69,10 +66,8 @@ async def test_read_file_exception_handling():
     try:
         # Mock aiofiles.open to raise an exception
         with patch("aiofiles.open", side_effect=PermissionError("Access denied")):
-            result = await read_file(path=temp_path)
-
-            assert "An unexpected error occurred" in result
-            assert "Access denied" in result
+            with pytest.raises(PermissionError):
+                await read_file(path=temp_path)
     finally:
         if os.path.exists(temp_path):
             os.unlink(temp_path)
@@ -137,7 +132,7 @@ async def test_write_file_overwrites_existing():
 
 @pytest.mark.asyncio
 async def test_write_file_exception_handling():
-    """Test exception handling in write_file."""
+    """Test exception handling in write_file (permission error)."""
     from unittest.mock import patch
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -145,10 +140,8 @@ async def test_write_file_exception_handling():
 
         # Mock aiofiles.open to raise an exception
         with patch("aiofiles.open", side_effect=PermissionError("Write denied")):
-            result = await write_file(path=file_path, content="test content")
-
-            assert "An unexpected error occurred" in result
-            assert "Write denied" in result
+            with pytest.raises(PermissionError):
+                await write_file(path=file_path, content="test content")
 
 
 @pytest.mark.asyncio

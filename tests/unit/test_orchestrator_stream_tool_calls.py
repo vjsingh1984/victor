@@ -1,4 +1,3 @@
-import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, AsyncIterator, Dict, List, Optional
@@ -99,6 +98,8 @@ async def test_orchestrator_executes_streamed_tool_call(monkeypatch):
     dummy_tool = DummyTool()
     orch.tools = ToolRegistry()
     orch.tools.register(dummy_tool)
+    # Update tool_executor to use the new registry
+    orch.tool_executor.tools = orch.tools
 
     # Bypass heavy semantic selector; return just our dummy tool definition
     orch._select_tools = lambda *args, **kwargs: [

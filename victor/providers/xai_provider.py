@@ -28,6 +28,7 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.openai_compat import convert_tools_to_openai_format
 
 
 class XAIProvider(BaseProvider):
@@ -122,8 +123,10 @@ class XAIProvider(BaseProvider):
                 payload["tools"] = self._convert_tools(tools)
                 payload["tool_choice"] = "auto"
 
-            # Make API call
-            response = await self.client.post("/chat/completions", json=payload)
+            # Make API call with circuit breaker protection
+            response = await self._execute_with_circuit_breaker(
+                self.client.post, "/chat/completions", json=payload
+            )
             response.raise_for_status()
 
             result = response.json()
@@ -211,25 +214,8 @@ class XAIProvider(BaseProvider):
             )
 
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
-        """Convert standard tools to xAI format (OpenAI-compatible).
-
-        Args:
-            tools: Standard tool definitions
-
-        Returns:
-            xAI-formatted tools
-        """
-        return [
-            {
-                "type": "function",
-                "function": {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": tool.parameters,
-                },
-            }
-            for tool in tools
-        ]
+        """Convert standard tools to xAI format (OpenAI-compatible)."""
+        return convert_tools_to_openai_format(tools)
 
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
         """Parse xAI API response.

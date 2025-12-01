@@ -19,15 +19,23 @@ import logging
 import pickle
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, ClassVar, Dict, List, Optional, Tuple
 
 import httpx
 import numpy as np
+import yaml
 
 from victor.providers.base import ToolDefinition
-from victor.tools.base import ToolRegistry
+from victor.tools.base import CostTier, ToolRegistry
 
 logger = logging.getLogger(__name__)
+
+
+# Cost tier warning messages for user visibility
+COST_TIER_WARNINGS = {
+    CostTier.HIGH: "HIGH COST: This tool may use significant resources or make external API calls",
+    CostTier.MEDIUM: "MEDIUM COST: This tool performs moderately expensive operations",
+}
 
 
 class SemanticToolSelector:
@@ -43,6 +51,80 @@ class SemanticToolSelector:
     - Self-improving with better tool descriptions
     """
 
+    # Class-level cache for tool knowledge loaded from YAML
+    _tool_knowledge: ClassVar[Optional[Dict[str, Dict[str, Any]]]] = None
+    _tool_knowledge_loaded: ClassVar[bool] = False
+
+    @classmethod
+    def _load_tool_knowledge(cls) -> Dict[str, Dict[str, Any]]:
+        """Load tool knowledge from YAML file.
+
+        Returns:
+            Dictionary mapping tool names to their knowledge (use_cases, keywords, examples)
+        """
+        if cls._tool_knowledge_loaded:
+            return cls._tool_knowledge or {}
+
+        # Find the tool_knowledge.yaml file
+        config_dir = Path(__file__).parent.parent / "config"
+        yaml_path = config_dir / "tool_knowledge.yaml"
+
+        if not yaml_path.exists():
+            logger.warning(f"Tool knowledge file not found: {yaml_path}")
+            cls._tool_knowledge = {}
+            cls._tool_knowledge_loaded = True
+            return {}
+
+        try:
+            with open(yaml_path, "r") as f:
+                data = yaml.safe_load(f) or {}
+
+            cls._tool_knowledge = data
+            cls._tool_knowledge_loaded = True
+            logger.info(f"Loaded tool knowledge for {len(data)} tools from {yaml_path}")
+            return data
+
+        except Exception as e:
+            logger.warning(f"Failed to load tool knowledge from {yaml_path}: {e}")
+            cls._tool_knowledge = {}
+            cls._tool_knowledge_loaded = True
+            return {}
+
+    @classmethod
+    def _build_use_case_text(cls, tool_name: str) -> str:
+        """Build use case text from loaded tool knowledge.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            Formatted use case text for embedding
+        """
+        knowledge = cls._load_tool_knowledge()
+
+        if tool_name not in knowledge:
+            return ""
+
+        tool_data = knowledge[tool_name]
+        parts = []
+
+        # Add use cases
+        use_cases = tool_data.get("use_cases", [])
+        if use_cases:
+            parts.append(f"Use for: {', '.join(use_cases)}.")
+
+        # Add keywords
+        keywords = tool_data.get("keywords", [])
+        if keywords:
+            parts.append(f"Common requests: {', '.join(keywords)}.")
+
+        # Add examples
+        examples = tool_data.get("examples", [])
+        if examples:
+            parts.append(f"Examples: {', '.join(examples)}.")
+
+        return " ".join(parts)
+
     def __init__(
         self,
         embedding_model: str = "all-MiniLM-L6-v2",
@@ -50,6 +132,8 @@ class SemanticToolSelector:
         ollama_base_url: str = "http://localhost:11434",
         cache_embeddings: bool = True,
         cache_dir: Optional[Path] = None,
+        cost_aware_selection: bool = True,
+        cost_penalty_factor: float = 0.05,
     ):
         """Initialize semantic tool selector.
 
@@ -62,11 +146,15 @@ class SemanticToolSelector:
             ollama_base_url: Ollama/vLLM/LMStudio API base URL
             cache_embeddings: Cache tool embeddings (recommended)
             cache_dir: Directory to store embedding cache (default: ~/.victor/embeddings/)
+            cost_aware_selection: Deprioritize high-cost tools (default: True)
+            cost_penalty_factor: Penalty per cost weight (default: 0.05)
         """
         self.embedding_model = embedding_model
         self.embedding_provider = embedding_provider
         self.ollama_base_url = ollama_base_url
         self.cache_embeddings = cache_embeddings
+        self.cost_aware_selection = cost_aware_selection
+        self.cost_penalty_factor = cost_penalty_factor
 
         # Cache directory
         if cache_dir is None:
@@ -98,6 +186,9 @@ class SemanticToolSelector:
         self._usage_cache_file = self.cache_dir / "tool_usage_stats.pkl"
         self._tool_usage_cache: Dict[str, Dict[str, Any]] = {}
         self._load_usage_cache()
+
+        # Phase 6: Store last cost warnings for retrieval
+        self._last_cost_warnings: List[str] = []
 
     async def initialize_tool_embeddings(self, tools: ToolRegistry) -> None:
         """Pre-compute embeddings for all tools (called once at startup).
@@ -268,6 +359,41 @@ class SemanticToolSelector:
         "document": ["generate_docs"],
         "docs": ["generate_docs", "analyze_docs"],
     }
+
+    # Common fallback tools - used when semantic selection returns too few results
+    # These are the most universally useful tools
+    COMMON_FALLBACK_TOOLS: List[str] = [
+        "read_file",
+        "code_search",
+        "semantic_code_search",
+        "list_directory",
+        "execute_bash",
+        "write_file",
+        "edit_file",
+    ]
+
+    def _get_fallback_tools(self, tools: "ToolRegistry", max_tools: int = 5) -> List[str]:
+        """Get fallback tools when semantic selection returns too few results.
+
+        Instead of broadcasting ALL tools (which wastes tokens), return a
+        curated list of common, universally useful tools.
+
+        Args:
+            tools: Tool registry
+            max_tools: Maximum fallback tools to return
+
+        Returns:
+            List of fallback tool names
+        """
+        fallback = []
+        for tool_name in self.COMMON_FALLBACK_TOOLS:
+            if tools.is_tool_enabled(tool_name) and tools.get(tool_name):
+                fallback.append(tool_name)
+            if len(fallback) >= max_tools:
+                break
+
+        logger.info(f"Using fallback tools ({len(fallback)}): {fallback}")
+        return fallback
 
     def _get_mandatory_tools(self, query: str) -> List[str]:
         """Get tools that MUST be included based on keywords.
@@ -595,6 +721,76 @@ class SemanticToolSelector:
 
         return min(0.2, total_boost)  # Cap total boost at 0.2
 
+    def _get_cost_penalty(self, tool: Any, tools: ToolRegistry) -> float:
+        """Calculate cost penalty for a tool based on its cost tier.
+
+        Higher-cost tools receive a penalty to deprioritize them when
+        lower-cost alternatives with similar relevance exist.
+
+        Args:
+            tool: Tool object
+            tools: Tool registry to lookup cost tiers
+
+        Returns:
+            Penalty value (0.0 to 0.15) to subtract from similarity score
+        """
+        if not self.cost_aware_selection:
+            return 0.0
+
+        cost_tier = tools.get_tool_cost(tool.name)
+        if cost_tier is None:
+            return 0.0
+
+        # Calculate penalty: weight * factor
+        # FREE (0) = 0.0 penalty
+        # LOW (1) = 0.05 penalty
+        # MEDIUM (2) = 0.10 penalty
+        # HIGH (3) = 0.15 penalty
+        penalty = cost_tier.weight * self.cost_penalty_factor
+
+        if penalty > 0:
+            logger.debug(f"Cost penalty for {tool.name}: -{penalty:.3f} (tier={cost_tier.value})")
+
+        return penalty
+
+    def _generate_cost_warnings(
+        self, selected_tools: List[Tuple[Any, float]], tools: ToolRegistry
+    ) -> List[str]:
+        """Generate user-facing warnings for high-cost tools in selection.
+
+        Args:
+            selected_tools: List of (tool, score) tuples
+            tools: Tool registry to lookup cost tiers
+
+        Returns:
+            List of warning messages for display to user
+        """
+        if not self.cost_aware_selection:
+            return []
+
+        warnings = []
+        for tool, _ in selected_tools:
+            cost_tier = tools.get_tool_cost(tool.name)
+            if cost_tier and cost_tier in COST_TIER_WARNINGS:
+                warning_msg = f"[{tool.name}] {COST_TIER_WARNINGS[cost_tier]}"
+                warnings.append(warning_msg)
+                logger.info(f"Cost warning for user: {warning_msg}")
+
+        return warnings
+
+    def get_last_cost_warnings(self) -> List[str]:
+        """Get cost warnings from the last tool selection.
+
+        Returns:
+            List of warning messages about high-cost tools selected.
+            Empty list if no high-cost tools were selected.
+        """
+        return self._last_cost_warnings.copy()
+
+    def clear_cost_warnings(self) -> None:
+        """Clear stored cost warnings."""
+        self._last_cost_warnings = []
+
     async def select_relevant_tools_with_context(
         self,
         user_message: str,
@@ -688,6 +884,10 @@ class SemanticToolSelector:
             usage_boost = await self._get_usage_boost(tool.name, enhanced_query)
             similarity += usage_boost
 
+            # Phase 5: Apply cost penalty for high-cost tools
+            cost_penalty = self._get_cost_penalty(tool, tools)
+            similarity -= cost_penalty
+
             if similarity >= similarity_threshold:
                 similarities.append((tool, similarity))
 
@@ -713,6 +913,20 @@ class SemanticToolSelector:
                 selected_tools.append((tool, score))
                 selected_names.add(tool.name)
 
+        # Phase 8: Smart fallback - if too few tools selected, add common fallback tools
+        MIN_TOOLS_THRESHOLD = 2
+        if len(selected_tools) < MIN_TOOLS_THRESHOLD:
+            fallback_names = self._get_fallback_tools(tools, max_tools - len(selected_tools))
+            for fallback_name in fallback_names:
+                if fallback_name not in selected_names:
+                    fallback_tool = tools.get(fallback_name)
+                    if fallback_tool:
+                        selected_tools.append((fallback_tool, 0.5))
+                        selected_names.add(fallback_name)
+            logger.info(
+                f"Added {len(fallback_names)} fallback tools (selection returned < {MIN_TOOLS_THRESHOLD})"
+            )
+
         # Log selection
         tool_names = [t.name for t, _ in selected_tools]
         scores = [f"{s:.3f}" for _, s in selected_tools]
@@ -725,6 +939,13 @@ class SemanticToolSelector:
         # Phase 3: Record tool usage for learning
         for tool_name in tool_names:
             self._record_tool_usage(tool_name, user_message, success=True)
+
+        # Phase 6: Generate and store cost warnings for high-cost tools
+        self._last_cost_warnings = self._generate_cost_warnings(selected_tools, tools)
+        if self._last_cost_warnings:
+            logger.warning(
+                f"Cost warnings for selected tools: {len(self._last_cost_warnings)} high-cost tools"
+            )
 
         # Convert to ToolDefinition
         return [
@@ -787,6 +1008,10 @@ class SemanticToolSelector:
             if tool.name in mandatory_tool_names:
                 similarity = max(similarity, 0.9)  # Ensure mandatory tools rank high
 
+            # Phase 5: Apply cost penalty for high-cost tools
+            cost_penalty = self._get_cost_penalty(tool, tools)
+            similarity -= cost_penalty
+
             if similarity >= similarity_threshold:
                 similarities.append((tool, similarity))
 
@@ -812,6 +1037,21 @@ class SemanticToolSelector:
                 selected_tools.append((tool, score))
                 selected_names.add(tool.name)
 
+        # Phase 8: Smart fallback - if too few tools selected, add common fallback tools
+        # This prevents broadcasting ALL tools (which wastes tokens)
+        MIN_TOOLS_THRESHOLD = 2
+        if len(selected_tools) < MIN_TOOLS_THRESHOLD:
+            fallback_names = self._get_fallback_tools(tools, max_tools - len(selected_tools))
+            for fallback_name in fallback_names:
+                if fallback_name not in selected_names:
+                    fallback_tool = tools.get(fallback_name)
+                    if fallback_tool:
+                        selected_tools.append((fallback_tool, 0.5))  # Default score for fallback
+                        selected_names.add(fallback_name)
+            logger.info(
+                f"Added {len(fallback_names)} fallback tools (semantic selection returned < {MIN_TOOLS_THRESHOLD})"
+            )
+
         # Log selection
         tool_names = [t.name for t, _ in selected_tools]
         scores = [f"{s:.3f}" for _, s in selected_tools]
@@ -819,6 +1059,13 @@ class SemanticToolSelector:
             f"Selected {len(selected_tools)} tools (mandatory={len(mandatory_tools)}): "
             f"{', '.join(f'{name}({score})' for name, score in zip(tool_names, scores, strict=False))}"
         )
+
+        # Phase 6: Generate and store cost warnings for high-cost tools
+        self._last_cost_warnings = self._generate_cost_warnings(selected_tools, tools)
+        if self._last_cost_warnings:
+            logger.warning(
+                f"Cost warnings for selected tools: {len(self._last_cost_warnings)} high-cost tools"
+            )
 
         # Convert to ToolDefinition
         return [
@@ -924,8 +1171,8 @@ class SemanticToolSelector:
 
         return float(dot_product / (norm_a * norm_b))
 
-    @staticmethod
-    def _create_tool_text(tool: Any) -> str:
+    @classmethod
+    def _create_tool_text(cls, tool: Any) -> str:
         """Create semantic description of tool for embedding.
 
         Combines tool name, description, parameter names, and use cases to create
@@ -952,15 +1199,18 @@ class SemanticToolSelector:
                 parts.append(f"Parameters: {param_names}")
 
         # Enrich with use cases based on tool name (improves semantic matching)
-        use_cases = SemanticToolSelector._get_tool_use_cases(tool.name)
+        use_cases = cls._get_tool_use_cases(tool.name)
         if use_cases:
             parts.append(use_cases)
 
         return ". ".join(parts)
 
-    @staticmethod
-    def _get_tool_use_cases(tool_name: str) -> str:
+    @classmethod
+    def _get_tool_use_cases(cls, tool_name: str) -> str:
         """Get common use cases for a tool to improve semantic matching.
+
+        Loads tool knowledge from YAML configuration file (tool_knowledge.yaml)
+        which is more maintainable than hardcoded dictionaries.
 
         Args:
             tool_name: Name of the tool
@@ -968,208 +1218,14 @@ class SemanticToolSelector:
         Returns:
             String describing common use cases with rich keywords and examples
         """
-        # Map tools to their common use cases for better semantic matching
-        # Each description includes:
-        # 1. Common use cases
-        # 2. Keywords users might say
-        # 3. Concrete examples
-        # 4. Programming concepts
-        use_case_map = {
-            # File operations
-            "write_file": (
-                "Use for: creating Python files, saving code, writing scripts, creating configuration files, saving data, generating files. "
-                "Common requests: write a Python function, create a script, save code to file, create a module, "
-                "write a class, implement a function, create a program, save implementation, write validation logic, "
-                "create email validator, write calculator, implement fibonacci, save solution, create hello world. "
-                "Examples: writing functions (factorial, fibonacci, email validation), creating classes (User, Product), "
-                "saving scripts (data processing, automation), generating config files (YAML, JSON, .env), "
-                "writing tests, creating utilities, implementing algorithms, saving code solutions."
-            ),
-            "read_file": (
-                "Use for: reading Python code, loading configuration, reading source files, examining file contents, loading data, viewing code. "
-                "Common requests: read this file, show me the code, load the configuration, view the source, "
-                "examine the implementation, check the file, look at the code, read the script, see the contents. "
-                "Examples: reading Python modules, loading config files (settings.py, config.yaml), "
-                "examining source code, reviewing implementations, loading data files, checking scripts."
-            ),
-            "list_directory": (
-                "Use for: exploring codebase structure, finding files, listing project contents, browsing directories, viewing file structure. "
-                "Common requests: show me the files, list the directory, what files are here, explore the codebase, "
-                "find all Python files, show project structure, list source files, browse the project. "
-                "Examples: exploring project layout, finding Python modules, listing source files, "
-                "viewing directory tree, discovering file organization."
-            ),
-            "edit_files": (
-                "Use for: modifying code, updating files, refactoring, making changes to existing files, fixing bugs, improving code. "
-                "Common requests: update this code, modify the function, fix the bug, change the implementation, "
-                "improve this code, refactor the function, update the logic, fix the error, change the variable. "
-                "Examples: fixing bugs in functions, updating variable names, modifying implementations, "
-                "improving algorithms, refactoring code structure, updating configurations."
-            ),
-            # Code execution
-            "execute_bash": (
-                "Use for: running scripts, executing commands, testing code, installing packages, git operations, file operations, running programs. "
-                "Common requests: run this script, execute the code, test this, install package, run the program, "
-                "execute command, test the function, run tests, verify the code works, check if it runs. "
-                "Examples: running Python scripts, executing shell commands, testing programs, "
-                "installing dependencies (pip install), running tests (pytest), verifying code execution."
-            ),
-            "execute_python_in_sandbox": (
-                "Use for: testing Python code, validating functions, running Python scripts, executing code safely, testing implementations, "
-                "verifying code works, running Python programs, checking code correctness, testing solutions, executing Python functions. "
-                "Common requests: test this Python function, run this code, validate this implementation, "
-                "execute this Python script, test if it works, run this function with test data, verify the code, "
-                "test the validation function, run the calculator, execute the fibonacci function, test email validator. "
-                "Examples: testing functions (factorial, fibonacci, email validation), running algorithms, "
-                "validating implementations, testing calculators, verifying solutions, running Python programs safely."
-            ),
-            # Code intelligence
-            "find_symbol": (
-                "Use for: locating function definitions, finding class declarations, searching for variables, code navigation, "
-                "finding where functions are defined, locating classes, searching symbols, finding declarations. "
-                "Common requests: find this function, where is this class defined, locate the variable, "
-                "find the definition, search for this symbol, where is the implementation. "
-                "Examples: finding function definitions, locating class declarations, searching for variables."
-            ),
-            "find_references": (
-                "Use for: finding where code is used, tracking function calls, analyzing dependencies, finding usages, "
-                "seeing where functions are called, tracking references, finding all uses. "
-                "Common requests: where is this used, find all calls to this function, show me the references, "
-                "where is this called, find usages, track dependencies. "
-                "Examples: finding function calls, tracking variable usage, analyzing dependencies."
-            ),
-            "rename_symbol": (
-                "Use for: refactoring variable names, renaming functions, updating identifiers across codebase, "
-                "renaming classes, changing variable names, refactoring identifiers. "
-                "Common requests: rename this variable, change the function name, update this identifier, "
-                "refactor the variable name, rename the class. "
-                "Examples: renaming variables, updating function names, refactoring class names."
-            ),
-            # Code quality
-            "code_review": (
-                "Use for: analyzing code quality, checking for issues, reviewing implementations, code analysis, "
-                "quality checks, finding problems, reviewing code, checking best practices. "
-                "Common requests: review this code, check code quality, analyze this implementation, "
-                "find issues in the code, check for problems, review my code. "
-                "Examples: reviewing implementations, checking code quality, finding issues."
-            ),
-            "security_scan": (
-                "Use for: finding security vulnerabilities, detecting secrets, security analysis, vulnerability scanning, "
-                "checking for security issues, finding exposed secrets, scanning for vulnerabilities. "
-                "Common requests: check for security issues, scan for vulnerabilities, find security problems, "
-                "check for exposed secrets, security audit. "
-                "Examples: finding SQL injection, detecting hardcoded passwords, scanning for XSS."
-            ),
-            "analyze_metrics": (
-                "Use for: measuring code complexity, analyzing code quality metrics, technical debt analysis, "
-                "complexity analysis, quality metrics, code health. "
-                "Common requests: analyze code complexity, check code metrics, measure quality, "
-                "calculate complexity, analyze code health. "
-                "Examples: measuring cyclomatic complexity, analyzing code quality."
-            ),
-            # Testing
-            "run_tests": (
-                "Use for: executing test suites, running pytest, validating code, test automation, checking test coverage, "
-                "running unit tests, executing tests, testing code, verifying tests pass. "
-                "Common requests: run the tests, execute test suite, run pytest, check if tests pass, "
-                "run unit tests, verify tests, execute test cases. "
-                "Examples: running pytest, executing unit tests, checking test coverage."
-            ),
-            # Documentation
-            "generate_docs": (
-                "Use for: creating documentation, generating API docs, documenting code, writing README files, "
-                "creating docstrings, generating documentation, writing docs. "
-                "Common requests: document this code, generate docs, create documentation, write API docs, "
-                "add docstrings, create README. "
-                "Examples: generating API documentation, writing docstrings, creating README files."
-            ),
-            "analyze_docs": (
-                "Use for: reviewing documentation, checking doc coverage, analyzing documentation quality, "
-                "checking if code is documented, reviewing docs. "
-                "Common requests: check documentation, review docs, analyze doc coverage, "
-                "check if code is documented. "
-                "Examples: reviewing documentation quality, checking doc coverage."
-            ),
-            # Git operations
-            "git": (
-                "Use for: version control, committing changes, managing branches, git operations, source control, "
-                "committing code, creating branches, git workflow. "
-                "Common requests: commit these changes, create a branch, git operations, version control, "
-                "commit my code, push changes. "
-                "Examples: committing changes, creating branches, pushing code."
-            ),
-            "git_suggest_commit": (
-                "Use for: generating commit messages, analyzing changes, creating commits, writing commit messages. "
-                "Common requests: create a commit message, generate commit message, suggest commit message. "
-                "Examples: generating commit messages based on changes."
-            ),
-            "git_create_pr": (
-                "Use for: creating pull requests, proposing changes, code review workflow, creating PRs. "
-                "Common requests: create a pull request, create PR, propose changes. "
-                "Examples: creating pull requests for code review."
-            ),
-            # Refactoring
-            "refactor_extract_function": (
-                "Use for: extracting methods, refactoring code, improving code structure, extracting functions. "
-                "Common requests: extract this into a function, refactor this code, extract method. "
-                "Examples: extracting code into functions, refactoring for better structure."
-            ),
-            "refactor_inline_variable": (
-                "Use for: inlining variables, simplifying code, removing unnecessary variables. "
-                "Common requests: inline this variable, simplify this code, remove unnecessary variable. "
-                "Examples: inlining temporary variables, simplifying code."
-            ),
-            "refactor_organize_imports": (
-                "Use for: organizing imports, cleaning up dependencies, import management, sorting imports. "
-                "Common requests: organize imports, clean up imports, sort imports. "
-                "Examples: organizing Python imports, cleaning up dependencies."
-            ),
-            # Web & HTTP
-            "web_search": (
-                "Use for: searching documentation, finding examples, looking up information, web research, "
-                "searching for solutions, finding tutorials, looking up APIs. "
-                "Common requests: search for documentation, find examples, look up information, "
-                "search online, find tutorials. "
-                "Examples: searching Python documentation, finding code examples."
-            ),
-            "web_fetch": (
-                "Use for: downloading documentation, fetching web content, retrieving online resources, "
-                "downloading pages, fetching data. "
-                "Common requests: fetch this webpage, download documentation, get web content. "
-                "Examples: downloading API documentation, fetching web pages."
-            ),
-            # Workflows
-            "run_workflow": (
-                "Use for: executing multi-step tasks, complex operations, automated workflows, orchestration, "
-                "running workflows, executing automation. "
-                "Common requests: run workflow, execute automation, run multi-step process. "
-                "Examples: executing complex workflows, running automation."
-            ),
-            # Additional tools
-            "batch": (
-                "Use for: processing multiple files, batch operations, bulk processing, mass operations, "
-                "processing many files at once. "
-                "Common requests: process all files, batch update, bulk operation, update multiple files. "
-                "Examples: batch processing files, bulk updates."
-            ),
-            "cicd": (
-                "Use for: CI/CD operations, pipeline management, continuous integration, deployment automation. "
-                "Common requests: setup CI/CD, configure pipeline, deployment automation. "
-                "Examples: setting up GitHub Actions, configuring CI/CD pipelines."
-            ),
-            "docker": (
-                "Use for: container operations, Docker management, container deployment, Docker commands. "
-                "Common requests: Docker operations, container management, run container. "
-                "Examples: managing Docker containers, running Docker commands."
-            ),
-            "scaffold": (
-                "Use for: project scaffolding, creating project templates, generating boilerplate, project setup. "
-                "Common requests: create project structure, scaffold project, generate template. "
-                "Examples: scaffolding new projects, creating project templates."
-            ),
-        }
+        # Try to get from YAML-loaded knowledge first
+        use_case_text = cls._build_use_case_text(tool_name)
+        if use_case_text:
+            return use_case_text
 
-        return use_case_map.get(tool_name, "")
+        # Fallback to empty string if not found in YAML
+        # The tool's description from the tool definition will still be used
+        return ""
 
     async def close(self) -> None:
         """Close HTTP client and save usage cache (Phase 3)."""

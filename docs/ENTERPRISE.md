@@ -1,6 +1,12 @@
+<div align="center">
+
+![Victor Banner](../assets/victor-banner.png)
+
 # Victor Enterprise Deployment Guide
 
 **Enterprise-Ready AI Coding Assistant • Apache 2.0 Licensed • Production-Grade**
+
+</div>
 
 This guide covers deploying Victor in enterprise environments with focus on security, compliance, cost optimization, and scale.
 

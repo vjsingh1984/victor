@@ -50,7 +50,8 @@ async def test_embedding_preloading_reduces_latency():
         orchestrator_no_preload.tools.register(dummy_tool)
 
         start_time_no_preload = time.monotonic()
-        await orchestrator_no_preload._select_relevant_tools_semantic("test message")
+        # Use the ToolSelector's select_semantic method
+        await orchestrator_no_preload.tool_selector.select_semantic("test message")
         end_time_no_preload = time.monotonic()
 
         latency_no_preload = end_time_no_preload - start_time_no_preload
@@ -76,7 +77,8 @@ async def test_embedding_preloading_reduces_latency():
 
         # Now, measure the latency of the actual selection call
         start_time_with_preload = time.monotonic()
-        await orchestrator_with_preload._select_relevant_tools_semantic("test message")
+        # Use the ToolSelector's select_semantic method
+        await orchestrator_with_preload.tool_selector.select_semantic("test message")
         end_time_with_preload = time.monotonic()
 
         latency_with_preload = end_time_with_preload - start_time_with_preload

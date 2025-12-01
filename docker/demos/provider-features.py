@@ -260,7 +260,7 @@ All demonstrations completed successfully! Victor is fully operational in Docker
 
 ---
 
-**Victor** - Universal AI Coding Assistant
+**Victor** - Enterprise-Ready AI Coding Assistant
 """
 
     report_file.write_text(report)
@@ -271,14 +271,9 @@ async def main():
     """Run all demonstrations."""
     console.print(
         Panel.fit(
-            """[bold magenta]
-╦  ╦╦╔═╗╔╦╗╔═╗╦═╗
-╚╗╔╝║║   ║ ║ ║╠╦╝
- ╚╝ ╩╚═╝ ╩ ╚═╝╩╚═
-        [/bold magenta]
-[cyan]Universal AI Coding Assistant[/cyan]
-[dim]Docker Demo Suite[/dim]
-        """,
+            "[bold magenta]Victor[/bold magenta]\n"
+            "[cyan]Enterprise-Ready AI Coding Assistant[/cyan]\n"
+            "[dim]Docker Demo Suite[/dim]",
             border_style="magenta",
         )
     )

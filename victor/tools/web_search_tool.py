@@ -29,6 +29,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 from bs4 import BeautifulSoup
 
+from victor.tools.base import CostTier
 from victor.tools.decorators import tool
 
 # Global provider and model for AI summarization (set by orchestrator)
@@ -166,7 +167,7 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
     return ""
 
 
-@tool
+@tool(cost_tier=CostTier.MEDIUM)
 async def web_search(
     query: str, max_results: int = 5, region: str = "wt-wt", safe_search: str = "moderate"
 ) -> Dict[str, Any]:
@@ -240,7 +241,7 @@ async def web_search(
         return {"success": False, "error": f"Search failed: {str(e)}"}
 
 
-@tool
+@tool(cost_tier=CostTier.MEDIUM)
 async def web_fetch(url: str) -> Dict[str, Any]:
     """
     Fetch and extract content from a URL.
@@ -287,7 +288,7 @@ async def web_fetch(url: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Failed to fetch URL: {str(e)}"}
 
 
-@tool
+@tool(cost_tier=CostTier.MEDIUM)
 async def web_summarize(
     query: str,
     max_results: int = 5,

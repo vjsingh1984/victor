@@ -20,7 +20,7 @@ Tests both scenarios:
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from docker.errors import DockerException
 
 from victor.tools.code_executor_tool import CodeExecutionManager
@@ -220,8 +220,8 @@ print(f"2 + 2 = {result}")
             assert "Hello from isolated Docker container!" in result["stdout"]
             assert "2 + 2 = 4" in result["stdout"]
 
-            print(f"   ✓ Execution successful")
-            print(f"\n   Output:")
+            print("   ✓ Execution successful")
+            print("\n   Output:")
             for line in result["stdout"].strip().split("\n"):
                 print(f"   {line}")
 
@@ -232,13 +232,13 @@ print(f"2 + 2 = {result}")
 
             assert error_result["exit_code"] != 0
             assert "ZeroDivisionError" in error_result["stderr"]
-            print(f"   ✓ Error handling works correctly")
+            print("   ✓ Error handling works correctly")
             print(f"   Error: {error_result['stderr'].strip()[:100]}...")
 
             # Step 4: Stop container
             print("\n4. Stopping Docker container...")
             manager.stop()
-            print(f"   ✓ Container stopped successfully")
+            print("   ✓ Container stopped successfully")
 
             print("\n" + "=" * 70)
             print("✅ FULL DOCKER INTEGRATION TEST PASSED")

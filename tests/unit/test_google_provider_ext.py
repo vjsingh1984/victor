@@ -15,12 +15,11 @@
 """Comprehensive tests for Google provider."""
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.providers.google_provider import GoogleProvider
 from victor.providers.base import (
     Message,
-    ToolDefinition,
     ProviderError,
 )
 
@@ -154,7 +153,7 @@ async def test_chat_with_conversation_history(google_provider):
             Message(role="assistant", content="First response"),
             Message(role="user", content="Second message"),
         ]
-        response = await google_provider.chat(
+        await google_provider.chat(
             messages=messages,
             model="gemini-1.5-pro",
         )
@@ -193,7 +192,7 @@ async def test_chat_with_system_message(google_provider):
             Message(role="system", content="System message"),
             Message(role="user", content="Hello"),
         ]
-        response = await google_provider.chat(
+        await google_provider.chat(
             messages=messages,
             model="gemini-1.5-pro",
         )
@@ -245,7 +244,7 @@ async def test_chat_with_custom_generation_config(google_provider):
         mock_gen_model.return_value = mock_model
 
         messages = [Message(role="user", content="Hello")]
-        response = await google_provider.chat(
+        await google_provider.chat(
             messages=messages,
             model="gemini-1.5-pro",
             temperature=0.9,
@@ -360,7 +359,7 @@ async def test_stream_error(google_provider):
         messages = [Message(role="user", content="Hello")]
 
         with pytest.raises(ProviderError) as exc_info:
-            async for chunk in google_provider.stream(
+            async for _chunk in google_provider.stream(
                 messages=messages,
                 model="gemini-1.5-pro",
             ):
@@ -590,7 +589,7 @@ async def test_single_user_message(google_provider):
         mock_gen_model.return_value = mock_model
 
         messages = [Message(role="user", content="Only message")]
-        response = await google_provider.chat(
+        await google_provider.chat(
             messages=messages,
             model="gemini-1.5-pro",
         )
@@ -621,7 +620,7 @@ async def test_model_initialization_params(google_provider):
         mock_gen_model.return_value = mock_model
 
         messages = [Message(role="user", content="Test")]
-        response = await google_provider.chat(
+        await google_provider.chat(
             messages=messages,
             model="gemini-1.5-flash",
             temperature=0.5,

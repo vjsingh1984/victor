@@ -175,6 +175,11 @@ class SentenceTransformerModel(BaseEmbeddingModel):
             return self.model.get_sentence_embedding_dimension()
         return self.config.dimension
 
+    async def close(self) -> None:
+        """Clean up resources."""
+        self.model = None
+        self._initialized = False
+
 
 class OpenAIEmbeddingModel(BaseEmbeddingModel):
     """OpenAI embedding model (cloud API).
@@ -244,6 +249,11 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         }
         return dimensions.get(self.config.model_name, self.config.dimension)
 
+    async def close(self) -> None:
+        """Clean up resources."""
+        self.client = None
+        self._initialized = False
+
 
 class CohereEmbeddingModel(BaseEmbeddingModel):
     """Cohere embedding model (cloud API).
@@ -310,6 +320,11 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
             "embed-multilingual-light-v3.0": 384,
         }
         return dimensions.get(self.config.model_name, self.config.dimension)
+
+    async def close(self) -> None:
+        """Clean up resources."""
+        self.client = None
+        self._initialized = False
 
 
 class OllamaEmbeddingModel(BaseEmbeddingModel):

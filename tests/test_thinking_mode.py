@@ -12,13 +12,22 @@ from victor.agent.orchestrator import AgentOrchestrator
 from victor.providers.base import BaseProvider
 
 
-def test_orchestrator_accepts_thinking_parameter():
-    """Test that AgentOrchestrator accepts thinking parameter in __init__."""
+def create_mock_settings():
+    """Create a mock settings object with all required attributes."""
     mock_settings = MagicMock(spec=Settings)
     mock_settings.tool_call_budget = 300
     mock_settings.airgapped_mode = False
     mock_settings.use_semantic_tool_selection = False
     mock_settings.use_mcp_tools = False
+    mock_settings.analytics_log_file = "/tmp/test_analytics.jsonl"
+    mock_settings.analytics_enabled = False
+    mock_settings.load_tool_config.return_value = {}
+    return mock_settings
+
+
+def test_orchestrator_accepts_thinking_parameter():
+    """Test that AgentOrchestrator accepts thinking parameter in __init__."""
+    mock_settings = create_mock_settings()
 
     mock_provider = MagicMock(spec=BaseProvider)
     mock_provider.supports_tools.return_value = True
@@ -36,11 +45,7 @@ def test_orchestrator_accepts_thinking_parameter():
 
 def test_orchestrator_thinking_defaults_to_false():
     """Test that thinking mode defaults to False when not specified."""
-    mock_settings = MagicMock(spec=Settings)
-    mock_settings.tool_call_budget = 300
-    mock_settings.airgapped_mode = False
-    mock_settings.use_semantic_tool_selection = False
-    mock_settings.use_mcp_tools = False
+    mock_settings = create_mock_settings()
 
     mock_provider = MagicMock(spec=BaseProvider)
     mock_provider.supports_tools.return_value = True
@@ -57,11 +62,7 @@ async def test_from_settings_passes_thinking_parameter():
     """Test that from_settings correctly passes thinking parameter to constructor."""
     from victor.config.settings import ProfileConfig
 
-    mock_settings = MagicMock(spec=Settings)
-    mock_settings.tool_call_budget = 300
-    mock_settings.airgapped_mode = False
-    mock_settings.use_semantic_tool_selection = False
-    mock_settings.use_mcp_tools = False
+    mock_settings = create_mock_settings()
 
     # Mock profile
     mock_profile = ProfileConfig(
@@ -87,11 +88,7 @@ async def test_from_settings_passes_thinking_parameter():
 @pytest.mark.asyncio
 async def test_chat_passes_thinking_to_provider():
     """Test that chat method passes thinking parameter to provider when enabled."""
-    mock_settings = MagicMock(spec=Settings)
-    mock_settings.tool_call_budget = 300
-    mock_settings.airgapped_mode = False
-    mock_settings.use_semantic_tool_selection = False
-    mock_settings.use_mcp_tools = False
+    mock_settings = create_mock_settings()
 
     mock_provider = MagicMock(spec=BaseProvider)
     mock_provider.supports_tools.return_value = True
@@ -123,11 +120,7 @@ async def test_chat_passes_thinking_to_provider():
 @pytest.mark.asyncio
 async def test_chat_without_thinking_omits_parameter():
     """Test that chat method doesn't pass thinking when disabled."""
-    mock_settings = MagicMock(spec=Settings)
-    mock_settings.tool_call_budget = 300
-    mock_settings.airgapped_mode = False
-    mock_settings.use_semantic_tool_selection = False
-    mock_settings.use_mcp_tools = False
+    mock_settings = create_mock_settings()
 
     mock_provider = MagicMock(spec=BaseProvider)
     mock_provider.supports_tools.return_value = True
@@ -157,11 +150,7 @@ async def test_chat_without_thinking_omits_parameter():
 @pytest.mark.asyncio
 async def test_stream_chat_passes_thinking_to_provider():
     """Test that stream_chat method passes thinking parameter to provider when enabled."""
-    mock_settings = MagicMock(spec=Settings)
-    mock_settings.tool_call_budget = 300
-    mock_settings.airgapped_mode = False
-    mock_settings.use_semantic_tool_selection = False
-    mock_settings.use_mcp_tools = False
+    mock_settings = create_mock_settings()
 
     mock_provider = MagicMock(spec=BaseProvider)
     mock_provider.supports_tools.return_value = True
@@ -213,11 +202,7 @@ async def test_stream_chat_passes_thinking_to_provider():
 @pytest.mark.asyncio
 async def test_thinking_mode_anthropic_format():
     """Test that thinking parameter uses correct Anthropic format."""
-    mock_settings = MagicMock(spec=Settings)
-    mock_settings.tool_call_budget = 300
-    mock_settings.airgapped_mode = False
-    mock_settings.use_semantic_tool_selection = False
-    mock_settings.use_mcp_tools = False
+    mock_settings = create_mock_settings()
 
     mock_provider = MagicMock(spec=BaseProvider)
     mock_provider.supports_tools.return_value = True

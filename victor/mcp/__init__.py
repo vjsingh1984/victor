@@ -21,16 +21,21 @@ implementations for Victor.
 Components:
 - MCP Server: Expose Victor's tools as MCP resources
 - MCP Client: Connect to external MCP servers
+- MCP Registry: Auto-discovery and management of multiple MCP servers
 - Protocol: Standard message formats and communication
 """
 
-from victor.mcp.server import MCPServer
 from victor.mcp.client import MCPClient
-from victor.mcp.protocol import MCPMessage, MCPTool, MCPResource
+from victor.mcp.protocol import MCPMessage, MCPResource, MCPTool
+from victor.mcp.registry import MCPRegistry, MCPServerConfig, ServerStatus
+from victor.mcp.server import MCPServer
 
 __all__ = [
     "MCPServer",
     "MCPClient",
+    "MCPRegistry",
+    "MCPServerConfig",
+    "ServerStatus",
     "MCPMessage",
     "MCPTool",
     "MCPResource",

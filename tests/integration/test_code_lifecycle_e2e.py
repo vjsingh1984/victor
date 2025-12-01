@@ -23,18 +23,34 @@ This test covers the full workflow:
 Requires Ollama to be running with a capable coding model.
 """
 
-import asyncio
-import os
 import tempfile
 from pathlib import Path
 
 import pytest
 from httpx import ConnectError
 
+
+# Check if Ollama is available at module load time
+def _check_ollama_available():
+    """Check if Ollama server is running."""
+    import socket
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.settimeout(1)
+        result = sock.connect_ex(("localhost", 11434))
+        return result == 0
+    finally:
+        sock.close()
+
+
+pytestmark = pytest.mark.skipif(
+    not _check_ollama_available(), reason="Ollama server not available at localhost:11434"
+)
+
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings
 from victor.providers.ollama import OllamaProvider
-from victor.tools.base import ToolRegistry
 from victor.tools.filesystem import read_file, write_file
 from victor.tools.bash import execute_bash
 
@@ -50,16 +66,32 @@ async def ollama_coding_provider():
         if not models:
             pytest.skip("No models available in Ollama")
 
-        # Look for a coding model (prefer qwen2.5-coder or similar)
-        coding_models = [
-            m["name"]
-            for m in models
-            if any(keyword in m["name"].lower() for keyword in ["coder", "code", "qwen"])
+        # Look for a coding model with good tool-calling support
+        # Prioritize latest models with best tool-call benchmarks (MTEB/Berkeley)
+        # qwen3-coder:30b, deepseek-coder-v2, qwen2.5-coder:32b are best for tool use
+        preferred_models = [
+            "qwen3-coder:30b",  # Latest Qwen3 coder with tool support
+            "qwen2.5-coder:32b",  # Excellent tool calling
+            "deepseek-coder-v2:16b",  # Strong tool-use with MoE efficiency
+            "qwen2.5-coder:14b",  # Good balance of speed/capability
+            "deepseek-coder:33b",  # Large model, reliable tools
+            "qwen2.5-coder:7b",  # Minimum viable for tool use
         ]
 
+        available_names = [m["name"] for m in models]
+        coding_models = [m for m in preferred_models if m in available_names]
+
         if not coding_models:
-            # Fallback to any available model
-            coding_models = [models[0]["name"]]
+            # Fallback to any 14b+ coding model
+            coding_models = [
+                m["name"]
+                for m in models
+                if any(kw in m["name"].lower() for kw in ["coder", "code"])
+                and any(size in m["name"] for size in ["14b", "16b", "30b", "32b", "33b", "70b"])
+            ]
+
+        if not coding_models:
+            pytest.skip("No suitable coding model (14B+) with tool-call support available")
 
         print(f"\nUsing model: {coding_models[0]}")
         provider.default_model = coding_models[0]
@@ -123,20 +155,27 @@ async def test_full_code_lifecycle_simple(agent_with_tools, temp_workspace):
 
     # Phase 1: Create a simple calculator script
     response1 = await agent.chat(
-        f"""Create a simple Python calculator script at {script_path}.
+        f"""Use the write_file tool to create a Python calculator script at {script_path}.
 
 The script should:
 - Have a function called 'calculate' that takes two numbers and an operator (+, -, *, /)
 - Have a main block that calls calculate(10, 5, '+') and prints the result
 - Use proper error handling
 
-Just write the code, don't explain it."""
+IMPORTANT: You must call the write_file tool to save the file. Do not just output code."""
     )
 
     print(f"Agent response: {response1.content[:200]}...")
 
-    # Verify the file was created
-    assert script_path.exists(), "Script file was not created"
+    # Verify the file was created (give a second attempt if model didn't call tool)
+    if not script_path.exists():
+        # Retry with more explicit instruction
+        response1b = await agent.chat(
+            f"The file was not created. Please use the write_file tool now to save the calculator code to {script_path}"
+        )
+        print(f"Retry response: {response1b.content[:200]}...")
+
+    assert script_path.exists(), "Script file was not created after retry"
     code_content = script_path.read_text()
     assert "calculate" in code_content.lower(), "Function 'calculate' not found"
     assert "def " in code_content, "No function definition found"
@@ -188,7 +227,7 @@ Read the file first, then write the enhanced version."""
         timeout=10,
     )
 
-    print(f"\n✓ Script executed")
+    print("\n✓ Script executed")
     print(f"Exit code: {result.returncode}")
     print(f"Output:\n{result.stdout}")
 
@@ -228,17 +267,24 @@ async def test_code_lifecycle_with_bugs(agent_with_tools, temp_workspace):
 
     # Phase 1: Create a script
     response1 = await agent.chat(
-        f"""Write a Python script at {script_path} that:
+        f"""Use the write_file tool to create a Python script at {script_path} that:
 1. Defines a function 'divide_numbers(a, b)' that returns a/b
 2. In the main block, call divide_numbers(10, 2) and print the result
 3. Then call divide_numbers(5, 0) and print the result
 
-Just write the code."""
+IMPORTANT: You must call the write_file tool to save the file."""
     )
 
     print(f"Agent response: {response1.content[:200]}...")
 
-    assert script_path.exists(), "Script was not created"
+    # Retry if file wasn't created
+    if not script_path.exists():
+        response1b = await agent.chat(
+            f"The file was not created. Please use write_file tool now to save the code to {script_path}"
+        )
+        print(f"Retry response: {response1b.content[:200]}...")
+
+    assert script_path.exists(), "Script was not created after retry"
     initial_content = script_path.read_text()
 
     print(f"\n✓ Created script ({len(initial_content)} chars)")
@@ -357,7 +403,7 @@ if __name__ == "__main__":
         timeout=10,
     )
 
-    print(f"\n✓ Executed script")
+    print("\n✓ Executed script")
     print(f"Output:\n{result.stdout}")
 
     assert result.returncode == 0

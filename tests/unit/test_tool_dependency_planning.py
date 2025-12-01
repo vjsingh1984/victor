@@ -1,13 +1,10 @@
-from typing import List
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
-    Message,
     StreamChunk,
-    ToolDefinition,
 )
 
 
@@ -62,7 +59,12 @@ def test_keyword_selection_includes_planned_chain():
         "dummy",
     )
     try:
-        tools = orch._select_relevant_tools_keywords("summarize the codebase")
+        # Use the ToolSelector's select_keywords method with planned tools
+        goals = orch._goal_hints_for_message("summarize the codebase")
+        planned_tools = orch._plan_tools(goals, available_inputs=["query"]) if goals else None
+        tools = orch.tool_selector.select_keywords(
+            "summarize the codebase", planned_tools=planned_tools
+        )
         names = [t.name for t in tools]
         # Planned tools should lead the list in order
         assert names[:3] == ["code_search", "read_file", "analyze_docs"]

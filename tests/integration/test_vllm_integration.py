@@ -27,6 +27,30 @@ import pytest
 from httpx import ConnectError, HTTPError
 import httpx
 
+
+# Check if vLLM is available at module load time
+def _check_vllm_available():
+    """Check if vLLM server is running by checking /v1/models endpoint."""
+    import urllib.request
+    import urllib.error
+    import json
+
+    try:
+        # vLLM specifically exposes /v1/models endpoint
+        req = urllib.request.urlopen("http://localhost:8000/v1/models", timeout=2)
+        if req.status == 200:
+            data = json.loads(req.read().decode())
+            # vLLM returns {"object": "list", "data": [...]}
+            return data.get("object") == "list" and "data" in data
+        return False
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError, json.JSONDecodeError):
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _check_vllm_available(), reason="vLLM server not available at localhost:8000/v1/models"
+)
+
 from victor.providers.base import Message, ToolDefinition
 from victor.providers.openai_provider import OpenAIProvider
 

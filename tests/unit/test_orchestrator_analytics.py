@@ -3,7 +3,6 @@ import pytest
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.analytics.logger import UsageLogger
 from victor.config.settings import Settings
-from victor.providers.base import Message
 
 
 @pytest.fixture
@@ -18,13 +17,15 @@ def orchestrator(mock_usage_logger: MagicMock) -> AgentOrchestrator:
     settings = Settings(analytics_enabled=True)
     mock_provider = MagicMock()
 
-    # Patch the logger inside the orchestrator's init
-    with patch("victor.analytics.logger.UsageLogger", return_value=mock_usage_logger):
+    # Patch at the import location in orchestrator module
+    with patch("victor.agent.orchestrator.UsageLogger", return_value=mock_usage_logger):
         orc = AgentOrchestrator(
             settings=settings,
             provider=mock_provider,
             model="test-model",
         )
+    # Replace the logger with our mock after creation
+    orc.usage_logger = mock_usage_logger
     return orc
 
 
@@ -33,7 +34,9 @@ def test_orchestrator_initializes_logger(mock_usage_logger: MagicMock):
     settings = Settings(analytics_enabled=True)
     mock_provider = MagicMock()
 
-    with patch("victor.analytics.logger.UsageLogger", return_value=mock_usage_logger) as MockLogger:
+    with patch(
+        "victor.agent.orchestrator.UsageLogger", return_value=mock_usage_logger
+    ) as MockLogger:
         AgentOrchestrator(
             settings=settings,
             provider=mock_provider,
@@ -63,28 +66,34 @@ async def test_handle_tool_calls_logs_events(
     orchestrator: AgentOrchestrator, mock_usage_logger: MagicMock
 ):
     """Tests that _handle_tool_calls logs tool_call and tool_result events."""
-    tool_calls = [{"name": "test_tool", "arguments": {"arg1": "val1"}}]
+    from victor.agent.tool_executor import ToolExecutionResult
 
-    # Mock the tool execution
-    mock_result = MagicMock()
-    mock_result.success = True
-    mock_result.output = "Success"
+    # Use an existing registered tool
+    tool_calls = [{"name": "read_file", "arguments": {"path": "/tmp/test.txt"}}]
 
-    with patch.object(orchestrator.tools, "execute", return_value=mock_result) as mock_execute:
+    # Mock the tool_executor.execute to return a ToolExecutionResult
+    mock_exec_result = ToolExecutionResult(
+        tool_name="read_file",
+        success=True,
+        result="File contents",
+        error=None,
+    )
+
+    with patch.object(orchestrator.tool_executor, "execute", return_value=mock_exec_result):
         await orchestrator._handle_tool_calls(tool_calls)
 
     # Check for tool_call log
     mock_usage_logger.log_event.assert_any_call(
-        "tool_call", {"tool_name": "test_tool", "tool_args": {"arg1": "val1"}}
+        "tool_call", {"tool_name": "read_file", "tool_args": {"path": "/tmp/test.txt"}}
     )
 
     # Check for tool_result log
     mock_usage_logger.log_event.assert_any_call(
         "tool_result",
         {
-            "tool_name": "test_tool",
+            "tool_name": "read_file",
             "success": True,
-            "result": "Success",
+            "result": "File contents",
             "error": None,
         },
     )

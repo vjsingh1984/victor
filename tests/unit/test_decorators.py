@@ -14,7 +14,6 @@
 
 """Tests for decorators module."""
 
-import inspect
 import pytest
 from typing import Dict, Any
 

@@ -21,6 +21,25 @@ Skip if Ollama is not available.
 import pytest
 from httpx import ConnectError
 
+
+# Check if Ollama is available at module load time
+def _check_ollama_available():
+    """Check if Ollama server is running."""
+    import socket
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.settimeout(1)
+        result = sock.connect_ex(("localhost", 11434))
+        return result == 0
+    finally:
+        sock.close()
+
+
+pytestmark = pytest.mark.skipif(
+    not _check_ollama_available(), reason="Ollama server not available at localhost:11434"
+)
+
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.providers.base import Message, ToolDefinition
 from victor.providers.ollama import OllamaProvider
@@ -225,10 +244,12 @@ async def test_agent_orchestrator_with_ollama():
         assert response.content
         assert len(response.content) > 0
 
-        # Check conversation history
-        assert len(agent.messages) == 2  # User + Assistant
-        assert agent.messages[0].role == "user"
-        assert agent.messages[1].role == "assistant"
+        # Check conversation history (system + user + assistant)
+        assert len(agent.messages) >= 2  # At least user + assistant
+        # Find user and assistant messages (system may be first)
+        roles = [m.role for m in agent.messages]
+        assert "user" in roles
+        assert "assistant" in roles
 
         print(f"\nAgent response: {response.content}")
 

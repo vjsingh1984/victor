@@ -1,0 +1,761 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Provider-specific tool calling adapters.
+
+Each adapter implements the BaseToolCallingAdapter interface for its provider,
+handling format conversion, parsing, and capability detection.
+
+Capabilities are resolved from model_capabilities.yaml when available,
+falling back to hardcoded defaults for robustness.
+"""
+
+import json
+import logging
+import re
+from typing import Any, Dict, List, Optional
+
+from victor.agent.tool_calling.base import (
+    BaseToolCallingAdapter,
+    ToolCall,
+    ToolCallingCapabilities,
+    ToolCallFormat,
+    ToolCallParseResult,
+)
+from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
+from victor.providers.base import ToolDefinition
+
+logger = logging.getLogger(__name__)
+
+# Singleton capability loader
+_capability_loader: Optional[ModelCapabilityLoader] = None
+
+
+def _get_capability_loader() -> ModelCapabilityLoader:
+    """Get or create the capability loader singleton."""
+    global _capability_loader
+    if _capability_loader is None:
+        _capability_loader = ModelCapabilityLoader()
+    return _capability_loader
+
+
+class AnthropicToolCallingAdapter(BaseToolCallingAdapter):
+    """Adapter for Anthropic Claude models.
+
+    Anthropic uses a distinct tool format with input_schema instead of parameters.
+    Tool calls are returned as content blocks with type="tool_use".
+    """
+
+    @property
+    def provider_name(self) -> str:
+        return "anthropic"
+
+    def get_capabilities(self) -> ToolCallingCapabilities:
+        # Load from YAML config, use format hint for Anthropic
+        loader = _get_capability_loader()
+        caps = loader.get_capabilities("anthropic", self.model, ToolCallFormat.ANTHROPIC)
+
+        # Anthropic always has native tool calls, override if YAML is missing
+        if not caps.native_tool_calls:
+            return ToolCallingCapabilities(
+                native_tool_calls=True,
+                streaming_tool_calls=True,
+                parallel_tool_calls=True,
+                tool_choice_param=True,
+                json_fallback_parsing=False,
+                xml_fallback_parsing=False,
+                thinking_mode=False,
+                requires_strict_prompting=False,
+                tool_call_format=ToolCallFormat.ANTHROPIC,
+                argument_format="json",
+                recommended_max_tools=50,
+                recommended_tool_budget=20,
+            )
+        return caps
+
+    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+        """Convert to Anthropic format (name, description, input_schema)."""
+        return [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "input_schema": tool.parameters,
+            }
+            for tool in tools
+        ]
+
+    def parse_tool_calls(
+        self,
+        content: str,
+        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+    ) -> ToolCallParseResult:
+        """Parse Anthropic tool calls.
+
+        Anthropic returns tool calls in the raw_tool_calls list with format:
+        {"id": "...", "name": "...", "arguments": {...}}
+        """
+        if not raw_tool_calls:
+            return ToolCallParseResult(remaining_content=content)
+
+        tool_calls = []
+        for tc in raw_tool_calls:
+            if not self.is_valid_tool_name(tc.get("name", "")):
+                continue
+            tool_calls.append(
+                ToolCall(
+                    name=tc.get("name", ""),
+                    arguments=tc.get("arguments", {}),
+                    id=tc.get("id"),
+                )
+            )
+
+        return ToolCallParseResult(
+            tool_calls=tool_calls,
+            remaining_content=content,
+            parse_method="native",
+            confidence=1.0,
+        )
+
+
+class OpenAIToolCallingAdapter(BaseToolCallingAdapter):
+    """Adapter for OpenAI GPT models.
+
+    OpenAI uses function calling format with tool_calls containing
+    function.name and function.arguments (as JSON string).
+    """
+
+    @property
+    def provider_name(self) -> str:
+        return "openai"
+
+    def get_capabilities(self) -> ToolCallingCapabilities:
+        # Load from YAML config
+        loader = _get_capability_loader()
+        caps = loader.get_capabilities("openai", self.model, ToolCallFormat.OPENAI)
+
+        # OpenAI always has native tool calls, override if YAML is missing
+        if not caps.native_tool_calls:
+            return ToolCallingCapabilities(
+                native_tool_calls=True,
+                streaming_tool_calls=True,
+                parallel_tool_calls=True,
+                tool_choice_param=True,
+                json_fallback_parsing=False,
+                xml_fallback_parsing=False,
+                thinking_mode=False,
+                requires_strict_prompting=False,
+                tool_call_format=ToolCallFormat.OPENAI,
+                argument_format="json",
+                recommended_max_tools=50,
+                recommended_tool_budget=20,
+            )
+        return caps
+
+    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+        """Convert to OpenAI function format."""
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.parameters,
+                },
+            }
+            for tool in tools
+        ]
+
+    def parse_tool_calls(
+        self,
+        content: str,
+        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+    ) -> ToolCallParseResult:
+        """Parse OpenAI tool calls.
+
+        OpenAI returns: {"id": "...", "name": "...", "arguments": "..."}
+        where arguments is a JSON string that needs parsing.
+        """
+        if not raw_tool_calls:
+            return ToolCallParseResult(remaining_content=content)
+
+        tool_calls = []
+        warnings = []
+
+        for tc in raw_tool_calls:
+            name = tc.get("name", "")
+            if not self.is_valid_tool_name(name):
+                warnings.append(f"Skipped invalid tool name: {name}")
+                continue
+
+            # Parse arguments (may be string or dict)
+            args = tc.get("arguments", {})
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except json.JSONDecodeError:
+                    warnings.append(f"Failed to parse arguments for {name}")
+                    args = {}
+
+            tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+
+        return ToolCallParseResult(
+            tool_calls=tool_calls,
+            remaining_content=content,
+            parse_method="native",
+            confidence=1.0,
+            warnings=warnings,
+        )
+
+
+class OllamaToolCallingAdapter(BaseToolCallingAdapter):
+    """Adapter for Ollama local models.
+
+    Ollama supports native tool calling for Llama 3.1+, Qwen 2.5+, Mistral, etc.
+    Falls back to JSON parsing from content for unsupported models.
+
+    References:
+    - https://docs.ollama.com/capabilities/tool-calling
+    - https://ollama.com/blog/tool-support
+    """
+
+    # Models with known good native tool calling support
+    NATIVE_TOOL_MODELS = frozenset(
+        [
+            "llama3.1",
+            "llama-3.1",
+            "llama3.2",
+            "llama-3.2",
+            "llama3.3",
+            "llama-3.3",
+            "qwen2.5",
+            "qwen-2.5",
+            "qwen3",
+            "qwen-3",
+            "mistral",
+            "mixtral",
+            "command-r",
+            "firefunction",
+            "hermes",
+            "functionary",
+        ]
+    )
+
+    @property
+    def provider_name(self) -> str:
+        return "ollama"
+
+    def _has_native_support(self) -> bool:
+        """Check if current model has native tool calling."""
+        return any(pattern in self.model_lower for pattern in self.NATIVE_TOOL_MODELS)
+
+    def _has_thinking_mode(self) -> bool:
+        """Check if model supports Qwen3 thinking mode."""
+        return "qwen3" in self.model_lower or "qwen-3" in self.model_lower
+
+    def get_capabilities(self) -> ToolCallingCapabilities:
+        # Determine format based on model detection
+        has_native = self._has_native_support()
+        format_hint = ToolCallFormat.OLLAMA_NATIVE if has_native else ToolCallFormat.OLLAMA_JSON
+
+        # Load from YAML config with model pattern matching
+        loader = _get_capability_loader()
+        caps = loader.get_capabilities("ollama", self.model, format_hint)
+
+        # Apply model-specific overrides that YAML can't detect
+        if self._has_thinking_mode() and not caps.thinking_mode:
+            # Qwen3 thinking mode detected but not in YAML
+            caps = ToolCallingCapabilities(
+                native_tool_calls=caps.native_tool_calls,
+                streaming_tool_calls=caps.streaming_tool_calls,
+                parallel_tool_calls=caps.parallel_tool_calls,
+                tool_choice_param=caps.tool_choice_param,
+                json_fallback_parsing=caps.json_fallback_parsing,
+                xml_fallback_parsing=caps.xml_fallback_parsing,
+                thinking_mode=True,
+                requires_strict_prompting=caps.requires_strict_prompting,
+                tool_call_format=format_hint,
+                argument_format=caps.argument_format,
+                recommended_max_tools=caps.recommended_max_tools,
+                recommended_tool_budget=caps.recommended_tool_budget,
+            )
+
+        return caps
+
+    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+        """Convert to Ollama format (OpenAI-compatible)."""
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.parameters,
+                },
+            }
+            for tool in tools
+        ]
+
+    def parse_tool_calls(
+        self,
+        content: str,
+        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+    ) -> ToolCallParseResult:
+        """Parse Ollama tool calls with fallback support."""
+        warnings: List[str] = []
+
+        # Try native tool calls first
+        if raw_tool_calls:
+            tool_calls = self._parse_native_tool_calls(raw_tool_calls, warnings)
+            if tool_calls:
+                return ToolCallParseResult(
+                    tool_calls=tool_calls,
+                    remaining_content=content,
+                    parse_method="native",
+                    confidence=1.0,
+                    warnings=warnings,
+                )
+
+        # Fallback: Try JSON parsing from content
+        if content:
+            result = self._parse_json_from_content(content)
+            if result.tool_calls:
+                return result
+
+            # Fallback: Try XML-style parsing
+            result = self._parse_xml_from_content(content)
+            if result.tool_calls:
+                return result
+
+        return ToolCallParseResult(remaining_content=content)
+
+    def _parse_native_tool_calls(
+        self, raw_tool_calls: List[Dict[str, Any]], warnings: List[str]
+    ) -> List[ToolCall]:
+        """Parse native Ollama tool calls."""
+        tool_calls = []
+
+        for tc in raw_tool_calls:
+            # Handle OpenAI format: {function: {name, arguments}}
+            if "function" in tc:
+                func = tc.get("function", {})
+                name = func.get("name", "")
+                args = func.get("arguments", {})
+            else:
+                # Direct format: {name, arguments}
+                name = tc.get("name", "")
+                args = tc.get("arguments", {})
+
+            if not self.is_valid_tool_name(name):
+                warnings.append(f"Skipped invalid tool name: {name}")
+                continue
+
+            # Parse string arguments
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except json.JSONDecodeError:
+                    warnings.append(f"Failed to parse arguments for {name}")
+                    args = {}
+
+            tool_calls.append(ToolCall(name=name, arguments=args))
+
+        return tool_calls
+
+    def _parse_json_from_content(self, content: str) -> ToolCallParseResult:
+        """Parse JSON tool calls from content (fallback)."""
+        content = content.strip()
+        if not content:
+            return ToolCallParseResult()
+
+        try:
+            data = json.loads(content)
+            if isinstance(data, dict) and "name" in data:
+                name = data.get("name", "")
+                if self.is_valid_tool_name(name):
+                    args = data.get("arguments") or data.get("parameters", {})
+                    return ToolCallParseResult(
+                        tool_calls=[ToolCall(name=name, arguments=args)],
+                        remaining_content="",
+                        parse_method="json_fallback",
+                        confidence=0.9,
+                    )
+        except json.JSONDecodeError:
+            pass
+
+        return ToolCallParseResult(remaining_content=content)
+
+    def _parse_xml_from_content(self, content: str) -> ToolCallParseResult:
+        """Parse XML-style tool calls from content (fallback)."""
+        # Pattern: <function_call><name>tool_name</name><arguments>{...}</arguments></function_call>
+        pattern = r"<function_call>\s*<name>([^<]+)</name>\s*<arguments>(.*?)</arguments>\s*</function_call>"
+        matches = re.findall(pattern, content, re.DOTALL | re.IGNORECASE)
+
+        if not matches:
+            return ToolCallParseResult(remaining_content=content)
+
+        tool_calls = []
+        warnings = []
+
+        for name, args_str in matches:
+            name = name.strip()
+            if not self.is_valid_tool_name(name):
+                warnings.append(f"Skipped invalid tool name: {name}")
+                continue
+
+            try:
+                args = json.loads(args_str.strip())
+            except json.JSONDecodeError:
+                warnings.append(f"Failed to parse XML arguments for {name}")
+                args = {}
+
+            tool_calls.append(ToolCall(name=name, arguments=args))
+
+        # Remove matched content
+        remaining = re.sub(pattern, "", content, flags=re.DOTALL | re.IGNORECASE).strip()
+
+        return ToolCallParseResult(
+            tool_calls=tool_calls,
+            remaining_content=remaining,
+            parse_method="xml_fallback",
+            confidence=0.7,
+            warnings=warnings,
+        )
+
+    def get_system_prompt_hints(self) -> str:
+        """Get system prompt hints for Ollama models."""
+        capabilities = self.get_capabilities()
+
+        if capabilities.native_tool_calls:
+            hints = [
+                "TOOL USAGE:",
+                "- Use list_directory and read_file to inspect code.",
+                "- Call tools one at a time, waiting for results.",
+                "- After 2-3 successful tool calls, provide your answer.",
+                "- Do NOT make identical repeated tool calls.",
+                "",
+                "RESPONSE FORMAT:",
+                "- Write your answer in plain, readable text.",
+                "- Do NOT output raw JSON in your response.",
+                "- Do NOT output XML tags or function call syntax.",
+                "- Be concise and answer the question directly.",
+            ]
+
+            if capabilities.thinking_mode:
+                hints.extend(
+                    [
+                        "",
+                        "QWEN3 MODE:",
+                        "- Use /no_think for simple questions.",
+                        "- Provide direct answers without excessive reasoning.",
+                    ]
+                )
+
+            return "\n".join(hints)
+        else:
+            return "\n".join(
+                [
+                    "CRITICAL TOOL RULES:",
+                    "1. Call tools ONE AT A TIME. Never batch calls.",
+                    "2. After reading 2-3 files, STOP and answer.",
+                    "3. Do NOT repeat the same tool call.",
+                    "4. Do NOT invent file contents.",
+                    "",
+                    "CRITICAL OUTPUT RULES:",
+                    "1. Write your answer in plain English.",
+                    '2. Do NOT output JSON objects like {"name": ...}.',
+                    "3. Do NOT output XML tags like </function> or </parameter>.",
+                    "4. Do NOT output function call syntax.",
+                    "5. Keep your answer focused and concise.",
+                ]
+            )
+
+
+class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
+    """Adapter for OpenAI-compatible local providers (LMStudio, vLLM).
+
+    These providers use the OpenAI API format but may have varying levels
+    of tool calling support based on the model.
+
+    LMStudio:
+    - Native support (hammer badge): Qwen2.5, Llama3.1, Ministral
+    - Default mode: Uses [TOOL_REQUEST] format
+
+    vLLM:
+    - Requires --enable-auto-tool-choice and --tool-call-parser flags
+    - Supports many model-specific parsers (hermes, mistral, llama3_json, etc.)
+
+    References:
+    - https://lmstudio.ai/docs/advanced/tool-use
+    - https://docs.vllm.ai/en/stable/features/tool_calling/
+    """
+
+    # Models with native LMStudio tool support
+    LMSTUDIO_NATIVE_MODELS = frozenset(
+        [
+            "qwen2.5",
+            "qwen-2.5",
+            "qwen3",
+            "qwen-3",
+            "llama-3.1",
+            "llama3.1",
+            "llama-3.2",
+            "llama3.2",
+            "ministral",
+            "mistral",
+        ]
+    )
+
+    def __init__(
+        self,
+        model: str = "",
+        config: Optional[Dict[str, Any]] = None,
+        provider_variant: str = "lmstudio",
+    ):
+        """Initialize adapter.
+
+        Args:
+            model: Model name
+            config: Configuration
+            provider_variant: "lmstudio" or "vllm"
+        """
+        super().__init__(model, config)
+        self.provider_variant = provider_variant
+
+    @property
+    def provider_name(self) -> str:
+        return self.provider_variant
+
+    def _has_native_support(self) -> bool:
+        """Check if model has native tool support."""
+        return any(pattern in self.model_lower for pattern in self.LMSTUDIO_NATIVE_MODELS)
+
+    def get_capabilities(self) -> ToolCallingCapabilities:
+        has_native = self._has_native_support()
+
+        if self.provider_variant == "vllm":
+            # vLLM: Load from YAML with model pattern matching
+            loader = _get_capability_loader()
+            caps = loader.get_capabilities("vllm", self.model, ToolCallFormat.VLLM)
+
+            # vLLM always has native when properly configured
+            if not caps.native_tool_calls:
+                return ToolCallingCapabilities(
+                    native_tool_calls=True,
+                    streaming_tool_calls=True,
+                    parallel_tool_calls=True,
+                    tool_choice_param=True,
+                    json_fallback_parsing=True,
+                    xml_fallback_parsing=False,
+                    thinking_mode=False,
+                    requires_strict_prompting=False,
+                    tool_call_format=ToolCallFormat.VLLM,
+                    argument_format="json",
+                    recommended_max_tools=30,
+                    recommended_tool_budget=15,
+                )
+            return caps
+        else:
+            # LMStudio: Load from YAML with model pattern matching
+            format_hint = (
+                ToolCallFormat.LMSTUDIO_NATIVE if has_native else ToolCallFormat.LMSTUDIO_DEFAULT
+            )
+            loader = _get_capability_loader()
+            caps = loader.get_capabilities("lmstudio", self.model, format_hint)
+
+            # Apply runtime model detection for thinking mode
+            if "qwen3" in self.model_lower and not caps.thinking_mode:
+                caps = ToolCallingCapabilities(
+                    native_tool_calls=caps.native_tool_calls,
+                    streaming_tool_calls=caps.streaming_tool_calls,
+                    parallel_tool_calls=caps.parallel_tool_calls,
+                    tool_choice_param=caps.tool_choice_param,
+                    json_fallback_parsing=caps.json_fallback_parsing,
+                    xml_fallback_parsing=caps.xml_fallback_parsing,
+                    thinking_mode=True,
+                    requires_strict_prompting=caps.requires_strict_prompting,
+                    tool_call_format=format_hint,
+                    argument_format=caps.argument_format,
+                    recommended_max_tools=caps.recommended_max_tools,
+                    recommended_tool_budget=caps.recommended_tool_budget,
+                )
+            return caps
+
+    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+        """Convert to OpenAI format."""
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.parameters,
+                },
+            }
+            for tool in tools
+        ]
+
+    def parse_tool_calls(
+        self,
+        content: str,
+        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+    ) -> ToolCallParseResult:
+        """Parse tool calls from OpenAI-compatible response."""
+        warnings = []
+
+        # Try native tool calls
+        if raw_tool_calls:
+            tool_calls = []
+            for tc in raw_tool_calls:
+                name = tc.get("name", "")
+                if not self.is_valid_tool_name(name):
+                    warnings.append(f"Skipped invalid tool name: {name}")
+                    continue
+
+                args = tc.get("arguments", {})
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except json.JSONDecodeError:
+                        warnings.append(f"Failed to parse arguments for {name}")
+                        args = {}
+
+                tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+
+            if tool_calls:
+                return ToolCallParseResult(
+                    tool_calls=tool_calls,
+                    remaining_content=content,
+                    parse_method="native",
+                    confidence=1.0,
+                    warnings=warnings,
+                )
+
+        # Fallback: Parse JSON from content
+        if content:
+            result = self._parse_json_from_content(content)
+            if result.tool_calls:
+                return result
+
+            # LMStudio default format: [TOOL_REQUEST]...[END_TOOL_REQUEST]
+            result = self._parse_tool_request_format(content)
+            if result.tool_calls:
+                return result
+
+        return ToolCallParseResult(remaining_content=content)
+
+    def _parse_json_from_content(self, content: str) -> ToolCallParseResult:
+        """Parse JSON tool calls from content."""
+        content = content.strip()
+        if not content:
+            return ToolCallParseResult()
+
+        try:
+            data = json.loads(content)
+            if isinstance(data, dict) and "name" in data:
+                name = data.get("name", "")
+                if self.is_valid_tool_name(name):
+                    args = data.get("arguments") or data.get("parameters", {})
+                    return ToolCallParseResult(
+                        tool_calls=[ToolCall(name=name, arguments=args)],
+                        remaining_content="",
+                        parse_method="json_fallback",
+                        confidence=0.9,
+                    )
+        except json.JSONDecodeError:
+            pass
+
+        return ToolCallParseResult(remaining_content=content)
+
+    def _parse_tool_request_format(self, content: str) -> ToolCallParseResult:
+        """Parse LMStudio [TOOL_REQUEST] format."""
+        pattern = r"\[TOOL_REQUEST\](.*?)\[END_TOOL_REQUEST\]"
+        matches = re.findall(pattern, content, re.DOTALL)
+
+        if not matches:
+            return ToolCallParseResult(remaining_content=content)
+
+        tool_calls = []
+        warnings = []
+
+        for match in matches:
+            try:
+                data = json.loads(match.strip())
+                name = data.get("name", "")
+                if self.is_valid_tool_name(name):
+                    args = data.get("arguments") or data.get("parameters", {})
+                    tool_calls.append(ToolCall(name=name, arguments=args))
+            except json.JSONDecodeError:
+                warnings.append("Failed to parse TOOL_REQUEST content")
+
+        remaining = re.sub(pattern, "", content, flags=re.DOTALL).strip()
+
+        return ToolCallParseResult(
+            tool_calls=tool_calls,
+            remaining_content=remaining,
+            parse_method="tool_request_format",
+            confidence=0.8,
+            warnings=warnings,
+        )
+
+    def get_system_prompt_hints(self) -> str:
+        """Get system prompt hints."""
+        capabilities = self.get_capabilities()
+
+        if self.provider_variant == "vllm":
+            return "\n".join(
+                [
+                    "TOOL CALLING:",
+                    "- Tools are called using the standard OpenAI function calling format.",
+                    "- You may call tools when needed to gather information.",
+                    "- After gathering sufficient information (2-4 tool calls), provide your answer.",
+                    "- Do NOT repeat the same tool call with identical arguments.",
+                    "",
+                    "IMPORTANT:",
+                    "- Do not output raw JSON tool calls in your text response.",
+                    "- When you're done using tools, provide a human-readable answer.",
+                ]
+            )
+
+        if capabilities.native_tool_calls:
+            return "\n".join(
+                [
+                    "TOOL USAGE:",
+                    "- Use tools via the OpenAI function calling format.",
+                    "- Call tools one at a time and wait for results.",
+                    "- After 2-3 tool calls, provide your answer.",
+                    "- Do NOT repeat identical tool calls.",
+                    "",
+                    "RESPONSE FORMAT:",
+                    "- Provide answers in plain, readable text.",
+                    "- Do NOT include JSON, XML, or tool syntax in your response.",
+                    "- Be direct and answer the user's question.",
+                ]
+            )
+        else:
+            return "\n".join(
+                [
+                    "CRITICAL RULES:",
+                    "1. Call tools ONE AT A TIME. Wait for each result.",
+                    "2. After reading 2-3 files, STOP and provide your answer.",
+                    "3. Do NOT repeat the same tool call.",
+                    "4. Do NOT invent or guess file contents.",
+                    "",
+                    "OUTPUT FORMAT:",
+                    "1. Your answer must be in plain English text.",
+                    "2. Do NOT output JSON objects in your response.",
+                    "3. Do NOT output XML tags like </function> or <parameter>.",
+                    "4. Do NOT output [TOOL_REQUEST] or similar markers.",
+                ]
+            )

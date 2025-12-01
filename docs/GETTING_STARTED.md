@@ -1,4 +1,10 @@
+<div align="center">
+
+![Victor Banner](../assets/victor-banner.png)
+
 # Getting Started with Victor
+
+</div>
 
 > Reality check: semantic tool selection is enabled by default; disable via `profiles.yaml` if desired. Stage pruning falls back to a small core tool set capped by `fallback_max_tools` (default 8) to avoid broadcasting everything. Allowlisted tools are cached (`tool_cache_*` settings) to avoid rerunning pure operations. `security_scan` is regex-only today (no CVE/IaC/package-audit yet). Docker users should prefer `docker/README.md` + `docker/QUICKREF.md`. The active package is `victor/`; the old copy now lives at `archive/victor-legacy/` and should be ignored.
 
@@ -37,7 +43,7 @@ victor main
 Example session:
 ```
 $ victor main
-🤖 Victor v0.1.0 - Universal AI Coding Assistant
+🤖 Victor v0.1.0 - Enterprise-Ready AI Coding Assistant
 Provider: ollama (qwen2.5-coder:7b)
 Tools: 35 loaded (semantic selection enabled)
 

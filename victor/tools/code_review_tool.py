@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 import logging
 
+from victor.tools.base import CostTier
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
@@ -439,7 +440,7 @@ def _build_best_practices_report(path: Path, issues: List[Dict[str, Any]]) -> st
 # Consolidated Tool Function
 
 
-@tool
+@tool(cost_tier=CostTier.LOW)
 async def code_review(
     path: str,
     aspects: List[str] = None,

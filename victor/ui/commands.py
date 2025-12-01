@@ -32,6 +32,8 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.config.settings import Settings
 
+from victor.agent.session import SessionManager, get_session_manager
+
 logger = logging.getLogger(__name__)
 
 
@@ -127,7 +129,7 @@ class SlashCommandHandler:
                 name="context",
                 description="Show loaded project context (.victor.md)",
                 handler=self._cmd_context,
-                aliases=["ctx"],
+                aliases=["ctx", "memory"],
             )
         )
 
@@ -164,6 +166,187 @@ class SlashCommandHandler:
                 name="config",
                 description="Show current configuration",
                 handler=self._cmd_config,
+                aliases=["settings"],
+            )
+        )
+
+        # Session management commands
+        self.register(
+            SlashCommand(
+                name="save",
+                description="Save current conversation to a session file",
+                handler=self._cmd_save,
+                usage="/save [name]",
+            )
+        )
+
+        self.register(
+            SlashCommand(
+                name="load",
+                description="Load a saved session",
+                handler=self._cmd_load,
+                usage="/load <session_id>",
+            )
+        )
+
+        self.register(
+            SlashCommand(
+                name="sessions",
+                description="List saved sessions",
+                handler=self._cmd_sessions,
+                aliases=["history"],
+                usage="/sessions [limit]",
+            )
+        )
+
+        # UX parity commands (Claude Code, Cursor, etc.)
+        self.register(
+            SlashCommand(
+                name="compact",
+                description="Compress conversation history (use --smart for AI summarization)",
+                handler=self._cmd_compact,
+                aliases=["summarize"],
+                usage="/compact [--smart]",
+            )
+        )
+
+        self.register(
+            SlashCommand(
+                name="mcp",
+                description="Show MCP server status and connections",
+                handler=self._cmd_mcp,
+                aliases=["servers"],
+                usage="/mcp",
+            )
+        )
+
+        self.register(
+            SlashCommand(
+                name="review",
+                description="Request a code review for recent changes",
+                handler=self._cmd_review,
+                usage="/review [file or directory]",
+            )
+        )
+
+        self.register(
+            SlashCommand(
+                name="bug",
+                description="Report an issue or bug",
+                handler=self._cmd_bug,
+                aliases=["issue", "feedback"],
+                usage="/bug",
+            )
+        )
+
+        self.register(
+            SlashCommand(
+                name="exit",
+                description="Exit Victor",
+                handler=self._cmd_exit,
+                aliases=["quit", "bye"],
+                usage="/exit",
+            )
+        )
+
+        self.register(
+            SlashCommand(
+                name="changes",
+                description="View, diff, or revert file changes",
+                handler=self._cmd_changes,
+                aliases=["diff", "undo", "rollback"],
+                usage="/changes [show|revert|stash] [file]",
+            )
+        )
+
+        self.register(
+            SlashCommand(
+                name="cost",
+                description="Show estimated token usage and cost for this session",
+                handler=self._cmd_cost,
+                aliases=["usage", "tokens", "stats"],
+                usage="/cost",
+            )
+        )
+
+        # Codex CLI parity commands
+        self.register(
+            SlashCommand(
+                name="approvals",
+                description="Configure what actions require user approval",
+                handler=self._cmd_approvals,
+                aliases=["safety"],
+                usage="/approvals [suggest|auto|full-auto]",
+            )
+        )
+
+        self.register(
+            SlashCommand(
+                name="resume",
+                description="Resume the most recent session",
+                handler=self._cmd_resume,
+                usage="/resume",
+            )
+        )
+
+        # Cursor parity commands
+        self.register(
+            SlashCommand(
+                name="plan",
+                description="Enter planning mode - research before coding",
+                handler=self._cmd_plan,
+                usage="/plan [task description]",
+            )
+        )
+
+        self.register(
+            SlashCommand(
+                name="search",
+                description="Toggle web search capability",
+                handler=self._cmd_search,
+                aliases=["web"],
+                usage="/search [on|off]",
+            )
+        )
+
+        # Gemini CLI parity commands
+        self.register(
+            SlashCommand(
+                name="copy",
+                description="Copy last assistant response to clipboard",
+                handler=self._cmd_copy,
+                usage="/copy",
+            )
+        )
+
+        self.register(
+            SlashCommand(
+                name="directory",
+                description="Show or change working directory",
+                handler=self._cmd_directory,
+                aliases=["dir", "cd", "pwd"],
+                usage="/directory [path]",
+            )
+        )
+
+        # Snapshot and commit commands (Aider/Cline parity)
+        self.register(
+            SlashCommand(
+                name="snapshots",
+                description="Manage workspace snapshots for safe rollback",
+                handler=self._cmd_snapshots,
+                aliases=["snap"],
+                usage="/snapshots [list|create|restore|diff|clear] [id]",
+            )
+        )
+
+        self.register(
+            SlashCommand(
+                name="commit",
+                description="Commit current changes with AI-generated message",
+                handler=self._cmd_commit,
+                aliases=["ci"],
+                usage="/commit [message]",
             )
         )
 
@@ -571,3 +754,1060 @@ class SlashCommandHandler:
                 border_style="blue",
             )
         )
+
+    def _cmd_save(self, args: List[str]) -> None:
+        """Save current conversation to a session file."""
+        if not self.agent:
+            self.console.print("[yellow]No active session to save[/]")
+            return
+
+        # Get optional title from args
+        title = " ".join(args) if args else None
+
+        try:
+            session_manager = get_session_manager()
+            session_id = session_manager.save_session(
+                conversation=self.agent.conversation,
+                model=self.agent.model,
+                provider=self.agent.provider_name,
+                profile=getattr(self.settings, "current_profile", "default"),
+                title=title,
+                conversation_state=getattr(self.agent, "conversation_state", None),
+            )
+            self.console.print(
+                Panel(
+                    f"Session saved successfully!\n\n"
+                    f"[bold]Session ID:[/] {session_id}\n"
+                    f"[bold]Location:[/] {session_manager.session_dir / f'{session_id}.json'}\n\n"
+                    f"[dim]Use '/load {session_id}' to restore this session[/]",
+                    title="Session Saved",
+                    border_style="green",
+                )
+            )
+        except Exception as e:
+            self.console.print(f"[red]Failed to save session:[/] {e}")
+            logger.exception("Error saving session")
+
+    def _cmd_load(self, args: List[str]) -> None:
+        """Load a saved session."""
+        if not args:
+            self.console.print("[yellow]Usage:[/] /load <session_id>")
+            self.console.print("[dim]Use '/sessions' to list available sessions[/]")
+            return
+
+        session_id = args[0]
+
+        try:
+            session_manager = get_session_manager()
+            session = session_manager.load_session(session_id)
+
+            if session is None:
+                self.console.print(f"[red]Session not found:[/] {session_id}")
+                return
+
+            if not self.agent:
+                self.console.print("[yellow]No active agent to load session into[/]")
+                return
+
+            # Restore conversation
+            from victor.agent.conversation import ConversationManager
+
+            self.agent.conversation = ConversationManager.from_dict(session.conversation)
+
+            # Note: Conversation state restoration is not yet implemented
+            # TODO: Add from_dict method to ConversationStateMachine
+
+            self.console.print(
+                Panel(
+                    f"Session loaded successfully!\n\n"
+                    f"[bold]Title:[/] {session.metadata.title}\n"
+                    f"[bold]Model:[/] {session.metadata.model}\n"
+                    f"[bold]Provider:[/] {session.metadata.provider}\n"
+                    f"[bold]Messages:[/] {session.metadata.message_count}\n"
+                    f"[bold]Created:[/] {session.metadata.created_at}",
+                    title="Session Loaded",
+                    border_style="green",
+                )
+            )
+        except Exception as e:
+            self.console.print(f"[red]Failed to load session:[/] {e}")
+            logger.exception("Error loading session")
+
+    def _cmd_sessions(self, args: List[str]) -> None:
+        """List saved sessions."""
+        # Parse limit from args
+        limit = 10
+        if args:
+            try:
+                limit = int(args[0])
+            except ValueError:
+                pass
+
+        try:
+            session_manager = get_session_manager()
+            sessions = session_manager.list_sessions(limit=limit)
+
+            if not sessions:
+                self.console.print("[dim]No saved sessions found[/]")
+                self.console.print(f"[dim]Sessions are stored in: {session_manager.session_dir}[/]")
+                return
+
+            # Create table
+            table = Table(title=f"Saved Sessions (last {len(sessions)})")
+            table.add_column("ID", style="cyan", no_wrap=True)
+            table.add_column("Title", style="white")
+            table.add_column("Model", style="yellow")
+            table.add_column("Messages", justify="right")
+            table.add_column("Updated", style="dim")
+
+            for session in sessions:
+                # Format date nicely
+                try:
+                    from datetime import datetime
+
+                    dt = datetime.fromisoformat(session.updated_at)
+                    date_str = dt.strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    date_str = session.updated_at[:16]
+
+                table.add_row(
+                    session.session_id,
+                    session.title[:40] + "..." if len(session.title) > 40 else session.title,
+                    session.model,
+                    str(session.message_count),
+                    date_str,
+                )
+
+            self.console.print(table)
+            self.console.print("\n[dim]Use '/load <session_id>' to restore a session[/]")
+        except Exception as e:
+            self.console.print(f"[red]Failed to list sessions:[/] {e}")
+            logger.exception("Error listing sessions")
+
+    async def _cmd_compact(self, args: List[str]) -> None:
+        """Compress conversation history to reduce context size.
+
+        Args:
+            args: Optional flags:
+                --smart: Use AI to generate intelligent summary
+                --keep N: Keep last N messages (default: auto)
+        """
+        if not self.agent:
+            self.console.print("[yellow]No active session to compact[/]")
+            return
+
+        original_count = self.agent.conversation.message_count()
+
+        if original_count < 5:
+            self.console.print("[dim]Conversation is already small enough, nothing to compact[/]")
+            return
+
+        # Parse arguments
+        use_smart = "--smart" in args or "-s" in args
+        keep_recent = 6  # default
+
+        # Parse --keep N
+        for i, arg in enumerate(args):
+            if arg in ("--keep", "-k") and i + 1 < len(args):
+                try:
+                    keep_recent = int(args[i + 1])
+                except ValueError:
+                    pass
+
+        keep_recent = min(keep_recent, len(self.agent.conversation.messages) // 2)
+        messages = self.agent.conversation.messages
+
+        if use_smart:
+            # AI-powered summarization
+            self.console.print("[dim]Generating AI summary...[/]")
+
+            conversation_text = "\n".join(
+                [
+                    (
+                        f"{msg.role}: {msg.content[:200]}..."
+                        if len(msg.content) > 200
+                        else f"{msg.role}: {msg.content}"
+                    )
+                    for msg in messages[:20]
+                ]
+            )
+
+            summary_prompt = f"""Summarize this conversation concisely. Focus on:
+1. Main topics discussed
+2. Key decisions made
+3. Important context to remember
+
+Conversation:
+{conversation_text}
+
+Provide a 2-3 sentence summary:"""
+
+            try:
+                response = await self.agent.chat(summary_prompt)
+                summary = response.content
+
+                self.agent.conversation.clear()
+                self.agent.conversation.add_message(
+                    "system", f"[AI Summary - {original_count} messages compacted]\n{summary}"
+                )
+
+                for msg in messages[-keep_recent:]:
+                    self.agent.conversation.add_message(msg.role, msg.content)
+
+                new_count = self.agent.conversation.message_count()
+                self.console.print(
+                    Panel(
+                        f"[bold]AI Summary:[/]\n{summary}\n\n"
+                        f"[dim]Reduced from {original_count} to {new_count} messages[/]",
+                        title="Smart Compaction Complete",
+                        border_style="green",
+                    )
+                )
+                return
+
+            except Exception as e:
+                self.console.print(f"[yellow]AI summary failed, using basic compaction: {e}[/]")
+
+        # Basic compaction (no AI)
+        old_messages = messages[:-keep_recent] if keep_recent > 0 else messages
+        summary_parts = []
+        for msg in old_messages[:10]:
+            role = msg.role
+            content = msg.content[:100] + "..." if len(msg.content) > 100 else msg.content
+            summary_parts.append(f"[{role}]: {content}")
+
+        self.agent.conversation.clear()
+        self.agent.conversation.add_message(
+            "system",
+            f"[Compacted - original had {original_count} messages]\n"
+            f"Earlier discussion:\n" + "\n".join(summary_parts[:5]),
+        )
+
+        for msg in messages[-keep_recent:]:
+            self.agent.conversation.add_message(msg.role, msg.content)
+
+        new_count = self.agent.conversation.message_count()
+        self.console.print(
+            Panel(
+                f"Conversation compacted!\n\n"
+                f"[bold]Original messages:[/] {original_count}\n"
+                f"[bold]After compaction:[/] {new_count}\n"
+                f"[bold]Reduced by:[/] {original_count - new_count} messages\n\n"
+                f"[dim]Tip: Use '/compact --smart' for AI-powered summarization[/]",
+                title="Compacted",
+                border_style="green",
+            )
+        )
+
+    def _cmd_mcp(self, args: List[str]) -> None:
+        """Show MCP server status and connections."""
+        if not self.agent:
+            self.console.print("[yellow]No active agent[/]")
+            return
+
+        # Check if MCP client is available
+        mcp_client = getattr(self.agent, "mcp_client", None)
+        if not mcp_client:
+            self.console.print("[dim]No MCP servers configured[/]")
+            self.console.print("\n[dim]Configure MCP servers in your settings or .victor.md[/]")
+            return
+
+        table = Table(title="MCP Servers")
+        table.add_column("Server", style="cyan")
+        table.add_column("Status", style="green")
+        table.add_column("Tools", justify="right")
+
+        # Get server info if available
+        if hasattr(mcp_client, "server_info") and mcp_client.server_info:
+            info = mcp_client.server_info
+            status = "Connected" if mcp_client.initialized else "Disconnected"
+            tools_count = len(mcp_client.tools) if hasattr(mcp_client, "tools") else 0
+            table.add_row(info.name, status, str(tools_count))
+        else:
+            table.add_row("Default", "Not connected", "0")
+
+        self.console.print(table)
+
+    async def _cmd_review(self, args: List[str]) -> None:
+        """Request a code review for recent changes."""
+        if not self.agent:
+            self.console.print("[yellow]No active agent for review[/]")
+            return
+
+        target = args[0] if args else "."
+
+        # Check for git changes
+        import subprocess
+
+        try:
+            result = subprocess.run(
+                ["git", "diff", "--stat", target],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if not result.stdout.strip():
+                self.console.print("[dim]No changes to review[/]")
+                return
+
+            # Show what will be reviewed
+            self.console.print(
+                Panel(
+                    f"[bold]Changes to review:[/]\n{result.stdout}",
+                    title="Code Review",
+                    border_style="blue",
+                )
+            )
+
+            # Queue review request to the agent
+            review_prompt = f"Please review the following code changes and provide feedback on code quality, potential bugs, and improvements:\n\n```diff\n{result.stdout}\n```"
+            self.console.print("\n[dim]Sending review request to agent...[/]")
+
+            # Send to agent
+            response = await self.agent.chat(review_prompt)
+            self.console.print(Markdown(response.content))
+
+        except FileNotFoundError:
+            self.console.print("[yellow]Git not found. Cannot review without git.[/]")
+        except subprocess.TimeoutExpired:
+            self.console.print("[red]Git command timed out[/]")
+        except Exception as e:
+            self.console.print(f"[red]Error during review:[/] {e}")
+
+    def _cmd_bug(self, args: List[str]) -> None:
+        """Report an issue or bug."""
+        self.console.print(
+            Panel(
+                "[bold]Report Issues[/]\n\n"
+                "To report a bug or request a feature:\n\n"
+                "1. [cyan]GitHub Issues[/]: https://github.com/vijaykumarsingh/victor/issues\n"
+                "2. [cyan]Include[/]: Steps to reproduce, expected vs actual behavior\n"
+                "3. [cyan]Attach[/]: Error messages, logs, and configuration\n\n"
+                "[dim]Use '/status' to get session info for your report[/]",
+                title="Report a Bug",
+                border_style="yellow",
+            )
+        )
+
+    def _cmd_exit(self, args: List[str]) -> None:
+        """Exit Victor."""
+        self.console.print("[dim]Goodbye! Session not saved.[/]")
+        self.console.print("[dim]Use '/save' before exiting to preserve your session.[/]")
+        raise SystemExit(0)
+
+    def _cmd_changes(self, args: List[str]) -> None:
+        """Unified command for viewing, diffing, or reverting file changes.
+
+        Subcommands:
+            show [file]   - Show diff of changes (default)
+            revert <file> - Revert specific file to last commit
+            stash         - Stash all current changes
+            list          - List modified files
+        """
+        import subprocess
+
+        subcommand = args[0].lower() if args else "show"
+        target = args[1] if len(args) > 1 else None
+
+        # Handle aliases being used as command names
+        if subcommand in ("diff", "undo", "rollback"):
+            subcommand = "show" if subcommand == "diff" else "help"
+
+        try:
+            if subcommand == "show":
+                # Show diff
+                cmd = ["git", "diff", "--stat"]
+                if target:
+                    cmd.append(target)
+
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+
+                if not result.stdout.strip():
+                    self.console.print("[dim]No uncommitted changes[/]")
+                    return
+
+                # Get detailed diff if specific file requested
+                if target:
+                    detail = subprocess.run(
+                        ["git", "diff", target],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    diff_content = detail.stdout
+                else:
+                    diff_content = result.stdout
+
+                self.console.print(
+                    Panel(
+                        f"```diff\n{diff_content[:2000]}{'...(truncated)' if len(diff_content) > 2000 else ''}\n```",
+                        title="File Changes",
+                        border_style="cyan",
+                    )
+                )
+
+            elif subcommand == "list":
+                # List modified files
+                result = subprocess.run(
+                    ["git", "status", "--short"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if result.stdout.strip():
+                    self.console.print(
+                        Panel(result.stdout, title="Modified Files", border_style="cyan")
+                    )
+                else:
+                    self.console.print("[dim]No modified files[/]")
+
+            elif subcommand == "revert":
+                if not target:
+                    self.console.print("[yellow]Usage:[/] /changes revert <file>")
+                    self.console.print("[dim]This will discard uncommitted changes to the file[/]")
+                    return
+
+                # Confirm before reverting
+                self.console.print(f"[yellow]Reverting:[/] {target}")
+                self.console.print(
+                    "[dim]This will discard all uncommitted changes to this file.[/]"
+                )
+
+                result = subprocess.run(
+                    ["git", "checkout", "--", target],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if result.returncode == 0:
+                    self.console.print(f"[green]✓[/] Reverted {target}")
+                else:
+                    self.console.print(f"[red]Failed:[/] {result.stderr}")
+
+            elif subcommand == "stash":
+                # Stash all changes
+                result = subprocess.run(
+                    ["git", "stash", "push", "-m", "Victor auto-stash"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if "No local changes" in result.stdout or "No local changes" in result.stderr:
+                    self.console.print("[dim]No changes to stash[/]")
+                elif result.returncode == 0:
+                    self.console.print("[green]✓[/] Changes stashed successfully")
+                    self.console.print("[dim]Use 'git stash pop' to restore[/]")
+                else:
+                    self.console.print(f"[red]Failed:[/] {result.stderr}")
+
+            else:
+                # Help
+                self.console.print(
+                    Panel(
+                        "[bold]File Changes Commands[/]\n\n"
+                        "[cyan]/changes[/] or [cyan]/changes show[/]\n"
+                        "  Show diff of all uncommitted changes\n\n"
+                        "[cyan]/changes show <file>[/]\n"
+                        "  Show diff for a specific file\n\n"
+                        "[cyan]/changes list[/]\n"
+                        "  List all modified files\n\n"
+                        "[cyan]/changes revert <file>[/]\n"
+                        "  Revert a specific file to last commit\n\n"
+                        "[cyan]/changes stash[/]\n"
+                        "  Stash all current changes\n\n"
+                        "[yellow]Tip:[/] Always commit or stash before major changes.",
+                        title="Changes Help",
+                        border_style="blue",
+                    )
+                )
+
+        except FileNotFoundError:
+            self.console.print("[yellow]Git not found[/]")
+        except subprocess.TimeoutExpired:
+            self.console.print("[red]Git command timed out[/]")
+        except Exception as e:
+            self.console.print(f"[red]Error:[/] {e}")
+
+    def _cmd_cost(self, args: List[str]) -> None:
+        """Show estimated token usage and cost for this session."""
+        if not self.agent:
+            self.console.print("[yellow]No active session[/]")
+            return
+
+        # Estimate tokens from conversation
+        messages = self.agent.conversation.messages
+        total_chars = sum(len(msg.content or "") for msg in messages)
+        estimated_tokens = total_chars // 4  # Rough estimate: 4 chars per token
+
+        # Provider-specific pricing (rough estimates)
+        pricing = {
+            "anthropic": {"input": 3.0, "output": 15.0},  # per 1M tokens (Claude 3.5 Sonnet)
+            "openai": {"input": 2.5, "output": 10.0},  # per 1M tokens (GPT-4o)
+            "google": {"input": 1.25, "output": 5.0},  # per 1M tokens (Gemini 1.5)
+            "ollama": {"input": 0.0, "output": 0.0},  # Local, free
+        }
+
+        provider = self.agent.provider_name.lower()
+        price_info = pricing.get(provider, {"input": 0.0, "output": 0.0})
+
+        # Rough split: 30% input, 70% output
+        input_tokens = int(estimated_tokens * 0.3)
+        output_tokens = int(estimated_tokens * 0.7)
+
+        input_cost = (input_tokens / 1_000_000) * price_info["input"]
+        output_cost = (output_tokens / 1_000_000) * price_info["output"]
+        total_cost = input_cost + output_cost
+
+        cost_display = f"${total_cost:.4f}" if total_cost > 0 else "Free (local)"
+
+        self.console.print(
+            Panel(
+                f"[bold]Session Token Usage[/]\n\n"
+                f"[bold]Provider:[/] {self.agent.provider_name}\n"
+                f"[bold]Model:[/] {self.agent.model}\n"
+                f"[bold]Messages:[/] {len(messages)}\n\n"
+                f"[bold]Estimated Tokens:[/]\n"
+                f"  Input:  ~{input_tokens:,}\n"
+                f"  Output: ~{output_tokens:,}\n"
+                f"  Total:  ~{estimated_tokens:,}\n\n"
+                f"[bold]Estimated Cost:[/] {cost_display}\n\n"
+                f"[dim]Note: Token counts are estimates. Actual usage may vary.[/]",
+                title="Cost Estimate",
+                border_style="blue",
+            )
+        )
+
+    def _cmd_approvals(self, args: List[str]) -> None:
+        """Configure what actions require user approval."""
+        from victor.agent.safety import RiskLevel, get_safety_checker
+
+        checker = get_safety_checker()
+
+        if not args:
+            # Show current approval level
+            threshold = checker.require_confirmation_threshold
+            mode_names = {
+                RiskLevel.SAFE: "full-auto (no confirmations)",
+                RiskLevel.LOW: "auto (confirm medium+ risk)",
+                RiskLevel.MEDIUM: "cautious (confirm medium+ risk)",
+                RiskLevel.HIGH: "suggest (confirm high+ risk)",
+                RiskLevel.CRITICAL: "strict (confirm critical only)",
+            }
+            current_mode = mode_names.get(threshold, "suggest")
+
+            self.console.print(
+                Panel(
+                    f"[bold]Current Approval Mode:[/] {current_mode}\n\n"
+                    "[bold]Available modes:[/]\n"
+                    "  [cyan]suggest[/]   - Confirm HIGH and CRITICAL risk operations (default)\n"
+                    "  [cyan]auto[/]      - Confirm only CRITICAL operations\n"
+                    "  [cyan]full-auto[/] - No confirmations (YOLO mode - use with caution!)\n\n"
+                    "[dim]Usage: /approvals <mode>[/]",
+                    title="Approval Settings",
+                    border_style="blue",
+                )
+            )
+            return
+
+        mode = args[0].lower()
+        mode_map = {
+            "suggest": RiskLevel.HIGH,
+            "auto": RiskLevel.CRITICAL,
+            "full-auto": RiskLevel.SAFE,  # Nothing requires confirmation
+            "yolo": RiskLevel.SAFE,
+        }
+
+        if mode not in mode_map:
+            self.console.print(f"[red]Unknown mode:[/] {mode}")
+            self.console.print("[dim]Valid modes: suggest, auto, full-auto[/]")
+            return
+
+        checker.require_confirmation_threshold = mode_map[mode]
+
+        if mode in ("full-auto", "yolo"):
+            self.console.print(
+                Panel(
+                    "[bold red]YOLO MODE ENABLED[/bold red]\n\n"
+                    "All operations will execute without confirmation.\n"
+                    "[yellow]Warning:[/] This bypasses safety checks!\n\n"
+                    "Use [cyan]/approvals suggest[/] to restore confirmations.",
+                    title="Full Auto Mode",
+                    border_style="red",
+                )
+            )
+        else:
+            self.console.print(f"[green]Approval mode set to:[/] {mode}")
+
+    def _cmd_resume(self, args: List[str]) -> None:
+        """Resume the most recent session."""
+        try:
+            session_manager = get_session_manager()
+            session = session_manager.get_latest_session()
+
+            if session is None:
+                self.console.print("[dim]No previous sessions found[/]")
+                self.console.print("[dim]Use '/sessions' to see all saved sessions[/]")
+                return
+
+            # Load the session
+            self._cmd_load([session.metadata.session_id])
+
+        except Exception as e:
+            self.console.print(f"[red]Failed to resume:[/] {e}")
+            logger.exception("Error resuming session")
+
+    async def _cmd_plan(self, args: List[str]) -> None:
+        """Enter planning mode - research before coding."""
+        if not self.agent:
+            self.console.print("[yellow]No active agent[/]")
+            return
+
+        task = " ".join(args) if args else None
+
+        if not task:
+            self.console.print(
+                Panel(
+                    "[bold]Plan Mode[/]\n\n"
+                    "Plan mode helps you think through tasks before coding:\n\n"
+                    "1. Researches relevant files in your codebase\n"
+                    "2. Identifies dependencies and patterns\n"
+                    "3. Creates a step-by-step implementation plan\n"
+                    "4. Asks clarifying questions if needed\n\n"
+                    "[bold]Usage:[/] /plan <describe your task>\n\n"
+                    "[bold]Example:[/]\n"
+                    "  /plan add user authentication with JWT tokens",
+                    title="Planning Mode",
+                    border_style="cyan",
+                )
+            )
+            return
+
+        self.console.print(f"[bold cyan]Planning:[/] {task}\n")
+        self.console.print("[dim]Analyzing codebase and creating plan...[/]\n")
+
+        plan_prompt = f"""I need to plan the following task. Please:
+
+1. First, analyze what files/modules might be relevant
+2. Identify any dependencies or existing patterns to follow
+3. List potential challenges or decisions needed
+4. Create a step-by-step implementation plan
+5. Ask any clarifying questions before we start coding
+
+Task: {task}
+
+Please think through this carefully and provide a detailed plan:"""
+
+        try:
+            response = await self.agent.chat(plan_prompt)
+            self.console.print(Markdown(response.content))
+        except Exception as e:
+            self.console.print(f"[red]Error during planning:[/] {e}")
+
+    def _cmd_search(self, args: List[str]) -> None:
+        """Toggle web search capability."""
+        if not args:
+            # Show current state
+            web_enabled = not getattr(self.settings, "airgapped_mode", False)
+            status = "[green]enabled[/]" if web_enabled else "[red]disabled[/]"
+
+            self.console.print(
+                Panel(
+                    f"[bold]Web Search:[/] {status}\n\n"
+                    "Web search allows Victor to fetch current information\n"
+                    "from the internet when answering questions.\n\n"
+                    "[bold]Usage:[/]\n"
+                    "  /search on   - Enable web search\n"
+                    "  /search off  - Disable web search (air-gapped mode)\n\n"
+                    f"[dim]Current air-gapped mode: {self.settings.airgapped_mode}[/]",
+                    title="Web Search Settings",
+                    border_style="blue",
+                )
+            )
+            return
+
+        mode = args[0].lower()
+        if mode in ("on", "enable", "true", "1"):
+            self.settings.airgapped_mode = False
+            self.console.print("[green]Web search enabled[/]")
+        elif mode in ("off", "disable", "false", "0"):
+            self.settings.airgapped_mode = True
+            self.console.print("[yellow]Web search disabled (air-gapped mode)[/]")
+        else:
+            self.console.print(f"[red]Unknown option:[/] {mode}")
+            self.console.print("[dim]Use 'on' or 'off'[/]")
+
+    def _cmd_copy(self, args: List[str]) -> None:
+        """Copy last assistant response to clipboard."""
+        if not self.agent:
+            self.console.print("[yellow]No active session[/]")
+            return
+
+        # Find the last assistant message
+        messages = self.agent.conversation.messages
+        last_assistant = None
+        for msg in reversed(messages):
+            if msg.role == "assistant":
+                last_assistant = msg.content
+                break
+
+        if not last_assistant:
+            self.console.print("[dim]No assistant response to copy[/]")
+            return
+
+        try:
+            import subprocess
+            import sys
+
+            if sys.platform == "darwin":
+                # macOS
+                process = subprocess.Popen(
+                    ["pbcopy"],
+                    stdin=subprocess.PIPE,
+                    text=True,
+                )
+                process.communicate(last_assistant)
+            elif sys.platform == "linux":
+                # Linux with xclip
+                try:
+                    process = subprocess.Popen(
+                        ["xclip", "-selection", "clipboard"],
+                        stdin=subprocess.PIPE,
+                        text=True,
+                    )
+                    process.communicate(last_assistant)
+                except FileNotFoundError:
+                    # Try xsel as fallback
+                    process = subprocess.Popen(
+                        ["xsel", "--clipboard", "--input"],
+                        stdin=subprocess.PIPE,
+                        text=True,
+                    )
+                    process.communicate(last_assistant)
+            elif sys.platform == "win32":
+                # Windows
+                process = subprocess.Popen(
+                    ["clip"],
+                    stdin=subprocess.PIPE,
+                    text=True,
+                )
+                process.communicate(last_assistant)
+            else:
+                self.console.print(f"[yellow]Clipboard not supported on {sys.platform}[/]")
+                return
+
+            # Show preview
+            preview = last_assistant[:100] + "..." if len(last_assistant) > 100 else last_assistant
+            self.console.print(f"[green]✓[/] Copied to clipboard ({len(last_assistant)} chars)")
+            self.console.print(f"[dim]Preview: {preview}[/]")
+
+        except FileNotFoundError:
+            self.console.print("[yellow]Clipboard tool not found[/]")
+            self.console.print("[dim]Install xclip or xsel on Linux[/]")
+        except Exception as e:
+            self.console.print(f"[red]Failed to copy:[/] {e}")
+
+    def _cmd_directory(self, args: List[str]) -> None:
+        """Show or change working directory."""
+        import os
+
+        if not args:
+            # Show current directory
+            cwd = os.getcwd()
+            self.console.print(
+                Panel(
+                    f"[bold]Current Directory:[/]\n{cwd}\n\n"
+                    "[bold]Usage:[/]\n"
+                    "  /directory <path>  - Change to directory\n"
+                    "  /directory ..      - Go up one level\n"
+                    "  /directory ~       - Go to home directory",
+                    title="Working Directory",
+                    border_style="blue",
+                )
+            )
+            return
+
+        target = args[0]
+
+        # Handle special paths
+        if target == "~":
+            target = os.path.expanduser("~")
+        elif target == "-":
+            # Could store previous directory, for now just show help
+            self.console.print("[yellow]Previous directory tracking not implemented[/]")
+            return
+
+        target = os.path.expanduser(target)
+        target = os.path.abspath(target)
+
+        if not os.path.exists(target):
+            self.console.print(f"[red]Directory not found:[/] {target}")
+            return
+
+        if not os.path.isdir(target):
+            self.console.print(f"[red]Not a directory:[/] {target}")
+            return
+
+        try:
+            os.chdir(target)
+            self.console.print(f"[green]✓[/] Changed to: {target}")
+
+            # If agent has project context, suggest reloading
+            if self.agent and hasattr(self.agent, "project_context"):
+                victor_md = Path(target) / ".victor.md"
+                if victor_md.exists():
+                    self.console.print("[dim]Found .victor.md - use /context to reload[/]")
+
+        except PermissionError:
+            self.console.print(f"[red]Permission denied:[/] {target}")
+        except Exception as e:
+            self.console.print(f"[red]Error:[/] {e}")
+
+    def _cmd_snapshots(self, args: List[str]) -> None:
+        """Manage workspace snapshots for safe rollback.
+
+        Subcommands:
+            list              - List recent snapshots (default)
+            create [desc]     - Create a new snapshot
+            restore <id>      - Restore to a snapshot
+            diff <id>         - Show diff between snapshot and current
+            clear             - Clear all snapshots
+        """
+        from victor.agent.snapshots import get_snapshot_manager
+
+        manager = get_snapshot_manager()
+        subcommand = args[0].lower() if args else "list"
+
+        if subcommand == "list":
+            snapshots = manager.list_snapshots(limit=10)
+
+            if not snapshots:
+                self.console.print("[dim]No snapshots found[/]")
+                self.console.print("[dim]Snapshots are created automatically before AI edits[/]")
+                self.console.print("[dim]Or manually with: /snapshots create [description][/]")
+                return
+
+            table = Table(title="Workspace Snapshots")
+            table.add_column("ID", style="cyan", no_wrap=True)
+            table.add_column("Time", style="dim")
+            table.add_column("Files", justify="right")
+            table.add_column("Description")
+            table.add_column("Git Ref", style="yellow")
+
+            for snap in snapshots:
+                try:
+                    from datetime import datetime
+
+                    dt = datetime.fromisoformat(snap.created_at)
+                    time_str = dt.strftime("%H:%M:%S")
+                except Exception:
+                    time_str = snap.created_at[:8]
+
+                table.add_row(
+                    snap.snapshot_id,
+                    time_str,
+                    str(snap.file_count),
+                    (
+                        snap.description[:40] + "..."
+                        if len(snap.description) > 40
+                        else snap.description
+                    ),
+                    snap.git_ref or "-",
+                )
+
+            self.console.print(table)
+            self.console.print("\n[dim]Commands: /snapshots restore <id>, /snapshots diff <id>[/]")
+
+        elif subcommand == "create":
+            description = " ".join(args[1:]) if len(args) > 1 else "Manual snapshot"
+
+            snapshot_id = manager.create_snapshot(description=description)
+            created_snap = manager.get_snapshot(snapshot_id)
+            file_count = created_snap.file_count if created_snap else 0
+
+            self.console.print(
+                Panel(
+                    f"[bold]Snapshot created![/]\n\n"
+                    f"[bold]ID:[/] {snapshot_id}\n"
+                    f"[bold]Files:[/] {file_count}\n"
+                    f"[bold]Description:[/] {description}",
+                    title="Snapshot Created",
+                    border_style="green",
+                )
+            )
+
+        elif subcommand == "restore":
+            if len(args) < 2:
+                self.console.print("[yellow]Usage:[/] /snapshots restore <snapshot_id>")
+                return
+
+            snapshot_id = args[1]
+            restore_snap = manager.get_snapshot(snapshot_id)
+
+            if not restore_snap:
+                self.console.print(f"[red]Snapshot not found:[/] {snapshot_id}")
+                return
+
+            self.console.print(f"[yellow]Restoring snapshot:[/] {snapshot_id}")
+            self.console.print(f"[dim]This will restore {restore_snap.file_count} files[/]")
+
+            if manager.restore_snapshot(snapshot_id):
+                self.console.print(f"[green]✓[/] Restored to snapshot {snapshot_id}")
+            else:
+                self.console.print(f"[red]Failed to restore snapshot[/]")
+
+        elif subcommand == "diff":
+            if len(args) < 2:
+                self.console.print("[yellow]Usage:[/] /snapshots diff <snapshot_id>")
+                return
+
+            snapshot_id = args[1]
+            diffs = manager.diff_snapshot(snapshot_id)
+
+            if not diffs:
+                self.console.print(f"[yellow]Snapshot not found or no files to compare[/]")
+                return
+
+            # Group by status
+            added = [d for d in diffs if d.status == "added"]
+            modified = [d for d in diffs if d.status == "modified"]
+            deleted = [d for d in diffs if d.status == "deleted"]
+            unchanged = [d for d in diffs if d.status == "unchanged"]
+
+            output = []
+            if added:
+                output.append(f"[green]Added ({len(added)}):[/]")
+                for d in added[:5]:
+                    output.append(f"  + {d.path}")
+            if modified:
+                output.append(f"[yellow]Modified ({len(modified)}):[/]")
+                for d in modified[:5]:
+                    output.append(f"  M {d.path}")
+            if deleted:
+                output.append(f"[red]Deleted ({len(deleted)}):[/]")
+                for d in deleted[:5]:
+                    output.append(f"  - {d.path}")
+            if unchanged:
+                output.append(f"[dim]Unchanged ({len(unchanged)})[/]")
+
+            self.console.print(
+                Panel(
+                    "\n".join(output) if output else "No changes",
+                    title=f"Diff: {snapshot_id} vs Current",
+                    border_style="cyan",
+                )
+            )
+
+        elif subcommand == "clear":
+            count = manager.clear_all()
+            self.console.print(f"[green]✓[/] Cleared {count} snapshots")
+
+        else:
+            # Show help
+            self.console.print(
+                Panel(
+                    "[bold]Snapshot Commands[/]\n\n"
+                    "[cyan]/snapshots[/] or [cyan]/snapshots list[/]\n"
+                    "  List recent snapshots\n\n"
+                    "[cyan]/snapshots create [description][/]\n"
+                    "  Create a manual snapshot\n\n"
+                    "[cyan]/snapshots restore <id>[/]\n"
+                    "  Restore workspace to snapshot state\n\n"
+                    "[cyan]/snapshots diff <id>[/]\n"
+                    "  Show what changed since snapshot\n\n"
+                    "[cyan]/snapshots clear[/]\n"
+                    "  Clear all snapshots",
+                    title="Snapshot Help",
+                    border_style="blue",
+                )
+            )
+
+    def _cmd_commit(self, args: List[str]) -> None:
+        """Commit current changes with AI-generated message.
+
+        Usage:
+            /commit              - Auto-generate message and commit
+            /commit <message>    - Commit with custom message
+            /commit --undo       - Undo last Victor commit
+            /commit --status     - Show commit status
+        """
+        from victor.agent.auto_commit import get_auto_committer
+
+        committer = get_auto_committer()
+
+        if not committer.is_git_repo():
+            self.console.print("[yellow]Not a git repository[/]")
+            return
+
+        # Handle flags
+        if args and args[0] in ("--undo", "-u"):
+            if committer.is_last_commit_by_victor():
+                if committer.undo_last_commit(keep_changes=True):
+                    self.console.print("[green]✓[/] Undid last Victor commit (changes kept)")
+                else:
+                    self.console.print("[red]Failed to undo commit[/]")
+            else:
+                self.console.print("[yellow]Last commit was not made by Victor[/]")
+                self.console.print("[dim]Use 'git reset --soft HEAD~1' to undo manually[/]")
+            return
+
+        if args and args[0] in ("--status", "-s"):
+            info = committer.get_last_commit_info()
+            changed = committer.get_changed_files()
+
+            output = []
+            if info:
+                output.append(f"[bold]Last commit:[/] {info['hash'][:8]}")
+                output.append(f"[bold]Message:[/] {info['subject']}")
+                output.append(f"[bold]By Victor:[/] {'Yes' if info['is_victor'] else 'No'}")
+            if changed:
+                output.append(f"\n[bold]Uncommitted changes:[/] {len(changed)} files")
+                for f in changed[:5]:
+                    output.append(f"  {f}")
+                if len(changed) > 5:
+                    output.append(f"  ... and {len(changed) - 5} more")
+            else:
+                output.append("\n[dim]No uncommitted changes[/]")
+
+            self.console.print(Panel("\n".join(output), title="Commit Status", border_style="blue"))
+            return
+
+        # Check for changes
+        changed_files = committer.get_changed_files()
+        if not changed_files:
+            self.console.print("[dim]No changes to commit[/]")
+            return
+
+        # Get message
+        if args:
+            message = " ".join(args)
+        else:
+            # Auto-generate message
+            message = f"AI-assisted changes to {len(changed_files)} file(s)"
+
+        # Show what will be committed
+        self.console.print(f"[bold]Committing {len(changed_files)} file(s):[/]")
+        for f in changed_files[:5]:
+            self.console.print(f"  {f}")
+        if len(changed_files) > 5:
+            self.console.print(f"  ... and {len(changed_files) - 5} more")
+
+        # Commit
+        result = committer.commit_changes(
+            files=changed_files,
+            description=message,
+        )
+
+        if result.success:
+            file_count = len(result.files_committed) if result.files_committed else 0
+            self.console.print(
+                Panel(
+                    f"[bold]Committed![/]\n\n"
+                    f"[bold]Hash:[/] {result.commit_hash}\n"
+                    f"[bold]Files:[/] {file_count}\n\n"
+                    f"[dim]Use '/commit --undo' to revert[/]",
+                    title="Commit Successful",
+                    border_style="green",
+                )
+            )
+        else:
+            self.console.print(f"[red]Commit failed:[/] {result.error}")

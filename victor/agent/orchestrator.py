@@ -21,14 +21,27 @@ import inspect
 import json
 import logging
 import os
-import re
 import time
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional, Set
 
 from rich.console import Console
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
+from victor.agent.conversation import ConversationManager
+from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
+from victor.agent.prompt_builder import SystemPromptBuilder
+from victor.agent.response_sanitizer import ResponseSanitizer
+from victor.agent.stream_handler import StreamMetrics
+from victor.agent.tool_selection import (
+    CORE_TOOLS,
+    ToolSelector,
+)
+from victor.agent.tool_calling import (
+    ToolCallingAdapterRegistry,
+    ToolCallParseResult,
+)
+from victor.agent.tool_executor import ToolExecutor
 from victor.analytics.logger import UsageLogger
 from victor.cache.tool_cache import ToolCache
 from victor.config.model_capabilities import ToolCallingMatrix
@@ -43,12 +56,13 @@ from victor.providers.base import (
 )
 from victor.providers.registry import ProviderRegistry
 from victor.tools.batch_processor_tool import set_batch_processor_config
-from victor.tools.base import ToolRegistry
+from victor.tools.base import CostTier, ToolRegistry
 from victor.tools.code_executor_tool import CodeExecutionManager
 from victor.tools.code_review_tool import set_code_review_config
 from victor.tools.dependency_graph import ToolDependencyGraph
 from victor.tools.git_tool import set_git_provider
 from victor.tools.mcp_bridge_tool import configure_mcp_client, get_mcp_tool_definitions
+from victor.tools.plugin_manager import ToolPluginManager
 from victor.tools.semantic_selector import SemanticToolSelector
 from victor.tools.web_search_tool import set_web_search_provider, set_web_tool_defaults
 from victor.workflows.base import WorkflowRegistry
@@ -100,21 +114,36 @@ class AgentOrchestrator:
             always_allow_providers=["openai", "anthropic", "google", "xai"],
         )
 
+        # Initialize tool calling adapter for unified provider handling
+        self.tool_adapter = ToolCallingAdapterRegistry.get_adapter(
+            provider_name=self.provider_name or getattr(provider, "name", "unknown"),
+            model=model,
+            config={"settings": settings},
+        )
+        self.tool_calling_caps = self.tool_adapter.get_capabilities()
+        logger.info(
+            f"Tool calling adapter: {self.tool_adapter.provider_name}, "
+            f"native={self.tool_calling_caps.native_tool_calls}, "
+            f"format={self.tool_calling_caps.tool_call_format.value}"
+        )
+
+        # Response sanitizer for cleaning model output
+        self.sanitizer = ResponseSanitizer()
+
+        # System prompt builder for provider-specific prompts
+        self.prompt_builder = SystemPromptBuilder(
+            provider_name=self.provider_name,
+            model=model,
+            tool_adapter=self.tool_adapter,
+            capabilities=self.tool_calling_caps,
+        )
+
         # Load project context from .victor.md (similar to Claude Code's CLAUDE.md)
         self.project_context = ProjectContext()
         self.project_context.load()
 
-        # Build system prompt with project context
-        base_system_prompt = (
-            "You are a code analyst for this repository. Follow this loop:\n"
-            "1) Plan briefly, then call list_directory/read_file to inspect real files (not imagined). "
-            "2) If the user names multiple files, read ALL of them before proposing or concluding. "
-            "3) Keep issuing tool calls iteratively until the task is complete or the tool budget is exhausted—do not stop after the first tool call. "
-            "4) If the user asks to modify or apply changes, propose a concise plan and then execute write_file/edit_files to apply the edits and show diffs. "
-            "4) Do NOT invent tool outputs—only cite results from tools you actually called. "
-            "5) When asked for web info, use web_search/web_summarize; when asked about repo code, use read_file/analyze_docs/code_review.\n"
-            "Always report findings with file paths. Avoid generic advice. Stop once you hit the tool budget."
-        )
+        # Build system prompt using adapter hints
+        base_system_prompt = self._build_system_prompt_with_adapter()
 
         # Inject project context if available
         if self.project_context.content:
@@ -126,7 +155,9 @@ class AgentOrchestrator:
             self._system_prompt = base_system_prompt
 
         self._system_added = False
-        self.tool_budget = getattr(settings, "tool_call_budget", 20)
+        # Use adapter's recommended budget, with settings override
+        default_budget = self.tool_calling_caps.recommended_tool_budget
+        self.tool_budget = getattr(settings, "tool_call_budget", default_budget)
         self.tool_calls_used = 0
         self.observed_files: List[str] = []
         self.executed_tools: List[str] = []
@@ -149,6 +180,12 @@ class AgentOrchestrator:
             "total_tools_selected": 0,
             "total_tools_executed": 0,
         }
+        # Cost tracking
+        self._cost_tracking: Dict[str, Any] = {
+            "total_cost_weight": 0.0,
+            "cost_by_tier": {tier.value: 0.0 for tier in CostTier},
+            "calls_by_tier": {tier.value: 0 for tier in CostTier},
+        }
         # Result cache for pure/idempotent tools
         self.tool_cache = None
         if getattr(self.settings, "tool_cache_enabled", True):
@@ -165,9 +202,6 @@ class AgentOrchestrator:
         # Minimal dependency graph (used for planning search→read→analyze)
         self.tool_graph = ToolDependencyGraph()
         self._register_default_tool_dependencies()
-        # Minimal dependency graph
-        self.tool_graph = ToolDependencyGraph()
-        self._register_default_tool_dependencies()
 
         # Stateful managers
         self.code_manager = CodeExecutionManager()
@@ -177,8 +211,14 @@ class AgentOrchestrator:
         self.workflow_registry = WorkflowRegistry()
         self._register_default_workflows()
 
-        # Conversation history
-        self.messages: List[Message] = []
+        # Conversation history (using ConversationManager for better encapsulation)
+        self.conversation = ConversationManager(
+            system_prompt=self._system_prompt,
+            max_history_messages=getattr(settings, "max_conversation_history", 100),
+        )
+
+        # Conversation state machine for intelligent stage detection
+        self.conversation_state = ConversationStateMachine()
 
         # Tool registry
         self.tools = ToolRegistry()
@@ -186,9 +226,23 @@ class AgentOrchestrator:
         self._load_tool_configurations()  # Load tool enable/disable states from config
         self.tools.register_before_hook(self._log_tool_call)
 
+        # Plugin system for extensible tools
+        self.plugin_manager: Optional[ToolPluginManager] = None
+        if getattr(settings, "plugin_enabled", True):
+            self._initialize_plugins()
+
         # Argument normalizer for handling malformed tool arguments (e.g., Python vs JSON syntax)
         provider_name = provider.__class__.__name__ if provider else "unknown"
         self.argument_normalizer = ArgumentNormalizer(provider_name=provider_name)
+
+        # Tool executor for centralized tool execution with retry, caching, and metrics
+        self.tool_executor = ToolExecutor(
+            tool_registry=self.tools,
+            argument_normalizer=self.argument_normalizer,
+            tool_cache=self.tool_cache,
+            max_retries=getattr(settings, "tool_retry_max_attempts", 3),
+            retry_delay=getattr(settings, "tool_retry_base_delay", 1.0),
+        )
 
         # Semantic tool selector (optional, configured via settings)
         self.use_semantic_selection = getattr(settings, "use_semantic_tool_selection", False)
@@ -207,28 +261,85 @@ class AgentOrchestrator:
                 ollama_base_url=settings.ollama_base_url,
                 cache_embeddings=True,
             )
-            # Initialize embeddings asynchronously in background to avoid blocking first query
-            self._embeddings_initialized = False
-            self._embedding_preload_task: Optional[asyncio.Task[None]] = None
 
-    def shutdown(self) -> None:
-        """Gracefully shut down stateful managers."""
-        self.console.print("[dim]Shutting down code execution environment...[/dim]")
-        self.code_manager.stop()
+        # Background embedding preload task (ToolSelector owns the _embeddings_initialized state)
+        self._embedding_preload_task: Optional[asyncio.Task[None]] = None
+
+        # Initialize unified ToolSelector (handles semantic + keyword selection)
+        self.tool_selector = ToolSelector(
+            tools=self.tools,
+            semantic_selector=self.semantic_selector,
+            conversation_state=self.conversation_state,
+            model=self.model,
+            provider_name=self.provider_name,
+            tool_selection_config=self.tool_selection,
+            fallback_max_tools=getattr(settings, "fallback_max_tools", 8),
+            on_selection_recorded=self._record_tool_selection,
+        )
+
+    @property
+    def messages(self) -> List[Message]:
+        """Get conversation messages (backward compatibility property).
+
+        Returns:
+            List of messages in conversation history
+        """
+        return self.conversation.messages
+
+    def _init_stream_metrics(self) -> StreamMetrics:
+        """Initialize fresh stream metrics for a new streaming session."""
+        self._current_stream_metrics = StreamMetrics(start_time=time.time())
+        return self._current_stream_metrics
+
+    def _record_first_token(self) -> None:
+        """Record the time of first token received."""
+        if hasattr(self, "_current_stream_metrics") and self._current_stream_metrics:
+            if self._current_stream_metrics.first_token_time is None:
+                self._current_stream_metrics.first_token_time = time.time()
+
+    def _finalize_stream_metrics(self) -> Optional[StreamMetrics]:
+        """Finalize stream metrics at end of streaming session."""
+        if hasattr(self, "_current_stream_metrics") and self._current_stream_metrics:
+            self._current_stream_metrics.end_time = time.time()
+            metrics = self._current_stream_metrics
+
+            # Log stream metrics
+            self.usage_logger.log_event(
+                "stream_completed",
+                {
+                    "ttft": metrics.time_to_first_token,
+                    "total_duration": metrics.total_duration,
+                    "tokens_per_second": metrics.tokens_per_second,
+                    "total_chunks": metrics.total_chunks,
+                },
+            )
+            return metrics
+        return None
+
+    def get_last_stream_metrics(self) -> Optional[StreamMetrics]:
+        """Get metrics from the last streaming session."""
+        return getattr(self, "_current_stream_metrics", None)
 
     async def _preload_embeddings(self) -> None:
         """Preload tool embeddings in background to avoid blocking first query.
 
         This is called asynchronously during initialization if semantic tool
         selection is enabled. Errors are logged but don't crash the app.
+
+        Note: The ToolSelector owns the _embeddings_initialized state to avoid
+        DRY violations and consistency issues.
         """
-        if not self.semantic_selector or self._embeddings_initialized:
+        if not self.semantic_selector:
+            return
+        # ToolSelector owns the initialization state
+        if self.tool_selector._embeddings_initialized:
             return
 
         try:
             logger.info("Starting background embedding preload...")
             await self.semantic_selector.initialize_tool_embeddings(self.tools)
-            self._embeddings_initialized = True
+            # Mark initialization complete in ToolSelector (single source of truth)
+            self.tool_selector._embeddings_initialized = True
             logger.info("✓ Tool embeddings preloaded successfully in background")
         except Exception as e:
             logger.warning(
@@ -286,6 +397,11 @@ class AgentOrchestrator:
             success: Whether execution succeeded
             elapsed_ms: Execution time in milliseconds
         """
+        # Get tool cost tier
+        tool_cost = self.tools.get_tool_cost(tool_name)
+        cost_tier = tool_cost if tool_cost else CostTier.FREE
+        cost_weight = cost_tier.weight
+
         if tool_name not in self._tool_usage_stats:
             self._tool_usage_stats[tool_name] = {
                 "total_calls": 0,
@@ -295,6 +411,8 @@ class AgentOrchestrator:
                 "avg_time_ms": 0.0,
                 "min_time_ms": float("inf"),
                 "max_time_ms": 0.0,
+                "cost_tier": cost_tier.value,
+                "total_cost_weight": 0.0,
             }
 
         stats = self._tool_usage_stats[tool_name]
@@ -305,6 +423,12 @@ class AgentOrchestrator:
         stats["avg_time_ms"] = stats["total_time_ms"] / stats["total_calls"]
         stats["min_time_ms"] = min(stats["min_time_ms"], elapsed_ms)
         stats["max_time_ms"] = max(stats["max_time_ms"], elapsed_ms)
+        stats["total_cost_weight"] += cost_weight
+
+        # Update global cost tracking
+        self._cost_tracking["total_cost_weight"] += cost_weight
+        self._cost_tracking["cost_by_tier"][cost_tier.value] += cost_weight
+        self._cost_tracking["calls_by_tier"][cost_tier.value] += 1
 
         self._tool_selection_stats["total_tools_executed"] += 1
 
@@ -322,11 +446,13 @@ class AgentOrchestrator:
             Dictionary with usage analytics including:
             - Selection stats (semantic/keyword/fallback counts)
             - Per-tool execution stats (calls, success rate, timing)
+            - Cost tracking (by tier and total)
             - Overall metrics
         """
         return {
             "selection_stats": self._tool_selection_stats,
             "tool_stats": self._tool_usage_stats,
+            "cost_tracking": self._cost_tracking,
             "top_tools_by_usage": sorted(
                 [(name, stats["total_calls"]) for name, stats in self._tool_usage_stats.items()],
                 key=lambda x: x[1],
@@ -337,70 +463,97 @@ class AgentOrchestrator:
                 key=lambda x: x[1],
                 reverse=True,
             )[:10],
+            "top_tools_by_cost": sorted(
+                [
+                    (name, stats.get("total_cost_weight", 0.0))
+                    for name, stats in self._tool_usage_stats.items()
+                ],
+                key=lambda x: x[1],
+                reverse=True,
+            )[:10],
+            "conversation_state": self.conversation_state.get_state_summary(),
         }
 
-    def _parse_json_tool_call_from_content(self, content: str) -> Optional[List[Dict[str, Any]]]:
-        """Best-effort parser for JSON tool calls embedded in text content."""
-        try:
-            if "name" not in content or "{" not in content:
-                return None
-            match = re.search(r"({.*})", content, re.DOTALL)
-            if not match:
-                return None
-            blob = match.group(1).strip()
-            parsed = json.loads(blob)
-            calls = parsed if isinstance(parsed, list) else [parsed]
-            normalized: List[Dict[str, Any]] = []
-            for call in calls:
-                if not isinstance(call, dict):
-                    continue
-                name = call.get("name")
-                if not name:
-                    continue
-                args = call.get("arguments") or call.get("parameters") or {}
-                normalized.append(
-                    {"id": f"json_call_{len(normalized)+1}", "name": name, "arguments": args}
-                )
-            return normalized or None
-        except Exception:
-            return None
+    def get_conversation_stage(self) -> ConversationStage:
+        """Get the current conversation stage.
 
-    def _parse_xmlish_tool_call_from_content(self, content: str) -> Optional[List[Dict[str, Any]]]:
-        """Handle simple XML/HTML-like wrappers that contain JSON."""
-        try:
-            matches = re.findall(
-                r"<function[^>]*>(.*?)</function>", content, re.DOTALL | re.IGNORECASE
+        Returns:
+            Current ConversationStage enum value
+        """
+        return self.conversation_state.get_stage()
+
+    def get_stage_recommended_tools(self) -> Set[str]:
+        """Get tools recommended for the current conversation stage.
+
+        Returns:
+            Set of tool names recommended for current stage
+        """
+        return self.conversation_state.get_stage_tools()
+
+    def _parse_tool_calls_with_adapter(
+        self, content: str, raw_tool_calls: Optional[List[Dict[str, Any]]] = None
+    ) -> ToolCallParseResult:
+        """Parse tool calls using the tool calling adapter.
+
+        This is the unified method for parsing tool calls that handles:
+        1. Native tool calls from provider
+        2. JSON fallback parsing
+        3. XML fallback parsing
+        4. Tool name validation
+
+        Args:
+            content: Response content text
+            raw_tool_calls: Native tool_calls from provider (if any)
+
+        Returns:
+            ToolCallParseResult with parsed tool calls and metadata
+        """
+        result = self.tool_adapter.parse_tool_calls(content, raw_tool_calls)
+
+        # Log any warnings
+        for warning in result.warnings:
+            logger.warning(f"Tool call parse warning: {warning}")
+
+        # Log parse method for debugging
+        if result.tool_calls:
+            logger.debug(
+                f"Parsed {len(result.tool_calls)} tool calls via {result.parse_method} "
+                f"(confidence={result.confidence})"
             )
-            if not matches:
-                return None
-            normalized: List[Dict[str, Any]] = []
-            for body in matches:
-                # Attempt to find JSON inside the function block
-                json_match = re.search(r"({.*})", body, re.DOTALL)
-                if not json_match:
-                    continue
-                parsed = json.loads(json_match.group(1))
-                calls = parsed if isinstance(parsed, list) else [parsed]
-                for call in calls:
-                    if not isinstance(call, dict):
-                        continue
-                    name = call.get("name")
-                    if not name:
-                        continue
-                    args = call.get("arguments") or call.get("parameters") or {}
-                    normalized.append(
-                        {"id": f"xml_call_{len(normalized)+1}", "name": name, "arguments": args}
-                    )
-            return normalized or None
-        except Exception:
-            return None
+
+        return result
+
+    def _is_cloud_provider(self) -> bool:
+        """Check if the current provider is a cloud-based API with robust tool calling."""
+        return self.prompt_builder.is_cloud_provider()
+
+    def _is_local_provider(self) -> bool:
+        """Check if the current provider is a local model (Ollama, LMStudio, vLLM)."""
+        return self.prompt_builder.is_local_provider()
+
+    def _build_system_prompt_with_adapter(self) -> str:
+        """Build system prompt using the tool calling adapter."""
+        return self.prompt_builder.build()
+
+    def _build_system_prompt_for_provider(self) -> str:
+        """Build an appropriate system prompt based on the provider type."""
+        return self.prompt_builder._build_for_provider()
 
     def _strip_markup(self, text: str) -> str:
         """Remove simple XML/HTML-like tags to salvage plain text."""
-        if not text:
-            return text
-        cleaned = re.sub(r"<[^>]+>", " ", text)
-        return " ".join(cleaned.split())
+        return self.sanitizer.strip_markup(text)
+
+    def _sanitize_response(self, text: str) -> str:
+        """Sanitize model response by removing malformed patterns."""
+        return self.sanitizer.sanitize(text)
+
+    def _is_garbage_content(self, content: str) -> bool:
+        """Detect if content is garbage/malformed output from local models."""
+        return self.sanitizer.is_garbage_content(content)
+
+    def _is_valid_tool_name(self, name: str) -> bool:
+        """Check if a tool name is valid and not a hallucination."""
+        return self.sanitizer.is_valid_tool_name(name)
 
     def _log_tool_call(self, name: str, kwargs: dict) -> None:
         """A hook that logs information before a tool is called."""
@@ -458,49 +611,188 @@ class AgentOrchestrator:
                     logger.warning(f"Failed to load tools from {module_name}: {e}")
 
         # --- Post-registration setup for special tools (like MCP) ---
-        # Register MCP tools if configured
+        # Register MCP tools if configured (supports both legacy and new registry approach)
         if getattr(self.settings, "use_mcp_tools", False):
-            mcp_command = getattr(self.settings, "mcp_command", None)
+            self._setup_mcp_integration()
+
+    def _setup_mcp_integration(self) -> None:
+        """Set up MCP integration using registry or legacy client.
+
+        Uses MCPRegistry for auto-discovery if available, falls back to
+        legacy single-client approach for backwards compatibility.
+        """
+        mcp_command = getattr(self.settings, "mcp_command", None)
+
+        # Try MCPRegistry with auto-discovery first
+        try:
+            from victor.mcp.registry import MCPRegistry
+
+            # Auto-discover MCP servers from standard locations
+            self.mcp_registry = MCPRegistry.discover_servers()
+
+            # Also register command from settings if specified
             if mcp_command:
-                try:
-                    from victor.mcp.client import MCPClient
+                from victor.mcp.registry import MCPServerConfig
 
-                    mcp_client = MCPClient()
-                    cmd_parts = mcp_command.split()
-                    asyncio.create_task(mcp_client.connect(cmd_parts))
-                    configure_mcp_client(
-                        mcp_client, prefix=getattr(self.settings, "mcp_prefix", "mcp")
+                cmd_parts = mcp_command.split()
+                self.mcp_registry.register_server(
+                    MCPServerConfig(
+                        name="settings_mcp",
+                        command=cmd_parts,
+                        description="MCP server from settings",
+                        auto_connect=True,
                     )
-                except Exception as exc:
-                    logger.warning(f"Failed to start MCP client: {exc}")
+                )
 
-            for mcp_tool in get_mcp_tool_definitions():
-                self.tools.register_dict(mcp_tool)
+            # Start registry and connect to servers in background
+            if self.mcp_registry.list_servers():
+                logger.info(
+                    f"MCP Registry initialized with {len(self.mcp_registry.list_servers())} server(s)"
+                )
+                asyncio.create_task(self._start_mcp_registry())
+            else:
+                logger.debug("No MCP servers configured")
+
+        except ImportError:
+            logger.debug("MCPRegistry not available, using legacy client")
+            self._setup_legacy_mcp(mcp_command)
+
+        # Register MCP tool definitions
+        for mcp_tool in get_mcp_tool_definitions():
+            self.tools.register_dict(mcp_tool)
+
+    def _setup_legacy_mcp(self, mcp_command: Optional[str]) -> None:
+        """Set up legacy single MCP client (backwards compatibility)."""
+        if mcp_command:
+            try:
+                from victor.mcp.client import MCPClient
+
+                mcp_client = MCPClient()
+                cmd_parts = mcp_command.split()
+                asyncio.create_task(mcp_client.connect(cmd_parts))
+                configure_mcp_client(mcp_client, prefix=getattr(self.settings, "mcp_prefix", "mcp"))
+            except Exception as exc:
+                logger.warning(f"Failed to start MCP client: {exc}")
+
+    async def _start_mcp_registry(self) -> None:
+        """Start MCP registry and connect to discovered servers."""
+        try:
+            await self.mcp_registry.start()
+            results = await self.mcp_registry.connect_all()
+            connected = sum(1 for v in results.values() if v)
+            if connected > 0:
+                logger.info(f"Connected to {connected} MCP server(s)")
+                # Update available tools from MCP
+                mcp_tools = self.mcp_registry.get_all_tools()
+                if mcp_tools:
+                    logger.info(f"Discovered {len(mcp_tools)} MCP tools")
+        except Exception as e:
+            logger.warning(f"Failed to start MCP registry: {e}")
 
     def _register_default_tool_dependencies(self) -> None:
-        """Register minimal tool input/output specs for planning."""
+        """Register minimal tool input/output specs for planning with cost tiers."""
         try:
-            self.tool_graph.add_tool("code_search", inputs=["query"], outputs=["file_candidates"])
+            # Search tools - FREE tier (local operations)
             self.tool_graph.add_tool(
-                "semantic_code_search", inputs=["query"], outputs=["file_candidates"]
-            )
-            self.tool_graph.add_tool("plan_files", inputs=["query"], outputs=["file_candidates"])
-            self.tool_graph.add_tool(
-                "read_file", inputs=["file_candidates"], outputs=["file_contents"]
-            )
-            self.tool_graph.add_tool("analyze_docs", inputs=["file_contents"], outputs=["summary"])
-            self.tool_graph.add_tool("code_review", inputs=["file_contents"], outputs=["summary"])
-            self.tool_graph.add_tool(
-                "generate_docs", inputs=["file_contents"], outputs=["documentation"]
+                "code_search",
+                inputs=["query"],
+                outputs=["file_candidates"],
+                cost_tier=CostTier.FREE,
             )
             self.tool_graph.add_tool(
-                "security_scan", inputs=["file_contents"], outputs=["security_report"]
+                "semantic_code_search",
+                inputs=["query"],
+                outputs=["file_candidates"],
+                cost_tier=CostTier.FREE,
             )
             self.tool_graph.add_tool(
-                "analyze_metrics", inputs=["file_contents"], outputs=["metrics_report"]
+                "plan_files",
+                inputs=["query"],
+                outputs=["file_candidates"],
+                cost_tier=CostTier.FREE,
+            )
+
+            # File operations - FREE tier
+            self.tool_graph.add_tool(
+                "read_file",
+                inputs=["file_candidates"],
+                outputs=["file_contents"],
+                cost_tier=CostTier.FREE,
+            )
+
+            # Analysis tools - LOW tier (more compute but local)
+            self.tool_graph.add_tool(
+                "analyze_docs",
+                inputs=["file_contents"],
+                outputs=["summary"],
+                cost_tier=CostTier.LOW,
+            )
+            self.tool_graph.add_tool(
+                "code_review",
+                inputs=["file_contents"],
+                outputs=["summary"],
+                cost_tier=CostTier.LOW,
+            )
+            self.tool_graph.add_tool(
+                "generate_docs",
+                inputs=["file_contents"],
+                outputs=["documentation"],
+                cost_tier=CostTier.LOW,
+            )
+            self.tool_graph.add_tool(
+                "security_scan",
+                inputs=["file_contents"],
+                outputs=["security_report"],
+                cost_tier=CostTier.LOW,
+            )
+            self.tool_graph.add_tool(
+                "analyze_metrics",
+                inputs=["file_contents"],
+                outputs=["metrics_report"],
+                cost_tier=CostTier.LOW,
             )
         except Exception as exc:
             logger.debug(f"Failed to register tool dependencies: {exc}")
+
+    def _initialize_plugins(self) -> None:
+        """Initialize and load tool plugins from configured directories."""
+        try:
+            plugin_dirs = [
+                Path(d).expanduser()
+                for d in getattr(self.settings, "plugin_dirs", ["~/.victor/plugins"])
+            ]
+            plugin_config = getattr(self.settings, "plugin_config", {})
+            disabled_plugins = set(getattr(self.settings, "plugin_disabled", []))
+
+            self.plugin_manager = ToolPluginManager(
+                plugin_dirs=plugin_dirs,
+                config=plugin_config,
+            )
+
+            # Disable specified plugins
+            for plugin_name in disabled_plugins:
+                self.plugin_manager.disable_plugin(plugin_name)
+
+            # Discover and load plugins from directories
+            loaded_count = self.plugin_manager.discover_and_load()
+
+            # Load plugins from packages
+            for package_name in getattr(self.settings, "plugin_packages", []):
+                plugin = self.plugin_manager.load_plugin_from_package(package_name)
+                if plugin:
+                    self.plugin_manager.register_plugin(plugin)
+
+            # Register plugin tools with our tool registry
+            if loaded_count > 0 or self.plugin_manager.loaded_plugins:
+                tool_count = self.plugin_manager.register_tools(self.tools)
+                logger.info(
+                    f"Plugins loaded: {len(self.plugin_manager.loaded_plugins)} plugins, "
+                    f"{tool_count} tools"
+                )
+
+        except Exception as e:
+            logger.warning(f"Failed to initialize plugin system: {e}")
+            self.plugin_manager = None
 
     def _plan_tools(
         self, goals: List[str], available_inputs: Optional[List[str]] = None
@@ -569,9 +861,6 @@ class AgentOrchestrator:
             # Get all registered tool names for validation
             registered_tools = {tool.name for tool in self.tools.list_tools(only_enabled=False)}
 
-            # Core tools that should generally remain enabled
-            core_tools = {"read_file", "write_file", "list_directory", "execute_bash"}
-
             # Format 1: Lists of enabled/disabled tools
             if "enabled" in tool_config:
                 enabled_tools = tool_config.get("enabled", [])
@@ -584,8 +873,8 @@ class AgentOrchestrator:
                         f"Available tools: {', '.join(sorted(registered_tools))}"
                     )
 
-                # Check if core tools are included
-                missing_core = core_tools - set(enabled_tools)
+                # Check if core tools are included (use centralized CORE_TOOLS from tool_selection)
+                missing_core = CORE_TOOLS - set(enabled_tools)
                 if missing_core:
                     logger.warning(
                         f"'enabled' list is missing recommended core tools: {', '.join(missing_core)}. "
@@ -612,7 +901,7 @@ class AgentOrchestrator:
                     )
 
                 # Warn if disabling core tools
-                disabled_core = core_tools & set(disabled_tools)
+                disabled_core = CORE_TOOLS & set(disabled_tools)
                 if disabled_core:
                     logger.warning(
                         f"Disabling core tools: {', '.join(disabled_core)}. "
@@ -638,7 +927,7 @@ class AgentOrchestrator:
                     else:
                         self.tools.disable_tool(tool_name)
                         # Warn if disabling core tools
-                        if tool_name in core_tools:
+                        if tool_name in CORE_TOOLS:
                             logger.warning(
                                 f"Disabling core tool '{tool_name}'. This may limit agent functionality."
                             )
@@ -681,413 +970,6 @@ class AgentOrchestrator:
             self._tool_capability_warned = True
         return supported
 
-    def _get_adaptive_threshold(self, user_message: str) -> tuple[float, int]:
-        """Calculate adaptive similarity threshold and max_tools based on context.
-
-        Adapts based on:
-        1. Model size (from config or detected from model name)
-        2. Query specificity (vague queries need stricter thresholds)
-        3. Conversation depth (deeper conversations can be more permissive)
-
-        Args:
-            user_message: The user's input message
-
-        Returns:
-            Tuple of (similarity_threshold, max_tools)
-        """
-        # Factor 1: Model size - Check configuration first, then fall back to detection
-        if self.tool_selection and "base_threshold" in self.tool_selection:
-            # Use configured values
-            base_threshold = self.tool_selection.get("base_threshold", 0.18)
-            base_max_tools = self.tool_selection.get("base_max_tools", 10)
-            logger.debug(
-                f"Using configured tool selection: threshold={base_threshold:.2f}, "
-                f"max_tools={base_max_tools}"
-            )
-        else:
-            # Fall back to model name pattern detection (backwards compatibility)
-            model_lower = self.model.lower()
-
-            # Detect model size from common naming patterns
-            if any(size in model_lower for size in [":0.5b", ":1b", ":1.5b", ":3b"]):
-                # Tiny models (0.5B-3B): Very strict
-                base_threshold = 0.35
-                base_max_tools = 5
-            elif any(size in model_lower for size in [":7b", ":8b"]):
-                # Small models (7B-8B): Strict
-                base_threshold = 0.25
-                base_max_tools = 7
-            elif any(size in model_lower for size in [":13b", ":14b", ":15b"]):
-                # Medium models (13B-15B): Moderate
-                base_threshold = 0.20
-                base_max_tools = 10
-            elif any(size in model_lower for size in [":30b", ":32b", ":34b", ":70b", ":72b"]):
-                # Large models (30B+): Permissive
-                base_threshold = 0.15
-                base_max_tools = 12
-            else:
-                # Unknown size or cloud models (Claude, GPT): Moderate-permissive
-                base_threshold = 0.18
-                base_max_tools = 10
-
-            logger.debug(
-                f"Detected tool selection from model name '{model_lower}': "
-                f"threshold={base_threshold:.2f}, max_tools={base_max_tools}"
-            )
-
-        # Factor 2: Query specificity
-        word_count = len(user_message.split())
-
-        if word_count < 5:
-            # Very vague query ("help me", "fix this") → stricter
-            base_threshold += 0.10
-            base_max_tools = max(5, base_max_tools - 2)
-        elif word_count < 10:
-            # Somewhat vague query → slightly stricter
-            base_threshold += 0.05
-        elif word_count > 20:
-            # Detailed query → looser (more context = better matching)
-            base_threshold -= 0.05
-            base_max_tools = min(15, base_max_tools + 2)
-
-        # Factor 3: Conversation depth
-        conversation_depth = len(self.messages)
-
-        if conversation_depth > 15:
-            # Deep conversation → looser (lots of context available)
-            base_threshold -= 0.05
-            base_max_tools = min(15, base_max_tools + 1)
-        elif conversation_depth > 8:
-            # Moderate conversation → slightly looser
-            base_threshold -= 0.03
-
-        # Clamp values to reasonable ranges
-        threshold = max(0.10, min(0.40, base_threshold))
-        max_tools = max(5, min(15, base_max_tools))
-
-        logger.debug(
-            f"Adaptive threshold: {threshold:.2f}, max_tools: {max_tools} "
-            f"(model: {self.model}, words: {word_count}, depth: {conversation_depth})"
-        )
-
-        return threshold, max_tools
-
-    async def _select_relevant_tools_semantic(self, user_message: str) -> List[ToolDefinition]:
-        """Select tools using embedding-based semantic similarity.
-
-        Args:
-            user_message: The user's input message
-
-        Returns:
-            List of relevant ToolDefinition objects based on semantic similarity
-        """
-        if not self.semantic_selector:
-            # Fallback to keyword-based if semantic not initialized
-            return self._select_relevant_tools_keywords(user_message)
-
-        # Initialize embeddings on first call
-        if not self._embeddings_initialized:
-            logger.info("Initializing tool embeddings (one-time operation)...")
-            await self.semantic_selector.initialize_tool_embeddings(self.tools)
-            self._embeddings_initialized = True
-
-        # Get adaptive threshold and max_tools based on model size, query, and context
-        threshold, max_tools = self._get_adaptive_threshold(user_message)
-
-        # Select tools with context awareness (Phase 2 enhancement)
-        # Pass conversation history for better tool selection across multi-turn tasks
-        # Convert Message objects to dicts for semantic selector
-        conversation_dicts = [msg.model_dump() for msg in self.messages] if self.messages else None
-        tools = await self.semantic_selector.select_relevant_tools_with_context(
-            user_message=user_message,
-            tools=self.tools,
-            conversation_history=conversation_dicts,  # Phase 2: Add context
-            max_tools=max_tools,
-            similarity_threshold=threshold,
-        )
-
-        # Blend with keyword-selected tools to avoid missing obvious categories (e.g., web search)
-        keyword_tools = self._select_relevant_tools_keywords(user_message)
-        if keyword_tools:
-            existing = {t.name for t in tools}
-            tools.extend([t for t in keyword_tools if t.name not in existing])
-
-        # If the user explicitly mentions searching the web, ensure web tools are present
-        message_lower = user_message.lower()
-        if any(
-            kw in message_lower for kw in ["search", "web", "online", "lookup", "http", "https"]
-        ):
-            must_have = {"web_search", "web_summarize", "web_fetch"}
-            existing = {t.name for t in tools}
-            for tool in self.tools.list_tools():
-                if tool.name in must_have and tool.name not in existing:
-                    tools.append(
-                        ToolDefinition(
-                            name=tool.name, description=tool.description, parameters=tool.parameters
-                        )
-                    )
-
-        # Deduplicate in case of overlaps
-        dedup = {}
-        for t in tools:
-            dedup[t.name] = t
-        tools = list(dedup.values())
-
-        logger.info(
-            f"Semantic+keyword tools selected ({len(tools)}): {', '.join(t.name for t in tools)}"
-        )
-
-        # Smart Fallback: If 0 tools selected, use core tools + keyword fallback
-        # This prevents overwhelming small models while still providing useful tools
-        if not tools:
-            logger.warning(
-                "Semantic selection returned 0 tools. "
-                "Using smart fallback: core tools + keyword matching."
-            )
-            # Core tools that are almost always useful
-            core_tool_names = {
-                "read_file",
-                "write_file",
-                "list_directory",
-                "execute_bash",
-                "edit_files",
-            }
-
-            # Get keyword-based tools as fallback
-            keyword_tools = self._select_relevant_tools_keywords(user_message)
-
-            # Combine core tools with keyword-selected tools
-            all_tools_map = {tool.name: tool for tool in self.tools.list_tools()}
-            tools = []
-
-            # Add core tools first
-            for tool_name in core_tool_names:
-                if tool_name in all_tools_map:
-                    tool = all_tools_map[tool_name]
-                    tools.append(
-                        ToolDefinition(
-                            name=tool.name, description=tool.description, parameters=tool.parameters
-                        )
-                    )
-
-            # Add keyword-selected tools (avoiding duplicates)
-            existing_names = {t.name for t in tools}
-            for keyword_tool in keyword_tools:
-                if keyword_tool.name not in existing_names:
-                    tools.append(keyword_tool)
-
-            logger.info(
-                f"Smart fallback selected {len(tools)} tools: "
-                f"{', '.join(t.name for t in tools)}"
-            )
-
-            # Record fallback selection analytics
-            self._record_tool_selection("fallback", len(tools))
-        else:
-            # Record semantic selection analytics
-            self._record_tool_selection("semantic", len(tools))
-
-        return tools
-
-    def _select_relevant_tools_keywords(self, user_message: str) -> List[ToolDefinition]:
-        """Intelligently select relevant tools based on the user's message.
-
-        For small models (<7B), limit to essential tools to prevent overwhelming.
-        For larger models, send all relevant tools.
-
-        Args:
-            user_message: The user's input message
-
-        Returns:
-            List of relevant ToolDefinition objects
-        """
-        all_tools = list(self.tools.list_tools())
-
-        # Core tools that are almost always useful (filesystem, bash, editor)
-        core_tool_names = {
-            "read_file",
-            "write_file",
-            "list_directory",
-            "execute_bash",
-            "edit_files",
-        }
-
-        # Categorize tools by use case
-        tool_categories = {
-            "git": ["git", "git_suggest_commit", "git_create_pr"],
-            "testing": ["testing_generate", "testing_run", "testing_coverage"],
-            "refactor": [
-                "refactor_extract_function",
-                "refactor_inline_variable",
-                "refactor_organize_imports",
-            ],
-            "security": ["security_scan"],
-            "docs": ["generate_docs", "analyze_docs"],
-            "review": ["code_review"],
-            "web": ["web_search", "web_fetch", "web_summarize"],
-            "docker": ["docker"],
-            "metrics": ["analyze_metrics"],
-            "batch": ["batch"],
-            "cicd": ["cicd"],
-            "scaffold": ["scaffold"],
-            "plan": ["plan_files"],
-            "search": ["code_search"],
-        }
-
-        # Keyword matching for tool selection
-        message_lower = user_message.lower()
-        selected_categories = set()
-        planned_tools: List[ToolDefinition] = []
-        goals = self._goal_hints_for_message(user_message)
-        if goals:
-            planned_tools = self._plan_tools(goals, available_inputs=["query"])
-
-        # Match keywords to categories
-        if any(kw in message_lower for kw in ["git", "commit", "branch", "merge", "repository"]):
-            selected_categories.add("git")
-        if any(kw in message_lower for kw in ["test", "pytest", "unittest", "coverage"]):
-            selected_categories.add("testing")
-        if any(kw in message_lower for kw in ["refactor", "rename", "extract", "reorganize"]):
-            selected_categories.add("refactor")
-        if any(kw in message_lower for kw in ["security", "vulnerability", "secret", "scan"]):
-            selected_categories.add("security")
-        if any(kw in message_lower for kw in ["document", "docstring", "readme", "api doc"]):
-            selected_categories.add("docs")
-        if any(
-            kw in message_lower for kw in ["review", "analyze code", "check code", "code quality"]
-        ):
-            selected_categories.add("review")
-        if any(
-            kw in message_lower
-            for kw in [
-                "search web",
-                "search the web",
-                "look up",
-                "find online",
-                "search for",
-                "web search",
-                "online search",
-            ]
-        ):
-            selected_categories.add("web")
-        if any(kw in message_lower for kw in ["docker", "container", "image"]):
-            selected_categories.add("docker")
-        if any(
-            kw in message_lower
-            for kw in ["complexity", "metrics", "maintainability", "technical debt"]
-        ):
-            selected_categories.add("metrics")
-        if any(
-            kw in message_lower
-            for kw in ["batch", "bulk", "multiple files", "search files", "replace across"]
-        ):
-            selected_categories.add("batch")
-        if any(
-            kw in message_lower
-            for kw in [
-                "ci/cd",
-                "cicd",
-                "pipeline",
-                "github actions",
-                "gitlab ci",
-                "circleci",
-                "workflow",
-            ]
-        ):
-            selected_categories.add("cicd")
-        if any(
-            kw in message_lower
-            for kw in ["scaffold", "template", "boilerplate", "new project", "create project"]
-        ):
-            selected_categories.add("scaffold")
-        if any(
-            kw in message_lower for kw in ["plan", "which files", "pick files", "where to start"]
-        ):
-            selected_categories.add("plan")
-        if any(
-            kw in message_lower
-            for kw in ["search code", "code search", "find file", "locate code", "where is"]
-        ):
-            selected_categories.add("search")
-
-        # Build selected tool names
-        selected_tool_names = core_tool_names.copy()
-        for category in selected_categories:
-            selected_tool_names.update(tool_categories.get(category, []))
-
-        # For small models, limit total tools
-        is_small_model = False
-        if self.provider.name == "ollama":
-            model_lower = self.model.lower()
-            small_model_indicators = [":0.5b", ":1.5b", ":3b"]
-            is_small_model = any(indicator in model_lower for indicator in small_model_indicators)
-
-        # Filter tools
-        selected_tools = planned_tools.copy()
-        existing_names = {t.name for t in selected_tools}
-        for tool in all_tools:
-            if tool.name in selected_tool_names and tool.name not in existing_names:
-                selected_tools.append(
-                    ToolDefinition(
-                        name=tool.name,
-                        description=tool.description,
-                        parameters=tool.parameters,
-                    )
-                )
-                existing_names.add(tool.name)
-
-        # For small models, limit to max 10 tools (core + most relevant)
-        if is_small_model and len(selected_tools) > 10:
-            # Prioritize core tools, then others
-            core_tools = [t for t in selected_tools if t.name in core_tool_names]
-            other_tools = [t for t in selected_tools if t.name not in core_tool_names]
-            selected_tools = core_tools + other_tools[: max(0, 10 - len(core_tools))]
-
-        tool_names = [t.name for t in selected_tools]
-        logger.info(
-            f"Selected {len(selected_tools)} tools for prompt (small_model={is_small_model}): {', '.join(tool_names)}"
-        )
-
-        return selected_tools
-
-    def _prioritize_tools_stage(
-        self, user_message: str, tools: Optional[List[ToolDefinition]], stage: str
-    ) -> Optional[List[ToolDefinition]]:
-        """Stage-aware pruning of tool list to keep it focused per step."""
-        if not tools:
-            return tools
-
-        # Stage definitions
-        planning_tools = {"plan_files", "code_search", "list_directory"}
-        reading_tools = {"read_file", "analyze_docs", "code_review"}
-        web_tools = {"web_search", "web_summarize", "web_fetch"}
-        core = {"write_file", "edit_files"}
-
-        message_lower = user_message.lower()
-        needs_web = any(kw in message_lower for kw in ["http", "https", "web", "online", "search"])
-
-        if stage == "initial":
-            keep = planning_tools | (web_tools if needs_web else set()) | core
-        elif stage == "post_plan":
-            keep = reading_tools | planning_tools | core | (web_tools if needs_web else set())
-        else:  # post_read
-            keep = reading_tools | core | (web_tools if needs_web else set())
-
-        pruned = [t for t in tools if t.name in keep]
-        if pruned:
-            return pruned
-
-        # If pruning eliminated everything, fall back to a minimal safe set to avoid broadcasting all tools
-        core_fallback = {"read_file", "write_file", "list_directory", "execute_bash", "edit_files"}
-        fallback_tools = [t for t in tools if t.name in core_fallback]
-
-        if fallback_tools:
-            return fallback_tools
-
-        # As a last resort, return a small prefix to prevent broadcasting the entire registry
-        fallback_limit = getattr(self.settings, "fallback_max_tools", 8)
-        return tools[:fallback_limit]
-
     def add_message(self, role: str, content: str) -> None:
         """Add a message to conversation history.
 
@@ -1095,7 +977,7 @@ class AgentOrchestrator:
             role: Message role (user, assistant, system)
             content: Message content
         """
-        self.messages.append(Message(role=role, content=content))
+        self.conversation.add_message(role, content)
         if role == "user":
             self.usage_logger.log_event("user_prompt", {"content": content})
         elif role == "assistant":
@@ -1103,9 +985,8 @@ class AgentOrchestrator:
 
     def _ensure_system_message(self) -> None:
         """Ensure the system prompt is included once at the start of the conversation."""
-        if not self._system_added:
-            self.messages.append(Message(role="system", content=self._system_prompt))
-            self._system_added = True
+        self.conversation.ensure_system_prompt()
+        self._system_added = True
 
     async def chat(self, user_message: str) -> CompletionResponse:
         """Send a chat message and get response.
@@ -1124,11 +1005,17 @@ class AgentOrchestrator:
         # Intelligently select relevant tools based on the user's message
         tools = None
         if self.provider.supports_tools():
-            if self.use_semantic_selection:
-                tools = await self._select_relevant_tools_semantic(user_message)
-            else:
-                tools = self._select_relevant_tools_keywords(user_message)
-            tools = self._prioritize_tools_stage(user_message, tools, stage="initial")
+            conversation_depth = self.conversation.message_count()
+            conversation_history = (
+                [msg.model_dump() for msg in self.messages] if self.messages else None
+            )
+            tools = await self.tool_selector.select_tools(
+                user_message,
+                use_semantic=self.use_semantic_selection,
+                conversation_history=conversation_history,
+                conversation_depth=conversation_depth,
+            )
+            tools = self.tool_selector.prioritize_by_stage(user_message, tools)
 
         # Get response from provider
         # Prepare optional thinking parameter for providers that support it (Anthropic)
@@ -1163,9 +1050,14 @@ class AgentOrchestrator:
 
         Yields:
             StreamChunk objects with incremental response
+
+        Note:
+            Stream metrics (TTFT, throughput) are available via get_last_stream_metrics()
+            after the stream completes.
         """
-        # Track performance metrics
-        start_time = time.time()
+        # Track performance metrics using StreamMetrics
+        stream_metrics = self._init_stream_metrics()
+        start_time = stream_metrics.start_time
         total_tokens: float = 0
 
         self._ensure_system_message()
@@ -1178,7 +1070,6 @@ class AgentOrchestrator:
 
         # Get tool definitions
         # Iteratively stream → run tools → stream follow-up until no tool calls or budget exhausted
-        first_pass = True
         context_msg = user_message
 
         # Detect action-oriented tasks (create, execute, run) - should allow more exploration before action
@@ -1209,21 +1100,36 @@ class AgentOrchestrator:
         # Track exploration without output (prevents endless exploration loops)
         consecutive_low_output_iterations = 0
 
-        # Use configurable limits from settings
-        # Analysis tasks get much higher limits (or unlimited) since they're expected to explore extensively
+        # Use configurable limits from settings, adjusted by adapter capabilities
+        # Local models with strict prompting needs get lower limits
+        needs_strict = self.tool_calling_caps.requires_strict_prompting
+
+        # Base limits - reduced for models needing strict prompting
+        base_analysis_limit = 10 if needs_strict else 15
+        base_action_limit = 4 if needs_strict else 6
+        base_default_limit = 3 if needs_strict else 5
+
         if is_analysis_task:
             max_low_output_iterations = getattr(
-                self.settings, "max_exploration_iterations_analysis", 50
+                self.settings, "max_exploration_iterations_analysis", base_analysis_limit
             )
             logger.info(
                 f"Detected analysis task - allowing up to {max_low_output_iterations} exploration iterations"
             )
         elif is_action_task:
             max_low_output_iterations = getattr(
-                self.settings, "max_exploration_iterations_action", 12
+                self.settings, "max_exploration_iterations_action", base_action_limit
             )
         else:
-            max_low_output_iterations = getattr(self.settings, "max_exploration_iterations", 8)
+            max_low_output_iterations = getattr(
+                self.settings, "max_exploration_iterations", base_default_limit
+            )
+
+        # Hard limit on total loop iterations to prevent runaway loops
+        # Lower for models without native tool calling
+        base_total_limit = 15 if needs_strict else 20
+        max_total_iterations = getattr(self.settings, "max_total_loop_iterations", base_total_limit)
+        total_iterations = 0
 
         min_content_threshold = getattr(self.settings, "min_content_threshold", 150)
         force_completion = False
@@ -1268,34 +1174,71 @@ class AgentOrchestrator:
         goals = self._goal_hints_for_message(user_message)
 
         while True:
+            # Check hard iteration limit
+            total_iterations += 1
+            if total_iterations > max_total_iterations:
+                logger.warning(
+                    f"Hard iteration limit reached ({max_total_iterations}). Forcing completion."
+                )
+                yield StreamChunk(
+                    content=f"\n[tool] ⚠ Maximum iterations ({max_total_iterations}) reached. Providing summary.\n"
+                )
+                # Force a final response without tools
+                self.add_message(
+                    "system",
+                    "CRITICAL: You have reached the maximum number of iterations. "
+                    "STOP ALL TOOL CALLS immediately. Provide a brief summary of what you found "
+                    "based on the information gathered so far. Do NOT attempt any more tool calls.",
+                )
+                # Make one final call without tools
+                try:
+                    response = await self.provider.chat(
+                        messages=self.messages,
+                        model=self.model,
+                        temperature=self.temperature,
+                        max_tokens=self.max_tokens,
+                        tools=None,  # No tools - force text response
+                    )
+                    if response and response.content:
+                        sanitized = self._sanitize_response(response.content)
+                        if sanitized:
+                            self.add_message("assistant", sanitized)
+                            yield StreamChunk(content=sanitized)
+                except Exception as e:
+                    logger.warning(f"Final response generation failed: {e}")
+                    yield StreamChunk(
+                        content="Unable to generate final summary due to iteration limit.\n"
+                    )
+                yield StreamChunk(content="", is_final=True)
+                break
+
             # Select tools for this pass
             tools = None
             provider_supports_tools = self.provider.supports_tools()
             tooling_allowed = provider_supports_tools and self._model_supports_tool_calls()
 
             if tooling_allowed:
-                if self.use_semantic_selection:
-                    tools = await self._select_relevant_tools_semantic(context_msg)
-                else:
-                    tools = self._select_relevant_tools_keywords(context_msg)
-                # If we have inferred goals and no files read yet, prepend planned chain
+                # Get planned tools if we have inferred goals
+                planned_tools = None
                 if goals:
                     available_inputs = ["query"]
-                    # If files already observed, skip search and use file contents as available
                     if self.observed_files:
                         available_inputs.append("file_contents")
-                    planned = self._plan_tools(goals, available_inputs=available_inputs)
-                    if planned:
-                        # Deduplicate while preserving order: planned first, then rest
-                        existing = {t.name for t in planned}
-                        remainder = [t for t in tools if t.name not in existing] if tools else []
-                        tools = planned + remainder
-                stage = (
-                    "initial"
-                    if first_pass
-                    else ("post_read" if self.observed_files else "post_plan")
+                    planned_tools = self._plan_tools(goals, available_inputs=available_inputs)
+
+                # Use unified ToolSelector for tool selection
+                conversation_depth = self.conversation.message_count()
+                conversation_history = (
+                    [msg.model_dump() for msg in self.messages] if self.messages else None
                 )
-                tools = self._prioritize_tools_stage(context_msg, tools, stage=stage)
+                tools = await self.tool_selector.select_tools(
+                    context_msg,
+                    use_semantic=self.use_semantic_selection,
+                    conversation_history=conversation_history,
+                    conversation_depth=conversation_depth,
+                    planned_tools=planned_tools,
+                )
+                tools = self.tool_selector.prioritize_by_stage(context_msg, tools)
 
             # Prepare optional thinking parameter for providers that support it (Anthropic)
             provider_kwargs = {}
@@ -1305,6 +1248,10 @@ class AgentOrchestrator:
 
             full_content = ""
             tool_calls = None
+            garbage_detected = False
+            consecutive_garbage_chunks = 0
+            max_garbage_chunks = 3  # Stop after 3 consecutive garbage chunks
+
             async for chunk in self.provider.stream(
                 messages=self.messages,
                 model=self.model,
@@ -1313,45 +1260,48 @@ class AgentOrchestrator:
                 tools=tools,
                 **provider_kwargs,
             ):
+                # Check for garbage content (local model confusion)
+                if chunk.content and self._is_garbage_content(chunk.content):
+                    consecutive_garbage_chunks += 1
+                    if consecutive_garbage_chunks >= max_garbage_chunks:
+                        if not garbage_detected:
+                            garbage_detected = True
+                            logger.warning(
+                                f"Garbage content detected after {len(full_content)} chars - "
+                                "stopping stream early"
+                            )
+                        # Don't yield garbage content, don't accumulate it
+                        continue
+                else:
+                    consecutive_garbage_chunks = 0
+
                 full_content += chunk.content
+                # Track stream metrics
+                stream_metrics.total_chunks += 1
                 # Estimate tokens (rough: ~4 chars per token)
                 if chunk.content:
+                    # Record TTFT on first content chunk
+                    self._record_first_token()
                     total_tokens += len(chunk.content) / 4
+                    stream_metrics.total_content_length += len(chunk.content)
                 if chunk.tool_calls:
                     logger.debug(f"Received tool_calls in chunk: {chunk.tool_calls}")
                     tool_calls = chunk.tool_calls
+                    stream_metrics.tool_calls_count += len(chunk.tool_calls)
                 yield chunk
 
-            # Fallback: parse JSON tool calls from accumulated content
-            if (
-                not tool_calls
-                and full_content
-                and hasattr(self.provider, "_parse_json_tool_call_from_content")
-            ):
-                parsed_tool_calls = self.provider._parse_json_tool_call_from_content(full_content)
-                if parsed_tool_calls:
-                    logger.debug("Parsed tool call from accumulated streaming content (fallback)")
-                    tool_calls = parsed_tool_calls
-                    full_content = ""
+            # If garbage was detected, force completion on next iteration
+            if garbage_detected and not tool_calls:
+                force_completion = True
+                logger.info("Setting force_completion due to garbage detection")
 
-            # Provider-agnostic JSON tool-call fallback
+            # Use unified adapter-based tool call parsing with fallbacks
             if not tool_calls and full_content:
-                parsed_tool_calls = self._parse_json_tool_call_from_content(full_content)
-                if parsed_tool_calls:
-                    logger.debug(
-                        "Parsed tool call from accumulated streaming content (generic fallback)"
-                    )
-                    tool_calls = parsed_tool_calls
-                    full_content = ""
-                else:
-                    # Try XML-ish wrapper containing JSON
-                    parsed_tool_calls = self._parse_xmlish_tool_call_from_content(full_content)
-                    if parsed_tool_calls:
-                        logger.debug(
-                            "Parsed tool call from XML-ish streaming content (generic fallback)"
-                        )
-                        tool_calls = parsed_tool_calls
-                        full_content = ""
+                parse_result = self._parse_tool_calls_with_adapter(full_content, tool_calls)
+                if parse_result.tool_calls:
+                    # Convert ToolCall objects to dicts for compatibility
+                    tool_calls = [tc.to_dict() for tc in parse_result.tool_calls]
+                    full_content = parse_result.remaining_content
 
             # Ensure tool_calls is a list of dicts to avoid type errors from malformed provider output
             if tool_calls:
@@ -1359,6 +1309,21 @@ class AgentOrchestrator:
                 if len(normalized_tool_calls) != len(tool_calls):
                     logger.warning(f"Dropped non-dict tool_calls: {tool_calls}")
                 tool_calls = normalized_tool_calls or None
+
+            # Filter out invalid/hallucinated tool names early (adapter already validates, but double-check for enabled)
+            if tool_calls:
+                valid_tool_calls = []
+                for tc in tool_calls:
+                    name = tc.get("name", "")
+                    if self.tools.is_tool_enabled(name):
+                        valid_tool_calls.append(tc)
+                    else:
+                        logger.debug(f"Filtered out disabled tool: {name}")
+                if len(valid_tool_calls) != len(tool_calls):
+                    logger.warning(
+                        f"Filtered {len(tool_calls) - len(valid_tool_calls)} invalid tool calls"
+                    )
+                tool_calls = valid_tool_calls or None
 
             # Coerce arguments to dicts early (providers may stream JSON strings)
             if tool_calls:
@@ -1376,8 +1341,15 @@ class AgentOrchestrator:
                         tc["arguments"] = {}
 
             if full_content:
-                plain_text = self._strip_markup(full_content)
-                self.add_message("assistant", plain_text or full_content)
+                # Sanitize response to remove malformed patterns from local models
+                sanitized = self._sanitize_response(full_content)
+                if sanitized:
+                    self.add_message("assistant", sanitized)
+                else:
+                    # If sanitization removed everything, use stripped markup as fallback
+                    plain_text = self._strip_markup(full_content)
+                    if plain_text:
+                        self.add_message("assistant", plain_text)
             elif not tool_calls:
                 # No content and no tool calls; attempt a non-stream fallback for a textual answer
                 try:
@@ -1449,6 +1421,7 @@ class AgentOrchestrator:
                 recent_tool_calls.pop(0)
 
             # Detect true loops: same tool call signature repeated 3+ times in recent history
+            # Also detect semantic loops: same tool names with slightly different args
             is_true_loop = False
             if len(recent_tool_calls) >= 3:
                 last_call = recent_tool_calls[-1]
@@ -1458,6 +1431,25 @@ class AgentOrchestrator:
                     logger.warning(
                         f"True loop detected: same tool call repeated {repeat_count} times"
                     )
+
+                # Detect semantic loops: same tools called repeatedly
+                if not is_true_loop and len(recent_tool_calls) >= 4:
+                    # Extract just tool names from signatures
+                    recent_tool_names = []
+                    for sig in recent_tool_calls[-6:]:
+                        if sig:
+                            names = [name for name, _ in sig]
+                            recent_tool_names.append(tuple(sorted(names)))
+
+                    # Check if the same set of tools keeps being called
+                    if len(recent_tool_names) >= 4:
+                        last_tools = recent_tool_names[-1]
+                        same_tools_count = sum(1 for t in recent_tool_names[-4:] if t == last_tools)
+                        if same_tools_count >= 3:
+                            is_true_loop = True
+                            logger.warning(
+                                f"Semantic loop detected: same tools ({last_tools}) called {same_tools_count} times"
+                            )
 
             content_length = len(full_content.strip())
 
@@ -1541,17 +1533,56 @@ class AgentOrchestrator:
                 yield StreamChunk(
                     content=f"[tool] ⚠ Tool budget reached ({self.tool_budget}); skipping tool calls.\n"
                 )
-                yield StreamChunk(
-                    content="No tools executed; cannot provide evidence-based answer.\n"
+                # Try to generate a final summary before exiting
+                yield StreamChunk(content="Generating final summary...\n")
+                try:
+                    self.add_message(
+                        "system",
+                        "Tool budget reached. Provide a brief summary of what you found based on "
+                        "the information gathered. Do NOT attempt any more tool calls.",
+                    )
+                    response = await self.provider.chat(
+                        messages=self.messages,
+                        model=self.model,
+                        temperature=self.temperature,
+                        max_tokens=self.max_tokens,
+                        tools=None,
+                    )
+                    if response and response.content:
+                        sanitized = self._sanitize_response(response.content)
+                        if sanitized:
+                            yield StreamChunk(content=sanitized + "\n")
+                except Exception as e:
+                    logger.warning(f"Failed to generate final summary: {e}")
+                    yield StreamChunk(content="Unable to generate summary due to budget limit.\n")
+
+                # Finalize and display performance metrics
+                final_metrics = self._finalize_stream_metrics()
+                elapsed_time = (
+                    final_metrics.total_duration if final_metrics else time.time() - start_time
                 )
-                # Display performance metrics
-                elapsed_time = time.time() - start_time
                 tokens_per_second = total_tokens / elapsed_time if elapsed_time > 0 else 0
+                ttft_info = ""
+                if final_metrics and final_metrics.time_to_first_token:
+                    ttft_info = f" | TTFT: {final_metrics.time_to_first_token:.2f}s"
                 yield StreamChunk(
-                    content=f"\n📊 {total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s\n",
+                    content=f"\n📊 {total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}\n",
                     is_final=True,
                 )
                 break
+
+            # Force final response after too many consecutive tool calls without output
+            # This prevents endless tool call loops
+            max_consecutive_tool_calls = getattr(self.settings, "max_consecutive_tool_calls", 8)
+            if self.tool_calls_used >= max_consecutive_tool_calls and not force_completion:
+                # Check if we've been making progress (reading new files)
+                if len(unique_files_read) < self.tool_calls_used // 2:
+                    # Not making good progress - force completion
+                    logger.warning(
+                        f"Forcing completion: {self.tool_calls_used} tool calls but only "
+                        f"{len(unique_files_read)} unique files read"
+                    )
+                    force_completion = True
 
             # Force completion if too many low-output iterations or research calls
             if force_completion:
@@ -1582,7 +1613,6 @@ class AgentOrchestrator:
                 # Clear tool calls to force final response
                 tool_calls = []
                 # Continue to next iteration which will generate final response without tools
-                first_pass = False
                 continue
 
             tool_calls = tool_calls[:remaining]
@@ -1613,7 +1643,6 @@ class AgentOrchestrator:
                     "No files read yet. Avoid file-specific claims; suggest using tools if needed.",
                 )
 
-            first_pass = False
             context_msg = full_content or user_message
 
     async def _execute_tool_with_retry(
@@ -1746,6 +1775,13 @@ class AgentOrchestrator:
                 self.console.print(f"[yellow]⚠ Skipping tool call without name: {tool_call}[/]")
                 continue
 
+            # Validate tool name format (reject hallucinated/malformed names)
+            if not self._is_valid_tool_name(tool_name):
+                self.console.print(
+                    f"[yellow]⚠ Skipping invalid/hallucinated tool name: {tool_name}[/]"
+                )
+                continue
+
             # Skip unknown tools immediately (no retries, no budget cost)
             if not self.tools.is_tool_enabled(tool_name):
                 self.console.print(f"[yellow]⚠ Skipping unknown or disabled tool: {tool_name}[/]")
@@ -1813,10 +1849,14 @@ class AgentOrchestrator:
                 "settings": self.settings,
             }
 
-            # Execute tool with retry logic (using normalized arguments)
-            result, success, error_msg = await self._execute_tool_with_retry(
-                tool_name, normalized_args, context
+            # Execute tool via centralized ToolExecutor (handles retry, caching, metrics)
+            exec_result = await self.tool_executor.execute(
+                tool_name=tool_name,
+                arguments=normalized_args,
+                context=context,
             )
+            success = exec_result.success
+            error_msg = exec_result.error
 
             # Update counters and tracking
             self.tool_calls_used += 1
@@ -1830,8 +1870,13 @@ class AgentOrchestrator:
             # Record tool execution analytics
             self._record_tool_execution(tool_name, success, elapsed_ms)
 
-            output = result.output if success and result else None
-            error_display = error_msg or (result.error if result else "Unknown error")
+            # Update conversation state machine for stage detection
+            self.conversation_state.record_tool_execution(tool_name, normalized_args)
+
+            # ToolExecutionResult stores actual output in .result field
+            output = exec_result.result if success else None
+            # Only set error_display for failures; keep None for successes
+            error_display = None if success else (error_msg or "Unknown error")
 
             self.usage_logger.log_event(
                 "tool_result",
@@ -1861,7 +1906,7 @@ class AgentOrchestrator:
                 )
             else:
                 self.failed_tool_signatures.add(signature)
-                error_display = error_msg or (result.error if result else "Unknown error")
+                # error_display was already set above from exec_result.error
                 self.console.print(
                     f"[red]✗ Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
                 )
@@ -1877,7 +1922,63 @@ class AgentOrchestrator:
 
     def reset_conversation(self) -> None:
         """Clear conversation history."""
-        self.messages.clear()
+        self.conversation.clear()
+        self._system_added = False
+
+    async def shutdown(self) -> None:
+        """Clean up resources and shutdown gracefully.
+
+        Should be called when the orchestrator is no longer needed.
+        Cleans up:
+        - Provider connections
+        - Code execution manager (Docker containers)
+        - Semantic selector resources
+        - HTTP clients
+        """
+        logger.info("Shutting down AgentOrchestrator...")
+
+        # Log final analytics
+        self.usage_logger.log_event(
+            "session_end",
+            {
+                "tool_calls_used": self.tool_calls_used,
+                "total_messages": self.conversation.message_count(),
+            },
+        )
+
+        # Close provider connection
+        if self.provider:
+            try:
+                await self.provider.close()
+                logger.debug("Provider connection closed")
+            except Exception as e:
+                logger.warning(f"Error closing provider: {e}")
+
+        # Stop code execution manager (cleans up Docker containers)
+        if hasattr(self, "code_manager") and self.code_manager:
+            try:
+                self.code_manager.stop()
+                logger.debug("Code execution manager stopped")
+            except Exception as e:
+                logger.warning(f"Error stopping code manager: {e}")
+
+        # Close semantic selector
+        if self.semantic_selector:
+            try:
+                await self.semantic_selector.close()
+                logger.debug("Semantic selector closed")
+            except Exception as e:
+                logger.warning(f"Error closing semantic selector: {e}")
+
+        logger.info("AgentOrchestrator shutdown complete")
+
+    async def __aenter__(self) -> "AgentOrchestrator":
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Async context manager exit - ensures cleanup."""
+        await self.shutdown()
 
     @classmethod
     async def from_settings(

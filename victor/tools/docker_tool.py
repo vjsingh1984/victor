@@ -27,6 +27,7 @@ import json
 import subprocess
 from typing import Any, Dict, List, Optional, Tuple
 
+from victor.tools.base import CostTier
 from victor.tools.decorators import tool
 
 
@@ -69,7 +70,7 @@ def _run_docker_command(args: List[str], timeout: int = 30) -> Tuple[bool, str, 
         return False, "", str(e)
 
 
-@tool
+@tool(cost_tier=CostTier.MEDIUM)
 async def docker(
     operation: str,
     resource_id: Optional[str] = None,

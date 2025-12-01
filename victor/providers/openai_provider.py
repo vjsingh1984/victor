@@ -29,6 +29,9 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.openai_compat import (
+    convert_tools_to_openai_format,
+)
 
 
 class OpenAIProvider(BaseProvider):
@@ -120,8 +123,10 @@ class OpenAIProvider(BaseProvider):
                 request_params["tools"] = self._convert_tools(tools)
                 request_params["tool_choice"] = "auto"
 
-            # Make API call
-            response: ChatCompletion = await self.client.chat.completions.create(**request_params)
+            # Make API call with circuit breaker protection
+            response: ChatCompletion = await self._execute_with_circuit_breaker(
+                self.client.chat.completions.create, **request_params
+            )
 
             return self._parse_response(response, model)
 
@@ -190,25 +195,8 @@ class OpenAIProvider(BaseProvider):
             raise self._handle_error(e)
 
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
-        """Convert standard tools to OpenAI format.
-
-        Args:
-            tools: Standard tool definitions
-
-        Returns:
-            OpenAI-formatted tools
-        """
-        return [
-            {
-                "type": "function",
-                "function": {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": tool.parameters,
-                },
-            }
-            for tool in tools
-        ]
+        """Convert standard tools to OpenAI format."""
+        return convert_tools_to_openai_format(tools)
 
     def _parse_response(self, response: ChatCompletion, model: str) -> CompletionResponse:
         """Parse OpenAI API response.

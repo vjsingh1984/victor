@@ -1,4 +1,10 @@
+<div align="center">
+
+![Victor Logo](./assets/victor-logo.png)
+
 # Contributing to Victor
+
+</div>
 
 Thank you for your interest in contributing to Victor! This document provides guidelines and instructions for contributing to the project.
 

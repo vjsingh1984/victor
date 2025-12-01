@@ -18,7 +18,7 @@ import json
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from anthropic import AsyncAnthropic
-from anthropic.types import Message as AnthropicMessage, MessageStreamEvent
+from anthropic.types import Message as AnthropicMessage
 
 from victor.providers.base import (
     BaseProvider,
@@ -30,6 +30,7 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.openai_compat import convert_tools_to_anthropic_format
 
 
 class AnthropicProvider(BaseProvider):
@@ -132,8 +133,10 @@ class AnthropicProvider(BaseProvider):
             if tools:
                 request_params["tools"] = self._convert_tools(tools)
 
-            # Make API call
-            response: AnthropicMessage = await self.client.messages.create(**request_params)
+            # Make API call with circuit breaker protection
+            response: AnthropicMessage = await self._execute_with_circuit_breaker(
+                self.client.messages.create, **request_params
+            )
 
             return self._parse_response(response, model)
 
@@ -254,22 +257,8 @@ class AnthropicProvider(BaseProvider):
             raise self._handle_error(e)
 
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
-        """Convert standard tools to Anthropic format.
-
-        Args:
-            tools: Standard tool definitions
-
-        Returns:
-            Anthropic-formatted tools
-        """
-        return [
-            {
-                "name": tool.name,
-                "description": tool.description,
-                "input_schema": tool.parameters,
-            }
-            for tool in tools
-        ]
+        """Convert standard tools to Anthropic format."""
+        return convert_tools_to_anthropic_format(tools)
 
     def _parse_response(self, response: AnthropicMessage, model: str) -> CompletionResponse:
         """Parse Anthropic API response.
@@ -329,29 +318,6 @@ class AnthropicProvider(BaseProvider):
             except Exception:
                 return raw_args
         return raw_args
-
-    def _parse_stream_event(self, event: MessageStreamEvent) -> Optional[StreamChunk]:
-        """Parse streaming event from Anthropic.
-
-        Args:
-            event: Stream event
-
-        Returns:
-            StreamChunk or None
-        """
-        if event.type == "content_block_delta":
-            if hasattr(event.delta, "text"):
-                return StreamChunk(
-                    content=event.delta.text,
-                    is_final=False,
-                )
-        elif event.type == "message_stop":
-            return StreamChunk(
-                content="",
-                is_final=True,
-            )
-
-        return None
 
     def _handle_error(self, error: Exception) -> ProviderError:
         """Handle and convert API errors.

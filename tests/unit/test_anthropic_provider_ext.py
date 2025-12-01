@@ -131,7 +131,7 @@ async def test_chat_with_system_message(anthropic_provider):
             Message(role="system", content="You are a helpful assistant"),
             Message(role="user", content="Hello"),
         ]
-        response = await anthropic_provider.chat(
+        await anthropic_provider.chat(
             messages=messages,
             model="claude-3-opus",
         )
@@ -301,14 +301,22 @@ async def test_chat_generic_error(anthropic_provider):
 @pytest.mark.asyncio
 async def test_stream_success(anthropic_provider):
     """Test successful streaming."""
-    # Create mock stream events
+    # Create mock stream events - delta needs type="text_delta" for the provider to recognize it
+    mock_delta1 = MagicMock()
+    mock_delta1.type = "text_delta"
+    mock_delta1.text = "Hello "
+
     mock_event1 = MagicMock()
     mock_event1.type = "content_block_delta"
-    mock_event1.delta = MagicMock(text="Hello ")
+    mock_event1.delta = mock_delta1
+
+    mock_delta2 = MagicMock()
+    mock_delta2.type = "text_delta"
+    mock_delta2.text = "world!"
 
     mock_event2 = MagicMock()
     mock_event2.type = "content_block_delta"
-    mock_event2.delta = MagicMock(text="world!")
+    mock_event2.delta = mock_delta2
 
     mock_event3 = MagicMock()
     mock_event3.type = "message_stop"
@@ -437,7 +445,7 @@ async def test_stream_error(anthropic_provider):
         messages = [Message(role="user", content="Hello")]
 
         with pytest.raises(ProviderError):
-            async for chunk in anthropic_provider.stream(
+            async for _chunk in anthropic_provider.stream(
                 messages=messages,
                 model="claude-sonnet-4-5",
             ):
@@ -521,56 +529,6 @@ async def test_parse_response_no_usage(anthropic_provider):
 
 
 @pytest.mark.asyncio
-async def test_parse_stream_event_text_delta(anthropic_provider):
-    """Test parsing text delta stream event."""
-    mock_event = MagicMock()
-    mock_event.type = "content_block_delta"
-    mock_event.delta = MagicMock(text="Hello")
-
-    chunk = anthropic_provider._parse_stream_event(mock_event)
-
-    assert chunk is not None
-    assert chunk.content == "Hello"
-    assert chunk.is_final is False
-
-
-@pytest.mark.asyncio
-async def test_parse_stream_event_message_stop(anthropic_provider):
-    """Test parsing message stop event."""
-    mock_event = MagicMock()
-    mock_event.type = "message_stop"
-
-    chunk = anthropic_provider._parse_stream_event(mock_event)
-
-    assert chunk is not None
-    assert chunk.content == ""
-    assert chunk.is_final is True
-
-
-@pytest.mark.asyncio
-async def test_parse_stream_event_unknown_type(anthropic_provider):
-    """Test parsing unknown stream event type."""
-    mock_event = MagicMock()
-    mock_event.type = "unknown_type"
-
-    chunk = anthropic_provider._parse_stream_event(mock_event)
-
-    assert chunk is None
-
-
-@pytest.mark.asyncio
-async def test_parse_stream_event_no_text_attribute(anthropic_provider):
-    """Test parsing delta without text attribute."""
-    mock_event = MagicMock()
-    mock_event.type = "content_block_delta"
-    mock_event.delta = MagicMock(spec=[])  # No 'text' attribute
-
-    chunk = anthropic_provider._parse_stream_event(mock_event)
-
-    assert chunk is None
-
-
-@pytest.mark.asyncio
 async def test_close(anthropic_provider):
     """Test closing the provider client."""
     with patch.object(
@@ -599,7 +557,7 @@ async def test_chat_with_custom_kwargs(anthropic_provider):
         mock_create.return_value = mock_message
 
         messages = [Message(role="user", content="Hello")]
-        response = await anthropic_provider.chat(
+        await anthropic_provider.chat(
             messages=messages,
             model="claude-sonnet-4-5",
             top_p=0.9,
@@ -635,7 +593,7 @@ async def test_multiple_system_messages(anthropic_provider):
             Message(role="system", content="Second system message"),
             Message(role="user", content="Hello"),
         ]
-        response = await anthropic_provider.chat(
+        await anthropic_provider.chat(
             messages=messages,
             model="claude-3-opus",
         )

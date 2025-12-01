@@ -141,3 +141,26 @@ EMBEDDING_ARCHITECTURE.md
 # Temporary test files
 test_semantic_fix.py
 test_victor_tools.sh
+
+# Development documentation (session snapshots, implementation notes)
+*_PLAN.md
+*_IMPLEMENTATION.md
+*_ANALYSIS.md
+*_OPTIMIZATIONS.md
+*_ENHANCEMENTS.md
+*_FINDINGS.md
+*_FIX.md
+*_COMPLETE.md
+*_SOLUTION.md
+
+# Temporary shell scripts
+fib*.sh
+fibonacci*.sh
+ollamamodels.sh
+
+# UI node_modules (install fresh with npm install)
+ui/node_modules/
+
+# Victor internal test files
+victor/fibonacci.py
+victor/test_*.py

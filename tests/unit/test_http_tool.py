@@ -34,7 +34,7 @@ class TestHttpRequest:
         mock_response.url = "https://api.example.com/data"
         mock_response.json.return_value = {"result": "success"}
 
-        with patch("httpx.AsyncClient") as mock_client:
+        with patch("victor.tools.http_tool.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock()
@@ -64,10 +64,10 @@ class TestHttpRequest:
         mock_response.reason_phrase = "OK"
         mock_response.headers = {}
         mock_response.url = "https://api.example.com"
-        mock_response.json.side_effect = Exception("Not JSON")
+        mock_response.json.side_effect = ValueError("Not JSON")  # ValueError, not Exception
         mock_response.text = "Plain text response"
 
-        with patch("httpx.AsyncClient") as mock_client:
+        with patch("victor.tools.http_tool.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock()
@@ -92,7 +92,7 @@ class TestHttpRequest:
         mock_response.url = "https://api.example.com"
         mock_response.json.return_value = {"authenticated": True}
 
-        with patch("httpx.AsyncClient") as mock_client:
+        with patch("victor.tools.http_tool.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock()
@@ -111,7 +111,7 @@ class TestHttpRequest:
     @pytest.mark.asyncio
     async def test_http_request_timeout(self):
         """Test HTTP request timeout handling."""
-        with patch("httpx.AsyncClient") as mock_client:
+        with patch("victor.tools.http_tool.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             # __aexit__ should return False to propagate exceptions
@@ -127,7 +127,7 @@ class TestHttpRequest:
     @pytest.mark.asyncio
     async def test_http_request_generic_exception(self):
         """Test HTTP request generic exception handling."""
-        with patch("httpx.AsyncClient") as mock_client:
+        with patch("victor.tools.http_tool.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock(return_value=False)
@@ -150,7 +150,7 @@ class TestHttpRequest:
         mock_response.url = "https://api.example.com/items"
         mock_response.json.return_value = {"id": 123}
 
-        with patch("httpx.AsyncClient") as mock_client:
+        with patch("victor.tools.http_tool.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock()
@@ -176,7 +176,7 @@ class TestHttpTest:
         mock_response.status_code = 200
         mock_response.url = "https://api.example.com"
 
-        with patch("httpx.AsyncClient") as mock_client:
+        with patch("victor.tools.http_tool.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock()
@@ -207,7 +207,7 @@ class TestHttpTest:
         mock_response.status_code = 404
         mock_response.url = "https://api.example.com"
 
-        with patch("httpx.AsyncClient") as mock_client:
+        with patch("victor.tools.http_tool.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock()
@@ -231,7 +231,7 @@ class TestHttpTest:
         mock_response.status_code = 200
         mock_response.url = "https://api.example.com"
 
-        with patch("httpx.AsyncClient") as mock_client:
+        with patch("victor.tools.http_tool.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock()
@@ -250,7 +250,7 @@ class TestHttpTest:
     @pytest.mark.asyncio
     async def test_http_test_timeout(self):
         """Test API test timeout handling."""
-        with patch("httpx.AsyncClient") as mock_client:
+        with patch("victor.tools.http_tool.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock(return_value=False)
@@ -265,7 +265,7 @@ class TestHttpTest:
     @pytest.mark.asyncio
     async def test_http_test_generic_exception(self):
         """Test API test generic exception handling."""
-        with patch("httpx.AsyncClient") as mock_client:
+        with patch("victor.tools.http_tool.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock()

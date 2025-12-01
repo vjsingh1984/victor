@@ -15,7 +15,6 @@
 """Tests for config/settings.py module."""
 
 import os
-import pytest
 from pathlib import Path
 from unittest.mock import patch, mock_open, MagicMock
 
@@ -91,7 +90,8 @@ class TestSettings:
         """Test Settings with default values."""
         settings = Settings()
 
-        assert settings.default_provider == "lmstudio"
+        # Note: default_provider is "ollama" in Settings class
+        assert settings.default_provider == "ollama"
         assert settings.default_model == "qwen3-coder:30b"
         assert settings.default_temperature == 0.7
         assert settings.default_max_tokens == 4096
@@ -119,11 +119,15 @@ class TestSettings:
             mock_dir.__truediv__.return_value = mock_profiles_file
             mock_get_config_dir.return_value = mock_dir
 
-            profiles = Settings.load_profiles()
+            # Mock the model selection to return a predictable value
+            with patch.object(
+                Settings, "_choose_default_lmstudio_model", return_value="qwen2.5-coder:7b"
+            ):
+                profiles = Settings.load_profiles()
 
-            assert "default" in profiles
-            assert profiles["default"].provider == "lmstudio"
-            assert profiles["default"].model == "qwen2.5-coder:7b"
+                assert "default" in profiles
+                assert profiles["default"].provider == "lmstudio"
+                assert profiles["default"].model == "qwen2.5-coder:7b"
 
     def test_load_profiles_with_file(self):
         """Test loading profiles from YAML file."""
@@ -395,4 +399,5 @@ class TestLoadSettings:
         settings = load_settings()
 
         assert isinstance(settings, Settings)
-        assert settings.default_provider == "lmstudio"
+        # Note: default_provider is "ollama" in Settings class
+        assert settings.default_provider == "ollama"

@@ -17,6 +17,7 @@
 import asyncio
 from typing import Dict, Any, Optional
 
+from victor.config.timeouts import ProcessTimeouts
 from victor.tools.decorators import tool
 
 
@@ -64,7 +65,7 @@ def _is_dangerous(command: str) -> bool:
 async def execute_bash(
     command: str,
     working_dir: Optional[str] = None,
-    timeout: int = 60,
+    timeout: Optional[int] = None,
     allow_dangerous: bool = False,
 ) -> Dict[str, Any]:
     """
@@ -77,7 +78,7 @@ async def execute_bash(
     Args:
         command: The bash command to execute.
         working_dir: Working directory for command execution (optional).
-        timeout: Command timeout in seconds (default: 60).
+        timeout: Command timeout in seconds (default: ProcessTimeouts.BASH_DEFAULT).
         allow_dangerous: Whether to allow potentially dangerous commands (default: False).
 
     Returns:
@@ -111,6 +112,10 @@ async def execute_bash(
             "stderr": "",
             "return_code": -1,
         }
+
+    # Apply default timeout from centralized config
+    if timeout is None:
+        timeout = ProcessTimeouts.BASH_DEFAULT
 
     # Check for dangerous commands
     if not allow_dangerous and _is_dangerous(command):

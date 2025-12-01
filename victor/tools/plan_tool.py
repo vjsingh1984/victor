@@ -1,18 +1,12 @@
-import os
 from typing import Any, Dict, List, Optional
 
+from victor.tools.common import safe_walk
 from victor.tools.decorators import tool
-
-EXCLUDE_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__", "web/ui/node_modules"}
 
 
 def _safe_walk(root: str) -> List[str]:
-    files: List[str] = []
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith(".")]
-        for fname in filenames:
-            files.append(os.path.join(dirpath, fname))
-    return files
+    """Walk directory tree safely, excluding common non-code directories."""
+    return safe_walk(root)
 
 
 @tool

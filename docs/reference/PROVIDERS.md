@@ -2,7 +2,7 @@
 
 ## Overview
 
-CodingAgent supports all major LLM providers through a unified interface. This guide covers setup and usage for each provider.
+Victor supports all major LLM providers through a unified interface. This guide covers setup and usage for each provider.
 
 ## Supported Providers
 
@@ -318,9 +318,9 @@ profiles:
 providers:
   lmstudio:
     base_url:
-      - http://192.168.1.126:1234  # Primary LMStudio server
-      - http://192.168.1.20:1234   # Secondary LMStudio server
-      - http://127.0.0.1:1234      # Tertiary LMStudio server (localhost fallback)
+      - http://127.0.0.1:1234      # Primary LMStudio server (localhost)
+      # Add LAN servers as needed:
+      # - http://your-lan-server:1234
     api_key: lm-studio  # Placeholder; LMStudio ignores it but OpenAI client requires a token
     timeout: 300
 ```

@@ -19,7 +19,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "victor"
 version = "0.1.0"
-description = "Universal AI Coding Assistant - Code to Victory with Any AI"
+description = "Enterprise-Ready AI Coding Assistant - Code to Victory with Any AI"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [
@@ -222,6 +222,9 @@ source = ["victor"]
 omit = [
     "*/tests/*",
     "*/__init__.py",
+    # CLI modules require interactive terminal testing
+    "victor/ui/cli.py",
+    "victor/ui/commands.py",
 ]
 
 [tool.coverage.report]

@@ -17,10 +17,10 @@
 import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch
 import numpy as np
 
-from victor.codebase.embeddings.base import EmbeddingConfig, SearchResult
+from victor.codebase.embeddings.base import EmbeddingConfig
 from victor.codebase.embeddings.lancedb_provider import LanceDBProvider
 from victor.codebase.embeddings.chromadb_provider import ChromaDBProvider
 from victor.codebase.embeddings.models import SentenceTransformerModel, EmbeddingModelConfig
@@ -285,8 +285,6 @@ class TestMemoryOptimization:
         )
 
         # Model size is approximately 120MB
-        expected_size_mb = 120
-        tolerance_mb = 20  # Allow 20MB tolerance
 
         # This test documents the expected memory footprint
         # Actual measurement would require loading the model

@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import logging
 
+from victor.tools.base import CostTier
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
@@ -150,7 +151,7 @@ def _is_stdlib(module_name: str) -> bool:
 # Tool functions
 
 
-@tool
+@tool(cost_tier=CostTier.LOW)
 async def refactor_rename_symbol(
     file: str,
     old_name: str,
@@ -266,7 +267,7 @@ async def refactor_rename_symbol(
     }
 
 
-@tool
+@tool(cost_tier=CostTier.LOW)
 async def refactor_extract_function(
     file: str,
     start_line: int,
@@ -407,7 +408,7 @@ async def refactor_extract_function(
     }
 
 
-@tool
+@tool(cost_tier=CostTier.LOW)
 async def refactor_inline_variable(
     file: str,
     variable_name: str,
@@ -536,7 +537,7 @@ async def refactor_inline_variable(
     }
 
 
-@tool
+@tool(cost_tier=CostTier.LOW)
 async def refactor_organize_imports(
     file: str,
     preview: bool = False,

@@ -1,12 +1,13 @@
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
+from victor.tools.common import EXCLUDE_DIRS, DEFAULT_CODE_EXTENSIONS, latest_mtime
 from victor.tools.decorators import tool
 
-EXCLUDE_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__", "web/ui/node_modules"}
-DEFAULT_EXTS = {".py", ".md", ".txt", ".yaml", ".yml", ".json", ".toml"}
+# Alias for backward compatibility
+DEFAULT_EXTS = DEFAULT_CODE_EXTENSIONS
 
 # Cache for semantic indexes to avoid re-embedding on every call
 _INDEX_CACHE: Dict[str, Dict[str, Any]] = {}
@@ -14,25 +15,17 @@ _INDEX_CACHE: Dict[str, Dict[str, Any]] = {}
 
 def _latest_mtime(root: Path) -> float:
     """Find latest modification time under root, respecting EXCLUDE_DIRS."""
-    latest = 0.0
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith(".")]
-        for fname in filenames:
-            fpath = Path(dirpath) / fname
-            try:
-                latest = max(latest, fpath.stat().st_mtime)
-            except OSError:
-                continue
-    return latest
+    return latest_mtime(root)
 
 
 def _gather_files(root: str, exts: Optional[List[str]], max_files: int) -> List[str]:
-    exts = set(exts) if exts else DEFAULT_EXTS
+    """Gather files from directory tree."""
+    ext_set: Set[str] = set(exts) if exts else DEFAULT_EXTS
     files: List[str] = []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith(".")]
         for fname in filenames:
-            if os.path.splitext(fname)[1] in exts:
+            if os.path.splitext(fname)[1] in ext_set:
                 files.append(os.path.join(dirpath, fname))
                 if len(files) >= max_files:
                     return files

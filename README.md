@@ -1,6 +1,6 @@
 <div align="center">
 
-![Victor Banner](./assets/victor-banner.svg)
+![Victor Banner](./assets/victor-banner.png)
 
 <h3>Enterprise-Ready AI Coding Assistant for Secure, Hybrid Software & Data Delivery</h3>
 <p><strong>Production-grade • Patent-protected • Apache 2.0 Licensed</strong></p>
@@ -22,7 +22,7 @@
 
 **Victor is currently in an alpha state.** The project has a comprehensive and ambitious roadmap, but the current implementation is a foundational subset of the full vision.
 
-Much of the documentation, especially `ARCHITECTURE_DEEP_DIVE.md`, describes the target architecture and features that are under active development. For a detailed breakdown of the current state and the plan to bridge this gap, please see our **[IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md)**.
+Much of the documentation, especially `docs/ARCHITECTURE_DEEP_DIVE.md`, describes the target architecture and features that are under active development. For a detailed breakdown of the current state and action items, please see our **[Codebase Analysis Report](docs/CODEBASE_ANALYSIS_REPORT.md)**.
 
 We welcome contributors who are excited to help us build the future of this project.
 
@@ -32,43 +32,56 @@ We welcome contributors who are excited to help us build the future of this proj
 
 ## What is Victor?
 
-**Victor** is an **enterprise-ready**, terminal-based AI coding assistant that provides a unified interface for working with multiple LLM providers. Whether you're using frontier models like Claude, GPT-4, and Gemini, or running open-source models locally via Ollama, LMStudio, or vLLM, Victor provides one consistent, powerful interface for all.
+**Victor** is an **enterprise-ready**, terminal-based AI coding assistant where **multiple LLMs can work together**—generating, critiquing, and refining code collaboratively. Instead of being locked into one provider's ecosystem, Victor lets you orchestrate Claude Opus 4.5, GPT-5, Gemini 3, and local models like Qwen3 or Llama as a unified team.
 
-**Why Consider Victor:**
-- **Apache 2.0 Licensed** - Patent-protected, safe for commercial use
-- **Air-Gapped Mode** - Complete offline operation for compliance requirements
-- **Production-Grade** - A solid foundation with a clear roadmap for hardening.
-- **Cost Flexibility** - Use free local models or paid APIs based on your needs
-- **Zero Vendor Lock-in** - Switch providers instantly, maintain full control
+### Why This Matters Now
 
-### The Problem Victor Solves
+The AI frontier is shifting *weekly*, not yearly:
+- **August 2025**: GPT-5 launched with unified reasoning (74.9% SWE-bench)
+- **November 18**: Gemini 3 topped 19/20 benchmarks with 37.4% on Humanity's Last Exam
+- **November 24**: Claude Opus 4.5 reclaimed coding crown (80.9% SWE-bench)
 
-<table>
-<tr>
-<td width="50%">
+Three frontier releases in one quarter. Each claiming "best for coding." If your tooling locks you into one provider, you're permanently one release behind.
 
-**Without Victor**
-- Locked into single AI provider
-- Expensive API costs for development
-- Complex tool integrations per provider
-- Manual context management
-- Limited offline capabilities
-- Fragmented workflows
+Victor is built for this reality: **add a new provider, keep your workflows**.
 
-</td>
-<td width="50%">
+### The Problem with Current AI Coding Tools
 
-**With Victor**
-- Switch providers instantly
-- Free local models for dev/test
-- 32 enterprise tools, unified
-- AI-powered semantic search
-- Full air-gapped mode
-- Single, powerful workflow
+| Tool | Lock-in | Privacy Concern | Cost Trend |
+|------|---------|-----------------|------------|
+| **GitHub Copilot** | OpenAI only | Code sent to Microsoft servers | Increasing ($19→$39/mo for enterprise) |
+| **Cursor** | Proprietary models | Caches/indexes your codebase on their servers | Rising (free tier shrinking) |
+| **Claude Code** | Anthropic only | Cloud-dependent | Pay per token |
+| **Continue.dev** | Multi-provider ✓ | Local option ✓ | Open source ✓ |
+| **Victor** | **7 providers** | **100% air-gapped option** | **Apache 2.0 open source** |
 
-</td>
-</tr>
-</table>
+**The hidden cost of Cursor and similar tools**: They index and cache your codebase on remote servers to provide "context-aware" suggestions. For enterprises with proprietary code, trade secrets, or compliance requirements (HIPAA, SOC2, ITAR)—this is a non-starter.
+
+Victor offers the same intelligent codebase understanding using **local embeddings that never leave your machine**.
+
+### Victor's Approach: LLMs as Collaborative Team Members
+
+Instead of one model doing everything, Victor enables workflows like:
+
+```
+1. DRAFT    → Fast local model (qwen3-coder:30b) generates initial code
+2. REVIEW   → Claude Opus 4.5 analyzes for edge cases and security issues
+3. REFINE   → GPT-5 optimizes for performance and readability
+4. VALIDATE → Local model runs tests (code never leaves your network)
+```
+
+Each model contributes its strength. The result is better than any single model alone.
+
+### Why Consider Victor
+
+| Feature | Benefit |
+|---------|---------|
+| **7 LLM Providers** | Claude Opus 4.5, GPT-5, Gemini 3, Grok, Ollama, LMStudio, vLLM |
+| **Future-Proof** | Add GPT-6, Claude 5, or any new model without changing workflows |
+| **100% Air-Gapped** | Complete offline operation—no code ever transmitted |
+| **Local Embeddings** | Codebase indexing that stays on your machine |
+| **54 Enterprise Tools** | Unified toolset works across all providers |
+| **Apache 2.0** | Truly open source, safe for commercial use |
 
 ---
 
@@ -80,11 +93,11 @@ Switch between AI providers as easily as changing a config file:
 
 | Provider | Models | Tool Calling | Streaming | Cost |
 |----------|--------|--------------|-----------|------|
-| **Anthropic Claude** | Sonnet 4.5, Opus, Haiku | Yes | Yes | Pay per use |
-| **OpenAI GPT** | GPT-4, GPT-4 Turbo, GPT-3.5 | Yes | Yes | Pay per use |
-| **Google Gemini** | 1.5 Pro, 1.5 Flash | Yes | Yes | Pay per use |
+| **Anthropic Claude** | Opus 4.5, Sonnet 4.5, Haiku | Yes | Yes | Pay per use |
+| **OpenAI GPT** | GPT-5, GPT-5 Pro, GPT-5 Mini | Yes | Yes | Pay per use |
+| **Google Gemini** | Gemini 3 Pro, 3 Deep Think | Yes | Yes | Pay per use |
 | **xAI Grok** | Grok, Grok Vision | Yes | Yes | Pay per use |
-| **Ollama** | Llama 3, Qwen, CodeLlama, +100 | Yes | Yes | **FREE** |
+| **Ollama** | Qwen3, Llama 3.3, CodeLlama, +100 | Yes | Yes | **FREE** |
 | **vLLM** | Any HuggingFace model | Yes | Yes | **FREE** |
 | **LMStudio** | Any GGUF model | Yes | Yes | **FREE** |
 
@@ -96,7 +109,7 @@ Switch between AI providers as easily as changing a config file:
 - **Multi-File Editor** - Atomic edits across multiple files with rollback
 - **Batch Processor** - Parallel operations on hundreds of files
 - **Refactoring Engine** - AST-based safe transformations (rename, extract, inline)
-- **Git Integration** - AI-powered commits, smart staging, intelligent branching
+- **Git Integration** - AI-powered commits, smart staging, conflict analysis, PR creation
 
 </details>
 
@@ -104,7 +117,7 @@ Switch between AI providers as easily as changing a config file:
 <summary><b>Code Quality & Analysis</b></summary>
 
 - **Code Review** - Automated quality analysis with complexity metrics
-- **Security Scanner** - Detect secrets (12+ patterns), vulnerabilities, dependencies
+- **Security Scanner** - Detect secrets (12+ patterns) and insecure configurations
 - **Code Metrics** - Complexity analysis, maintainability index, technical debt
 - **Semantic Search** - AI-powered codebase indexing with context-aware search
 
@@ -113,18 +126,19 @@ Switch between AI providers as easily as changing a config file:
 <details>
 <summary><b>Testing & CI/CD</b></summary>
 
-- **Test Generator** - Automated pytest-compatible test suites with fixtures
-- **CI/CD Automation** - Generate GitHub Actions, GitLab CI, CircleCI pipelines
-- **Coverage Analysis** - Track test coverage and identify gaps
+- **Test Runner** - Execute pytest with configurable options
+- **CI/CD Automation** - Generate GitHub Actions pipelines (GitLab/CircleCI planned)
+- *Test Generation* - Coming soon
+- *Coverage Analysis* - Coming soon
 
 </details>
 
 <details>
 <summary><b>Documentation</b></summary>
 
-- **Docstring Generator** - Auto-generate function/class documentation
-- **API Documentation** - Create comprehensive API docs
-- **README Automation** - Generate and maintain project README files
+- **Docstring Generator** - Auto-generate function/class documentation with AST analysis
+- *API Documentation* - OpenAPI/Swagger generation planned
+- *README Automation* - Coming soon
 
 </details>
 
@@ -173,7 +187,7 @@ Switch between AI providers as easily as changing a config file:
 
 ## Reality Check (Current Implementation)
 
-- **Tooling surface**: 53 tools dynamically registered (editor, git, tests, Docker, docs, refactors, cache/database/http, basic CI/CD stub). Coverage analysis and rich pipeline generators are not implemented yet.
+- **Tooling surface**: 54 tools dynamically registered (editor, git, test runner, Docker, docs, refactors, cache/database/http, basic CI/CD stub). Test generation, coverage analysis, and rich pipeline generators are not implemented yet.
 - **Tool selection & budgets**: Semantic tool selection is on by default; tool call budget/loop-guarding is enforced by the orchestrator. If stage pruning removes everything, Victor falls back to a small core set capped by `fallback_max_tools` (default 8) to avoid broadcasting all tools. Disable semantic selection via `profiles.yaml` → `tools` config if you want keyword-only.
 - **Tool cache**: Allowlisted tools (defaults: code_search, semantic_code_search, list_directory, plan_files) are cached for `tool_cache_ttl` seconds to avoid rerunning pure/idempotent operations. Configure via `tool_cache_*` settings.
 - **Planning scaffold**: A minimal dependency graph is registered for search→read→analyze flows; deeper auto-planning is a future enhancement.
@@ -372,7 +386,7 @@ Victor provides enterprise-grade tools for:
 # Install LMStudio (download from https://lmstudio.ai)
 # Launch LMStudio → Local Server tab → start qwen2.5-coder:7b
 
-# Configure Victor (tiered LMStudio endpoints: primary 192.168.1.126, secondary 192.168.1.20, fallback localhost)
+# Configure Victor (tiered LMStudio endpoints)
 cat > ~/.victor/profiles.yaml <<EOF
 profiles:
   default:
@@ -383,14 +397,14 @@ profiles:
 providers:
   lmstudio:
     base_url:
-      - http://192.168.1.126:1234  # Primary
-      - http://192.168.1.20:1234   # Secondary
-      - http://127.0.0.1:1234      # Tertiary (localhost fallback)
+      - http://127.0.0.1:1234      # Primary (localhost)
+      # Add LAN servers if needed:
+      # - http://your-lan-server:1234
     timeout: 300
 EOF
 
 # Start coding (no API key required)
-victor
+victor main
 ```
 
 **Cost**: FREE | **Speed**: Fast | **Privacy**: 100% local
@@ -433,7 +447,7 @@ providers:
 EOF
 
 # Start coding
- victor
+ victor main
 ```
 
 **Cost**: Pay per use | **Speed**: Very fast | **Privacy**: Cloud-based
@@ -443,7 +457,7 @@ EOF
 ### Your First Session
 
 ```bash
-$ victor
+$ victor main
 
 ╦  ╦╦╔═╗╔╦╗╔═╗╦═╗
 ╚╗╔╝║║   ║ ║ ║╠╦╝
@@ -620,48 +634,54 @@ See [docs/guides/MODEL_SHARING.md](docs/guides/MODEL_SHARING.md) for details.
 
 | Guide | Description |
 |-------|-------------|
-| [Getting Started](docs/guides/getting-started.md) | Installation and first steps |
-| [Configuration](docs/guides/configuration.md) | Provider and tool setup |
-| [Tools Reference](docs/reference/tools.md) | Complete tool reference |
+| [Getting Started](docs/GETTING_STARTED.md) | Installation and first steps |
+| [User Guide](docs/USER_GUIDE.md) | Complete usage guide |
+| [Tool Catalog](docs/TOOL_CATALOG.md) | All 54 tools with examples |
+| [Model Comparison](docs/MODEL_COMPARISON.md) | Ollama model benchmarks |
 | [Docker Deployment](docker/README.md) | Container deployment guide |
-| [Model Sharing](docs/guides/MODEL_SHARING.md) | Save disk space guide |
-| [Air-Gapped Mode](docs/guides/AIRGAPPED.md) | Offline operation |
-| [Contributing](CONTRIBUTING.md) | Development guidelines |
+| [Air-Gapped Mode](docs/embeddings/AIRGAPPED.md) | Offline operation |
+| [Developer Guide](docs/DEVELOPER_GUIDE.md) | Contributing and development |
+| [Full Documentation Index](docs/README.md) | All documentation |
 
 ---
 
 ## Roadmap
 
-This roadmap provides a high-level overview of the project's future direction. For a detailed breakdown of the current implementation and a concrete development plan, please see our **[IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md)**.
+This roadmap provides a high-level overview of the project's future direction. For a detailed breakdown of the current implementation and action items, please see our **[Codebase Analysis Report](docs/CODEBASE_ANALYSIS_REPORT.md)**.
 
 ### Completed
 
 - [x] Universal provider abstraction with 6+ LLMs
-- [x] 32 enterprise-grade tools (consolidated from 86, 63% reduction)
+- [x] 54 enterprise-grade tools (consolidated from 86)
 - [x] MCP protocol (server + client)
 - [x] Multi-file editing with transactions
 - [x] Semantic search & codebase indexing
 - [x] Docker deployment (production-ready)
 - [x] Air-gapped mode for enterprise
 - [x] Batch processing engine
-- [x] Code review & security scanning
-- [x] Test generation & CI/CD automation
+- [x] Code review & secret scanning (regex-based)
+- [x] Test runner & GitHub Actions CI/CD
 - [x] Tiered caching system
+- [x] Workspace snapshots & auto-commit
+- [x] Browser automation (Playwright)
 
 ### In Progress
 
 - [ ] Comprehensive test coverage (90%+ target)
 - [ ] Performance profiling & optimization
 - [ ] Additional providers (Azure OpenAI, Bedrock)
+- [ ] GitLab CI & CircleCI pipeline generation
 
 ### Planned
 
+- [ ] Test generation (pytest scaffolding)
+- [ ] Coverage analysis integration
+- [ ] Dependency vulnerability scanning
 - [ ] VS Code extension
 - [ ] JetBrains IDE plugin
 - [ ] Web UI (optional)
 - [ ] Multi-agent collaboration
 - [ ] Plugin marketplace
-- [ ] Community templates
 
 ---
 

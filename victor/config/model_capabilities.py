@@ -13,71 +13,104 @@ def _default_tool_calling_models() -> Dict[str, List[str]]:
     """Built-in manifest for providers that support tool calling."""
     return {
         # Local/open-weight: ordered by coding/tool proficiency and size bands for ~64GB hosts (Q4 focus).
+        # Source: https://ollama.com/search?c=tools
         "ollama": [
-            # 25B-50B first (best quality per GB)
-            "qwen3-coder:30b",  # ~34GB Q4, strong coder + tools
-            "deepseek-coder:33b",  # ~36GB Q4, strong code/tool
-            "deepseek-coder-v2:34b",  # ~36GB Q4, newer
-            "seed-36b",  # est ~38-42GB Q4
-            "gemma3:27b",  # est ~30-34GB Q4
-            "qwen2.5-coder:32b",  # ~36GB Q4
-            # 10B-25B next
-            "deepseek-coder-v2:16b",  # ~18GB Q4
-            "qwen2.5-coder:14b",  # ~18GB Q4
-            "seed-14b",  # ~18-20GB Q4
-            "gemma3:12b",  # ~14-16GB Q4
-            "mixtral:8x7b",  # MoE; ~24GB Q4, good tools
+            # 50B-70B tier (need 48GB+ VRAM)
+            "llama3.1:70b",  # ~40GB Q4, native tools
+            "llama3.3:70b",  # ~40GB Q4, native tools (newer)
+            "llama3-groq-tool-use:70b",  # ~40GB Q4, specialized for tools
+            "hermes3:70b",  # ~40GB Q4, tool calling
+            "nemotron:70b",  # ~40GB Q4, tool calling
+            "athene-v2:72b",  # ~44GB Q4, tool calling
+            # 25B-50B tier (best quality per GB)
+            "mixtral:8x7b",  # MoE; ~26GB Q4, good tools
             "mixtral-8x7b",  # alias
             "mixtral-8x22b",  # MoE; heavier, use only with headroom
-            # 50B-70B tier (borderline on 64GB shared GPU)
-            "llama3.1:70b",  # ~64GB Q4, borderline
+            "qwen3:32b",  # ~20GB Q4, native tools
+            "qwen3-coder:30b",  # ~18GB Q4, strong coder + tools
+            "qwen3:30b",  # ~18GB Q4, MoE variant
+            "qwen2.5-coder:32b",  # ~20GB Q4, strong coder
+            "qwen2.5:32b",  # ~20GB Q4, general purpose
+            "deepseek-coder:33b",  # ~20GB Q4, strong code/tool
+            "deepseek-coder-v2:34b",  # ~20GB Q4, newer
+            "command-r:35b",  # ~22GB Q4, enterprise tools
+            "seed-36b",  # est ~22GB Q4
+            "gemma3:27b",  # ~17GB Q4, tool calling
+            "aya-expanse:32b",  # ~20GB Q4, multilingual + tools
+            # 10B-25B tier
+            "qwen2.5-coder:14b",  # ~9GB Q4, fast coder
+            "qwen2.5-coder:7b",  # ~5GB Q4, lightweight coder
+            "deepseek-coder-v2:16b",  # ~10GB Q4
+            "seed-14b",  # ~9GB Q4
+            "gemma3:12b",  # ~8GB Q4
             # <10B for light use
-            "mistral:7b-instruct",  # ~10GB Q4
-            "phi-4",  # ~12-14GB Q4
-            "phi-4-mini",  # ~8-10GB Q4
-            "llama3.1:8b",  # ~10GB Q4
+            "llama3.1:8b",  # ~5GB Q4
+            "llama3.2:3b",  # ~2GB Q4
+            "llama3-groq-tool-use:8b",  # ~5GB Q4, specialized for tools
+            "mistral:7b-instruct",  # ~4GB Q4
+            "mistral:7b",  # ~4GB Q4
+            "phi-4",  # ~8GB Q4
+            "phi-4-mini",  # ~4GB Q4
+            "hermes3:8b",  # ~5GB Q4
+            "firefunction-v2:70b",  # specialized function calling
         ],
         "lmstudio": [
-            # 25B-50B
-            "qwen3-coder:30b",  # ~34GB Q4
-            "deepseek-coder:33b",  # ~36GB Q4
-            "seed-36b",  # ~38-42GB Q4
-            "gemma3:27b",  # ~30-34GB Q4
-            # 10B-25B
-            "deepseek-coder-v2:16b",  # ~18GB Q4
-            "qwen2.5-coder:14b",  # ~18GB Q4
-            "seed-14b",  # ~18-20GB Q4
-            "gemma3:12b",  # ~14-16GB Q4
-            "mixtral:8x7b",  # ~24GB Q4 MoE
+            # 50B-70B tier
+            "llama3.1:70b",
+            "llama3.3:70b",
+            # 25B-50B tier
+            "qwen3:32b",
+            "qwen3-coder:30b",
+            "qwen3:30b",
+            "qwen2.5-coder:32b",
+            "qwen2.5:32b",
+            "deepseek-coder:33b",
+            "deepseek-coder-v2:34b",
+            "seed-36b",
+            "gemma3:27b",
+            "mixtral:8x7b",
+            # 10B-25B tier
+            "qwen2.5-coder:14b",
+            "qwen2.5-coder:7b",
+            "deepseek-coder-v2:16b",
+            "seed-14b",
+            "gemma3:12b",
             # <10B
-            "mistral:7b-instruct",  # ~10GB Q4
-            "phi-4",  # ~12-14GB Q4
-            "phi-4-mini",  # ~8-10GB Q4
-            "llama3.1:8b",  # ~10GB Q4
+            "llama3.1:8b",
+            "mistral:7b-instruct",
+            "mistral:7b",
+            "phi-4",
+            "phi-4-mini",
         ],
         "vllm": [
-            # 25B-50B
-            "qwen3-coder:30b",  # ~34GB Q4
-            "deepseek-coder:33b",  # ~36GB Q4
-            "deepseek-coder-v2:34b",  # ~36GB Q4
-            "seed-36b",  # ~38-42GB Q4
-            "gemma3:27b",  # ~30-34GB Q4
-            "qwen2.5-coder:32b",  # ~36GB Q4
-            # 10B-25B
-            "deepseek-coder-v2:16b",  # ~18GB Q4
-            "qwen2.5-coder:14b",  # ~18GB Q4
-            "seed-14b",  # ~18-20GB Q4
-            "gemma3:12b",  # ~14-16GB Q4
-            "mixtral:8x7b",  # ~24GB Q4 MoE
-            "mixtral-8x7b",  # alias
-            "mixtral-8x22b",  # heavier MoE
-            # 50B-70B (borderline)
-            "llama3.1:70b",  # ~64GB Q4, borderline
+            # 50B-70B tier
+            "llama3.1:70b",
+            "llama3.3:70b",
+            # 25B-50B tier
+            "qwen3:32b",
+            "qwen3-coder:30b",
+            "qwen3:30b",
+            "qwen2.5-coder:32b",
+            "qwen2.5:32b",
+            "deepseek-coder:33b",
+            "deepseek-coder-v2:34b",
+            "seed-36b",
+            "gemma3:27b",
+            "mixtral:8x7b",
+            "mixtral-8x7b",
+            "mixtral-8x22b",
+            # 10B-25B tier
+            "qwen2.5-coder:14b",
+            "qwen2.5-coder:7b",
+            "deepseek-coder-v2:16b",
+            "seed-14b",
+            "gemma3:12b",
             # <10B
-            "mistral:7b-instruct",  # ~10GB Q4
-            "phi-4",  # ~12-14GB Q4
-            "phi-4-mini",  # ~8-10GB Q4
-            "llama3.1:8b",  # ~10GB Q4
+            "llama3.1:8b",
+            "mistral:7b-instruct",
+            "mistral:7b",
+            "phi-4",
+            "phi-4-mini",
         ],
         "anthropic": [
             "claude-3-5-sonnet-20241022",

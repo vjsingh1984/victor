@@ -206,7 +206,7 @@ class TestOllamaEmbeddingModel:
         """Test cleanup."""
         model = OllamaEmbeddingModel(ollama_config)
 
-        with patch("httpx.AsyncClient") as mock_client_class:
+        with patch("httpx.AsyncClient"):
             mock_client = AsyncMock()
             mock_client.aclose = AsyncMock()
             model.client = mock_client
@@ -246,7 +246,7 @@ class TestSentenceTransformerModel:
 
         with patch(
             "sentence_transformers.SentenceTransformer", return_value=mock_st_model
-        ) as mock_st:
+        ):
             with patch("asyncio.get_event_loop") as mock_loop:
                 # run_in_executor returns an awaitable that resolves to the model
                 async def mock_run_in_executor(executor, func, *args):

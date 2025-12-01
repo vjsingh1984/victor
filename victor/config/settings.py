@@ -124,12 +124,14 @@ class Settings(BaseSettings):
     google_api_key: Optional[str] = None
 
     # Local server URLs
+    # Can be overridden via environment variables:
+    #   OLLAMA_BASE_URL, LMSTUDIO_BASE_URLS (comma-separated), VLLM_BASE_URL
+    # For LAN servers, set: LMSTUDIO_BASE_URLS="http://<your-server>:1234,http://localhost:1234"
     ollama_base_url: str = "http://localhost:11434"
-    # LMStudio tiered endpoints (try in order)
+    # LMStudio tiered endpoints (try in order) - defaults to localhost only
+    # Set LMSTUDIO_BASE_URLS env var to add LAN servers
     lmstudio_base_urls: List[str] = [
         "http://127.0.0.1:1234",
-        "http://192.168.1.126:1234",
-        "http://192.168.1.20:1234",
     ]
     vllm_base_url: str = "http://localhost:8000"
 
@@ -201,6 +203,16 @@ class Settings(BaseSettings):
         "list_directory",
         "plan_files",
     ]
+
+    # Plugin System
+    plugin_enabled: bool = True  # Enable plugin system
+    plugin_dirs: List[str] = ["~/.victor/plugins"]  # Directories to search for plugins
+    plugin_packages: List[str] = []  # Python packages to load as plugins
+    plugin_disabled: List[str] = []  # List of plugin names to disable
+    plugin_config: Dict[str, Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Plugin-specific configuration (plugin_name -> config dict)",
+    )
 
     # Security scan extensions
     security_dependency_scan: bool = False
@@ -390,8 +402,6 @@ class Settings(BaseSettings):
 
         if not profiles_file.exists():
             urls = getattr(cls, "lmstudio_base_urls", []) or [
-                "http://192.168.1.126:1234",
-                "http://192.168.1.20:1234",
                 "http://localhost:1234",
             ]
             default_model = cls._choose_default_lmstudio_model(

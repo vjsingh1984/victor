@@ -780,6 +780,6 @@ class TestMyTool:
 **Related**:
 - [TESTING_STRATEGY.md](TESTING_STRATEGY.md) - Testing approach
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Detailed architecture
+- [ARCHITECTURE_DEEP_DIVE.md](ARCHITECTURE_DEEP_DIVE.md) - Detailed architecture
 
 *Last Updated: 2025-11-24*

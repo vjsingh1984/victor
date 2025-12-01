@@ -15,19 +15,27 @@
 
 import inspect
 from functools import wraps
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional, Union
 
 from docstring_parser import parse
 
-from victor.tools.base import BaseTool, ToolResult
+from victor.tools.base import BaseTool, CostTier, ToolResult
 
 
-def tool(func: Callable) -> Callable:
+def tool(
+    func: Optional[Callable] = None,
+    *,
+    cost_tier: CostTier = CostTier.FREE,
+) -> Union[Callable, Callable[[Callable], Callable]]:
     """
     A decorator that converts a Python function into a Victor tool.
 
     This decorator automatically extracts the tool's name, description,
     and parameters from the function's signature and docstring.
+
+    Args:
+        func: The function to wrap (optional, for @tool without parentheses)
+        cost_tier: Cost tier for the tool (FREE, LOW, MEDIUM, HIGH)
 
     The docstring should follow the Google Python Style Guide format.
     Example:
@@ -40,23 +48,42 @@ def tool(func: Callable) -> Callable:
                 param2: Description of the second parameter.
             '''
             # ... tool logic ...
+
+        @tool(cost_tier=CostTier.MEDIUM)
+        def web_search_tool(query: str):
+            '''Search the web - makes external API calls.'''
+            # ... tool logic ...
     """
 
-    @wraps(func)
-    def wrapper(*args, **kwargs) -> Any:
-        # This wrapper is what gets called if the decorated function is called directly
-        return func(*args, **kwargs)
+    def decorator(fn: Callable) -> Callable:
+        @wraps(fn)
+        def wrapper(*args, **kwargs) -> Any:
+            # This wrapper is what gets called if the decorated function is called directly
+            return fn(*args, **kwargs)
 
-    # Mark as tool for dynamic discovery
-    wrapper._is_tool = True  # type: ignore[attr-defined]
-    # We will attach a class to the wrapper that is the actual tool
-    wrapper.Tool = _create_tool_class(func)
+        # Mark as tool for dynamic discovery
+        wrapper._is_tool = True  # type: ignore[attr-defined]
+        # We will attach a class to the wrapper that is the actual tool
+        wrapper.Tool = _create_tool_class(fn, cost_tier=cost_tier)
 
-    return wrapper
+        return wrapper
+
+    # Support both @tool and @tool(cost_tier=...) syntax
+    if func is not None:
+        # Called without parentheses: @tool
+        return decorator(func)
+    else:
+        # Called with parentheses: @tool(cost_tier=...)
+        return decorator
 
 
-def _create_tool_class(func: Callable) -> type:
-    """Dynamically creates a class that wraps the given function to act as a BaseTool."""
+def _create_tool_class(func: Callable, cost_tier: CostTier = CostTier.FREE) -> type:
+    """Dynamically creates a class that wraps the given function to act as a BaseTool.
+
+    Args:
+        func: The function to wrap
+        cost_tier: The cost tier for this tool
+    """
 
     docstring = parse(func.__doc__ or "")
     tool_description = docstring.short_description or "No description provided."
@@ -97,6 +124,9 @@ def _create_tool_class(func: Callable) -> type:
         "required": required,
     }
 
+    # Capture cost_tier in closure
+    _cost_tier = cost_tier
+
     # Dynamically create the tool class
     class FunctionTool(BaseTool):
         def __init__(self, fn: Callable):
@@ -104,6 +134,7 @@ def _create_tool_class(func: Callable) -> type:
             self._name = fn.__name__
             self._description = tool_description
             self._parameters = tool_params_schema
+            self._cost_tier = _cost_tier
 
         @property
         def name(self) -> str:
@@ -116,6 +147,10 @@ def _create_tool_class(func: Callable) -> type:
         @property
         def parameters(self) -> Dict[str, Any]:
             return self._parameters
+
+        @property
+        def cost_tier(self) -> CostTier:
+            return self._cost_tier
 
         async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
             try:

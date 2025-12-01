@@ -1,13 +1,10 @@
-import asyncio
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings
-from victor.providers.base import BaseProvider, Message
-from victor.tools.base import ToolRegistry, BaseTool
+from victor.providers.base import BaseProvider
+from victor.tools.base import ToolRegistry, BaseTool, ToolResult
 from pathlib import Path
 
 
@@ -54,7 +51,7 @@ class AlwaysFailTool(BaseTool):
 
     async def execute(self, context, **kwargs):
         self.attempts += 1
-        return SimpleNamespace(success=False, output=None, error="boom")
+        return ToolResult(success=False, output=None, error="boom")
 
 
 @pytest.mark.asyncio
@@ -77,10 +74,12 @@ async def test_repeated_failing_call_is_skipped_after_first_failure(monkeypatch)
         max_tokens=10,
     )
 
-    # Inject a failing tool
+    # Inject a failing tool into both tools registry and tool_executor
     failing_tool = AlwaysFailTool()
     orch.tools = ToolRegistry()
     orch.tools.register(failing_tool)
+    # Update tool_executor to use the new registry
+    orch.tool_executor.tools = orch.tools
 
     # Simulate a single tool call repeated twice
     tool_calls = [
@@ -91,8 +90,10 @@ async def test_repeated_failing_call_is_skipped_after_first_failure(monkeypatch)
     # Execute tool calls
     results = await orch._handle_tool_calls(tool_calls)
 
-    # First call executed (with retries), second skipped due to repeat signature
-    assert failing_tool.attempts == 3  # retries inside ToolExecutionManager
+    # First call executed once (no retries for explicit ToolResult failures)
+    # Second call skipped due to repeat signature
+    # Note: ToolExecutor only retries on exceptions, not on explicit failures via ToolResult.success=False
+    assert failing_tool.attempts == 1  # First call only, no retries for explicit failures
     assert orch.executed_tools.count("always_fail") == 1
     assert len(results) == 1  # second call skipped pre-execution
     assert results[0]["success"] is False

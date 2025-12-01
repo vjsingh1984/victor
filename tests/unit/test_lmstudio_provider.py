@@ -27,8 +27,6 @@ from victor.providers.base import (
     Message,
     ToolDefinition,
     ProviderError,
-    ProviderAuthenticationError,
-    CompletionResponse,
 )
 
 
@@ -319,7 +317,7 @@ class TestLMStudioToolCalling:
             ]
 
             messages = [Message(role="user", content="Help me with file operations")]
-            response = await lmstudio_provider.chat(
+            await lmstudio_provider.chat(
                 messages=messages,
                 model="local-model",
                 tools=tools,
@@ -483,7 +481,7 @@ class TestVLLMProvider:
             mock_create.return_value = mock_response
 
             messages = [Message(role="user", content="Test")]
-            response = await vllm_provider.chat(
+            await vllm_provider.chat(
                 messages=messages,
                 model="deepseek-ai/deepseek-coder-6.7b-instruct",
             )
@@ -648,7 +646,7 @@ class TestVLLMToolCalling:
             ]
 
             messages = [Message(role="user", content="Help me with code analysis")]
-            response = await vllm_provider.chat(
+            await vllm_provider.chat(
                 messages=messages,
                 model="Qwen/Qwen2.5-Coder-7B-Instruct",
                 tools=tools,
@@ -835,7 +833,7 @@ class TestVLLMAdvancedFeatures:
 
             messages.append(Message(role="user", content="Summarize all analyses"))
 
-            response = await vllm_provider.chat(
+            await vllm_provider.chat(
                 messages=messages,
                 model="Qwen/Qwen2.5-Coder-7B-Instruct",
                 max_tokens=16384,  # Large context
@@ -869,7 +867,7 @@ class TestVLLMAdvancedFeatures:
             mock_create.return_value = mock_response
 
             messages = [Message(role="user", content="Generate code")]
-            response = await vllm_provider.chat(
+            await vllm_provider.chat(
                 messages=messages,
                 model="Qwen/Qwen2.5-Coder-7B-Instruct",
                 temperature=0.1,
@@ -1064,7 +1062,7 @@ class TestAdvancedFeatures:
 
             messages.append(Message(role="user", content="Final question"))
 
-            response = await lmstudio_provider.chat(
+            await lmstudio_provider.chat(
                 messages=messages,
                 model="local-model",
                 max_tokens=8192,
@@ -1098,7 +1096,7 @@ class TestAdvancedFeatures:
             mock_create.return_value = mock_response
 
             messages = [Message(role="user", content="Test")]
-            response = await lmstudio_provider.chat(
+            await lmstudio_provider.chat(
                 messages=messages,
                 model="local-model",
                 temperature=0.1,

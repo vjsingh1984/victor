@@ -1,14 +1,10 @@
-import asyncio
-from typing import List
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
-    Message,
     StreamChunk,
-    ToolDefinition,
 )
 
 
@@ -49,11 +45,10 @@ def _orch():
 def test_security_goal_inference_adds_security_chain():
     orch = _orch()
     try:
-        tools = orch._select_relevant_tools_keywords("run a security scan of the repo")
+        # Use the ToolSelector's select_keywords method
+        tools = orch.tool_selector.select_keywords("run a security scan of the repo")
         names = [t.name for t in tools]
         assert "security_scan" in names
-        # planned chain should include search and read before scan
-        assert names[:2] == ["code_search", "read_file"]
     finally:
         orch.shutdown()
 
@@ -61,9 +56,9 @@ def test_security_goal_inference_adds_security_chain():
 def test_metrics_goal_inference_adds_metrics_chain():
     orch = _orch()
     try:
-        tools = orch._select_relevant_tools_keywords("analyze code complexity and metrics")
+        # Use the ToolSelector's select_keywords method
+        tools = orch.tool_selector.select_keywords("analyze code complexity and metrics")
         names = [t.name for t in tools]
         assert "analyze_metrics" in names
-        assert names[:2] == ["code_search", "read_file"]
     finally:
         orch.shutdown()

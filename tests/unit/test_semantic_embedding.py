@@ -16,8 +16,7 @@
 
 import pytest
 import numpy as np
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
-from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.tools.semantic_selector import SemanticToolSelector
 from victor.tools.base import ToolRegistry, BaseTool
@@ -130,7 +129,7 @@ class TestSentenceTransformersEmbedding:
             MockST.return_value = mock_model
 
             # Should run without blocking
-            embedding = await selector._get_sentence_transformer_embedding("test text")
+            await selector._get_sentence_transformer_embedding("test text")
 
             # Verify encode was called
             mock_model.encode.assert_called_once_with("test text", convert_to_numpy=True)
@@ -166,7 +165,7 @@ class TestOllamaAPIEmbedding:
             mock_post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
             mock_post.return_value.__aexit__ = AsyncMock()
 
-            embedding = await selector._get_api_embedding("test text")
+            await selector._get_api_embedding("test text")
 
             # Verify correct API endpoint and payload
             mock_post.assert_called_once()
@@ -246,7 +245,12 @@ class TestToolSelectionWithEmbeddings:
     async def test_tool_selection_with_sentence_transformers(
         self, mock_tool_registry, temp_cache_dir
     ):
-        """Test complete tool selection flow with sentence-transformers."""
+        """Test complete tool selection flow with sentence-transformers.
+
+        Note: select_relevant_tools filters by categories first, so mock_tool
+        won't be selected unless we also mock the category filtering.
+        This test verifies the embedding initialization and basic selection flow.
+        """
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
         with patch("sentence_transformers.SentenceTransformer") as MockST:
@@ -265,14 +269,20 @@ class TestToolSelectionWithEmbeddings:
             # Initialize embeddings
             await selector.initialize_tool_embeddings(mock_tool_registry)
 
-            # Select tools
-            selected_tools = await selector.select_relevant_tools(
-                "use the mock tool", mock_tool_registry, max_tools=5, similarity_threshold=0.3
-            )
+            # Verify embeddings were cached
+            assert "mock_tool" in selector._tool_embedding_cache
 
-            # Should select mock_tool due to high similarity
-            tool_names = [t.name for t in selected_tools]
-            assert len(tool_names) > 0
+            # Mock the category filtering to include our mock_tool
+            with patch.object(selector, "_get_relevant_categories", return_value=["mock_tool"]):
+                # Select tools
+                selected_tools = await selector.select_relevant_tools(
+                    "use the mock tool", mock_tool_registry, max_tools=5, similarity_threshold=0.3
+                )
+
+                # Should select mock_tool since we mocked the category filter
+                tool_names = [t.name for t in selected_tools]
+                assert len(tool_names) > 0
+                assert "mock_tool" in tool_names
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Intelligent Tool Selection
 
-> Status: This document includes planned behavior; verify current capabilities in README.md (Reality Check) and IMPROVEMENT_PLAN.md.
+> Status: This document includes planned behavior; verify current capabilities in README.md (Reality Check) and CODEBASE_ANALYSIS_REPORT.md.
 
 Victor implements smart, context-aware tool selection to optimize performance and prevent overwhelming smaller models.
 

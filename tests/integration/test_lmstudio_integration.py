@@ -68,7 +68,7 @@ async def test_lmstudio_server_available():
         async with httpx.AsyncClient() as client:
             response = await client.get("http://localhost:1234/v1/models", timeout=5.0)
             assert response.status_code == 200
-            print(f"\nLMStudio server is running")
+            print("\nLMStudio server is running")
     except Exception as e:
         pytest.skip(f"LMStudio server not running: {e}")
 

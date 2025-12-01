@@ -6,9 +6,7 @@ from victor.config.settings import Settings
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
-    Message,
     StreamChunk,
-    ToolDefinition,
 )
 from victor.tools.base import ToolResult
 

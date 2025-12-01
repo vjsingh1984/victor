@@ -22,8 +22,6 @@ Tests the consolidated code_review function with various aspects:
 - all (comprehensive review)
 """
 
-import tempfile
-from pathlib import Path
 import pytest
 
 from victor.tools.code_review_tool import (

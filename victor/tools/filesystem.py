@@ -33,6 +33,11 @@ async def read_file(path: str) -> str:
     Returns:
         The content of the file as a string.
 
+    Raises:
+        FileNotFoundError: If the file doesn't exist.
+        IsADirectoryError: If the path is a directory.
+        PermissionError: If access is denied.
+
     Examples:
         Read a Python source file:
             await read_file("src/main.py")
@@ -43,19 +48,15 @@ async def read_file(path: str) -> str:
         Read a requirements file:
             await read_file("requirements.txt")
     """
-    try:
-        file_path = Path(path).expanduser().resolve()
+    file_path = Path(path).expanduser().resolve()
 
-        if not file_path.exists():
-            return f"Error: File not found at {path}"
-        if not file_path.is_file():
-            return f"Error: Path {path} is not a file."
+    if not file_path.exists():
+        raise FileNotFoundError(f"File not found: {path}")
+    if not file_path.is_file():
+        raise IsADirectoryError(f"Path is not a file: {path}")
 
-        async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
-            return await f.read()
-
-    except Exception as e:
-        return f"An unexpected error occurred: {e}"
+    async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+        return await f.read()
 
 
 @tool
@@ -70,6 +71,10 @@ async def write_file(path: str, content: str) -> str:
     Returns:
         A confirmation message upon success.
 
+    Raises:
+        IsADirectoryError: If the path is a directory.
+        PermissionError: If access is denied.
+
     Examples:
         Create a new Python module:
             await write_file("src/utils.py", "def helper():\\n    pass")
@@ -80,17 +85,17 @@ async def write_file(path: str, content: str) -> str:
         Create a README:
             await write_file("README.md", "# Project Title\\n\\nDescription here")
     """
-    try:
-        file_path = Path(path).expanduser().resolve()
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path = Path(path).expanduser().resolve()
 
-        async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
-            await f.write(content)
+    if file_path.exists() and file_path.is_dir():
+        raise IsADirectoryError(f"Cannot write to directory: {path}")
 
-        return f"Successfully wrote {len(content)} characters to {path}."
+    file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    except Exception as e:
-        return f"An unexpected error occurred: {e}"
+    async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
+        await f.write(content)
+
+    return f"Successfully wrote {len(content)} characters to {path}."
 
 
 @tool

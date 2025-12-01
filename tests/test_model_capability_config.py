@@ -6,8 +6,23 @@ configured per profile instead of being hardcoded in the orchestrator.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from victor.config.settings import ProfileConfig
+
+
+def create_mock_settings():
+    """Create a mock settings object with all required attributes."""
+    from victor.config.settings import Settings
+
+    mock_settings = MagicMock(spec=Settings)
+    mock_settings.tool_call_budget = 300
+    mock_settings.airgapped_mode = False
+    mock_settings.use_semantic_tool_selection = False
+    mock_settings.use_mcp_tools = False
+    mock_settings.analytics_log_file = "/tmp/test_analytics.jsonl"
+    mock_settings.analytics_enabled = False
+    mock_settings.load_tool_config.return_value = {}
+    return mock_settings
 
 
 def test_profile_config_accepts_tool_selection_params():
@@ -56,15 +71,9 @@ def test_profile_config_without_tool_selection_uses_defaults():
 def test_orchestrator_uses_configured_tool_selection():
     """Test that orchestrator uses tool_selection from profile config."""
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.providers.base import BaseProvider, Message, CompletionResponse
-    from victor.config.settings import Settings
+    from victor.providers.base import BaseProvider
 
-    # Mock settings with all required attributes
-    mock_settings = MagicMock(spec=Settings)
-    mock_settings.tool_call_budget = 300
-    mock_settings.airgapped_mode = False
-    mock_settings.use_semantic_tool_selection = False  # Disable for simpler testing
-    mock_settings.use_mcp_tools = False
+    mock_settings = create_mock_settings()
 
     # Mock provider
     mock_provider = MagicMock(spec=BaseProvider)
@@ -99,13 +108,8 @@ def test_orchestrator_adaptive_logic_still_applies():
     """Test that adaptive adjustments still work with configured values."""
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.providers.base import BaseProvider
-    from victor.config.settings import Settings
 
-    mock_settings = MagicMock(spec=Settings)
-    mock_settings.tool_call_budget = 300
-    mock_settings.airgapped_mode = False
-    mock_settings.use_semantic_tool_selection = False
-    mock_settings.use_mcp_tools = False
+    mock_settings = create_mock_settings()
 
     mock_provider = MagicMock(spec=BaseProvider)
     mock_provider.supports_tools.return_value = True
@@ -137,13 +141,8 @@ def test_orchestrator_without_config_uses_hardcoded_defaults():
     """Test backwards compatibility - orchestrator without tool_selection config."""
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.providers.base import BaseProvider
-    from victor.config.settings import Settings
 
-    mock_settings = MagicMock(spec=Settings)
-    mock_settings.tool_call_budget = 300
-    mock_settings.airgapped_mode = False
-    mock_settings.use_semantic_tool_selection = False
-    mock_settings.use_mcp_tools = False
+    mock_settings = create_mock_settings()
 
     mock_provider = MagicMock(spec=BaseProvider)
     mock_provider.supports_tools.return_value = True
@@ -176,9 +175,9 @@ def test_model_size_tier_shortcuts():
         "cloud": {"base_threshold": 0.18, "base_max_tools": 10},  # Claude/GPT
     }
 
-    for tier_name, expected in tiers.items():
+    for tier_name, _expected in tiers.items():
         config = ProfileConfig(
-            provider="ollama", model=f"test-model", tool_selection={"model_size_tier": tier_name}
+            provider="ollama", model="test-model", tool_selection={"model_size_tier": tier_name}
         )
 
         assert config.tool_selection["model_size_tier"] == tier_name
