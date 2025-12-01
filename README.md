@@ -443,7 +443,7 @@ See [docs/guides/MODEL_SHARING.md](docs/guides/MODEL_SHARING.md) for details.
 > Index this codebase with semantic search
 
 [✓] Analyzing codebase structure...
-[✓] Generating embeddings with Qwen3-Embedding:8b
+[✓] Generating embeddings with sentence-transformers (all-MiniLM-L6-v2)
 [✓] Indexed 1,247 files in 3.2 minutes
 
 > Find all authentication-related code
@@ -455,7 +455,7 @@ See [docs/guides/MODEL_SHARING.md](docs/guides/MODEL_SHARING.md) for details.
     ...
 ```
 
-**Powered by**: Qwen3-Embedding:8b (#1 MTEB multilingual, 70.58 score)
+**Powered by**: sentence-transformers by default (local, free); configurable to other embedding providers (OpenAI, Cohere, custom) via `EmbeddingConfig`.
 
 ### Batch Operations
 
