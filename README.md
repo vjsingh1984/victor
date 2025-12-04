@@ -44,19 +44,16 @@ Three frontier releases in one quarter. Each claiming "best for coding." If your
 
 Victor is built for this reality: **add a new provider, keep your workflows**.
 
-### The Problem with Current AI Coding Tools
+### What Victor Provides
 
-| Tool | Lock-in | Privacy Concern | Cost Trend |
-|------|---------|-----------------|------------|
-| **GitHub Copilot** | OpenAI only | Code sent to Microsoft servers | Increasing ($19→$39/mo for enterprise) |
-| **Cursor** | Proprietary models | Caches/indexes your codebase on their servers | Rising (free tier shrinking) |
-| **Claude Code** | Anthropic only | Cloud-dependent | Pay per token |
-| **Continue.dev** | Multi-provider ✓ | Local option ✓ | Open source ✓ |
-| **Victor** | **7 providers** | **100% air-gapped option** | **Apache 2.0 open source** |
+| Capability | Description |
+|------------|-------------|
+| **7 LLM Providers** | Anthropic, OpenAI, Google, xAI, Ollama, LMStudio, vLLM |
+| **100% Air-Gapped Option** | Complete offline operation with local models |
+| **Local Embeddings** | Codebase indexing that never leaves your machine |
+| **Apache 2.0 License** | Open source, safe for commercial use |
 
-**The hidden cost of Cursor and similar tools**: They index and cache your codebase on remote servers to provide "context-aware" suggestions. For enterprises with proprietary code, trade secrets, or compliance requirements (HIPAA, SOC2, ITAR)—this is a non-starter.
-
-Victor offers the same intelligent codebase understanding using **local embeddings that never leave your machine**.
+For enterprises with proprietary code, trade secrets, or compliance requirements (HIPAA, SOC2, ITAR), Victor provides **local embeddings that never leave your machine**.
 
 ### Victor's Approach: LLMs as Collaborative Team Members
 
@@ -84,31 +81,30 @@ Each model contributes its strength. The result is better than any single model 
 
 ---
 
-## Best-in-Class Features
+## Victor Features
 
-Victor combines the best capabilities of commercial AI coding tools while remaining 100% open source and privacy-first.
+Victor is 100% open source and privacy-first.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                         VICTOR vs COMMERCIAL AI CODING TOOLS                         │
+│                              VICTOR FEATURE SUMMARY                                  │
 ├─────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                      │
-│  Feature              │ Victor      │ Cursor     │ Copilot    │ Claude Code         │
-│  ─────────────────────┼─────────────┼────────────┼────────────┼───────────────────  │
-│  Semantic Code Search │ ✅ Local     │ ✅ Cloud   │ ❌         │ ❌                   │
-│  Project Isolation    │ ✅ Per-repo  │ ❌ Global  │ N/A        │ N/A                 │
-│  Multi-Provider       │ ✅ 7+        │ ❌ 1       │ ❌ 1       │ ❌ 1                 │
-│  Air-Gapped Mode      │ ✅ Full      │ ❌         │ ❌         │ ❌                   │
-│  Local Embeddings     │ ✅           │ ❌ Cloud   │ ❌         │ ❌                   │
-│  Metadata Filters     │ ✅ 6 types   │ ⚠️ Limited │ ❌         │ ❌                   │
-│  Open Source          │ ✅ Apache 2  │ ❌         │ ❌         │ ❌                   │
-│  Self-Hosted          │ ✅           │ ❌         │ ❌         │ ❌                   │
-│  Price                │ FREE         │ $20/mo     │ $19/mo     │ Usage-based         │
+│  Feature              │ Description                                                 │
+│  ─────────────────────┼───────────────────────────────────────────────────────────  │
+│  Semantic Code Search │ Local embeddings, project-isolated storage                  │
+│  Project Isolation    │ Per-repo embeddings in {project}/.embeddings/               │
+│  Multi-Provider       │ 7+ providers (Anthropic, OpenAI, Google, Ollama, etc.)      │
+│  Air-Gapped Mode      │ 100% offline operation with local models                    │
+│  Local Embeddings     │ BAAI/bge-small-en-v1.5, runs locally                        │
+│  Metadata Filters     │ 6 filter types (symbol, visibility, language, etc.)         │
+│  Open Source          │ Apache 2.0 license                                          │
+│  Self-Hosted          │ Docker-ready, no external dependencies required             │
 │                                                                                      │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### What Makes Victor Best-in-Class
+### Intelligent Indexing Pipeline
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
@@ -577,7 +573,7 @@ See [docs/guides/MODEL_SHARING.md](docs/guides/MODEL_SHARING.md) for details.
 
 ### Semantic Search & Codebase Intelligence
 
-Victor features **best-in-class semantic code search** with intelligent indexing that rivals commercial tools like Cursor and GitHub Copilot—but runs 100% locally with project-isolated storage.
+Victor features **semantic code search** with intelligent indexing that runs 100% locally with project-isolated storage.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -691,97 +687,59 @@ Victor features **best-in-class semantic code search** with intelligent indexing
 
 ### Benchmark Evaluation Framework
 
-Victor includes an **industry-standard benchmark evaluation harness** for measuring code generation quality against published benchmarks like SWE-bench, HumanEval, and MBPP.
+Victor includes a **benchmark evaluation harness** for measuring code quality using industry-standard datasets.
 
+**What the Framework Provides:**
+- Pass@k metric calculation (from OpenAI's Codex paper)
+- Code quality analysis (syntax, complexity, type coverage)
+- Dataset loaders for HumanEval, MBPP, SWE-bench from HuggingFace
+- Test execution and result tracking
+
+**Verified Framework Test** (run on 2025-12-04):
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    BENCHMARK EVALUATION FRAMEWORK                            │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  SUPPORTED BENCHMARKS (Real HuggingFace datasets - no simulation):          │
-│  ┌────────────────────────────────────────────────────────────────────────┐ │
-│  │ SWE-bench         │ 2,294 real GitHub issues from Python repos         │ │
-│  │ SWE-bench Lite    │ 300 curated subset for faster evaluation           │ │
-│  │ HumanEval         │ 164 code generation problems (OpenAI)              │ │
-│  │ MBPP              │ 974 basic Python problems (Google Research)        │ │
-│  └────────────────────────────────────────────────────────────────────────┘ │
-│                                                                              │
-│  EVALUATION METRICS:                                                         │
-│  ┌────────────────────────────────────────────────────────────────────────┐ │
-│  │ Pass@k           │ Probability of 1 correct in k samples (Codex paper) │ │
-│  │ Code Quality     │ Syntax, linting, complexity, maintainability        │ │
-│  │ Token Efficiency │ Tokens used per test passed                         │ │
-│  │ Completion Score │ Weighted partial success scoring                    │ │
-│  └────────────────────────────────────────────────────────────────────────┘ │
-│                                                                              │
-│  QUALITY DIMENSIONS:                                                         │
-│  ├── Syntax validation (AST parsing)                                        │
-│  ├── Lint errors/warnings (ruff integration)                                │
-│  ├── Cyclomatic complexity                                                  │
-│  ├── Maintainability index                                                  │
-│  ├── Type hint coverage                                                     │
-│  └── Overall quality score (0-100)                                          │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
+======================================================================
+VICTOR BENCHMARK VERIFICATION - HumanEval Sample
+======================================================================
+Timestamp: 2025-12-04T05:26:10
+
+[1/5] HumanEval/0    Status: PASS    Quality: 91.8/100    Time: 36ms
+[2/5] HumanEval/1    Status: PASS    Quality: 91.5/100    Time: 35ms
+[3/5] HumanEval/2    Status: PASS    Quality: 98.8/100    Time: 33ms
+[4/5] HumanEval/3    Status: PASS    Quality: 95.2/100    Time: 37ms
+[5/5] HumanEval/4    Status: PASS    Quality: 97.0/100    Time: 36ms
+
+SUMMARY:
+  Total Tasks:         5
+  Passed:              5
+  Pass Rate:           100.0%
+  Avg Code Quality:    94.9/100
+
+Note: This test used canonical (ground-truth) solutions from HumanEval
+to verify the evaluation framework executes correctly.
+======================================================================
 ```
 
-**Pass@k Metric** (Industry Standard):
-```
-Formula: pass@k = 1 - C(n-c, k) / C(n, k)
-  where n = total samples, c = correct samples
+**Run It Yourself:**
+```bash
+# 1. Install dependencies
+pip install -e ".[dev]"
+pip install datasets
 
-Example with 100 samples, 50 correct:
-  Pass@  1: ███████████████░░░░░░░░░░░░░░░ 50.00%
-  Pass@  5: █████████████████████████████░ 97.19%
-  Pass@ 10: █████████████████████████████░ 99.94%
-  Pass@100: ██████████████████████████████ 100.00%
-```
+# 2. Run unit tests (32 tests)
+pytest tests/unit/test_evaluation.py -v
+# Expected: 32 passed
 
-**Code Quality Analysis**:
-```
-Sample                      Syntax  Lines  Funcs  Types  Complexity  Score
-----------------------------------------------------------------------
-Fibonacci (Recursive)          ✓      5      1    100%      2.0      95.0
-Binary Search (Typed)          ✓     13      1    100%      4.0      92.7
-Quick Sort (Complex)           ✓      8      1      0%      5.0      90.0
-FizzBuzz (Simple)              ✓     12      1      0%      5.0      90.4
+# 3. Run benchmark verification
+python scripts/run_benchmark_sample.py --tasks 5
 ```
 
-**Competitive Analysis**:
-```
-┌─────────────────────┬────────────┬────────────┬────────────┬────────────┐
-│ Feature             │   Victor   │   Cursor   │   Copilot  │  Amazon Q  │
-├─────────────────────┼────────────┼────────────┼────────────┼────────────┤
-│ SWE-bench eval      │     ✓      │     ✓      │     ✗      │     ✗      │
-│ Pass@k metrics      │     ✓      │     ?      │     ✗      │     ✗      │
-│ Code quality score  │     ✓      │     ✗      │     ✗      │     ✗      │
-│ Token efficiency    │     ✓      │     ✗      │     ✗      │     ✗      │
-│ Open source         │     ✓      │     ✗      │     ✗      │     ✗      │
-│ Local LLM support   │     ✓      │     ✗      │     ✗      │     ✗      │
-└─────────────────────┴────────────┴────────────┴────────────┴────────────┘
-```
-
-**Run Benchmarks**:
+**Load Benchmark Datasets:**
 ```python
-from victor.evaluation import (
-    EvaluationHarness, EvaluationConfig, BenchmarkType,
-    HumanEvalRunner, pass_at_k, CodeQualityAnalyzer
-)
+from victor.evaluation import HumanEvalRunner, MBPPRunner
 
-# Setup harness
-harness = EvaluationHarness()
-harness.register_runner(HumanEvalRunner())
-
-# Configure evaluation
-config = EvaluationConfig(
-    benchmark=BenchmarkType.HUMAN_EVAL,
-    model="claude-3-5-haiku",
-    max_tasks=50,
-)
-
-# Run evaluation
-result = await harness.run_evaluation(config, agent_callback)
-print(f"Pass rate: {result.pass_rate:.1%}")
+# Loads from HuggingFace:
+# - openai/openai_humaneval (164 tasks)
+# - google-research-datasets/mbpp (974 tasks)
 ```
 
 ---
@@ -875,11 +833,11 @@ This roadmap provides a high-level overview of the project's future direction. F
 - [x] Workspace snapshots & auto-commit
 - [x] Browser automation (Playwright)
 - [x] **Benchmark Evaluation Framework**:
-  - [x] Industry-standard Pass@k metric (Codex paper methodology)
-  - [x] Code quality analyzer (syntax, linting, complexity, maintainability)
-  - [x] SWE-bench, HumanEval, MBPP benchmark runners
-  - [x] Real HuggingFace dataset integration (no simulation)
-  - [x] Token efficiency and completion scoring
+  - [x] Pass@k metric calculation (Codex paper methodology)
+  - [x] Code quality analyzer (syntax, complexity, type coverage)
+  - [x] HumanEval, MBPP dataset loaders (from HuggingFace)
+  - [x] Test execution and result tracking
+  - [x] 32 unit tests verifying framework functionality
 
 ### In Progress
 
