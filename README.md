@@ -331,6 +331,7 @@ Victor includes an industry-standard evaluation harness using the **HumanEval** 
 |---------------|-------|-----------|--------|--------|---------------|
 | **Anthropic/claude-sonnet-4-5** | 164 | **93.9%** | 93.90% | 100% | 1.3s |
 | **Ollama/gpt-oss:latest** | 164 | **88.4%** | 88.41% | 100% | 9.1s |
+| **Ollama/qwen2.5-coder:32b** | 164 | **86.6%** | 86.59% | 100% | 9.2s |
 | Anthropic/claude-3-5-haiku | 164 | **81.1%** | 81.10% | 99.98% | 1.0s |
 | Ollama/qwen3-coder:30b | 164 | **78.7%** | 78.66% | 99.97% | 3.4s |
 | Ollama/deepseek-coder-v2:16b | 164 | **76.2%** | 76.22% | 99.94% | 2.1s |
@@ -350,8 +351,9 @@ Victor includes an industry-standard evaluation harness using the **HumanEval** 
 
 **Key Observations:**
 - **Claude Sonnet 4.5 leads at 93.9%** - the only model above 90% on full HumanEval
-- **Ollama gpt-oss:latest achieves 88.4%** - within 5.5 points of Sonnet with zero API costs
+- **Three local models exceed 86%**: gpt-oss (88.4%), qwen2.5-coder:32b (86.6%), Claude Haiku (81.1%)
 - **Best local model (gpt-oss) delivers 94% of Sonnet's performance** at zero cost
+- **qwen2.5-coder:32b** achieves 86.6% - excellent quality/cost tradeoff
 - **Model size matters**: llama3.1:8b (4.9GB) scores 57.9% vs 88.4% for gpt-oss (13GB)
 - All models achieve ≥98.79% Pass@5, demonstrating robust solution generation with retries
 - **qwen3-coder:30b** is 2.7x faster than gpt-oss (3.4s vs 9.1s per task)
@@ -362,6 +364,7 @@ Victor includes an industry-standard evaluation harness using the **HumanEval** 
 |-------|-----------|---------|------|----------|
 | Claude Sonnet 4.5 | 93.9% | Fast (1.3s) | $$$ | Production, critical code |
 | gpt-oss:latest | 88.4% | Medium (9.1s) | **FREE** | Cost-sensitive, air-gapped |
+| qwen2.5-coder:32b | 86.6% | Medium (9.2s) | **FREE** | High-quality local alternative |
 | Claude Haiku | 81.1% | Fast (1.0s) | $ | High volume, budget conscious |
 | qwen3-coder:30b | 78.7% | Fast (3.4s) | **FREE** | Fast local iteration |
 
