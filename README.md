@@ -93,7 +93,7 @@ Victor is 100% open source and privacy-first.
 │  Feature              │ Description                                                 │
 │  ─────────────────────┼───────────────────────────────────────────────────────────  │
 │  Semantic Code Search │ Local embeddings, project-isolated storage                  │
-│  Project Isolation    │ Per-repo embeddings in {project}/.embeddings/               │
+│  Project Isolation    │ Per-repo embeddings in {project}/.victor/embeddings/        │
 │  Multi-Provider       │ 7+ providers (Anthropic, OpenAI, Google, Ollama, etc.)      │
 │  Air-Gapped Mode      │ 100% offline operation with local models                    │
 │  Local Embeddings     │ BAAI/bge-small-en-v1.5, runs locally                        │
@@ -146,7 +146,7 @@ Victor is 100% open source and privacy-first.
 | **Adaptive Batching** | Dynamic batch sizes (8-64) based on text length | Prevents OOM, maximizes throughput |
 | **Content Deduplication** | SHA256 hashing before embedding | 15% fewer chunks, lower storage |
 | **Incremental Updates** | Only re-embeds modified files | Instant subsequent searches |
-| **Project Isolation** | `{project}/.embeddings/` storage | Each repo independent, scales infinitely |
+| **Project Isolation** | `{project}/.victor/embeddings/` storage | Each repo independent, scales infinitely |
 | **Rich Metadata** | 6 filter dimensions + 10+ metrics per chunk | Precise, filtered searches |
 | **40+ Languages** | Extension-based detection with fallbacks | True polyglot support |
 
@@ -164,7 +164,7 @@ Victor is 100% open source and privacy-first.
 │  ├── After dedup:       7,960 (6.5% reduction)                           │
 │  ├── Parse time:        2.34s (parallel AST)                             │
 │  ├── Embed time:        ~45s (local sentence-transformers)               │
-│  └── Storage:           ~50MB in .embeddings/                            │
+│  └── Storage:           ~50MB in .victor/embeddings/                     │
 │                                                                          │
 │  Subsequent Searches (with cached index):                                │
 │  ├── Index load:        <1s (LanceDB memory-mapped)                      │
@@ -300,7 +300,7 @@ Switch between AI providers as easily as changing a config file:
 ## Reality Check (Current Implementation)
 
 - **Tooling surface**: 65 tools dynamically registered (editor, git, test runner, Docker, docs, refactors, cache/database/http, semantic search, basic CI/CD stub). Test generation, coverage analysis, and rich pipeline generators are not implemented yet.
-- **Semantic code search**: Full-featured `semantic_code_search` with parallel AST parsing, BODY_AWARE chunking, metadata filters, incremental updates, and project-local storage. Auto-indexes on first search, instant subsequent queries. Use `code_search` for simple keyword matching.
+- **Semantic code search**: Full-featured `semantic_code_search` with parallel AST parsing, BODY_AWARE chunking, metadata filters, incremental updates, and project-local storage (`{project}/.victor/embeddings/`). Auto-indexes on first search, instant subsequent queries. Use `code_search` for simple keyword matching.
 - **Tool selection & budgets**: Semantic tool selection is on by default; tool call budget/loop-guarding is enforced by the orchestrator. If stage pruning removes everything, Victor falls back to a small core set capped by `fallback_max_tools` (default 8) to avoid broadcasting all tools. Disable semantic selection via `profiles.yaml` → `tools` config if you want keyword-only.
 - **Tool cache**: Allowlisted tools (defaults: code_search, semantic_code_search, list_directory, plan_files) are cached for `tool_cache_ttl` seconds to avoid rerunning pure/idempotent operations. Configure via `tool_cache_*` settings.
 - **Planning scaffold**: A minimal dependency graph is registered for search→read→analyze flows; deeper auto-planning is a future enhancement.
@@ -601,7 +601,7 @@ Victor features **semantic code search** with intelligent indexing that runs 100
 │                                               │                              │
 │                                               ▼                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │  PROJECT-LOCAL STORAGE: {project}/.embeddings/                        │   │
+│  │  PROJECT-LOCAL STORAGE: {project}/.victor/embeddings/                  │   │
 │  │  ┌─────────────────────────────────────────────────────────────────┐ │   │
 │  │  │ LanceDB Vector Store                                             │ │   │
 │  │  │ • Persistent across sessions    • Instant search (<100ms)       │ │   │
@@ -621,7 +621,7 @@ Victor features **semantic code search** with intelligent indexing that runs 100
 | **Dynamic Batch Sizing** | Adaptive batch sizes (8-64) based on text length to prevent OOM |
 | **Content Deduplication** | SHA256 hashing eliminates duplicate chunks before embedding |
 | **Incremental Updates** | Only re-embeds changed files, not entire codebase |
-| **Project Isolation** | Each project stores embeddings in `{project}/.embeddings/` |
+| **Project Isolation** | Each project stores embeddings in `{project}/.victor/embeddings/` |
 | **40+ Language Support** | Python, TypeScript, Go, Rust, Java, C++, and more |
 | **Rich Metadata Filters** | Filter by symbol type, visibility, language, test files, docstrings |
 
@@ -822,7 +822,7 @@ This roadmap provides a high-level overview of the project's future direction. F
   - [x] Dynamic batch sizing (8-64) to prevent OOM
   - [x] SHA256 content deduplication (~15% reduction)
   - [x] Incremental updates (only changed files re-embedded)
-  - [x] Project-local storage (`{repo}/.embeddings/`)
+  - [x] Project-local storage (`{repo}/.victor/embeddings/`)
   - [x] 40+ language detection
 - [x] Docker deployment (production-ready)
 - [x] Air-gapped mode for enterprise
