@@ -18,6 +18,7 @@ Implements evaluation against the SWE-bench benchmark for
 real-world software engineering tasks.
 """
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -383,8 +384,13 @@ class HumanEvalRunner(BaseBenchmarkRunner):
             generated_code=agent_output,
         )
 
-        # Combine generated code with test
-        full_code = agent_output + "\n\n" + task.test_code
+        # Extract function name from the prompt to call the check function
+        import re
+        func_match = re.search(r"def\s+(\w+)\s*\(", task.prompt)
+        func_name = func_match.group(1) if func_match else "solution"
+
+        # Combine generated code with test and call the check function
+        full_code = agent_output + "\n\n" + task.test_code + f"\n\ncheck({func_name})\n"
 
         env = TaskEnvironment(task=task, use_docker=config.use_docker)
 
@@ -396,7 +402,6 @@ class HumanEvalRunner(BaseBenchmarkRunner):
             code_file.write_text(full_code)
 
             # Run tests
-            import asyncio
             proc = await asyncio.create_subprocess_exec(
                 "python", str(code_file),
                 stdout=asyncio.subprocess.PIPE,
@@ -571,14 +576,13 @@ class MBPPRunner(BaseBenchmarkRunner):
             code_file.write_text(full_code)
 
             # Run tests
-            import asyncio as aio
-            proc = await aio.create_subprocess_exec(
+            proc = await asyncio.create_subprocess_exec(
                 "python", str(code_file),
-                stdout=aio.subprocess.PIPE,
-                stderr=aio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
 
-            stdout, stderr = await aio.wait_for(
+            stdout, stderr = await asyncio.wait_for(
                 proc.communicate(),
                 timeout=30,
             )

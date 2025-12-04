@@ -154,9 +154,10 @@ class TaskEnvironment:
         Returns:
             Path to the workspace directory
         """
-        # Create temporary directory
+        # Create temporary directory (sanitize task_id to be valid for directory names)
+        safe_task_id = self.task.task_id.replace("/", "_").replace("\\", "_")
         self._temp_dir = Path(tempfile.mkdtemp(
-            prefix=f"eval_{self.task.task_id}_",
+            prefix=f"eval_{safe_task_id}_",
             dir=self.workspace_dir,
         ))
 
