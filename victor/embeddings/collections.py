@@ -56,9 +56,10 @@ class StaticEmbeddingCollection:
 
     Usage:
         # Create collection
+        from victor.config.settings import get_project_paths
         collection = StaticEmbeddingCollection(
             name="intents",
-            cache_dir=Path.home() / ".victor" / "embeddings",
+            cache_dir=get_project_paths().global_embeddings_dir,
         )
 
         # Initialize with items (computes embeddings if cache invalid)
@@ -87,8 +88,10 @@ class StaticEmbeddingCollection:
             cache_dir: Directory for cache files (default: ~/.victor/embeddings/)
             embedding_service: Shared embedding service (uses singleton if not provided)
         """
+        from victor.config.settings import get_project_paths
+
         self.name = name
-        self.cache_dir = cache_dir or Path.home() / ".victor" / "embeddings"
+        self.cache_dir = cache_dir or get_project_paths().global_embeddings_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Use shared embedding service

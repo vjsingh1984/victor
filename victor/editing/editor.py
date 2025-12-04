@@ -88,11 +88,13 @@ class FileEditor:
         """Initialize file editor.
 
         Args:
-            backup_dir: Directory for backups (default: .victor/backups)
+            backup_dir: Directory for backups (default: {project}/.victor/backups)
             auto_backup: Automatically backup files before editing
             console: Rich console for output
         """
-        self.backup_dir = Path(backup_dir or Path.home() / ".victor/backups")
+        from victor.config.settings import get_project_paths
+
+        self.backup_dir = Path(backup_dir or get_project_paths().backups_dir)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         self.auto_backup = auto_backup
         self.console = console or Console()

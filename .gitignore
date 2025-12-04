@@ -98,6 +98,12 @@ temp/
 coverage.json
 victor_debug.log
 demo_workspace/
+
+# Victor project-local storage directory
+# Contains: conversation.db, embeddings/, backups/, sessions/, init.md
+.victor/
+
+# Legacy context file location (now .victor/init.md)
 .victor.md
 .victor.md.backup
 
@@ -170,5 +176,3 @@ vscode-victor/node_modules/
 vscode-victor/out/
 vscode-victor/.vscode-test/
 vscode-victor/*.vsix
-# Project-local embedding storage
-.embeddings/

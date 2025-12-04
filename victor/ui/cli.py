@@ -255,6 +255,7 @@ def _configure_tui_logging() -> None:
     - Logs go to a file (~/.victor/logs/victor.log) instead of stdout
     """
     from pathlib import Path
+    from victor.config.settings import get_project_paths
 
     # TUI mode defaults to WARNING level to avoid cluttering the UI
     log_level = os.getenv("VICTOR_LOG_LEVEL", "WARNING").upper()
@@ -262,7 +263,7 @@ def _configure_tui_logging() -> None:
         log_level = "WARNING"
 
     # Create logs directory
-    log_dir = Path.home() / ".victor" / "logs"
+    log_dir = get_project_paths().global_logs_dir
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "victor.log"
 

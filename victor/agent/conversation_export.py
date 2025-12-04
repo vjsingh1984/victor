@@ -502,10 +502,12 @@ class ConversationPersistence:
         """Initialize the store.
 
         Args:
-            base_dir: Base directory for storage (defaults to ~/.victor/conversations)
+            base_dir: Base directory for storage (defaults to {project}/.victor/conversations)
         """
         if base_dir is None:
-            base_dir = Path.home() / ".victor" / "conversations"
+            from victor.config.settings import get_project_paths
+
+            base_dir = get_project_paths().conversations_export_dir
         self._base_dir = Path(base_dir)
         self._base_dir.mkdir(parents=True, exist_ok=True)
         self._exporter = ConversationExporter()

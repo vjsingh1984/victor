@@ -348,7 +348,9 @@ class CodebaseIndex:
     @property
     def _metadata_file(self) -> Path:
         """Path to persistent metadata file."""
-        return self.root / ".victor" / "index_metadata.json"
+        from victor.config.settings import get_project_paths
+
+        return get_project_paths(self.root).index_metadata
 
     def _compute_file_hash(self, file_path: Path) -> str:
         """Compute SHA256 hash of file contents.
@@ -1212,9 +1214,11 @@ class CodebaseIndex:
             if not config:
                 config = {}
 
-            # Default persist directory is {rootrepo}/.embeddings/
-            # This keeps embeddings with the project, not in ~/.victor/
-            default_persist_dir = self.root / ".embeddings"
+            # Default persist directory is {rootrepo}/.victor/embeddings/
+            # This keeps embeddings with the project for isolation
+            from victor.config.settings import get_project_paths
+
+            default_persist_dir = get_project_paths(self.root).embeddings_dir
 
             embedding_config = EmbeddingConfig(
                 vector_store=config.get("vector_store", "chromadb"),

@@ -215,12 +215,14 @@ class ConversationStore:
         """Initialize the conversation memory manager.
 
         Args:
-            db_path: Path to SQLite database. Defaults to ~/.victor/conversations.db
+            db_path: Path to SQLite database. Defaults to {project}/.victor/conversation.db
             max_context_tokens: Maximum tokens in context window
             response_reserve: Tokens reserved for response
             chars_per_token: Approximate characters per token for estimation
         """
-        self.db_path = db_path or Path.home() / ".victor" / "conversations.db"
+        from victor.config.settings import get_project_paths
+
+        self.db_path = db_path or get_project_paths().conversation_db
         self.max_context_tokens = max_context_tokens
         self.response_reserve = response_reserve
         self.chars_per_token = chars_per_token

@@ -27,12 +27,17 @@ logger = logging.getLogger(__name__)
 
 # File names to search for (in order of priority)
 # Victor checks for its own context files first, then falls back to
-# aliases that might be symlinks to .victor.md (for interoperability)
+# aliases and legacy locations for interoperability
+from victor.config.settings import VICTOR_DIR_NAME, VICTOR_CONTEXT_FILE
+
 CONTEXT_FILE_NAMES = [
+    # New location (preferred): .victor/init.md
+    f"{VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}",
+    # Legacy location (for backwards compatibility)
     ".victor.md",
     "VICTOR.md",
     ".victor/context.md",
-    # Aliases for other AI coding tools (may be symlinks to .victor.md)
+    # Aliases for other AI coding tools (may be symlinks)
     "CLAUDE.md",
     "GEMINI.md",
     "AGENTS.md",

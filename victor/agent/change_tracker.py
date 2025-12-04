@@ -152,11 +152,13 @@ class FileChangeHistory:
         """Initialize the file change history.
 
         Args:
-            storage_dir: Directory to store change history. Defaults to ~/.victor/changes/
+            storage_dir: Directory to store change history. Defaults to {project}/.victor/changes/
             max_history: Maximum number of change groups to keep
             session_id: Current session identifier
         """
-        self.storage_dir = storage_dir or Path.home() / ".victor" / "changes"
+        from victor.config.settings import get_project_paths
+
+        self.storage_dir = storage_dir or get_project_paths().changes_dir
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.max_history = max_history
         self.session_id = session_id or self._generate_session_id()

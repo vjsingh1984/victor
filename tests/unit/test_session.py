@@ -318,7 +318,9 @@ class TestGlobalSessionManager:
         assert manager1 is manager2
 
     def test_default_session_dir(self):
-        """Default session directory should be ~/.victor/sessions/."""
+        """Default session directory should be {project}/.victor/sessions/."""
+        from victor.config.settings import get_project_paths
+
         manager = get_session_manager()
-        expected_dir = Path.home() / ".victor" / "sessions"
+        expected_dir = get_project_paths().sessions_dir
         assert manager.session_dir == expected_dir

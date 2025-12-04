@@ -148,9 +148,10 @@ async def edit_files(
             }
 
     from victor.agent.change_tracker import ChangeType, get_change_tracker
+    from victor.config.settings import get_project_paths
 
     # Initialize editor
-    backup_dir = Path.home() / ".victor" / "backups"
+    backup_dir = get_project_paths().backups_dir
     editor = FileEditor(backup_dir=str(backup_dir))
     transaction_id = editor.start_transaction(description)
 

@@ -155,7 +155,9 @@ class IntentClassifier:
                 Higher values (0.5+) are more conservative but may miss legitimate cases.
             completion_threshold: Minimum similarity for completion intent (default 0.30)
         """
-        self.cache_dir = cache_dir or Path.home() / ".victor" / "embeddings"
+        from victor.config.settings import get_project_paths
+
+        self.cache_dir = cache_dir or get_project_paths().global_embeddings_dir
         self.embedding_service = embedding_service or EmbeddingService.get_instance()
         self.continuation_threshold = continuation_threshold
         self.completion_threshold = completion_threshold

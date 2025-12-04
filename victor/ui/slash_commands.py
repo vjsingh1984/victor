@@ -539,15 +539,21 @@ class SlashCommandHandler:
         self.console.print("\n[dim]Type /help <command> for more details[/]")
 
     async def _cmd_init(self, args: List[str]) -> None:
-        """Initialize .victor.md file with smart codebase analysis."""
+        """Initialize .victor/init.md file with smart codebase analysis."""
+        from victor.config.settings import get_project_paths
+
         force = "--force" in args or "-f" in args
         simple = "--simple" in args or "-s" in args
         smart = "--smart" in args or "-a" in args  # -a for AI-powered
         symlinks = "--symlinks" in args or "-l" in args
-        target_path = Path.cwd() / ".victor.md"
+
+        paths = get_project_paths()
+        target_path = paths.project_context_file
+        # Ensure .victor directory exists
+        paths.project_victor_dir.mkdir(parents=True, exist_ok=True)
 
         if target_path.exists() and not force:
-            self.console.print(f"[yellow].victor.md already exists at {target_path}[/]")
+            self.console.print(f"[yellow]{target_path.name} already exists at {target_path}[/]")
             self.console.print("Use [bold]/init --force[/] to overwrite")
             self.console.print("Use [bold]/init --simple[/] for basic template")
             self.console.print("Use [bold]/init --smart[/] for LLM-powered analysis (any language)")
@@ -560,7 +566,7 @@ class SlashCommandHandler:
                     Markdown(
                         content + "\n\n..." if len(target_path.read_text()) > 500 else content
                     ),
-                    title="Current .victor.md",
+                    title=f"Current {target_path.name}",
                     border_style="dim",
                 )
             )

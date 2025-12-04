@@ -123,22 +123,22 @@ class Session:
 class SessionPersistence:
     """File-based session persistence for Victor conversations.
 
-    Sessions are stored as JSON files in ~/.victor/sessions/ by default.
+    Sessions are stored as JSON files in {project}/.victor/sessions/ by default.
     Each session includes the conversation history, metadata, and optionally
     tool usage statistics.
 
     Note: Previously named `SessionManager`. Alias kept for backward compatibility.
     """
 
-    DEFAULT_SESSION_DIR = Path.home() / ".victor" / "sessions"
-
     def __init__(self, session_dir: Optional[Path] = None):
         """Initialize session manager.
 
         Args:
-            session_dir: Directory to store sessions (default: ~/.victor/sessions/)
+            session_dir: Directory to store sessions (default: {project}/.victor/sessions/)
         """
-        self.session_dir = session_dir or self.DEFAULT_SESSION_DIR
+        from victor.config.settings import get_project_paths
+
+        self.session_dir = session_dir or get_project_paths().sessions_dir
         self._ensure_session_dir()
 
     def _ensure_session_dir(self) -> None:

@@ -40,7 +40,9 @@ class CacheConfig:
     def __post_init__(self) -> None:
         """Set default cache path if not provided."""
         if self.disk_path is None:
-            self.disk_path = Path.home() / ".victor" / "cache"
+            from victor.config.settings import get_project_paths
+
+            self.disk_path = get_project_paths().global_cache_dir
 
         # Ensure cache directory exists
         if self.enable_disk:

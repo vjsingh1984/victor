@@ -94,8 +94,10 @@ async def _get_or_build_index(
             _INDEX_CACHE[str(root)]["latest_mtime"] = latest
             return cached_index, False  # Not a full rebuild
 
-    # Default persist directory is {root}/.embeddings/ for project-local storage
-    default_persist_dir = str(root / ".embeddings")
+    # Default persist directory is {root}/.victor/embeddings/ for project-local storage
+    from victor.config.settings import get_project_paths
+
+    default_persist_dir = str(get_project_paths(root).embeddings_dir)
 
     embedding_config = {
         "vector_store": getattr(settings, "codebase_vector_store", "lancedb"),

@@ -24,6 +24,245 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
 
 
+# =============================================================================
+# CENTRALIZED PATH CONFIGURATION
+# =============================================================================
+# All Victor paths are centralized here for consistency and easy configuration.
+# Project-local paths are stored in {project_root}/.victor/
+# Global paths are stored in ~/.victor/
+# =============================================================================
+
+# Directory names (configurable via environment variables)
+VICTOR_DIR_NAME = os.getenv("VICTOR_DIR_NAME", ".victor")
+VICTOR_CONTEXT_FILE = os.getenv("VICTOR_CONTEXT_FILE", "init.md")
+
+# Global config directory (user home)
+GLOBAL_VICTOR_DIR = Path.home() / VICTOR_DIR_NAME
+
+
+class ProjectPaths:
+    """Centralized path management for Victor.
+
+    Provides consistent paths for both project-local and global storage.
+    Project-local paths are preferred for isolation between projects.
+
+    Directory structure:
+        {project_root}/.victor/
+        ├── init.md              # Project context (was .victor.md)
+        ├── conversation.db      # Conversation history
+        ├── embeddings/          # Vector embeddings for semantic search
+        ├── index_metadata.json  # Codebase index metadata
+        ├── backups/             # File edit backups
+        ├── changes/             # Undo/redo history
+        ├── sessions/            # Session snapshots
+        └── mcp.yaml             # MCP server configuration
+
+        ~/.victor/
+        ├── profiles.yaml        # Global profiles configuration
+        ├── plugins/             # Plugins directory
+        ├── cache/               # Global cache
+        ├── logs/                # Log files
+        └── embeddings/          # Global embedding cache (task classifier, etc.)
+    """
+
+    def __init__(self, project_root: Optional[Path] = None):
+        """Initialize paths for a project.
+
+        Args:
+            project_root: Project root directory. Defaults to current working directory.
+        """
+        self._project_root = Path(project_root) if project_root else Path.cwd()
+
+    @property
+    def project_root(self) -> Path:
+        """Get project root directory."""
+        return self._project_root
+
+    # -------------------------------------------------------------------------
+    # Project-local paths (stored in {project}/.victor/)
+    # -------------------------------------------------------------------------
+
+    @property
+    def project_victor_dir(self) -> Path:
+        """Get project-local .victor directory."""
+        return self._project_root / VICTOR_DIR_NAME
+
+    @property
+    def project_context_file(self) -> Path:
+        """Get project context file path (.victor/init.md)."""
+        return self.project_victor_dir / VICTOR_CONTEXT_FILE
+
+    @property
+    def project_context_file_legacy(self) -> Path:
+        """Get legacy project context file path (.victor.md) for backwards compatibility."""
+        return self._project_root / ".victor.md"
+
+    @property
+    def conversation_db(self) -> Path:
+        """Get project-local conversation database path."""
+        return self.project_victor_dir / "conversation.db"
+
+    @property
+    def embeddings_dir(self) -> Path:
+        """Get project-local embeddings directory."""
+        return self.project_victor_dir / "embeddings"
+
+    @property
+    def index_metadata(self) -> Path:
+        """Get codebase index metadata file path."""
+        return self.project_victor_dir / "index_metadata.json"
+
+    @property
+    def backups_dir(self) -> Path:
+        """Get project-local backups directory."""
+        return self.project_victor_dir / "backups"
+
+    @property
+    def changes_dir(self) -> Path:
+        """Get project-local changes (undo/redo) directory."""
+        return self.project_victor_dir / "changes"
+
+    @property
+    def sessions_dir(self) -> Path:
+        """Get project-local sessions directory."""
+        return self.project_victor_dir / "sessions"
+
+    @property
+    def conversations_export_dir(self) -> Path:
+        """Get project-local conversations export directory."""
+        return self.project_victor_dir / "conversations"
+
+    @property
+    def mcp_config(self) -> Path:
+        """Get project-local MCP configuration file."""
+        return self.project_victor_dir / "mcp.yaml"
+
+    # -------------------------------------------------------------------------
+    # Global paths (stored in ~/.victor/)
+    # -------------------------------------------------------------------------
+
+    @property
+    def global_victor_dir(self) -> Path:
+        """Get global .victor directory."""
+        return GLOBAL_VICTOR_DIR
+
+    @property
+    def global_profiles(self) -> Path:
+        """Get global profiles.yaml path."""
+        return GLOBAL_VICTOR_DIR / "profiles.yaml"
+
+    @property
+    def global_plugins_dir(self) -> Path:
+        """Get global plugins directory."""
+        return GLOBAL_VICTOR_DIR / "plugins"
+
+    @property
+    def global_cache_dir(self) -> Path:
+        """Get global cache directory."""
+        return GLOBAL_VICTOR_DIR / "cache"
+
+    @property
+    def global_logs_dir(self) -> Path:
+        """Get global logs directory."""
+        return GLOBAL_VICTOR_DIR / "logs"
+
+    @property
+    def global_embeddings_dir(self) -> Path:
+        """Get global embeddings cache directory (for task classifier, etc.)."""
+        return GLOBAL_VICTOR_DIR / "embeddings"
+
+    @property
+    def global_mcp_config(self) -> Path:
+        """Get global MCP configuration file."""
+        return GLOBAL_VICTOR_DIR / "mcp.yaml"
+
+    # -------------------------------------------------------------------------
+    # Helper methods
+    # -------------------------------------------------------------------------
+
+    def ensure_project_dirs(self) -> None:
+        """Create project-local directories if they don't exist."""
+        self.project_victor_dir.mkdir(parents=True, exist_ok=True)
+        self.embeddings_dir.mkdir(parents=True, exist_ok=True)
+        self.backups_dir.mkdir(parents=True, exist_ok=True)
+        self.changes_dir.mkdir(parents=True, exist_ok=True)
+        self.sessions_dir.mkdir(parents=True, exist_ok=True)
+
+    def ensure_global_dirs(self) -> None:
+        """Create global directories if they don't exist."""
+        self.global_victor_dir.mkdir(parents=True, exist_ok=True)
+        self.global_plugins_dir.mkdir(parents=True, exist_ok=True)
+        self.global_cache_dir.mkdir(parents=True, exist_ok=True)
+        self.global_logs_dir.mkdir(parents=True, exist_ok=True)
+        self.global_embeddings_dir.mkdir(parents=True, exist_ok=True)
+
+    def find_context_file(self) -> Optional[Path]:
+        """Find project context file, checking new and legacy locations.
+
+        Returns:
+            Path to context file if found, None otherwise.
+
+        Priority:
+            1. .victor/init.md (new location)
+            2. .victor.md (legacy location)
+            3. VICTOR.md, CLAUDE.md, etc. (aliases)
+        """
+        # New location first
+        if self.project_context_file.exists():
+            return self.project_context_file
+
+        # Legacy location
+        if self.project_context_file_legacy.exists():
+            return self.project_context_file_legacy
+
+        # Check aliases
+        aliases = ["VICTOR.md", "CLAUDE.md", "COPILOT.md", "CURSOR.md"]
+        for alias in aliases:
+            alias_path = self._project_root / alias
+            if alias_path.exists():
+                return alias_path
+
+        return None
+
+
+# Global singleton for current project
+_current_project_paths: Optional[ProjectPaths] = None
+
+
+def get_project_paths(project_root: Optional[Path] = None) -> ProjectPaths:
+    """Get ProjectPaths instance for a project.
+
+    Args:
+        project_root: Project root directory. If None, uses cached instance or cwd.
+
+    Returns:
+        ProjectPaths instance for the project.
+    """
+    global _current_project_paths
+
+    if project_root is not None:
+        return ProjectPaths(project_root)
+
+    if _current_project_paths is None:
+        _current_project_paths = ProjectPaths()
+
+    return _current_project_paths
+
+
+def set_project_root(project_root: Path) -> ProjectPaths:
+    """Set the current project root and return paths.
+
+    Args:
+        project_root: Project root directory.
+
+    Returns:
+        ProjectPaths instance for the project.
+    """
+    global _current_project_paths
+    _current_project_paths = ProjectPaths(project_root)
+    return _current_project_paths
+
+
 class ProviderConfig(BaseSettings):
     """Configuration for a specific provider."""
 
