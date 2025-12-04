@@ -95,6 +95,52 @@ class BenchmarkTask:
 
 
 @dataclass
+class CodeQualityMetrics:
+    """Code quality metrics for generated code."""
+
+    # Syntax and style
+    syntax_valid: bool = True
+    lint_errors: int = 0
+    lint_warnings: int = 0
+    style_score: float = 1.0  # 0.0 to 1.0
+
+    # Complexity
+    cyclomatic_complexity: float = 0.0
+    cognitive_complexity: float = 0.0
+    maintainability_index: float = 100.0  # 0-100 scale
+
+    # Structure
+    lines_of_code: int = 0
+    functions_count: int = 0
+    classes_count: int = 0
+    duplicate_lines: int = 0
+
+    # Type safety
+    type_coverage: float = 0.0  # For typed languages
+
+    def get_overall_score(self) -> float:
+        """Calculate overall code quality score (0-100)."""
+        weights = {
+            "syntax": 0.3,
+            "style": 0.2,
+            "complexity": 0.25,
+            "maintainability": 0.25,
+        }
+
+        syntax_score = 100.0 if self.syntax_valid else 0.0
+        style_score = self.style_score * 100
+        complexity_score = max(0, 100 - (self.cyclomatic_complexity * 5))
+        maint_score = self.maintainability_index
+
+        return (
+            weights["syntax"] * syntax_score +
+            weights["style"] * style_score +
+            weights["complexity"] * complexity_score +
+            weights["maintainability"] * maint_score
+        )
+
+
+@dataclass
 class TaskResult:
     """Result of running a single task."""
 
@@ -115,8 +161,21 @@ class TaskResult:
 
     # Agent metrics
     tokens_used: int = 0
+    tokens_input: int = 0  # Input tokens (prompt)
+    tokens_output: int = 0  # Output tokens (completion)
     tool_calls: int = 0
     turns: int = 0
+
+    # Code quality metrics
+    code_quality: Optional[CodeQualityMetrics] = None
+
+    # Partial completion scoring (0.0 to 1.0)
+    completion_score: float = 0.0
+    partial_tests_weight: float = 0.0  # Weighted partial test success
+
+    # Pass@k tracking
+    attempts: int = 1
+    successful_attempts: int = 0
 
     # Error info
     error_message: str = ""
@@ -137,6 +196,41 @@ class TaskResult:
     def is_success(self) -> bool:
         """Whether the task was successful."""
         return self.status == TaskStatus.PASSED
+
+    @property
+    def tokens_per_test(self) -> float:
+        """Token efficiency: tokens used per test passed."""
+        if self.tests_passed == 0:
+            return float('inf')
+        return self.tokens_used / self.tests_passed
+
+    @property
+    def cost_efficiency(self) -> float:
+        """Cost efficiency score (higher is better)."""
+        if self.tokens_used == 0:
+            return 0.0
+        # Score based on success per 1K tokens
+        return (self.completion_score * 1000) / self.tokens_used
+
+    def calculate_completion_score(self) -> float:
+        """Calculate partial completion score based on tests and quality."""
+        score = 0.0
+
+        # Test-based score (60% weight)
+        if self.tests_total > 0:
+            test_score = self.tests_passed / self.tests_total
+            score += test_score * 0.6
+
+        # Code quality score (20% weight)
+        if self.code_quality:
+            quality_score = self.code_quality.get_overall_score() / 100
+            score += quality_score * 0.2
+
+        # Basic completion (20% weight) - did it generate valid code?
+        if self.generated_code and self.status != TaskStatus.ERROR:
+            score += 0.2
+
+        return min(score, 1.0)
 
 
 @dataclass

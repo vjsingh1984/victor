@@ -35,6 +35,7 @@ from victor.evaluation.protocol import (
     BenchmarkMetadata,
     BenchmarkTask,
     BenchmarkType,
+    CodeQualityMetrics,
     EvaluationConfig,
     EvaluationResult,
     TaskResult,
@@ -544,6 +545,18 @@ class EvaluationHarness:
 
             task_result.generated_code = agent_output
 
+            # Analyze code quality
+            try:
+                from victor.evaluation.analyzers import get_code_quality_analyzer
+                analyzer = get_code_quality_analyzer()
+                code_quality = await analyzer.analyze(
+                    agent_output,
+                    language=task.language,
+                )
+                task_result.code_quality = code_quality
+            except Exception as e:
+                logger.warning(f"Code quality analysis failed: {e}")
+
             # Evaluate result
             eval_result = await runner.run_task(task, agent_output, config)
 
@@ -554,6 +567,9 @@ class EvaluationHarness:
             task_result.tests_total = eval_result.tests_total
             task_result.stdout = eval_result.stdout
             task_result.stderr = eval_result.stderr
+
+            # Calculate completion score
+            task_result.completion_score = task_result.calculate_completion_score()
 
         except Exception as e:
             task_result.status = TaskStatus.ERROR
@@ -595,6 +611,21 @@ class EvaluationHarness:
                     "tests_total": r.tests_total,
                     "duration_seconds": r.duration_seconds,
                     "tokens_used": r.tokens_used,
+                    "tokens_input": r.tokens_input,
+                    "tokens_output": r.tokens_output,
+                    "tool_calls": r.tool_calls,
+                    "turns": r.turns,
+                    "completion_score": r.completion_score,
+                    "code_quality": {
+                        "syntax_valid": r.code_quality.syntax_valid,
+                        "lint_errors": r.code_quality.lint_errors,
+                        "lint_warnings": r.code_quality.lint_warnings,
+                        "style_score": r.code_quality.style_score,
+                        "cyclomatic_complexity": r.code_quality.cyclomatic_complexity,
+                        "maintainability_index": r.code_quality.maintainability_index,
+                        "type_coverage": r.code_quality.type_coverage,
+                        "overall_score": r.code_quality.get_overall_score(),
+                    } if r.code_quality else None,
                     "error_message": r.error_message,
                 }
                 for r in result.task_results

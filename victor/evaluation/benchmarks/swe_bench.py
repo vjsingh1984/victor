@@ -38,8 +38,22 @@ logger = logging.getLogger(__name__)
 class SWEBenchRunner(BaseBenchmarkRunner):
     """Runner for SWE-bench benchmark.
 
-    SWE-bench evaluates the ability to solve real GitHub issues
-    from popular Python repositories.
+    SWE-bench evaluates the ability to solve REAL GitHub issues
+    from popular Python repositories using the official Princeton
+    NLP dataset from HuggingFace.
+
+    Dataset: https://huggingface.co/datasets/princeton-nlp/SWE-bench
+    Paper: "SWE-bench: Can Language Models Resolve Real-World GitHub Issues?" (2024)
+    Leaderboard: https://www.swebench.com/
+
+    IMPORTANT: This runner loads REAL benchmark data from HuggingFace,
+    clones REAL repositories, applies patches, and runs REAL tests.
+    Results are not simulated - they represent actual test execution.
+
+    Supported splits:
+    - test: Full test set (~2294 tasks)
+    - dev: Development set
+    - lite: SWE-bench Lite (~300 tasks, curated subset)
     """
 
     def __init__(
@@ -50,7 +64,7 @@ class SWEBenchRunner(BaseBenchmarkRunner):
         """Initialize the SWE-bench runner.
 
         Args:
-            dataset_path: Path to SWE-bench dataset (JSON)
+            dataset_path: Path to SWE-bench dataset (JSON file)
             split: Dataset split (test, dev, lite)
         """
         self._dataset_path = dataset_path
@@ -297,7 +311,14 @@ The patch should:
 class HumanEvalRunner(BaseBenchmarkRunner):
     """Runner for HumanEval benchmark.
 
-    Evaluates code generation from docstrings.
+    Evaluates code generation from docstrings using the official
+    OpenAI HumanEval dataset from HuggingFace.
+
+    Dataset: https://huggingface.co/datasets/openai/openai_humaneval
+    Paper: "Evaluating Large Language Models Trained on Code" (2021)
+
+    IMPORTANT: This runner loads REAL benchmark data from HuggingFace
+    and executes REAL tests. Results are not simulated.
     """
 
     @property
@@ -308,12 +329,18 @@ class HumanEvalRunner(BaseBenchmarkRunner):
         self,
         config: EvaluationConfig,
     ) -> list[BenchmarkTask]:
-        """Load HumanEval tasks."""
+        """Load HumanEval tasks from HuggingFace.
+
+        Requires: pip install datasets
+        """
         tasks = []
 
         try:
             from datasets import load_dataset
+
+            logger.info("Loading HumanEval dataset from HuggingFace...")
             dataset = load_dataset("openai/openai_humaneval", split="test")
+            logger.info(f"Loaded {len(dataset)} HumanEval problems")
 
             for item in dataset:
                 task = BenchmarkTask(
@@ -329,9 +356,17 @@ class HumanEvalRunner(BaseBenchmarkRunner):
                 tasks.append(task)
 
         except ImportError:
-            logger.warning("datasets library not installed")
+            logger.error(
+                "datasets library not installed. "
+                "Install with: pip install datasets"
+            )
+            raise RuntimeError(
+                "Cannot load HumanEval: datasets library required. "
+                "Install with: pip install datasets"
+            )
         except Exception as e:
-            logger.error(f"Failed to load HumanEval: {e}")
+            logger.error(f"Failed to load HumanEval from HuggingFace: {e}")
+            raise
 
         return self._filter_tasks(tasks, config)
 
@@ -387,6 +422,183 @@ class HumanEvalRunner(BaseBenchmarkRunner):
 
         except asyncio.TimeoutError:
             result.status = TaskStatus.TIMEOUT
+        except Exception as e:
+            result.status = TaskStatus.ERROR
+            result.error_message = str(e)
+        finally:
+            await env.cleanup()
+
+        return result
+
+
+class MBPPRunner(BaseBenchmarkRunner):
+    """Runner for MBPP (Mostly Basic Python Problems) benchmark.
+
+    MBPP contains crowd-sourced Python programming problems
+    designed to be solvable by entry-level programmers.
+
+    Dataset: https://huggingface.co/datasets/google-research-datasets/mbpp
+    Paper: "Program Synthesis with Large Language Models" (2021)
+
+    IMPORTANT: This runner loads REAL benchmark data from HuggingFace
+    and executes REAL tests. Results are not simulated.
+
+    Supported splits:
+    - test: Test set (500 tasks)
+    - train: Training set
+    - validation: Validation set
+    - prompt: Few-shot prompt examples (10 tasks)
+    """
+
+    def __init__(self, split: str = "test"):
+        """Initialize the MBPP runner.
+
+        Args:
+            split: Dataset split (test, train, validation, prompt)
+        """
+        self._split = split
+        self._tasks_cache: Optional[list[BenchmarkTask]] = None
+
+    @property
+    def benchmark_type(self) -> BenchmarkType:
+        return BenchmarkType.MBPP
+
+    async def load_tasks(
+        self,
+        config: EvaluationConfig,
+    ) -> list[BenchmarkTask]:
+        """Load MBPP tasks from HuggingFace.
+
+        Requires: pip install datasets
+        """
+        if self._tasks_cache is not None:
+            return self._filter_tasks(self._tasks_cache, config)
+
+        tasks = []
+
+        try:
+            from datasets import load_dataset
+
+            logger.info(f"Loading MBPP dataset (split={self._split}) from HuggingFace...")
+            dataset = load_dataset(
+                "google-research-datasets/mbpp",
+                split=self._split,
+            )
+            logger.info(f"Loaded {len(dataset)} MBPP problems")
+
+            for item in dataset:
+                # MBPP format: task_id, text, code, test_list, test_setup_code, challenge_test_list
+                task = BenchmarkTask(
+                    task_id=str(item["task_id"]),
+                    benchmark=BenchmarkType.MBPP,
+                    description=item["text"],
+                    language="python",
+                    prompt=self._build_prompt(item),
+                    test_code=self._build_test_code(item),
+                    solution=item["code"],
+                    category="basic_programming",
+                    difficulty="easy",
+                )
+                tasks.append(task)
+
+        except ImportError:
+            logger.error(
+                "datasets library not installed. "
+                "Install with: pip install datasets"
+            )
+            raise RuntimeError(
+                "Cannot load MBPP: datasets library required. "
+                "Install with: pip install datasets"
+            )
+        except Exception as e:
+            logger.error(f"Failed to load MBPP from HuggingFace: {e}")
+            raise
+
+        self._tasks_cache = tasks
+        return self._filter_tasks(tasks, config)
+
+    def _build_prompt(self, item: dict) -> str:
+        """Build the prompt for the agent."""
+        return f'''"""
+{item["text"]}
+"""
+'''
+
+    def _build_test_code(self, item: dict) -> str:
+        """Build test code from test_list."""
+        tests = item.get("test_list", [])
+        setup = item.get("test_setup_code", "")
+
+        code_lines = []
+        if setup:
+            code_lines.append(setup)
+            code_lines.append("")
+
+        # Add assertions
+        for test in tests:
+            code_lines.append(test)
+
+        # Add challenge tests if available
+        challenge_tests = item.get("challenge_test_list", [])
+        for test in challenge_tests:
+            code_lines.append(test)
+
+        return "\n".join(code_lines)
+
+    async def run_task(
+        self,
+        task: BenchmarkTask,
+        agent_output: str,
+        config: EvaluationConfig,
+    ) -> TaskResult:
+        """Run an MBPP task by executing generated code with tests."""
+        result = TaskResult(
+            task_id=task.task_id,
+            status=TaskStatus.RUNNING,
+            generated_code=agent_output,
+        )
+
+        # Combine generated code with test assertions
+        full_code = agent_output + "\n\n" + task.test_code
+
+        env = TaskEnvironment(task=task, use_docker=config.use_docker)
+
+        try:
+            workspace = await env.setup()
+
+            # Write code to file
+            code_file = workspace / "solution.py"
+            code_file.write_text(full_code)
+
+            # Run tests
+            import asyncio as aio
+            proc = await aio.create_subprocess_exec(
+                "python", str(code_file),
+                stdout=aio.subprocess.PIPE,
+                stderr=aio.subprocess.PIPE,
+            )
+
+            stdout, stderr = await aio.wait_for(
+                proc.communicate(),
+                timeout=30,
+            )
+
+            result.stdout = stdout.decode()
+            result.stderr = stderr.decode()
+
+            if proc.returncode == 0:
+                result.status = TaskStatus.PASSED
+                result.tests_passed = 1
+                result.tests_total = 1
+            else:
+                result.status = TaskStatus.FAILED
+                result.tests_failed = 1
+                result.tests_total = 1
+                result.error_message = result.stderr[:500] if result.stderr else "Test failed"
+
+        except asyncio.TimeoutError:
+            result.status = TaskStatus.TIMEOUT
+            result.error_message = "Execution timeout (30s)"
         except Exception as e:
             result.status = TaskStatus.ERROR
             result.error_message = str(e)

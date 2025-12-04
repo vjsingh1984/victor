@@ -59,6 +59,7 @@ from victor.evaluation.protocol import (
     BenchmarkMetadata,
     BenchmarkTask,
     BenchmarkType,
+    CodeQualityMetrics,
     EvaluationConfig,
     EvaluationMetric,
     EvaluationResult,
@@ -75,7 +76,26 @@ from victor.evaluation.harness import (
 )
 from victor.evaluation.benchmarks import (
     HumanEvalRunner,
+    MBPPRunner,
     SWEBenchRunner,
+)
+from victor.evaluation.code_quality import (
+    CodeQualityAnalyzer,
+    BatchCodeAnalyzer,
+    LintResult,
+)
+from victor.evaluation.pass_at_k import (
+    PassAtKEvaluator,
+    PassAtKResult,
+    AggregatePassAtKResult,
+    GreedyVsSamplingComparison,
+    pass_at_k,
+    generate_report as generate_pass_at_k_report,
+)
+from victor.evaluation.analyzers import (
+    AnalyzerRegistry,
+    get_code_quality_analyzer,
+    get_pass_at_k_evaluator,
 )
 
 __all__ = [
@@ -83,6 +103,7 @@ __all__ = [
     "BenchmarkMetadata",
     "BenchmarkTask",
     "BenchmarkType",
+    "CodeQualityMetrics",
     "EvaluationConfig",
     "EvaluationMetric",
     "EvaluationResult",
@@ -97,5 +118,21 @@ __all__ = [
     "get_harness",
     # Benchmark runners
     "HumanEvalRunner",
+    "MBPPRunner",
     "SWEBenchRunner",
+    # Code quality
+    "CodeQualityAnalyzer",
+    "BatchCodeAnalyzer",
+    "LintResult",
+    # Pass@k
+    "PassAtKEvaluator",
+    "PassAtKResult",
+    "AggregatePassAtKResult",
+    "GreedyVsSamplingComparison",
+    "pass_at_k",
+    "generate_pass_at_k_report",
+    # Registry
+    "AnalyzerRegistry",
+    "get_code_quality_analyzer",
+    "get_pass_at_k_evaluator",
 ]

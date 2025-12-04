@@ -12,14 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Benchmark runners for different evaluation datasets."""
+"""Benchmark runners for industry-standard evaluation datasets.
+
+All runners load REAL benchmark data from HuggingFace and execute
+REAL tests. Results are not simulated - they represent actual test
+execution against actual benchmark problems.
+
+Supported benchmarks:
+- SWE-bench: Real-world GitHub issues from Python repositories
+- HumanEval: Code generation from docstrings (OpenAI)
+- MBPP: Mostly Basic Python Problems (Google Research)
+"""
 
 from victor.evaluation.benchmarks.swe_bench import (
     HumanEvalRunner,
+    MBPPRunner,
     SWEBenchRunner,
 )
 
 __all__ = [
     "HumanEvalRunner",
+    "MBPPRunner",
     "SWEBenchRunner",
 ]
