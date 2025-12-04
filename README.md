@@ -689,6 +689,101 @@ Victor features **best-in-class semantic code search** with intelligent indexing
 [✓] All changes committed atomically
 ```
 
+### Benchmark Evaluation Framework
+
+Victor includes an **industry-standard benchmark evaluation harness** for measuring code generation quality against published benchmarks like SWE-bench, HumanEval, and MBPP.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    BENCHMARK EVALUATION FRAMEWORK                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  SUPPORTED BENCHMARKS (Real HuggingFace datasets - no simulation):          │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ SWE-bench         │ 2,294 real GitHub issues from Python repos         │ │
+│  │ SWE-bench Lite    │ 300 curated subset for faster evaluation           │ │
+│  │ HumanEval         │ 164 code generation problems (OpenAI)              │ │
+│  │ MBPP              │ 974 basic Python problems (Google Research)        │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  EVALUATION METRICS:                                                         │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ Pass@k           │ Probability of 1 correct in k samples (Codex paper) │ │
+│  │ Code Quality     │ Syntax, linting, complexity, maintainability        │ │
+│  │ Token Efficiency │ Tokens used per test passed                         │ │
+│  │ Completion Score │ Weighted partial success scoring                    │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  QUALITY DIMENSIONS:                                                         │
+│  ├── Syntax validation (AST parsing)                                        │
+│  ├── Lint errors/warnings (ruff integration)                                │
+│  ├── Cyclomatic complexity                                                  │
+│  ├── Maintainability index                                                  │
+│  ├── Type hint coverage                                                     │
+│  └── Overall quality score (0-100)                                          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Pass@k Metric** (Industry Standard):
+```
+Formula: pass@k = 1 - C(n-c, k) / C(n, k)
+  where n = total samples, c = correct samples
+
+Example with 100 samples, 50 correct:
+  Pass@  1: ███████████████░░░░░░░░░░░░░░░ 50.00%
+  Pass@  5: █████████████████████████████░ 97.19%
+  Pass@ 10: █████████████████████████████░ 99.94%
+  Pass@100: ██████████████████████████████ 100.00%
+```
+
+**Code Quality Analysis**:
+```
+Sample                      Syntax  Lines  Funcs  Types  Complexity  Score
+----------------------------------------------------------------------
+Fibonacci (Recursive)          ✓      5      1    100%      2.0      95.0
+Binary Search (Typed)          ✓     13      1    100%      4.0      92.7
+Quick Sort (Complex)           ✓      8      1      0%      5.0      90.0
+FizzBuzz (Simple)              ✓     12      1      0%      5.0      90.4
+```
+
+**Competitive Analysis**:
+```
+┌─────────────────────┬────────────┬────────────┬────────────┬────────────┐
+│ Feature             │   Victor   │   Cursor   │   Copilot  │  Amazon Q  │
+├─────────────────────┼────────────┼────────────┼────────────┼────────────┤
+│ SWE-bench eval      │     ✓      │     ✓      │     ✗      │     ✗      │
+│ Pass@k metrics      │     ✓      │     ?      │     ✗      │     ✗      │
+│ Code quality score  │     ✓      │     ✗      │     ✗      │     ✗      │
+│ Token efficiency    │     ✓      │     ✗      │     ✗      │     ✗      │
+│ Open source         │     ✓      │     ✗      │     ✗      │     ✗      │
+│ Local LLM support   │     ✓      │     ✗      │     ✗      │     ✗      │
+└─────────────────────┴────────────┴────────────┴────────────┴────────────┘
+```
+
+**Run Benchmarks**:
+```python
+from victor.evaluation import (
+    EvaluationHarness, EvaluationConfig, BenchmarkType,
+    HumanEvalRunner, pass_at_k, CodeQualityAnalyzer
+)
+
+# Setup harness
+harness = EvaluationHarness()
+harness.register_runner(HumanEvalRunner())
+
+# Configure evaluation
+config = EvaluationConfig(
+    benchmark=BenchmarkType.HUMAN_EVAL,
+    model="claude-3-5-haiku",
+    max_tasks=50,
+)
+
+# Run evaluation
+result = await harness.run_evaluation(config, agent_callback)
+print(f"Pass rate: {result.pass_rate:.1%}")
+```
+
 ---
 
 ## Architecture
@@ -779,6 +874,12 @@ This roadmap provides a high-level overview of the project's future direction. F
 - [x] Tiered caching system
 - [x] Workspace snapshots & auto-commit
 - [x] Browser automation (Playwright)
+- [x] **Benchmark Evaluation Framework**:
+  - [x] Industry-standard Pass@k metric (Codex paper methodology)
+  - [x] Code quality analyzer (syntax, linting, complexity, maintainability)
+  - [x] SWE-bench, HumanEval, MBPP benchmark runners
+  - [x] Real HuggingFace dataset integration (no simulation)
+  - [x] Token efficiency and completion scoring
 
 ### In Progress
 
