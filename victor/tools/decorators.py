@@ -15,30 +15,42 @@
 
 import inspect
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from docstring_parser import parse
 
-from victor.tools.base import BaseTool, CostTier, ToolResult
+from victor.tools.base import BaseTool, CostTier, ToolMetadata, ToolResult
 
 
 def tool(
     func: Optional[Callable] = None,
     *,
     cost_tier: CostTier = CostTier.FREE,
+    category: Optional[str] = None,
+    keywords: Optional[List[str]] = None,
+    use_cases: Optional[List[str]] = None,
+    examples: Optional[List[str]] = None,
+    priority_hints: Optional[List[str]] = None,
 ) -> Union[Callable, Callable[[Callable], Callable]]:
     """
     A decorator that converts a Python function into a Victor tool.
 
     This decorator automatically extracts the tool's name, description,
-    and parameters from the function's signature and docstring.
+    and parameters from the function's signature and docstring. It also
+    supports optional semantic metadata for dynamic tool selection.
 
     Args:
         func: The function to wrap (optional, for @tool without parentheses)
         cost_tier: Cost tier for the tool (FREE, LOW, MEDIUM, HIGH)
+        category: Tool category for semantic grouping (e.g., 'git', 'filesystem')
+        keywords: Keywords that trigger this tool in user requests
+        use_cases: High-level use cases for semantic matching
+        examples: Example requests that should match this tool
+        priority_hints: Usage hints for tool selection
 
     The docstring should follow the Google Python Style Guide format.
-    Example:
+
+    Example with auto-generated metadata:
         @tool
         def my_tool(param1: str, param2: int = 5):
             '''This is the tool's description.
@@ -49,11 +61,26 @@ def tool(
             '''
             # ... tool logic ...
 
-        @tool(cost_tier=CostTier.MEDIUM)
+    Example with explicit metadata:
+        @tool(
+            cost_tier=CostTier.MEDIUM,
+            category="web",
+            keywords=["search", "google", "find online"],
+            use_cases=["searching the web", "finding information online"],
+            examples=["search for python tutorials", "find documentation"],
+        )
         def web_search_tool(query: str):
             '''Search the web - makes external API calls.'''
             # ... tool logic ...
     """
+    # Capture metadata parameters
+    metadata_params = {
+        "category": category,
+        "keywords": keywords,
+        "use_cases": use_cases,
+        "examples": examples,
+        "priority_hints": priority_hints,
+    }
 
     def decorator(fn: Callable) -> Callable:
         @wraps(fn)
@@ -64,7 +91,7 @@ def tool(
         # Mark as tool for dynamic discovery
         wrapper._is_tool = True  # type: ignore[attr-defined]
         # We will attach a class to the wrapper that is the actual tool
-        wrapper.Tool = _create_tool_class(fn, cost_tier=cost_tier)
+        wrapper.Tool = _create_tool_class(fn, cost_tier=cost_tier, metadata_params=metadata_params)
 
         return wrapper
 
@@ -77,13 +104,19 @@ def tool(
         return decorator
 
 
-def _create_tool_class(func: Callable, cost_tier: CostTier = CostTier.FREE) -> type:
+def _create_tool_class(
+    func: Callable,
+    cost_tier: CostTier = CostTier.FREE,
+    metadata_params: Optional[Dict[str, Any]] = None,
+) -> type:
     """Dynamically creates a class that wraps the given function to act as a BaseTool.
 
     Args:
         func: The function to wrap
         cost_tier: The cost tier for this tool
+        metadata_params: Optional dict with category, keywords, use_cases, examples, priority_hints
     """
+    metadata_params = metadata_params or {}
 
     docstring = parse(func.__doc__ or "")
     tool_description = docstring.short_description or "No description provided."
@@ -124,8 +157,21 @@ def _create_tool_class(func: Callable, cost_tier: CostTier = CostTier.FREE) -> t
         "required": required,
     }
 
-    # Capture cost_tier in closure
+    # Capture closures
     _cost_tier = cost_tier
+    _metadata_params = metadata_params
+
+    # Build explicit metadata if any params were provided
+    _explicit_metadata: Optional[ToolMetadata] = None
+    has_explicit = any(v is not None for v in _metadata_params.values())
+    if has_explicit:
+        _explicit_metadata = ToolMetadata(
+            category=_metadata_params.get("category") or "",
+            keywords=_metadata_params.get("keywords") or [],
+            use_cases=_metadata_params.get("use_cases") or [],
+            examples=_metadata_params.get("examples") or [],
+            priority_hints=_metadata_params.get("priority_hints") or [],
+        )
 
     # Dynamically create the tool class
     class FunctionTool(BaseTool):
@@ -135,6 +181,7 @@ def _create_tool_class(func: Callable, cost_tier: CostTier = CostTier.FREE) -> t
             self._description = tool_description
             self._parameters = tool_params_schema
             self._cost_tier = _cost_tier
+            self._explicit_metadata = _explicit_metadata
 
         @property
         def name(self) -> str:
@@ -151,6 +198,28 @@ def _create_tool_class(func: Callable, cost_tier: CostTier = CostTier.FREE) -> t
         @property
         def cost_tier(self) -> CostTier:
             return self._cost_tier
+
+        @property
+        def metadata(self) -> Optional[ToolMetadata]:
+            """Return explicit metadata if provided via decorator."""
+            return self._explicit_metadata
+
+        def get_metadata(self) -> ToolMetadata:
+            """Get semantic metadata (ToolMetadataProvider contract).
+
+            Returns explicit metadata if provided via @tool decorator,
+            otherwise auto-generates from tool properties.
+            """
+            if self._explicit_metadata is not None:
+                return self._explicit_metadata
+
+            # Auto-generate metadata from tool properties
+            return ToolMetadata.generate_from_tool(
+                name=self._name,
+                description=self._description,
+                parameters=self._parameters,
+                cost_tier=self._cost_tier,
+            )
 
         async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
             try:

@@ -83,6 +83,14 @@ TOOL_CATEGORIES: Dict[str, List[str]] = {
     "cache": ["cache"],
     "workflow": ["run_workflow"],
     "sandbox": ["execute_python_in_sandbox"],
+    # Enterprise: Pipeline analytics and CI/CD
+    "pipeline": ["pipeline_analyzer"],
+    # Enterprise: Infrastructure as Code security
+    "iac": ["iac_scanner"],
+    # Enterprise: Merge conflict resolution
+    "merge": ["merge_conflicts"],
+    # Enterprise: Audit and compliance
+    "audit": ["audit"],
 }
 
 # Web-related tools that should be included when web search is detected
@@ -222,6 +230,57 @@ CATEGORY_KEYWORDS: Dict[str, List[str]] = {
         "execute python",
         "run python safely",
     ],
+    # Enterprise: Pipeline analytics
+    "pipeline": [
+        "pipeline",
+        "coverage",
+        "github actions",
+        "gitlab ci",
+        "cobertura",
+        "lcov",
+        "jacoco",
+        "test coverage",
+        "pipeline health",
+        "build analysis",
+        "workflow analysis",
+    ],
+    # Enterprise: IaC security
+    "iac": [
+        "iac",
+        "infrastructure as code",
+        "terraform",
+        "kubernetes",
+        "k8s",
+        "dockerfile",
+        "docker-compose",
+        "helm",
+        "security scan",
+        "infrastructure security",
+        "misconfiguration",
+    ],
+    # Enterprise: Merge conflicts
+    "merge": [
+        "merge conflict",
+        "conflict",
+        "resolve conflict",
+        "git conflict",
+        "rebase conflict",
+        "merge resolution",
+        "conflict markers",
+    ],
+    # Enterprise: Audit and compliance
+    "audit": [
+        "audit",
+        "compliance",
+        "soc2",
+        "gdpr",
+        "hipaa",
+        "pci dss",
+        "audit log",
+        "security audit",
+        "compliance report",
+        "pii detection",
+    ],
 }
 
 # Web-related keywords for explicit web tool inclusion
@@ -302,6 +361,10 @@ def detect_categories_from_message(message: str) -> Set[str]:
 def get_tools_for_categories(categories: Set[str]) -> Set[str]:
     """Get tool names for the given categories.
 
+    Tries to use ToolMetadataRegistry for dynamic category lookup first,
+    falls back to hardcoded TOOL_CATEGORIES if registry is not initialized
+    or has no matches.
+
     Args:
         categories: Set of category names
 
@@ -309,9 +372,26 @@ def get_tools_for_categories(categories: Set[str]) -> Set[str]:
         Set of tool names from all categories
     """
     tools: Set[str] = set()
-    for category in categories:
-        if category in TOOL_CATEGORIES:
-            tools.update(TOOL_CATEGORIES[category])
+
+    # Try registry first for dynamic categories
+    try:
+        from victor.tools.base import ToolMetadataRegistry
+
+        registry = ToolMetadataRegistry.get_instance()
+        for category in categories:
+            # Get tools from registry (dynamic)
+            registry_tools = registry.get_tools_by_category(category)
+            if registry_tools:
+                tools.update(registry_tools)
+            elif category in TOOL_CATEGORIES:
+                # Fallback to hardcoded (deprecated)
+                tools.update(TOOL_CATEGORIES[category])
+    except Exception:
+        # Fallback to hardcoded categories if registry not available
+        for category in categories:
+            if category in TOOL_CATEGORIES:
+                tools.update(TOOL_CATEGORIES[category])
+
     return tools
 
 

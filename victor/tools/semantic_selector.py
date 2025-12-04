@@ -28,10 +28,9 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import httpx
 import numpy as np
-import yaml
 
 from victor.providers.base import ToolDefinition
-from victor.tools.base import CostTier, ToolRegistry
+from victor.tools.base import CostTier, ToolMetadataRegistry, ToolRegistry
 from victor.embeddings.service import EmbeddingService
 
 logger = logging.getLogger(__name__)
@@ -63,7 +62,15 @@ class SemanticToolSelector:
 
     @classmethod
     def _load_tool_knowledge(cls) -> Dict[str, Dict[str, Any]]:
-        """Load tool knowledge from YAML file.
+        """Load tool knowledge from YAML file (DEPRECATED).
+
+        NOTE: This is a legacy fallback for tools that don't implement
+        the ToolMetadataProvider contract (get_metadata()). New tools
+        should use inline metadata via @tool decorator or metadata property.
+
+        The tool_knowledge.yaml file has been archived. All tools should
+        now provide metadata via get_metadata() which auto-generates from
+        tool properties if not explicitly defined.
 
         Returns:
             Dictionary mapping tool names to their knowledge (use_cases, keywords, examples)
@@ -71,30 +78,15 @@ class SemanticToolSelector:
         if cls._tool_knowledge_loaded:
             return cls._tool_knowledge or {}
 
-        # Find the tool_knowledge.yaml file
-        config_dir = Path(__file__).parent.parent / "config"
-        yaml_path = config_dir / "tool_knowledge.yaml"
-
-        if not yaml_path.exists():
-            logger.warning(f"Tool knowledge file not found: {yaml_path}")
-            cls._tool_knowledge = {}
-            cls._tool_knowledge_loaded = True
-            return {}
-
-        try:
-            with open(yaml_path, "r") as f:
-                data = yaml.safe_load(f) or {}
-
-            cls._tool_knowledge = data
-            cls._tool_knowledge_loaded = True
-            logger.info(f"Loaded tool knowledge for {len(data)} tools from {yaml_path}")
-            return data
-
-        except Exception as e:
-            logger.warning(f"Failed to load tool knowledge from {yaml_path}: {e}")
-            cls._tool_knowledge = {}
-            cls._tool_knowledge_loaded = True
-            return {}
+        # tool_knowledge.yaml is deprecated and archived
+        # Return empty dict - all metadata now comes from get_metadata()
+        cls._tool_knowledge = {}
+        cls._tool_knowledge_loaded = True
+        logger.debug(
+            "tool_knowledge.yaml is deprecated. All tools should use get_metadata() "
+            "for metadata discovery (auto-generated or explicit)."
+        )
+        return {}
 
     @classmethod
     def _build_use_case_text(cls, tool_name: str) -> str:
@@ -164,7 +156,9 @@ class SemanticToolSelector:
 
         # Cache directory
         if cache_dir is None:
-            cache_dir = Path.home() / ".victor" / "embeddings"
+            from victor.config.settings import get_project_paths
+
+            cache_dir = get_project_paths().global_embeddings_dir
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -202,9 +196,31 @@ class SemanticToolSelector:
         Loads from pickle cache if available and tools haven't changed.
         Otherwise, computes embeddings and saves to cache.
 
+        Also refreshes the ToolMetadataRegistry with metadata from all tools.
+
         Args:
             tools: Tool registry with all available tools
         """
+        # Refresh the centralized ToolMetadataRegistry (smart reindexing)
+        # This collects metadata from all tools (explicit or auto-generated)
+        # Uses hash-based change detection to skip reindexing if tools haven't changed
+        metadata_registry = ToolMetadataRegistry.get_instance()
+        tool_list = tools.list_tools()
+        reindexed = metadata_registry.refresh_from_tools(tool_list)
+
+        if reindexed:
+            stats = metadata_registry.get_statistics()
+            logger.info(
+                f"ToolMetadataRegistry reindexed: {stats['total_tools']} tools, "
+                f"{stats['total_categories']} categories, {stats['total_keywords']} keywords"
+            )
+        else:
+            logger.debug("ToolMetadataRegistry cache valid, skipping reindex")
+
+        # Pre-initialize usage stats for ALL tools (not just used ones)
+        # This ensures show_tool_stats.py reports all 47 tools, not just used ones
+        self._initialize_all_tool_stats(tool_list)
+
         if not self.cache_embeddings:
             return
 
@@ -317,29 +333,67 @@ class SemanticToolSelector:
         except Exception as e:
             logger.warning(f"Failed to save embedding cache: {e}")
 
-    # Tool categories for intelligent selection
-    TOOL_CATEGORIES = {
+    # Category alias mappings: maps semantic category names to registry categories
+    # This enables using logical names (file_ops, git_ops) that map to
+    # auto-generated metadata categories (filesystem, git, etc.)
+    CATEGORY_ALIASES = {
+        "file_ops": ["filesystem", "code"],
+        "git_ops": ["git", "merge"],
+        "analysis": ["code", "pipeline", "security", "audit", "code_quality"],
+        "refactoring": ["refactoring", "code"],
+        "generation": ["generation", "search", "code"],
+        "execution": ["code", "testing"],
+        "code_intel": ["search", "code", "lsp"],
+        "web": ["web"],
+        "workflows": ["pipeline", "code"],
+        "pipeline": ["pipeline"],
+        "merge": ["merge", "git"],
+        "security": ["security"],
+        "audit": ["audit"],
+    }
+
+    # Fallback tools for each logical category (used when registry has no matches)
+    # These are deprecated and will be removed once all tools have proper metadata
+    FALLBACK_CATEGORY_TOOLS = {
         "file_ops": ["read_file", "write_file", "edit_files", "list_directory"],
-        "git_ops": ["execute_bash", "git_suggest_commit", "git_create_pr", "git_analyze_conflicts"],
-        "analysis": ["analyze_docs", "analyze_metrics", "code_review", "security_scan"],
-        "refactoring": [
-            "refactor_extract_function",
-            "refactor_inline_variable",
-            "rename_symbol",
-            "refactor_organize_imports",
-        ],
-        "generation": [
-            "generate_docs",
-            "semantic_code_search",
-            "code_search",
-            "plan_files",
-            "scaffold",
-        ],
+        "git_ops": ["execute_bash", "git_suggest_commit", "git_create_pr"],
+        "analysis": ["analyze_docs", "analyze_metrics"],
+        "refactoring": ["refactor_extract_function", "refactor_inline_variable", "rename_symbol"],
+        "generation": ["generate_docs", "semantic_code_search", "code_search"],
         "execution": ["execute_bash", "execute_python_in_sandbox", "run_tests"],
         "code_intel": ["find_symbol", "find_references", "semantic_code_search", "code_search"],
         "web": ["web_search", "web_fetch", "web_summarize"],
         "workflows": ["run_workflow", "batch", "cicd"],
     }
+
+    def get_tools_for_logical_category(self, logical_category: str) -> List[str]:
+        """Get tools for a logical category using the registry.
+
+        Maps logical category names (file_ops, git_ops) to registry categories
+        and returns the combined list of tools. Falls back to hardcoded lists
+        if registry has no matches.
+
+        Args:
+            logical_category: Logical category name (file_ops, git_ops, etc.)
+
+        Returns:
+            List of tool names for the category
+        """
+        # Get registry categories for this logical category
+        registry_categories = self.CATEGORY_ALIASES.get(logical_category, [])
+
+        # Collect tools from all registry categories
+        tools = set()
+        registry = ToolMetadataRegistry.get_instance()
+        for category in registry_categories:
+            tools.update(registry.get_tools_by_category(category))
+
+        # If registry has tools, use them
+        if tools:
+            return list(tools)
+
+        # Fallback to hardcoded list (deprecated)
+        return self.FALLBACK_CATEGORY_TOOLS.get(logical_category, [])
 
     # Mandatory tools for specific keywords (Phase 1)
     MANDATORY_TOOL_KEYWORDS = {
@@ -513,6 +567,9 @@ class SemanticToolSelector:
     def _get_relevant_categories(self, query: str) -> List[str]:
         """Determine which tool categories are relevant for this query.
 
+        Uses ToolMetadataRegistry dynamically for category lookups, falling
+        back to hardcoded lists only when registry is empty.
+
         Args:
             query: User query
 
@@ -524,19 +581,19 @@ class SemanticToolSelector:
 
         # Multi-step tasks need file_ops and git_ops
         if any(sep in query for sep in [";", "then", "after", "next", "and then"]):
-            relevant_tools.extend(self.TOOL_CATEGORIES.get("file_ops", []))
-            relevant_tools.extend(self.TOOL_CATEGORIES.get("git_ops", []))
+            relevant_tools.extend(self.get_tools_for_logical_category("file_ops"))
+            relevant_tools.extend(self.get_tools_for_logical_category("git_ops"))
             logger.debug("Multi-step task detected, including file_ops and git_ops")
 
         # Analysis keywords
         if any(kw in query_lower for kw in ["analyze", "review", "check", "scan", "audit"]):
-            relevant_tools.extend(self.TOOL_CATEGORIES.get("analysis", []))
+            relevant_tools.extend(self.get_tools_for_logical_category("analysis"))
             logger.debug("Analysis task detected")
 
         # Editing keywords
         if any(kw in query_lower for kw in ["edit", "modify", "change", "update", "fix"]):
-            relevant_tools.extend(self.TOOL_CATEGORIES.get("file_ops", []))
-            relevant_tools.extend(self.TOOL_CATEGORIES.get("refactoring", []))
+            relevant_tools.extend(self.get_tools_for_logical_category("file_ops"))
+            relevant_tools.extend(self.get_tools_for_logical_category("refactoring"))
             logger.debug("Editing task detected")
 
         # Git/diff keywords
@@ -544,12 +601,12 @@ class SemanticToolSelector:
             self._keyword_in_text(query_lower, kw)
             for kw in ["diff", "commit", "pr", "git", "pull request"]
         ):
-            relevant_tools.extend(self.TOOL_CATEGORIES.get("git_ops", []))
+            relevant_tools.extend(self.get_tools_for_logical_category("git_ops"))
             logger.debug("Git operation detected")
 
         # Code navigation
         if any(kw in query_lower for kw in ["find", "locate", "search", "where"]):
-            code_intel_tools = self.TOOL_CATEGORIES.get("code_intel", [])
+            code_intel_tools = self.get_tools_for_logical_category("code_intel")
             # For conceptual queries, exclude code_search to prefer semantic_code_search
             if self._is_conceptual_query(query):
                 code_intel_tools = [t for t in code_intel_tools if t != "code_search"]
@@ -560,14 +617,14 @@ class SemanticToolSelector:
 
         # Generation/creation
         if any(kw in query_lower for kw in ["create", "generate", "make", "write new"]):
-            relevant_tools.extend(self.TOOL_CATEGORIES.get("file_ops", []))
-            relevant_tools.extend(self.TOOL_CATEGORIES.get("generation", []))
+            relevant_tools.extend(self.get_tools_for_logical_category("file_ops"))
+            relevant_tools.extend(self.get_tools_for_logical_category("generation"))
             logger.debug("Generation task detected")
 
         # Default: file_ops + execution
         if not relevant_tools:
-            relevant_tools.extend(self.TOOL_CATEGORIES.get("file_ops", []))
-            relevant_tools.extend(self.TOOL_CATEGORIES.get("execution", []))
+            relevant_tools.extend(self.get_tools_for_logical_category("file_ops"))
+            relevant_tools.extend(self.get_tools_for_logical_category("execution"))
             logger.debug("Using default categories: file_ops + execution")
 
         return list(set(relevant_tools))
@@ -729,6 +786,35 @@ class SemanticToolSelector:
             logger.debug(f"Saved usage stats for {len(self._tool_usage_cache)} tools")
         except Exception as e:
             logger.warning(f"Failed to save usage cache: {e}")
+
+    def _initialize_all_tool_stats(self, tools: List[Any]) -> None:
+        """Pre-initialize usage stats for ALL tools, not just used ones.
+
+        This ensures that show_tool_stats.py and other analytics tools can
+        report on all available tools, even those that haven't been used yet.
+        Tools are initialized with 0 usage count but preserve existing stats
+        for tools that have been used.
+
+        Args:
+            tools: List of BaseTool instances from ToolRegistry
+        """
+        initialized_count = 0
+        for tool in tools:
+            if tool.name not in self._tool_usage_cache:
+                self._tool_usage_cache[tool.name] = {
+                    "usage_count": 0,
+                    "success_count": 0,
+                    "last_used": 0,
+                    "recent_contexts": [],
+                }
+                initialized_count += 1
+
+        if initialized_count > 0:
+            logger.info(
+                f"Pre-initialized usage stats for {initialized_count} new tools "
+                f"(total: {len(self._tool_usage_cache)} tools)"
+            )
+            self._save_usage_cache()
 
     def _record_tool_usage(self, tool_name: str, query: str, success: bool = True) -> None:
         """Record tool usage for learning (Phase 3).
@@ -1266,6 +1352,11 @@ class SemanticToolSelector:
         Combines tool name, description, parameter names, and use cases to create
         a rich semantic representation that matches user queries better.
 
+        Uses the ToolMetadataProvider contract: tool.get_metadata() is guaranteed
+        to return valid ToolMetadata (either explicit or auto-generated from
+        tool properties). Falls back to YAML only for legacy tools without
+        get_metadata().
+
         Args:
             tool: Tool object
 
@@ -1286,10 +1377,21 @@ class SemanticToolSelector:
                 param_names = ", ".join(params.keys())
                 parts.append(f"Parameters: {param_names}")
 
-        # Enrich with use cases based on tool name (improves semantic matching)
-        use_cases = cls._get_tool_use_cases(tool.name)
-        if use_cases:
-            parts.append(use_cases)
+        # Use get_metadata() for ToolMetadataProvider contract
+        # This guarantees valid metadata (explicit or auto-generated)
+        if hasattr(tool, "get_metadata"):
+            metadata = tool.get_metadata()
+            if metadata.use_cases:
+                parts.append(f"Use for: {', '.join(metadata.use_cases)}.")
+            if metadata.keywords:
+                parts.append(f"Common requests: {', '.join(metadata.keywords)}.")
+            if metadata.examples:
+                parts.append(f"Examples: {', '.join(metadata.examples)}.")
+        else:
+            # Fallback for legacy tools without get_metadata()
+            use_cases = cls._get_tool_use_cases(tool.name)
+            if use_cases:
+                parts.append(use_cases)
 
         return ". ".join(parts)
 
