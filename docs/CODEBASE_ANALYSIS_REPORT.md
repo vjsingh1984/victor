@@ -86,12 +86,10 @@ Victor is an enterprise-ready coding assistant with solid foundations but accumu
 
 | Category | Items | Est. Lines |
 |----------|-------|------------|
-| **ProximaDB stubs** | 5 NotImplementedError methods with extensive pseudo-code | ~200 |
 | **Unused base methods** | `normalize_messages()`, `normalize_tools()` | ~40 |
 | **Dead MCP methods** | `_parse_stream_event()`, `get_tool_by_name()` | ~50 |
 | **Incomplete features** | `create_with_default_tools()`, `run_mcp_server_stdio()` | ~100 |
 | **Legacy parsing** | `_parse_json_tool_call_from_content()` (replaced by adapters) | ~60 |
-| **Commented code** | ProximaDB pseudo-code blocks | ~50 |
 
 ### 2.4 Test Coverage Crisis
 
@@ -240,7 +238,6 @@ This is the largest single method - needs careful refactoring
 #### 4.3 Remove Dead Code (~500 lines)
 ```
 Items to remove:
-  - ProximaDB stubs (if not implementing soon)
   - Unused base.py methods
   - Dead MCP methods
   - Legacy tool call parsers
@@ -269,7 +266,6 @@ Tests needed:
 | `mcp/client.py` | 496-516 | `get_tool_by_name()`, `get_resource_by_uri()` | UNUSED in agent |
 | `mcp/server.py` | 413-433 | `create_with_default_tools()` | INCOMPLETE - returns empty registry |
 | `mcp/server.py` | 458-506 | `run_mcp_server_stdio()` | INCOMPLETE - tools not registered |
-| `codebase/embeddings/proximadb_provider.py` | 92-378 | 5 stub methods | STUBS with pseudo-code |
 
 ### 4.2 Obsolete Code (Deprecated)
 
@@ -384,7 +380,6 @@ victor/tools/filesystem.py:write_file   # Use edit_files instead
 
 # Remove dead code from
 victor/mcp/server.py:413-506            # Incomplete implementations
-victor/codebase/embeddings/proximadb_provider.py  # If not implementing
 ```
 
 ---

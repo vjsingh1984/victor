@@ -69,32 +69,21 @@ def test_profile_config_without_tool_selection_uses_defaults():
 
 
 def test_orchestrator_uses_configured_tool_selection():
-    """Test that orchestrator uses tool_selection from profile config."""
-    from victor.agent.orchestrator import AgentOrchestrator
-    from victor.providers.base import BaseProvider
+    """Test that ToolSelector uses tool_selection from profile config."""
+    from victor.agent.tool_selection import ToolSelector
 
-    mock_settings = create_mock_settings()
-
-    # Mock provider
-    mock_provider = MagicMock(spec=BaseProvider)
-    mock_provider.supports_tools.return_value = True
-    mock_provider.supports_streaming.return_value = True
-
-    # Create orchestrator with configured tool_selection
-    orchestrator = AgentOrchestrator(
-        settings=mock_settings,
-        provider=mock_provider,
+    # Create ToolSelector with configured tool_selection
+    selector = ToolSelector(
         model="qwen2.5-coder:7b",
-        temperature=0.7,
-        max_tokens=4096,
-        tool_selection={
+        tools=[],  # Empty tools list for this test
+        tool_selection_config={
             "base_threshold": 0.30,  # Custom threshold
             "base_max_tools": 5,  # Custom max tools
         },
     )
 
     # Get adaptive threshold (should use configured values as base)
-    threshold, max_tools = orchestrator._get_adaptive_threshold("test message")
+    threshold, max_tools = selector.get_adaptive_threshold("test message")
 
     # The threshold and max_tools should be based on configured values,
     # with adjustments from query specificity and conversation depth
@@ -106,26 +95,19 @@ def test_orchestrator_uses_configured_tool_selection():
 
 def test_orchestrator_adaptive_logic_still_applies():
     """Test that adaptive adjustments still work with configured values."""
-    from victor.agent.orchestrator import AgentOrchestrator
-    from victor.providers.base import BaseProvider
+    from victor.agent.tool_selection import ToolSelector
 
-    mock_settings = create_mock_settings()
-
-    mock_provider = MagicMock(spec=BaseProvider)
-    mock_provider.supports_tools.return_value = True
-
-    orchestrator = AgentOrchestrator(
-        settings=mock_settings,
-        provider=mock_provider,
+    selector = ToolSelector(
         model="custom-model",
-        tool_selection={"base_threshold": 0.20, "base_max_tools": 10},
+        tools=[],
+        tool_selection_config={"base_threshold": 0.20, "base_max_tools": 10},
     )
 
     # Short vague query should increase threshold
-    threshold_short, tools_short = orchestrator._get_adaptive_threshold("help me")
+    threshold_short, tools_short = selector.get_adaptive_threshold("help me")
 
     # Long detailed query should decrease threshold
-    threshold_long, tools_long = orchestrator._get_adaptive_threshold(
+    threshold_long, tools_long = selector.get_adaptive_threshold(
         "I need help implementing a Python function that validates email addresses "
         "using regular expressions and handles edge cases properly"
     )
@@ -138,24 +120,18 @@ def test_orchestrator_adaptive_logic_still_applies():
 
 
 def test_orchestrator_without_config_uses_hardcoded_defaults():
-    """Test backwards compatibility - orchestrator without tool_selection config."""
-    from victor.agent.orchestrator import AgentOrchestrator
-    from victor.providers.base import BaseProvider
+    """Test backwards compatibility - ToolSelector without tool_selection config."""
+    from victor.agent.tool_selection import ToolSelector
 
-    mock_settings = create_mock_settings()
-
-    mock_provider = MagicMock(spec=BaseProvider)
-    mock_provider.supports_tools.return_value = True
-
-    # Create orchestrator without tool_selection (old behavior)
-    orchestrator = AgentOrchestrator(
-        settings=mock_settings,
-        provider=mock_provider,
+    # Create ToolSelector without tool_selection (old behavior)
+    selector = ToolSelector(
         model="qwen2.5-coder:7b",  # Known model size pattern
+        tools=[],
+        tool_selection_config=None,  # No config - should use defaults
     )
 
     # Should still work using model name pattern detection
-    threshold, max_tools = orchestrator._get_adaptive_threshold("test message")
+    threshold, max_tools = selector.get_adaptive_threshold("test message")
 
     # Should get values appropriate for 7b model (from hardcoded logic)
     assert 0.15 <= threshold <= 0.50  # Reasonable range

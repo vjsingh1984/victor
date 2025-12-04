@@ -486,18 +486,3 @@ async def cicd(
             "success": False,
             "error": f"Unknown operation: {operation}. Valid operations: generate, validate, list",
         }
-
-
-# Keep class for backward compatibility
-class CICDTool:
-    """Deprecated: Use cicd function instead."""
-
-    def __init__(self):
-        """Initialize - deprecated."""
-        import warnings
-
-        warnings.warn(
-            "CICDTool class is deprecated. Use cicd function instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )

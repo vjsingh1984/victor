@@ -480,3 +480,30 @@ class TestToolExecutorCacheableTools:
         assert "write_file" in ToolExecutor.CACHE_INVALIDATING_TOOLS
         assert "edit_files" in ToolExecutor.CACHE_INVALIDATING_TOOLS
         assert "execute_bash" in ToolExecutor.CACHE_INVALIDATING_TOOLS
+
+
+class TestToolExecutorSafetyCheck:
+    """Tests for ToolExecutor safety check integration."""
+
+    @pytest.mark.asyncio
+    async def test_safety_check_blocks_execution(self):
+        """Test that safety check can block tool execution (covers lines 202-203)."""
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "dangerous_tool"
+        mock_tool.execute = AsyncMock(return_value="should not be called")
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(tool_registry=registry)
+
+        # Mock safety checker to block execution
+        executor.safety_checker.check_and_confirm = AsyncMock(
+            return_value=(False, "Operation blocked for safety")
+        )
+
+        result = await executor.execute("dangerous_tool", {"path": "/etc/passwd"})
+
+        assert result.success is False
+        assert "safety" in result.error.lower() or "blocked" in result.error.lower()
+        mock_tool.execute.assert_not_called()

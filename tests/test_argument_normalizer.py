@@ -257,5 +257,314 @@ class TestNormalizationStrategy:
         assert NormalizationStrategy.FAILED.value == "failed"
 
 
+class TestArgumentNormalizerInit:
+    """Test ArgumentNormalizer initialization."""
+
+    def test_init_default_provider(self):
+        """Test init with default provider name."""
+        normalizer = ArgumentNormalizer()
+        assert normalizer.provider_name == "unknown"
+        assert normalizer.config == {}
+
+    def test_init_custom_provider(self):
+        """Test init with custom provider name."""
+        normalizer = ArgumentNormalizer(provider_name="ollama")
+        assert normalizer.provider_name == "ollama"
+
+    def test_init_with_config(self):
+        """Test init with config."""
+        config = {"setting": "value"}
+        normalizer = ArgumentNormalizer(config=config)
+        assert normalizer.config == config
+
+    def test_init_stats_structure(self):
+        """Test initial stats structure."""
+        normalizer = ArgumentNormalizer()
+        assert normalizer.stats["total_calls"] == 0
+        assert normalizer.stats["failures"] == 0
+        assert "direct" in normalizer.stats["normalizations"]
+        assert "python_ast" in normalizer.stats["normalizations"]
+        assert "regex_quotes" in normalizer.stats["normalizations"]
+        assert "manual_repair" in normalizer.stats["normalizations"]
+        assert "failed" in normalizer.stats["normalizations"]
+        assert normalizer.stats["by_tool"] == {}
+
+
+class TestGetStats:
+    """Test get_stats method."""
+
+    def test_get_stats_initial(self):
+        """Test get_stats with no calls."""
+        normalizer = ArgumentNormalizer(provider_name="test")
+        stats = normalizer.get_stats()
+        assert stats["provider"] == "test"
+        assert stats["total_calls"] == 0
+        assert stats["failures"] == 0
+        # (0-0)/max(0,1) * 100 = 0.0
+        assert stats["success_rate"] == 0.0
+
+    def test_get_stats_after_calls(self):
+        """Test get_stats after some calls."""
+        normalizer = ArgumentNormalizer()
+        normalizer.normalize_arguments({"key": "value"}, "tool1")
+        normalizer.normalize_arguments({"key": "[{'a': 'b'}]"}, "tool2")
+
+        stats = normalizer.get_stats()
+        assert stats["total_calls"] == 2
+        assert stats["failures"] == 0
+        assert stats["success_rate"] == 100.0
+        assert "tool1" in stats["by_tool"]
+        assert "tool2" in stats["by_tool"]
+
+    def test_get_stats_with_failures(self):
+        """Test success_rate calculation with failures."""
+        normalizer = ArgumentNormalizer()
+        # Force a failure by setting stats directly
+        normalizer.stats["total_calls"] = 10
+        normalizer.stats["failures"] = 2
+        stats = normalizer.get_stats()
+        assert stats["success_rate"] == 80.0
+
+
+class TestResetStats:
+    """Test reset_stats method."""
+
+    def test_reset_stats(self):
+        """Test stats reset after calls."""
+        normalizer = ArgumentNormalizer()
+        normalizer.normalize_arguments({"key": "value"}, "tool1")
+        normalizer.normalize_arguments({"key": "value"}, "tool2")
+
+        assert normalizer.stats["total_calls"] == 2
+
+        normalizer.reset_stats()
+
+        assert normalizer.stats["total_calls"] == 0
+        assert normalizer.stats["failures"] == 0
+        assert normalizer.stats["by_tool"] == {}
+
+
+class TestLogStats:
+    """Test log_stats method."""
+
+    def test_log_stats(self, caplog):
+        """Test that log_stats logs to INFO level."""
+        import logging
+
+        caplog.set_level(logging.INFO)
+
+        normalizer = ArgumentNormalizer(provider_name="test_provider")
+        normalizer.normalize_arguments({"key": "value"}, "test_tool")
+        normalizer.log_stats()
+
+        assert "Argument normalization stats" in caplog.text
+
+
+class TestNormalizeViaRegex:
+    """Test regex-based normalization."""
+
+    def test_regex_single_quote_replacement(self):
+        """Test single quote to double quote replacement."""
+        normalizer = ArgumentNormalizer()
+        # Test _normalize_via_regex directly
+        args = {"key": "{'field': 'value'}"}
+        result = normalizer._normalize_via_regex(args)
+        assert '"field"' in result["key"]
+        assert '"value"' in result["key"]
+
+    def test_regex_escaped_quote_replacement(self):
+        """Test escaped quote replacement."""
+        normalizer = ArgumentNormalizer()
+        args = {"key": "{\\'field\\': \\'value\\'}"}
+        result = normalizer._normalize_via_regex(args)
+        # Escaped single quotes should be replaced with double quotes
+        assert '"field"' in result["key"]
+
+    def test_regex_non_string_unchanged(self):
+        """Test non-string values are unchanged."""
+        normalizer = ArgumentNormalizer()
+        args = {"key": 42, "list": [1, 2, 3]}
+        result = normalizer._normalize_via_regex(args)
+        assert result["key"] == 42
+        assert result["list"] == [1, 2, 3]
+
+
+class TestNormalizeViaAst:
+    """Test AST-based normalization."""
+
+    def test_ast_python_dict_to_json(self):
+        """Test Python dict syntax to JSON conversion."""
+        normalizer = ArgumentNormalizer()
+        args = {"key": "{'field': 'value'}"}
+        result = normalizer._normalize_via_ast(args)
+        # Should be valid JSON string
+        parsed = json.loads(result["key"])
+        assert parsed["field"] == "value"
+
+    def test_ast_empty_list_type_coercion(self):
+        """Test empty list type coercion."""
+        normalizer = ArgumentNormalizer()
+        args = {"patterns": "[]"}
+        result = normalizer._normalize_via_ast(args)
+        # Empty list should be coerced to actual list type
+        assert result["patterns"] == []
+
+    def test_ast_empty_dict_type_coercion(self):
+        """Test empty dict type coercion."""
+        normalizer = ArgumentNormalizer()
+        args = {"data": "{}"}
+        result = normalizer._normalize_via_ast(args)
+        # Empty dict should be coerced to actual dict type
+        assert result["data"] == {}
+
+    def test_ast_non_json_like_string_unchanged(self):
+        """Test non-JSON-like strings are unchanged."""
+        normalizer = ArgumentNormalizer()
+        args = {"path": "/some/file/path.txt"}
+        result = normalizer._normalize_via_ast(args)
+        assert result["path"] == "/some/file/path.txt"
+
+    def test_ast_invalid_syntax_unchanged(self):
+        """Test invalid syntax is kept unchanged."""
+        normalizer = ArgumentNormalizer()
+        args = {"key": "[{invalid syntax}]"}
+        result = normalizer._normalize_via_ast(args)
+        assert result["key"] == "[{invalid syntax}]"
+
+    def test_ast_primitive_value_unchanged(self):
+        """Test primitive values from AST are kept unchanged."""
+        normalizer = ArgumentNormalizer()
+        # A string that looks like JSON but evaluates to a primitive
+        args = {"key": "42"}  # Doesn't start with [ or {
+        result = normalizer._normalize_via_ast(args)
+        assert result["key"] == "42"
+
+
+class TestNormalizeViaManualRepair:
+    """Test manual repair strategy."""
+
+    def test_manual_repair_edit_files(self):
+        """Test edit_files specific repair."""
+        normalizer = ArgumentNormalizer()
+        args = {"operations": "[{'type': 'modify', 'path': 'test.py'}]"}
+        result = normalizer._normalize_via_manual_repair(args, "edit_files")
+        # Should attempt repair for edit_files
+        assert "operations" in result
+
+    def test_manual_repair_other_tool_unchanged(self):
+        """Test other tools pass through unchanged."""
+        normalizer = ArgumentNormalizer()
+        args = {"key": "value"}
+        result = normalizer._normalize_via_manual_repair(args, "other_tool")
+        assert result == args
+
+    def test_repair_edit_files_string_operations(self):
+        """Test edit_files repair with string operations."""
+        normalizer = ArgumentNormalizer()
+        result = normalizer._repair_edit_files_args(
+            {"operations": "[{'type': 'create', 'path': 'new.txt'}]"}
+        )
+        # Should convert to valid JSON
+        parsed = json.loads(result["operations"])
+        assert parsed[0]["type"] == "create"
+
+    def test_repair_edit_files_non_string_operations(self):
+        """Test edit_files repair with non-string operations."""
+        normalizer = ArgumentNormalizer()
+        ops_list = [{"type": "modify", "path": "file.txt"}]
+        result = normalizer._repair_edit_files_args({"operations": ops_list})
+        # Already a list, should be unchanged
+        assert result["operations"] == ops_list
+
+    def test_repair_edit_files_malformed_string(self):
+        """Test edit_files repair with malformed string."""
+        normalizer = ArgumentNormalizer()
+        result = normalizer._repair_edit_files_args({"operations": "[this is not valid"})
+        # Should keep original on failure
+        assert result["operations"] == "[this is not valid"
+
+
+class TestIsValidJsonDict:
+    """Test _is_valid_json_dict method."""
+
+    def test_valid_simple_dict(self):
+        """Test valid simple dict."""
+        normalizer = ArgumentNormalizer()
+        assert normalizer._is_valid_json_dict({"key": "value"}) is True
+
+    def test_valid_nested_dict(self):
+        """Test valid nested dict."""
+        normalizer = ArgumentNormalizer()
+        assert normalizer._is_valid_json_dict({"key": {"nested": [1, 2, 3]}}) is True
+
+    def test_invalid_non_serializable(self):
+        """Test invalid non-JSON-serializable object."""
+        normalizer = ArgumentNormalizer()
+        # Sets are not JSON serializable
+        assert normalizer._is_valid_json_dict({"key": {1, 2, 3}}) is False
+
+    def test_valid_json_like_string_value(self):
+        """Test dict with JSON-like string values."""
+        normalizer = ArgumentNormalizer()
+        assert normalizer._is_valid_json_dict({"operations": '[{"type": "modify"}]'}) is True
+
+
+class TestNormalizationEdgeCases:
+    """Test edge cases in normalization."""
+
+    def test_layer2_ast_after_preemptive_fails(self):
+        """Test Layer 2 AST normalization when preemptive didn't try."""
+        normalizer = ArgumentNormalizer()
+        # Args without JSON-like strings (no [ or { prefix)
+        # but that fail basic validation
+        args = {"key": object()}  # Non-serializable
+        # This will fail validation and try Layer 2
+        # but object() can't be AST-normalized either
+        normalized, strategy = normalizer.normalize_arguments(args, "tool")
+        # Should fail all strategies
+        assert strategy == NormalizationStrategy.FAILED
+
+    def test_layer3_regex_fallback(self):
+        """Test regex fallback when AST fails."""
+        normalizer = ArgumentNormalizer()
+        # This might trigger regex layer
+        args = {"key": "{'a': 'b', 'c': 'd'}"}
+        normalized, strategy = normalizer.normalize_arguments(args, "tool")
+        # Should succeed via AST or another strategy
+        assert strategy != NormalizationStrategy.FAILED
+
+    def test_validation_exception_handling(self):
+        """Test exception handling in validation."""
+        normalizer = ArgumentNormalizer()
+
+        # Create an object that might raise on validation
+        class BadObj:
+            def __repr__(self):
+                raise ValueError("Bad repr")
+
+        # This tests the exception handling in Layer 1
+        try:
+            normalizer._is_valid_json_dict({"key": BadObj()})
+        except Exception:
+            pass  # Expected - bad object can't be validated
+
+
+class TestNormalizationWithLiteralNewlines:
+    """Test handling of literal newlines in content."""
+
+    def test_literal_newlines_preserved(self):
+        """Test that literal newlines are preserved in content."""
+        normalizer = ArgumentNormalizer()
+        # Content with Python-style escape sequences
+        args = {
+            "operations": "[{'type': 'create', 'path': 'test.sh', 'content': '#!/bin/bash\\necho hello'}]"
+        }
+        normalized, strategy = normalizer.normalize_arguments(args, "edit_files")
+        # After normalization, \\n becomes actual newline
+        assert strategy == NormalizationStrategy.PYTHON_AST
+        ops = json.loads(normalized["operations"])
+        assert "\n" in ops[0]["content"]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

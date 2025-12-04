@@ -18,7 +18,7 @@ import pytest
 from typing import Dict, Any
 
 from victor.tools.decorators import tool, _create_tool_class
-from victor.tools.base import BaseTool, ToolResult
+from victor.tools.base import BaseTool, CostTier, ToolResult
 
 
 class TestToolDecorator:
@@ -302,3 +302,71 @@ class TestCreateToolClass:
         assert schema["function"]["name"] == "schema_test_function"
         assert "Schema test function" in schema["function"]["description"]
         assert "param" in schema["function"]["parameters"]["properties"]
+
+    def test_create_tool_class_cost_tier_property(self):
+        """Test that cost_tier property is correctly set (covers line 153)."""
+
+        def cost_tier_function(param: str):
+            """Function with cost tier.
+
+            Args:
+                param: A parameter.
+            """
+            return param
+
+        # Test with non-default cost tier
+        tool_obj = _create_tool_class(cost_tier_function, cost_tier=CostTier.HIGH)
+        assert tool_obj.cost_tier == CostTier.HIGH
+
+        # Test default cost tier
+        tool_obj_default = _create_tool_class(cost_tier_function)
+        assert tool_obj_default.cost_tier == CostTier.FREE
+
+
+class TestToolDecoratorCostTier:
+    """Tests for @tool decorator with cost_tier parameter."""
+
+    def test_tool_decorator_with_cost_tier(self):
+        """Test @tool decorator with explicit cost_tier."""
+
+        @tool(cost_tier=CostTier.MEDIUM)
+        def medium_cost_tool(param: str):
+            """A medium cost tool.
+
+            Args:
+                param: A parameter.
+            """
+            return param
+
+        tool_obj = medium_cost_tool.Tool
+        assert tool_obj.cost_tier == CostTier.MEDIUM
+
+    def test_tool_decorator_with_high_cost_tier(self):
+        """Test @tool decorator with HIGH cost_tier."""
+
+        @tool(cost_tier=CostTier.HIGH)
+        def high_cost_tool(param: str):
+            """A high cost tool.
+
+            Args:
+                param: A parameter.
+            """
+            return param
+
+        tool_obj = high_cost_tool.Tool
+        assert tool_obj.cost_tier == CostTier.HIGH
+
+    def test_tool_decorator_default_cost_tier(self):
+        """Test @tool decorator has FREE as default cost_tier."""
+
+        @tool
+        def default_cost_tool(param: str):
+            """A default cost tool.
+
+            Args:
+                param: A parameter.
+            """
+            return param
+
+        tool_obj = default_cost_tool.Tool
+        assert tool_obj.cost_tier == CostTier.FREE

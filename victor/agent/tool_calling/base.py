@@ -19,10 +19,12 @@ Provides a unified interface for handling tool calling across different
 LLM providers, abstracting away provider-specific formats and behaviors.
 """
 
+import json
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 from victor.providers.base import ToolDefinition
@@ -33,6 +35,7 @@ class ToolCallFormat(Enum):
 
     OPENAI = "openai"  # OpenAI function calling format
     ANTHROPIC = "anthropic"  # Anthropic tool use format
+    GOOGLE = "google"  # Google Gemini function_declarations format
     OLLAMA_NATIVE = "ollama_native"  # Ollama's native tool_calls
     OLLAMA_JSON = "ollama_json"  # JSON in content (fallback)
     LMSTUDIO_NATIVE = "lmstudio_native"  # LMStudio native (hammer badge models)
@@ -113,6 +116,279 @@ class ToolCallParseResult:
     parse_method: str = "none"  # How the tool calls were parsed
     confidence: float = 1.0  # Confidence in the parsing (0-1)
     warnings: List[str] = field(default_factory=list)
+
+
+class FallbackParsingMixin:
+    """Mixin providing common fallback parsing methods for tool calls.
+
+    This mixin extracts reusable parsing logic that was duplicated across
+    multiple adapters:
+    - JSON parsing from content
+    - XML-style parsing from content
+    - Native tool call parsing with format detection
+    - Argument string-to-dict conversion
+
+    Usage:
+        class MyAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
+            def parse_tool_calls(self, content, raw_tool_calls):
+                # Try native first
+                if raw_tool_calls:
+                    result = self.parse_native_tool_calls(raw_tool_calls)
+                    if result.tool_calls:
+                        return result
+
+                # Fall back to content parsing
+                return self.parse_from_content(content)
+    """
+
+    def parse_json_arguments(self, args: Any) -> Tuple[Dict[str, Any], Optional[str]]:
+        """Parse arguments that may be string or dict.
+
+        Args:
+            args: Arguments (string JSON or dict)
+
+        Returns:
+            Tuple of (parsed_dict, warning_message or None)
+        """
+        if isinstance(args, dict):
+            return args, None
+
+        if isinstance(args, str):
+            try:
+                parsed = json.loads(args)
+                if isinstance(parsed, dict):
+                    return parsed, None
+                return {}, f"Parsed JSON is not a dict: {type(parsed).__name__}"
+            except json.JSONDecodeError:
+                return {}, "Failed to parse JSON arguments"
+
+        return {}, f"Unexpected argument type: {type(args).__name__}"
+
+    def parse_native_tool_calls(
+        self,
+        raw_tool_calls: List[Dict[str, Any]],
+        validate_name_fn: Optional[Callable[[str], bool]] = None,
+    ) -> ToolCallParseResult:
+        """Parse native tool calls from provider response.
+
+        Handles multiple formats:
+        - OpenAI: {function: {name, arguments}}
+        - Anthropic: {name, arguments, id}
+        - Ollama: {name, arguments} or {function: {...}}
+
+        Args:
+            raw_tool_calls: List of raw tool call dicts from provider
+            validate_name_fn: Optional function to validate tool names
+
+        Returns:
+            ToolCallParseResult with parsed tool calls
+        """
+        if not raw_tool_calls:
+            return ToolCallParseResult()
+
+        tool_calls: List[ToolCall] = []
+        warnings: List[str] = []
+
+        for tc in raw_tool_calls:
+            # Handle OpenAI/Ollama format: {function: {name, arguments}}
+            if "function" in tc:
+                func = tc.get("function", {})
+                name = func.get("name", "")
+                args = func.get("arguments", {})
+                tc_id = tc.get("id")
+            else:
+                # Direct format: {name, arguments}
+                name = tc.get("name", "")
+                args = tc.get("arguments", {})
+                tc_id = tc.get("id")
+
+            # Validate tool name if validator provided
+            if validate_name_fn and not validate_name_fn(name):
+                warnings.append(f"Skipped invalid tool name: {name}")
+                continue
+            elif not name:
+                warnings.append("Skipped tool call with empty name")
+                continue
+
+            # Parse string arguments
+            parsed_args, warning = self.parse_json_arguments(args)
+            if warning:
+                warnings.append(f"{name}: {warning}")
+
+            tool_calls.append(ToolCall(name=name, arguments=parsed_args, id=tc_id))
+
+        return ToolCallParseResult(
+            tool_calls=tool_calls,
+            remaining_content="",
+            parse_method="native",
+            confidence=1.0,
+            warnings=warnings,
+        )
+
+    def parse_json_from_content(
+        self,
+        content: str,
+        validate_name_fn: Optional[Callable[[str], bool]] = None,
+    ) -> ToolCallParseResult:
+        """Parse JSON tool calls from content (fallback).
+
+        Looks for JSON objects with 'name' and 'arguments' or 'parameters'.
+
+        Args:
+            content: Response content to parse
+            validate_name_fn: Optional function to validate tool names
+
+        Returns:
+            ToolCallParseResult with parsed tool calls
+        """
+        content = content.strip()
+        if not content:
+            return ToolCallParseResult()
+
+        try:
+            data = json.loads(content)
+            if isinstance(data, dict) and "name" in data:
+                name = data.get("name", "")
+
+                # Validate name if validator provided
+                if validate_name_fn and not validate_name_fn(name):
+                    return ToolCallParseResult(remaining_content=content)
+
+                args = data.get("arguments") or data.get("parameters", {})
+                parsed_args, _ = self.parse_json_arguments(args)
+
+                return ToolCallParseResult(
+                    tool_calls=[ToolCall(name=name, arguments=parsed_args)],
+                    remaining_content="",
+                    parse_method="json_fallback",
+                    confidence=0.9,
+                )
+        except json.JSONDecodeError:
+            pass
+
+        return ToolCallParseResult(remaining_content=content)
+
+    def parse_xml_from_content(
+        self,
+        content: str,
+        validate_name_fn: Optional[Callable[[str], bool]] = None,
+    ) -> ToolCallParseResult:
+        """Parse XML-style tool calls from content (fallback).
+
+        Supports multiple formats:
+        1. <function_call><name>X</name><arguments>{...}</arguments></function_call>
+        2. <function=X><parameter=Y>value</parameter>...</function>
+        3. <tool_call><name>X</name><arguments>{...}</arguments></tool_call>
+
+        Args:
+            content: Response content to parse
+            validate_name_fn: Optional function to validate tool names
+
+        Returns:
+            ToolCallParseResult with parsed tool calls
+        """
+        if not content:
+            return ToolCallParseResult()
+
+        # Define all patterns
+        patterns = [
+            # Pattern 1: Standard function_call format
+            (
+                r"<function_call>\s*<name>([^<]+)</name>\s*<arguments>(.*?)</arguments>\s*</function_call>",
+                "standard",
+            ),
+            # Pattern 2: <tool_call> format
+            (
+                r"<tool_call>\s*<name>([^<]+)</name>\s*<arguments>(.*?)</arguments>\s*</tool_call>",
+                "tool_call",
+            ),
+        ]
+
+        matches: List[Tuple[str, str]] = []
+        matched_patterns: List[str] = []
+
+        for pattern, _pattern_name in patterns:
+            found = re.findall(pattern, content, re.DOTALL | re.IGNORECASE)
+            if found:
+                matches.extend(found)
+                matched_patterns.append(pattern)
+                break  # Use first matching pattern
+
+        # Pattern 3: <function=name> format (Qwen3, some local models)
+        if not matches:
+            func_pattern = r"<function=([^>]+)>(.*?)</function>"
+            func_matches = re.findall(func_pattern, content, re.DOTALL | re.IGNORECASE)
+            if func_matches:
+                matched_patterns.append(func_pattern)
+                for name, params_content in func_matches:
+                    name = name.strip()
+                    # Parse <parameter=X>value</parameter> tags
+                    param_pattern = r"<parameter=([^>]+)>\s*(.*?)\s*</parameter>"
+                    param_matches = re.findall(param_pattern, params_content, re.DOTALL)
+                    args = {p.strip(): v.strip() for p, v in param_matches}
+                    matches.append((name, json.dumps(args)))
+
+        if not matches:
+            return ToolCallParseResult(remaining_content=content)
+
+        tool_calls: List[ToolCall] = []
+        warnings: List[str] = []
+
+        for name, args_str in matches:
+            name = name.strip()
+
+            # Validate name if validator provided
+            if validate_name_fn and not validate_name_fn(name):
+                warnings.append(f"Skipped invalid tool name: {name}")
+                continue
+
+            parsed_args, warning = self.parse_json_arguments(args_str.strip())
+            if warning:
+                warnings.append(f"{name}: {warning}")
+
+            tool_calls.append(ToolCall(name=name, arguments=parsed_args))
+
+        # Remove matched content
+        remaining = content
+        for pattern in matched_patterns:
+            remaining = re.sub(pattern, "", remaining, flags=re.DOTALL | re.IGNORECASE)
+        remaining = remaining.strip()
+
+        return ToolCallParseResult(
+            tool_calls=tool_calls,
+            remaining_content=remaining,
+            parse_method="xml_fallback",
+            confidence=0.7,
+            warnings=warnings,
+        )
+
+    def parse_from_content(
+        self,
+        content: str,
+        validate_name_fn: Optional[Callable[[str], bool]] = None,
+    ) -> ToolCallParseResult:
+        """Parse tool calls from content using all fallback methods.
+
+        Tries JSON first, then XML parsing.
+
+        Args:
+            content: Response content to parse
+            validate_name_fn: Optional function to validate tool names
+
+        Returns:
+            ToolCallParseResult with parsed tool calls
+        """
+        # Try JSON first (higher confidence)
+        result = self.parse_json_from_content(content, validate_name_fn)
+        if result.tool_calls:
+            return result
+
+        # Try XML parsing
+        result = self.parse_xml_from_content(content, validate_name_fn)
+        if result.tool_calls:
+            return result
+
+        return ToolCallParseResult(remaining_content=content)
 
 
 class BaseToolCallingAdapter(ABC):

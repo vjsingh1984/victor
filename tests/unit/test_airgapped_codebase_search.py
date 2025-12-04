@@ -26,12 +26,9 @@ from victor.codebase.embeddings.chromadb_provider import ChromaDBProvider
 from victor.codebase.embeddings.models import SentenceTransformerModel, EmbeddingModelConfig
 
 # Check if chromadb is available
-try:
-    import chromadb
+import importlib.util
 
-    CHROMADB_AVAILABLE = True
-except ImportError:
-    CHROMADB_AVAILABLE = False
+CHROMADB_AVAILABLE = importlib.util.find_spec("chromadb") is not None
 
 
 class TestEmbeddingConfigDefaults:
@@ -77,22 +74,31 @@ class TestUnifiedEmbeddingModel:
 
     @pytest.mark.asyncio
     async def test_unified_model_loads_once(self):
-        """Test that unified model is loaded only once and shared."""
-        with patch("sentence_transformers.SentenceTransformer") as MockST:
-            mock_model = MagicMock()
-            mock_model.encode.return_value = np.random.randn(384).astype(np.float32)
-            mock_model.get_sentence_embedding_dimension.return_value = 384
-            MockST.return_value = mock_model
+        """Test that unified model is loaded only once and shared via EmbeddingService."""
+        from victor.embeddings.service import EmbeddingService
 
-            config = EmbeddingModelConfig(
-                model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
-            )
+        # Reset singleton to ensure clean state
+        EmbeddingService.reset_instance()
 
+        # Mock EmbeddingService.get_instance
+        mock_service = MagicMock()
+        mock_service.dimension = 384
+        mock_service._ensure_model_loaded = MagicMock()
+
+        config = EmbeddingModelConfig(
+            model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
+        )
+
+        with patch.object(EmbeddingService, "get_instance", return_value=mock_service):
             model = SentenceTransformerModel(config)
             await model.initialize()
 
-            # Should have loaded model once
-            MockST.assert_called_once_with("all-MiniLM-L12-v2")
+            # Should have called EmbeddingService.get_instance once
+            EmbeddingService.get_instance.assert_called_once_with(model_name="all-MiniLM-L12-v2")
+            mock_service._ensure_model_loaded.assert_called_once()
+
+        # Reset singleton after test
+        EmbeddingService.reset_instance()
 
     @pytest.mark.asyncio
     async def test_unified_model_embedding_shape(self):
@@ -116,21 +122,29 @@ class TestUnifiedEmbeddingModel:
 
     @pytest.mark.asyncio
     async def test_unified_model_batch_embedding(self):
-        """Test that unified model handles batch embeddings efficiently."""
-        with patch("sentence_transformers.SentenceTransformer") as MockST:
-            mock_model = MagicMock()
-            mock_embeddings = np.random.randn(3, 384).astype(np.float32)
-            mock_model.encode.return_value = mock_embeddings
-            mock_model.get_sentence_embedding_dimension.return_value = 384
-            MockST.return_value = mock_model
+        """Test that unified model handles batch embeddings efficiently via EmbeddingService."""
+        from unittest.mock import AsyncMock
 
-            config = EmbeddingModelConfig(
-                model_type="sentence-transformers",
-                model_name="all-MiniLM-L12-v2",
-                dimension=384,
-                batch_size=32,
-            )
+        from victor.embeddings.service import EmbeddingService
 
+        # Reset singleton to ensure clean state
+        EmbeddingService.reset_instance()
+
+        # Mock EmbeddingService with async methods
+        mock_embeddings = np.random.randn(3, 384).astype(np.float32)
+        mock_service = MagicMock()
+        mock_service.dimension = 384
+        mock_service._ensure_model_loaded = MagicMock()
+        mock_service.embed_batch = AsyncMock(return_value=mock_embeddings)
+
+        config = EmbeddingModelConfig(
+            model_type="sentence-transformers",
+            model_name="all-MiniLM-L12-v2",
+            dimension=384,
+            batch_size=32,
+        )
+
+        with patch.object(EmbeddingService, "get_instance", return_value=mock_service):
             model = SentenceTransformerModel(config)
             await model.initialize()
 
@@ -139,6 +153,10 @@ class TestUnifiedEmbeddingModel:
 
             assert len(embeddings) == 3
             assert all(len(emb) == 384 for emb in embeddings)
+            mock_service.embed_batch.assert_called_once_with(texts)
+
+        # Reset singleton after test
+        EmbeddingService.reset_instance()
 
 
 class TestLanceDBProvider:

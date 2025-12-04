@@ -19,11 +19,11 @@ from pathlib import Path
 
 import pytest
 
-from victor.agent.snapshots import (
+from victor.agent.snapshot_store import (
     FileSnapshot,
-    SnapshotManager,
+    FileSnapshotStore,
     WorkspaceSnapshot,
-    get_snapshot_manager,
+    get_snapshot_store,
 )
 
 
@@ -43,7 +43,7 @@ def temp_workspace():
 @pytest.fixture
 def snapshot_manager(temp_workspace):
     """Create a snapshot manager with temporary workspace."""
-    return SnapshotManager(workspace_root=temp_workspace, max_snapshots=5)
+    return FileSnapshotStore(workspace_root=temp_workspace, max_snapshots=5)
 
 
 class TestFileSnapshot:
@@ -137,8 +137,8 @@ class TestWorkspaceSnapshot:
         assert snapshot.get_file("nonexistent.py") is None
 
 
-class TestSnapshotManager:
-    """Tests for SnapshotManager class."""
+class TestFileSnapshotStore:
+    """Tests for FileSnapshotStore class."""
 
     def test_create_snapshot(self, snapshot_manager, temp_workspace):
         """create_snapshot should capture file state."""
@@ -288,7 +288,7 @@ class TestSnapshotManager:
 
     def test_max_snapshots_cleanup(self, temp_workspace):
         """Old snapshots should be cleaned up when max_snapshots exceeded."""
-        manager = SnapshotManager(workspace_root=temp_workspace, max_snapshots=3)
+        manager = FileSnapshotStore(workspace_root=temp_workspace, max_snapshots=3)
 
         ids = []
         for i in range(5):
@@ -314,11 +314,11 @@ class TestSnapshotManager:
         assert len(snapshot_manager.list_snapshots()) == 0
 
 
-class TestGlobalSnapshotManager:
-    """Tests for global snapshot manager functions."""
+class TestGlobalFileSnapshotStore:
+    """Tests for global snapshot store functions."""
 
     def test_get_snapshot_manager_singleton(self):
-        """get_snapshot_manager should return same instance."""
-        manager1 = get_snapshot_manager()
-        manager2 = get_snapshot_manager()
+        """get_snapshot_store should return same instance."""
+        manager1 = get_snapshot_store()
+        manager2 = get_snapshot_store()
         assert manager1 is manager2

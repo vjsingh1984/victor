@@ -397,7 +397,8 @@ class TestToolRegistry:
         registry.register_before_hook(before_hook)
 
         assert len(registry._before_hooks) == 1
-        assert registry._before_hooks[0] == before_hook
+        # Hook wraps the callback - check the callback attribute
+        assert registry._before_hooks[0].callback == before_hook
 
     def test_register_after_hook(self):
         """Test registering after-execution hook."""
@@ -409,7 +410,8 @@ class TestToolRegistry:
         registry.register_after_hook(after_hook)
 
         assert len(registry._after_hooks) == 1
-        assert registry._after_hooks[0] == after_hook
+        # Hook wraps the callback - check the callback attribute
+        assert registry._after_hooks[0].callback == after_hook
 
     @pytest.mark.asyncio
     async def test_execute_with_hooks(self):

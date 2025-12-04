@@ -52,11 +52,13 @@ class TestCoreConstants:
             "web",
             "docker",
             "metrics",
-            "batch",
             "cicd",
             "scaffold",
-            "plan",
             "search",
+            "database",
+            "lsp",
+            "dependencies",
+            "cache",
         ]
         for category in expected:
             assert category in TOOL_CATEGORIES
@@ -105,7 +107,7 @@ class TestGetToolsForCategories:
         """Test getting tools for multiple categories."""
         tools = get_tools_for_categories({"git", "testing"})
         assert "git" in tools
-        assert "testing_run" in tools
+        assert "run_tests" in tools
 
 
 class TestIsSmallModel:

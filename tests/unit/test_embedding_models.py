@@ -220,7 +220,11 @@ class TestOllamaEmbeddingModel:
 
 
 class TestSentenceTransformerModel:
-    """Tests for SentenceTransformerModel."""
+    """Tests for SentenceTransformerModel.
+
+    Note: SentenceTransformerModel now uses the shared EmbeddingService singleton
+    for memory efficiency (shares model with IntentClassifier and SemanticToolSelector).
+    """
 
     @pytest.mark.asyncio
     async def test_initialization(self, sentence_transformer_config):
@@ -228,57 +232,65 @@ class TestSentenceTransformerModel:
         model = SentenceTransformerModel(sentence_transformer_config)
 
         assert model.config == sentence_transformer_config
-        assert model.model is None
+        assert model._embedding_service is None
         assert not model._initialized
 
     @pytest.mark.asyncio
     async def test_initialize_success(self, sentence_transformer_config):
-        """Test successful initialization."""
-        try:
-            import sentence_transformers
-        except ImportError:
-            pytest.skip("sentence-transformers not installed")
+        """Test successful initialization via EmbeddingService."""
+        from victor.embeddings.service import EmbeddingService
+
+        # Reset singleton to ensure clean state
+        EmbeddingService.reset_instance()
 
         model = SentenceTransformerModel(sentence_transformer_config)
 
-        mock_st_model = MagicMock()
-        mock_st_model.get_sentence_embedding_dimension.return_value = 384
+        # Mock the EmbeddingService.get_instance at the source module
+        mock_service = MagicMock()
+        mock_service.dimension = 384
+        mock_service._ensure_model_loaded = MagicMock()
 
-        with patch(
-            "sentence_transformers.SentenceTransformer", return_value=mock_st_model
-        ):
-            with patch("asyncio.get_event_loop") as mock_loop:
-                # run_in_executor returns an awaitable that resolves to the model
-                async def mock_run_in_executor(executor, func, *args):
-                    return mock_st_model
+        with patch.object(EmbeddingService, "get_instance", return_value=mock_service):
+            await model.initialize()
 
-                mock_loop.return_value.run_in_executor = mock_run_in_executor
+            assert model._initialized
+            assert model._embedding_service == mock_service
+            mock_service._ensure_model_loaded.assert_called_once()
 
-                await model.initialize()
-
-                assert model._initialized
-                assert model.model == mock_st_model
+        # Reset singleton after test
+        EmbeddingService.reset_instance()
 
     @pytest.mark.asyncio
     async def test_initialize_import_error(self, sentence_transformer_config):
-        """Test initialization with missing package."""
+        """Test initialization with missing EmbeddingService.
+
+        Note: Import error now happens inside EmbeddingService when it tries
+        to load sentence-transformers. We test that the model handles this.
+        """
+        from victor.embeddings.service import EmbeddingService
+
         model = SentenceTransformerModel(sentence_transformer_config)
 
-        with patch.dict("sys.modules", {"sentence_transformers": None}):
+        # Mock EmbeddingService.get_instance to raise ImportError
+        with patch.object(
+            EmbeddingService,
+            "get_instance",
+            side_effect=ImportError("sentence-transformers not installed"),
+        ):
             with pytest.raises(ImportError, match="sentence-transformers not installed"):
                 await model.initialize()
 
-    def test_get_dimension_with_model(self, sentence_transformer_config):
-        """Test dimension getter with loaded model."""
+    def test_get_dimension_with_service(self, sentence_transformer_config):
+        """Test dimension getter with loaded service."""
         model = SentenceTransformerModel(sentence_transformer_config)
-        mock_st_model = MagicMock()
-        mock_st_model.get_sentence_embedding_dimension.return_value = 384
-        model.model = mock_st_model
+        mock_service = MagicMock()
+        mock_service.dimension = 384
+        model._embedding_service = mock_service
 
         assert model.get_dimension() == 384
 
-    def test_get_dimension_without_model(self, sentence_transformer_config):
-        """Test dimension getter without loaded model."""
+    def test_get_dimension_without_service(self, sentence_transformer_config):
+        """Test dimension getter without loaded service."""
         model = SentenceTransformerModel(sentence_transformer_config)
         assert model.get_dimension() == 384
 
@@ -298,9 +310,9 @@ class TestOpenAIEmbeddingModel:
     @pytest.mark.asyncio
     async def test_initialize_success(self, openai_config):
         """Test successful initialization."""
-        try:
-            import openai
-        except ImportError:
+        import importlib.util
+
+        if importlib.util.find_spec("openai") is None:
             pytest.skip("openai not installed")
 
         with patch("openai.AsyncOpenAI") as mock_openai:
@@ -330,9 +342,9 @@ class TestOpenAIEmbeddingModel:
     @pytest.mark.asyncio
     async def test_embed_text(self, openai_config):
         """Test single text embedding."""
-        try:
-            import openai
-        except ImportError:
+        import importlib.util
+
+        if importlib.util.find_spec("openai") is None:
             pytest.skip("openai not installed")
 
         with patch("openai.AsyncOpenAI") as mock_openai:

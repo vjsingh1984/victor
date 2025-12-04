@@ -82,8 +82,9 @@ async def test_write_file_success():
 
         result = await write_file(path=file_path, content=content)
 
-        assert "Successfully wrote" in result
+        assert "Successfully created" in result
         assert f"{len(content)} characters" in result
+        assert "/undo" in result  # Verify undo hint is shown
 
         # Verify file was actually written
         assert os.path.exists(file_path)
@@ -102,7 +103,7 @@ async def test_write_file_creates_directories():
 
         result = await write_file(path=file_path, content=content)
 
-        assert "Successfully wrote" in result
+        assert "Successfully created" in result
 
         # Verify directories and file were created
         assert os.path.exists(file_path)
@@ -120,7 +121,7 @@ async def test_write_file_overwrites_existing():
         new_content = "New content"
         result = await write_file(path=temp_path, content=new_content)
 
-        assert "Successfully wrote" in result
+        assert "Successfully modified" in result  # File existed, so it's a modification
 
         # Verify content was overwritten
         with open(temp_path, "r") as f:
@@ -226,3 +227,13 @@ async def test_list_directory_empty():
         result = await list_directory(path=tmpdir)
 
         assert result == []
+
+
+@pytest.mark.asyncio
+async def test_write_file_to_directory_raises_error():
+    """Test that write_file raises IsADirectoryError for directory path (line 91)."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with pytest.raises(IsADirectoryError) as excinfo:
+            await write_file(path=tmpdir, content="test content")
+
+        assert "Cannot write to directory" in str(excinfo.value)

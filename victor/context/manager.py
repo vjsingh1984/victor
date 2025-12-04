@@ -78,7 +78,7 @@ class ContextWindow(BaseModel):
         return (self.total_tokens / (self.max_tokens - self.reserved_tokens)) * 100
 
 
-class ContextManager:
+class ProjectContextLoader:
     """Manages conversation context and token budgeting.
 
     Features:
@@ -87,6 +87,8 @@ class ContextManager:
     - Smart file selection based on relevance
     - Message prioritization
     - Context window optimization
+
+    Note: Previously named `ContextManager`. Alias kept for backward compatibility.
     """
 
     def __init__(
@@ -386,3 +388,7 @@ class ContextManager:
                 "assistant": len([m for m in self.context.messages if m.role == "assistant"]),
             },
         }
+
+
+# Backward compatibility alias
+ContextManager = ProjectContextLoader

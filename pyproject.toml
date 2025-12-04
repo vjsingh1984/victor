@@ -60,11 +60,13 @@ dependencies = [
     # Async
     "httpx>=0.27",
     "aiofiles>=23.0",
+    "aiohttp>=3.9",
 
     # CLI/UI
     "typer>=0.12",
     "rich>=13.7",
     "prompt-toolkit>=3.0",
+    "textual>=0.85.0",
 
     # LLM Providers
     "anthropic>=0.34",
@@ -108,6 +110,9 @@ dev = [
     "mypy>=1.10",
     "black>=24.0",
 
+    # TUI Development
+    "textual-dev>=1.4.0",
+
     # Type stubs
     "types-pyyaml",
     "types-aiofiles",
@@ -119,8 +124,14 @@ docs = [
     "mkdocstrings[python]>=0.24",
 ]
 
+build = [
+    # Binary distribution
+    "pyinstaller>=6.0",
+    "pyinstaller-hooks-contrib>=2024.0",
+]
+
 all = [
-    "victor[dev,docs]",
+    "victor[dev,docs,build]",
 ]
 
 [project.urls]

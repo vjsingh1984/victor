@@ -81,6 +81,7 @@ class ToolCallingAdapterRegistry:
         # Import adapters here to avoid circular imports
         from victor.agent.tool_calling.adapters import (
             AnthropicToolCallingAdapter,
+            GoogleToolCallingAdapter,
             OllamaToolCallingAdapter,
             OpenAICompatToolCallingAdapter,
             OpenAIToolCallingAdapter,
@@ -91,6 +92,7 @@ class ToolCallingAdapterRegistry:
             cls._adapters = {
                 "anthropic": AnthropicToolCallingAdapter,
                 "openai": OpenAIToolCallingAdapter,
+                "google": GoogleToolCallingAdapter,
                 "ollama": OllamaToolCallingAdapter,
                 "lmstudio": OpenAICompatToolCallingAdapter,
                 "vllm": OpenAICompatToolCallingAdapter,
@@ -112,8 +114,8 @@ class ToolCallingAdapterRegistry:
         # Check for cloud providers
         cloud_providers = {"anthropic", "openai", "google", "xai"}
         if provider_key in cloud_providers:
-            # Google and xAI use OpenAI-compatible format
-            if provider_key in {"google", "xai"}:
+            # xAI uses OpenAI-compatible format
+            if provider_key == "xai":
                 return OpenAIToolCallingAdapter(model=model, config=config)
             raise ValueError(f"No adapter registered for cloud provider: {provider_name}")
 

@@ -26,10 +26,18 @@ from typing import Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # File names to search for (in order of priority)
+# Victor checks for its own context files first, then falls back to
+# aliases that might be symlinks to .victor.md (for interoperability)
 CONTEXT_FILE_NAMES = [
     ".victor.md",
     "VICTOR.md",
     ".victor/context.md",
+    # Aliases for other AI coding tools (may be symlinks to .victor.md)
+    "CLAUDE.md",
+    "GEMINI.md",
+    "AGENTS.md",
+    ".cursorrules",
+    ".windsurfrules",
 ]
 
 

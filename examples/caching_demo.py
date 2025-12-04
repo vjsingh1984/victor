@@ -166,9 +166,9 @@ def demo_embedding_cache():
 
     embedding_cache = EmbeddingCache()
 
-    print("\n1️⃣ Simulate expensive embedding computation...")
+    print("\n1️⃣ Simulate embedding computation...")
     text = "Victor is an AI coding assistant"
-    model = "text-embedding-ada-002"
+    model = "all-MiniLM-L12-v2"  # Local sentence-transformers model
 
     # Simulate embedding vector (normally from API)
     simulated_embedding = [0.123, -0.456, 0.789] * 100  # 300-dim vector

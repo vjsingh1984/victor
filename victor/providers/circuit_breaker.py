@@ -12,15 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Circuit breaker pattern for provider resilience.
+"""Standalone circuit breaker pattern for provider resilience.
 
 Implements the circuit breaker pattern to prevent cascading failures
 when external LLM providers are unavailable or experiencing issues.
+
+This module provides a standalone CircuitBreaker with decorator and context
+manager support, plus a CircuitBreakerRegistry for managing multiple breakers.
 
 States:
 - CLOSED: Normal operation, requests pass through
 - OPEN: Circuit tripped, requests fail immediately
 - HALF_OPEN: Testing if service recovered, limited requests allowed
+
+When to use this module:
+- For decorator-based circuit breaking on individual functions/methods
+- For managing circuit breakers across multiple services via CircuitBreakerRegistry
+- For standalone circuit breaker usage outside of ResilientProvider
+
+Related module:
+- victor.providers.resilience: Contains an embedded CircuitBreaker optimized for
+  the ResilientProvider workflow with retry strategies and fallback chains.
+  Use ResilientProvider for a complete resilience solution that includes
+  circuit breaking, retries, and fallback providers.
 """
 
 import asyncio

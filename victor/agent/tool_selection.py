@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tupl
 
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.milestone_monitor import TaskMilestoneMonitor, TaskToolConfigLoader
     from victor.providers.base import ToolDefinition
     from victor.tools.base import ToolRegistry
     from victor.tools.semantic_selector import SemanticToolSelector
@@ -48,24 +49,40 @@ CORE_TOOLS: Set[str] = {
 
 # Tool categories by use case
 TOOL_CATEGORIES: Dict[str, List[str]] = {
-    "git": ["git", "git_suggest_commit", "git_create_pr"],
-    "testing": ["testing_generate", "testing_run", "testing_coverage"],
+    "git": ["git", "git_suggest_commit", "git_create_pr", "git_analyze_conflicts"],
+    "testing": ["run_tests", "testing_generate", "testing_coverage"],
     "refactor": [
         "refactor_extract_function",
         "refactor_inline_variable",
         "refactor_organize_imports",
+        "rename_symbol",  # AST-based rename
     ],
     "security": ["security_scan"],
     "docs": ["generate_docs", "analyze_docs"],
     "review": ["code_review"],
-    "web": ["web_search", "web_fetch", "web_summarize"],
+    # Web/HTTP merged: includes search, fetch, and API operations
+    "web": ["web_search", "web_fetch", "web_summarize", "http_request", "http_test"],
     "docker": ["docker"],
     "metrics": ["analyze_metrics"],
-    "batch": ["batch"],
     "cicd": ["cicd"],
     "scaffold": ["scaffold"],
-    "plan": ["plan_files"],
-    "search": ["code_search"],
+    # Search: includes keyword, semantic, and AST-based code intelligence
+    "search": [
+        "code_search",
+        "semantic_code_search",
+        "find_symbol",  # AST-based symbol lookup
+        "find_references",  # AST-based reference finding
+    ],
+    "database": ["database"],
+    # LSP: unified tool for language server operations
+    "lsp": ["lsp"],
+    # Dependencies: unified package management tool
+    "dependencies": ["dependency"],
+    "patch": ["apply_patch", "create_patch"],
+    # Cache: unified cache management tool
+    "cache": ["cache"],
+    "workflow": ["run_workflow"],
+    "sandbox": ["execute_python_in_sandbox"],
 }
 
 # Web-related tools that should be included when web search is detected
@@ -73,12 +90,13 @@ WEB_TOOLS: Set[str] = {"web_search", "web_summarize", "web_fetch"}
 
 # Keyword mappings to categories
 CATEGORY_KEYWORDS: Dict[str, List[str]] = {
-    "git": ["git", "commit", "branch", "merge", "repository"],
-    "testing": ["test", "pytest", "unittest", "coverage"],
-    "refactor": ["refactor", "rename", "extract", "reorganize"],
+    "git": ["git", "commit", "branch", "merge", "repository", "conflict", "rebase"],
+    "testing": ["test", "pytest", "unittest", "coverage", "run tests"],
+    "refactor": ["refactor", "rename", "extract", "reorganize", "rename symbol"],
     "security": ["security", "vulnerability", "secret", "scan"],
     "docs": ["document", "docstring", "readme", "api doc"],
     "review": ["review", "analyze code", "check code", "code quality"],
+    # Web/HTTP merged keywords
     "web": [
         "search web",
         "search the web",
@@ -87,10 +105,16 @@ CATEGORY_KEYWORDS: Dict[str, List[str]] = {
         "search for",
         "web search",
         "online search",
+        "http request",
+        "api call",
+        "rest api",
+        "curl",
+        "fetch url",
+        "get request",
+        "post request",
     ],
     "docker": ["docker", "container", "image"],
     "metrics": ["complexity", "metrics", "maintainability", "technical debt"],
-    "batch": ["batch", "bulk", "multiple files", "search files", "replace across"],
     "cicd": [
         "ci/cd",
         "cicd",
@@ -98,11 +122,106 @@ CATEGORY_KEYWORDS: Dict[str, List[str]] = {
         "github actions",
         "gitlab ci",
         "circleci",
-        "workflow",
     ],
     "scaffold": ["scaffold", "template", "boilerplate", "new project", "create project"],
-    "plan": ["plan", "which files", "pick files", "where to start"],
-    "search": ["search code", "code search", "find file", "locate code", "where is"],
+    # Search: includes code search + symbol lookup keywords
+    "search": [
+        "search code",
+        "code search",
+        "find file",
+        "locate code",
+        "locate",  # Single word for "locate the error handling code"
+        "where is",
+        "find symbol",
+        "find definition",
+        "find references",
+        "references",  # Single word for flexible matching
+        "where is defined",
+        "symbol lookup",
+        "defined",  # Single word for "find where this class is defined"
+        "find where",  # Common pattern
+        "find all",  # For "find all references"
+        "class is",  # For "where this class is defined"
+    ],
+    "database": [
+        "database",
+        "sql",
+        "query",
+        "postgresql",
+        "mysql",
+        "sqlite",
+        "table",
+        "connect to",
+        "schema",
+        "rows",
+        "columns",
+        "select from",
+        "db",
+    ],
+    # LSP: unified tool keywords
+    "lsp": [
+        "lsp",
+        "language server",
+        "autocomplete",
+        "completions",
+        "hover",
+        "go to definition",
+        "diagnostics",
+        "intellisense",
+        "code intelligence",
+        "find references",
+        "references",
+        "find all references",
+        "symbol info",
+        "type info",
+    ],
+    "dependencies": [
+        "dependencies",
+        "packages",
+        "package",  # Single word for flexible matching
+        "requirements",
+        "pip",
+        "npm",
+        "outdated",
+        "upgrade packages",
+        "dependency tree",
+        "requirements.txt",
+        "package.json",
+        "update package",
+        "install package",
+        "upgrade package",
+        "package update",
+        "pip install",
+        "npm install",
+    ],
+    "patch": [
+        "patch",
+        "diff",
+        "apply patch",
+        "create patch",
+        "unified diff",
+        ".patch file",
+    ],
+    "cache": [
+        "cache",
+        "clear cache",
+        "cache stats",
+        "cache info",
+        "memory cache",
+    ],
+    "workflow": [
+        "workflow",
+        "run workflow",
+        "automation",
+        "multi-step",
+    ],
+    "sandbox": [
+        "sandbox",
+        "safe execution",
+        "isolated",
+        "execute python",
+        "run python safely",
+    ],
 }
 
 # Web-related keywords for explicit web tool inclusion
@@ -347,6 +466,7 @@ class ToolSelector:
         tools: "ToolRegistry",
         semantic_selector: Optional["SemanticToolSelector"] = None,
         conversation_state: Optional["ConversationStateMachine"] = None,
+        task_tracker: Optional["TaskMilestoneMonitor"] = None,
         model: str = "",
         provider_name: str = "",
         tool_selection_config: Optional[Dict[str, Any]] = None,
@@ -359,6 +479,7 @@ class ToolSelector:
             tools: Tool registry containing available tools
             semantic_selector: Optional semantic selector for embedding-based selection
             conversation_state: Optional conversation state machine for stage detection
+            task_tracker: Optional task progress tracker for goal-aware tool selection
             model: Model name (used for adaptive thresholds)
             provider_name: Provider name (used for small model detection)
             tool_selection_config: Optional config with base_threshold, base_max_tools
@@ -368,11 +489,15 @@ class ToolSelector:
         self.tools = tools
         self.semantic_selector = semantic_selector
         self.conversation_state = conversation_state
+        self.task_tracker = task_tracker
         self.model = model
         self.provider_name = provider_name
         self.tool_selection_config = tool_selection_config or {}
         self.fallback_max_tools = fallback_max_tools
         self._on_selection_recorded = on_selection_recorded
+
+        # Task tool config loader for YAML-based configuration
+        self._task_config_loader: Optional["TaskToolConfigLoader"] = None
 
         # Track whether embeddings have been initialized
         self._embeddings_initialized = False
@@ -725,6 +850,107 @@ class ToolSelector:
         # Last resort: return a small prefix
         logger.warning(f"Stage pruning: last resort fallback to {self.fallback_max_tools} tools")
         return tools[: self.fallback_max_tools]
+
+    def get_task_aware_tools(
+        self,
+        stage: str = "initial",
+    ) -> Set[str]:
+        """Get tools appropriate for the current task type and stage.
+
+        Uses TaskMilestoneMonitor to determine task type and TaskToolConfigLoader
+        to get stage-specific tool recommendations from YAML configuration.
+
+        Args:
+            stage: Current conversation stage (initial, reading, executing, verifying)
+
+        Returns:
+            Set of tool names appropriate for the task and stage
+        """
+        if not self.task_tracker:
+            return CORE_TOOLS.copy()
+
+        # Lazy load the config loader
+        if self._task_config_loader is None:
+            from victor.agent.milestone_monitor import TaskToolConfigLoader
+
+            self._task_config_loader = TaskToolConfigLoader()
+
+        # Get task type from tracker
+        task_type = self.task_tracker.progress.task_type.value
+
+        # Get stage-specific tools from YAML config
+        stage_tools = self._task_config_loader.get_stage_tools(task_type, stage)
+
+        # Always include required tools for the task type
+        required = self.task_tracker.get_required_tools()
+
+        # Combine stage tools with required tools
+        tools = set(stage_tools) | required
+
+        logger.debug(f"Task-aware tools for {task_type}/{stage}: " f"{sorted(tools)}")
+
+        return tools
+
+    def get_force_action_hint(self) -> Optional[str]:
+        """Get hint message if LLM should be forced to take action.
+
+        Returns:
+            Hint message if action should be forced, None otherwise
+        """
+        if not self.task_tracker:
+            return None
+
+        should_force, hint = self.task_tracker.should_force_action()
+        return hint if should_force else None
+
+    def prioritize_by_task(
+        self,
+        tools: List["ToolDefinition"],
+        stage: str = "initial",
+    ) -> List["ToolDefinition"]:
+        """Filter and prioritize tools based on task type and stage.
+
+        Args:
+            tools: List of tool definitions to filter
+            stage: Current conversation stage
+
+        Returns:
+            Filtered list of tools appropriate for task and stage
+        """
+        if not tools:
+            return tools
+
+        if not self.task_tracker:
+            return tools
+
+        # Get task-aware tools
+        task_tools = self.get_task_aware_tools(stage)
+
+        # Always include core tools
+        allowed = task_tools | CORE_TOOLS
+
+        # Check if we need to force action tools
+        if self.task_tracker.progress.task_type.value == "edit":
+            # For EDIT tasks after target read, ensure edit_files is included
+            from victor.agent.milestone_monitor import Milestone
+
+            if Milestone.TARGET_READ in self.task_tracker.progress.milestones:
+                allowed.add("edit_files")
+                logger.debug("Added edit_files for EDIT task after TARGET_READ")
+
+        # Filter tools to only those allowed
+        filtered = [t for t in tools if t.name in allowed]
+
+        if filtered:
+            logger.info(
+                f"Task-aware tool filtering: {len(filtered)} tools from {len(tools)} "
+                f"(task={self.task_tracker.progress.task_type.value}, stage={stage})"
+            )
+            return filtered
+
+        # Fallback to original tools
+        logger.warning("Task-aware filtering removed all tools, keeping originals")
+        return tools
 
     def _get_fallback_tools(self, user_message: str) -> List["ToolDefinition"]:
         """Get fallback tools when semantic selection returns 0 results.

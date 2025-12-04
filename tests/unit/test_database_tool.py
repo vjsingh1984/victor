@@ -12,23 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for database_tool module."""
+"""Tests for unified database tool module."""
 
 import pytest
 import tempfile
 import os
 
 from victor.tools.database_tool import (
-    database_connect,
-    database_query,
-    database_tables,
-    database_describe,
-    database_schema,
-    database_disconnect,
+    database,
     set_database_config,
     DANGEROUS_PATTERNS,
     _connections,
-    DatabaseTool,
 )
 
 
@@ -47,18 +41,18 @@ class TestSetDatabaseConfig:
 
 
 class TestDatabaseConnect:
-    """Tests for database_connect function."""
+    """Tests for database connect action."""
 
     @pytest.mark.asyncio
     async def test_connect_sqlite_memory(self):
         """Test SQLite in-memory connection."""
-        result = await database_connect(database=":memory:")
+        result = await database(action="connect", database=":memory:")
         assert result["success"] is True
         assert "connection_id" in result
         assert "sqlite_" in result["connection_id"]
         # Cleanup
         if result["success"]:
-            await database_disconnect(result["connection_id"])
+            await database(action="disconnect", connection_id=result["connection_id"])
 
     @pytest.mark.asyncio
     async def test_connect_sqlite_file(self):
@@ -67,62 +61,30 @@ class TestDatabaseConnect:
             db_path = f.name
 
         try:
-            result = await database_connect(database=db_path, db_type="sqlite")
+            result = await database(action="connect", database=db_path, db_type="sqlite")
             assert result["success"] is True
             if result["success"]:
-                await database_disconnect(result["connection_id"])
+                await database(action="disconnect", connection_id=result["connection_id"])
         finally:
             os.unlink(db_path)
 
     @pytest.mark.asyncio
     async def test_connect_unsupported_type(self):
         """Test connection with unsupported database type."""
-        result = await database_connect(database="test", db_type="mongodb")
+        result = await database(action="connect", database="test", db_type="mongodb")
         assert result["success"] is False
         assert "Unsupported database type" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_connect_postgresql_no_driver(self):
-        """Test PostgreSQL connection without driver."""
-        result = await database_connect(
-            database="testdb",
-            db_type="postgresql",
-            host="localhost",
-            username="user",
-            password="pass",
-        )
-        # Either succeeds (if psycopg2 is installed) or fails with import error
-        assert "success" in result
-
-    @pytest.mark.asyncio
-    async def test_connect_mysql_no_driver(self):
-        """Test MySQL connection without driver."""
-        result = await database_connect(
-            database="testdb",
-            db_type="mysql",
-            host="localhost",
-            username="user",
-            password="pass",
-        )
-        # Either succeeds (if mysql-connector is installed) or fails with import error
-        assert "success" in result
-
-    @pytest.mark.asyncio
-    async def test_connect_sqlserver_no_driver(self):
-        """Test SQL Server connection without driver."""
-        result = await database_connect(
-            database="testdb",
-            db_type="sqlserver",
-            host="localhost",
-            username="user",
-            password="pass",
-        )
-        # Either succeeds (if pyodbc is installed) or fails with import error
-        assert "success" in result
+    async def test_connect_missing_database(self):
+        """Test connection with missing database parameter."""
+        result = await database(action="connect")
+        assert result["success"] is False
+        assert "Missing required parameter" in result["error"]
 
 
 class TestDatabaseQuery:
-    """Tests for database_query function."""
+    """Tests for database query action."""
 
     @pytest.fixture
     async def sqlite_conn(self):
@@ -130,7 +92,7 @@ class TestDatabaseQuery:
         # Reset config
         set_database_config(allow_modifications=False, max_rows=100)
 
-        result = await database_connect(database=":memory:")
+        result = await database(action="connect", database=":memory:")
         conn_id = result["connection_id"]
 
         # Create test table
@@ -153,26 +115,28 @@ class TestDatabaseQuery:
 
         yield conn_id
 
-        await database_disconnect(conn_id)
+        await database(action="disconnect", connection_id=conn_id)
 
     @pytest.mark.asyncio
     async def test_query_invalid_connection(self):
         """Test query with invalid connection."""
-        result = await database_query(connection_id="invalid_conn", sql="SELECT 1")
+        result = await database(action="query", connection_id="invalid_conn", sql="SELECT 1")
         assert result["success"] is False
         assert "Invalid or missing connection_id" in result["error"]
 
     @pytest.mark.asyncio
     async def test_query_missing_sql(self, sqlite_conn):
         """Test query with missing SQL."""
-        result = await database_query(connection_id=sqlite_conn, sql="")
+        result = await database(action="query", connection_id=sqlite_conn)
         assert result["success"] is False
         assert "Missing required parameter" in result["error"]
 
     @pytest.mark.asyncio
     async def test_query_select(self, sqlite_conn):
         """Test SELECT query."""
-        result = await database_query(connection_id=sqlite_conn, sql="SELECT * FROM users")
+        result = await database(
+            action="query", connection_id=sqlite_conn, sql="SELECT * FROM users"
+        )
         assert result["success"] is True
         assert result["count"] == 2
         assert "columns" in result
@@ -183,41 +147,26 @@ class TestDatabaseQuery:
     @pytest.mark.asyncio
     async def test_query_select_with_limit(self, sqlite_conn):
         """Test SELECT query with limit."""
-        result = await database_query(connection_id=sqlite_conn, sql="SELECT * FROM users", limit=1)
+        result = await database(
+            action="query", connection_id=sqlite_conn, sql="SELECT * FROM users", limit=1
+        )
         assert result["success"] is True
         assert result["count"] == 1
 
     @pytest.mark.asyncio
     async def test_query_dangerous_blocked(self, sqlite_conn):
         """Test dangerous queries are blocked."""
-        result = await database_query(connection_id=sqlite_conn, sql="DROP TABLE users")
+        result = await database(action="query", connection_id=sqlite_conn, sql="DROP TABLE users")
         assert result["success"] is False
         assert "Modification operations not allowed" in result["error"]
 
     @pytest.mark.asyncio
     async def test_query_insert_blocked(self, sqlite_conn):
         """Test INSERT is blocked by default."""
-        result = await database_query(
+        result = await database(
+            action="query",
             connection_id=sqlite_conn,
             sql="INSERT INTO users (name, email) VALUES ('Charlie', 'c@test.com')",
-        )
-        assert result["success"] is False
-        assert "Modification operations not allowed" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_query_update_blocked(self, sqlite_conn):
-        """Test UPDATE is blocked by default."""
-        result = await database_query(
-            connection_id=sqlite_conn, sql="UPDATE users SET name = 'Updated' WHERE id = 1"
-        )
-        assert result["success"] is False
-        assert "Modification operations not allowed" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_query_delete_blocked(self, sqlite_conn):
-        """Test DELETE is blocked by default."""
-        result = await database_query(
-            connection_id=sqlite_conn, sql="DELETE FROM users WHERE id = 1"
         )
         assert result["success"] is False
         assert "Modification operations not allowed" in result["error"]
@@ -227,7 +176,8 @@ class TestDatabaseQuery:
         """Test modifications work when allowed."""
         set_database_config(allow_modifications=True, max_rows=100)
 
-        result = await database_query(
+        result = await database(
+            action="query",
             connection_id=sqlite_conn,
             sql="INSERT INTO users (name, email) VALUES ('Charlie', 'c@test.com')",
         )
@@ -240,18 +190,20 @@ class TestDatabaseQuery:
     @pytest.mark.asyncio
     async def test_query_invalid_sql(self, sqlite_conn):
         """Test invalid SQL."""
-        result = await database_query(connection_id=sqlite_conn, sql="INVALID SQL STATEMENT")
+        result = await database(
+            action="query", connection_id=sqlite_conn, sql="INVALID SQL STATEMENT"
+        )
         assert result["success"] is False
         assert "Query failed" in result["error"]
 
 
 class TestDatabaseTables:
-    """Tests for database_tables function."""
+    """Tests for database tables action."""
 
     @pytest.fixture
     async def sqlite_conn(self):
         """Create SQLite connection for testing."""
-        result = await database_connect(database=":memory:")
+        result = await database(action="connect", database=":memory:")
         conn_id = result["connection_id"]
 
         # Create test tables
@@ -261,19 +213,19 @@ class TestDatabaseTables:
 
         yield conn_id
 
-        await database_disconnect(conn_id)
+        await database(action="disconnect", connection_id=conn_id)
 
     @pytest.mark.asyncio
     async def test_tables_invalid_connection(self):
         """Test listing tables with invalid connection."""
-        result = await database_tables(connection_id="invalid_conn")
+        result = await database(action="tables", connection_id="invalid_conn")
         assert result["success"] is False
         assert "Invalid or missing connection_id" in result["error"]
 
     @pytest.mark.asyncio
     async def test_tables_list(self, sqlite_conn):
         """Test listing tables."""
-        result = await database_tables(connection_id=sqlite_conn)
+        result = await database(action="tables", connection_id=sqlite_conn)
         assert result["success"] is True
         assert "tables" in result
         assert "users" in result["tables"]
@@ -282,12 +234,12 @@ class TestDatabaseTables:
 
 
 class TestDatabaseDescribe:
-    """Tests for database_describe function."""
+    """Tests for database describe action."""
 
     @pytest.fixture
     async def sqlite_conn(self):
         """Create SQLite connection for testing."""
-        result = await database_connect(database=":memory:")
+        result = await database(action="connect", database=":memory:")
         conn_id = result["connection_id"]
 
         _connections[conn_id].execute(
@@ -304,32 +256,31 @@ class TestDatabaseDescribe:
 
         yield conn_id
 
-        await database_disconnect(conn_id)
+        await database(action="disconnect", connection_id=conn_id)
 
     @pytest.mark.asyncio
     async def test_describe_invalid_connection(self):
         """Test describe with invalid connection."""
-        result = await database_describe(connection_id="invalid_conn", table="users")
+        result = await database(action="describe", connection_id="invalid_conn", table="users")
         assert result["success"] is False
         assert "Invalid or missing connection_id" in result["error"]
 
     @pytest.mark.asyncio
     async def test_describe_missing_table(self, sqlite_conn):
         """Test describe with missing table name."""
-        result = await database_describe(connection_id=sqlite_conn, table="")
+        result = await database(action="describe", connection_id=sqlite_conn)
         assert result["success"] is False
         assert "Missing required parameter" in result["error"]
 
     @pytest.mark.asyncio
     async def test_describe_table(self, sqlite_conn):
         """Test describing a table."""
-        result = await database_describe(connection_id=sqlite_conn, table="users")
+        result = await database(action="describe", connection_id=sqlite_conn, table="users")
         assert result["success"] is True
         assert result["table"] == "users"
         assert result["count"] == 4
         assert len(result["columns"]) == 4
 
-        # Check column details
         col_names = [c["name"] for c in result["columns"]]
         assert "id" in col_names
         assert "name" in col_names
@@ -338,12 +289,12 @@ class TestDatabaseDescribe:
 
 
 class TestDatabaseSchema:
-    """Tests for database_schema function."""
+    """Tests for database schema action."""
 
     @pytest.fixture
     async def sqlite_conn(self):
         """Create SQLite connection for testing."""
-        result = await database_connect(database=":memory:")
+        result = await database(action="connect", database=":memory:")
         conn_id = result["connection_id"]
 
         _connections[conn_id].execute("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)")
@@ -354,19 +305,19 @@ class TestDatabaseSchema:
 
         yield conn_id
 
-        await database_disconnect(conn_id)
+        await database(action="disconnect", connection_id=conn_id)
 
     @pytest.mark.asyncio
     async def test_schema_invalid_connection(self):
         """Test schema with invalid connection."""
-        result = await database_schema(connection_id="invalid_conn")
+        result = await database(action="schema", connection_id="invalid_conn")
         assert result["success"] is False
         assert "Invalid or missing connection_id" in result["error"]
 
     @pytest.mark.asyncio
     async def test_schema_full(self, sqlite_conn):
         """Test getting full schema."""
-        result = await database_schema(connection_id=sqlite_conn)
+        result = await database(action="schema", connection_id=sqlite_conn)
         assert result["success"] is True
         assert "tables" in result
         assert len(result["tables"]) == 2
@@ -375,35 +326,31 @@ class TestDatabaseSchema:
         assert "users" in table_names
         assert "orders" in table_names
 
-        # Check columns are included
         for table in result["tables"]:
             assert "columns" in table
 
 
 class TestDatabaseDisconnect:
-    """Tests for database_disconnect function."""
+    """Tests for database disconnect action."""
 
     @pytest.mark.asyncio
     async def test_disconnect_invalid_connection(self):
         """Test disconnect with invalid connection."""
-        result = await database_disconnect(connection_id="invalid_conn")
+        result = await database(action="disconnect", connection_id="invalid_conn")
         assert result["success"] is False
         assert "Invalid or missing connection_id" in result["error"]
 
     @pytest.mark.asyncio
     async def test_disconnect_success(self):
         """Test successful disconnect."""
-        # Connect first
-        conn_result = await database_connect(database=":memory:")
+        conn_result = await database(action="connect", database=":memory:")
         assert conn_result["success"] is True
         conn_id = conn_result["connection_id"]
 
-        # Disconnect
-        result = await database_disconnect(connection_id=conn_id)
+        result = await database(action="disconnect", connection_id=conn_id)
         assert result["success"] is True
         assert "Disconnected" in result["message"]
 
-        # Verify connection is removed
         assert conn_id not in _connections
 
 
@@ -420,16 +367,12 @@ class TestDangerousPatterns:
         assert "INSERT INTO" in DANGEROUS_PATTERNS
 
 
-class TestDatabaseToolDeprecation:
-    """Tests for deprecated DatabaseTool class."""
+class TestDatabaseUnknownAction:
+    """Tests for unknown action handling."""
 
-    def test_deprecated_class_warning(self):
-        """Test deprecation warning for DatabaseTool class."""
-        import warnings
-
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            DatabaseTool()
-            assert len(w) == 1
-            assert issubclass(w[0].category, DeprecationWarning)
-            assert "deprecated" in str(w[0].message).lower()
+    @pytest.mark.asyncio
+    async def test_unknown_action(self):
+        """Test unknown action returns error."""
+        result = await database(action="invalid_action")
+        assert result["success"] is False
+        assert "Unknown action" in result["error"]

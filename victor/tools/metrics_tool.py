@@ -369,18 +369,3 @@ async def analyze_metrics(
         "recommendations": recommendations,
         "formatted_report": "\n".join(report),
     }
-
-
-# Keep class for backward compatibility
-class MetricsTool:
-    """Deprecated: Use individual metrics_* functions instead."""
-
-    def __init__(self):
-        """Initialize - deprecated."""
-        import warnings
-
-        warnings.warn(
-            "MetricsTool class is deprecated. Use metrics_* functions instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )

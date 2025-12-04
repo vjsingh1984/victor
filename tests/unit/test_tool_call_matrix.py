@@ -4,21 +4,10 @@ from victor.config.model_capabilities import ToolCallingMatrix
 
 
 def test_matrix_merges_yaml_and_defaults(tmp_path: Path):
-    yaml_path = tmp_path / "tool_calling_models.yaml"
-    yaml_path.write_text(
-        """
-tool_calling_models:
-  ollama:
-    tier_a:
-      - name: "llama3.1:8b"
-    tier_b:
-      - name: "custom-model"
-        """
-    )
-
+    # Note: manifest_path is no longer used - ToolCallingMatrix loads from
+    # profiles.yaml. Use the manifest dict directly for custom models.
     matrix = ToolCallingMatrix(
-        {"ollama": ["qwen3-coder:30b"]},
-        manifest_path=yaml_path,
+        {"ollama": ["qwen3-coder:30b", "llama3.1:8b", "custom-model"]},
         always_allow_providers=["openai"],
     )
 

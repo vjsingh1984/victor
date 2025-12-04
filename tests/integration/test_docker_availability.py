@@ -33,7 +33,11 @@ class TestDockerAvailability:
         """Test that Docker availability is correctly detected when Docker is running."""
         # This test will pass if Docker is running, skip if not
         try:
-            manager = CodeExecutionManager()
+            manager = CodeExecutionManager(require_docker=False)
+
+            # Skip test if Docker is not available (instead of failing)
+            if not manager.docker_available:
+                pytest.skip("Docker not running - skipping Docker-available test")
 
             # Should detect Docker is available
             assert manager.docker_available is True, "Docker should be detected as available"

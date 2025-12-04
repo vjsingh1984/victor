@@ -270,3 +270,135 @@ class TestConversationStateMachineTransitions:
 
         # Confidence should be updated
         assert sm.state._stage_confidence >= 0
+
+
+class TestConversationStateSerialization:
+    """Tests for serialization/deserialization."""
+
+    def test_state_to_dict(self):
+        """Test ConversationState.to_dict (covers line 176)."""
+        state = ConversationState(
+            stage=ConversationStage.READING,
+            message_count=5,
+        )
+        state.tool_history = ["read_file", "code_search"]
+        state.observed_files = {"/test.py", "/other.py"}
+        state.modified_files = {"/changed.py"}
+        state.last_tools = ["read_file"]
+
+        data = state.to_dict()
+
+        assert data["stage"] == "READING"
+        assert data["tool_history"] == ["read_file", "code_search"]
+        assert set(data["observed_files"]) == {"/test.py", "/other.py"}
+        assert set(data["modified_files"]) == {"/changed.py"}
+        assert data["message_count"] == 5
+        assert data["last_tools"] == ["read_file"]
+
+    def test_state_from_dict(self):
+        """Test ConversationState.from_dict (covers lines 196-204)."""
+        data = {
+            "stage": "EXECUTION",
+            "tool_history": ["write_file"],
+            "observed_files": ["/test.py"],
+            "modified_files": ["/test.py"],
+            "message_count": 3,
+            "last_tools": ["write_file"],
+            "stage_confidence": 0.8,
+        }
+
+        state = ConversationState.from_dict(data)
+
+        assert state.stage == ConversationStage.EXECUTION
+        assert state.tool_history == ["write_file"]
+        assert state.observed_files == {"/test.py"}
+        assert state.modified_files == {"/test.py"}
+        assert state.message_count == 3
+        assert state.last_tools == ["write_file"]
+        assert state._stage_confidence == 0.8
+
+    def test_state_from_dict_empty(self):
+        """Test ConversationState.from_dict with empty dict."""
+        state = ConversationState.from_dict({})
+
+        assert state.stage == ConversationStage.INITIAL
+        assert state.tool_history == []
+        assert state.message_count == 0
+
+    def test_state_machine_to_dict(self):
+        """Test ConversationStateMachine.to_dict (covers line 417)."""
+        sm = ConversationStateMachine()
+        sm.record_tool_execution("read_file", {"path": "/test.py"})
+
+        data = sm.to_dict()
+
+        assert "state" in data
+        assert data["state"]["tool_history"] == ["read_file"]
+
+    def test_state_machine_from_dict(self):
+        """Test ConversationStateMachine.from_dict (covers lines 431-434)."""
+        data = {
+            "state": {
+                "stage": "ANALYSIS",
+                "tool_history": ["code_search"],
+                "observed_files": ["/file.py"],
+                "modified_files": [],
+                "message_count": 2,
+                "last_tools": ["code_search"],
+                "stage_confidence": 0.7,
+            }
+        }
+
+        sm = ConversationStateMachine.from_dict(data)
+
+        assert sm.state.stage == ConversationStage.ANALYSIS
+        assert sm.state.tool_history == ["code_search"]
+        assert sm.state.message_count == 2
+
+    def test_state_machine_from_dict_empty(self):
+        """Test ConversationStateMachine.from_dict with empty dict."""
+        sm = ConversationStateMachine.from_dict({})
+
+        assert sm.state.stage == ConversationStage.INITIAL
+
+
+class TestConversationStateMachineRoundTrip:
+    """Tests for state machine round-trip serialization."""
+
+    def test_state_roundtrip(self):
+        """Test ConversationState serialization round-trip."""
+        original = ConversationState(
+            stage=ConversationStage.ANALYSIS,
+            message_count=10,
+        )
+        original.tool_history = ["read_file", "code_search", "write_file"]
+        original.observed_files = {"/a.py", "/b.py"}
+        original.modified_files = {"/c.py"}
+        original.last_tools = ["write_file"]
+        original._stage_confidence = 0.75
+
+        data = original.to_dict()
+        restored = ConversationState.from_dict(data)
+
+        assert restored.stage == original.stage
+        assert restored.tool_history == original.tool_history
+        assert restored.observed_files == original.observed_files
+        assert restored.modified_files == original.modified_files
+        assert restored.message_count == original.message_count
+        assert restored.last_tools == original.last_tools
+        assert restored._stage_confidence == original._stage_confidence
+
+    def test_machine_roundtrip(self):
+        """Test ConversationStateMachine serialization round-trip."""
+        original = ConversationStateMachine()
+        original.record_tool_execution("read_file", {"path": "/test.py"})
+        original.record_tool_execution("write_file", {"path": "/test.py"})
+        original.record_message("Hello, please help", is_user=True)
+
+        data = original.to_dict()
+        restored = ConversationStateMachine.from_dict(data)
+
+        assert restored.state.tool_history == original.state.tool_history
+        assert restored.state.observed_files == original.state.observed_files
+        assert restored.state.modified_files == original.state.modified_files
+        assert restored.state.message_count == original.state.message_count

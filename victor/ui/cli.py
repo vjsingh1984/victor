@@ -17,6 +17,7 @@
 import asyncio
 import logging
 import os
+import sys
 from typing import Any, Optional
 
 try:
@@ -28,19 +29,118 @@ except Exception:
     _history_enabled = False
 
 import typer
-from rich.console import Console
-from rich.markdown import Markdown
-from rich.panel import Panel
-from rich.prompt import Confirm, Prompt
 
-from victor import __version__
-from victor.agent.orchestrator import AgentOrchestrator
-from victor.agent.safety import ConfirmationRequest, RiskLevel, set_confirmation_callback
-from victor.config.settings import load_settings
-from victor.ui.commands import SlashCommandHandler
+
+def _check_tui_compatibility() -> tuple[bool, str]:
+    """Check if the terminal supports TUI features.
+
+    Returns:
+        Tuple of (is_compatible, reason_if_not)
+    """
+    # Check if running in a TTY
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        return False, "Not running in an interactive terminal (no TTY)"
+
+    # Check terminal size
+    try:
+        import shutil
+
+        cols, rows = shutil.get_terminal_size()
+        if cols < 40 or rows < 10:
+            return False, f"Terminal too small ({cols}x{rows}). Need at least 40x10"
+    except Exception:
+        pass  # Best effort check
+
+    # Check for TERM environment variable
+    term = os.environ.get("TERM", "")
+    if term in ("dumb", ""):
+        return False, f"Unsupported terminal type: '{term}'"
+
+    # Check for known problematic environments
+    if os.environ.get("EMACS"):
+        return False, "Running in Emacs shell (use M-x shell instead)"
+
+    # Check if Textual can import successfully
+    try:
+        from textual.app import App  # noqa: F401
+
+        return True, ""
+    except ImportError as e:
+        return False, f"Textual library not available: {e}"
+    except Exception as e:
+        return False, f"TUI initialization error: {e}"
+
+
+# These imports are after the readline try/except block intentionally
+from rich.console import Console  # noqa: E402
+from rich.markdown import Markdown  # noqa: E402
+from rich.panel import Panel  # noqa: E402
+from rich.prompt import Confirm, Prompt  # noqa: E402
+
+from victor import __version__  # noqa: E402
+from victor.agent.orchestrator import AgentOrchestrator  # noqa: E402
+from victor.agent.safety import (  # noqa: E402
+    ConfirmationRequest,
+    RiskLevel,
+    set_confirmation_callback,
+)
+from victor.config.settings import load_settings  # noqa: E402
+from victor.ui.commands import SlashCommandHandler  # noqa: E402
 
 # Configure default logging (can be overridden by CLI argument)
 logger = logging.getLogger(__name__)
+
+
+async def _check_codebase_index(cwd: str, console_obj: Console, silent: bool = False) -> None:
+    """Check codebase index status at startup and reindex if needed.
+
+    This ensures the semantic search index is up-to-date based on file mtimes.
+
+    Args:
+        cwd: Current working directory (codebase root)
+        console_obj: Rich console for output
+        silent: If True, only show output for actual changes
+    """
+    try:
+        from victor.codebase.indexer import CodebaseIndex
+
+        # Create index instance (without embeddings for quick check)
+        index = CodebaseIndex(
+            root_path=cwd,
+            use_embeddings=False,  # Skip embeddings for startup check
+            enable_watcher=False,  # Don't start watcher yet
+        )
+
+        # Check staleness based on mtimes
+        is_stale, modified, deleted = index.check_staleness_by_mtime()
+
+        if not is_stale:
+            if not silent:
+                logger.debug("Codebase index is up to date")
+            return
+
+        total_changes = len(modified) + len(deleted)
+
+        if not silent:
+            console_obj.print(
+                f"[dim]Index stale: {len(modified)} modified, {len(deleted)} deleted files[/]"
+            )
+
+        # Perform quick reindex (without embeddings)
+        if total_changes <= 10:
+            await index.incremental_reindex()
+            if not silent:
+                console_obj.print(f"[green]Incrementally reindexed {total_changes} files[/]")
+        else:
+            await index.reindex()
+            if not silent:
+                console_obj.print(f"[green]Full reindex completed ({len(index.files)} files)[/]")
+
+    except ImportError:
+        logger.debug("Codebase indexer not available")
+    except Exception as e:
+        logger.debug(f"Codebase index check failed: {e}")
+
 
 app = typer.Typer(
     name="victor",
@@ -107,8 +207,108 @@ def version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
+@app.callback(invoke_without_command=True)
+def callback(
+    ctx: typer.Context,
+    version: Optional[bool] = typer.Option(
+        None,
+        "--version",
+        "-v",
+        callback=version_callback,
+        is_eager=True,
+        help="Show version and exit",
+    ),
+    no_tui: bool = typer.Option(
+        False,
+        "--no-tui",
+        "--cli",
+        help="Disable TUI and use CLI mode with console logging.",
+    ),
+) -> None:
+    """Victor - Enterprise-Ready AI Coding Assistant. Code to Victory with Any AI.
+
+    \b
+    Usage:
+        victor              # Start interactive TUI mode (default)
+        victor --no-tui     # Start interactive CLI mode (for debugging)
+        victor chat "msg"   # One-shot message
+        victor --help       # Show this help
+
+    \b
+    Examples:
+        victor                          # Interactive TUI mode
+        victor --no-tui                 # Interactive CLI mode with logs
+        victor chat "hello"             # One-shot query
+        victor chat --no-tui "hello"    # One-shot with debug output
+    """
+    # Only run if no subcommand is being invoked
+    if ctx.invoked_subcommand is None:
+        # Default: run interactive mode (TUI unless --no-tui)
+        _run_default_interactive(force_cli=no_tui)
+
+
+def _configure_tui_logging() -> None:
+    """Configure logging for TUI mode.
+
+    In TUI mode:
+    - Default log level is WARNING (unless overridden by VICTOR_LOG_LEVEL)
+    - Logs go to a file (~/.victor/logs/victor.log) instead of stdout
+    """
+    from pathlib import Path
+
+    # TUI mode defaults to WARNING level to avoid cluttering the UI
+    log_level = os.getenv("VICTOR_LOG_LEVEL", "WARNING").upper()
+    if log_level == "WARN":
+        log_level = "WARNING"
+
+    # Create logs directory
+    log_dir = Path.home() / ".victor" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "victor.log"
+
+    # Configure logging to file only for TUI mode
+    logging.basicConfig(
+        level=getattr(logging, log_level),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.FileHandler(log_file, mode="a", encoding="utf-8"),
+        ],
+        force=True,
+    )
+
+    # Suppress noisy third-party loggers
+    from victor.agent.debug_logger import configure_logging_levels
+
+    configure_logging_levels(log_level)
+
+
+def _run_default_interactive(force_cli: bool = False) -> None:
+    """Run the default interactive mode with default options.
+
+    Args:
+        force_cli: If True, use CLI mode instead of TUI.
+    """
+    if force_cli:
+        # CLI mode - configure console logging
+        log_level = os.getenv("VICTOR_LOG_LEVEL", "INFO").upper()
+        if log_level == "WARN":
+            log_level = "WARNING"
+        logging.basicConfig(
+            level=getattr(logging, log_level),
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            force=True,
+        )
+    else:
+        # TUI mode - configure file-based logging
+        _configure_tui_logging()
+
+    settings = load_settings()
+    _setup_safety_confirmation()
+    asyncio.run(run_interactive(settings, "default", True, False, force_cli=force_cli))
+
+
 @app.command()
-def main(
+def chat(
     message: Optional[str] = typer.Argument(
         None,
         help="Message to send to the agent (starts interactive mode if not provided)",
@@ -136,32 +336,33 @@ def main(
         "--thinking/--no-thinking",
         help="Enable extended thinking/reasoning mode (Claude models). Shows model's reasoning process.",
     ),
-    version: Optional[bool] = typer.Option(
-        None,
-        "--version",
-        "-v",
-        callback=version_callback,
-        is_eager=True,
-        help="Show version and exit",
+    no_tui: bool = typer.Option(
+        False,
+        "--no-tui",
+        "--cli",
+        help="Disable TUI and use CLI mode. Useful for debugging with console logs.",
     ),
 ) -> None:
-    """Victor - Enterprise-Ready AI Coding Assistant. Code to Victory with Any AI.
+    """Start interactive chat or send a one-shot message.
+
+    By default, Victor uses a modern TUI (Text User Interface) for interactive mode.
+    Use --no-tui or --cli to switch to classic CLI mode with console log output.
 
     Examples:
-        # Interactive mode
-        victor
+        # Interactive TUI mode (default)
+        victor chat
+
+        # CLI mode with debug logging (for debugging)
+        victor chat --no-tui --log-level DEBUG
 
         # One-shot command
-        victor "Write a Python function to calculate Fibonacci numbers"
+        victor chat "Write a Python function to calculate Fibonacci numbers"
 
         # Use specific profile
-        victor --profile claude "Explain how async/await works"
-
-        # Enable debug logging
-        victor --log-level DEBUG "help me debug this code"
+        victor chat --profile claude "Explain how async/await works"
 
         # Enable thinking mode (shows reasoning process)
-        victor --thinking "Explain the best way to implement a caching layer"
+        victor chat --thinking "Explain the best way to implement a caching layer"
     """
     # Configure logging based on CLI argument or environment variable
     if log_level is None:
@@ -180,11 +381,23 @@ def main(
     if log_level == "WARN":
         log_level = "WARNING"
 
-    logging.basicConfig(
-        level=getattr(logging, log_level),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        force=True,  # Override any existing configuration
-    )
+    # Configure logging based on mode
+    # TUI mode: log to file at WARNING level by default (unless overridden)
+    # CLI mode: log to console at specified level
+    if not no_tui and not message:
+        # TUI mode - use file-based logging to avoid cluttering the UI
+        _configure_tui_logging()
+    else:
+        # CLI/one-shot mode - log to console
+        logging.basicConfig(
+            level=getattr(logging, log_level),
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            force=True,  # Override any existing configuration
+        )
+        # Silence noisy third-party loggers
+        from victor.agent.debug_logger import configure_logging_levels
+
+        configure_logging_levels(log_level)
 
     # Load settings
     settings = load_settings()
@@ -196,8 +409,8 @@ def main(
         # One-shot mode
         asyncio.run(run_oneshot(message, settings, profile, stream, thinking))
     else:
-        # Interactive REPL mode
-        asyncio.run(run_interactive(settings, profile, stream, thinking))
+        # Interactive mode (TUI by default, CLI with --no-tui)
+        asyncio.run(run_interactive(settings, profile, stream, thinking, force_cli=no_tui))
 
 
 async def run_oneshot(
@@ -223,6 +436,9 @@ async def run_oneshot(
         if thinking:
             logger.info("Extended thinking mode enabled (for supported models like Claude)")
 
+        # Check codebase index at startup (silent - only log if changes)
+        await _check_codebase_index(os.getcwd(), console, silent=True)
+
         # Start background embedding preload to avoid blocking first query
         agent.start_embedding_preload()
 
@@ -247,18 +463,26 @@ async def run_interactive(
     profile: str,
     stream: bool,
     thinking: bool = False,
+    force_cli: bool = False,
 ) -> None:
-    """Run interactive REPL mode.
+    """Run interactive mode (TUI or CLI fallback).
 
     Args:
         settings: Application settings
         profile: Profile name
-        stream: Whether to stream responses
+        stream: Whether to stream responses (used in TUI)
         thinking: Whether to enable thinking mode
+        force_cli: Force CLI mode even if TUI is available
     """
+    agent = None
     try:
         # Load profile info
-        profiles = settings.load_profiles()
+        try:
+            profiles = settings.load_profiles()
+        except Exception as e:
+            console.print(f"[bold red]Error loading profiles:[/] {e}")
+            raise typer.Exit(1)
+
         profile_config = profiles.get(profile)
 
         if not profile_config:
@@ -271,88 +495,47 @@ async def run_interactive(
         if thinking:
             logger.info("Extended thinking mode enabled (for supported models like Claude)")
 
+        # Check codebase index at startup (show output in interactive mode)
+        await _check_codebase_index(os.getcwd(), console, silent=False)
+
         # Start background embedding preload to avoid blocking first query
         agent.start_embedding_preload()
 
         # Initialize slash command handler
         cmd_handler = SlashCommandHandler(console, settings, agent)
 
-        # Check for project context
-        context_status = ""
-        if agent.project_context.content:
-            context_status = f"\nContext: [green].victor.md loaded[/]"
+        # Check if TUI is supported
+        tui_compatible, tui_reason = _check_tui_compatibility()
+
+        if force_cli or not tui_compatible:
+            if not force_cli and tui_reason:
+                console.print(
+                    Panel(
+                        f"[yellow]TUI mode unavailable:[/] {tui_reason}\n\n"
+                        "[dim]Falling back to CLI mode. For full TUI experience:[/]\n"
+                        "  - Use a modern terminal (iTerm2, Windows Terminal, etc.)\n"
+                        "  - Ensure terminal size is at least 40x10\n"
+                        "  - Run in an interactive shell (not piped)\n\n"
+                        "[dim]You can also use:[/]\n"
+                        '  [cyan]victor chat "your message"[/] for one-shot queries',
+                        title="Victor - CLI Mode",
+                        border_style="yellow",
+                    )
+                )
+            # Run CLI fallback mode
+            await _run_cli_repl(agent, settings, cmd_handler, profile_config, stream)
         else:
-            context_status = f"\nContext: [dim]none (run /init to create)[/]"
+            # Run full TUI mode
+            from victor.ui.tui import VictorApp
 
-        # Welcome message
-        console.print(
-            Panel(
-                f"[bold]Victor v{__version__}[/]\n\n"
-                f"Provider: [cyan]{profile_config.provider}[/]\n"
-                f"Model: [cyan]{profile_config.model}[/]"
-                f"{context_status}\n\n"
-                f"Type your message and press Enter to chat.\n"
-                f"Type [bold]/help[/] for available commands.\n"
-                f"Type [bold]exit[/] or [bold]quit[/] to leave.",
-                title="Welcome",
-                border_style="blue",
+            app = VictorApp(
+                agent=agent,
+                settings=settings,
+                cmd_handler=cmd_handler,
+                provider=profile_config.provider,
+                model=profile_config.model,
             )
-        )
-
-        # REPL loop
-        while True:
-            try:
-                # Get user input (with shell history if readline is available)
-                if _history_enabled:
-                    console.print("\n[bold green]You[/] ", end="")
-                    user_input = input()
-                    if user_input:
-                        try:
-                            readline.add_history(user_input)
-                        except Exception:
-                            pass
-                else:
-                    user_input = Prompt.ask("\n[bold green]You[/]")
-
-                # Handle exit commands
-                if user_input.lower() in ["exit", "quit"]:
-                    console.print("[dim]Goodbye![/]")
-                    break
-
-                if not user_input.strip():
-                    continue
-
-                # Handle slash commands
-                if cmd_handler.is_command(user_input):
-                    await cmd_handler.execute(user_input)
-                    continue
-
-                # Handle legacy clear command (also available as /clear)
-                if user_input.lower() == "clear":
-                    agent.reset_conversation()
-                    console.print("[dim]Conversation cleared[/]")
-                    continue
-
-                # Send message and get response
-                console.print("\n[bold blue]Assistant[/]")
-
-                if stream and agent.provider.supports_streaming():
-                    async for chunk in agent.stream_chat(user_input):
-                        if chunk.content:
-                            console.print(chunk.content, end="")
-                    console.print()  # New line at end
-                else:
-                    response = await agent.chat(user_input)
-                    console.print(Markdown(response.content))
-
-            except KeyboardInterrupt:
-                console.print("\n[dim]Use 'exit' or 'quit' to leave[/]")
-                continue
-
-            except EOFError:
-                break
-
-        await agent.provider.close()
+            await app.run_async()
 
     except Exception as e:
         console.print(f"[bold red]Error:[/] {str(e)}")
@@ -360,6 +543,88 @@ async def run_interactive(
 
         console.print(traceback.format_exc())
         raise typer.Exit(1)
+    finally:
+        # Cleanup - always close provider if agent was created
+        if agent and agent.provider:
+            await agent.provider.close()
+
+
+async def _run_cli_repl(
+    agent: AgentOrchestrator,
+    settings: Any,
+    cmd_handler: SlashCommandHandler,
+    profile_config: Any,
+    stream: bool,
+) -> None:
+    """Run the CLI-based REPL (fallback for unsupported terminals).
+
+    Args:
+        agent: The agent orchestrator
+        settings: Application settings
+        cmd_handler: Slash command handler
+        profile_config: Profile configuration
+        stream: Whether to stream responses
+    """
+    console.print(
+        Panel(
+            f"[bold blue]Victor[/] - Enterprise-Ready AI Coding Assistant\n\n"
+            f"[bold]Provider:[/] [cyan]{profile_config.provider}[/]  "
+            f"[bold]Model:[/] [cyan]{profile_config.model}[/]\n\n"
+            f"Type [bold]/help[/] for commands, [bold]/exit[/] or [bold]Ctrl+D[/] to quit.",
+            title="Victor CLI",
+            border_style="blue",
+        )
+    )
+
+    while True:
+        try:
+            # Get user input
+            user_input = Prompt.ask("[green]You[/]")
+
+            if not user_input.strip():
+                continue
+
+            # Handle exit commands
+            if user_input.strip().lower() in ("exit", "quit", "/exit", "/quit"):
+                console.print("[dim]Goodbye![/]")
+                break
+
+            # Handle slash commands
+            if cmd_handler.is_command(user_input):
+                await cmd_handler.execute(user_input)
+                continue
+
+            # Handle clear command
+            if user_input.strip().lower() == "clear":
+                agent.reset_conversation()
+                console.print("[green]Conversation cleared[/]")
+                continue
+
+            # Send message to agent
+            console.print("[blue]Assistant:[/]")
+
+            if stream:
+                # Stream the response
+                content_buffer = ""
+                async for chunk in agent.stream_chat(user_input):
+                    if chunk.content:
+                        console.print(chunk.content, end="")
+                        content_buffer += chunk.content
+                console.print()  # Newline after streaming
+            else:
+                # Non-streaming response
+                response = await agent.chat(user_input)
+                console.print(Markdown(response.content))
+
+        except KeyboardInterrupt:
+            console.print("\n[dim]Use /exit or Ctrl+D to quit[/]")
+            continue
+        except EOFError:
+            console.print("\n[dim]Goodbye![/]")
+            break
+        except Exception as e:
+            console.print(f"[red]Error:[/] {e}")
+            logger.exception("Error in CLI REPL")
 
 
 @app.command(name="config-validate")
@@ -396,8 +661,6 @@ def config_validate(
         # Include connectivity checks
         victor config-validate --check-connectivity
     """
-    from pathlib import Path
-    from rich.table import Table
     import yaml
 
     errors: list[str] = []
@@ -568,14 +831,14 @@ async def _check_connectivity(settings: Any, profiles: dict, verbose: bool) -> N
     """Check provider connectivity for profiles."""
     checked_providers: set[str] = set()
 
-    for name, profile in profiles.items():
+    for _name, profile in profiles.items():
         provider = profile.provider
         if provider in checked_providers:
             continue
         checked_providers.add(provider)
 
         if provider == "ollama":
-            from victor.providers.ollama import OllamaProvider
+            from victor.providers.ollama_provider import OllamaProvider
 
             provider_settings = settings.get_provider_settings(provider)
             try:
@@ -584,7 +847,7 @@ async def _check_connectivity(settings: Any, profiles: dict, verbose: bool) -> N
                 if models:
                     console.print(f"  [green]✓[/] Ollama: Connected ({len(models)} models)")
                 else:
-                    console.print(f"  [yellow]⚠[/] Ollama: Connected but no models installed")
+                    console.print("  [yellow]⚠[/] Ollama: Connected but no models installed")
                 await ollama.close()
             except Exception as e:
                 console.print(f"  [red]✗[/] Ollama: Cannot connect - {e}")
@@ -597,7 +860,6 @@ async def _check_connectivity(settings: Any, profiles: dict, verbose: bool) -> N
 def init() -> None:
     """Initialize configuration files."""
     from pathlib import Path
-    import shutil
 
     config_dir = Path.home() / ".victor"
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -713,7 +975,7 @@ async def list_models_async(provider: str) -> None:
     try:
         # Special handling for Ollama
         if provider == "ollama":
-            from victor.providers.ollama import OllamaProvider
+            from victor.providers.ollama_provider import OllamaProvider
 
             provider_settings = settings.get_provider_settings(provider)
             ollama = OllamaProvider(**provider_settings)
@@ -755,7 +1017,7 @@ async def list_models_async(provider: str) -> None:
                     )
 
                 console.print(table)
-                console.print(f"\n[dim]Use a model with: [bold]victor --profile <profile>[/dim]")
+                console.print("\n[dim]Use a model with: [bold]victor --profile <profile>[/dim]")
 
                 await ollama.close()
 
@@ -772,6 +1034,201 @@ async def list_models_async(provider: str) -> None:
 
 
 @app.command()
+def serve(
+    host: str = typer.Option(
+        "127.0.0.1",
+        "--host",
+        "-h",
+        help="Host to bind the server to",
+    ),
+    port: int = typer.Option(
+        8765,
+        "--port",
+        "-p",
+        help="Port to listen on",
+    ),
+    log_level: str = typer.Option(
+        "INFO",
+        "--log-level",
+        "-l",
+        help="Set logging level (DEBUG, INFO, WARN, ERROR)",
+    ),
+    profile: str = typer.Option(
+        "default",
+        "--profile",
+        help="Profile to use for the server",
+    ),
+) -> None:
+    """Start the Victor API server for IDE integrations.
+
+    The server provides REST API endpoints that VS Code and other IDEs
+    can connect to for AI-powered coding assistance.
+
+    Examples:
+        # Start server with defaults (localhost:8765)
+        victor serve
+
+        # Custom port
+        victor serve --port 9000
+
+        # Debug logging
+        victor serve --log-level DEBUG
+
+        # Allow external connections (use with caution)
+        victor serve --host 0.0.0.0
+    """
+    # Configure logging
+    log_level = log_level.upper()
+    if log_level == "WARN":
+        log_level = "WARNING"
+
+    logging.basicConfig(
+        level=getattr(logging, log_level),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        force=True,
+    )
+
+    console.print(
+        Panel(
+            f"[bold blue]Victor API Server[/]\n\n"
+            f"[bold]Host:[/] [cyan]{host}[/]\n"
+            f"[bold]Port:[/] [cyan]{port}[/]\n"
+            f"[bold]Profile:[/] [cyan]{profile}[/]\n\n"
+            f"[dim]Press Ctrl+C to stop[/]",
+            title="Victor Server",
+            border_style="blue",
+        )
+    )
+
+    asyncio.run(_run_server(host, port, profile))
+
+
+async def _run_server(host: str, port: int, profile: str) -> None:
+    """Run the API server."""
+    try:
+        from pathlib import Path
+
+        from victor.api.server import VictorAPIServer
+
+        server = VictorAPIServer(
+            host=host,
+            port=port,
+            workspace_root=str(Path.cwd()),
+        )
+
+        # Run server
+        server.run()
+
+    except ImportError as e:
+        console.print(f"[red]Error:[/] Missing dependency for server: {e}")
+        console.print("\nInstall with: [bold]pip install aiohttp[/]")
+        raise typer.Exit(1)
+    except KeyboardInterrupt:
+        console.print("\n[dim]Server stopped[/]")
+    except Exception as e:
+        console.print(f"[red]Error:[/] {e}")
+        raise typer.Exit(1)
+
+
+@app.command()
+def mcp(
+    stdio: bool = typer.Option(
+        True,
+        "--stdio/--no-stdio",
+        help="Run in stdio mode (for MCP clients)",
+    ),
+    log_level: str = typer.Option(
+        "WARNING",
+        "--log-level",
+        "-l",
+        help="Set logging level",
+    ),
+) -> None:
+    """Run Victor as an MCP server.
+
+    This exposes Victor's 54+ tools through the Model Context Protocol,
+    allowing MCP clients (like Claude Desktop) to use them.
+
+    Examples:
+        # Run MCP server (stdio mode)
+        victor mcp
+
+        # With debug logging
+        victor mcp --log-level DEBUG
+
+    To configure in Claude Desktop (~/Library/Application Support/Claude/claude_desktop_config.json):
+
+        {
+          "mcpServers": {
+            "victor": {
+              "command": "victor",
+              "args": ["mcp"]
+            }
+          }
+        }
+    """
+    import sys
+
+    # Configure logging to stderr (stdout is for MCP protocol)
+    log_level = log_level.upper()
+    if log_level == "WARN":
+        log_level = "WARNING"
+
+    logging.basicConfig(
+        level=getattr(logging, log_level),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        stream=sys.stderr,
+        force=True,
+    )
+
+    if stdio:
+        asyncio.run(_run_mcp_server())
+    else:
+        console.print("[red]Only stdio mode is currently supported[/]")
+        raise typer.Exit(1)
+
+
+async def _run_mcp_server() -> None:
+    """Run MCP server with all registered tools."""
+    import importlib
+    import inspect
+    import os
+    import sys
+
+    from victor.mcp.server import MCPServer
+    from victor.tools.base import ToolRegistry
+
+    # Create tool registry
+    registry = ToolRegistry()
+
+    # Dynamic tool discovery (same pattern as orchestrator)
+    tools_dir = os.path.join(os.path.dirname(__file__), "..", "tools")
+    excluded_files = {"__init__.py", "base.py", "decorators.py", "semantic_selector.py"}
+    registered_tools_count = 0
+
+    for filename in os.listdir(tools_dir):
+        if filename.endswith(".py") and filename not in excluded_files:
+            module_name = f"victor.tools.{filename[:-3]}"
+            try:
+                module = importlib.import_module(module_name)
+                for _name, obj in inspect.getmembers(module):
+                    if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
+                        registry.register(obj)
+                        registered_tools_count += 1
+            except Exception as e:
+                print(f"Warning: Failed to load tools from {module_name}: {e}", file=sys.stderr)
+
+    server = MCPServer(
+        name="Victor MCP Server",
+        version="1.0.0",
+        tool_registry=registry,
+    )
+
+    print(f"Victor MCP Server starting with {registered_tools_count} tools", file=sys.stderr)
+    await server.start_stdio_server()
+
+
+@app.command()
 def test_provider(
     provider: str = typer.Argument(..., help="Provider name to test"),
 ) -> None:
@@ -783,7 +1240,7 @@ def test_provider(
 
 async def test_provider_async(provider: str) -> None:
     """Async function to test provider."""
-    from victor.providers.registry import ProviderRegistry, ProviderNotFoundError
+    from victor.providers.registry import ProviderRegistry
 
     settings = load_settings()
 
@@ -794,7 +1251,7 @@ async def test_provider_async(provider: str) -> None:
             console.print(f"\nAvailable providers: {', '.join(ProviderRegistry.list_providers())}")
             return
 
-        console.print(f"[green]✓[/] Provider registered")
+        console.print("[green]✓[/] Provider registered")
 
         # Get provider settings
         provider_settings = settings.get_provider_settings(provider)
@@ -806,11 +1263,11 @@ async def test_provider_async(provider: str) -> None:
                 console.print(f"[red]✗[/] No API key configured for {provider}")
                 console.print(f"\nSet environment variable: [bold]{provider.upper()}_API_KEY[/]")
                 return
-            console.print(f"[green]✓[/] API key configured")
+            console.print("[green]✓[/] API key configured")
 
         # For Ollama, test connection
         if provider == "ollama":
-            from victor.providers.ollama import OllamaProvider
+            from victor.providers.ollama_provider import OllamaProvider
 
             ollama = OllamaProvider(**provider_settings)
             try:

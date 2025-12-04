@@ -167,6 +167,42 @@ class ConversationState:
         """Record a new message in the conversation."""
         self.message_count += 1
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize the conversation state to a dictionary.
+
+        Returns:
+            Dictionary representation of the state.
+        """
+        return {
+            "stage": self.stage.name,
+            "tool_history": self.tool_history,
+            "observed_files": list(self.observed_files),
+            "modified_files": list(self.modified_files),
+            "message_count": self.message_count,
+            "last_tools": self.last_tools,
+            "stage_confidence": self._stage_confidence,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ConversationState":
+        """Restore conversation state from a dictionary.
+
+        Args:
+            data: Dictionary containing serialized state.
+
+        Returns:
+            Restored ConversationState instance.
+        """
+        state = cls()
+        state.stage = ConversationStage[data.get("stage", "INITIAL")]
+        state.tool_history = data.get("tool_history", [])
+        state.observed_files = set(data.get("observed_files", []))
+        state.modified_files = set(data.get("modified_files", []))
+        state.message_count = data.get("message_count", 0)
+        state.last_tools = data.get("last_tools", [])
+        state._stage_confidence = data.get("stage_confidence", 0.5)
+        return state
+
 
 class ConversationStateMachine:
     """State machine for detecting and managing conversation stages.
@@ -371,3 +407,28 @@ class ConversationStateMachine:
                     return 0.08  # Medium boost for adjacent stage tools
 
         return 0.0  # No boost
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize the state machine to a dictionary.
+
+        Returns:
+            Dictionary representation suitable for JSON serialization.
+        """
+        return {
+            "state": self.state.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ConversationStateMachine":
+        """Restore state machine from a dictionary.
+
+        Args:
+            data: Dictionary containing serialized state machine.
+
+        Returns:
+            Restored ConversationStateMachine instance.
+        """
+        machine = cls()
+        if "state" in data:
+            machine.state = ConversationState.from_dict(data["state"])
+        return machine

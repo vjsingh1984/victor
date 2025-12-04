@@ -127,7 +127,7 @@ class ToolPlugin(ABC):
         """
         pass
 
-    def initialize(self) -> None:
+    def initialize(self) -> None:  # noqa: B027
         """Initialize plugin resources.
 
         Called once when the plugin is loaded. Use this to:
@@ -136,10 +136,11 @@ class ToolPlugin(ABC):
         - Initialize shared state
 
         Override this method in your plugin if needed.
+        This is an optional lifecycle hook with empty default implementation.
         """
         pass
 
-    def cleanup(self) -> None:
+    def cleanup(self) -> None:  # noqa: B027
         """Cleanup plugin resources.
 
         Called when the plugin is unloaded. Use this to:
@@ -148,18 +149,21 @@ class ToolPlugin(ABC):
         - Release resources
 
         Override this method in your plugin if needed.
+        This is an optional lifecycle hook with empty default implementation.
         """
         pass
 
-    def on_tool_registered(self, tool: BaseTool) -> None:
+    def on_tool_registered(self, tool: BaseTool) -> None:  # noqa: B027
         """Called when a tool from this plugin is registered.
 
         Args:
             tool: The tool that was registered
+
+        This is an optional lifecycle hook with empty default implementation.
         """
         pass
 
-    def on_tool_executed(self, tool_name: str, success: bool, result: Any) -> None:
+    def on_tool_executed(self, tool_name: str, success: bool, result: Any) -> None:  # noqa: B027
         """Called after a tool from this plugin is executed.
 
         Useful for logging, metrics, or plugin-specific handling.
@@ -168,6 +172,8 @@ class ToolPlugin(ABC):
             tool_name: Name of the executed tool
             success: Whether execution succeeded
             result: Tool execution result
+
+        This is an optional lifecycle hook with empty default implementation.
         """
         pass
 

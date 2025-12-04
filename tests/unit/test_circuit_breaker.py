@@ -274,3 +274,77 @@ class TestCircuitBreakerRegistry:
         stats = CircuitBreakerRegistry.get_all_stats()
         assert "stats1" in stats
         assert "stats2" in stats
+
+
+class TestCircuitBreakerEdgeCases:
+    """Edge case tests for CircuitBreaker."""
+
+    def test_should_attempt_recovery_no_last_failure(self) -> None:
+        """Test recovery check when no failure recorded (covers line 135)."""
+        breaker = CircuitBreaker(name="test_no_failure")
+        # Set state to OPEN without recording last_failure_time
+        breaker._state = CircuitState.OPEN
+        breaker._last_failure_time = None
+        # _should_attempt_recovery should return True
+        assert breaker._should_attempt_recovery() is True
+
+    @pytest.mark.asyncio
+    async def test_half_open_max_calls_exceeded(self) -> None:
+        """Test rejection when half_open_max_calls is exceeded (covers line 201)."""
+        breaker = CircuitBreaker(
+            failure_threshold=1,
+            recovery_timeout=0.01,
+            half_open_max_calls=1,
+            name="test_max_calls",
+        )
+
+        async def failing_func() -> None:
+            raise ValueError("fail")
+
+        async def success_func() -> str:
+            await asyncio.sleep(0.1)  # Slow to keep half-open occupied
+            return "success"
+
+        # Open the circuit
+        with pytest.raises(ValueError):
+            await breaker.execute(failing_func)
+
+        # Wait for recovery
+        await asyncio.sleep(0.02)
+        assert breaker.state == CircuitState.HALF_OPEN
+
+        # Start first call (will occupy the half-open slot)
+        # We need to simulate the scenario where max calls is reached
+        breaker._half_open_calls = breaker.half_open_max_calls
+
+        # Now try another call - should be rejected
+        with pytest.raises(CircuitBreakerError) as exc_info:
+            await breaker.execute(success_func)
+
+        assert exc_info.value.state == CircuitState.HALF_OPEN
+        assert exc_info.value.retry_after == 1.0
+
+    def test_transition_to_same_state_no_change(self) -> None:
+        """Test transition to same state doesn't add to state_changes."""
+        breaker = CircuitBreaker(name="test_same_state")
+        initial_changes = len(breaker._state_changes)
+        breaker._transition_to(CircuitState.CLOSED)
+        assert len(breaker._state_changes) == initial_changes
+
+    @pytest.mark.asyncio
+    async def test_execute_with_args_and_kwargs(self) -> None:
+        """Test execute passes args and kwargs correctly."""
+        breaker = CircuitBreaker(name="test_args")
+
+        async def func_with_args(x: int, y: str = "default") -> str:
+            return f"{x}-{y}"
+
+        result = await breaker.execute(func_with_args, 42, y="custom")
+        assert result == "42-custom"
+
+    def test_success_in_closed_resets_failure_count(self) -> None:
+        """Test success in closed state resets failure count."""
+        breaker = CircuitBreaker(failure_threshold=5, name="test_reset")
+        breaker._failure_count = 3
+        breaker._record_success()
+        assert breaker._failure_count == 0

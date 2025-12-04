@@ -12,32 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Session persistence for saving and loading conversation state.
+"""File-based session persistence for saving and loading conversation state.
 
-This module provides:
+This module provides JSON file-based session persistence:
 - Save conversation state to disk
 - Load previous sessions
 - List available sessions
 - Auto-save functionality
 - Session metadata (timestamp, model, provider, etc.)
 
+The primary class is `SessionPersistence` (formerly `SessionManager`).
+
+For in-memory message history, see `victor.agent.message_history.MessageHistory`.
+For SQLite-based persistence with token management, see `victor.agent.conversation_memory.ConversationStore`.
+
 Usage:
-    from victor.agent.session import SessionManager
+    from victor.agent.session import SessionPersistence
 
     # Save a session
-    manager = SessionManager()
-    session_id = manager.save_session(
-        conversation=conversation_manager,
+    persistence = SessionPersistence()
+    session_id = persistence.save_session(
+        conversation=message_history,
         model="claude-sonnet-4-20250514",
         provider="anthropic",
         profile="default"
     )
 
     # List sessions
-    sessions = manager.list_sessions()
+    sessions = persistence.list_sessions()
 
     # Load a session
-    data = manager.load_session(session_id)
+    data = persistence.load_session(session_id)
+
+Note: `SessionManager` is kept as an alias for backward compatibility.
 """
 
 import json
@@ -89,7 +96,7 @@ class Session:
     """A saved conversation session."""
 
     metadata: SessionMetadata
-    conversation: Dict[str, Any]  # Serialized ConversationManager state
+    conversation: Dict[str, Any]  # Serialized MessageHistory state
     conversation_state: Optional[Dict[str, Any]] = None  # ConversationStateMachine state
     tool_selection_stats: Optional[Dict[str, Any]] = None  # Tool usage statistics
 
@@ -113,12 +120,14 @@ class Session:
         )
 
 
-class SessionManager:
-    """Manages session persistence for Victor conversations.
+class SessionPersistence:
+    """File-based session persistence for Victor conversations.
 
     Sessions are stored as JSON files in ~/.victor/sessions/ by default.
     Each session includes the conversation history, metadata, and optionally
     tool usage statistics.
+
+    Note: Previously named `SessionManager`. Alias kept for backward compatibility.
     """
 
     DEFAULT_SESSION_DIR = Path.home() / ".victor" / "sessions"
@@ -161,7 +170,7 @@ class SessionManager:
 
     def save_session(
         self,
-        conversation: Any,  # ConversationManager or dict
+        conversation: Any,  # MessageHistory or dict
         model: str,
         provider: str,
         profile: str = "default",
@@ -174,7 +183,7 @@ class SessionManager:
         """Save a session to disk.
 
         Args:
-            conversation: ConversationManager instance or dict
+            conversation: MessageHistory instance or dict
             model: Model name used in the session
             provider: Provider name
             profile: Profile name
@@ -338,7 +347,7 @@ class SessionManager:
 
         Args:
             session_id: The session ID to update
-            conversation: Updated ConversationManager
+            conversation: Updated MessageHistory
             conversation_state: Updated ConversationStateMachine state
             tool_selection_stats: Updated tool usage statistics
 
@@ -392,13 +401,20 @@ class SessionManager:
         return self.load_session(sessions[0].session_id)
 
 
+# Backward compatibility alias
+SessionManager = SessionPersistence
+
+
 # Default singleton instance
-_default_manager: Optional[SessionManager] = None
+_default_persistence: Optional[SessionPersistence] = None
 
 
-def get_session_manager() -> SessionManager:
-    """Get the default session manager instance."""
-    global _default_manager
-    if _default_manager is None:
-        _default_manager = SessionManager()
-    return _default_manager
+def get_session_manager() -> SessionPersistence:
+    """Get the default session persistence instance.
+
+    Note: Function name kept for backward compatibility.
+    """
+    global _default_persistence
+    if _default_persistence is None:
+        _default_persistence = SessionPersistence()
+    return _default_persistence

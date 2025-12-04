@@ -314,6 +314,35 @@ class TestToolCacheEdgeCases:
 
         assert result == large_value
 
+    def test_root_already_in_path_values(self):
+        """Test that root is not duplicated in path_values (covers line 57)."""
+        cache = ToolCache(ttl=60, allowlist=["code_search"])
+        # path == root, so root shouldn't be added again
+        args = {"path": "/project", "root": "/project", "query": "test"}
+        cache.set("code_search", args, "results")
+
+        # Only one entry for /project in path_index
+        assert "/project" in cache._path_index
+        # There should be only one reference, not duplicate
+        assert len(cache._path_index["/project"]) == 1
+
+    def test_hash_args_json_exception(self):
+        """Test _hash_args fallback when json.dumps fails (covers lines 13-14)."""
+
+        # Create an object that raises an exception during JSON serialization
+        class BadObject:
+            def __str__(self):
+                return "bad_object_string"
+
+            def __repr__(self):
+                return "BadObject()"
+
+        args = {"obj": BadObject()}
+        # Should fall back to str() representation
+        result = _hash_args(args)
+        assert isinstance(result, str)
+        assert len(result) == 64
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

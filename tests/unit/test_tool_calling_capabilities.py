@@ -188,3 +188,70 @@ class TestAdapterSystemPromptHints:
         adapter = ToolCallingAdapterRegistry.get_adapter("vllm", "llama-3.1-8b")
         hints = adapter.get_system_prompt_hints()
         assert "TOOL" in hints
+
+
+class TestModelCapabilityLoaderEdgeCases:
+    """Edge case tests for ModelCapabilityLoader."""
+
+    def test_reload_method(self):
+        """Test reload method refreshes config (covers line 80)."""
+        loader = ModelCapabilityLoader()
+        # Just verify reload doesn't error
+        loader.reload()
+        # Config should still be valid after reload
+        providers = loader.get_provider_names()
+        assert len(providers) > 0
+
+    def test_get_capabilities_none_config(self):
+        """Test get_capabilities when _config is None (covers line 105)."""
+        from unittest.mock import patch
+
+        loader = ModelCapabilityLoader()
+        # Force _config to None to test the reload path
+        with patch.object(loader, "_config", None):
+            with patch.object(loader, "_load_config") as mock_load:
+                mock_load.side_effect = lambda: setattr(
+                    loader, "_config", {"defaults": {}, "providers": {}, "models": {}}
+                )
+                caps = loader.get_capabilities("test_provider")
+                mock_load.assert_called_once()
+                assert caps is not None
+
+    def test_get_capabilities_with_format_hint(self):
+        """Test get_capabilities accepts format_hint parameter."""
+        loader = ModelCapabilityLoader()
+        caps = loader.get_capabilities("ollama", "test", format_hint=ToolCallFormat.OPENAI)
+        assert caps is not None
+
+    def test_config_file_not_found(self):
+        """Test handling of missing config file (covers lines 66-68)."""
+        from unittest.mock import patch
+        from pathlib import Path
+
+        loader = ModelCapabilityLoader()
+        with patch.object(Path, "exists", return_value=False):
+            # Force reload to test missing file path
+            loader._config = None
+            loader._load_config()
+            # Should have default empty config
+            assert loader._config is not None
+            assert loader._config.get("defaults") == {}
+
+    def test_config_load_exception(self):
+        """Test handling of exception during config load (covers lines 74-76)."""
+        from unittest.mock import patch, mock_open
+
+        loader = ModelCapabilityLoader()
+        # Reset singleton state for this test
+        original_config = loader._config
+
+        try:
+            with patch("builtins.open", mock_open()) as m:
+                m.return_value.read.side_effect = Exception("Read error")
+                loader._config = None
+                loader._load_config()
+                # Should have default empty config after error
+                assert loader._config is not None
+        finally:
+            # Restore original config
+            loader._config = original_config

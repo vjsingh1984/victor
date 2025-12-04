@@ -1,0 +1,418 @@
+{
+  "name": "victor-ai",
+  "displayName": "Victor AI Assistant",
+  "description": "AI-powered coding assistant with multi-provider support, semantic code search, and enterprise tools",
+  "version": "0.1.0",
+  "publisher": "victor-ai",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/victor-ai/vscode-victor"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Machine Learning",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "assistant",
+    "code",
+    "copilot",
+    "llm",
+    "claude",
+    "gpt",
+    "ollama"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "victor.chat",
+        "title": "Victor: Open Chat Panel",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "victor.explain",
+        "title": "Victor: Explain Selected Code"
+      },
+      {
+        "command": "victor.refactor",
+        "title": "Victor: Refactor Selected Code"
+      },
+      {
+        "command": "victor.fix",
+        "title": "Victor: Fix Issues in Selection"
+      },
+      {
+        "command": "victor.test",
+        "title": "Victor: Generate Tests for Selection"
+      },
+      {
+        "command": "victor.document",
+        "title": "Victor: Add Documentation"
+      },
+      {
+        "command": "victor.search",
+        "title": "Victor: Semantic Code Search"
+      },
+      {
+        "command": "victor.switchModel",
+        "title": "Victor: Switch AI Model"
+      },
+      {
+        "command": "victor.switchMode",
+        "title": "Victor: Switch Mode (Build/Plan/Explore)"
+      },
+      {
+        "command": "victor.undo",
+        "title": "Victor: Undo Last Change"
+      },
+      {
+        "command": "victor.redo",
+        "title": "Victor: Redo Last Change"
+      },
+      {
+        "command": "victor.startServer",
+        "title": "Victor: Start Server"
+      },
+      {
+        "command": "victor.stopServer",
+        "title": "Victor: Stop Server"
+      },
+      {
+        "command": "victor.restartServer",
+        "title": "Victor: Restart Server"
+      },
+      {
+        "command": "victor.serverStatus",
+        "title": "Victor: Server Status"
+      },
+      {
+        "command": "victor.showServerLogs",
+        "title": "Victor: Show Server Logs"
+      },
+      {
+        "command": "victor.showPendingChanges",
+        "title": "Victor: Show Pending Changes",
+        "icon": "$(git-compare)"
+      },
+      {
+        "command": "victor.applyAllChanges",
+        "title": "Victor: Apply All Pending Changes",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "victor.rejectAllChanges",
+        "title": "Victor: Reject All Pending Changes",
+        "icon": "$(close-all)"
+      },
+      {
+        "command": "victor.refreshHistory",
+        "title": "Victor: Refresh History",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "victor.refreshTools",
+        "title": "Victor: Refresh Tools",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "victor.showToolInfo",
+        "title": "Victor: Show Tool Info"
+      },
+      {
+        "command": "victor.undoFromHistory",
+        "title": "Victor: Undo Change",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "victor.showRecentChanges",
+        "title": "Victor: Show Recent File Changes",
+        "icon": "$(history)"
+      },
+      {
+        "command": "victor.addContext",
+        "title": "Victor: Add Context (@-mentions)"
+      },
+      {
+        "command": "victor.previewContext",
+        "title": "Victor: Preview Context"
+      },
+      {
+        "command": "victor.showTerminal",
+        "title": "Victor: Show Terminal"
+      },
+      {
+        "command": "victor.runCommand",
+        "title": "Victor: Run Command"
+      },
+      {
+        "command": "victor.showCommandLogs",
+        "title": "Victor: Show Command Logs"
+      },
+      {
+        "command": "victor.killTerminal",
+        "title": "Victor: Kill Terminal"
+      },
+      {
+        "command": "victor.goToDiagnostic",
+        "title": "Victor: Go to Diagnostic"
+      },
+      {
+        "command": "victor.fixDiagnosticFromView",
+        "title": "Victor: Fix with AI",
+        "icon": "$(lightbulb-autofix)"
+      },
+      {
+        "command": "victor.fixAllInFile",
+        "title": "Victor: Fix All in File",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "victor.refreshDiagnostics",
+        "title": "Victor: Refresh Diagnostics",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "victor.openSettings",
+        "title": "Victor: Open Settings"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "submenu": "victor.submenu",
+          "group": "victor"
+        }
+      ],
+      "victor.submenu": [
+        {
+          "command": "victor.explain",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "victor.refactor",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "victor.fix",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "victor.test",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "victor.document",
+          "when": "editorHasSelection"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "victor.refreshHistory",
+          "when": "view == victor.historyView",
+          "group": "navigation"
+        },
+        {
+          "command": "victor.refreshTools",
+          "when": "view == victor.toolsView",
+          "group": "navigation"
+        },
+        {
+          "command": "victor.refreshDiagnostics",
+          "when": "view == victor.diagnosticsView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "victor.undoFromHistory",
+          "when": "view == victor.historyView && viewItem == undoable",
+          "group": "inline"
+        },
+        {
+          "command": "victor.fixDiagnosticFromView",
+          "when": "view == victor.diagnosticsView && viewItem == diagnostic",
+          "group": "inline"
+        },
+        {
+          "command": "victor.fixAllInFile",
+          "when": "view == victor.diagnosticsView && viewItem == diagnosticFile",
+          "group": "inline"
+        }
+      ]
+    },
+    "submenus": [
+      {
+        "id": "victor.submenu",
+        "label": "Victor AI"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "victor.chat",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v"
+      },
+      {
+        "command": "victor.explain",
+        "key": "ctrl+shift+e",
+        "mac": "cmd+shift+e",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "victor.search",
+        "key": "ctrl+shift+s",
+        "mac": "cmd+shift+s"
+      }
+    ],
+    "configuration": {
+      "title": "Victor AI",
+      "properties": {
+        "victor.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:8765",
+          "description": "URL of the Victor server (deprecated, use serverPort instead)"
+        },
+        "victor.serverPort": {
+          "type": "number",
+          "default": 8765,
+          "description": "Port for the Victor server"
+        },
+        "victor.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to Python executable (leave empty for auto-detection)"
+        },
+        "victor.victorPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to bundled Victor binary (for standalone distribution)"
+        },
+        "victor.provider": {
+          "type": "string",
+          "enum": [
+            "anthropic",
+            "openai",
+            "ollama",
+            "google",
+            "lmstudio",
+            "vllm",
+            "xai"
+          ],
+          "default": "anthropic",
+          "description": "Default LLM provider"
+        },
+        "victor.model": {
+          "type": "string",
+          "default": "claude-sonnet-4-20250514",
+          "description": "Default model to use"
+        },
+        "victor.mode": {
+          "type": "string",
+          "enum": [
+            "build",
+            "plan",
+            "explore"
+          ],
+          "default": "build",
+          "description": "Agent mode"
+        },
+        "victor.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start Victor server on activation"
+        },
+        "victor.showInlineCompletions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline code completions"
+        },
+        "victor.semanticSearch.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable semantic code search"
+        },
+        "victor.semanticSearch.maxResults": {
+          "type": "number",
+          "default": 10,
+          "description": "Maximum number of semantic search results"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "victor",
+          "title": "Victor AI",
+          "icon": "$(hubot)"
+        }
+      ]
+    },
+    "views": {
+      "victor": [
+        {
+          "type": "webview",
+          "id": "victor.chatView",
+          "name": "Chat"
+        },
+        {
+          "id": "victor.historyView",
+          "name": "History"
+        },
+        {
+          "id": "victor.toolsView",
+          "name": "Tools"
+        },
+        {
+          "id": "victor.terminalHistoryView",
+          "name": "Commands"
+        },
+        {
+          "id": "victor.diagnosticsView",
+          "name": "Diagnostics"
+        },
+        {
+          "type": "webview",
+          "id": "victor.settingsView",
+          "name": "Settings"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.5.10",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "@vscode/test-electron": "^2.3.8",
+    "@vscode/vsce": "^2.22.0",
+    "eslint": "^8.54.0",
+    "glob": "^13.0.0",
+    "mocha": "^11.7.5",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "ws": "^8.14.0"
+  }
+}

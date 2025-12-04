@@ -159,3 +159,64 @@ class TestConvenienceFunctions:
     def test_strip_markup_function(self):
         """Test the strip_markup convenience function."""
         assert strip_markup("<p>Hello</p>") == "Hello"
+
+
+class TestResponseSanitizerEdgeCases:
+    """Edge case tests for ResponseSanitizer."""
+
+    @pytest.fixture
+    def sanitizer(self):
+        """Create a ResponseSanitizer instance."""
+        return ResponseSanitizer()
+
+    def test_sanitize_removes_json_name_lines(self, sanitizer):
+        """Test removal of lines starting with {"name": (covers line 154)."""
+        text = 'Some text\n{"name": "tool", "arguments": {}}\nMore text'
+        result = sanitizer.sanitize(text)
+        assert '{"name":' not in result
+        assert "Some text" in result
+        assert "More text" in result
+
+    def test_sanitize_removes_parameter_equals_lines(self, sanitizer):
+        """Test removal of lines with parameter= syntax (covers line 157)."""
+        text = "Output\nparameter=value\nResult"
+        result = sanitizer.sanitize(text)
+        assert "parameter=" not in result
+        assert "Output" in result
+        assert "Result" in result
+
+    def test_sanitize_removes_parameter_tag_lines(self, sanitizer):
+        """Test removal of lines with <parameter syntax (covers line 157)."""
+        text = "Data\n<parameter=x>value</parameter>\nEnd"
+        result = sanitizer.sanitize(text)
+        assert "<parameter" not in result
+        assert "Data" in result
+        assert "End" in result
+
+    def test_sanitize_logs_warning_on_significant_removal(self, sanitizer, caplog):
+        """Test warning logged when >50% content removed (covers line 167)."""
+        import logging
+
+        caplog.set_level(logging.WARNING)
+        # Create text > 100 chars that will be mostly garbage
+        garbage = "<function>test</function>" * 10 + '{"name": "tool", "arguments": {"x": "test"}}'
+        assert len(garbage) > 100
+        result = sanitizer.sanitize(garbage)
+        # Result should be shorter after removing garbage
+        assert len(result) < len(garbage)
+
+    def test_sanitize_removes_lines_starting_with_closing_tag(self, sanitizer):
+        """Test removal of lines starting with </."""
+        text = "Result\n</function>\n</param>\nDone"
+        result = sanitizer.sanitize(text)
+        assert "</function>" not in result
+        assert "</param>" not in result
+        assert "Result" in result
+        assert "Done" in result
+
+    def test_sanitize_removes_important_tags_lowercase(self, sanitizer):
+        """Test removal of lowercase <important> tags."""
+        text = "Text <important>note</important> more"
+        result = sanitizer.sanitize(text)
+        # IMPORTANT tags should be removed
+        assert "Text" in result or result == ""

@@ -1,149 +1,114 @@
-"""Model capability helpers for tool-calling support across providers."""
+"""Model capability helpers for tool-calling support across providers.
+
+SINGLE SOURCE OF TRUTH: ~/.victor/profiles.yaml
+
+This module derives tool-capable model patterns from the user's profiles.yaml.
+Models with `native_tool_calls: true` in the `model_capabilities` section are
+considered tool-capable.
+
+Users should copy examples/profiles.yaml.example to ~/.victor/profiles.yaml
+to get the full list of pre-configured model capabilities.
+"""
 
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 import yaml
 
+logger = logging.getLogger(__name__)
 
-def _default_tool_calling_models() -> Dict[str, List[str]]:
-    """Built-in manifest for providers that support tool calling."""
-    return {
-        # Local/open-weight: ordered by coding/tool proficiency and size bands for ~64GB hosts (Q4 focus).
-        # Source: https://ollama.com/search?c=tools
-        "ollama": [
-            # 50B-70B tier (need 48GB+ VRAM)
-            "llama3.1:70b",  # ~40GB Q4, native tools
-            "llama3.3:70b",  # ~40GB Q4, native tools (newer)
-            "llama3-groq-tool-use:70b",  # ~40GB Q4, specialized for tools
-            "hermes3:70b",  # ~40GB Q4, tool calling
-            "nemotron:70b",  # ~40GB Q4, tool calling
-            "athene-v2:72b",  # ~44GB Q4, tool calling
-            # 25B-50B tier (best quality per GB)
-            "mixtral:8x7b",  # MoE; ~26GB Q4, good tools
-            "mixtral-8x7b",  # alias
-            "mixtral-8x22b",  # MoE; heavier, use only with headroom
-            "qwen3:32b",  # ~20GB Q4, native tools
-            "qwen3-coder:30b",  # ~18GB Q4, strong coder + tools
-            "qwen3:30b",  # ~18GB Q4, MoE variant
-            "qwen2.5-coder:32b",  # ~20GB Q4, strong coder
-            "qwen2.5:32b",  # ~20GB Q4, general purpose
-            "deepseek-coder:33b",  # ~20GB Q4, strong code/tool
-            "deepseek-coder-v2:34b",  # ~20GB Q4, newer
-            "command-r:35b",  # ~22GB Q4, enterprise tools
-            "seed-36b",  # est ~22GB Q4
-            "gemma3:27b",  # ~17GB Q4, tool calling
-            "aya-expanse:32b",  # ~20GB Q4, multilingual + tools
-            # 10B-25B tier
-            "qwen2.5-coder:14b",  # ~9GB Q4, fast coder
-            "qwen2.5-coder:7b",  # ~5GB Q4, lightweight coder
-            "deepseek-coder-v2:16b",  # ~10GB Q4
-            "seed-14b",  # ~9GB Q4
-            "gemma3:12b",  # ~8GB Q4
-            # <10B for light use
-            "llama3.1:8b",  # ~5GB Q4
-            "llama3.2:3b",  # ~2GB Q4
-            "llama3-groq-tool-use:8b",  # ~5GB Q4, specialized for tools
-            "mistral:7b-instruct",  # ~4GB Q4
-            "mistral:7b",  # ~4GB Q4
-            "phi-4",  # ~8GB Q4
-            "phi-4-mini",  # ~4GB Q4
-            "hermes3:8b",  # ~5GB Q4
-            "firefunction-v2:70b",  # specialized function calling
-        ],
-        "lmstudio": [
-            # 50B-70B tier
-            "llama3.1:70b",
-            "llama3.3:70b",
-            # 25B-50B tier
-            "qwen3:32b",
-            "qwen3-coder:30b",
-            "qwen3:30b",
-            "qwen2.5-coder:32b",
-            "qwen2.5:32b",
-            "deepseek-coder:33b",
-            "deepseek-coder-v2:34b",
-            "seed-36b",
-            "gemma3:27b",
-            "mixtral:8x7b",
-            # 10B-25B tier
-            "qwen2.5-coder:14b",
-            "qwen2.5-coder:7b",
-            "deepseek-coder-v2:16b",
-            "seed-14b",
-            "gemma3:12b",
-            # <10B
-            "llama3.1:8b",
-            "mistral:7b-instruct",
-            "mistral:7b",
-            "phi-4",
-            "phi-4-mini",
-        ],
-        "vllm": [
-            # 50B-70B tier
-            "llama3.1:70b",
-            "llama3.3:70b",
-            # 25B-50B tier
-            "qwen3:32b",
-            "qwen3-coder:30b",
-            "qwen3:30b",
-            "qwen2.5-coder:32b",
-            "qwen2.5:32b",
-            "deepseek-coder:33b",
-            "deepseek-coder-v2:34b",
-            "seed-36b",
-            "gemma3:27b",
-            "mixtral:8x7b",
-            "mixtral-8x7b",
-            "mixtral-8x22b",
-            # 10B-25B tier
-            "qwen2.5-coder:14b",
-            "qwen2.5-coder:7b",
-            "deepseek-coder-v2:16b",
-            "seed-14b",
-            "gemma3:12b",
-            # <10B
-            "llama3.1:8b",
-            "mistral:7b-instruct",
-            "mistral:7b",
-            "phi-4",
-            "phi-4-mini",
-        ],
-        "anthropic": [
-            "claude-3-5-sonnet-20241022",
-            "claude-3-opus-20240229",
-            "claude-3-5-haiku-20241022",
-            "claude-sonnet-4-5",
-            "claude-opus-4-5",
-            "claude-haiku-4-5",
-        ],
-        "openai": [
-            # Order by expected coding/tool strength
-            "gpt-5.1",
-            "gpt-5",
-            "gpt-4.5-preview",
-            "gpt-4.1",
-            "gpt-4o",
-            "gpt-4.1-mini",
-            "gpt-4o-mini",
-        ],
-        "google": [
-            # Order by capability; 3.x then 2.5
-            "gemini-3-pro",
-            "gemini-3-pro-preview",
-            "gemini-2.5-pro",
-            "gemini-2.5-flash",
-            "gemini-2.5-flash-lite",
-            "gemini-2.0-flash",
-            "gemini-2.0-flash-001",
-        ],
-        "xai": [
-            "grok-2",
-        ],
+
+def _load_tool_capable_patterns_from_yaml(
+    user_profiles_path: Optional[Path] = None,
+) -> Dict[str, List[str]]:
+    """Load tool-capable model patterns from profiles.yaml.
+
+    SINGLE SOURCE OF TRUTH: ~/.victor/profiles.yaml
+
+    The model_capabilities section in profiles.yaml defines which models
+    support native tool calling. Users get a pre-configured list by copying
+    examples/profiles.yaml.example to ~/.victor/profiles.yaml.
+
+    Returns model patterns where native_tool_calls is true, organized by provider.
+    """
+    result: Dict[str, List[str]] = {}
+
+    # Load from user's profiles.yaml (the single source of truth)
+    user_path = user_profiles_path or Path.home() / ".victor" / "profiles.yaml"
+    if user_path.exists():
+        try:
+            user_data = yaml.safe_load(user_path.read_text()) or {}
+            model_caps = user_data.get("model_capabilities", {})
+            if model_caps:
+                _extract_tool_capable_patterns(model_caps, result)
+                logger.debug(f"Loaded model capabilities from {user_path}")
+        except Exception as e:
+            logger.warning(f"Failed to load profiles.yaml: {e}")
+
+    # If profiles.yaml doesn't have model_capabilities, use minimal built-in defaults
+    # This ensures basic functionality even without a profiles.yaml
+    if not result:
+        logger.debug("No model_capabilities in profiles.yaml, using minimal defaults")
+        result = _minimal_builtin_defaults()
+
+    return result
+
+
+def _minimal_builtin_defaults() -> Dict[str, List[str]]:
+    """Minimal built-in defaults for when profiles.yaml is missing.
+
+    These are just enough to get started. Users should copy
+    examples/profiles.yaml.example to get the full list.
+    """
+    # Cloud providers support all models
+    defaults: Dict[str, List[str]] = {
+        "anthropic": ["*"],
+        "openai": ["*"],
+        "google": ["*"],
+        "xai": ["*"],
+        "vllm": ["*"],
     }
+
+    # Common local model patterns
+    local_patterns = [
+        "llama3.1*",
+        "llama3.2*",
+        "llama3.3*",
+        "qwen2.5*",
+        "qwen3*",
+        "mistral*",
+        "mixtral*",
+        "deepseek*",
+        "hermes*",
+        "command-r*",
+    ]
+    for provider in ["ollama", "lmstudio"]:
+        defaults[provider] = local_patterns.copy()
+
+    return defaults
+
+
+def _extract_tool_capable_patterns(data: Dict, result: Dict[str, List[str]]) -> None:
+    """Extract tool-capable patterns from capability data into result dict."""
+    # Providers with native_tool_calls: true at provider level
+    providers = data.get("providers", {})
+    for provider, caps in providers.items():
+        if isinstance(caps, dict) and caps.get("native_tool_calls", False):
+            # This provider supports tools by default (e.g., anthropic, openai)
+            result.setdefault(provider.lower(), []).append("*")
+
+    # Model-specific patterns with native_tool_calls: true
+    models = data.get("models", {})
+    for pattern, caps in models.items():
+        if isinstance(caps, dict) and caps.get("native_tool_calls", False):
+            # Add this pattern to local providers that use model matching
+            for provider in ["ollama", "lmstudio", "vllm"]:
+                if pattern not in result.get(provider.lower(), []):
+                    result.setdefault(provider.lower(), []).append(pattern)
 
 
 def _flatten_yaml_manifest(data: Dict[str, Iterable]) -> Dict[str, List[str]]:
@@ -183,36 +148,30 @@ def _flatten_yaml_manifest(data: Dict[str, Iterable]) -> Dict[str, List[str]]:
 
 
 class ToolCallingMatrix:
-    """Capability matrix to decide whether a model supports structured tool calls."""
+    """Capability matrix to decide whether a model supports structured tool calls.
+
+    SINGLE SOURCE OF TRUTH: model_capabilities.yaml
+
+    Tool-capable models are derived from patterns with `native_tool_calls: true`
+    in model_capabilities.yaml. No hardcoded model lists.
+    """
 
     def __init__(
         self,
         manifest: Optional[Dict[str, List[str]]] = None,
-        manifest_path: Optional[Path] = None,
+        manifest_path: Optional[Path] = None,  # noqa: ARG002 - kept for API compat
         always_allow_providers: Optional[List[str]] = None,
     ) -> None:
-        base = _default_tool_calling_models()
+        # Load tool-capable patterns from model_capabilities.yaml
+        base = _load_tool_capable_patterns_from_yaml()
+
+        # Merge any additional manifest patterns (for extensibility)
         if manifest:
             for provider, models in manifest.items():
                 base.setdefault(provider.lower(), [])
                 for model in models:
                     if model not in base[provider.lower()]:
                         base[provider.lower()].append(model)
-
-        # Merge YAML manifest if available
-        path = manifest_path or Path(__file__).with_name("tool_calling_models.yaml")
-        if path.exists():
-            try:
-                yaml_data = yaml.safe_load(path.read_text()) or {}
-                yaml_manifest = _flatten_yaml_manifest(yaml_data.get("tool_calling_models", {}))
-                for provider, models in yaml_manifest.items():
-                    base.setdefault(provider.lower(), [])
-                    for model in models:
-                        if model not in base[provider.lower()]:
-                            base[provider.lower()].append(model)
-            except Exception:
-                # If the manifest is malformed, fall back to the base set
-                pass
 
         # Normalize to lowercase for matching
         self.manifest: Dict[str, List[str]] = {
@@ -258,4 +217,4 @@ class ToolCallingMatrix:
         return json.dumps(self.manifest, indent=2, sort_keys=True)
 
 
-__all__ = ["ToolCallingMatrix", "_default_tool_calling_models"]
+__all__ = ["ToolCallingMatrix", "_load_tool_capable_patterns_from_yaml"]

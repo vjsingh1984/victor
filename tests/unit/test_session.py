@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from victor.agent.conversation import ConversationManager
+from victor.agent.message_history import MessageHistory
 from victor.agent.session import (
     Session,
     SessionManager,
@@ -44,7 +44,7 @@ def session_manager(temp_session_dir):
 @pytest.fixture
 def sample_conversation():
     """Create a sample conversation manager."""
-    conv = ConversationManager(system_prompt="You are a helpful assistant.")
+    conv = MessageHistory(system_prompt="You are a helpful assistant.")
     conv.add_user_message("Hello, how are you?")
     conv.add_assistant_message("I'm doing well, thank you for asking!")
     conv.add_user_message("Can you help me with Python?")
@@ -294,7 +294,7 @@ class TestSessionManager:
 
     def test_auto_generate_title(self, session_manager):
         """save_session should auto-generate title from first user message."""
-        conv = ConversationManager()
+        conv = MessageHistory()
         conv.add_user_message("How do I implement a binary search tree in Python?")
         conv.add_assistant_message("Here's how to implement a BST...")
 

@@ -552,6 +552,107 @@ def generate_smart_victor_md(root_path: Optional[str] = None) -> str:
     return "\n".join(sections)
 
 
+# Supported context file aliases for other AI coding tools
+CONTEXT_FILE_ALIASES = {
+    "CLAUDE.md": "Claude Code (Anthropic)",
+    "GEMINI.md": "Gemini (Google AI Studio)",
+    ".cursorrules": "Cursor IDE",
+    ".windsurfrules": "Windsurf IDE",
+    "AGENTS.md": "Generic AI agents",
+}
+
+
+def create_context_symlinks(
+    root_path: Optional[str] = None,
+    source_file: str = ".victor.md",
+    aliases: Optional[List[str]] = None,
+) -> Dict[str, str]:
+    """Create symlinks from .victor.md to other context file names.
+
+    This allows a single source of truth (.victor.md) to work with
+    multiple AI coding tools that look for different filenames.
+
+    Args:
+        root_path: Root directory. Defaults to current directory.
+        source_file: Source file to link from (default: .victor.md)
+        aliases: List of alias names to create. If None, creates all supported aliases.
+
+    Returns:
+        Dict mapping alias name to status ('created', 'exists', 'failed', 'skipped')
+    """
+    root = Path(root_path) if root_path else Path.cwd()
+    source = root / source_file
+    results: Dict[str, str] = {}
+
+    if not source.exists():
+        logger.warning(f"Source file {source} does not exist")
+        return {"error": f"Source file {source_file} not found"}
+
+    # Use all aliases if not specified
+    target_aliases = aliases if aliases is not None else list(CONTEXT_FILE_ALIASES.keys())
+
+    for alias in target_aliases:
+        target = root / alias
+        try:
+            if target.exists():
+                if target.is_symlink():
+                    # Check if it points to our source
+                    if target.resolve() == source.resolve():
+                        results[alias] = "exists"
+                    else:
+                        results[alias] = "exists_different"
+                else:
+                    results[alias] = "exists_file"
+            else:
+                # Create relative symlink
+                target.symlink_to(source_file)
+                results[alias] = "created"
+                logger.info(f"Created symlink: {alias} -> {source_file}")
+        except OSError as e:
+            results[alias] = f"failed: {e}"
+            logger.warning(f"Failed to create symlink {alias}: {e}")
+
+    return results
+
+
+def remove_context_symlinks(
+    root_path: Optional[str] = None,
+    aliases: Optional[List[str]] = None,
+) -> Dict[str, str]:
+    """Remove symlinks to context files.
+
+    Only removes files that are symlinks pointing to .victor.md or similar.
+    Does not remove actual files.
+
+    Args:
+        root_path: Root directory. Defaults to current directory.
+        aliases: List of alias names to remove. If None, checks all supported aliases.
+
+    Returns:
+        Dict mapping alias name to status ('removed', 'not_symlink', 'not_found')
+    """
+    root = Path(root_path) if root_path else Path.cwd()
+    results: Dict[str, str] = {}
+
+    target_aliases = aliases if aliases is not None else list(CONTEXT_FILE_ALIASES.keys())
+
+    for alias in target_aliases:
+        target = root / alias
+        try:
+            if not target.exists() and not target.is_symlink():
+                results[alias] = "not_found"
+            elif target.is_symlink():
+                target.unlink()
+                results[alias] = "removed"
+                logger.info(f"Removed symlink: {alias}")
+            else:
+                results[alias] = "not_symlink"
+        except OSError as e:
+            results[alias] = f"failed: {e}"
+
+    return results
+
+
 def _extract_readme_description(root: Path) -> str:
     """Extract project description from README."""
     readme_files = ["README.md", "README.rst", "README.txt"]
@@ -578,3 +679,263 @@ def _extract_readme_description(root: Path) -> str:
                 pass
 
     return ""
+
+
+# =============================================================================
+# LLM-Powered Analysis (Language-Agnostic)
+# =============================================================================
+
+
+def gather_project_context(root_path: Optional[str] = None, max_files: int = 50) -> Dict[str, any]:
+    """Gather project context for LLM analysis (works with any language).
+
+    This function collects structural information about any project type
+    without parsing language-specific syntax.
+
+    Args:
+        root_path: Root directory to analyze. Defaults to current directory.
+        max_files: Maximum number of source files to list.
+
+    Returns:
+        Dict containing project structure information.
+    """
+    root = Path(root_path) if root_path else Path.cwd()
+
+    # Directories to skip
+    skip_dirs = {
+        "__pycache__",
+        ".git",
+        ".pytest_cache",
+        "venv",
+        "env",
+        ".venv",
+        "node_modules",
+        ".tox",
+        "build",
+        "dist",
+        "target",
+        ".next",
+        ".nuxt",
+        "coverage",
+        ".cache",
+    }
+
+    # Project type detection by config files
+    project_indicators = {
+        "pyproject.toml": "Python (modern)",
+        "setup.py": "Python (legacy)",
+        "package.json": "JavaScript/TypeScript",
+        "Cargo.toml": "Rust",
+        "go.mod": "Go",
+        "pom.xml": "Java (Maven)",
+        "build.gradle": "Java/Kotlin (Gradle)",
+        "Gemfile": "Ruby",
+        "composer.json": "PHP",
+        "mix.exs": "Elixir",
+        "CMakeLists.txt": "C/C++ (CMake)",
+        "Makefile": "Make-based",
+        "pubspec.yaml": "Dart/Flutter",
+        "Package.swift": "Swift",
+        ".csproj": "C# (.NET)",
+    }
+
+    # Source file extensions by language
+    source_extensions = {
+        ".py": "Python",
+        ".js": "JavaScript",
+        ".ts": "TypeScript",
+        ".tsx": "TypeScript React",
+        ".jsx": "JavaScript React",
+        ".rs": "Rust",
+        ".go": "Go",
+        ".java": "Java",
+        ".kt": "Kotlin",
+        ".rb": "Ruby",
+        ".php": "PHP",
+        ".ex": "Elixir",
+        ".exs": "Elixir",
+        ".c": "C",
+        ".cpp": "C++",
+        ".h": "C/C++ Header",
+        ".cs": "C#",
+        ".swift": "Swift",
+        ".dart": "Dart",
+        ".vue": "Vue",
+        ".svelte": "Svelte",
+    }
+
+    context = {
+        "project_name": root.name,
+        "root_path": str(root),
+        "detected_languages": [],
+        "config_files": [],
+        "directory_structure": [],
+        "source_files": [],
+        "readme_content": "",
+        "main_config_content": "",
+    }
+
+    # Detect project type(s)
+    for config_file, lang in project_indicators.items():
+        if (root / config_file).exists():
+            context["detected_languages"].append(lang)
+            context["config_files"].append(config_file)
+
+    # Get README content (first 2000 chars)
+    for readme in ["README.md", "README.rst", "README.txt", "readme.md"]:
+        readme_path = root / readme
+        if readme_path.exists():
+            try:
+                context["readme_content"] = readme_path.read_text(encoding="utf-8")[:2000]
+            except Exception:
+                pass
+            break
+
+    # Get main config content
+    main_configs = ["pyproject.toml", "package.json", "Cargo.toml", "go.mod"]
+    for config in main_configs:
+        config_path = root / config
+        if config_path.exists():
+            try:
+                context["main_config_content"] = config_path.read_text(encoding="utf-8")[:3000]
+            except Exception:
+                pass
+            break
+
+    # Collect directory structure (depth 2)
+    def walk_dirs(path: Path, depth: int = 0, max_depth: int = 2) -> List[str]:
+        dirs = []
+        if depth > max_depth:
+            return dirs
+        try:
+            for item in sorted(path.iterdir()):
+                if item.name.startswith(".") or item.name in skip_dirs:
+                    continue
+                if item.is_dir():
+                    rel_path = str(item.relative_to(root))
+                    dirs.append(rel_path + "/")
+                    dirs.extend(walk_dirs(item, depth + 1, max_depth))
+        except PermissionError:
+            pass
+        return dirs
+
+    context["directory_structure"] = walk_dirs(root)[:100]  # Limit to 100 dirs
+
+    # Collect source files with extensions
+    file_count = 0
+    lang_counts: Dict[str, int] = {}
+    for item in root.rglob("*"):
+        if file_count >= max_files:
+            break
+        if any(skip in item.parts for skip in skip_dirs):
+            continue
+        if item.is_file() and item.suffix in source_extensions:
+            rel_path = str(item.relative_to(root))
+            context["source_files"].append(rel_path)
+            lang = source_extensions[item.suffix]
+            lang_counts[lang] = lang_counts.get(lang, 0) + 1
+            file_count += 1
+
+    # Add detected languages from file extensions
+    for lang, count in sorted(lang_counts.items(), key=lambda x: -x[1]):
+        if lang not in context["detected_languages"]:
+            context["detected_languages"].append(f"{lang} ({count} files)")
+
+    return context
+
+
+def build_llm_prompt_for_victor_md(context: Dict[str, any]) -> str:
+    """Build the prompt for LLM to generate .victor.md.
+
+    Args:
+        context: Project context from gather_project_context()
+
+    Returns:
+        Prompt string for the LLM.
+    """
+    prompt = f"""Analyze this project and generate a comprehensive .victor.md file.
+
+PROJECT: {context['project_name']}
+DETECTED LANGUAGES: {', '.join(context['detected_languages']) or 'Unknown'}
+
+CONFIG FILES FOUND:
+{chr(10).join('- ' + f for f in context['config_files']) or 'None detected'}
+
+DIRECTORY STRUCTURE:
+{chr(10).join(context['directory_structure'][:50]) or 'Unable to determine'}
+
+SOURCE FILES (sample):
+{chr(10).join(context['source_files'][:30]) or 'No source files found'}
+
+README CONTENT:
+{context['readme_content'][:1500] or '[No README found]'}
+
+MAIN CONFIG CONTENT:
+{context['main_config_content'][:2000] or '[No config found]'}
+
+---
+
+Generate a .victor.md file with these sections:
+1. **Project Overview**: Brief description of what the project does
+2. **Package Layout**: Table showing important directories (use | Path | Status | Description | format)
+3. **Key Components**: Main modules, classes, or files with their purposes
+4. **Common Commands**: Build, test, run commands based on the detected build system
+5. **Architecture**: High-level architecture notes (if determinable)
+6. **Important Notes**: Any special considerations, deprecated paths, etc.
+
+IMPORTANT:
+- Be concise but comprehensive
+- Include file paths where relevant
+- Use markdown tables for structured data
+- Don't make up information - only document what's evident from the structure
+- Start with "# .victor.md" header
+
+Output ONLY the .victor.md content, no explanations."""
+
+    return prompt
+
+
+async def generate_victor_md_with_llm(
+    provider,
+    model: str,
+    root_path: Optional[str] = None,
+    max_files: int = 50,
+) -> str:
+    """Generate .victor.md using an LLM provider.
+
+    This function works with any project type by gathering structural
+    information and asking the LLM to analyze and document it.
+
+    Args:
+        provider: A Victor provider instance (BaseProvider)
+        model: Model identifier to use for generation
+        root_path: Root directory to analyze. Defaults to current directory.
+        max_files: Maximum source files to include in context.
+
+    Returns:
+        Generated .victor.md content.
+    """
+    from victor.providers.base import Message
+
+    # Gather project context
+    context = gather_project_context(root_path, max_files)
+
+    # Build prompt
+    prompt = build_llm_prompt_for_victor_md(context)
+
+    # Call the LLM
+    messages = [Message(role="user", content=prompt)]
+
+    try:
+        response = await provider.chat(messages, model=model)
+        content = response.content.strip()
+
+        # Ensure it starts with the header
+        if not content.startswith("# .victor.md"):
+            content = "# .victor.md\n\n" + content
+
+        return content
+    except Exception as e:
+        logger.error(f"LLM generation failed: {e}")
+        # Fall back to basic generation
+        return generate_smart_victor_md(root_path)

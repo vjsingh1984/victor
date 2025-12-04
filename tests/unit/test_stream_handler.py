@@ -356,3 +356,159 @@ class TestStreamBuffer:
         buffer = StreamBuffer()
         flushed = buffer.flush()
         assert flushed == []
+
+
+class TestStreamHandlerEdgeCases:
+    """Edge case tests for StreamHandler."""
+
+    @pytest.mark.asyncio
+    async def test_process_stream_timeout(self):
+        """Test stream timeout handling (covers lines 179-184)."""
+        handler = StreamHandler(timeout=0.01)  # Very short timeout
+
+        async def slow_stream():
+            yield StreamChunk(content="Start")
+            await asyncio.sleep(1)  # Will trigger timeout
+            yield StreamChunk(content="End", is_final=True)
+
+        result = await handler.process_stream(slow_stream())
+        assert result.error is not None
+        assert "timed out" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_process_stream_timeout_with_on_error(self):
+        """Test timeout calls on_error callback."""
+        errors = []
+
+        def on_error(e):
+            errors.append(e)
+
+        handler = StreamHandler(timeout=0.01, on_error=on_error)
+
+        async def slow_stream():
+            yield StreamChunk(content="Start")
+            await asyncio.sleep(1)
+            yield StreamChunk(is_final=True)
+
+        await handler.process_stream(slow_stream())
+        assert len(errors) == 1
+        assert isinstance(errors[0], TimeoutError)
+
+    @pytest.mark.asyncio
+    async def test_process_stream_exception(self):
+        """Test exception handling during stream (covers lines 185-189)."""
+        errors = []
+
+        def on_error(e):
+            errors.append(e)
+
+        handler = StreamHandler(on_error=on_error)
+
+        async def error_stream():
+            yield StreamChunk(content="Start")
+            raise RuntimeError("Stream error")
+
+        result = await handler.process_stream(error_stream())
+        assert result.error == "Stream error"
+        assert len(errors) == 1
+        assert isinstance(errors[0], RuntimeError)
+
+    @pytest.mark.asyncio
+    async def test_process_stream_tool_call_callback_error(self):
+        """Test tool call callback error is handled (covers lines 167-168)."""
+
+        def bad_tool_callback(tc):
+            raise ValueError("Bad callback")
+
+        handler = StreamHandler(on_tool_call=bad_tool_callback)
+
+        chunks = [
+            StreamChunk(tool_calls=[{"name": "test", "args": {}}]),
+            StreamChunk(is_final=True),
+        ]
+
+        # Should complete despite callback error
+        result = await handler.process_stream(mock_stream(chunks))
+        assert len(result.tool_calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_process_stream_on_complete_callback_error(self):
+        """Test on_complete callback error is handled (covers lines 205-206)."""
+
+        def bad_complete_callback(result):
+            raise ValueError("Complete callback error")
+
+        handler = StreamHandler(on_complete=bad_complete_callback)
+
+        chunks = [
+            StreamChunk(content="Done", is_final=True),
+        ]
+
+        # Should complete despite callback error
+        result = await handler.process_stream(mock_stream(chunks))
+        assert result.content == "Done"
+
+
+class TestStreamMetricsEdgeCases:
+    """Edge case tests for StreamMetrics."""
+
+    def test_total_duration_no_times(self):
+        """Test total_duration returns 0 when times not set (covers line 51)."""
+        metrics = StreamMetrics()
+        assert metrics.total_duration == 0.0
+
+    def test_total_duration_only_start(self):
+        """Test total_duration with only start time."""
+        metrics = StreamMetrics(start_time=1.0)
+        assert metrics.total_duration == 0.0
+
+    def test_total_duration_only_end(self):
+        """Test total_duration with only end time."""
+        metrics = StreamMetrics(end_time=5.0)
+        assert metrics.total_duration == 0.0
+
+    def test_time_to_first_token_no_start(self):
+        """Test TTFT without start time."""
+        metrics = StreamMetrics(first_token_time=1.5)
+        assert metrics.time_to_first_token is None
+
+
+class TestStreamBufferEdgeCases:
+    """Edge case tests for StreamBuffer."""
+
+    def test_buffer_array_arguments(self):
+        """Test buffer completes with array JSON arguments."""
+        buffer = StreamBuffer()
+        buffer.add_chunk("call_1", {"function": {"name": "test"}})
+        result = buffer.add_chunk("call_1", {"function": {"arguments": "[1, 2, 3]"}})
+        assert result is not None
+        assert result["function"]["arguments"] == "[1, 2, 3]"
+
+    def test_buffer_empty_function_data(self):
+        """Test buffer handles empty function data."""
+        buffer = StreamBuffer()
+        result = buffer.add_chunk("call_1", {"function": {}})
+        assert result is None
+        assert "call_1" in buffer._buffers
+
+    def test_buffer_no_function_key(self):
+        """Test buffer handles chunk without function key."""
+        buffer = StreamBuffer()
+        result = buffer.add_chunk("call_1", {"other": "data"})
+        assert result is None
+        assert "call_1" in buffer._buffers
+
+    def test_buffer_multiple_calls(self):
+        """Test buffer handles multiple concurrent tool calls."""
+        buffer = StreamBuffer()
+
+        buffer.add_chunk("call_1", {"function": {"name": "tool1"}})
+        buffer.add_chunk("call_2", {"function": {"name": "tool2"}})
+
+        result1 = buffer.add_chunk("call_1", {"function": {"arguments": "{}"}})
+        result2 = buffer.add_chunk("call_2", {"function": {"arguments": "{}"}})
+
+        assert result1 is not None
+        assert result2 is not None
+        assert result1["function"]["name"] == "tool1"
+        assert result2["function"]["name"] == "tool2"

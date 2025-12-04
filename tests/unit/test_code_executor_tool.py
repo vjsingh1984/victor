@@ -335,7 +335,7 @@ class TestExecutePythonInSandbox:
         result = await execute_python_in_sandbox(code="print('test')", context=context)
 
         assert "Error" in result
-        assert "CodeExecutionManager not found" in result
+        assert "CodeSandbox not found" in result
 
 
 class TestUploadFilesToSandbox:
@@ -374,4 +374,4 @@ class TestUploadFilesToSandbox:
         result = await upload_files_to_sandbox(file_paths=["file.txt"], context=context)
 
         assert "Error" in result
-        assert "CodeExecutionManager not found" in result
+        assert "CodeSandbox not found" in result

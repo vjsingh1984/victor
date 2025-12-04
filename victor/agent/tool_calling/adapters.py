@@ -29,6 +29,7 @@ from typing import Any, Dict, List, Optional
 
 from victor.agent.tool_calling.base import (
     BaseToolCallingAdapter,
+    FallbackParsingMixin,
     ToolCall,
     ToolCallingCapabilities,
     ToolCallFormat,
@@ -219,11 +220,13 @@ class OpenAIToolCallingAdapter(BaseToolCallingAdapter):
         )
 
 
-class OllamaToolCallingAdapter(BaseToolCallingAdapter):
+class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
     """Adapter for Ollama local models.
 
     Ollama supports native tool calling for Llama 3.1+, Qwen 2.5+, Mistral, etc.
-    Falls back to JSON parsing from content for unsupported models.
+    Falls back to JSON/XML parsing from content for unsupported models.
+
+    Uses FallbackParsingMixin for common parsing logic shared across adapters.
 
     References:
     - https://docs.ollama.com/capabilities/tool-calling
@@ -312,126 +315,30 @@ class OllamaToolCallingAdapter(BaseToolCallingAdapter):
         content: str,
         raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
     ) -> ToolCallParseResult:
-        """Parse Ollama tool calls with fallback support."""
-        warnings: List[str] = []
+        """Parse Ollama tool calls with fallback support.
 
-        # Try native tool calls first
+        Uses FallbackParsingMixin methods for common parsing logic.
+        """
+        # Try native tool calls first (using mixin method)
         if raw_tool_calls:
-            tool_calls = self._parse_native_tool_calls(raw_tool_calls, warnings)
-            if tool_calls:
+            result = self.parse_native_tool_calls(raw_tool_calls, self.is_valid_tool_name)
+            if result.tool_calls:
+                # Preserve original content for reference
                 return ToolCallParseResult(
-                    tool_calls=tool_calls,
+                    tool_calls=result.tool_calls,
                     remaining_content=content,
-                    parse_method="native",
-                    confidence=1.0,
-                    warnings=warnings,
+                    parse_method=result.parse_method,
+                    confidence=result.confidence,
+                    warnings=result.warnings,
                 )
 
-        # Fallback: Try JSON parsing from content
+        # Fallback: Try content parsing (using mixin method)
         if content:
-            result = self._parse_json_from_content(content)
-            if result.tool_calls:
-                return result
-
-            # Fallback: Try XML-style parsing
-            result = self._parse_xml_from_content(content)
+            result = self.parse_from_content(content, self.is_valid_tool_name)
             if result.tool_calls:
                 return result
 
         return ToolCallParseResult(remaining_content=content)
-
-    def _parse_native_tool_calls(
-        self, raw_tool_calls: List[Dict[str, Any]], warnings: List[str]
-    ) -> List[ToolCall]:
-        """Parse native Ollama tool calls."""
-        tool_calls = []
-
-        for tc in raw_tool_calls:
-            # Handle OpenAI format: {function: {name, arguments}}
-            if "function" in tc:
-                func = tc.get("function", {})
-                name = func.get("name", "")
-                args = func.get("arguments", {})
-            else:
-                # Direct format: {name, arguments}
-                name = tc.get("name", "")
-                args = tc.get("arguments", {})
-
-            if not self.is_valid_tool_name(name):
-                warnings.append(f"Skipped invalid tool name: {name}")
-                continue
-
-            # Parse string arguments
-            if isinstance(args, str):
-                try:
-                    args = json.loads(args)
-                except json.JSONDecodeError:
-                    warnings.append(f"Failed to parse arguments for {name}")
-                    args = {}
-
-            tool_calls.append(ToolCall(name=name, arguments=args))
-
-        return tool_calls
-
-    def _parse_json_from_content(self, content: str) -> ToolCallParseResult:
-        """Parse JSON tool calls from content (fallback)."""
-        content = content.strip()
-        if not content:
-            return ToolCallParseResult()
-
-        try:
-            data = json.loads(content)
-            if isinstance(data, dict) and "name" in data:
-                name = data.get("name", "")
-                if self.is_valid_tool_name(name):
-                    args = data.get("arguments") or data.get("parameters", {})
-                    return ToolCallParseResult(
-                        tool_calls=[ToolCall(name=name, arguments=args)],
-                        remaining_content="",
-                        parse_method="json_fallback",
-                        confidence=0.9,
-                    )
-        except json.JSONDecodeError:
-            pass
-
-        return ToolCallParseResult(remaining_content=content)
-
-    def _parse_xml_from_content(self, content: str) -> ToolCallParseResult:
-        """Parse XML-style tool calls from content (fallback)."""
-        # Pattern: <function_call><name>tool_name</name><arguments>{...}</arguments></function_call>
-        pattern = r"<function_call>\s*<name>([^<]+)</name>\s*<arguments>(.*?)</arguments>\s*</function_call>"
-        matches = re.findall(pattern, content, re.DOTALL | re.IGNORECASE)
-
-        if not matches:
-            return ToolCallParseResult(remaining_content=content)
-
-        tool_calls = []
-        warnings = []
-
-        for name, args_str in matches:
-            name = name.strip()
-            if not self.is_valid_tool_name(name):
-                warnings.append(f"Skipped invalid tool name: {name}")
-                continue
-
-            try:
-                args = json.loads(args_str.strip())
-            except json.JSONDecodeError:
-                warnings.append(f"Failed to parse XML arguments for {name}")
-                args = {}
-
-            tool_calls.append(ToolCall(name=name, arguments=args))
-
-        # Remove matched content
-        remaining = re.sub(pattern, "", content, flags=re.DOTALL | re.IGNORECASE).strip()
-
-        return ToolCallParseResult(
-            tool_calls=tool_calls,
-            remaining_content=remaining,
-            parse_method="xml_fallback",
-            confidence=0.7,
-            warnings=warnings,
-        )
 
     def get_system_prompt_hints(self) -> str:
         """Get system prompt hints for Ollama models."""
@@ -480,6 +387,297 @@ class OllamaToolCallingAdapter(BaseToolCallingAdapter):
                     "5. Keep your answer focused and concise.",
                 ]
             )
+
+
+class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
+    """Adapter for Google Gemini models.
+
+    Google Gemini uses a different function calling format than OpenAI.
+    Tool definitions use 'function_declarations' format.
+
+    Gemini models may also output tool calls in text format like:
+    - <execute_bash>command</execute_bash>
+    - <tool_code>python_code</tool_code>
+    - ```tool_code ... ```
+
+    This adapter handles both native function calls and fallback text parsing.
+
+    References:
+    - https://ai.google.dev/gemini-api/docs/function-calling
+    """
+
+    # Patterns for text-based tool calls from Gemini
+    EXECUTE_BASH_PATTERN = re.compile(r"<execute_bash>\s*(.*?)\s*</execute_bash>", re.DOTALL)
+    TOOL_CODE_PATTERN = re.compile(r"<tool_code>\s*(.*?)\s*</tool_code>", re.DOTALL)
+    CODE_BLOCK_PATTERN = re.compile(r"```tool_code\s*(.*?)\s*```", re.DOTALL)
+    # Pattern for <ctrl42>call: `tool_name` followed by ```json {...}```
+    CTRL42_CALL_PATTERN = re.compile(
+        r"<ctrl42>call:\s*`?(\w+)`?\s*```json\s*(.*?)\s*```", re.DOTALL
+    )
+    # Pattern for simpler call: `tool_name` followed by json block
+    SIMPLE_CALL_PATTERN = re.compile(
+        r"(?:call|Call):\s*`?(\w+)`?\s*```json\s*(.*?)\s*```", re.DOTALL
+    )
+    # Pattern for Python-style function call: tool_name("value") or tool_name(path="value")
+    # Handles both positional and keyword arguments
+    PYTHON_CALL_PATTERN = re.compile(
+        r"(?:^|\n)\s*(?:print\s*\(\s*)?(\w+)\s*\(\s*"
+        r"(?:(?:path|command|file_path|query)\s*=\s*)?"  # Optional keyword
+        r"['\"]([^'\"]+)['\"]\s*"
+        r"\)?",
+        re.MULTILINE,
+    )
+    # Pattern to detect hallucinated tool output (Gemini likes to fake results)
+    TOOL_OUTPUT_HALLUCINATION = re.compile(
+        r"<TOOL_OUTPUT>.*?</TOOL_OUTPUT>|```text\n.*?```", re.DOTALL
+    )
+
+    @property
+    def provider_name(self) -> str:
+        return "google"
+
+    def get_capabilities(self) -> ToolCallingCapabilities:
+        """Get capabilities for Google Gemini models."""
+        loader = _get_capability_loader()
+        caps = loader.get_capabilities("google", self.model, ToolCallFormat.GOOGLE)
+
+        # Gemini always has native tool calls when tools are provided
+        if not caps.native_tool_calls:
+            return ToolCallingCapabilities(
+                native_tool_calls=True,
+                streaming_tool_calls=True,
+                parallel_tool_calls=True,
+                tool_choice_param=False,  # Gemini has different tool_config
+                json_fallback_parsing=True,
+                xml_fallback_parsing=True,  # For <execute_bash> style
+                thinking_mode=False,
+                requires_strict_prompting=False,
+                tool_call_format=ToolCallFormat.GOOGLE,
+                argument_format="json",
+                recommended_max_tools=30,
+                recommended_tool_budget=15,
+            )
+        return caps
+
+    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+        """Convert to Google Gemini function_declarations format.
+
+        Google format requires:
+        {
+            "function_declarations": [
+                {
+                    "name": "tool_name",
+                    "description": "description",
+                    "parameters": {...}
+                }
+            ]
+        }
+        """
+        function_declarations = []
+        for tool in tools:
+            func_decl = {
+                "name": tool.name,
+                "description": tool.description,
+            }
+            # Only add parameters if they exist and are not empty
+            if tool.parameters and tool.parameters.get("properties"):
+                func_decl["parameters"] = tool.parameters
+            function_declarations.append(func_decl)
+
+        return [{"function_declarations": function_declarations}]
+
+    def parse_tool_calls(
+        self,
+        content: str,
+        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+    ) -> ToolCallParseResult:
+        """Parse Google Gemini tool calls.
+
+        Handles:
+        1. Native function calls from API response
+        2. Text-based <execute_bash>...</execute_bash> format
+        3. Text-based <tool_code>...</tool_code> format
+        """
+        warnings = []
+
+        # Try native tool calls first (from function_call response)
+        if raw_tool_calls:
+            tool_calls = []
+            for tc in raw_tool_calls:
+                name = tc.get("name", "")
+                if not self.is_valid_tool_name(name):
+                    warnings.append(f"Skipped invalid tool name: {name}")
+                    continue
+
+                # Google returns args as dict directly, not as JSON string
+                args = tc.get("args", {}) or tc.get("arguments", {})
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except json.JSONDecodeError:
+                        warnings.append(f"Failed to parse arguments for {name}")
+                        args = {}
+
+                tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+
+            if tool_calls:
+                return ToolCallParseResult(
+                    tool_calls=tool_calls,
+                    remaining_content=content,
+                    parse_method="native",
+                    confidence=1.0,
+                    warnings=warnings,
+                )
+
+        # Fallback: Parse text-based tool calls from Gemini output
+        if content:
+            result = self._parse_gemini_text_tools(content)
+            if result.tool_calls:
+                return result
+
+            # Try standard JSON fallback (using mixin)
+            result = self.parse_from_content(content, self.is_valid_tool_name)
+            if result.tool_calls:
+                return result
+
+        return ToolCallParseResult(remaining_content=content)
+
+    def _parse_gemini_text_tools(self, content: str) -> ToolCallParseResult:
+        """Parse Gemini's text-based tool call format.
+
+        Handles patterns like:
+        - <execute_bash>ls -la</execute_bash>
+        - <tool_code>print(read_file("path"))</tool_code>
+        - <ctrl42>call: `tool_name` ```json {...}```
+        - call: `tool_name` ```json {...}```
+        - print(list_directory(path="..."))
+        """
+        tool_calls = []
+        warnings = []
+        remaining = content
+
+        # Parse <ctrl42>call: patterns first (most specific)
+        for match in self.CTRL42_CALL_PATTERN.finditer(content):
+            tool_name = match.group(1).strip()
+            json_str = match.group(2).strip()
+            if tool_name and self.is_valid_tool_name(tool_name):
+                try:
+                    args = json.loads(json_str) if json_str else {}
+                    tool_calls.append(ToolCall(name=tool_name, arguments=args))
+                    remaining = remaining.replace(match.group(0), "")
+                    logger.debug(f"Parsed ctrl42 call: {tool_name}({args})")
+                except json.JSONDecodeError:
+                    warnings.append(f"Failed to parse JSON for {tool_name}: {json_str[:50]}")
+
+        # Parse simpler call: patterns
+        for match in self.SIMPLE_CALL_PATTERN.finditer(content):
+            tool_name = match.group(1).strip()
+            json_str = match.group(2).strip()
+            if tool_name and self.is_valid_tool_name(tool_name):
+                try:
+                    args = json.loads(json_str) if json_str else {}
+                    tool_calls.append(ToolCall(name=tool_name, arguments=args))
+                    remaining = remaining.replace(match.group(0), "")
+                    logger.debug(f"Parsed simple call: {tool_name}({args})")
+                except json.JSONDecodeError:
+                    warnings.append(f"Failed to parse JSON for {tool_name}")
+
+        # Strip hallucinated tool output (Gemini likes to make up results)
+        content_cleaned = self.TOOL_OUTPUT_HALLUCINATION.sub("", content)
+        if content_cleaned != content:
+            logger.warning("Stripped hallucinated tool output from Gemini response")
+            remaining = content_cleaned
+
+        # Parse Python-style function calls: tool_name("value") or tool_name(path="value")
+        for match in self.PYTHON_CALL_PATTERN.finditer(content_cleaned):
+            tool_name = match.group(1).strip()
+            arg_value = match.group(2).strip()
+            if tool_name and self.is_valid_tool_name(tool_name):
+                # Map common tool argument names
+                if tool_name in ("list_directory", "read_file"):
+                    args = {"path": arg_value}
+                elif tool_name == "execute_bash":
+                    args = {"command": arg_value}
+                elif tool_name in ("code_search", "semantic_code_search"):
+                    args = {"query": arg_value}
+                else:
+                    args = {"path": arg_value}  # Default
+                tool_calls.append(ToolCall(name=tool_name, arguments=args))
+                remaining = remaining.replace(match.group(0), "")
+                logger.debug(f"Parsed Python call: {tool_name}({args})")
+
+        # Parse <execute_bash> patterns
+        for match in self.EXECUTE_BASH_PATTERN.finditer(content):
+            command = match.group(1).strip()
+            if command:
+                tool_calls.append(
+                    ToolCall(
+                        name="execute_bash",
+                        arguments={"command": command},
+                    )
+                )
+                remaining = remaining.replace(match.group(0), "")
+
+        # Parse <tool_code> patterns (Python code that reads files, etc.)
+        for match in self.TOOL_CODE_PATTERN.finditer(content):
+            code = match.group(1).strip()
+            if code:
+                # Try to extract read_file calls
+                read_file_match = re.search(r'read_file\s*\(\s*["\']([^"\']+)["\']\s*\)', code)
+                if read_file_match:
+                    path = read_file_match.group(1)
+                    tool_calls.append(
+                        ToolCall(
+                            name="read_file",
+                            arguments={"path": path},
+                        )
+                    )
+                else:
+                    # Generic tool code - might be execute_python
+                    warnings.append(f"Unrecognized tool_code: {code[:50]}...")
+                remaining = remaining.replace(match.group(0), "")
+
+        # Parse ```tool_code blocks
+        for match in self.CODE_BLOCK_PATTERN.finditer(content):
+            code = match.group(1).strip()
+            if code:
+                read_file_match = re.search(r'read_file\s*\(\s*["\']([^"\']+)["\']\s*\)', code)
+                if read_file_match:
+                    path = read_file_match.group(1)
+                    tool_calls.append(
+                        ToolCall(
+                            name="read_file",
+                            arguments={"path": path},
+                        )
+                    )
+                remaining = remaining.replace(match.group(0), "")
+
+        if tool_calls:
+            return ToolCallParseResult(
+                tool_calls=tool_calls,
+                remaining_content=remaining.strip(),
+                parse_method="gemini_text_fallback",
+                confidence=0.8,
+                warnings=warnings,
+            )
+
+        return ToolCallParseResult(remaining_content=content)
+
+    def get_system_prompt_hints(self) -> str:
+        """Get system prompt hints for Google Gemini."""
+        return "\n".join(
+            [
+                "TOOL USAGE:",
+                "- Use the available tools to gather information when needed.",
+                "- Call one tool at a time and wait for the result.",
+                "- After 2-3 successful tool calls, provide your complete answer.",
+                "- Do NOT repeat identical tool calls.",
+                "",
+                "RESPONSE FORMAT:",
+                "- Provide your final answer in clear, readable text.",
+                "- Be concise and directly answer the question.",
+            ]
+        )
 
 
 class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):

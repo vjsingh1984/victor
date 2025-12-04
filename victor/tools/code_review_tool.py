@@ -696,19 +696,3 @@ async def code_review(
         "issues": filtered_issues,
         "formatted_report": "\n".join(report),
     }
-
-
-# Keep class for backward compatibility
-class CodeReviewTool:
-    """Deprecated: Use individual code_review_* functions instead."""
-
-    def __init__(self, max_complexity: int = 10):
-        """Initialize - deprecated."""
-        import warnings
-
-        warnings.warn(
-            "CodeReviewTool class is deprecated. Use code_review_* functions instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        set_code_review_config(max_complexity=max_complexity)

@@ -2,7 +2,7 @@ import hashlib
 import json
 from typing import Any, Dict, Optional, Tuple
 
-from victor.cache.manager import CacheManager
+from victor.cache.tiered_cache import TieredCache
 from victor.cache.config import CacheConfig
 
 
@@ -26,7 +26,7 @@ class ToolCache:
     ) -> None:
         self.ttl = ttl
         self.allowlist = set(allowlist or [])
-        self.cache = CacheManager(cache_config or CacheConfig())
+        self.cache = TieredCache(cache_config or CacheConfig())
         # track keys by touched paths for selective invalidation
         self._path_index: Dict[str, set[str]] = {}
 

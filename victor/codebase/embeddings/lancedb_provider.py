@@ -311,6 +311,42 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         self.table.delete(f"id = '{doc_id}'")
 
+    async def delete_by_file(self, file_path: str) -> int:
+        """Delete all documents from a specific file.
+
+        Used for incremental updates - when a file changes, we delete all
+        its chunks and re-index.
+
+        Args:
+            file_path: Relative file path to delete documents for
+
+        Returns:
+            Number of documents deleted
+        """
+        if not self._initialized:
+            await self.initialize()
+
+        if self.table is None:
+            return 0
+
+        # Count documents before deletion
+        try:
+            count_before = self.table.count_rows()
+        except (AttributeError, RuntimeError, ValueError):
+            count_before = 0
+
+        # Delete documents with matching file_path
+        # LanceDB uses SQL-like predicates
+        self.table.delete(f"file_path = '{file_path}'")
+
+        # Count documents after deletion
+        try:
+            count_after = self.table.count_rows()
+        except (AttributeError, RuntimeError, ValueError):
+            count_after = 0
+
+        return count_before - count_after
+
     async def clear_index(self) -> None:
         """Clear entire index."""
         if not self._initialized:

@@ -1,0 +1,250 @@
+# Task-Aware Tool Configuration
+#
+# This file defines tool availability and behavior for different task types
+# and conversation stages. Used by the TaskProgressTracker and ToolSelector
+# to make intelligent decisions about which tools to offer.
+#
+# Task Types: edit, search, create, analyze, design, general
+# Stages: initial, reading, executing, verifying
+#
+# Tool names must match those registered in AgentOrchestrator.
+
+# Task type configurations
+task_types:
+  edit:
+    description: "Modify existing code/files"
+    max_exploration_iterations: 3
+    force_action_after_target_read: true
+
+    # Tools required to complete this task type
+    required_tools:
+      - edit_files
+      - read_file
+
+    # Tools recommended for each stage
+    stage_tools:
+      initial:
+        - list_directory
+        - code_search
+        - semantic_code_search
+        - plan_files
+      reading:
+        - read_file
+        - code_search
+        - semantic_code_search
+      executing:
+        - edit_files
+        - read_file
+      verifying:
+        - read_file
+        - run_tests
+        - execute_bash
+
+    # Hints to show when forcing action
+    force_action_hints:
+      after_target_read: "You have gathered enough information about the target file. Now use edit_files to make the requested change."
+      max_iterations: "You have done extensive exploration. Please use edit_files to make the change or explain what's blocking you."
+
+  search:
+    description: "Find/locate code or files"
+    max_exploration_iterations: 8
+    force_action_after_target_read: false
+
+    required_tools:
+      - code_search
+      - read_file
+
+    stage_tools:
+      initial:
+        - list_directory
+        - code_search
+        - semantic_code_search
+      reading:
+        - read_file
+        - code_search
+        - semantic_code_search
+        - list_directory
+      executing:
+        - read_file
+        - code_search
+      verifying:
+        - read_file
+
+    force_action_hints:
+      max_iterations: "You have done extensive exploration. Please summarize your findings and provide the answer."
+
+  create:
+    description: "Write new files"
+    max_exploration_iterations: 3
+    force_action_after_target_read: false
+
+    required_tools:
+      - write_file
+
+    stage_tools:
+      initial:
+        - list_directory
+        - read_file
+        - plan_files
+      reading:
+        - read_file
+        - list_directory
+      executing:
+        - write_file
+        - edit_files
+        - execute_bash
+      verifying:
+        - read_file
+        - run_tests
+        - execute_bash
+
+    force_action_hints:
+      max_iterations: "You have gathered sufficient context. Please create the file using write_file."
+
+  analyze:
+    description: "Count, measure, analyze code"
+    max_exploration_iterations: 10
+    force_action_after_target_read: false
+
+    required_tools:
+      - read_file
+      - execute_bash
+
+    stage_tools:
+      initial:
+        - list_directory
+        - code_search
+        - semantic_code_search
+      reading:
+        - read_file
+        - code_search
+        - list_directory
+        - execute_bash
+      executing:
+        - execute_bash
+        - execute_python_in_sandbox
+      verifying:
+        - read_file
+
+    force_action_hints:
+      max_iterations: "You have done extensive analysis. Please summarize your findings."
+
+  design:
+    description: "Conceptual/planning tasks (no tools needed)"
+    max_exploration_iterations: 2
+    force_action_after_target_read: false
+    needs_tools: false
+
+    required_tools: []
+
+    stage_tools:
+      initial: []
+      reading: []
+      executing: []
+      verifying: []
+
+    force_action_hints:
+      max_iterations: "Please provide your design recommendations."
+
+  general:
+    description: "Ambiguous or general help"
+    max_exploration_iterations: 8
+    force_action_after_target_read: false
+
+    required_tools:
+      - read_file
+      - list_directory
+
+    stage_tools:
+      initial:
+        - list_directory
+        - code_search
+        - semantic_code_search
+        - read_file
+        - plan_files
+      reading:
+        - read_file
+        - code_search
+        - list_directory
+      executing:
+        - edit_files
+        - write_file
+        - execute_bash
+      verifying:
+        - read_file
+        - run_tests
+
+    force_action_hints:
+      max_iterations: "You have gathered sufficient context. Please complete the task or explain what's blocking you."
+
+# Stage progression rules
+stage_progression:
+  # After reading N files without taking action, suggest next stage
+  reading_to_executing_threshold: 3
+
+  # After making changes, move to verifying stage
+  auto_verify_after_change: true
+
+  # Tools that trigger stage transitions
+  stage_triggers:
+    reading:
+      - read_file
+    executing:
+      - edit_files
+      - write_file
+    verifying:
+      - run_tests
+
+# Milestones and their meanings
+milestones:
+  target_identified:
+    description: "Found the file/entity to work on"
+    triggers:
+      - list_directory
+      - code_search
+
+  target_read:
+    description: "Read the target file"
+    triggers:
+      - read_file
+
+  change_made:
+    description: "Used edit_files or write_file"
+    triggers:
+      - edit_files
+      - write_file
+
+  change_verified:
+    description: "Verified the change (tests/read)"
+    triggers:
+      - run_tests
+      - execute_bash  # When running tests
+
+  search_complete:
+    description: "Found requested items"
+    triggers:
+      - code_search
+      - semantic_code_search
+
+# Tool priority for semantic selection
+# Higher priority tools get boosted in scoring
+tool_priorities:
+  # Core tools always available
+  core:
+    - read_file
+    - list_directory
+    - execute_bash
+
+  # Action tools for making changes
+  action:
+    - edit_files
+    - write_file
+
+  # Search tools for exploration
+  search:
+    - code_search
+    - semantic_code_search
+
+  # Verification tools
+  verification:
+    - run_tests

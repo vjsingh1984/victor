@@ -298,6 +298,32 @@ class ChromaDBProvider(BaseEmbeddingProvider):
 
         self.collection.delete(ids=[doc_id])
 
+    async def delete_by_file(self, file_path: str) -> int:
+        """Delete all documents from a specific file.
+
+        Used for incremental updates - when a file changes, we delete all
+        its chunks and re-index.
+
+        Args:
+            file_path: Relative file path to delete documents for
+
+        Returns:
+            Number of documents deleted
+        """
+        if not self._initialized:
+            await self.initialize()
+
+        # Count documents before deletion
+        count_before = self.collection.count()
+
+        # ChromaDB uses where clause for metadata filtering
+        self.collection.delete(where={"file_path": file_path})
+
+        # Count documents after deletion
+        count_after = self.collection.count()
+
+        return count_before - count_after
+
     async def clear_index(self) -> None:
         """Clear entire index."""
         if not self._initialized:

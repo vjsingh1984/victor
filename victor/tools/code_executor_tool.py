@@ -37,9 +37,10 @@ except ImportError:
 from victor.tools.decorators import tool
 
 
-class CodeExecutionManager:
-    """
-    Manages a persistent, isolated Docker container for stateful code execution.
+class CodeSandbox:
+    """Manages a persistent, isolated Docker container for stateful code execution.
+
+    Note: Previously named `CodeExecutionManager`. Alias kept for backward compatibility.
     """
 
     def __init__(self, docker_image: str = "python:3.11-slim", require_docker: bool = False):
@@ -183,6 +184,10 @@ class CodeExecutionManager:
         raise FileNotFoundError(f"File not found in container: {remote_path}")
 
 
+# Backward compatibility alias
+CodeExecutionManager = CodeSandbox
+
+
 @tool
 async def execute_python_in_sandbox(code: str, context: dict) -> str:
     """
@@ -196,11 +201,11 @@ async def execute_python_in_sandbox(code: str, context: dict) -> str:
     Returns:
         A string containing the exit code, stdout, and stderr.
     """
-    manager: CodeExecutionManager = context.get("code_manager")
-    if not manager:
-        return "Error: CodeExecutionManager not found in context."
+    sandbox: CodeSandbox = context.get("code_manager")
+    if not sandbox:
+        return "Error: CodeSandbox not found in context."
 
-    result = manager.execute(code)
+    result = sandbox.execute(code)
 
     output = f"Exit Code: {result['exit_code']}\n"
     if result["stdout"]:
@@ -223,12 +228,12 @@ async def upload_files_to_sandbox(file_paths: List[str], context: dict) -> str:
     Returns:
         A confirmation message.
     """
-    manager: CodeExecutionManager = context.get("code_manager")
-    if not manager:
-        return "Error: CodeExecutionManager not found in context."
+    sandbox: CodeSandbox = context.get("code_manager")
+    if not sandbox:
+        return "Error: CodeSandbox not found in context."
 
     try:
-        manager.put_files(file_paths)
+        sandbox.put_files(file_paths)
         return f"Successfully uploaded {len(file_paths)} files to the sandbox."
     except Exception as e:
         return f"Error uploading files: {e}"

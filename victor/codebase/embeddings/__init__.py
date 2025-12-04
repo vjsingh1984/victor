@@ -23,7 +23,7 @@ This module provides a plugin-based architecture for embeddings with two layers:
 
 2. **Vector Stores** (storage + search):
    - ChromaDB: Development, lightweight
-   - ProximaDB: Production, custom-built for scale
+   - LanceDB: Production, fast, disk-based
    - FAISS: Fast CPU-based search
 
 Mix and match for your needs:
@@ -35,12 +35,11 @@ config = EmbeddingConfig(
     embedding_model_name="all-MiniLM-L6-v2"
 )
 
-# Production: OpenAI embeddings + ProximaDB
+# Production: Local embeddings + LanceDB (recommended - fast, free, no API latency)
 config = EmbeddingConfig(
-    vector_store="proximadb",
-    embedding_model_type="openai",
-    embedding_model_name="text-embedding-3-small",
-    embedding_api_key=os.getenv("OPENAI_API_KEY")
+    vector_store="lancedb",
+    embedding_model_type="sentence-transformers",
+    embedding_model_name="all-MiniLM-L12-v2"  # 384-dim, ~8ms, optimal for code search
 )
 ```
 """

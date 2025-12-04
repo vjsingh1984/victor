@@ -63,31 +63,51 @@ class TestSentenceTransformersEmbedding:
     @pytest.mark.asyncio
     async def test_default_provider_is_sentence_transformers(self):
         """Test that default provider is sentence-transformers."""
+        from victor.embeddings.service import DEFAULT_EMBEDDING_MODEL
+
         selector = SemanticToolSelector()
         assert selector.embedding_provider == "sentence-transformers"
-        assert selector.embedding_model == "all-MiniLM-L6-v2"
+        # Default model comes from settings.unified_embedding_model
+        # which defaults to BAAI/bge-small-en-v1.5 (or all-MiniLM-L6-v2 as fallback)
+        assert selector.embedding_model in [DEFAULT_EMBEDDING_MODEL, "all-MiniLM-L6-v2"]
 
     @pytest.mark.asyncio
     async def test_sentence_transformer_lazy_loading(self, temp_cache_dir):
-        """Test that sentence-transformers model is loaded lazily."""
+        """Test that sentence-transformers model is loaded lazily via EmbeddingService."""
+        from victor.embeddings.service import EmbeddingService
+
+        # Reset the singleton to ensure clean state
+        EmbeddingService.reset_instance()
+
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
-        # Model should not be loaded initially
-        assert selector._sentence_model is None
+        # Model should not be loaded initially (EmbeddingService is lazy)
+        assert EmbeddingService._instance is None or not EmbeddingService._instance.is_loaded
 
-        # Mock sentence-transformers import (patch the import path)
-        with patch("sentence_transformers.SentenceTransformer") as MockST:
-            mock_model = MagicMock()
-            mock_model.encode.return_value = np.random.randn(384).astype(np.float32)
-            MockST.return_value = mock_model
+        # Mock the EmbeddingService's embed_text method
+        mock_embedding = np.random.randn(384).astype(np.float32)
+        with patch.object(EmbeddingService, "get_instance") as mock_get_instance:
+            mock_service = MagicMock()
+            mock_service.embed_text = AsyncMock(return_value=mock_embedding)
+            mock_get_instance.return_value = mock_service
 
-            # Get embedding should load model
+            # Get embedding should use EmbeddingService
             embedding = await selector._get_sentence_transformer_embedding("test text")
 
-            # Model should be loaded now
-            MockST.assert_called_once_with("all-MiniLM-L6-v2")
+            # EmbeddingService should have been called with some model name
+            mock_get_instance.assert_called_once()
+            # Model name comes from settings, which may be the new default or legacy
+            call_args = mock_get_instance.call_args
+            model_name = call_args.kwargs.get(
+                "model_name", call_args.args[0] if call_args.args else None
+            )
+            assert model_name is not None
+            mock_service.embed_text.assert_called_once_with("test text")
             assert embedding.shape == (384,)
             assert embedding.dtype == np.float32
+
+        # Reset singleton after test
+        EmbeddingService.reset_instance()
 
     @pytest.mark.asyncio
     async def test_sentence_transformer_embedding_dimensions(self, temp_cache_dir):
@@ -120,19 +140,24 @@ class TestSentenceTransformersEmbedding:
 
     @pytest.mark.asyncio
     async def test_async_execution_in_thread_pool(self, temp_cache_dir):
-        """Test that sentence-transformers runs in thread pool (non-blocking)."""
+        """Test that embedding runs async via EmbeddingService (non-blocking)."""
+        from victor.embeddings.service import EmbeddingService
+
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
-        with patch("sentence_transformers.SentenceTransformer") as MockST:
-            mock_model = MagicMock()
-            mock_model.encode.return_value = np.random.randn(384).astype(np.float32)
-            MockST.return_value = mock_model
+        # Mock the EmbeddingService's async embed_text method
+        mock_embedding = np.random.randn(384).astype(np.float32)
+        with patch.object(EmbeddingService, "get_instance") as mock_get_instance:
+            mock_service = MagicMock()
+            mock_service.embed_text = AsyncMock(return_value=mock_embedding)
+            mock_get_instance.return_value = mock_service
 
             # Should run without blocking
-            await selector._get_sentence_transformer_embedding("test text")
+            embedding = await selector._get_sentence_transformer_embedding("test text")
 
-            # Verify encode was called
-            mock_model.encode.assert_called_once_with("test text", convert_to_numpy=True)
+            # Verify async embed_text was called on the service
+            mock_service.embed_text.assert_called_once_with("test text")
+            assert np.array_equal(embedding, mock_embedding)
 
 
 class TestOllamaAPIEmbedding:
@@ -257,7 +282,7 @@ class TestToolSelectionWithEmbeddings:
             mock_model = MagicMock()
 
             # Return different embeddings for different inputs
-            def mock_encode(text, convert_to_numpy=False):
+            def mock_encode(text, convert_to_numpy=False, show_progress_bar=False):
                 if "mock" in text.lower():
                     return np.ones(384, dtype=np.float32)
                 else:
@@ -283,6 +308,418 @@ class TestToolSelectionWithEmbeddings:
                 tool_names = [t.name for t in selected_tools]
                 assert len(tool_names) > 0
                 assert "mock_tool" in tool_names
+
+
+class TestToolKnowledge:
+    """Tests for tool knowledge loading from YAML."""
+
+    def test_load_tool_knowledge_returns_dict(self):
+        """Test _load_tool_knowledge returns dictionary."""
+        # Reset class-level cache
+        SemanticToolSelector._tool_knowledge = None
+        SemanticToolSelector._tool_knowledge_loaded = False
+
+        result = SemanticToolSelector._load_tool_knowledge()
+        assert isinstance(result, dict)
+
+    def test_load_tool_knowledge_caches_result(self):
+        """Test _load_tool_knowledge caches result (covers lines 70-71)."""
+        # First call loads
+        SemanticToolSelector._tool_knowledge = None
+        SemanticToolSelector._tool_knowledge_loaded = False
+        result1 = SemanticToolSelector._load_tool_knowledge()
+
+        # Second call should return cached
+        result2 = SemanticToolSelector._load_tool_knowledge()
+        assert result1 is result2
+
+    def test_build_use_case_text_unknown_tool(self):
+        """Test _build_use_case_text returns empty for unknown tool (covers line 111)."""
+        result = SemanticToolSelector._build_use_case_text("unknown_tool_xyz_123")
+        assert result == ""
+
+    def test_build_use_case_text_known_tool(self):
+        """Test _build_use_case_text builds text for known tool (covers lines 113-131)."""
+        # Force load knowledge
+        SemanticToolSelector._tool_knowledge = None
+        SemanticToolSelector._tool_knowledge_loaded = False
+
+        # Use a tool that exists in the YAML
+        result = SemanticToolSelector._build_use_case_text("read_file")
+        # Should return empty string or use case text depending on YAML content
+        assert isinstance(result, str)
+
+
+class TestCacheOperations:
+    """Tests for cache loading and saving operations."""
+
+    @pytest.mark.asyncio
+    async def test_load_from_cache_file_not_exists(self, temp_cache_dir):
+        """Test _load_from_cache returns False when file doesn't exist (covers line 270-271)."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+        # Cache file doesn't exist
+        if selector.cache_file.exists():
+            selector.cache_file.unlink()
+
+        result = selector._load_from_cache("test_hash")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_load_from_cache_hash_mismatch(self, temp_cache_dir):
+        """Test _load_from_cache returns False on hash mismatch (covers lines 278-280)."""
+        import pickle
+
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        # Create a cache file with different hash
+        cache_data = {
+            "tools_hash": "different_hash",
+            "embedding_model": selector.embedding_model,
+            "embeddings": {},
+        }
+        with open(selector.cache_file, "wb") as f:
+            pickle.dump(cache_data, f)
+
+        result = selector._load_from_cache("expected_hash")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_load_from_cache_model_mismatch(self, temp_cache_dir):
+        """Test _load_from_cache returns False on model mismatch (covers lines 283-285)."""
+        import pickle
+
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        # Create a cache file with different model
+        cache_data = {
+            "tools_hash": "test_hash",
+            "embedding_model": "different_model",
+            "embeddings": {},
+        }
+        with open(selector.cache_file, "wb") as f:
+            pickle.dump(cache_data, f)
+
+        result = selector._load_from_cache("test_hash")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_load_from_cache_success(self, temp_cache_dir):
+        """Test _load_from_cache loads embeddings successfully (covers lines 287-291)."""
+        import pickle
+
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        # Create a valid cache file
+        test_embeddings = {"tool1": np.array([0.1, 0.2, 0.3], dtype=np.float32)}
+        cache_data = {
+            "tools_hash": "test_hash",
+            "embedding_model": selector.embedding_model,
+            "embeddings": test_embeddings,
+        }
+        with open(selector.cache_file, "wb") as f:
+            pickle.dump(cache_data, f)
+
+        result = selector._load_from_cache("test_hash")
+        assert result is True
+        assert "tool1" in selector._tool_embedding_cache
+
+    @pytest.mark.asyncio
+    async def test_load_from_cache_corrupt_file(self, temp_cache_dir):
+        """Test _load_from_cache handles corrupt cache (covers lines 293-295)."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        # Write corrupt data
+        with open(selector.cache_file, "wb") as f:
+            f.write(b"not valid pickle data")
+
+        result = selector._load_from_cache("test_hash")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_save_to_cache_success(self, temp_cache_dir):
+        """Test _save_to_cache saves embeddings (covers lines 303-314)."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+        selector._tool_embedding_cache = {"test_tool": np.array([0.1, 0.2], dtype=np.float32)}
+
+        selector._save_to_cache("test_hash")
+
+        assert selector.cache_file.exists()
+
+    @pytest.mark.asyncio
+    async def test_save_to_cache_failure(self, temp_cache_dir):
+        """Test _save_to_cache handles write error (covers lines 316-317)."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        # Make cache file read-only directory to cause write error
+        with patch("builtins.open", side_effect=PermissionError("No write access")):
+            # Should not raise, just log warning
+            selector._save_to_cache("test_hash")
+
+
+class TestFallbackAndMandatoryTools:
+    """Tests for fallback and mandatory tool selection."""
+
+    @pytest.mark.asyncio
+    async def test_get_fallback_tools(self, mock_tool_registry, temp_cache_dir):
+        """Test _get_fallback_tools returns common tools (covers lines 393-401)."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        # Add some common tools to registry
+        class ReadFileTool(BaseTool):
+            @property
+            def name(self):
+                return "read_file"
+
+            @property
+            def description(self):
+                return "Read file"
+
+            @property
+            def parameters(self):
+                return {}
+
+            async def execute(self, **kwargs):
+                return {}
+
+        mock_tool_registry.register(ReadFileTool())
+
+        result = selector._get_fallback_tools(mock_tool_registry, max_tools=2)
+        assert isinstance(result, list)
+
+    @pytest.mark.asyncio
+    async def test_get_mandatory_tools_with_commit(self, temp_cache_dir):
+        """Test _get_mandatory_tools returns git tools for commit (covers lines 412-418)."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        result = selector._get_mandatory_tools("please commit my changes")
+        assert "git_suggest_commit" in result or "execute_bash" in result
+
+    @pytest.mark.asyncio
+    async def test_get_mandatory_tools_with_test(self, temp_cache_dir):
+        """Test _get_mandatory_tools returns test tools."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        result = selector._get_mandatory_tools("run the tests")
+        assert "execute_bash" in result or "run_tests" in result
+
+    @pytest.mark.asyncio
+    async def test_get_mandatory_tools_no_keywords(self, temp_cache_dir):
+        """Test _get_mandatory_tools returns empty for generic query."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        result = selector._get_mandatory_tools("hello world")
+        # May return empty or minimal list
+        assert isinstance(result, list)
+
+
+class TestToolsHash:
+    """Tests for tool hash calculation."""
+
+    @pytest.mark.asyncio
+    async def test_calculate_tools_hash(self, mock_tool_registry, temp_cache_dir):
+        """Test _calculate_tools_hash returns consistent hash (covers lines 253-259)."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        hash1 = selector._calculate_tools_hash(mock_tool_registry)
+        hash2 = selector._calculate_tools_hash(mock_tool_registry)
+
+        assert hash1 == hash2
+        assert len(hash1) == 64  # SHA256 hex length
+
+
+class TestCostAwareSelection:
+    """Tests for cost-aware tool selection."""
+
+    @pytest.mark.asyncio
+    async def test_cost_aware_selection_enabled(self, temp_cache_dir):
+        """Test cost-aware selection is enabled by default."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+        assert selector.cost_aware_selection is True
+
+    @pytest.mark.asyncio
+    async def test_cost_penalty_factor_default(self, temp_cache_dir):
+        """Test cost penalty factor default value."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+        assert selector.cost_penalty_factor == 0.05
+
+    @pytest.mark.asyncio
+    async def test_cost_aware_selection_disabled(self, temp_cache_dir):
+        """Test cost-aware selection can be disabled."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir, cost_aware_selection=False)
+        assert selector.cost_aware_selection is False
+
+
+class TestConceptualQueryRouting:
+    """Tests for conceptual query detection and semantic search routing (GAP-003 fix)."""
+
+    @pytest.mark.asyncio
+    async def test_is_conceptual_query_detects_inheritance_patterns(self, temp_cache_dir):
+        """Test _is_conceptual_query detects inheritance-related queries."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        # Should detect inheritance queries
+        assert selector._is_conceptual_query("What classes inherit from BaseTool?")
+        assert selector._is_conceptual_query("Find all subclasses that inherit from Provider")
+        assert selector._is_conceptual_query("Show me classes that extend BaseClass")
+
+    @pytest.mark.asyncio
+    async def test_is_conceptual_query_detects_pattern_queries(self, temp_cache_dir):
+        """Test _is_conceptual_query detects pattern-related queries."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        # Should detect pattern queries (newly added patterns)
+        assert selector._is_conceptual_query("Find error handling patterns")
+        assert selector._is_conceptual_query("Show me exception handling code")
+        assert selector._is_conceptual_query("Find logging implementations")
+        assert selector._is_conceptual_query("Find caching patterns")
+
+    @pytest.mark.asyncio
+    async def test_is_conceptual_query_detects_related_queries(self, temp_cache_dir):
+        """Test _is_conceptual_query detects 'similar to' and 'related to' queries."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        assert selector._is_conceptual_query("Find code similar to the provider")
+        assert selector._is_conceptual_query("Show related to authentication")
+
+    @pytest.mark.asyncio
+    async def test_is_conceptual_query_rejects_non_conceptual(self, temp_cache_dir):
+        """Test _is_conceptual_query rejects non-conceptual queries."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        # Literal queries - should NOT be conceptual
+        assert not selector._is_conceptual_query("Read file victor/tools/base.py")
+        assert not selector._is_conceptual_query("List files in directory")
+        assert not selector._is_conceptual_query("Run git status")
+
+    @pytest.mark.asyncio
+    async def test_get_fallback_tools_conceptual_query(self, temp_cache_dir):
+        """Test _get_fallback_tools returns semantic search for conceptual queries."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        # Create a mock registry with semantic_code_search and read_file
+        registry = ToolRegistry()
+
+        class MockSemanticSearch(BaseTool):
+            @property
+            def name(self) -> str:
+                return "semantic_code_search"
+
+            @property
+            def description(self) -> str:
+                return "Semantic code search"
+
+            @property
+            def parameters(self) -> dict:
+                return {"type": "object", "properties": {}}
+
+            async def execute(self, **kwargs):
+                return {"success": True}
+
+        class MockReadFile(BaseTool):
+            @property
+            def name(self) -> str:
+                return "read_file"
+
+            @property
+            def description(self) -> str:
+                return "Read file"
+
+            @property
+            def parameters(self) -> dict:
+                return {"type": "object", "properties": {}}
+
+            async def execute(self, **kwargs):
+                return {"success": True}
+
+        class MockListDirectory(BaseTool):
+            @property
+            def name(self) -> str:
+                return "list_directory"
+
+            @property
+            def description(self) -> str:
+                return "List directory"
+
+            @property
+            def parameters(self) -> dict:
+                return {"type": "object", "properties": {}}
+
+            async def execute(self, **kwargs):
+                return {"success": True}
+
+        registry.register(MockSemanticSearch())
+        registry.register(MockReadFile())
+        registry.register(MockListDirectory())
+
+        # For conceptual query, should return semantic_code_search + read_file (NOT list_directory)
+        fallback = selector._get_fallback_tools(
+            registry, max_tools=5, query="What classes inherit from BaseTool?"
+        )
+
+        assert "semantic_code_search" in fallback
+        assert "read_file" in fallback
+        # list_directory should NOT be included in conceptual fallback
+        assert "list_directory" not in fallback
+
+    @pytest.mark.asyncio
+    async def test_get_fallback_tools_non_conceptual_query(self, temp_cache_dir):
+        """Test _get_fallback_tools returns common tools for non-conceptual queries."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        # Create a mock registry
+        registry = ToolRegistry()
+
+        class MockListDirectory(BaseTool):
+            @property
+            def name(self) -> str:
+                return "list_directory"
+
+            @property
+            def description(self) -> str:
+                return "List directory"
+
+            @property
+            def parameters(self) -> dict:
+                return {"type": "object", "properties": {}}
+
+            async def execute(self, **kwargs):
+                return {"success": True}
+
+        registry.register(MockListDirectory())
+
+        # For non-conceptual query, should use common fallback tools
+        fallback = selector._get_fallback_tools(
+            registry, max_tools=5, query="List files in directory"
+        )
+
+        # list_directory should be in non-conceptual fallback
+        assert "list_directory" in fallback
+
+    @pytest.mark.asyncio
+    async def test_conceptual_fallback_tools_constant_exists(self, temp_cache_dir):
+        """Test CONCEPTUAL_FALLBACK_TOOLS constant is defined with correct tools."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        # CONCEPTUAL_FALLBACK_TOOLS should exist and contain the right tools
+        assert hasattr(selector, "CONCEPTUAL_FALLBACK_TOOLS")
+        assert "semantic_code_search" in selector.CONCEPTUAL_FALLBACK_TOOLS
+        assert "read_file" in selector.CONCEPTUAL_FALLBACK_TOOLS
+        # Should NOT include exploratory tools that distract from semantic search
+        assert "list_directory" not in selector.CONCEPTUAL_FALLBACK_TOOLS
+
+    @pytest.mark.asyncio
+    async def test_conceptual_query_patterns_extended(self, temp_cache_dir):
+        """Test CONCEPTUAL_QUERY_PATTERNS includes new patterns for GAP-003."""
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+
+        # Check that new patterns are present
+        patterns = selector.CONCEPTUAL_QUERY_PATTERNS
+        assert "error handling" in patterns
+        assert "exception" in patterns
+        assert "logging" in patterns
+        assert "caching" in patterns
+        assert "similar to" in patterns
+        assert "related to" in patterns
 
 
 if __name__ == "__main__":

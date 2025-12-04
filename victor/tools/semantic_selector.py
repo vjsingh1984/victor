@@ -16,10 +16,15 @@
 
 import hashlib
 import logging
+import os
 import pickle
 import re
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Tuple
+
+# Disable tokenizers parallelism BEFORE importing sentence_transformers
+# This prevents "bad value(s) in fds_to_keep" errors in async contexts
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import httpx
 import numpy as np
@@ -27,6 +32,7 @@ import yaml
 
 from victor.providers.base import ToolDefinition
 from victor.tools.base import CostTier, ToolRegistry
+from victor.embeddings.service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -174,8 +180,8 @@ class SemanticToolSelector:
         # Tool version hash (to detect when tools change)
         self._tools_hash: Optional[str] = None
 
-        # Sentence-transformers model (loaded on demand)
-        self._sentence_model = None
+        # Note: sentence-transformers model is managed by shared EmbeddingService singleton
+        # This reduces memory usage by sharing the model with IntentClassifier
 
         # HTTP client for Ollama/vLLM/LMStudio
         self._client = None
@@ -358,7 +364,51 @@ class SemanticToolSelector:
         "review": ["code_review"],
         "document": ["generate_docs"],
         "docs": ["generate_docs", "analyze_docs"],
+        # File explanation requires reading the file first - prevents hallucination
+        "explain": ["read_file"],
+        "describe": ["read_file"],
+        "what does": ["read_file"],
+        # Count operations are more efficient with bash
+        "count": ["execute_bash", "list_directory"],
+        "how many": ["execute_bash", "list_directory"],
     }
+
+    # Conceptual query patterns that strongly prefer semantic_code_search over code_search
+    # When these patterns are detected, code_search is excluded from mandatory tools
+    CONCEPTUAL_QUERY_PATTERNS = [
+        "inherit",  # "classes that inherit from"
+        "implement",  # "classes implementing interface"
+        "extend",  # "classes that extend"
+        "subclass",  # "subclasses of"
+        "pattern",  # "find patterns", "error handling patterns"
+        "similar",  # "similar code", "similar to"
+        "related",  # "related functionality"
+        "usage",  # "find usages", "usage patterns"
+        "example",  # "examples of", "example code"
+        "all classes",  # "find all classes"
+        "all functions",  # "all functions that"
+        "all methods",  # "all methods"
+        "how is",  # "how is X done"
+        "where is",  # "where is X implemented"
+        "what classes",  # "what classes"
+        "which files",  # "which files handle"
+        "error handling",  # conceptual search
+        "exception",  # conceptual search
+        "try catch",  # conceptual search
+        "logging",  # conceptual search
+        "caching",  # conceptual search
+        "authentication",  # conceptual search
+        "validation",  # conceptual search
+        "similar to",  # conceptual search
+        "related to",  # conceptual search
+    ]
+
+    # Tools for conceptual queries - forces semantic_code_search as primary
+    # Excludes list_directory to prevent LLM from exploring instead of searching
+    CONCEPTUAL_FALLBACK_TOOLS: List[str] = [
+        "semantic_code_search",  # MUST be first - primary tool for conceptual queries
+        "read_file",  # To examine results after search
+    ]
 
     # Common fallback tools - used when semantic selection returns too few results
     # These are the most universally useful tools
@@ -372,19 +422,37 @@ class SemanticToolSelector:
         "edit_file",
     ]
 
-    def _get_fallback_tools(self, tools: "ToolRegistry", max_tools: int = 5) -> List[str]:
+    def _get_fallback_tools(
+        self, tools: "ToolRegistry", max_tools: int = 5, query: str = ""
+    ) -> List[str]:
         """Get fallback tools when semantic selection returns too few results.
 
         Instead of broadcasting ALL tools (which wastes tokens), return a
         curated list of common, universally useful tools.
 
+        For conceptual queries (inheritance, patterns, etc.), uses a restricted
+        tool set that forces semantic_code_search as the primary tool.
+
         Args:
             tools: Tool registry
             max_tools: Maximum fallback tools to return
+            query: User query (used to detect conceptual queries)
 
         Returns:
             List of fallback tool names
         """
+        # For conceptual queries, use restricted tool set that forces semantic search
+        if query and self._is_conceptual_query(query):
+            fallback = []
+            for tool_name in self.CONCEPTUAL_FALLBACK_TOOLS:
+                if tools.is_tool_enabled(tool_name) and tools.get(tool_name):
+                    fallback.append(tool_name)
+                if len(fallback) >= max_tools:
+                    break
+            logger.info(f"Using CONCEPTUAL fallback tools ({len(fallback)}): {fallback}")
+            return fallback
+
+        # Standard fallback for non-conceptual queries
         fallback = []
         for tool_name in self.COMMON_FALLBACK_TOOLS:
             if tools.is_tool_enabled(tool_name) and tools.get(tool_name):
@@ -394,6 +462,22 @@ class SemanticToolSelector:
 
         logger.info(f"Using fallback tools ({len(fallback)}): {fallback}")
         return fallback
+
+    def _is_conceptual_query(self, query: str) -> bool:
+        """Check if query is conceptual and should prefer semantic_code_search.
+
+        Args:
+            query: User query
+
+        Returns:
+            True if query matches conceptual patterns
+        """
+        query_lower = query.lower()
+        for pattern in self.CONCEPTUAL_QUERY_PATTERNS:
+            if pattern in query_lower:
+                logger.debug(f"Conceptual query detected via pattern: '{pattern}'")
+                return True
+        return False
 
     def _get_mandatory_tools(self, query: str) -> List[str]:
         """Get tools that MUST be included based on keywords.
@@ -407,10 +491,22 @@ class SemanticToolSelector:
         mandatory = []
         query_lower = query.lower()
 
+        # Check if this is a conceptual query that should strongly prefer semantic search
+        is_conceptual = self._is_conceptual_query(query)
+
         for keyword, tools in self.MANDATORY_TOOL_KEYWORDS.items():
             if self._keyword_in_text(query_lower, keyword):
-                mandatory.extend(tools)
-                logger.debug(f"Mandatory tools for '{keyword}': {tools}")
+                # For conceptual queries, exclude code_search from search-related tools
+                # to force the LLM to use semantic_code_search instead
+                if is_conceptual and keyword in ["search", "find"]:
+                    filtered_tools = [t for t in tools if t != "code_search"]
+                    mandatory.extend(filtered_tools)
+                    logger.debug(
+                        f"Mandatory tools for '{keyword}' (conceptual, excluding code_search): {filtered_tools}"
+                    )
+                else:
+                    mandatory.extend(tools)
+                    logger.debug(f"Mandatory tools for '{keyword}': {tools}")
 
         return list(set(mandatory))
 
@@ -453,8 +549,14 @@ class SemanticToolSelector:
 
         # Code navigation
         if any(kw in query_lower for kw in ["find", "locate", "search", "where"]):
-            relevant_tools.extend(self.TOOL_CATEGORIES.get("code_intel", []))
-            logger.debug("Code navigation detected")
+            code_intel_tools = self.TOOL_CATEGORIES.get("code_intel", [])
+            # For conceptual queries, exclude code_search to prefer semantic_code_search
+            if self._is_conceptual_query(query):
+                code_intel_tools = [t for t in code_intel_tools if t != "code_search"]
+                logger.debug("Code navigation detected (conceptual - excluding code_search)")
+            else:
+                logger.debug("Code navigation detected")
+            relevant_tools.extend(code_intel_tools)
 
         # Generation/creation
         if any(kw in query_lower for kw in ["create", "generate", "make", "write new"]):
@@ -916,7 +1018,9 @@ class SemanticToolSelector:
         # Phase 8: Smart fallback - if too few tools selected, add common fallback tools
         MIN_TOOLS_THRESHOLD = 2
         if len(selected_tools) < MIN_TOOLS_THRESHOLD:
-            fallback_names = self._get_fallback_tools(tools, max_tools - len(selected_tools))
+            fallback_names = self._get_fallback_tools(
+                tools, max_tools - len(selected_tools), query=user_message
+            )
             for fallback_name in fallback_names:
                 if fallback_name not in selected_names:
                     fallback_tool = tools.get(fallback_name)
@@ -943,9 +1047,8 @@ class SemanticToolSelector:
         # Phase 6: Generate and store cost warnings for high-cost tools
         self._last_cost_warnings = self._generate_cost_warnings(selected_tools, tools)
         if self._last_cost_warnings:
-            logger.warning(
-                f"Cost warnings for selected tools: {len(self._last_cost_warnings)} high-cost tools"
-            )
+            # Use INFO level - this is informational, not a production warning
+            logger.info(f"Cost info: {len(self._last_cost_warnings)} high-cost tools selected")
 
         # Convert to ToolDefinition
         return [
@@ -1041,7 +1144,9 @@ class SemanticToolSelector:
         # This prevents broadcasting ALL tools (which wastes tokens)
         MIN_TOOLS_THRESHOLD = 2
         if len(selected_tools) < MIN_TOOLS_THRESHOLD:
-            fallback_names = self._get_fallback_tools(tools, max_tools - len(selected_tools))
+            fallback_names = self._get_fallback_tools(
+                tools, max_tools - len(selected_tools), query=user_message
+            )
             for fallback_name in fallback_names:
                 if fallback_name not in selected_names:
                     fallback_tool = tools.get(fallback_name)
@@ -1063,9 +1168,8 @@ class SemanticToolSelector:
         # Phase 6: Generate and store cost warnings for high-cost tools
         self._last_cost_warnings = self._generate_cost_warnings(selected_tools, tools)
         if self._last_cost_warnings:
-            logger.warning(
-                f"Cost warnings for selected tools: {len(self._last_cost_warnings)} high-cost tools"
-            )
+            # Use INFO level - this is informational, not a production warning
+            logger.info(f"Cost info: {len(self._last_cost_warnings)} high-cost tools selected")
 
         # Convert to ToolDefinition
         return [
@@ -1090,7 +1194,10 @@ class SemanticToolSelector:
             raise NotImplementedError(f"Provider {self.embedding_provider} not yet supported")
 
     async def _get_sentence_transformer_embedding(self, text: str) -> np.ndarray:
-        """Get embedding from sentence-transformers (local, fast).
+        """Get embedding from sentence-transformers using shared EmbeddingService.
+
+        Uses the shared EmbeddingService singleton for memory efficiency
+        (single model instance shared with IntentClassifier and other components).
 
         Args:
             text: Text to embed
@@ -1099,31 +1206,12 @@ class SemanticToolSelector:
             Embedding vector as numpy array
         """
         try:
-            # Lazy load sentence-transformers model
-            if self._sentence_model is None:
-                try:
-                    from sentence_transformers import SentenceTransformer
-
-                    logger.info(f"Loading sentence-transformers model: {self.embedding_model}")
-                    self._sentence_model = SentenceTransformer(self.embedding_model)
-                    logger.info("Model loaded successfully (local, ~5ms per embedding)")
-                except ImportError:
-                    raise ImportError(
-                        "sentence-transformers not installed. "
-                        "Install with: pip install sentence-transformers"
-                    )
-
-            # Run in thread pool to avoid blocking event loop
-            import asyncio
-
-            loop = asyncio.get_event_loop()
-            embedding = await loop.run_in_executor(
-                None, lambda: self._sentence_model.encode(text, convert_to_numpy=True)
-            )
-            return embedding.astype(np.float32)
+            # Use shared embedding service (singleton)
+            embedding_service = EmbeddingService.get_instance(model_name=self.embedding_model)
+            return await embedding_service.embed_text(text)
 
         except Exception as e:
-            logger.warning(f"Failed to get embedding from sentence-transformers: {e}")
+            logger.warning(f"Failed to get embedding from EmbeddingService: {e}")
             # Fall back to random embedding (better than crashing)
             logger.warning("Falling back to random embedding")
             return np.random.randn(384).astype(np.float32)

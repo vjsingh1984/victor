@@ -20,7 +20,10 @@ allowing other MCP clients to use Victor's capabilities.
 
 import json
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from victor.agent.orchestrator import AgentOrchestrator
 
 from victor.mcp.protocol import (
     MCPCapabilities,

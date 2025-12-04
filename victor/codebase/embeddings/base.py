@@ -16,7 +16,7 @@
 
 This module separates concerns:
 1. **Embedding Model**: Generates vectors from text (sentence-transformers, OpenAI, etc.)
-2. **Vector Store**: Stores and searches vectors (ChromaDB, ProximaDB, FAISS, etc.)
+2. **Vector Store**: Stores and searches vectors (ChromaDB, LanceDB, FAISS, etc.)
 """
 
 from abc import ABC, abstractmethod
@@ -37,7 +37,7 @@ class EmbeddingConfig(BaseModel):
     # Vector Store Configuration
     vector_store: str = Field(
         default="lancedb",
-        description="Vector store provider (lancedb, chromadb, proximadb) - LanceDB recommended for performance",
+        description="Vector store provider (lancedb, chromadb) - LanceDB recommended for performance",
     )
     persist_directory: Optional[str] = Field(
         default=None,
@@ -85,11 +85,11 @@ class BaseEmbeddingProvider(ABC):
 
     Separation of concerns:
     - Embedding Model: text -> vector (sentence-transformers, OpenAI, etc.)
-    - Vector Store: vector storage/search (ChromaDB, ProximaDB, FAISS, etc.)
+    - Vector Store: vector storage/search (ChromaDB, LanceDB, FAISS, etc.)
 
     This allows mixing and matching:
     - OpenAI embeddings + FAISS storage
-    - Sentence-transformers + ProximaDB storage
+    - Sentence-transformers + LanceDB storage
     - Cohere embeddings + ChromaDB storage
     """
 
@@ -192,6 +192,21 @@ class BaseEmbeddingProvider(ABC):
 
         Args:
             doc_id: Document identifier to delete
+        """
+        pass
+
+    @abstractmethod
+    async def delete_by_file(self, file_path: str) -> int:
+        """Delete all documents from a specific file.
+
+        Used for incremental updates - when a file changes, we delete all
+        its chunks and re-index.
+
+        Args:
+            file_path: Relative file path to delete documents for
+
+        Returns:
+            Number of documents deleted
         """
         pass
 

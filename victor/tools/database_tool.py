@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Database tool for SQL operations and schema inspection.
+"""Unified database tool for SQL operations and schema inspection.
 
+Consolidates all database operations into a single tool for better token efficiency.
 Supports multiple database types:
 - SQLite (built-in, no dependencies)
 - PostgreSQL (requires psycopg2)
@@ -21,14 +22,16 @@ Supports multiple database types:
 - SQL Server (requires pyodbc)
 
 Features:
+- Connect/disconnect to databases
 - Execute SQL queries
 - Inspect database schemas
-- Table information
+- List tables
+- Describe table structure
 - Safe query execution with validation
 """
 
 import sqlite3
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from victor.tools.decorators import tool
 
@@ -169,36 +172,15 @@ async def _connect_sqlserver(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": f"SQL Server connection failed: {str(e)}"}
 
 
-@tool
-async def database_connect(
+async def _do_connect(
     database: str,
-    db_type: str = "sqlite",
-    host: Optional[str] = None,
-    port: Optional[int] = None,
-    username: Optional[str] = None,
-    password: Optional[str] = None,
+    db_type: str,
+    host: Optional[str],
+    port: Optional[int],
+    username: Optional[str],
+    password: Optional[str],
 ) -> Dict[str, Any]:
-    """
-    Connect to a database.
-
-    Supports SQLite, PostgreSQL, MySQL, and SQL Server. Returns a connection_id
-    that must be used for subsequent operations.
-
-    Args:
-        database: Database name or path (for SQLite).
-        db_type: Database type - 'sqlite', 'postgresql', 'mysql', or 'sqlserver' (default: 'sqlite').
-        host: Database host for remote databases (default: 'localhost').
-        port: Database port (defaults vary by db_type).
-        username: Database username for authenticated connections.
-        password: Database password for authenticated connections.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether connection succeeded
-        - connection_id: ID to use for subsequent operations
-        - message: Status message
-        - error: Error message if failed
-    """
+    """Internal connect handler."""
     if db_type == "sqlite":
         return await _connect_sqlite(database)
     elif db_type == "postgresql":
@@ -229,34 +211,12 @@ async def database_connect(
         return {"success": False, "error": f"Unsupported database type: {db_type}"}
 
 
-@tool
-async def database_query(
-    connection_id: str, sql: str, limit: Optional[int] = None
-) -> Dict[str, Any]:
-    """
-    Execute a SQL query.
-
-    Supports SELECT queries (returns results) and modification queries
-    (INSERT/UPDATE/DELETE - if allowed). Read-only by default for safety.
-
-    Args:
-        connection_id: Connection ID from database_connect.
-        sql: SQL query to execute.
-        limit: Maximum rows to return (default: configured max_rows).
-
-    Returns:
-        Dictionary containing:
-        - success: Whether query succeeded
-        - columns: Column names (for SELECT)
-        - rows: Query results as list of dicts (for SELECT)
-        - count: Number of rows returned
-        - rows_affected: Number of rows affected (for modifications)
-        - error: Error message if failed
-    """
+async def _do_query(connection_id: str, sql: str, limit: Optional[int] = None) -> Dict[str, Any]:
+    """Internal query handler."""
     if not connection_id or connection_id not in _connections:
         return {
             "success": False,
-            "error": "Invalid or missing connection_id. Use database_connect first.",
+            "error": "Invalid or missing connection_id. Use action='connect' first.",
         }
 
     if not sql:
@@ -269,7 +229,8 @@ async def database_query(
             if pattern in sql_upper:
                 return {
                     "success": False,
-                    "error": f"Modification operations not allowed: {pattern}. Call set_database_config(allow_modifications=True) to enable.",
+                    "error": f"Modification operations not allowed: {pattern}. "
+                    "Call set_database_config(allow_modifications=True) to enable.",
                 }
 
     try:
@@ -312,21 +273,8 @@ async def database_query(
         return {"success": False, "error": f"Query failed: {str(e)}"}
 
 
-@tool
-async def database_tables(connection_id: str) -> Dict[str, Any]:
-    """
-    List all tables in the database.
-
-    Args:
-        connection_id: Connection ID from database_connect.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - tables: List of table names
-        - count: Number of tables
-        - error: Error message if failed
-    """
+async def _do_tables(connection_id: str) -> Dict[str, Any]:
+    """Internal list tables handler."""
     if not connection_id or connection_id not in _connections:
         return {"success": False, "error": "Invalid or missing connection_id"}
 
@@ -355,26 +303,8 @@ async def database_tables(connection_id: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Failed to list tables: {str(e)}"}
 
 
-@tool
-async def database_describe(connection_id: str, table: str) -> Dict[str, Any]:
-    """
-    Describe a table's structure.
-
-    Returns column information including names, types, nullable status,
-    and primary key information.
-
-    Args:
-        connection_id: Connection ID from database_connect.
-        table: Name of the table to describe.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - table: Table name
-        - columns: List of column info dicts
-        - count: Number of columns
-        - error: Error message if failed
-    """
+async def _do_describe(connection_id: str, table: str) -> Dict[str, Any]:
+    """Internal describe table handler."""
     if not connection_id or connection_id not in _connections:
         return {"success": False, "error": "Invalid or missing connection_id"}
 
@@ -434,38 +364,22 @@ async def database_describe(connection_id: str, table: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Failed to describe table: {str(e)}"}
 
 
-@tool
-async def database_schema(connection_id: str) -> Dict[str, Any]:
-    """
-    Get complete database schema.
-
-    Returns information about all tables and their columns.
-    This is a convenience function that combines database_tables
-    and database_describe for all tables.
-
-    Args:
-        connection_id: Connection ID from database_connect.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - tables: List of table info dicts (name and columns)
-        - error: Error message if failed
-    """
+async def _do_schema(connection_id: str) -> Dict[str, Any]:
+    """Internal get schema handler."""
     if not connection_id or connection_id not in _connections:
         return {"success": False, "error": "Invalid or missing connection_id"}
 
     # Get list of tables first
-    tables_result = await database_tables(connection_id)
+    tables_result = await _do_tables(connection_id)
     if not tables_result["success"]:
         return tables_result
 
     # Get schema for each table
-    schema_info = {"tables": []}
+    schema_info: Dict[str, List[Dict[str, Any]]] = {"tables": []}
 
     try:
         for table in tables_result["tables"]:
-            describe_result = await database_describe(connection_id, table)
+            describe_result = await _do_describe(connection_id, table)
             if describe_result["success"]:
                 schema_info["tables"].append({"name": table, "columns": describe_result["columns"]})
 
@@ -475,22 +389,8 @@ async def database_schema(connection_id: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Schema inspection failed: {str(e)}"}
 
 
-@tool
-async def database_disconnect(connection_id: str) -> Dict[str, Any]:
-    """
-    Disconnect from database.
-
-    Closes the connection and removes it from the connection pool.
-
-    Args:
-        connection_id: Connection ID from database_connect.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether disconnection succeeded
-        - message: Status message
-        - error: Error message if failed
-    """
+async def _do_disconnect(connection_id: str) -> Dict[str, Any]:
+    """Internal disconnect handler."""
     if not connection_id or connection_id not in _connections:
         return {"success": False, "error": "Invalid or missing connection_id"}
 
@@ -505,17 +405,107 @@ async def database_disconnect(connection_id: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Disconnect failed: {str(e)}"}
 
 
-# Keep class for backward compatibility
-class DatabaseTool:
-    """Deprecated: Use individual database_* functions instead."""
+@tool
+async def database(
+    action: str,
+    database: Optional[str] = None,
+    db_type: str = "sqlite",
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    username: Optional[str] = None,
+    password: Optional[str] = None,
+    connection_id: Optional[str] = None,
+    sql: Optional[str] = None,
+    table: Optional[str] = None,
+    limit: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Unified database tool for SQL operations. Supports SQLite, PostgreSQL, MySQL, SQL Server.
 
-    def __init__(self, allow_modifications: bool = False, max_rows: int = 100):
-        """Initialize - deprecated."""
-        import warnings
+    Actions:
+    - connect: Connect to a database
+    - query: Execute SQL queries
+    - tables: List all tables
+    - describe: Describe a table's structure
+    - schema: Get complete database schema
+    - disconnect: Close connection
 
-        warnings.warn(
-            "DatabaseTool class is deprecated. Use database_* functions instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        set_database_config(allow_modifications, max_rows)
+    Args:
+        action: Operation to perform - 'connect', 'query', 'tables', 'describe', 'schema', 'disconnect'.
+        database: Database name or path (required for connect).
+        db_type: Database type - 'sqlite', 'postgresql', 'mysql', 'sqlserver' (default: 'sqlite').
+        host: Database host for remote databases (default: 'localhost').
+        port: Database port (defaults vary by db_type).
+        username: Database username for authenticated connections.
+        password: Database password for authenticated connections.
+        connection_id: Connection ID from previous connect (required for query/tables/describe/schema/disconnect).
+        sql: SQL query to execute (required for query action).
+        table: Table name (required for describe action).
+        limit: Maximum rows to return for query (default: 100).
+
+    Returns:
+        Dictionary containing:
+        - success: Whether operation succeeded
+        - For connect: connection_id, message
+        - For query: columns, rows, count
+        - For tables: tables list, count
+        - For describe: table name, columns list
+        - For schema: tables with their columns
+        - error: Error message if failed
+
+    Example:
+        # Connect to PostgreSQL
+        database(action="connect", database="mydb", db_type="postgresql",
+                host="localhost", username="user", password="pass")
+
+        # Query with returned connection_id
+        database(action="query", connection_id="postgresql_123",
+                sql="SELECT * FROM users LIMIT 10")
+
+        # List tables
+        database(action="tables", connection_id="postgresql_123")
+
+        # Describe table
+        database(action="describe", connection_id="postgresql_123", table="users")
+    """
+    action_lower = action.lower().strip()
+
+    if action_lower == "connect":
+        if not database:
+            return {"success": False, "error": "Missing required parameter: database"}
+        return await _do_connect(database, db_type, host, port, username, password)
+
+    elif action_lower == "query":
+        if not connection_id:
+            return {"success": False, "error": "Missing required parameter: connection_id"}
+        if not sql:
+            return {"success": False, "error": "Missing required parameter: sql"}
+        return await _do_query(connection_id, sql, limit)
+
+    elif action_lower == "tables":
+        if not connection_id:
+            return {"success": False, "error": "Missing required parameter: connection_id"}
+        return await _do_tables(connection_id)
+
+    elif action_lower == "describe":
+        if not connection_id:
+            return {"success": False, "error": "Missing required parameter: connection_id"}
+        if not table:
+            return {"success": False, "error": "Missing required parameter: table"}
+        return await _do_describe(connection_id, table)
+
+    elif action_lower == "schema":
+        if not connection_id:
+            return {"success": False, "error": "Missing required parameter: connection_id"}
+        return await _do_schema(connection_id)
+
+    elif action_lower == "disconnect":
+        if not connection_id:
+            return {"success": False, "error": "Missing required parameter: connection_id"}
+        return await _do_disconnect(connection_id)
+
+    else:
+        return {
+            "success": False,
+            "error": f"Unknown action: {action}. Valid actions: connect, query, tables, describe, schema, disconnect",
+        }

@@ -164,3 +164,11 @@ ui/node_modules/
 # Victor internal test files
 victor/fibonacci.py
 victor/test_*.py
+
+# VS Code extension build artifacts and test caches
+vscode-victor/node_modules/
+vscode-victor/out/
+vscode-victor/.vscode-test/
+vscode-victor/*.vsix
+# Project-local embedding storage
+.embeddings/

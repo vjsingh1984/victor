@@ -401,3 +401,165 @@ class TestLoadSettings:
         assert isinstance(settings, Settings)
         # Note: default_provider is "ollama" in Settings class
         assert settings.default_provider == "ollama"
+
+
+class TestToolSelectionValidation:
+    """Tests for ProfileConfig tool_selection validation."""
+
+    def test_tool_selection_none(self):
+        """Test tool_selection with None value (covers line 65-66)."""
+        config = ProfileConfig(
+            provider="ollama",
+            model="test",
+            tool_selection=None,
+        )
+        assert config.tool_selection is None
+
+    def test_tool_selection_tier_preset_tiny(self):
+        """Test tool_selection with tiny tier preset (covers lines 69-84)."""
+        config = ProfileConfig(
+            provider="ollama",
+            model="test",
+            tool_selection={"model_size_tier": "tiny"},
+        )
+        assert config.tool_selection["base_threshold"] == 0.35
+        assert config.tool_selection["base_max_tools"] == 5
+
+    def test_tool_selection_tier_preset_small(self):
+        """Test tool_selection with small tier preset."""
+        config = ProfileConfig(
+            provider="ollama",
+            model="test",
+            tool_selection={"model_size_tier": "small"},
+        )
+        assert config.tool_selection["base_threshold"] == 0.25
+        assert config.tool_selection["base_max_tools"] == 7
+
+    def test_tool_selection_tier_preset_medium(self):
+        """Test tool_selection with medium tier preset."""
+        config = ProfileConfig(
+            provider="ollama",
+            model="test",
+            tool_selection={"model_size_tier": "medium"},
+        )
+        assert config.tool_selection["base_threshold"] == 0.20
+        assert config.tool_selection["base_max_tools"] == 10
+
+    def test_tool_selection_tier_preset_large(self):
+        """Test tool_selection with large tier preset."""
+        config = ProfileConfig(
+            provider="ollama",
+            model="test",
+            tool_selection={"model_size_tier": "large"},
+        )
+        assert config.tool_selection["base_threshold"] == 0.15
+        assert config.tool_selection["base_max_tools"] == 12
+
+    def test_tool_selection_tier_preset_cloud(self):
+        """Test tool_selection with cloud tier preset."""
+        config = ProfileConfig(
+            provider="anthropic",
+            model="claude",
+            tool_selection={"model_size_tier": "cloud"},
+        )
+        assert config.tool_selection["base_threshold"] == 0.18
+        assert config.tool_selection["base_max_tools"] == 10
+
+    def test_tool_selection_tier_preset_with_override(self):
+        """Test tier preset values can be overridden manually (covers line 83-84)."""
+        config = ProfileConfig(
+            provider="ollama",
+            model="test",
+            tool_selection={
+                "model_size_tier": "small",
+                "base_threshold": 0.30,  # Override preset
+            },
+        )
+        # Override should take precedence
+        assert config.tool_selection["base_threshold"] == 0.30
+        assert config.tool_selection["base_max_tools"] == 7  # From preset
+
+    def test_tool_selection_invalid_threshold_type(self):
+        """Test tool_selection with invalid threshold type (covers lines 89-90)."""
+        import pytest
+
+        with pytest.raises(ValueError, match="base_threshold must be a number"):
+            ProfileConfig(
+                provider="ollama",
+                model="test",
+                tool_selection={"base_threshold": "not_a_number"},
+            )
+
+    def test_tool_selection_threshold_out_of_range(self):
+        """Test tool_selection with threshold out of range (covers lines 91-92)."""
+        import pytest
+
+        with pytest.raises(ValueError, match="base_threshold must be between 0.0 and 1.0"):
+            ProfileConfig(
+                provider="ollama",
+                model="test",
+                tool_selection={"base_threshold": 1.5},
+            )
+
+    def test_tool_selection_invalid_max_tools_type(self):
+        """Test tool_selection with invalid max_tools type (covers lines 97-98)."""
+        import pytest
+
+        with pytest.raises(ValueError, match="base_max_tools must be an integer"):
+            ProfileConfig(
+                provider="ollama",
+                model="test",
+                tool_selection={"base_max_tools": "not_an_int"},
+            )
+
+    def test_tool_selection_max_tools_negative(self):
+        """Test tool_selection with negative max_tools (covers lines 99-100)."""
+        import pytest
+
+        with pytest.raises(ValueError, match="base_max_tools must be positive"):
+            ProfileConfig(
+                provider="ollama",
+                model="test",
+                tool_selection={"base_max_tools": 0},
+            )
+
+    def test_tool_selection_valid_custom_values(self):
+        """Test tool_selection with valid custom values (covers lines 87-88, 94-96)."""
+        config = ProfileConfig(
+            provider="ollama",
+            model="test",
+            tool_selection={
+                "base_threshold": 0.5,
+                "base_max_tools": 8,
+            },
+        )
+        assert config.tool_selection["base_threshold"] == 0.5
+        assert config.tool_selection["base_max_tools"] == 8
+
+
+class TestSettingsExtra:
+    """Additional Settings tests for coverage."""
+
+    def test_settings_semantic_tool_selection(self):
+        """Test semantic tool selection settings."""
+        settings = Settings(use_semantic_tool_selection=True)
+        assert settings.use_semantic_tool_selection is True
+
+    def test_settings_airgapped_mode(self):
+        """Test airgapped mode settings."""
+        settings = Settings(airgapped_mode=True)
+        assert settings.airgapped_mode is True
+
+    def test_settings_tool_cache_settings(self):
+        """Test tool cache settings."""
+        settings = Settings(
+            tool_cache_enabled=True,
+            tool_cache_ttl=600,
+        )
+        assert settings.tool_cache_enabled is True
+        assert settings.tool_cache_ttl == 600
+
+    def test_settings_analytics_disabled(self):
+        """Test analytics disabled setting."""
+        settings = Settings(analytics_enabled=False)
+        assert settings.analytics_enabled is False

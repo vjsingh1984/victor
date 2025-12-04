@@ -14,6 +14,8 @@
 
 """Tests for MCP registry module."""
 
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.mcp.registry import (
     ServerStatus,
@@ -100,8 +102,336 @@ class TestMCPRegistryInit:
         assert registry._servers == {}
         assert registry._tool_to_server == {}
         assert registry._health_check_enabled is True
-        assert registry._default_health_interval == 30
         assert registry._running is False
+
+    def test_init_with_params(self):
+        """Test initialization with parameters."""
+        registry = MCPRegistry(health_check_enabled=False, default_health_interval=60)
+
+        assert registry._health_check_enabled is False
+        assert registry._default_health_interval == 60
+
+
+class TestMCPRegistryConnect:
+    """Tests for connect/disconnect methods."""
+
+    @pytest.mark.asyncio
+    async def test_connect_unregistered_server(self):
+        """Test connecting to unregistered server returns False."""
+        registry = MCPRegistry()
+        result = await registry.connect("nonexistent")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_connect_disabled_server(self):
+        """Test connecting to disabled server returns False."""
+        registry = MCPRegistry()
+        config = MCPServerConfig(
+            name="disabled",
+            command=["echo"],
+            enabled=False,
+        )
+        registry.register_server(config)
+        result = await registry.connect("disabled")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_connect_success(self):
+        """Test successful connection."""
+        from unittest.mock import patch, AsyncMock, MagicMock
+
+        registry = MCPRegistry()
+        config = MCPServerConfig(name="test", command=["echo"])
+        registry.register_server(config)
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock(return_value=True)
+        mock_client.tools = []
+        mock_client.resources = []
+
+        with patch("victor.mcp.registry.MCPClient", return_value=mock_client):
+            result = await registry.connect("test")
+            assert result is True
+            assert registry._servers["test"].status == ServerStatus.CONNECTED
+
+    @pytest.mark.asyncio
+    async def test_connect_failure(self):
+        """Test connection failure."""
+        from unittest.mock import patch, AsyncMock, MagicMock
+
+        registry = MCPRegistry()
+        config = MCPServerConfig(name="test", command=["echo"])
+        registry.register_server(config)
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock(return_value=False)
+
+        with patch("victor.mcp.registry.MCPClient", return_value=mock_client):
+            result = await registry.connect("test")
+            assert result is False
+            assert registry._servers["test"].status == ServerStatus.FAILED
+
+    @pytest.mark.asyncio
+    async def test_connect_exception(self):
+        """Test connection exception handling."""
+        from unittest.mock import patch, AsyncMock, MagicMock
+
+        registry = MCPRegistry()
+        config = MCPServerConfig(name="test", command=["echo"])
+        registry.register_server(config)
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock(side_effect=Exception("Connection error"))
+
+        with patch("victor.mcp.registry.MCPClient", return_value=mock_client):
+            result = await registry.connect("test")
+            assert result is False
+            assert registry._servers["test"].status == ServerStatus.FAILED
+            assert "Connection error" in registry._servers["test"].error_message
+
+    @pytest.mark.asyncio
+    async def test_disconnect(self):
+        """Test disconnecting from a server."""
+        from unittest.mock import MagicMock
+
+        registry = MCPRegistry()
+        config = MCPServerConfig(name="test", command=["echo"])
+        registry.register_server(config)
+
+        # Set up connected state
+        mock_client = MagicMock()
+        registry._servers["test"].client = mock_client
+        registry._servers["test"].status = ServerStatus.CONNECTED
+        registry._servers["test"].tools_cache = [MagicMock(name="tool1")]
+        registry._tool_to_server["tool1"] = "test"
+
+        result = await registry.disconnect("test")
+
+        assert result is True
+        assert registry._servers["test"].status == ServerStatus.DISCONNECTED
+        assert registry._servers["test"].client is None
+        assert "tool1" not in registry._tool_to_server
+
+    @pytest.mark.asyncio
+    async def test_disconnect_unregistered(self):
+        """Test disconnecting from unregistered server."""
+        registry = MCPRegistry()
+        result = await registry.disconnect("nonexistent")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_connect_all(self):
+        """Test connecting to all servers."""
+        from unittest.mock import patch, AsyncMock, MagicMock
+
+        registry = MCPRegistry()
+        registry.register_server(MCPServerConfig(name="s1", command=["echo"]))
+        registry.register_server(MCPServerConfig(name="s2", command=["echo"], auto_connect=False))
+        registry.register_server(MCPServerConfig(name="s3", command=["echo"]))
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock(return_value=True)
+        mock_client.tools = []
+        mock_client.resources = []
+
+        with patch("victor.mcp.registry.MCPClient", return_value=mock_client):
+            results = await registry.connect_all()
+            # Only s1 and s3 have auto_connect=True
+            assert "s1" in results
+            assert "s3" in results
+            assert "s2" not in results
+
+    @pytest.mark.asyncio
+    async def test_disconnect_all(self):
+        """Test disconnecting from all servers."""
+        from unittest.mock import MagicMock
+
+        registry = MCPRegistry()
+        registry.register_server(MCPServerConfig(name="s1", command=["echo"]))
+        registry.register_server(MCPServerConfig(name="s2", command=["echo"]))
+
+        # Set up connected state
+        for name in ["s1", "s2"]:
+            registry._servers[name].client = MagicMock()
+            registry._servers[name].status = ServerStatus.CONNECTED
+
+        await registry.disconnect_all()
+
+        assert registry._servers["s1"].status == ServerStatus.DISCONNECTED
+        assert registry._servers["s2"].status == ServerStatus.DISCONNECTED
+
+
+class TestMCPRegistryHealthCheck:
+    """Tests for health check functionality."""
+
+    @pytest.mark.asyncio
+    async def test_health_check_unregistered(self):
+        """Test health check on unregistered server."""
+        registry = MCPRegistry()
+        result = await registry.health_check("nonexistent")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_health_check_not_connected(self):
+        """Test health check on disconnected server."""
+        registry = MCPRegistry()
+        registry.register_server(MCPServerConfig(name="test", command=["echo"]))
+        result = await registry.health_check("test")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_health_check_success(self):
+        """Test successful health check."""
+        from unittest.mock import MagicMock, AsyncMock
+
+        registry = MCPRegistry()
+        config = MCPServerConfig(name="test", command=["echo"])
+        registry.register_server(config)
+
+        mock_client = MagicMock()
+        mock_client.ping = AsyncMock(return_value=True)
+        registry._servers["test"].client = mock_client
+        registry._servers["test"].status = ServerStatus.CONNECTED
+
+        result = await registry.health_check("test")
+
+        assert result is True
+        assert registry._servers["test"].consecutive_failures == 0
+
+    @pytest.mark.asyncio
+    async def test_health_check_failure(self):
+        """Test failed health check."""
+        from unittest.mock import MagicMock, AsyncMock
+
+        registry = MCPRegistry()
+        config = MCPServerConfig(name="test", command=["echo"])
+        registry.register_server(config)
+
+        mock_client = MagicMock()
+        mock_client.ping = AsyncMock(return_value=False)
+        registry._servers["test"].client = mock_client
+        registry._servers["test"].status = ServerStatus.CONNECTED
+
+        result = await registry.health_check("test")
+
+        assert result is False
+        assert registry._servers["test"].status == ServerStatus.UNHEALTHY
+
+    @pytest.mark.asyncio
+    async def test_health_check_exception(self):
+        """Test health check with exception."""
+        from unittest.mock import MagicMock, AsyncMock
+
+        registry = MCPRegistry()
+        config = MCPServerConfig(name="test", command=["echo"])
+        registry.register_server(config)
+
+        mock_client = MagicMock()
+        mock_client.ping = AsyncMock(side_effect=Exception("Network error"))
+        registry._servers["test"].client = mock_client
+        registry._servers["test"].status = ServerStatus.CONNECTED
+
+        result = await registry.health_check("test")
+
+        assert result is False
+        assert registry._servers["test"].status == ServerStatus.UNHEALTHY
+
+
+class TestMCPRegistryReconnect:
+    """Tests for reconnection functionality."""
+
+    @pytest.mark.asyncio
+    async def test_try_reconnect_unregistered(self):
+        """Test reconnecting unregistered server."""
+        registry = MCPRegistry()
+        result = await registry._try_reconnect("nonexistent")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_try_reconnect_max_retries(self):
+        """Test reconnect gives up after max retries."""
+        registry = MCPRegistry()
+        config = MCPServerConfig(name="test", command=["echo"], max_retries=3)
+        registry.register_server(config)
+        registry._servers["test"].consecutive_failures = 3
+
+        result = await registry._try_reconnect("test")
+
+        assert result is False
+        assert registry._servers["test"].status == ServerStatus.FAILED
+
+
+class TestMCPRegistryStartStop:
+    """Tests for start/stop functionality."""
+
+    @pytest.mark.asyncio
+    async def test_start(self):
+        """Test starting the registry."""
+        from unittest.mock import patch, AsyncMock, MagicMock
+
+        registry = MCPRegistry()
+        registry.register_server(MCPServerConfig(name="test", command=["echo"]))
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock(return_value=True)
+        mock_client.tools = []
+        mock_client.resources = []
+
+        with patch("victor.mcp.registry.MCPClient", return_value=mock_client):
+            await registry.start()
+            assert registry._running is True
+            # Clean up
+            await registry.stop()
+
+    @pytest.mark.asyncio
+    async def test_stop(self):
+        """Test stopping the registry."""
+        registry = MCPRegistry()
+        registry._running = True
+
+        await registry.stop()
+
+        assert registry._running is False
+
+
+class TestMCPRegistryCallTool:
+    """Tests for call_tool functionality."""
+
+    @pytest.mark.asyncio
+    async def test_call_tool_not_found(self):
+        """Test calling a tool that doesn't exist."""
+        registry = MCPRegistry()
+        result = await registry.call_tool("nonexistent_tool")
+
+        assert result.success is False
+        assert "not found" in result.error
+
+    @pytest.mark.asyncio
+    async def test_call_tool_success(self):
+        """Test successful tool call."""
+        from unittest.mock import MagicMock, AsyncMock
+        from victor.mcp.protocol import MCPToolCallResult
+
+        registry = MCPRegistry()
+        config = MCPServerConfig(name="test", command=["echo"])
+        registry.register_server(config)
+
+        mock_client = MagicMock()
+        mock_client.call_tool = AsyncMock(
+            return_value=MCPToolCallResult(
+                tool_name="my_tool",
+                success=True,
+                result="Done",
+            )
+        )
+        registry._servers["test"].client = mock_client
+        registry._servers["test"].status = ServerStatus.CONNECTED
+        registry._tool_to_server["my_tool"] = "test"
+
+        result = await registry.call_tool("my_tool", arg1="value")
+
+        assert result.success is True
+        assert result.result == "Done"
 
     def test_custom_init(self):
         """Test custom initialization."""

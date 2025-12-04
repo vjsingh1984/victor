@@ -324,7 +324,7 @@ docker-compose run --rm victor bash /app/docker/init-victor.sh
 **Problem**: Tool calling not working
 ```bash
 # Verify fallback parser is included
-docker-compose run --rm victor python3 -c "from victor.providers.ollama import OllamaProvider; print(hasattr(OllamaProvider, '_parse_json_tool_call_from_content'))"
+docker-compose run --rm victor python3 -c "from victor.providers.ollama_provider import OllamaProvider; print(hasattr(OllamaProvider, '_parse_json_tool_call_from_content'))"
 
 # Test with specific model
 docker-compose run --rm victor victor --profile general main "Write hello world"

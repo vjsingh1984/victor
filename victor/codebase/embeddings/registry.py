@@ -30,7 +30,7 @@ class EmbeddingRegistry:
         EmbeddingRegistry.register("chromadb", ChromaDBProvider)
 
         # Create a provider
-        config = EmbeddingConfig(provider="chromadb")
+        config = EmbeddingConfig(vector_store="chromadb")
         provider = EmbeddingRegistry.create(config)
     """
 
@@ -41,7 +41,7 @@ class EmbeddingRegistry:
         """Register an embedding provider.
 
         Args:
-            name: Provider name (e.g., "chromadb", "proximadb")
+            name: Provider name (e.g., "chromadb", "lancedb")
             provider_class: Provider class (must inherit from BaseEmbeddingProvider)
         """
         if not issubclass(provider_class, BaseEmbeddingProvider):
@@ -82,7 +82,7 @@ class EmbeddingRegistry:
         Returns:
             Initialized provider instance
         """
-        provider_class = cls.get(config.provider)
+        provider_class = cls.get(config.vector_store)
         return provider_class(config)
 
     @classmethod
@@ -123,13 +123,6 @@ def _auto_register_providers() -> None:
         EmbeddingRegistry.register("lancedb", LanceDBProvider)
     except ImportError:
         pass  # LanceDB not installed
-
-    try:
-        from victor.codebase.embeddings.proximadb_provider import ProximaDBProvider
-
-        EmbeddingRegistry.register("proximadb", ProximaDBProvider)
-    except ImportError:
-        pass  # ProximaDB not available
 
 
 # Auto-register on module import

@@ -382,18 +382,3 @@ async def security_scan(
         "findings": filtered_findings,
         "formatted_report": "\n".join(report),
     }
-
-
-# Keep class for backward compatibility
-class SecurityScannerTool:
-    """Deprecated: Use individual security_* functions instead."""
-
-    def __init__(self):
-        """Initialize - deprecated."""
-        import warnings
-
-        warnings.warn(
-            "SecurityScannerTool class is deprecated. Use security_* functions instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )

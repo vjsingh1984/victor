@@ -1,0 +1,26 @@
+# Gitleaks configuration for Victor
+# https://github.com/gitleaks/gitleaks
+
+title = "Victor Gitleaks Configuration"
+
+# Allowlist paths that contain intentional test secrets
+[allowlist]
+description = "Allowlist for test files and documentation with example secrets"
+
+# Test files that intentionally contain fake secrets for testing security scanning
+paths = [
+    '''tests/unit/test_security_scan_consolidated\.py''',
+    '''tests/unit/test_security_scanner_tool\.py\.skip''',
+    '''tests/unit/test_code_review_tool\.py''',
+    '''examples/enterprise_tools_demo\.py''',
+    '''docs/design/AUTHENTICATION_DESIGN_SPEC\.md''',
+]
+
+# Also allow specific test patterns that look like secrets but aren't
+regexes = [
+    # Test API keys that are obviously fake
+    '''sk_test_[a-zA-Z0-9]{24}''',
+    '''sk_live_fake[a-zA-Z0-9]+''',
+    # Example tokens in documentation
+    '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.test''',
+]

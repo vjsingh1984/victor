@@ -116,10 +116,6 @@ settings:
 #   - HNSW index for fast search
 #   - Best for: Development, small codebases (<100K docs)
 #
-# ProximaDB:
-#   - Custom implementation (if you've built it)
-#   - Best for: Specialized requirements
-#
 # ========================================
 # Performance Tuning
 # ========================================

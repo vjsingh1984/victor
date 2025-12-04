@@ -48,7 +48,7 @@ parameters
 **Test Environment**:
 - Provider: Ollama
 - Model: llama3.1:8b
-- Working Directory: `/Users/vijaysingh/code/codingagent/victor_test/`
+- Working Directory: `./victor_test/`
 
 **Test 1: Code Creation**
 - **Task**: Create ShoppingCart class from natural language requirements

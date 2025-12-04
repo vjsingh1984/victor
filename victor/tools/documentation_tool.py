@@ -745,18 +745,3 @@ async def analyze_docs(
         "recommendations": recommendations,
         "formatted_report": "\n".join(report),
     }
-
-
-# Keep class for backward compatibility
-class DocumentationTool:
-    """Deprecated: Use generate_docs and analyze_docs functions instead."""
-
-    def __init__(self):
-        """Initialize - deprecated."""
-        import warnings
-
-        warnings.warn(
-            "DocumentationTool class is deprecated. Use generate_docs and analyze_docs functions instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )

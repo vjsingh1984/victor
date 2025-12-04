@@ -6,18 +6,17 @@ Comprehensive documentation for Victor - Enterprise-Ready AI Coding Assistant.
 
 | Document | Description |
 |----------|-------------|
-| [Getting Started](GETTING_STARTED.md) | Installation and first steps |
+| [Quick Start](guides/QUICKSTART.md) | Installation and first steps |
 | [User Guide](USER_GUIDE.md) | Complete usage guide |
-| [Tool Catalog](TOOL_CATALOG.md) | All 54 available tools |
+| [Tool Catalog](TOOL_CATALOG.md) | All 43 available tools |
 | [Model Comparison](MODEL_COMPARISON.md) | Ollama model benchmarks |
 
 ## Documentation Structure
 
 ```
 docs/
-├── GETTING_STARTED.md      # Quick start guide
 ├── USER_GUIDE.md           # Comprehensive user guide
-├── TOOL_CATALOG.md         # All 54 tools with examples
+├── TOOL_CATALOG.md         # All 43 tools with examples
 ├── MODEL_COMPARISON.md     # Ollama model benchmarks
 ├── DEVELOPER_GUIDE.md      # Contributing and development
 ├── ENTERPRISE.md           # Enterprise deployment
@@ -34,33 +33,33 @@ docs/
 │   └── TOOL_MIGRATION.md   # Migrating tools
 │
 ├── embeddings/             # Embedding system docs
+│   ├── README.md           # Embeddings overview
 │   ├── ARCHITECTURE.md     # Embedding architecture
 │   ├── SETUP.md            # Setup guide
 │   ├── AIRGAPPED.md        # Air-gapped operation
-│   ├── AIRGAPPED_GUIDE.md  # Deployment guide
 │   ├── TOOL_SELECTION.md   # Semantic tool selection
+│   ├── TOOL_CALLING_FORMATS.md # Tool calling formats
 │   └── MODELS.md           # Embedding model options
 │
-├── design/                 # Design documents (historical)
+├── design/                 # Design documents
 │   ├── ARGUMENT_NORMALIZATION_DESIGN.md
 │   └── AUTHENTICATION_DESIGN_SPEC.md
 │
 ├── ARCHITECTURE_DEEP_DIVE.md  # System architecture
-├── CODEBASE_ANALYSIS_REPORT.md # Technical debt analysis
 └── TESTING_STRATEGY.md        # Testing approach
 ```
 
 ## By Topic
 
 ### Getting Started
-- [Installation](GETTING_STARTED.md#installation)
 - [Quick Start Guide](guides/QUICKSTART.md)
-- [Configuration](GETTING_STARTED.md#configuration)
+- [User Guide](USER_GUIDE.md)
+- [Configuration](guides/QUICKSTART.md#configuration)
 
 ### Using Victor
 - [Interactive Mode](USER_GUIDE.md#interactive-mode)
 - [One-shot Commands](USER_GUIDE.md#one-shot-mode)
-- [Tool Catalog](TOOL_CATALOG.md) - 54 tools across 8 categories
+- [Tool Catalog](TOOL_CATALOG.md) - 54+ tools across 8 categories
 
 ### Models & Providers
 - [Model Comparison](MODEL_COMPARISON.md) - Tested Ollama benchmarks
@@ -69,7 +68,6 @@ docs/
 
 ### Air-gapped & Offline
 - [Air-gapped Setup](embeddings/AIRGAPPED.md)
-- [Deployment Guide](embeddings/AIRGAPPED_GUIDE.md)
 - [Docker Deployment](../docker/README.md)
 
 ### Development
@@ -80,7 +78,6 @@ docs/
 ### Architecture
 - [Architecture Deep Dive](ARCHITECTURE_DEEP_DIVE.md)
 - [Embedding System](embeddings/ARCHITECTURE.md)
-- [Codebase Analysis](CODEBASE_ANALYSIS_REPORT.md)
 
 ## Docker Documentation
 

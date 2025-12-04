@@ -572,18 +572,3 @@ async def scaffold(
             "success": False,
             "error": f"Unknown operation: {operation}. Valid operations: create, list, add, init-git",
         }
-
-
-# Keep class for backward compatibility
-class ScaffoldTool:
-    """Deprecated: Use scaffold function instead."""
-
-    def __init__(self):
-        """Initialize - deprecated."""
-        import warnings
-
-        warnings.warn(
-            "ScaffoldTool class is deprecated. Use scaffold function instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )

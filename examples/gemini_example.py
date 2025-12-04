@@ -15,7 +15,16 @@
 """Example using Google Gemini provider."""
 
 import asyncio
+import logging
 import os
+
+# Configure logging to see what's happening
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+# Enable DEBUG for victor providers to see safety filter details
+logging.getLogger("victor.providers").setLevel(logging.DEBUG)
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings

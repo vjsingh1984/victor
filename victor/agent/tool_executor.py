@@ -22,7 +22,13 @@ from typing import Any, Dict, List, Optional, Tuple
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.safety import SafetyChecker, get_safety_checker
 from victor.cache.tool_cache import ToolCache
-from victor.tools.base import BaseTool, ToolRegistry, ToolResult
+from victor.core.retry import (
+    RetryContext,
+    RetryExecutor,
+    RetryStrategy,
+    tool_retry_strategy,
+)
+from victor.tools.base import BaseTool, Hook, HookError, ToolRegistry, ToolResult
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +98,7 @@ class ToolExecutor:
         safety_checker: Optional[SafetyChecker] = None,
         max_retries: int = 3,
         retry_delay: float = 1.0,
+        retry_strategy: Optional[RetryStrategy] = None,
         context: Optional[Dict[str, Any]] = None,
     ):
         """Initialize tool executor.
@@ -103,6 +110,7 @@ class ToolExecutor:
             safety_checker: Checker for dangerous operations (uses global if None)
             max_retries: Maximum retry attempts for failed tools
             retry_delay: Initial delay between retries (exponential backoff)
+            retry_strategy: Unified retry strategy (overrides max_retries/retry_delay)
             context: Shared context passed to all tools
         """
         self.tools = tool_registry
@@ -111,6 +119,11 @@ class ToolExecutor:
         self.safety_checker = safety_checker or get_safety_checker()
         self.max_retries = max_retries
         self.retry_delay = retry_delay
+        # Use provided strategy or create one from legacy params
+        self.retry_strategy = retry_strategy or tool_retry_strategy(
+            max_retries=max_retries, base_delay=retry_delay
+        )
+        self.retry_executor = RetryExecutor(self.retry_strategy)
         self.context = context or {}
 
         # Execution statistics
@@ -242,13 +255,62 @@ class ToolExecutor:
             normalization_strategy=strategy,
         )
 
+    def _run_before_hooks(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+        """Run before hooks for a tool execution.
+
+        Args:
+            tool_name: Name of the tool being executed
+            arguments: Tool arguments
+
+        Raises:
+            HookError: If a critical hook fails
+        """
+        for before_hook in self.tools._before_hooks:
+            hook_obj = before_hook if isinstance(before_hook, Hook) else None
+            hook_name = hook_obj.name if hook_obj else getattr(before_hook, "__name__", "hook")
+            is_critical = hook_obj.critical if hook_obj else False
+            try:
+                before_hook(tool_name, arguments)
+            except Exception as e:
+                if is_critical:
+                    logger.error(f"Critical before hook '{hook_name}' failed: {e}")
+                    raise HookError(hook_name, e, tool_name)
+                else:
+                    logger.warning(f"Before hook '{hook_name}' failed (non-critical): {e}")
+
+    def _run_after_hooks(self, tool_name: str, result: Any) -> None:
+        """Run after hooks for a tool execution.
+
+        Args:
+            tool_name: Name of the tool that was executed
+            result: Tool execution result
+
+        Raises:
+            HookError: If a critical hook fails
+        """
+        for after_hook in self.tools._after_hooks:
+            hook_obj = after_hook if isinstance(after_hook, Hook) else None
+            hook_name = hook_obj.name if hook_obj else getattr(after_hook, "__name__", "hook")
+            is_critical = hook_obj.critical if hook_obj else False
+            try:
+                after_hook(result)
+            except Exception as e:
+                if is_critical:
+                    logger.error(f"Critical after hook '{hook_name}' failed: {e}")
+                    raise HookError(hook_name, e, tool_name)
+                else:
+                    logger.warning(f"After hook '{hook_name}' failed (non-critical): {e}")
+
     async def _execute_with_retry(
         self,
         tool: BaseTool,
         arguments: Dict[str, Any],
         context: Dict[str, Any],
     ) -> Tuple[Any, bool, Optional[str], int]:
-        """Execute a tool with exponential backoff retry.
+        """Execute a tool with retry logic from unified RetryStrategy.
+
+        Uses the configured retry strategy for exponential backoff and
+        retry decisions. Hooks are run before/after each attempt.
 
         Args:
             tool: Tool to execute
@@ -258,52 +320,54 @@ class ToolExecutor:
         Returns:
             Tuple of (result, success, error_message, retry_count)
         """
-        last_error: Optional[str] = None
-        retries = 0
+        retry_context = RetryContext(
+            max_attempts=getattr(self.retry_strategy, "max_attempts", self.max_retries)
+        )
 
-        for attempt in range(self.max_retries + 1):
+        while True:
+            retry_context.attempt += 1
+
             try:
-                # Run before hooks
-                for before_hook in self.tools._before_hooks:
-                    try:
-                        before_hook(tool.name, arguments)
-                    except Exception as e:
-                        logger.warning(f"Before hook failed: {e}")
+                # Run before hooks - critical hooks can block execution
+                self._run_before_hooks(tool.name, arguments)
 
                 # Execute the tool
                 result = await tool.execute(context, **arguments)
 
-                # Run after hooks
-                for after_hook in self.tools._after_hooks:
-                    try:
-                        after_hook(result)
-                    except Exception as e:
-                        logger.warning(f"After hook failed: {e}")
+                # Run after hooks - critical hooks can raise errors
+                self._run_after_hooks(tool.name, result)
 
                 # Handle ToolResult
                 if isinstance(result, ToolResult):
                     if result.success:
-                        return result.output, True, None, retries
+                        self.retry_strategy.on_success(retry_context)
+                        return result.output, True, None, retry_context.attempt - 1
                     else:
-                        last_error = result.error or "Tool returned failure"
-                        # Don't retry if tool explicitly failed
-                        return result.output, False, last_error, retries
+                        # Don't retry if tool explicitly returned failure
+                        error = result.error or "Tool returned failure"
+                        return result.output, False, error, retry_context.attempt - 1
                 else:
                     # Raw result (for tools that don't return ToolResult)
-                    return result, True, None, retries
+                    self.retry_strategy.on_success(retry_context)
+                    return result, True, None, retry_context.attempt - 1
 
             except Exception as e:
-                last_error = str(e)
-                retries = attempt
+                retry_context.record_exception(e)
                 logger.warning(
-                    f"Tool {tool.name} failed (attempt {attempt + 1}/{self.max_retries + 1}): {e}"
+                    f"Tool {tool.name} failed (attempt {retry_context.attempt}/"
+                    f"{retry_context.max_attempts}): {e}"
                 )
 
-                if attempt < self.max_retries:
-                    delay = self.retry_delay * (2**attempt)
-                    await asyncio.sleep(delay)
+                if self.retry_strategy.should_retry(retry_context):
+                    self.retry_strategy.on_retry(retry_context)
+                    delay = self.retry_strategy.get_delay(retry_context)
+                    retry_context.record_delay(delay)
 
-        return None, False, last_error, retries
+                    if delay > 0:
+                        await asyncio.sleep(delay)
+                else:
+                    self.retry_strategy.on_failure(retry_context)
+                    return None, False, str(e), retry_context.attempt - 1
 
     def has_failed_before(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
         """Check if this exact tool call has failed before."""

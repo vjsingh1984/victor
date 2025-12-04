@@ -28,11 +28,40 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Set
 from rich.console import Console
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
-from victor.agent.conversation import ConversationManager
+from victor.agent.message_history import MessageHistory
+from victor.agent.conversation_memory import (
+    ConversationStore,
+    MessageRole,
+)
 from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
-from victor.agent.prompt_builder import SystemPromptBuilder
+from victor.agent.debug_logger import get_debug_logger
+from victor.agent.action_authorizer import ActionAuthorizer, ActionIntent
+from victor.agent.loop_detector import ProgressConfig, LoopDetector, TaskType
+from victor.agent.prompt_builder import SystemPromptBuilder, get_task_type_hint
 from victor.agent.response_sanitizer import ResponseSanitizer
+from victor.agent.search_router import SearchRouter
+from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity, DEFAULT_BUDGETS
 from victor.agent.stream_handler import StreamMetrics
+from victor.agent.milestone_monitor import TaskMilestoneMonitor
+
+# New decomposed components (facades for orchestrator responsibilities)
+from victor.agent.conversation_controller import (
+    ConversationController,
+    ConversationConfig,
+    ContextMetrics,
+)
+from victor.agent.tool_pipeline import (
+    ToolPipeline,
+    ToolPipelineConfig,
+    ToolCallResult,
+)
+from victor.agent.streaming_controller import (
+    StreamingController,
+    StreamingControllerConfig,
+    StreamingSession,
+)
+from victor.agent.task_analyzer import TaskAnalyzer, get_task_analyzer
+
 from victor.agent.tool_selection import (
     CORE_TOOLS,
     ToolSelector,
@@ -42,7 +71,15 @@ from victor.agent.tool_calling import (
     ToolCallParseResult,
 )
 from victor.agent.tool_executor import ToolExecutor
+from victor.agent.parallel_executor import (
+    create_parallel_executor,
+)
+from victor.agent.response_completer import (
+    ToolFailureContext,
+    create_response_completer,
+)
 from victor.analytics.logger import UsageLogger
+from victor.analytics.streaming_metrics import StreamingMetricsCollector
 from victor.cache.tool_cache import ToolCache
 from victor.config.model_capabilities import ToolCallingMatrix
 from victor.config.settings import Settings
@@ -62,13 +99,29 @@ from victor.tools.code_review_tool import set_code_review_config
 from victor.tools.dependency_graph import ToolDependencyGraph
 from victor.tools.git_tool import set_git_provider
 from victor.tools.mcp_bridge_tool import configure_mcp_client, get_mcp_tool_definitions
-from victor.tools.plugin_manager import ToolPluginManager
+from victor.tools.plugin_registry import ToolPluginRegistry
 from victor.tools.semantic_selector import SemanticToolSelector
 from victor.tools.web_search_tool import set_web_search_provider, set_web_tool_defaults
+from victor.embeddings.intent_classifier import IntentClassifier, IntentType
 from victor.workflows.base import WorkflowRegistry
 from victor.workflows.new_feature_workflow import NewFeatureWorkflow
 
 logger = logging.getLogger(__name__)
+
+# Tools with progressive parameters - different params = progress, not a loop
+# Format: tool_name -> list of param names that indicate progress
+PROGRESSIVE_TOOLS = {
+    "read_file": ["path", "offset", "limit"],
+    "code_search": ["query", "directory"],
+    "semantic_code_search": ["query", "directory"],
+    "list_directory": ["path", "recursive"],
+    "execute_bash": ["command"],
+    "git": ["operation", "files", "branch"],
+    "http_request": ["url", "method"],
+    "web_search": ["query"],
+    "web_summarize": ["query"],
+    "web_fetch": ["url"],
+}
 
 
 class AgentOrchestrator:
@@ -156,9 +209,37 @@ class AgentOrchestrator:
 
         self._system_added = False
         # Use adapter's recommended budget, with settings override
+        # Note: For analysis tasks, this may be increased dynamically in stream_chat()
         default_budget = self.tool_calling_caps.recommended_tool_budget
+        # Ensure minimum budget of 50 for meaningful work
+        default_budget = max(default_budget, 50)
         self.tool_budget = getattr(settings, "tool_call_budget", default_budget)
         self.tool_calls_used = 0
+
+        # Unified progress tracker for loop detection and progress monitoring
+        # Replaces scattered loop detection variables with a single source of truth
+        self.progress_tracker = LoopDetector(
+            config=ProgressConfig(
+                tool_budget=self.tool_budget,
+                max_iterations_default=getattr(settings, "max_exploration_iterations", 5),
+                max_iterations_analysis=getattr(
+                    settings, "max_exploration_iterations_analysis", 15
+                ),
+                max_iterations_action=getattr(settings, "max_exploration_iterations_action", 6),
+                max_iterations_research=getattr(settings, "max_research_iterations", 6),
+                repeat_threshold_default=3,
+                repeat_threshold_analysis=5,
+                min_content_threshold=getattr(settings, "min_content_threshold", 150),
+                max_total_iterations=getattr(settings, "max_total_loop_iterations", 20),
+            ),
+            task_type=TaskType.DEFAULT,
+        )
+
+        # Gap implementations: Complexity classifier, action authorizer, search router
+        self.task_classifier = ComplexityClassifier()
+        self.intent_detector = ActionAuthorizer()
+        self.search_router = SearchRouter()
+
         self.observed_files: List[str] = []
         self.executed_tools: List[str] = []
         self.failed_tool_signatures: set[tuple[str, str]] = set()
@@ -170,6 +251,27 @@ class AgentOrchestrator:
         self.usage_logger.log_event(
             "session_start", {"model": self.model, "provider": self.provider.__class__.__name__}
         )
+
+        # Streaming metrics collector for performance monitoring
+        self.streaming_metrics_collector: Optional[StreamingMetricsCollector] = None
+        if getattr(settings, "streaming_metrics_enabled", True):
+            history_size = getattr(settings, "streaming_metrics_history_size", 1000)
+            self.streaming_metrics_collector = StreamingMetricsCollector(max_history=history_size)
+            logger.info(f"StreamingMetricsCollector initialized (history: {history_size})")
+
+        # Debug logger for incremental output and conversation tracking
+        self.debug_logger = get_debug_logger()
+        self.debug_logger.enabled = (
+            getattr(settings, "debug_logging", False)
+            or logging.getLogger("victor").level <= logging.DEBUG
+        )
+
+        # Cancellation support for streaming
+        self._cancel_event: Optional[asyncio.Event] = None
+        self._is_streaming = False
+
+        # Background task tracking for graceful shutdown
+        self._background_tasks: set[asyncio.Task] = set()
 
         # Tool usage analytics
         self._tool_usage_stats: Dict[str, Dict[str, Any]] = {}
@@ -211,14 +313,51 @@ class AgentOrchestrator:
         self.workflow_registry = WorkflowRegistry()
         self._register_default_workflows()
 
-        # Conversation history (using ConversationManager for better encapsulation)
-        self.conversation = ConversationManager(
+        # Conversation history (using MessageHistory for better encapsulation)
+        self.conversation = MessageHistory(
             system_prompt=self._system_prompt,
             max_history_messages=getattr(settings, "max_conversation_history", 100),
         )
 
+        # Persistent conversation memory with SQLite backing (optional)
+        # Provides session recovery, token-aware pruning, and multi-turn context retention
+        self.memory_manager: Optional[ConversationStore] = None
+        self._memory_session_id: Optional[str] = None
+        if getattr(settings, "conversation_memory_enabled", True):
+            try:
+                db_path = Path(
+                    getattr(settings, "conversation_memory_db", "~/.victor/conversations.db")
+                ).expanduser()
+                max_context = getattr(settings, "max_context_tokens", 100000)
+                response_reserve = getattr(settings, "response_token_reserve", 4096)
+                self.memory_manager = ConversationStore(
+                    db_path=db_path,
+                    max_context_tokens=max_context,
+                    response_reserve=response_reserve,
+                )
+                # Create a session for this orchestrator instance
+                project_path = str(Path.cwd())
+                session = self.memory_manager.create_session(
+                    project_path=project_path,
+                    provider=self.provider_name,
+                    model=model,
+                    max_tokens=max_context,
+                )
+                self._memory_session_id = session.session_id
+                logger.info(
+                    f"ConversationStore initialized. "
+                    f"Session: {session.session_id[:8]}..., DB: {db_path}"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to initialize ConversationStore: {e}")
+                self.memory_manager = None
+
         # Conversation state machine for intelligent stage detection
         self.conversation_state = ConversationStateMachine()
+
+        # Intent classifier for semantic continuation/completion detection
+        # Uses embeddings instead of hardcoded phrase matching
+        self.intent_classifier = IntentClassifier()
 
         # Tool registry
         self.tools = ToolRegistry()
@@ -227,7 +366,7 @@ class AgentOrchestrator:
         self.tools.register_before_hook(self._log_tool_call)
 
         # Plugin system for extensible tools
-        self.plugin_manager: Optional[ToolPluginManager] = None
+        self.plugin_manager: Optional[ToolPluginRegistry] = None
         if getattr(settings, "plugin_enabled", True):
             self._initialize_plugins()
 
@@ -242,6 +381,22 @@ class AgentOrchestrator:
             tool_cache=self.tool_cache,
             max_retries=getattr(settings, "tool_retry_max_attempts", 3),
             retry_delay=getattr(settings, "tool_retry_base_delay", 1.0),
+        )
+
+        # Parallel tool executor for concurrent independent tool calls
+        parallel_enabled = getattr(settings, "parallel_tool_execution", True)
+        max_concurrent = getattr(settings, "max_concurrent_tools", 5)
+        self.parallel_executor = create_parallel_executor(
+            tool_executor=self.tool_executor,
+            max_concurrent=max_concurrent,
+            enable=parallel_enabled,
+        )
+
+        # Response completer for ensuring complete responses after tool calls
+        self.response_completer = create_response_completer(
+            provider=self.provider,
+            max_retries=getattr(settings, "response_completion_retries", 3),
+            force_response=getattr(settings, "force_response_on_error", True),
         )
 
         # Semantic tool selector (optional, configured via settings)
@@ -265,17 +420,137 @@ class AgentOrchestrator:
         # Background embedding preload task (ToolSelector owns the _embeddings_initialized state)
         self._embedding_preload_task: Optional[asyncio.Task[None]] = None
 
+        # Initialize TaskMilestoneMonitor for goal-aware orchestration
+        self.task_tracker = TaskMilestoneMonitor()
+
         # Initialize unified ToolSelector (handles semantic + keyword selection)
         self.tool_selector = ToolSelector(
             tools=self.tools,
             semantic_selector=self.semantic_selector,
             conversation_state=self.conversation_state,
+            task_tracker=self.task_tracker,
             model=self.model,
             provider_name=self.provider_name,
             tool_selection_config=self.tool_selection,
             fallback_max_tools=getattr(settings, "fallback_max_tools", 8),
             on_selection_recorded=self._record_tool_selection,
         )
+
+        # =================================================================
+        # NEW: Decomposed component facades for orchestrator responsibilities
+        # These provide cleaner interfaces while maintaining backward compatibility
+        # =================================================================
+
+        # ConversationController: Manages message history and conversation state
+        self._conversation_controller = ConversationController(
+            config=ConversationConfig(
+                max_context_chars=getattr(settings, "max_context_chars", 200000),
+                enable_stage_tracking=True,
+                enable_context_monitoring=True,
+            ),
+            message_history=self.conversation,
+            state_machine=self.conversation_state,
+        )
+        self._conversation_controller.set_system_prompt(self._system_prompt)
+
+        # ToolPipeline: Coordinates tool execution flow
+        self._tool_pipeline = ToolPipeline(
+            tool_registry=self.tools,
+            tool_executor=self.tool_executor,
+            config=ToolPipelineConfig(
+                tool_budget=self.tool_budget,
+                enable_caching=self.tool_cache is not None,
+                enable_analytics=True,
+                enable_failed_signature_tracking=True,
+            ),
+            tool_cache=self.tool_cache,
+            argument_normalizer=self.argument_normalizer,
+            on_tool_start=self._on_tool_start_callback,
+            on_tool_complete=self._on_tool_complete_callback,
+        )
+
+        # StreamingController: Manages streaming sessions and metrics
+        self._streaming_controller = StreamingController(
+            config=StreamingControllerConfig(
+                max_history=100,
+                enable_metrics_collection=self.streaming_metrics_collector is not None,
+            ),
+            metrics_collector=self.streaming_metrics_collector,
+            on_session_complete=self._on_streaming_session_complete,
+        )
+
+        # TaskAnalyzer: Unified task analysis facade
+        self._task_analyzer = get_task_analyzer()
+
+        logger.info(
+            "Orchestrator initialized with decomposed components: "
+            "ConversationController, ToolPipeline, StreamingController, TaskAnalyzer"
+        )
+
+    # =====================================================================
+    # Callbacks for decomposed components
+    # =====================================================================
+
+    def _on_tool_start_callback(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+        """Callback when tool execution starts (from ToolPipeline)."""
+        # Use the pipeline's calls_used as the iteration count
+        iteration = self._tool_pipeline.calls_used if hasattr(self, "_tool_pipeline") else 0
+        self.debug_logger.log_tool_call(tool_name, arguments, iteration)
+
+    def _on_tool_complete_callback(self, result: ToolCallResult) -> None:
+        """Callback when tool execution completes (from ToolPipeline)."""
+        # Update tool usage stats
+        if result.tool_name not in self._tool_usage_stats:
+            self._tool_usage_stats[result.tool_name] = {
+                "calls": 0,
+                "successes": 0,
+                "failures": 0,
+                "total_time_ms": 0.0,
+            }
+        stats = self._tool_usage_stats[result.tool_name]
+        stats["calls"] += 1
+        if result.success:
+            stats["successes"] += 1
+        else:
+            stats["failures"] += 1
+        stats["total_time_ms"] += result.execution_time_ms
+
+    def _on_streaming_session_complete(self, session: StreamingSession) -> None:
+        """Callback when streaming session completes (from StreamingController)."""
+        self.usage_logger.log_event(
+            "stream_completed",
+            {
+                "session_id": session.session_id,
+                "model": session.model,
+                "provider": session.provider,
+                "duration": session.duration,
+                "cancelled": session.cancelled,
+            },
+        )
+
+    # =====================================================================
+    # Component accessors for external use
+    # =====================================================================
+
+    @property
+    def conversation_controller(self) -> ConversationController:
+        """Get the conversation controller component."""
+        return self._conversation_controller
+
+    @property
+    def tool_pipeline(self) -> ToolPipeline:
+        """Get the tool pipeline component."""
+        return self._tool_pipeline
+
+    @property
+    def streaming_controller(self) -> StreamingController:
+        """Get the streaming controller component."""
+        return self._streaming_controller
+
+    @property
+    def task_analyzer(self) -> TaskAnalyzer:
+        """Get the task analyzer component."""
+        return self._task_analyzer
 
     @property
     def messages(self) -> List[Message]:
@@ -285,6 +560,49 @@ class AgentOrchestrator:
             List of messages in conversation history
         """
         return self.conversation.messages
+
+    def _get_context_size(self) -> tuple[int, int]:
+        """Calculate current context size in chars and estimated tokens.
+
+        Returns:
+            Tuple of (char_count, estimated_token_count)
+        """
+        # Delegate to ConversationController for centralized context tracking
+        metrics = self._conversation_controller.get_context_metrics()
+        return metrics.char_count, metrics.estimated_tokens
+
+    def _check_context_overflow(self, max_context_chars: int = 200000) -> bool:
+        """Check if context is at risk of overflow.
+
+        Args:
+            max_context_chars: Maximum allowed context size in chars
+
+        Returns:
+            True if context is dangerously large
+        """
+        # Delegate to ConversationController
+        metrics = self._conversation_controller.get_context_metrics()
+
+        # Update debug logger
+        self.debug_logger.log_context_size(metrics.char_count, metrics.estimated_tokens)
+
+        if metrics.is_overflow_risk:
+            logger.warning(
+                f"Context overflow risk: {metrics.char_count:,} chars "
+                f"(~{metrics.estimated_tokens:,} tokens). "
+                f"Max: {metrics.max_context_chars:,} chars"
+            )
+            return True
+
+        return False
+
+    def get_context_metrics(self) -> ContextMetrics:
+        """Get detailed context metrics.
+
+        Returns:
+            ContextMetrics with size and overflow information
+        """
+        return self._conversation_controller.get_context_metrics()
 
     def _init_stream_metrics(self) -> StreamMetrics:
         """Initialize fresh stream metrics for a new streaming session."""
@@ -313,12 +631,68 @@ class AgentOrchestrator:
                     "total_chunks": metrics.total_chunks,
                 },
             )
+
+            # Record to streaming metrics collector if available
+            if self.streaming_metrics_collector:
+                try:
+                    from victor.analytics.streaming_metrics import StreamMetrics as AnalyticsMetrics
+                    import uuid
+
+                    # Estimate total tokens from content length (roughly 4 chars per token)
+                    estimated_tokens = metrics.total_content_length // 4
+
+                    # Convert to analytics format and record
+                    analytics_metrics = AnalyticsMetrics(
+                        request_id=str(uuid.uuid4()),
+                        start_time=metrics.start_time,
+                        first_token_time=metrics.first_token_time,
+                        last_token_time=metrics.end_time,
+                        total_chunks=metrics.total_chunks,
+                        total_tokens=estimated_tokens,
+                        model=self.model,
+                        provider=self.provider_name,
+                    )
+                    self.streaming_metrics_collector.record_metrics(analytics_metrics)
+                except Exception as e:
+                    logger.debug(f"Failed to record to metrics collector: {e}")
+
             return metrics
         return None
 
     def get_last_stream_metrics(self) -> Optional[StreamMetrics]:
         """Get metrics from the last streaming session."""
         return getattr(self, "_current_stream_metrics", None)
+
+    def get_streaming_metrics_summary(self) -> Optional[Dict[str, Any]]:
+        """Get comprehensive streaming metrics summary.
+
+        Returns:
+            Dictionary with aggregated metrics or None if metrics disabled.
+        """
+        if not self.streaming_metrics_collector:
+            return None
+
+        summary = self.streaming_metrics_collector.get_summary()
+        # Convert MetricsSummary dataclass to dict if needed
+        if hasattr(summary, "__dict__"):
+            return vars(summary)
+        return summary  # type: ignore[return-value]
+
+    def get_streaming_metrics_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get recent streaming metrics history.
+
+        Args:
+            limit: Maximum number of recent metrics to return
+
+        Returns:
+            List of recent metrics dictionaries
+        """
+        if not self.streaming_metrics_collector:
+            return []
+
+        metrics_list = self.streaming_metrics_collector.get_recent_metrics(count=limit)
+        # Convert StreamMetrics to dictionaries
+        return [vars(m) if hasattr(m, "__dict__") else m for m in metrics_list]  # type: ignore[misc]
 
     async def _preload_embeddings(self) -> None:
         """Preload tool embeddings in background to avoid blocking first query.
@@ -347,6 +721,34 @@ class AgentOrchestrator:
                 "Will load on first query (may add ~5s latency)."
             )
 
+    def _create_background_task(
+        self, coro: Any, name: str = "background_task"
+    ) -> Optional[asyncio.Task]:
+        """Create and track a background task for graceful shutdown.
+
+        Args:
+            coro: The coroutine to run as a background task.
+            name: Name for the task (for logging).
+
+        Returns:
+            The created task, or None if no event loop is available.
+        """
+        try:
+            loop = asyncio.get_event_loop()
+            task = loop.create_task(coro, name=name)
+
+            # Track the task
+            self._background_tasks.add(task)
+
+            # Remove from tracking when done
+            task.add_done_callback(self._background_tasks.discard)
+
+            logger.debug(f"Created background task: {name}")
+            return task
+        except RuntimeError:
+            logger.debug(f"No event loop available for background task: {name}")
+            return None
+
     def start_embedding_preload(self) -> None:
         """Start background embedding preload task.
 
@@ -356,16 +758,10 @@ class AgentOrchestrator:
         if not self.use_semantic_selection or self._embedding_preload_task:
             return
 
-        import asyncio
-
-        try:
-            # Create background task for embedding preload
-            loop = asyncio.get_event_loop()
-            self._embedding_preload_task = loop.create_task(self._preload_embeddings())
+        task = self._create_background_task(self._preload_embeddings(), name="embedding_preload")
+        if task:
+            self._embedding_preload_task = task
             logger.info("Started background task for embedding preload")
-        except RuntimeError:
-            # No event loop available yet, will load on first query
-            logger.debug("No event loop available for background preload, will load on first query")
 
     def _record_tool_selection(self, method: str, num_tools: int) -> None:
         """Record tool selection statistics.
@@ -557,7 +953,178 @@ class AgentOrchestrator:
 
     def _log_tool_call(self, name: str, kwargs: dict) -> None:
         """A hook that logs information before a tool is called."""
-        self.console.print(f"[dim]Attempting to call tool '{name}' with arguments: {kwargs}[/dim]")
+        # Move verbose argument logging to debug level - not user-facing
+        logger.debug(f"Tool call: {name} with args: {kwargs}")
+
+    def _extract_file_structure(self, content: str, file_path: str) -> str:
+        """Extract a structural summary for very large files.
+
+        For Python files, extracts class and function definitions.
+        For other files, shows line count and sample lines.
+
+        Args:
+            content: Full file content
+            file_path: Path to the file
+
+        Returns:
+            Structural summary string
+        """
+        lines = content.split("\n")
+        num_lines = len(lines)
+
+        # Detect file type
+        ext = Path(file_path).suffix.lower()
+
+        summary_parts = [f"FILE STRUCTURE: {file_path}"]
+        summary_parts.append(f"Total lines: {num_lines}")
+
+        if ext in (".py", ".pyi"):
+            # Extract Python structure
+            classes = []
+            functions = []
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                if stripped.startswith("class ") and ":" in stripped:
+                    class_name = stripped[6:].split("(")[0].split(":")[0].strip()
+                    classes.append(f"  Line {i+1}: class {class_name}")
+                elif stripped.startswith("def ") and "(" in stripped:
+                    func_name = stripped[4:].split("(")[0].strip()
+                    # Only top-level functions (no leading whitespace)
+                    if not line.startswith(" ") and not line.startswith("\t"):
+                        functions.append(f"  Line {i+1}: def {func_name}()")
+
+            if classes:
+                summary_parts.append(f"\nClasses ({len(classes)}):")
+                summary_parts.extend(classes[:20])  # Max 20 classes
+                if len(classes) > 20:
+                    summary_parts.append(f"  ... and {len(classes) - 20} more")
+
+            if functions:
+                summary_parts.append(f"\nFunctions ({len(functions)}):")
+                summary_parts.extend(functions[:30])  # Max 30 functions
+                if len(functions) > 30:
+                    summary_parts.append(f"  ... and {len(functions) - 30} more")
+
+        elif ext in (".js", ".ts", ".jsx", ".tsx"):
+            # Extract JS/TS structure
+            exports = []
+            functions = []
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                if "function " in stripped or "const " in stripped or "export " in stripped:
+                    if len(stripped) < 100:  # Skip very long lines
+                        if stripped.startswith("export "):
+                            exports.append(f"  Line {i+1}: {stripped[:60]}...")
+                        elif "function " in stripped:
+                            functions.append(f"  Line {i+1}: {stripped[:60]}...")
+
+            if exports:
+                summary_parts.append(f"\nExports ({len(exports)}):")
+                summary_parts.extend(exports[:20])
+            if functions:
+                summary_parts.append(f"\nFunctions ({len(functions)}):")
+                summary_parts.extend(functions[:20])
+
+        # Add first and last few lines as sample
+        summary_parts.append("\n--- FIRST 30 LINES ---")
+        summary_parts.extend(lines[:30])
+        summary_parts.append("\n--- LAST 20 LINES ---")
+        summary_parts.extend(lines[-20:])
+
+        return "\n".join(summary_parts)
+
+    def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
+        """Format tool output with clear boundaries to prevent model hallucination.
+
+        Uses structured markers that models recognize as authoritative tool output.
+        This prevents the model from ignoring or fabricating tool results.
+
+        Args:
+            tool_name: Name of the tool that was executed
+            args: Arguments passed to the tool
+            output: Raw output from the tool
+
+        Returns:
+            Formatted string with clear TOOL_OUTPUT boundaries
+        """
+        # Maximum output size to prevent context overflow (reduced from 50K to 15K)
+        max_output_chars = getattr(self.settings, "max_tool_output_chars", 15000)
+
+        output_str = str(output) if output is not None else ""
+        original_len = len(output_str)
+        truncated = False
+
+        if original_len > max_output_chars:
+            truncated = True
+            output_str = output_str[:max_output_chars]
+
+        # Special formatting for file reading tools - make content unmistakably clear
+        if tool_name == "read_file":
+            file_path = args.get("path", "unknown")
+
+            # For very large files (>50KB), show structure instead of raw content
+            structure_threshold = getattr(self.settings, "file_structure_threshold", 50000)
+            if original_len > structure_threshold:
+                # Show file structure summary for very large files
+                file_content = str(output) if output is not None else ""
+                structure_summary = self._extract_file_structure(file_content, file_path)
+                return f"""<TOOL_OUTPUT tool="{tool_name}" path="{file_path}">
+═══ FILE IS VERY LARGE ({original_len:,} chars / {len(file_content.splitlines())} lines) ═══
+{structure_summary}
+═══ END OF FILE STRUCTURE ═══
+</TOOL_OUTPUT>
+
+NOTE: This file is very large. Showing structure summary instead of full content.
+To see specific sections, use read_file with offset/limit parameters or code_search to find specific code."""
+
+            header = f"═══ ACTUAL FILE CONTENT: {file_path} ═══"
+            footer = f"═══ END OF FILE: {file_path} ═══"
+            if truncated:
+                footer = f"═══ END OF FILE (TRUNCATED: showing {max_output_chars:,} of {original_len:,} chars): {file_path} ═══"
+
+            return f"""<TOOL_OUTPUT tool="{tool_name}" path="{file_path}">
+{header}
+{output_str}
+{footer}
+</TOOL_OUTPUT>
+
+IMPORTANT: The content above between the ═══ markers is the EXACT content of the file.
+You MUST use this actual content in your analysis. Do NOT fabricate or imagine different content."""
+
+        elif tool_name == "list_directory":
+            dir_path = args.get("path", ".")
+            return f"""<TOOL_OUTPUT tool="{tool_name}" path="{dir_path}">
+═══ ACTUAL DIRECTORY LISTING: {dir_path} ═══
+{output_str}
+═══ END OF DIRECTORY LISTING ═══
+</TOOL_OUTPUT>
+
+Use only the files/directories listed above. Do not invent files that are not shown."""
+
+        elif tool_name in ("code_search", "semantic_code_search"):
+            query = args.get("query", args.get("pattern", ""))
+            return f"""<TOOL_OUTPUT tool="{tool_name}" query="{query}">
+═══ SEARCH RESULTS ═══
+{output_str}
+═══ END OF SEARCH RESULTS ═══
+</TOOL_OUTPUT>
+
+These are the actual search results. Reference only the files and matches shown above."""
+
+        elif tool_name == "execute_bash":
+            command = args.get("command", "")
+            return f"""<TOOL_OUTPUT tool="{tool_name}" command="{command}">
+═══ COMMAND OUTPUT ═══
+{output_str}
+═══ END OF COMMAND OUTPUT ═══
+</TOOL_OUTPUT>"""
+
+        else:
+            # Generic tool output format
+            truncation_note = " [OUTPUT TRUNCATED]" if truncated else ""
+            return f"""<TOOL_OUTPUT tool="{tool_name}">
+{output_str}{truncation_note}
+</TOOL_OUTPUT>"""
 
     def _register_default_workflows(self) -> None:
         """Register default workflows."""
@@ -595,6 +1162,7 @@ class AgentOrchestrator:
         # --- Dynamic Tool Discovery and Registration ---
         tools_dir = os.path.join(os.path.dirname(__file__), "..", "tools")
         excluded_files = {"__init__.py", "base.py", "decorators.py", "semantic_selector.py"}
+        registered_tools_count = 0
 
         for filename in os.listdir(tools_dir):
             if filename.endswith(".py") and filename not in excluded_files:
@@ -604,11 +1172,11 @@ class AgentOrchestrator:
                     for _name, obj in inspect.getmembers(module):
                         if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
                             self.tools.register(obj)
-                            logger.debug(
-                                f"Dynamically registered tool: {obj.__name__} from {module_name}"
-                            )
+                            registered_tools_count += 1
                 except Exception as e:
                     logger.warning(f"Failed to load tools from {module_name}: {e}")
+
+        logger.debug(f"Dynamically registered {registered_tools_count} tools from victor.tools/")
 
         # --- Post-registration setup for special tools (like MCP) ---
         # Register MCP tools if configured (supports both legacy and new registry approach)
@@ -649,7 +1217,7 @@ class AgentOrchestrator:
                 logger.info(
                     f"MCP Registry initialized with {len(self.mcp_registry.list_servers())} server(s)"
                 )
-                asyncio.create_task(self._start_mcp_registry())
+                self._create_background_task(self._start_mcp_registry(), name="mcp_registry_start")
             else:
                 logger.debug("No MCP servers configured")
 
@@ -669,7 +1237,9 @@ class AgentOrchestrator:
 
                 mcp_client = MCPClient()
                 cmd_parts = mcp_command.split()
-                asyncio.create_task(mcp_client.connect(cmd_parts))
+                self._create_background_task(
+                    mcp_client.connect(cmd_parts), name="mcp_legacy_connect"
+                )
                 configure_mcp_client(mcp_client, prefix=getattr(self.settings, "mcp_prefix", "mcp"))
             except Exception as exc:
                 logger.warning(f"Failed to start MCP client: {exc}")
@@ -705,13 +1275,6 @@ class AgentOrchestrator:
                 outputs=["file_candidates"],
                 cost_tier=CostTier.FREE,
             )
-            self.tool_graph.add_tool(
-                "plan_files",
-                inputs=["query"],
-                outputs=["file_candidates"],
-                cost_tier=CostTier.FREE,
-            )
-
             # File operations - FREE tier
             self.tool_graph.add_tool(
                 "read_file",
@@ -764,7 +1327,7 @@ class AgentOrchestrator:
             plugin_config = getattr(self.settings, "plugin_config", {})
             disabled_plugins = set(getattr(self.settings, "plugin_disabled", []))
 
-            self.plugin_manager = ToolPluginManager(
+            self.plugin_manager = ToolPluginRegistry(
                 plugin_dirs=plugin_dirs,
                 config=plugin_config,
             )
@@ -978,6 +1541,24 @@ class AgentOrchestrator:
             content: Message content
         """
         self.conversation.add_message(role, content)
+
+        # Persist to memory manager if available
+        if self.memory_manager and self._memory_session_id:
+            try:
+                role_map = {
+                    "user": MessageRole.USER,
+                    "assistant": MessageRole.ASSISTANT,
+                    "system": MessageRole.SYSTEM,
+                }
+                msg_role = role_map.get(role, MessageRole.USER)
+                self.memory_manager.add_message(
+                    session_id=self._memory_session_id,
+                    role=msg_role,
+                    content=content,
+                )
+            except Exception as e:
+                logger.debug(f"Failed to persist message to memory manager: {e}")
+
         if role == "user":
             self.usage_logger.log_event("user_prompt", {"content": content})
         elif role == "assistant":
@@ -989,58 +1570,133 @@ class AgentOrchestrator:
         self._system_added = True
 
     async def chat(self, user_message: str) -> CompletionResponse:
-        """Send a chat message and get response.
+        """Send a chat message and get response with full agentic loop.
+
+        This method implements a proper agentic loop that:
+        1. Gets model response
+        2. Executes any tool calls
+        3. Continues until model provides a final response (no tool calls)
+        4. Ensures non-empty response on tool failures
 
         Args:
             user_message: User's message
 
         Returns:
-            CompletionResponse from the model
+            CompletionResponse from the model with complete response
         """
         self._ensure_system_message()
         # Add user message to history
         self.add_message("user", user_message)
 
-        # Get tool definitions if provider supports them
-        # Intelligently select relevant tools based on the user's message
-        tools = None
-        if self.provider.supports_tools():
-            conversation_depth = self.conversation.message_count()
-            conversation_history = (
-                [msg.model_dump() for msg in self.messages] if self.messages else None
-            )
-            tools = await self.tool_selector.select_tools(
-                user_message,
-                use_semantic=self.use_semantic_selection,
-                conversation_history=conversation_history,
-                conversation_depth=conversation_depth,
-            )
-            tools = self.tool_selector.prioritize_by_stage(user_message, tools)
+        # Initialize tracking for this conversation turn
+        self.tool_calls_used = 0
+        failure_context = ToolFailureContext()
+        max_iterations = getattr(self.settings, "chat_max_iterations", 10)
+        iteration = 0
 
-        # Get response from provider
-        # Prepare optional thinking parameter for providers that support it (Anthropic)
-        provider_kwargs = {}
-        if self.thinking:
-            # Anthropic extended thinking format
-            provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
-
-        response = await self.provider.chat(
-            messages=self.messages,
-            model=self.model,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            tools=tools,
-            **provider_kwargs,
+        # Classify task complexity for appropriate budgeting
+        task_classification = self.task_classifier.classify(user_message)
+        iteration_budget = min(
+            task_classification.tool_budget * 2, max_iterations  # Allow 2x budget for iterations
         )
 
-        # Add assistant response to history
-        self.add_message("assistant", response.content)
+        # Agentic loop: continue until no tool calls or budget exhausted
+        final_response: Optional[CompletionResponse] = None
 
-        # Handle tool calls if present
-        if response.tool_calls:
-            await self._handle_tool_calls(response.tool_calls)
+        while iteration < iteration_budget:
+            iteration += 1
 
-        return response
+            # Get tool definitions if provider supports them
+            tools = None
+            if self.provider.supports_tools() and self.tool_calls_used < self.tool_budget:
+                conversation_depth = self.conversation.message_count()
+                conversation_history = (
+                    [msg.model_dump() for msg in self.messages] if self.messages else None
+                )
+                tools = await self.tool_selector.select_tools(
+                    user_message,
+                    use_semantic=self.use_semantic_selection,
+                    conversation_history=conversation_history,
+                    conversation_depth=conversation_depth,
+                )
+                tools = self.tool_selector.prioritize_by_stage(user_message, tools)
+
+            # Prepare optional thinking parameter
+            provider_kwargs = {}
+            if self.thinking:
+                provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
+
+            # Get response from provider
+            response = await self.provider.chat(
+                messages=self.messages,
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                tools=tools,
+                **provider_kwargs,
+            )
+
+            # Add assistant response to history if has content
+            if response.content:
+                self.add_message("assistant", response.content)
+
+            # Check if model wants to use tools
+            if response.tool_calls:
+                # Handle tool calls and track results
+                tool_results = await self._handle_tool_calls(response.tool_calls)
+
+                # Update failure context
+                for result in tool_results:
+                    if result.get("success"):
+                        failure_context.successful_tools.append(result)
+                    else:
+                        failure_context.failed_tools.append(result)
+                        failure_context.last_error = result.get("error")
+
+                # Continue loop to get follow-up response
+                continue
+
+            # No tool calls - this is the final response
+            final_response = response
+            break
+
+        # Ensure we have a complete response
+        if final_response is None or not final_response.content:
+            # Use response completer to generate a response
+            completion_result = await self.response_completer.ensure_response(
+                messages=self.messages,
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                failure_context=failure_context if failure_context.failed_tools else None,
+            )
+
+            if completion_result.content:
+                self.add_message("assistant", completion_result.content)
+                # Create a synthetic response
+                final_response = CompletionResponse(
+                    content=completion_result.content,
+                    role="assistant",
+                    tool_calls=None,
+                )
+            else:
+                # Last resort fallback
+                fallback_content = (
+                    "I was unable to generate a complete response. "
+                    "Please try rephrasing your request."
+                )
+                if failure_context.failed_tools:
+                    fallback_content = self.response_completer.format_tool_failure_message(
+                        failure_context
+                    )
+                self.add_message("assistant", fallback_content)
+                final_response = CompletionResponse(
+                    content=fallback_content,
+                    role="assistant",
+                    tool_calls=None,
+                )
+
+        return final_response
 
     async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
         """Stream a chat response.
@@ -1054,7 +1710,14 @@ class AgentOrchestrator:
         Note:
             Stream metrics (TTFT, throughput) are available via get_last_stream_metrics()
             after the stream completes.
+
+        The stream can be cancelled by calling request_cancellation(). When cancelled,
+        the stream will yield a final chunk indicating cancellation and stop.
         """
+        # Initialize cancellation support
+        self._cancel_event = asyncio.Event()
+        self._is_streaming = True
+
         # Track performance metrics using StreamMetrics
         stream_metrics = self._init_stream_metrics()
         start_time = stream_metrics.start_time
@@ -1065,8 +1728,66 @@ class AgentOrchestrator:
         self.observed_files = []
         self.executed_tools = []
         self.failed_tool_signatures = set()
+
+        # Reset progress tracker for new conversation turn
+        self.progress_tracker.reset()
+
+        # Local aliases for frequently-used progress tracker values
+        # These are derived from the progress tracker config for convenience in logs
+        max_total_iterations = self.progress_tracker.config.max_total_iterations
+        max_low_output_iterations = 3  # Legacy compat - now tracked by progress_tracker
+        unique_files_read: set = set()  # Legacy compat - progress_tracker tracks unique_resources
+        total_iterations = 0
+        force_completion = False
+
         # Add user message to history
         self.add_message("user", user_message)
+
+        # Detect task type for goal-aware orchestration
+        self.task_tracker.reset()  # Reset for new conversation turn
+        task_type = self.task_tracker.detect_task_type(user_message)
+        logger.info(f"Task type detected: {task_type.value}")
+
+        # Inject task-specific prompt hint for better guidance
+        task_hint = get_task_type_hint(task_type.value)
+        if task_hint:
+            self.add_message("system", task_hint.strip())
+            logger.debug(f"Injected task hint for task type: {task_type.value}")
+
+        # Gap 1: Classify task complexity and adjust tool budget
+        task_classification = self.task_classifier.classify(user_message)
+        complexity_tool_budget = DEFAULT_BUDGETS.get(task_classification.complexity, 15)
+        if task_classification.complexity == TaskComplexity.SIMPLE:
+            # Override with simpler budget for simple tasks
+            self.progress_tracker.config.max_total_iterations = min(
+                complexity_tool_budget, self.progress_tracker.config.max_total_iterations
+            )
+            logger.info(
+                f"Task complexity: {task_classification.complexity.value}, "
+                f"adjusted max_iterations to {complexity_tool_budget}"
+            )
+        elif task_classification.complexity == TaskComplexity.GENERATION:
+            # Generation tasks should complete in 1-2 tool calls
+            self.progress_tracker.config.max_total_iterations = min(
+                complexity_tool_budget + 1, self.progress_tracker.config.max_total_iterations
+            )
+            logger.info(
+                f"Generation task detected, limiting iterations to {complexity_tool_budget + 1}"
+            )
+        else:
+            logger.info(
+                f"Task complexity: {task_classification.complexity.value}, "
+                f"confidence: {task_classification.confidence:.2f}"
+            )
+
+        # Gap 4: Detect intent and inject prompt guard for non-write tasks
+        intent_result = self.intent_detector.detect(user_message)
+        if intent_result.intent in (ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY):
+            if intent_result.prompt_guard:
+                self.add_message("system", intent_result.prompt_guard.strip())
+                logger.info(f"Intent: {intent_result.intent.value}, injected prompt guard")
+        elif intent_result.intent == ActionIntent.WRITE_ALLOWED:
+            logger.info("Intent: write_allowed, no prompt guard needed")
 
         # Get tool definitions
         # Iteratively stream → run tools → stream follow-up until no tool calls or budget exhausted
@@ -1097,51 +1818,55 @@ class AgentOrchestrator:
         ]
         is_analysis_task = any(keyword in user_message.lower() for keyword in analysis_keywords)
 
-        # Track exploration without output (prevents endless exploration loops)
-        consecutive_low_output_iterations = 0
-
-        # Use configurable limits from settings, adjusted by adapter capabilities
-        # Local models with strict prompting needs get lower limits
-        needs_strict = self.tool_calling_caps.requires_strict_prompting
-
-        # Base limits - reduced for models needing strict prompting
-        base_analysis_limit = 10 if needs_strict else 15
-        base_action_limit = 4 if needs_strict else 6
-        base_default_limit = 3 if needs_strict else 5
-
+        # Configure progress tracker task type based on detected task type
+        # This determines thresholds for loop detection and iteration limits
         if is_analysis_task:
-            max_low_output_iterations = getattr(
-                self.settings, "max_exploration_iterations_analysis", base_analysis_limit
-            )
-            logger.info(
-                f"Detected analysis task - allowing up to {max_low_output_iterations} exploration iterations"
-            )
+            self.progress_tracker.task_type = TaskType.ANALYSIS
         elif is_action_task:
-            max_low_output_iterations = getattr(
-                self.settings, "max_exploration_iterations_action", base_action_limit
-            )
+            self.progress_tracker.task_type = TaskType.ACTION
         else:
-            max_low_output_iterations = getattr(
-                self.settings, "max_exploration_iterations", base_default_limit
+            self.progress_tracker.task_type = TaskType.DEFAULT
+        logger.info(f"LoopDetector task_type: {self.progress_tracker.task_type.value}")
+
+        # For analysis tasks: increase temperature to reduce repetition/getting stuck
+        if is_analysis_task:
+            # Bump temperature for analysis tasks (helps prevent getting stuck)
+            analysis_temp = min(self.temperature + 0.2, 1.0)
+            logger.info(
+                f"Analysis task: increasing temperature {self.temperature:.1f} -> {analysis_temp:.1f}"
+            )
+            self.temperature = analysis_temp
+
+            # Add simplified analysis guidance - focus on one module at a time
+            self.add_message(
+                "system",
+                "ANALYSIS APPROACH: Work through the codebase one module at a time. "
+                "For each module: 1) List its files, 2) Read 2-3 key files, 3) Note observations. "
+                "After examining 3-4 modules, provide your summary. Keep responses concise.",
             )
 
-        # Hard limit on total loop iterations to prevent runaway loops
-        # Lower for models without native tool calling
-        base_total_limit = 15 if needs_strict else 20
-        max_total_iterations = getattr(self.settings, "max_total_loop_iterations", base_total_limit)
-        total_iterations = 0
+        # Add guidance for analysis tasks - encourage thorough exploration
+        if is_analysis_task:
+            # Increase tool budget for analysis tasks
+            original_budget = self.tool_budget
+            self.tool_budget = max(
+                self.tool_budget, 200
+            )  # Allow at least 200 tool calls for analysis
+            if self.tool_budget != original_budget:
+                logger.info(
+                    f"Analysis task: increased tool_budget from {original_budget} to {self.tool_budget}"
+                )
 
-        min_content_threshold = getattr(self.settings, "min_content_threshold", 150)
-        force_completion = False
-
-        # Track unique files read and tool calls for smarter loop detection
-        unique_files_read: set = set()
-        recent_tool_calls: list = []  # Track last N tool calls for loop detection
-        max_recent_calls = 10  # Window for detecting repeated calls
-
-        # Track consecutive research calls (prevents endless research loops)
-        consecutive_research_calls = 0
-        max_research_iterations = getattr(self.settings, "max_research_iterations", 6)
+            self.add_message(
+                "system",
+                "This is an ANALYSIS task requiring thorough exploration of the codebase. "
+                "You MUST systematically examine multiple modules and files using tools like "
+                "read_file, list_directory, and code_search. "
+                "DO NOT stop after examining just a few files. "
+                "Continue using tools until you have gathered comprehensive information about "
+                "all major components of the codebase. "
+                "Only provide your final analysis AFTER you have examined all relevant modules.",
+            )
 
         # Add guidance for action-oriented tasks
         if is_action_task:
@@ -1173,9 +1898,83 @@ class AgentOrchestrator:
 
         goals = self._goal_hints_for_message(user_message)
 
+        # Log all limits for debugging
+        logger.info(
+            f"Stream chat limits: "
+            f"tool_budget={self.tool_budget}, "
+            f"max_total_iterations={max_total_iterations}, "
+            f"max_low_output_iterations={max_low_output_iterations}, "
+            f"is_analysis_task={is_analysis_task}, "
+            f"is_action_task={is_action_task}"
+        )
+
+        # Reset debug logger for new conversation turn
+        self.debug_logger.reset()
+
         while True:
+            # Check for cancellation request
+            if self._check_cancellation():
+                logger.info("Stream cancelled by user request")
+                self._is_streaming = False
+                yield StreamChunk(
+                    content="\n\n[Cancelled by user]\n",
+                    is_final=True,
+                )
+                return
+
             # Check hard iteration limit
             total_iterations += 1
+            logger.debug(
+                f"Iteration {total_iterations}/{max_total_iterations}: "
+                f"tool_calls_used={self.tool_calls_used}/{self.tool_budget}, "
+                f"unique_files_read={len(unique_files_read)}, "
+                f"force_completion={force_completion}"
+            )
+
+            # Use debug logger for incremental tracking
+            self.debug_logger.log_iteration_start(
+                total_iterations,
+                tool_calls=self.tool_calls_used,
+                files_read=len(unique_files_read),
+            )
+            self.debug_logger.log_limits(
+                tool_budget=self.tool_budget,
+                tool_calls_used=self.tool_calls_used,
+                max_iterations=max_total_iterations,
+                current_iteration=total_iterations,
+                is_analysis_task=is_analysis_task,
+            )
+
+            # Check for context overflow
+            max_context = getattr(self.settings, "max_context_chars", 200000)
+            if self._check_context_overflow(max_context):
+                logger.warning("Context overflow detected. Forcing completion.")
+                yield StreamChunk(
+                    content="\n[tool] ⚠ Context size limit reached. Providing summary.\n"
+                )
+                # Force completion due to context overflow
+                self.add_message(
+                    "system",
+                    "CRITICAL: Context size limit reached. Provide a concise summary of findings.",
+                )
+                try:
+                    response = await self.provider.chat(
+                        messages=self.messages,
+                        model=self.model,
+                        temperature=self.temperature,
+                        max_tokens=self.max_tokens,
+                        tools=None,
+                    )
+                    if response and response.content:
+                        sanitized = self._sanitize_response(response.content)
+                        if sanitized:
+                            self.add_message("assistant", sanitized)
+                            yield StreamChunk(content=sanitized)
+                except Exception as e:
+                    logger.warning(f"Final response after context overflow failed: {e}")
+                yield StreamChunk(content="", is_final=True)
+                return
+
             if total_iterations > max_total_iterations:
                 logger.warning(
                     f"Hard iteration limit reached ({max_total_iterations}). Forcing completion."
@@ -1351,165 +2150,219 @@ class AgentOrchestrator:
                     if plain_text:
                         self.add_message("assistant", plain_text)
             elif not tool_calls:
-                # No content and no tool calls; attempt a non-stream fallback for a textual answer
-                try:
-                    response = await self.provider.chat(
-                        messages=self.messages,
-                        model=self.model,
-                        temperature=self.temperature,
-                        max_tokens=self.max_tokens,
-                        tools=None,
+                # No content and no tool calls; attempt aggressive recovery
+                logger.warning("Model returned empty response - attempting aggressive recovery")
+
+                # Aggressive retry with progressively simpler prompts and higher temperature
+                recovery_prompts = [
+                    (
+                        "Summarize your findings so far. What files did you examine? "
+                        "What patterns or issues did you notice? Keep it brief.",
+                        min(self.temperature + 0.2, 1.0),
+                    ),
+                    (
+                        "Based on the code you've seen, list 3-5 observations or suggestions.",
+                        min(self.temperature + 0.3, 1.0),
+                    ),
+                    (
+                        "What did you learn from the files? One paragraph summary.",
+                        min(self.temperature + 0.4, 1.0),
+                    ),
+                ]
+
+                recovery_success = False
+                for attempt, (prompt, temp) in enumerate(recovery_prompts, 1):
+                    logger.info(f"Recovery attempt {attempt}/3 with temp={temp:.1f}")
+
+                    # Add simplified prompt
+                    self.add_message("system", prompt)
+
+                    try:
+                        response = await self.provider.chat(
+                            messages=self.messages,
+                            model=self.model,
+                            temperature=temp,  # Higher temperature
+                            max_tokens=self.max_tokens,
+                            tools=None,  # Force text response
+                        )
+                        if response and response.content:
+                            logger.debug(
+                                f"Recovery attempt {attempt}: got {len(response.content)} chars"
+                            )
+                            sanitized = self._sanitize_response(response.content)
+                            if sanitized and len(sanitized) > 20:
+                                self.add_message("assistant", sanitized)
+                                yield StreamChunk(content=sanitized, is_final=True)
+                                recovery_success = True
+                                break
+                            elif response.content and len(response.content) > 20:
+                                # Use raw if sanitization failed but content exists
+                                yield StreamChunk(content=response.content, is_final=True)
+                                recovery_success = True
+                                break
+                        else:
+                            logger.debug(f"Recovery attempt {attempt}: empty response")
+                    except Exception as exc:
+                        logger.warning(f"Recovery attempt {attempt} failed: {exc}")
+
+                if recovery_success:
+                    return
+
+                # All recovery attempts failed - provide helpful error
+                if is_analysis_task and self.tool_calls_used > 0:
+                    # Generate a minimal summary from what we know
+                    unique_resources = self.progress_tracker.unique_resources
+                    files_examined = list(unique_resources)[:10]
+                    fallback_msg = (
+                        f"\n\n**Analysis Summary** (auto-generated)\n\n"
+                        f"Examined {len(unique_resources)} files including:\n"
+                        + "\n".join(f"- {f}" for f in files_examined)
+                        + "\n\nThe model was unable to provide detailed analysis. "
+                        "Try with a simpler query like 'analyze victor/agent/' or use a different model."
                     )
-                    if response and response.content:
-                        self.add_message("assistant", response.content)
-                        yield StreamChunk(content=response.content, is_final=True)
-                        return
-                except Exception as exc:
-                    logger.warning(f"Non-stream fallback failed: {exc}")
-                # If fallback also failed, surface a minimal message
-                fallback_msg = "No tool calls were returned and the model provided no content. Please retry or simplify the request."
+                else:
+                    fallback_msg = "No tool calls were returned and the model provided no content. Please retry or simplify the request."
                 yield StreamChunk(content=fallback_msg, is_final=True)
                 return
 
-            # Track exploration without substantial output
-            # Distinguish between exploration tools (read-only), research tools (web), and action tools (write/execute)
-            exploration_tools = {
-                "list_directory",
-                "read_file",
-                "plan_files",
-                "code_search",
-                "find_symbol",
-                "find_references",
-            }
-            research_tools = {"web_search", "web_fetch"}
-            action_tools = {
-                "write_file",
-                "execute_bash",
-                "edit_files",
-                "run_tests",
-                "git_suggest_commit",
-            }
-
-            # Check if this iteration used only exploration tools or research tools
-            tool_names = [tc.get("name") for tc in (tool_calls or [])]
-            only_exploration = (
-                all(name in exploration_tools for name in tool_names) if tool_names else False
-            )
-            has_research = (
-                any(name in research_tools for name in tool_names) if tool_names else False
-            )
-
-            # Track unique files being read for progress detection
+            # Record tool calls in progress tracker for loop detection
+            # Progress tracker handles unique resource tracking internally
             for tc in tool_calls or []:
-                if tc.get("name") == "read_file":
-                    file_path = tc.get("arguments", {}).get("path", "")
-                    if file_path:
-                        unique_files_read.add(file_path)
-                elif tc.get("name") == "list_directory":
-                    dir_path = tc.get("arguments", {}).get("path", "")
-                    if dir_path:
-                        unique_files_read.add(f"dir:{dir_path}")
+                tool_name = tc.get("name", "")
+                tool_args = tc.get("arguments", {})
 
-            # Track recent tool calls for loop detection
-            call_signature = tuple(
-                sorted(
-                    (tc.get("name", ""), str(tc.get("arguments", {}))) for tc in (tool_calls or [])
-                )
-            )
-            recent_tool_calls.append(call_signature)
-            if len(recent_tool_calls) > max_recent_calls:
-                recent_tool_calls.pop(0)
-
-            # Detect true loops: same tool call signature repeated 3+ times in recent history
-            # Also detect semantic loops: same tool names with slightly different args
-            is_true_loop = False
-            if len(recent_tool_calls) >= 3:
-                last_call = recent_tool_calls[-1]
-                repeat_count = sum(1 for c in recent_tool_calls[-5:] if c == last_call)
-                if repeat_count >= 3:
-                    is_true_loop = True
-                    logger.warning(
-                        f"True loop detected: same tool call repeated {repeat_count} times"
-                    )
-
-                # Detect semantic loops: same tools called repeatedly
-                if not is_true_loop and len(recent_tool_calls) >= 4:
-                    # Extract just tool names from signatures
-                    recent_tool_names = []
-                    for sig in recent_tool_calls[-6:]:
-                        if sig:
-                            names = [name for name, _ in sig]
-                            recent_tool_names.append(tuple(sorted(names)))
-
-                    # Check if the same set of tools keeps being called
-                    if len(recent_tool_names) >= 4:
-                        last_tools = recent_tool_names[-1]
-                        same_tools_count = sum(1 for t in recent_tool_names[-4:] if t == last_tools)
-                        if same_tools_count >= 3:
-                            is_true_loop = True
-                            logger.warning(
-                                f"Semantic loop detected: same tools ({last_tools}) called {same_tools_count} times"
-                            )
+                # Record tool call in unified progress tracker
+                # This consolidates loop detection and resource tracking
+                self.progress_tracker.record_tool_call(tool_name, tool_args)
 
             content_length = len(full_content.strip())
 
-            # Smart exploration tracking:
-            # - For analysis tasks: only force completion on true loops, not just iteration count
-            # - For other tasks: use iteration count but track progress
-            if is_analysis_task:
-                # For analysis tasks, only force completion on true loops
-                if is_true_loop:
-                    force_completion = True
-                    logger.warning("Forcing completion due to detected loop in analysis task")
-                # Log progress for analysis tasks
-                if tool_calls and only_exploration:
-                    logger.debug(
-                        f"Analysis exploration: {len(unique_files_read)} unique files examined"
-                    )
-            elif content_length < min_content_threshold and tool_calls and only_exploration:
-                # For non-analysis tasks, check if we're making progress (reading new files)
-                progress_made = len(unique_files_read) > consecutive_low_output_iterations
-                if not progress_made or is_true_loop:
-                    consecutive_low_output_iterations += 1
-                    logger.debug(
-                        f"Low output exploration iteration {consecutive_low_output_iterations}/{max_low_output_iterations} (content length: {content_length}, tools: {tool_names}, unique files: {len(unique_files_read)})"
-                    )
+            # Record iteration in unified progress tracker
+            self.progress_tracker.record_iteration(content_length)
 
-                    if consecutive_low_output_iterations >= max_low_output_iterations:
-                        force_completion = True
-                        logger.warning(
-                            f"Forcing completion after {consecutive_low_output_iterations} exploration iterations with minimal output"
-                        )
-                else:
-                    logger.debug(
-                        f"Progress detected: {len(unique_files_read)} unique files read - not counting as low-output iteration"
-                    )
-            else:
-                # Reset counter when substantial output is produced OR action tools are used
-                if content_length >= min_content_threshold or any(
-                    name in action_tools for name in tool_names
-                ):
-                    consecutive_low_output_iterations = 0
+            # Check if progress tracker recommends stopping
+            stop_reason = self.progress_tracker.should_stop()
+            if stop_reason.should_stop and not force_completion:
+                force_completion = True
+                logger.info(f"LoopDetector: {stop_reason.reason}")
 
-            # Track consecutive research calls (prevents endless web search loops)
-            if has_research:
-                consecutive_research_calls += 1
-                logger.debug(
-                    f"Research iteration {consecutive_research_calls}/{max_research_iterations} (tools: {tool_names})"
-                )
-
-                if consecutive_research_calls >= max_research_iterations:
-                    force_completion = True
-                    logger.warning(
-                        f"Forcing synthesis after {consecutive_research_calls} consecutive research calls"
-                    )
-            else:
-                # Reset research counter when non-research tools are used
-                consecutive_research_calls = 0
+            # Check task-aware force action (goal-oriented completion)
+            should_force, force_hint = self.task_tracker.should_force_action()
+            if should_force and not force_completion:
+                force_completion = True
+                logger.info(f"Task tracker forcing action: {force_hint}")
 
             logger.debug(f"After streaming pass, tool_calls = {tool_calls}")
 
             if not tool_calls:
+                # Check if model intended to continue but didn't make a tool call
+                # (common with local models that sometimes forget to actually call the tool)
+                # Use semantic intent classification instead of hardcoded phrase matching
+                intent_result = self.intent_classifier.classify_intent_sync(full_content or "")
+
+                # Only consider continuation if semantically matches continuation intent
+                # and does NOT match completion intent
+                intends_to_continue = intent_result.intent == IntentType.CONTINUATION
+                is_completion = intent_result.intent == IntentType.COMPLETION
+
+                logger.debug(
+                    f"Intent classification: {intent_result.intent.name} "
+                    f"(confidence={intent_result.confidence:.3f}, "
+                    f"top_matches={intent_result.top_matches[:2]})"
+                )
+
+                # Track continuation prompts to avoid infinite loops
+                if not hasattr(self, "_continuation_prompts"):
+                    self._continuation_prompts = 0
+
+                # For analysis tasks, if the model seems to want to continue, prompt it
+                # Allow more continuation prompts for analysis tasks
+                max_continuation_prompts = 10 if is_analysis_task else 2
+                budget_threshold = (
+                    self.tool_budget // 4 if is_analysis_task else self.tool_budget // 2
+                )
+                max_iterations = self.progress_tracker.config.max_total_iterations
+                iteration_threshold = (
+                    max_iterations * 3 // 4 if is_analysis_task else max_iterations // 2
+                )
+
+                # For analysis tasks, also continue if intent is NEUTRAL and response looks
+                # incomplete (short content without structured output)
+                content_looks_incomplete = content_length < 500 and not any(
+                    marker in (full_content or "")
+                    for marker in ["## ", "**Summary", "**Strengths", "**Weaknesses", "1. ", "2. "]
+                )
+                should_prompt_continuation = intends_to_continue or (
+                    intent_result.intent == IntentType.NEUTRAL
+                    and content_looks_incomplete
+                    and not is_completion
+                )
+
+                if (
+                    is_analysis_task
+                    and should_prompt_continuation
+                    and self.tool_calls_used < budget_threshold
+                    and self.progress_tracker.iterations < iteration_threshold
+                    and self._continuation_prompts < max_continuation_prompts
+                ):
+                    self._continuation_prompts += 1
+                    logger.info(
+                        f"Model indicated continuation intent without tool call - prompting to continue "
+                        f"(attempt {self._continuation_prompts}/{max_continuation_prompts})"
+                    )
+                    self.add_message(
+                        "system",
+                        "You said you would examine more files but did not call any tool. "
+                        "Either:\n"
+                        "1. Call list_directory to explore a directory, OR\n"
+                        "2. Call read_file to read a specific file, OR\n"
+                        "3. Provide your analysis NOW if you have enough information.\n\n"
+                        "Make a tool call or provide your summary.",
+                    )
+                    # Continue the loop to give the model another chance
+                    continue
+
+                # If we hit the continuation limit, ask for a summary instead
+                if (
+                    is_analysis_task
+                    and self._continuation_prompts >= max_continuation_prompts
+                    and self.tool_calls_used > 0
+                ):
+                    logger.info(
+                        f"Max continuation prompts ({max_continuation_prompts}) reached, requesting summary"
+                    )
+                    self.add_message(
+                        "system",
+                        "Please provide your analysis NOW based on what you have examined so far. "
+                        "Summarize the strengths, weaknesses, and improvement areas you've identified.",
+                    )
+                    # One more iteration to get the summary
+                    self._continuation_prompts = 99  # Prevent further prompting
+                    continue
+
+                # For analysis tasks with tool calls but incomplete output, request a summary
+                if (
+                    is_analysis_task
+                    and self.tool_calls_used > 0
+                    and content_looks_incomplete
+                    and not is_completion
+                    and not hasattr(self, "_final_summary_requested")
+                ):
+                    self._final_summary_requested = True
+                    logger.info(
+                        "Analysis task exiting with incomplete output - requesting final summary"
+                    )
+                    self.add_message(
+                        "system",
+                        "You have examined several files. Please provide a complete summary "
+                        "of your analysis including:\n"
+                        "1. **Strengths** - What the codebase does well\n"
+                        "2. **Weaknesses** - Areas that need improvement\n"
+                        "3. **Recommendations** - Specific suggestions for improvement\n\n"
+                        "Provide your analysis NOW.",
+                    )
+                    continue
+
                 # No more tool calls requested; finish
                 # Display performance metrics
                 elapsed_time = time.time() - start_time
@@ -1573,20 +2426,34 @@ class AgentOrchestrator:
 
             # Force final response after too many consecutive tool calls without output
             # This prevents endless tool call loops
-            max_consecutive_tool_calls = getattr(self.settings, "max_consecutive_tool_calls", 8)
+            # For analysis tasks, allow significantly more tool calls
+            base_max_consecutive = 8
+            if is_analysis_task:
+                base_max_consecutive = 50  # Analysis needs many tool calls to explore codebase
+            max_consecutive_tool_calls = getattr(
+                self.settings, "max_consecutive_tool_calls", base_max_consecutive
+            )
             if self.tool_calls_used >= max_consecutive_tool_calls and not force_completion:
                 # Check if we've been making progress (reading new files)
-                if len(unique_files_read) < self.tool_calls_used // 2:
+                # For analysis tasks, use a more lenient progress threshold
+                progress_threshold = (
+                    self.tool_calls_used // 4 if is_analysis_task else self.tool_calls_used // 2
+                )
+                if len(unique_files_read) < progress_threshold:
                     # Not making good progress - force completion
                     logger.warning(
                         f"Forcing completion: {self.tool_calls_used} tool calls but only "
-                        f"{len(unique_files_read)} unique files read"
+                        f"{len(unique_files_read)} unique files read (threshold: {progress_threshold})"
                     )
                     force_completion = True
 
             # Force completion if too many low-output iterations or research calls
             if force_completion:
-                if consecutive_research_calls >= max_research_iterations:
+                # Check stop reason from progress tracker to determine message type
+                stop_reason = self.progress_tracker.should_stop()
+                is_research_loop = "research" in stop_reason.reason.lower()
+
+                if is_research_loop:
                     yield StreamChunk(
                         content="[tool] ⚠ Research loop detected - forcing synthesis\n"
                     )
@@ -1597,10 +2464,9 @@ class AgentOrchestrator:
                         "Provide your FINAL ANSWER based on the search results you have collected. "
                         "Answer all parts of the user's question comprehensively.",
                     )
-                    context_msg = "Synthesize search results and provide final answer now"
                 else:
                     yield StreamChunk(
-                        content="[tool] ⚠ Exploration loop detected - forcing final summary\n"
+                        content="⚠️ Reached exploration limit - summarizing findings...\n"
                     )
                     self.add_message(
                         "system",
@@ -1608,26 +2474,44 @@ class AgentOrchestrator:
                         "STOP using tools now. Instead, provide your FINAL COMPREHENSIVE ANSWER based on "
                         "the information you have already gathered. Answer all parts of the user's question.",
                     )
-                    context_msg = "Provide final comprehensive answer now"
 
-                # Clear tool calls to force final response
-                tool_calls = []
-                # Continue to next iteration which will generate final response without tools
-                continue
+                # Force a final response by calling provider WITHOUT tools
+                try:
+                    response = await self.provider.chat(
+                        messages=self.messages,
+                        model=self.model,
+                        temperature=self.temperature,
+                        max_tokens=self.max_tokens,
+                        tools=None,  # No tools - force text response
+                    )
+                    if response and response.content:
+                        sanitized = self._sanitize_response(response.content)
+                        if sanitized:
+                            self.add_message("assistant", sanitized)
+                            yield StreamChunk(content=sanitized)
+                except Exception as e:
+                    logger.warning(f"Error forcing final response: {e}")
+                    yield StreamChunk(
+                        content="Unable to generate final summary. Please try a simpler query."
+                    )
+                break  # Exit the loop after forcing final response
 
             tool_calls = tool_calls[:remaining]
             for tool_call in tool_calls:
                 tool_name = tool_call.get("name", "tool")
-                yield StreamChunk(content=f"[tool] … {tool_name} started\n")
+                # Clean user-friendly message without internal [tool] prefix
+                yield StreamChunk(content=f"🔧 Running {tool_name}...\n")
 
             tool_results = await self._handle_tool_calls(tool_calls)
             for result in tool_results:
                 tool_name = result.get("name", "tool")
                 elapsed = result.get("elapsed", 0.0)
-                status = "ok" if result.get("success") else "failed"
-                yield StreamChunk(content=f"[tool] ✓ {tool_name} {status} ({elapsed:.1f}s)\n")
+                if result.get("success"):
+                    yield StreamChunk(content=f"   ✓ {tool_name} ({elapsed:.1f}s)\n")
+                else:
+                    yield StreamChunk(content=f"   ✗ {tool_name} failed\n")
 
-            yield StreamChunk(content="Generating final response...\n")
+            yield StreamChunk(content="💭 Thinking...\n")
 
             if self.observed_files:
                 evidence_note = "Evidence files read: " + ", ".join(
@@ -1698,7 +2582,6 @@ class AgentOrchestrator:
                                     "code_search",
                                     "semantic_code_search",
                                     "list_directory",
-                                    "plan_files",
                                 ]
                                 self.tool_cache.clear_namespaces(namespaces_to_clear)
                     if attempt > 0:
@@ -1835,7 +2718,8 @@ class AgentOrchestrator:
                 "tool_call", {"tool_name": tool_name, "tool_args": normalized_args}
             )
 
-            self.console.print(f"\n[bold cyan]Executing tool:[/] {tool_name}")
+            # Tool execution message handled by streaming - avoid duplicate
+            logger.debug(f"Executing tool: {tool_name}")
 
             start = time.monotonic()
 
@@ -1873,29 +2757,55 @@ class AgentOrchestrator:
             # Update conversation state machine for stage detection
             self.conversation_state.record_tool_execution(tool_name, normalized_args)
 
+            # Update task progress tracker for milestone tracking
+            result_dict = {"success": success}
+            if hasattr(exec_result, "result") and exec_result.result:
+                result_dict["result"] = exec_result.result
+            self.task_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
+            self.task_tracker.increment_iteration()
+
             # ToolExecutionResult stores actual output in .result field
             output = exec_result.result if success else None
+
+            # Check for semantic failure in result dict (e.g., edit_files returning success=False)
+            semantic_success = success
+            if success and isinstance(output, dict) and output.get("success") is False:
+                semantic_success = False
+                # Extract error from result dict
+                error_msg = output.get("error", "Operation returned success=False")
+
             # Only set error_display for failures; keep None for successes
-            error_display = None if success else (error_msg or "Unknown error")
+            error_display = None if semantic_success else (error_msg or "Unknown error")
 
             self.usage_logger.log_event(
                 "tool_result",
                 {
                     "tool_name": tool_name,
-                    "success": success,
+                    "success": semantic_success,
                     "result": output,
                     "error": error_display,
                 },
             )
 
-            if success:
-                self.console.print(
-                    f"[green]✓ Tool executed successfully[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
-                )
-                # Add tool result to conversation
+            if semantic_success:
+                # Success message handled by streaming - log for debug only
+                logger.debug(f"Tool {tool_name} executed successfully ({elapsed_ms:.0f}ms)")
+
+                # Format tool output with clear boundaries to prevent hallucination
+                # Use structured format that models recognize as authoritative
+                formatted_output = self._format_tool_output(tool_name, normalized_args, output)
+
+                # Log actual tool output for debugging (truncated for readability)
+                output_preview = str(output)[:500] if output else "<empty>"
+                if len(str(output)) > 500:
+                    output_preview += f"... [truncated, total {len(str(output))} chars]"
+                logger.debug(f"Tool '{tool_name}' actual output:\n{output_preview}")
+
+                # Add tool result to conversation with proper role
+                # Use "user" role but with clear TOOL_OUTPUT markers that models recognize
                 self.add_message(
                     "user",
-                    f"Tool '{tool_name}' result: {output}",
+                    formatted_output,
                 )
                 results.append(
                     {
@@ -1906,10 +2816,21 @@ class AgentOrchestrator:
                 )
             else:
                 self.failed_tool_signatures.add(signature)
-                # error_display was already set above from exec_result.error
+                # error_display was already set above from exec_result.error or semantic failure
                 self.console.print(
                     f"[red]✗ Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
                 )
+
+                # For semantic failures (tool ran but returned success=False), pass the
+                # error details back to the model so it can understand and retry
+                if success and not semantic_success:
+                    # Tool executed but had semantic failure - give model actionable feedback
+                    error_output = output if isinstance(output, dict) else {"error": error_display}
+                    formatted_error = self._format_tool_output(
+                        tool_name, normalized_args, error_output
+                    )
+                    self.add_message("user", formatted_error)
+
                 results.append(
                     {
                         "name": tool_name,
@@ -1921,21 +2842,230 @@ class AgentOrchestrator:
         return results
 
     def reset_conversation(self) -> None:
-        """Clear conversation history."""
+        """Clear conversation history and session state.
+
+        Resets:
+        - Conversation history
+        - Tool call counter
+        - Failed tool signatures cache
+        - Observed files list
+        - Executed tools list
+        - Conversation state machine
+        """
         self.conversation.clear()
         self._system_added = False
+
+        # Reset session-specific state to prevent memory leaks
+        self.tool_calls_used = 0
+        self.failed_tool_signatures.clear()
+        self.observed_files.clear()
+        self.executed_tools.clear()
+
+        # Reset conversation state machine
+        if hasattr(self, "conversation_state"):
+            self.conversation_state.reset()
+
+        logger.debug("Conversation and session state reset")
+
+    def request_cancellation(self) -> None:
+        """Request cancellation of the current streaming operation.
+
+        Safe to call even if not streaming. The cancellation will take
+        effect at the next check point in the stream loop.
+        """
+        if self._cancel_event:
+            self._cancel_event.set()
+            logger.info("Cancellation requested for streaming operation")
+
+    def is_streaming(self) -> bool:
+        """Check if a streaming operation is currently in progress.
+
+        Returns:
+            True if streaming, False otherwise.
+        """
+        return self._is_streaming
+
+    def _check_cancellation(self) -> bool:
+        """Check if cancellation has been requested.
+
+        Returns:
+            True if cancelled, False otherwise.
+        """
+        if self._cancel_event and self._cancel_event.is_set():
+            return True
+        return False
+
+    # =========================================================================
+    # Conversation Memory Management
+    # =========================================================================
+
+    def get_memory_session_id(self) -> Optional[str]:
+        """Get the current memory session ID.
+
+        Returns:
+            Session ID or None if memory manager not enabled.
+        """
+        return self._memory_session_id
+
+    def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get recent conversation sessions for recovery.
+
+        Args:
+            limit: Maximum number of sessions to return
+
+        Returns:
+            List of session metadata dictionaries
+        """
+        if not self.memory_manager:
+            return []
+
+        try:
+            sessions = self.memory_manager.list_sessions(limit=limit)
+            return [
+                {
+                    "session_id": s.session_id,
+                    "created_at": s.created_at.isoformat() if s.created_at else None,
+                    "last_activity": s.last_activity.isoformat() if s.last_activity else None,
+                    "project_path": s.project_path,
+                    "provider": s.provider,
+                    "model": s.model,
+                    "message_count": len(s.messages),
+                }
+                for s in sessions
+            ]
+        except Exception as e:
+            logger.warning(f"Failed to get recent sessions: {e}")
+            return []
+
+    def recover_session(self, session_id: str) -> bool:
+        """Recover a previous conversation session.
+
+        Args:
+            session_id: ID of the session to recover
+
+        Returns:
+            True if session was recovered successfully
+        """
+        if not self.memory_manager:
+            logger.warning("Memory manager not enabled, cannot recover session")
+            return False
+
+        try:
+            session = self.memory_manager.get_session(session_id)
+            if not session:
+                logger.warning(f"Session not found: {session_id}")
+                return False
+
+            # Update current session
+            self._memory_session_id = session_id
+
+            # Restore messages to in-memory conversation
+            self.conversation.clear()
+            for msg in session.messages:
+                provider_msg = msg.to_provider_format()
+                self.conversation.add_message(
+                    role=provider_msg["role"],
+                    content=provider_msg["content"],
+                )
+
+            logger.info(
+                f"Recovered session {session_id[:8]}... " f"with {len(session.messages)} messages"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to recover session {session_id}: {e}")
+            return False
+
+    def get_memory_context(self, max_tokens: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get token-aware context messages from memory manager.
+
+        Uses intelligent pruning to select the most relevant messages
+        within token budget. Useful for long conversations.
+
+        Args:
+            max_tokens: Override max tokens for this retrieval
+
+        Returns:
+            List of messages in provider format
+        """
+        if not self.memory_manager or not self._memory_session_id:
+            # Fall back to in-memory conversation
+            return [msg.model_dump() for msg in self.messages]
+
+        try:
+            return self.memory_manager.get_context_messages(
+                session_id=self._memory_session_id,
+                max_tokens=max_tokens,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to get memory context: {e}, using in-memory")
+            return [msg.model_dump() for msg in self.messages]
+
+    def get_session_stats(self) -> Dict[str, Any]:
+        """Get statistics for the current memory session.
+
+        Returns:
+            Dictionary with session statistics
+        """
+        if not self.memory_manager or not self._memory_session_id:
+            return {
+                "enabled": False,
+                "session_id": None,
+                "message_count": len(self.messages),
+            }
+
+        try:
+            session = self.memory_manager.get_session(self._memory_session_id)
+            if not session:
+                return {
+                    "enabled": True,
+                    "session_id": self._memory_session_id,
+                    "error": "Session not found",
+                }
+
+            total_tokens = sum(m.token_count for m in session.messages)
+            return {
+                "enabled": True,
+                "session_id": self._memory_session_id,
+                "message_count": len(session.messages),
+                "total_tokens": total_tokens,
+                "max_tokens": session.max_tokens,
+                "reserved_tokens": session.reserved_tokens,
+                "available_tokens": session.max_tokens - session.reserved_tokens - total_tokens,
+                "project_path": session.project_path,
+                "provider": session.provider,
+                "model": session.model,
+            }
+        except Exception as e:
+            logger.warning(f"Failed to get session stats: {e}")
+            return {"enabled": True, "session_id": self._memory_session_id, "error": str(e)}
 
     async def shutdown(self) -> None:
         """Clean up resources and shutdown gracefully.
 
         Should be called when the orchestrator is no longer needed.
         Cleans up:
+        - Background async tasks
         - Provider connections
         - Code execution manager (Docker containers)
         - Semantic selector resources
         - HTTP clients
         """
         logger.info("Shutting down AgentOrchestrator...")
+
+        # Cancel all background tasks first
+        if self._background_tasks:
+            logger.debug(f"Cancelling {len(self._background_tasks)} background task(s)...")
+            for task in self._background_tasks:
+                if not task.done():
+                    task.cancel()
+
+            # Wait for all tasks to complete cancellation
+            if self._background_tasks:
+                await asyncio.gather(*self._background_tasks, return_exceptions=True)
+            self._background_tasks.clear()
+            logger.debug("Background tasks cancelled")
 
         # Log final analytics
         self.usage_logger.log_event(

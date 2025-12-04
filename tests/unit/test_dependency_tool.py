@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for dependency_tool module."""
+"""Tests for unified dependency tool module."""
 
 import json
 import pytest
@@ -20,13 +20,7 @@ from unittest.mock import Mock, patch
 import subprocess
 
 from victor.tools.dependency_tool import (
-    dependency_list,
-    dependency_outdated,
-    dependency_security,
-    dependency_generate,
-    dependency_update,
-    dependency_tree,
-    dependency_check,
+    dependency,
     _parse_version,
     _version_satisfies,
 )
@@ -47,7 +41,6 @@ class TestHelperFunctions:
 
     def test_parse_version_invalid(self):
         """Test parsing invalid version."""
-        # "invalid" has no digits, so returns empty tuple
         assert _parse_version("invalid") == ()
         assert _parse_version("") == ()
 
@@ -59,7 +52,7 @@ class TestHelperFunctions:
 
 
 class TestDependencyList:
-    """Tests for dependency_list function."""
+    """Tests for dependency list action."""
 
     @pytest.mark.asyncio
     async def test_dependency_list_success(self):
@@ -75,7 +68,7 @@ class TestDependencyList:
         mock_result.returncode = 0
 
         with patch("subprocess.run", return_value=mock_result):
-            result = await dependency_list()
+            result = await dependency(action="list")
 
             assert result["success"] is True
             assert result["count"] == 3
@@ -90,7 +83,7 @@ class TestDependencyList:
         mock_result.returncode = 0
 
         with patch("subprocess.run", return_value=mock_result):
-            result = await dependency_list()
+            result = await dependency(action="list")
 
             assert result["success"] is True
             assert result["count"] == 0
@@ -101,14 +94,14 @@ class TestDependencyList:
         with patch(
             "subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")
         ):
-            result = await dependency_list()
+            result = await dependency(action="list")
 
             assert result["success"] is False
             assert "error" in result
 
 
 class TestDependencyOutdated:
-    """Tests for dependency_outdated function."""
+    """Tests for dependency outdated action."""
 
     @pytest.mark.asyncio
     async def test_dependency_outdated_with_updates(self):
@@ -124,7 +117,7 @@ class TestDependencyOutdated:
         mock_result.returncode = 0
 
         with patch("subprocess.run", return_value=mock_result):
-            result = await dependency_outdated()
+            result = await dependency(action="outdated")
 
             assert result["success"] is True
             assert result["count"] == 3
@@ -141,7 +134,7 @@ class TestDependencyOutdated:
         mock_result.returncode = 0
 
         with patch("subprocess.run", return_value=mock_result):
-            result = await dependency_outdated()
+            result = await dependency(action="outdated")
 
             assert result["success"] is True
             assert result["count"] == 0
@@ -153,14 +146,14 @@ class TestDependencyOutdated:
         with patch(
             "subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")
         ):
-            result = await dependency_outdated()
+            result = await dependency(action="outdated")
 
             assert result["success"] is False
             assert "error" in result
 
 
 class TestDependencySecurity:
-    """Tests for dependency_security function."""
+    """Tests for dependency security action."""
 
     @pytest.mark.asyncio
     async def test_dependency_security_with_vulnerabilities(self):
@@ -176,11 +169,10 @@ class TestDependencySecurity:
         mock_result.returncode = 0
 
         with patch("subprocess.run", return_value=mock_result):
-            result = await dependency_security()
+            result = await dependency(action="security")
 
             assert result["success"] is True
             assert "vulnerabilities" in result
-            # Should find vulnerabilities in django and pillow
             assert result["count"] >= 0
 
     @pytest.mark.asyncio
@@ -196,7 +188,7 @@ class TestDependencySecurity:
         mock_result.returncode = 0
 
         with patch("subprocess.run", return_value=mock_result):
-            result = await dependency_security()
+            result = await dependency(action="security")
 
             assert result["success"] is True
             assert result["count"] == 0
@@ -207,14 +199,14 @@ class TestDependencySecurity:
         with patch(
             "subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")
         ):
-            result = await dependency_security()
+            result = await dependency(action="security")
 
             assert result["success"] is False
             assert "error" in result
 
 
 class TestDependencyGenerate:
-    """Tests for dependency_generate function."""
+    """Tests for dependency generate action."""
 
     @pytest.mark.asyncio
     async def test_dependency_generate_success(self):
@@ -223,13 +215,12 @@ class TestDependencyGenerate:
         mock_result.stdout = "requests==2.28.0\npytest==7.2.0"
         mock_result.returncode = 0
 
-        # Mock both subprocess.run and Path.write_text
         with patch("subprocess.run", return_value=mock_result):
             with patch("pathlib.Path.write_text"):
-                result = await dependency_generate(output="test_requirements.txt")
+                result = await dependency(action="generate", output="test_requirements.txt")
 
                 assert result["success"] is True
-                assert "file" in result  # Function returns 'file', not 'output_file'
+                assert "file" in result
 
     @pytest.mark.asyncio
     async def test_dependency_generate_error(self):
@@ -237,20 +228,19 @@ class TestDependencyGenerate:
         with patch(
             "subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")
         ):
-            result = await dependency_generate()
+            result = await dependency(action="generate")
 
             assert result["success"] is False
             assert "error" in result
 
 
 class TestDependencyUpdate:
-    """Tests for dependency_update function."""
+    """Tests for dependency update action."""
 
     @pytest.mark.asyncio
     async def test_dependency_update_dry_run(self):
         """Test updating packages in dry run mode."""
-        # Dry run returns immediately without calling subprocess
-        result = await dependency_update(packages=["requests"], dry_run=True)
+        result = await dependency(action="update", packages=["requests"], dry_run=True)
 
         assert result["success"] is True
         assert "would_update" in result
@@ -264,7 +254,7 @@ class TestDependencyUpdate:
         mock_result.returncode = 0
 
         with patch("subprocess.run", return_value=mock_result):
-            result = await dependency_update(packages=["requests"], dry_run=False)
+            result = await dependency(action="update", packages=["requests"], dry_run=False)
 
             assert result["success"] is True
             assert "updated" in result
@@ -272,7 +262,7 @@ class TestDependencyUpdate:
     @pytest.mark.asyncio
     async def test_dependency_update_empty_packages(self):
         """Test update with empty package list."""
-        result = await dependency_update(packages=[])
+        result = await dependency(action="update", packages=[])
 
         assert result["success"] is False
         assert "No packages specified" in result["error"]
@@ -283,24 +273,27 @@ class TestDependencyUpdate:
         with patch(
             "subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")
         ):
-            result = await dependency_update(packages=["invalid-package"], dry_run=False)
+            result = await dependency(action="update", packages=["invalid-package"], dry_run=False)
 
             assert result["success"] is False
             assert "error" in result
 
 
 class TestDependencyTree:
-    """Tests for dependency_tree function."""
+    """Tests for dependency tree action."""
 
     @pytest.mark.asyncio
     async def test_dependency_tree_all_packages(self):
         """Test showing dependency tree for all packages."""
+        mock_check = Mock()
+        mock_check.returncode = 0
+
         mock_result = Mock()
         mock_result.stdout = "requests==2.28.0\n  - urllib3 [required: >=1.26, installed: 1.26.9]"
         mock_result.returncode = 0
 
-        with patch("subprocess.run", return_value=mock_result):
-            result = await dependency_tree()
+        with patch("subprocess.run", side_effect=[mock_check, mock_result]):
+            result = await dependency(action="tree")
 
             assert result["success"] is True
             assert "tree" in result
@@ -308,36 +301,40 @@ class TestDependencyTree:
     @pytest.mark.asyncio
     async def test_dependency_tree_specific_package(self):
         """Test showing dependency tree for specific package."""
+        mock_check = Mock()
+        mock_check.returncode = 0
+
         mock_result = Mock()
         mock_result.stdout = "requests==2.28.0\n  - urllib3"
         mock_result.returncode = 0
 
-        with patch("subprocess.run", return_value=mock_result):
-            result = await dependency_tree(package="requests")
+        with patch("subprocess.run", side_effect=[mock_check, mock_result]):
+            result = await dependency(action="tree", package="requests")
 
             assert result["success"] is True
             assert "package" in result
 
     @pytest.mark.asyncio
-    async def test_dependency_tree_error(self):
-        """Test error handling in dependency tree."""
-        with patch(
-            "subprocess.run", side_effect=subprocess.CalledProcessError(1, "pip", stderr="Error")
-        ):
-            result = await dependency_tree()
+    async def test_dependency_tree_no_pipdeptree(self):
+        """Test error when pipdeptree not installed."""
+        mock_check = Mock()
+        mock_check.returncode = 1
+
+        with patch("subprocess.run", return_value=mock_check):
+            result = await dependency(action="tree")
 
             assert result["success"] is False
-            assert "error" in result
+            assert "pipdeptree not installed" in result["error"]
 
 
 class TestDependencyCheck:
-    """Tests for dependency_check function."""
+    """Tests for dependency check action."""
 
     @pytest.mark.asyncio
     async def test_dependency_check_file_not_found(self):
         """Test checking non-existent requirements file."""
         with patch("pathlib.Path.exists", return_value=False):
-            result = await dependency_check(requirements_file="nonexistent.txt")
+            result = await dependency(action="check", requirements_file="nonexistent.txt")
 
             assert result["success"] is False
             assert "not found" in result["error"]
@@ -358,24 +355,18 @@ class TestDependencyCheck:
         with patch("pathlib.Path.exists", return_value=True):
             with patch("pathlib.Path.read_text", return_value=mock_content):
                 with patch("subprocess.run", return_value=mock_result):
-                    result = await dependency_check(requirements_file="requirements.txt")
+                    result = await dependency(action="check", requirements_file="requirements.txt")
 
                     assert result["success"] is True
                     assert "satisfied_count" in result
 
+
+class TestDependencyUnknownAction:
+    """Tests for unknown action handling."""
+
     @pytest.mark.asyncio
-    async def test_dependency_check_empty_file(self):
-        """Test checking empty requirements file."""
-        mock_installed = []
-
-        mock_result = Mock()
-        mock_result.stdout = json.dumps(mock_installed)
-        mock_result.returncode = 0
-
-        with patch("pathlib.Path.exists", return_value=True):
-            with patch("pathlib.Path.read_text", return_value=""):
-                with patch("subprocess.run", return_value=mock_result):
-                    result = await dependency_check(requirements_file="requirements.txt")
-
-                    assert result["success"] is True
-                    assert result["satisfied_count"] == 0
+    async def test_unknown_action(self):
+        """Test unknown action returns error."""
+        result = await dependency(action="invalid_action")
+        assert result["success"] is False
+        assert "Unknown action" in result["error"]

@@ -36,16 +36,36 @@ async def edit_files(
     """
     Unified file editing with transaction support.
 
-    Perform multiple file operations (create, modify, delete, rename) in a single
-    transaction with built-in preview and rollback capability. Consolidates all
-    file editing functionality into one unified interface.
+    Perform multiple file operations in a single transaction with built-in
+    preview and rollback capability.
+
+    OPERATION TYPES:
+        - "replace" (RECOMMENDED for edits): Surgical string replacement. Only
+          changes the exact matched text, preserving the rest of the file.
+          Use this for fixing bugs, refactoring, or adding code to existing files.
+          Requires: old_str (exact text to find), new_str (replacement text).
+          FAILS if old_str not found or matches multiple times (ambiguous).
+
+        - "create": Create a new file. Use for new files only.
+          Requires: path, content.
+
+        - "modify": Replace ENTIRE file content. Use only when you need to
+          completely rewrite a file. For surgical edits, use "replace" instead.
+          Requires: path, content (or new_content).
+
+        - "delete": Remove a file.
+          Requires: path.
+
+        - "rename": Move/rename a file.
+          Requires: path, new_path.
 
     Args:
         operations: List of file operations. Each operation is a dict with:
-            - type: "create", "modify", "delete", or "rename" (required)
+            - type: "replace", "create", "modify", "delete", or "rename" (required)
             - path: File path (required)
-            - content: File content (for create/modify, optional for create)
-            - new_content: New file content (alias for content in modify)
+            - old_str: Text to find and replace (required for "replace")
+            - new_str: Replacement text (required for "replace")
+            - content: File content (for create/modify)
             - new_path: New file path (required for rename)
         preview: If True, show diff preview without applying changes (default: False).
         auto_commit: If True, automatically commit changes after queuing (default: True).
@@ -63,10 +83,17 @@ async def edit_files(
         - error: Error message if failed
 
     Examples:
-        # Create and modify files
+        # RECOMMENDED: Surgical edit with replace (most token-efficient)
+        edit_files(operations=[{
+            "type": "replace",
+            "path": "foo.py",
+            "old_str": "def calculate():\\n    return 1",
+            "new_str": "def calculate():\\n    return 42"
+        }])
+
+        # Create a new file
         edit_files(operations=[
-            {"type": "create", "path": "foo.py", "content": "print('hello')"},
-            {"type": "modify", "path": "bar.py", "content": "updated content"}
+            {"type": "create", "path": "new_file.py", "content": "print('hello')"}
         ])
 
         # Delete and rename files
@@ -75,11 +102,10 @@ async def edit_files(
             {"type": "rename", "path": "temp.py", "new_path": "final.py"}
         ])
 
-        # Preview changes without applying
-        edit_files(operations=[...], preview=True, auto_commit=False)
-
-        # Queue operations without committing
-        edit_files(operations=[...], auto_commit=False)
+        # Full file rewrite (use sparingly - prefer "replace" for edits)
+        edit_files(operations=[
+            {"type": "modify", "path": "config.py", "content": "# Complete new content"}
+        ])
     """
     # Allow callers (models) to pass operations as a JSON string; normalize to list[dict]
     if isinstance(operations, str):
@@ -105,10 +131,10 @@ async def edit_files(
         if not op_type:
             return {"success": False, "error": f"Operation {i} missing required field: type"}
 
-        if op_type not in ["create", "modify", "delete", "rename"]:
+        if op_type not in ["create", "modify", "delete", "rename", "replace"]:
             return {
                 "success": False,
-                "error": f"Operation {i} has invalid type: {op_type}. Must be create, modify, delete, or rename",
+                "error": f"Operation {i} has invalid type: {op_type}. Must be create, modify, delete, rename, or replace",
             }
 
         if "path" not in op:
@@ -121,10 +147,16 @@ async def edit_files(
                 "error": f"Rename operation {i} missing required field: new_path",
             }
 
+    from victor.agent.change_tracker import ChangeType, get_change_tracker
+
     # Initialize editor
     backup_dir = Path.home() / ".victor" / "backups"
     editor = FileEditor(backup_dir=str(backup_dir))
     transaction_id = editor.start_transaction(description)
+
+    # Initialize change tracker for undo/redo
+    tracker = get_change_tracker()
+    tracker.begin_change_group("edit_files", description or f"Edit {len(operations)} files")
 
     # Count operations by type
     by_type = {"create": 0, "modify": 0, "delete": 0, "rename": 0}
@@ -134,11 +166,21 @@ async def edit_files(
         for op in operations:
             op_type = op["type"]
             path = op["path"]
+            file_path = Path(path).expanduser().resolve()
 
             if op_type == "create":
                 content = op.get("content", "")
                 editor.add_create(path, content)
                 by_type["create"] += 1
+                # Track for undo
+                tracker.record_change(
+                    file_path=str(file_path),
+                    change_type=ChangeType.CREATE,
+                    original_content=None,
+                    new_content=content,
+                    tool_name="edit_files",
+                    tool_args={"type": "create", "path": path},
+                )
 
             elif op_type == "modify":
                 # Support both "content" and "new_content" keys
@@ -148,20 +190,135 @@ async def edit_files(
                         "success": False,
                         "error": f"Modify operation for {path} missing content or new_content",
                     }
+                # Read original content for undo
+                original_content = None
+                if file_path.exists():
+                    original_content = file_path.read_text(encoding="utf-8")
                 editor.add_modify(path, content)
                 by_type["modify"] += 1
+                # Track for undo
+                tracker.record_change(
+                    file_path=str(file_path),
+                    change_type=ChangeType.MODIFY,
+                    original_content=original_content,
+                    new_content=content,
+                    tool_name="edit_files",
+                    tool_args={"type": "modify", "path": path},
+                )
 
             elif op_type == "delete":
+                # Read content before delete for undo
+                original_content = None
+                if file_path.exists():
+                    original_content = file_path.read_text(encoding="utf-8")
                 editor.add_delete(path)
                 by_type["delete"] += 1
+                # Track for undo
+                tracker.record_change(
+                    file_path=str(file_path),
+                    change_type=ChangeType.DELETE,
+                    original_content=original_content,
+                    new_content=None,
+                    tool_name="edit_files",
+                    tool_args={"type": "delete", "path": path},
+                )
 
             elif op_type == "rename":
                 new_path = op["new_path"]
                 editor.add_rename(path, new_path)
                 by_type["rename"] += 1
+                # Track for undo
+                new_file_path = Path(new_path).expanduser().resolve()
+                tracker.record_change(
+                    file_path=str(new_file_path),
+                    change_type=ChangeType.RENAME,
+                    original_path=str(file_path),
+                    tool_name="edit_files",
+                    tool_args={"type": "rename", "path": path, "new_path": new_path},
+                )
+
+            elif op_type == "replace":
+                # Surgical string replacement (Claude Code style)
+                old_str = op.get("old_str")
+                new_str = op.get("new_str")
+
+                if old_str is None:
+                    return {
+                        "success": False,
+                        "error": f"Replace operation for {path} missing required field: old_str",
+                    }
+                if new_str is None:
+                    return {
+                        "success": False,
+                        "error": f"Replace operation for {path} missing required field: new_str",
+                    }
+
+                # File must exist for replace
+                if not file_path.exists():
+                    return {
+                        "success": False,
+                        "error": f"Replace operation failed: file {path} does not exist",
+                    }
+
+                # Read current content
+                original_content = file_path.read_text(encoding="utf-8")
+
+                # Check if old_str exists in file
+                occurrences = original_content.count(old_str)
+                if occurrences == 0:
+                    # Build helpful error message
+                    old_str_preview = old_str[:80] + "..." if len(old_str) > 80 else old_str
+                    old_str_first_line = old_str.split("\n")[0][:60]
+
+                    # Try to find similar content to help debug
+                    hint = ""
+                    if old_str_first_line in original_content:
+                        hint = (
+                            f" The first line '{old_str_first_line}' exists in file but "
+                            f"subsequent lines don't match. Check line endings and indentation."
+                        )
+                    elif old_str.rstrip() in original_content:
+                        hint = " Found match without trailing whitespace. Remove trailing newlines from old_str."
+                    elif old_str.lstrip() in original_content:
+                        hint = " Found match without leading whitespace. Check indentation at start of old_str."
+
+                    return {
+                        "success": False,
+                        "error": (
+                            f"Replace operation failed: old_str not found in {path}.{hint} "
+                            f"Make sure the string matches exactly including whitespace. "
+                            f"Searched for: {repr(old_str_preview)}"
+                        ),
+                    }
+                if occurrences > 1:
+                    return {
+                        "success": False,
+                        "error": f"Replace operation failed: old_str found {occurrences} times in {path}. "
+                        f"Ambiguous match - provide more context to make the match unique.",
+                    }
+
+                # Perform replacement
+                new_content = original_content.replace(old_str, new_str, 1)
+
+                # Queue as a modify operation
+                editor.add_modify(path, new_content)
+                if "replace" not in by_type:
+                    by_type["replace"] = 0
+                by_type["replace"] += 1
+
+                # Track for undo
+                tracker.record_change(
+                    file_path=str(file_path),
+                    change_type=ChangeType.MODIFY,
+                    original_content=original_content,
+                    new_content=new_content,
+                    tool_name="edit_files",
+                    tool_args={"type": "replace", "path": path, "old_str": old_str[:50]},
+                )
 
     except Exception as e:
         editor.abort()
+        tracker.commit_change_group()  # Empty commit to reset state
         return {"success": False, "error": f"Failed to queue operations: {str(e)}"}
 
     operations_queued = len(operations)
@@ -213,19 +370,24 @@ async def edit_files(
     if auto_commit:
         success = editor.commit(dry_run=False)
         if success:
+            # Commit the change group for undo/redo
+            tracker.commit_change_group()
             return {
                 "success": True,
                 "operations_queued": operations_queued,
                 "operations_applied": operations_queued,
                 "by_type": by_type,
-                "message": f"Successfully applied {operations_queued} operations",
+                "message": f"Successfully applied {operations_queued} operations. Use /undo to revert.",
                 "transaction_id": transaction_id,
             }
         else:
+            # Clear change group on failure
+            tracker._current_group = None
             return {"success": False, "error": "Failed to commit changes. Transaction rolled back."}
     else:
         # Queue only, don't commit
         editor.abort()  # Abort to clean up, since we're not committing
+        tracker._current_group = None  # Clear uncommitted changes
         return {
             "success": True,
             "operations_queued": operations_queued,
@@ -233,19 +395,3 @@ async def edit_files(
             "by_type": by_type,
             "message": f"Queued {operations_queued} operations (not applied, auto_commit=False)",
         }
-
-
-# Keep the class for backward compatibility during transition
-# This can be removed once all imports are updated
-class FileEditorTool:
-    """Deprecated: Use edit_files function instead."""
-
-    def __init__(self):
-        """Initialize - deprecated."""
-        import warnings
-
-        warnings.warn(
-            "FileEditorTool class is deprecated. Use edit_files function instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )

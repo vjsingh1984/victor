@@ -99,7 +99,7 @@ class ProviderRegistry:
 # Auto-register all providers
 def _register_default_providers() -> None:
     """Register all default providers."""
-    from victor.providers.ollama import OllamaProvider
+    from victor.providers.ollama_provider import OllamaProvider
     from victor.providers.anthropic_provider import AnthropicProvider
     from victor.providers.openai_provider import OpenAIProvider
     from victor.providers.google_provider import GoogleProvider

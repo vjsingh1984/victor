@@ -43,9 +43,9 @@ def chroma_config():
 def mock_chromadb():
     """Mock ChromaDB client and collection."""
     # Check if chromadb is available first
-    try:
-        import chromadb
-    except ImportError:
+    import importlib.util
+
+    if importlib.util.find_spec("chromadb") is None:
         pytest.skip("chromadb not installed")
 
     # Patch chromadb.Client directly instead of through module

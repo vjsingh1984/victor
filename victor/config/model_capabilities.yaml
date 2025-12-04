@@ -246,3 +246,19 @@ models:
     native_tool_calls: false
     requires_strict_prompting: true
     recommended_tool_budget: 10
+
+  # GPT-OSS (GPT-style open source model)
+  "gpt-oss*":
+    native_tool_calls: true
+    streaming_tool_calls: false
+    parallel_tool_calls: true
+    requires_strict_prompting: false
+    recommended_tool_budget: 15
+
+  # Gemma3 models with tool support
+  "gemma3*":
+    native_tool_calls: true
+    streaming_tool_calls: false
+    parallel_tool_calls: true
+    requires_strict_prompting: false
+    recommended_tool_budget: 12

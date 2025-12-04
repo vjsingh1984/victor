@@ -12,27 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Cache management tool for controlling Victor's caching system.
+"""Unified cache management tool for Victor's caching system.
 
-Features:
-- Cache statistics
-- Cache clearing
-- Cache configuration
+Consolidates all cache operations into a single tool for better token efficiency.
+Supports: stats, clear, info.
 """
 
 from typing import Dict, Any, Optional
 import logging
 
 from victor.tools.decorators import tool
-from victor.cache.manager import CacheManager
+from victor.cache.tiered_cache import TieredCache
 
 logger = logging.getLogger(__name__)
 
 # Global cache manager instance (set by orchestrator)
-_cache_manager: Optional[CacheManager] = None
+# Using TieredCache (renamed from CacheManager)
+_cache_manager: Optional[TieredCache] = None
 
 
-def set_cache_manager(manager: CacheManager) -> None:
+def set_cache_manager(manager: TieredCache) -> None:
     """Set the global cache manager instance.
 
     Args:
@@ -42,23 +41,8 @@ def set_cache_manager(manager: CacheManager) -> None:
     _cache_manager = manager
 
 
-@tool
-async def cache_stats() -> Dict[str, Any]:
-    """
-    Get cache statistics and performance metrics.
-
-    Shows hit rates, counts, and cache sizes for Victor's tiered
-    caching system (memory + disk).
-
-    Returns:
-        Dictionary containing:
-        - memory_hit_rate: Percentage of cache hits in memory
-        - disk_hit_rate: Percentage of cache hits on disk
-        - memory_hits, memory_misses: Memory cache statistics
-        - disk_hits, disk_misses: Disk cache statistics
-        - memory_size, disk_size: Current cache sizes
-        - formatted_report: Human-readable statistics report
-    """
+async def _do_stats() -> Dict[str, Any]:
+    """Get cache statistics."""
     if _cache_manager is None:
         return {"success": False, "error": "Cache manager not initialized"}
 
@@ -98,24 +82,8 @@ async def cache_stats() -> Dict[str, Any]:
     return {"success": True, "stats": stats, "formatted_report": "\n".join(report)}
 
 
-@tool
-async def cache_clear(namespace: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Clear cache entries.
-
-    Can clear all cache or just a specific namespace. This affects
-    both memory and disk caches.
-
-    Args:
-        namespace: Optional namespace to clear (e.g., "responses", "embeddings").
-                  If not provided, clears all cache.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - cleared_count: Number of entries cleared
-        - message: Human-readable result message
-    """
+async def _do_clear(namespace: Optional[str] = None) -> Dict[str, Any]:
+    """Clear cache entries."""
     if _cache_manager is None:
         return {"success": False, "error": "Cache manager not initialized"}
 
@@ -134,19 +102,8 @@ async def cache_clear(namespace: Optional[str] = None) -> Dict[str, Any]:
         return {"success": False, "error": f"Failed to clear cache: {str(e)}"}
 
 
-@tool
-async def cache_info() -> Dict[str, Any]:
-    """
-    Get cache configuration information.
-
-    Shows the current cache settings including memory/disk
-    configuration, TTL settings, and enabled features.
-
-    Returns:
-        Dictionary containing:
-        - config: Raw configuration dictionary
-        - formatted_report: Human-readable configuration report
-    """
+async def _do_info() -> Dict[str, Any]:
+    """Get cache configuration info."""
     if _cache_manager is None:
         return {"success": False, "error": "Cache manager not initialized"}
 
@@ -177,11 +134,11 @@ async def cache_info() -> Dict[str, Any]:
     report.append("")
 
     report.append("Features:")
-    report.append("  ✓ Automatic tiering (memory → disk → source)")
-    report.append("  ✓ TTL-based expiration")
-    report.append("  ✓ Thread-safe operations")
-    report.append("  ✓ Persistent across restarts (disk cache)")
-    report.append("  ✓ Zero external dependencies")
+    report.append("  - Automatic tiering (memory -> disk -> source)")
+    report.append("  - TTL-based expiration")
+    report.append("  - Thread-safe operations")
+    report.append("  - Persistent across restarts (disk cache)")
+    report.append("  - Zero external dependencies")
 
     return {
         "success": True,
@@ -196,3 +153,60 @@ async def cache_info() -> Dict[str, Any]:
         },
         "formatted_report": "\n".join(report),
     }
+
+
+@tool
+async def cache(
+    action: str,
+    namespace: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Unified cache management tool for Victor's tiered caching system.
+
+    Actions:
+    - stats: Get cache statistics and performance metrics
+    - clear: Clear cache entries (optionally by namespace)
+    - info: Get cache configuration information
+
+    Args:
+        action: Operation to perform - 'stats', 'clear', or 'info'.
+        namespace: Optional namespace for clear action (e.g., "responses", "embeddings").
+                  If not provided with clear, clears all cache.
+
+    Returns:
+        Dictionary containing:
+        - success: Whether operation succeeded
+        - For stats: stats dict, formatted_report
+        - For clear: cleared_count, message
+        - For info: config dict, formatted_report
+        - error: Error message if failed
+
+    Examples:
+        # Get cache statistics
+        cache(action="stats")
+
+        # Clear all cache
+        cache(action="clear")
+
+        # Clear specific namespace
+        cache(action="clear", namespace="responses")
+
+        # Get cache configuration
+        cache(action="info")
+    """
+    action_lower = action.lower().strip()
+
+    if action_lower == "stats":
+        return await _do_stats()
+
+    elif action_lower == "clear":
+        return await _do_clear(namespace)
+
+    elif action_lower == "info":
+        return await _do_info()
+
+    else:
+        return {
+            "success": False,
+            "error": f"Unknown action: {action}. Valid actions: stats, clear, info",
+        }

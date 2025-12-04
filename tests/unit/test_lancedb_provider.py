@@ -43,9 +43,9 @@ def lancedb_config():
 def mock_lancedb():
     """Mock LanceDB client and table."""
     # Check if lancedb is available, skip tests if not
-    try:
-        import lancedb
-    except ImportError:
+    import importlib.util
+
+    if importlib.util.find_spec("lancedb") is None:
         pytest.skip("lancedb not installed")
 
     with patch("lancedb.connect") as mock_connect:

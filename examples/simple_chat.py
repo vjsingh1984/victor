@@ -18,7 +18,7 @@ import asyncio
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings
-from victor.providers.ollama import OllamaProvider
+from victor.providers.ollama_provider import OllamaProvider
 
 
 async def main():

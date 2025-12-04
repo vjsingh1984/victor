@@ -161,7 +161,7 @@ Example test structure:
 
 ```python
 import pytest
-from victor.providers.ollama import OllamaProvider
+from victor.providers.ollama_provider import OllamaProvider
 
 @pytest.fixture
 async def ollama_provider():

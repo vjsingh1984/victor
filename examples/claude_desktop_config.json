@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "victor": {
+      "command": "victor",
+      "args": ["mcp"],
+      "env": {}
+    }
+  }
+}

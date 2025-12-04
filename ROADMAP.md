@@ -246,6 +246,63 @@ Month 5+:   IDE plugin, advanced features
 4. Run checks: `black . && ruff check . && mypy victor && pytest`
 5. Submit PR referencing this roadmap
 
+---
+
+## Benchmarks & Metrics Integration
+
+### Industry-Standard Benchmarks
+
+| Benchmark | Type | Description | Priority |
+|-----------|------|-------------|----------|
+| HumanEval | Code Generation | 164 Python programming problems | High |
+| MBPP | Code Generation | 974 Python problems from crowd-sourcing | Medium |
+| SWE-Bench | Issue Resolution | Real GitHub issues with test verification | High |
+| Aider Polyglot | Multi-file Editing | 225 exercises across 7 languages | Medium |
+| LiveCodeBench | Continuous | Monthly updated coding challenges | Low |
+
+### Current Metrics Tracking
+
+**Implemented:**
+- `victor/agent/observability.py` - Span-based tracing with hooks
+- `victor/analytics/logger.py` - JSONL event logging (UsageLogger)
+- `victor/context/manager.py` - Token counting and context management
+- Provider-level token tracking (prompt_tokens, completion_tokens, total_tokens)
+- `/usage` command for session token estimates
+
+### Metrics Roadmap Items
+
+**Phase A: Enhanced Token Tracking**
+- Persist token usage across sessions to SQLite
+- Add cost calculation per provider/model
+- Cumulative session and lifetime metrics
+
+**Phase B: Context Management Commands**
+- `/compact` - Summarize conversation to reduce tokens
+- `/context` - Show context window usage with visual indicator
+- `/sessions` - List and resume previous sessions
+
+**Phase C: Benchmark Runner**
+- Create `victor/benchmarks/` module
+- Implement HumanEval and SWE-Bench runners
+- Auto-report pass@k metrics
+- Track tool selection accuracy
+
+**Phase D: Analytics Dashboard**
+- `victor analytics --summary` for aggregate stats
+- Export to CSV/JSON for external analysis
+- Prometheus metrics endpoint
+
+### Tool Selection Efficacy (Post-Optimization)
+
+| Tool | Score | Keywords |
+|------|-------|----------|
+| database | 10/10 | SQL, schema, query, tables, columns, db |
+| lsp | 10/10 | completions, hover, definition, references, diagnostics |
+| dependency | 10/10 | package, pip, npm, requirements, outdated |
+| cache | 10/10 | cache, stats, clear, hit rate |
+
+---
+
 ## References
 
 - [Claude Code](https://claude.ai/code)
@@ -254,3 +311,5 @@ Month 5+:   IDE plugin, advanced features
 - [Cline](https://cline.bot/)
 - [OpenHands](https://openhands.dev/)
 - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
+- [HumanEval](https://github.com/openai/human-eval)
+- [SWE-Bench](https://www.swebench.com/)

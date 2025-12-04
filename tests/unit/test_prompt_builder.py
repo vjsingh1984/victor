@@ -186,3 +186,54 @@ class TestProviderConstants:
         assert "ollama" in LOCAL_PROVIDERS
         assert "lmstudio" in LOCAL_PROVIDERS
         assert "vllm" in LOCAL_PROVIDERS
+
+
+class TestSystemPromptBuilderEdgeCases:
+    """Edge case tests for SystemPromptBuilder."""
+
+    def test_build_for_vllm_provider(self):
+        """Test _build_for_provider for vllm (covers line 157-158)."""
+        builder = SystemPromptBuilder(provider_name="vllm", model="test")
+        result = builder._build_for_provider()
+        assert "OpenAI-compatible" in result
+
+    def test_build_for_lmstudio_provider(self):
+        """Test _build_for_provider for lmstudio (covers lines 161-162)."""
+        builder = SystemPromptBuilder(provider_name="lmstudio", model="qwen2.5:7b")
+        result = builder._build_for_provider()
+        assert isinstance(result, str)
+
+    def test_build_for_ollama_provider(self):
+        """Test _build_for_provider for ollama (covers lines 165-166)."""
+        builder = SystemPromptBuilder(provider_name="ollama", model="llama3.1:8b")
+        result = builder._build_for_provider()
+        assert isinstance(result, str)
+
+    def test_build_for_unknown_provider(self):
+        """Test _build_for_provider for unknown provider (covers lines 168-169)."""
+        builder = SystemPromptBuilder(provider_name="totally_unknown", model="test")
+        result = builder._build_for_provider()
+        assert "code analyst" in result.lower()
+
+    def test_build_lmstudio_prompt_no_native_support(self):
+        """Test LMStudio prompt for models without native support (covers line 224)."""
+        builder = SystemPromptBuilder(provider_name="lmstudio", model="codellama:7b")
+        result = builder._build_lmstudio_prompt()
+        assert "ONE AT A TIME" in result
+        assert "CRITICAL RULES" in result
+
+    def test_build_with_adapter_no_hints_no_caps(self):
+        """Test _build_with_adapter includes base_prompt and grounding rules when no hints/caps."""
+        mock_adapter = MagicMock()
+        mock_adapter.get_system_prompt_hints.return_value = None
+        mock_adapter.get_capabilities.return_value = None
+
+        builder = SystemPromptBuilder(
+            provider_name="test",
+            model="test",
+            tool_adapter=mock_adapter,
+        )
+        result = builder._build_with_adapter()
+        # Should include base prompt and grounding rules
+        assert "You are a code analyst for this repository." in result
+        assert "CRITICAL - TOOL OUTPUT GROUNDING:" in result

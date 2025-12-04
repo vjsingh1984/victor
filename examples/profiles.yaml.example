@@ -1,58 +1,335 @@
-# Example Victor Configuration
+# Victor Configuration - Single Source of Truth
 # Copy to ~/.victor/profiles.yaml to activate
+#
+# This file contains:
+# 1. User profiles (provider, model, temperature, etc.)
+# 2. Provider configuration (API keys, endpoints)
+# 3. Tool configuration (enabled/disabled tools)
+# 4. Model capabilities (tool calling support for each model)
 
+# =============================================================================
+# PROFILES - Define your LLM configurations
+# =============================================================================
 profiles:
   default:
-    provider: lmstudio
+    provider: ollama
     model: qwen3-coder:30b
     temperature: 0.7
     max_tokens: 4096
-    description: "Default profile with Qwen 30B coder model (LMStudio)"
+    description: "Default profile with Qwen3 30B coder model"
 
   quick:
-    provider: lmstudio
+    provider: ollama
     model: qwen2.5-coder:7b
     temperature: 0.5
     max_tokens: 2048
-    description: "Quick responses with lighter sampling on LMStudio"
+    description: "Quick responses with lighter model"
 
+  claude:
+    provider: anthropic
+    model: claude-sonnet-4-5
+    temperature: 1.0
+    max_tokens: 8192
+    description: "Claude Sonnet for complex tasks"
+
+  gpt:
+    provider: openai
+    model: gpt-4o
+    temperature: 0.7
+    max_tokens: 4096
+    description: "GPT-4o for general coding"
+
+# =============================================================================
+# PROVIDERS - API keys and endpoints
+# =============================================================================
 providers:
-  lmstudio:
-    base_url:
-      - http://127.0.0.1:1234      # Primary LMStudio server (localhost)
-      # Add LAN servers as needed:
-      # - http://your-lan-server:1234
-    timeout: 300
-
   ollama:
     base_url:
-      - http://localhost:11434     # Primary Ollama server
-      # Add LAN servers as needed:
-      # - http://your-lan-server:11434
+      - http://192.168.1.20:11434  # Primary (LAN server)
+      - http://localhost:11434      # Fallback (localhost)
+    timeout: 300
+
+  lmstudio:
+    base_url:
+      - http://192.168.1.20:1234   # Primary (LAN server)
+      - http://127.0.0.1:1234      # Fallback (localhost)
     timeout: 300
 
   anthropic:
     api_key: ${ANTHROPIC_API_KEY}
-    base_url: https://api.anthropic.com
 
-# Tool Configuration
+  openai:
+    api_key: ${OPENAI_API_KEY}
+
+  google:
+    api_key: ${GOOGLE_API_KEY}
+
+  xai:
+    api_key: ${XAI_API_KEY}
+
+# =============================================================================
+# TOOLS - Enable/disable specific tools
+# =============================================================================
 tools:
-  # Disable problematic tools (code_review has aspect validation issues)
   disabled:
-    - code_review
+    - code_review  # Has aspect validation issues
 
   # Individual tool configuration (optional)
-  web_search:
-    enabled: true
-
-  security_scan:
-    enabled: true
-
-  docker:
-    enabled: false  # Disable if not using Docker
+  # web_search:
+  #   enabled: true
+  # docker:
+  #   enabled: false
 
 # Web tools configuration
 web_tools:
   summarize_fetch_top: 5
   summarize_fetch_pool: 10
   summarize_max_content_length: 50000
+
+# =============================================================================
+# MODEL CAPABILITIES - Tool calling support per model
+# =============================================================================
+# This section defines which models support native tool calling.
+# Patterns use glob-style matching: "qwen3*" matches "qwen3-coder:30b", "qwen3:32b", etc.
+#
+# Capability fields:
+#   native_tool_calls: bool - Model returns structured tool_calls
+#   streaming_tool_calls: bool - Tool calls can be streamed
+#   parallel_tool_calls: bool - Model can request multiple tools at once
+#   thinking_mode: bool - Supports /think /no_think (Qwen3)
+#   requires_strict_prompting: bool - Needs strict system prompts
+#   recommended_tool_budget: int - Max tool calls per conversation
+
+model_capabilities:
+  # Default for unknown models
+  defaults:
+    native_tool_calls: false
+    streaming_tool_calls: false
+    parallel_tool_calls: false
+    thinking_mode: false
+    requires_strict_prompting: true
+    recommended_tool_budget: 10
+
+  # Provider-level defaults (cloud providers have native tool support)
+  providers:
+    anthropic:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    openai:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    google:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    xai:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    # Local providers default to fallback parsing
+    ollama:
+      native_tool_calls: false
+      requires_strict_prompting: true
+      recommended_tool_budget: 12
+
+    lmstudio:
+      native_tool_calls: false
+      requires_strict_prompting: true
+      recommended_tool_budget: 12
+
+    vllm:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+  # Model-specific overrides (patterns match model names)
+  models:
+    # -------------------------------------------------------------------------
+    # Llama models - Native tool calling in 3.1+
+    # -------------------------------------------------------------------------
+    "llama3.1*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "llama3.2*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "llama3.3*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "llama-3.1*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    # -------------------------------------------------------------------------
+    # Qwen models - Excellent tool support, Qwen3 has thinking mode
+    # -------------------------------------------------------------------------
+    "qwen2.5*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "qwen3*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      thinking_mode: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "qwen-2.5*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "qwen-3*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      thinking_mode: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    # -------------------------------------------------------------------------
+    # Mistral/Mixtral models
+    # -------------------------------------------------------------------------
+    "mistral*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "mixtral*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "ministral*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    # -------------------------------------------------------------------------
+    # DeepSeek models - Strong coder with tool support
+    # -------------------------------------------------------------------------
+    "deepseek*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    # -------------------------------------------------------------------------
+    # Specialized tool-calling models
+    # -------------------------------------------------------------------------
+    "command-r*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "hermes*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "functionary*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    "firefunction*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "llama3-groq-tool-use*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    # -------------------------------------------------------------------------
+    # Gemma models - Gemma3 has tool support, older versions limited
+    # -------------------------------------------------------------------------
+    "gemma3*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 12
+
+    "gemma2*":
+      native_tool_calls: false
+      requires_strict_prompting: true
+      recommended_tool_budget: 8
+
+    "gemma*":
+      native_tool_calls: false
+      requires_strict_prompting: true
+      recommended_tool_budget: 8
+
+    # -------------------------------------------------------------------------
+    # GPT-OSS and other open models
+    # -------------------------------------------------------------------------
+    "gpt-oss*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    # -------------------------------------------------------------------------
+    # Models with limited/no tool support (use fallback parsing)
+    # -------------------------------------------------------------------------
+    "codellama*":
+      native_tool_calls: false
+      requires_strict_prompting: true
+      recommended_tool_budget: 8
+
+    "phi*":
+      native_tool_calls: false
+      requires_strict_prompting: true
+      recommended_tool_budget: 8
+
+    "yi*":
+      native_tool_calls: false
+      requires_strict_prompting: true
+      recommended_tool_budget: 10
+
+    # -------------------------------------------------------------------------
+    # Add your custom models here
+    # -------------------------------------------------------------------------
+    # "my-custom-model*":
+    #   native_tool_calls: true
+    #   parallel_tool_calls: true
+    #   requires_strict_prompting: false
+    #   recommended_tool_budget: 15

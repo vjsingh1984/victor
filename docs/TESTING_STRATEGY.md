@@ -149,7 +149,7 @@ class TestMCPProtocol:
 **Example: Provider Tool Integration**
 ```python
 import pytest
-from victor.providers.ollama import OllamaProvider
+from victor.providers.ollama_provider import OllamaProvider
 from victor.agent.orchestrator import AgentOrchestrator
 
 

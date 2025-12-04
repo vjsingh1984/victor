@@ -12,35 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for agent/conversation module."""
+"""Tests for agent/message_history module."""
 
 
-from victor.agent.conversation import ConversationManager
+from victor.agent.message_history import MessageHistory
 
 
-class TestConversationManager:
-    """Tests for ConversationManager class."""
+class TestMessageHistory:
+    """Tests for MessageHistory class."""
 
     def test_init_defaults(self):
-        """Test ConversationManager initialization with defaults."""
-        manager = ConversationManager()
+        """Test MessageHistory initialization with defaults."""
+        manager = MessageHistory()
         assert manager.messages == []
         assert manager.system_prompt == ""
         assert manager._max_history == 100
 
     def test_init_with_system_prompt(self):
-        """Test ConversationManager with system prompt."""
-        manager = ConversationManager(system_prompt="You are a helpful assistant")
+        """Test MessageHistory with system prompt."""
+        manager = MessageHistory(system_prompt="You are a helpful assistant")
         assert manager.system_prompt == "You are a helpful assistant"
 
     def test_init_with_max_history(self):
-        """Test ConversationManager with custom max history."""
-        manager = ConversationManager(max_history_messages=50)
+        """Test MessageHistory with custom max history."""
+        manager = MessageHistory(max_history_messages=50)
         assert manager._max_history == 50
 
     def test_add_message(self):
         """Test adding a message."""
-        manager = ConversationManager()
+        manager = MessageHistory()
         msg = manager.add_message("user", "Hello")
         assert len(manager.messages) == 1
         assert msg.role == "user"
@@ -48,28 +48,28 @@ class TestConversationManager:
 
     def test_add_user_message(self):
         """Test adding a user message."""
-        manager = ConversationManager()
+        manager = MessageHistory()
         msg = manager.add_user_message("Hello")
         assert msg.role == "user"
         assert msg.content == "Hello"
 
     def test_add_assistant_message(self):
         """Test adding an assistant message."""
-        manager = ConversationManager()
+        manager = MessageHistory()
         msg = manager.add_assistant_message("Hi there!")
         assert msg.role == "assistant"
         assert msg.content == "Hi there!"
 
     def test_add_assistant_message_with_tool_calls(self):
         """Test adding assistant message with tool calls."""
-        manager = ConversationManager()
+        manager = MessageHistory()
         tool_calls = [{"id": "call_1", "function": {"name": "test"}}]
         msg = manager.add_assistant_message("Using tool", tool_calls=tool_calls)
         assert msg.tool_calls == tool_calls
 
     def test_add_tool_result(self):
         """Test adding a tool result."""
-        manager = ConversationManager()
+        manager = MessageHistory()
         msg = manager.add_tool_result("call_1", "Tool output", "test_tool")
         assert msg.role == "tool"
         assert msg.content == "Tool output"
@@ -78,7 +78,7 @@ class TestConversationManager:
 
     def test_ensure_system_prompt(self):
         """Test ensure_system_prompt adds system message."""
-        manager = ConversationManager(system_prompt="System instruction")
+        manager = MessageHistory(system_prompt="System instruction")
         manager.add_user_message("Hello")
         manager.ensure_system_prompt()
 
@@ -89,7 +89,7 @@ class TestConversationManager:
 
     def test_ensure_system_prompt_only_once(self):
         """Test ensure_system_prompt only adds once."""
-        manager = ConversationManager(system_prompt="System instruction")
+        manager = MessageHistory(system_prompt="System instruction")
         manager.ensure_system_prompt()
         manager.ensure_system_prompt()
 
@@ -98,7 +98,7 @@ class TestConversationManager:
 
     def test_get_messages_for_provider(self):
         """Test getting messages for provider."""
-        manager = ConversationManager(system_prompt="System")
+        manager = MessageHistory(system_prompt="System")
         manager.add_user_message("Hello")
 
         messages = manager.get_messages_for_provider()
@@ -108,7 +108,7 @@ class TestConversationManager:
 
     def test_clear(self):
         """Test clearing conversation."""
-        manager = ConversationManager(system_prompt="System")
+        manager = MessageHistory(system_prompt="System")
         manager.add_user_message("Hello")
         manager.ensure_system_prompt()
 
@@ -119,7 +119,7 @@ class TestConversationManager:
 
     def test_trim_history(self):
         """Test history trimming when over limit."""
-        manager = ConversationManager(max_history_messages=5)
+        manager = MessageHistory(max_history_messages=5)
 
         for i in range(10):
             manager.add_user_message(f"Message {i}")
@@ -128,7 +128,7 @@ class TestConversationManager:
 
     def test_trim_history_preserves_system(self):
         """Test trim_history preserves system message."""
-        manager = ConversationManager(system_prompt="System", max_history_messages=5)
+        manager = MessageHistory(system_prompt="System", max_history_messages=5)
         manager.ensure_system_prompt()
 
         for i in range(10):
@@ -142,7 +142,7 @@ class TestConversationManager:
 
     def test_get_last_user_message(self):
         """Test getting last user message."""
-        manager = ConversationManager()
+        manager = MessageHistory()
         manager.add_user_message("First")
         manager.add_assistant_message("Response")
         manager.add_user_message("Second")
@@ -151,12 +151,12 @@ class TestConversationManager:
 
     def test_get_last_user_message_empty(self):
         """Test getting last user message when none exists."""
-        manager = ConversationManager()
+        manager = MessageHistory()
         assert manager.get_last_user_message() is None
 
     def test_get_last_assistant_message(self):
         """Test getting last assistant message."""
-        manager = ConversationManager()
+        manager = MessageHistory()
         manager.add_user_message("Hello")
         manager.add_assistant_message("First response")
         manager.add_user_message("Question")
@@ -166,12 +166,12 @@ class TestConversationManager:
 
     def test_get_last_assistant_message_empty(self):
         """Test getting last assistant message when none exists."""
-        manager = ConversationManager()
+        manager = MessageHistory()
         assert manager.get_last_assistant_message() is None
 
     def test_message_count(self):
         """Test message count."""
-        manager = ConversationManager()
+        manager = MessageHistory()
         assert manager.message_count() == 0
 
         manager.add_user_message("Hello")
@@ -182,7 +182,7 @@ class TestConversationManager:
 
     def test_to_dict(self):
         """Test serialization to dict."""
-        manager = ConversationManager(system_prompt="System", max_history_messages=50)
+        manager = MessageHistory(system_prompt="System", max_history_messages=50)
         manager.add_user_message("Hello")
 
         data = manager.to_dict()
@@ -203,7 +203,7 @@ class TestConversationManager:
             ],
         }
 
-        manager = ConversationManager.from_dict(data)
+        manager = MessageHistory.from_dict(data)
 
         assert manager.system_prompt == "System"
         assert manager._system_added is True
@@ -212,13 +212,13 @@ class TestConversationManager:
 
     def test_system_prompt_setter(self):
         """Test setting system prompt."""
-        manager = ConversationManager()
+        manager = MessageHistory()
         manager.system_prompt = "New system prompt"
         assert manager.system_prompt == "New system prompt"
 
     def test_messages_returns_copy(self):
         """Test that messages property returns a copy."""
-        manager = ConversationManager()
+        manager = MessageHistory()
         manager.add_user_message("Hello")
 
         messages1 = manager.messages

@@ -21,7 +21,7 @@ from typing import Any, Dict, Optional, Union, List
 import yaml
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from victor.config.model_capabilities import _default_tool_calling_models
+from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
 
 
 class ProviderConfig(BaseSettings):
@@ -144,11 +144,17 @@ class Settings(BaseSettings):
 
     # Unified Embedding Model (Optimized for Memory + Cache Efficiency)
     # Using same model for tool selection AND codebase search provides:
-    # - 40% memory reduction (120MB vs 200MB)
+    # - 40% memory reduction (130MB vs 200MB)
     # - Better OS page cache utilization (1 model file instead of 2)
     # - Improved CPU L2/L3 cache hit rates
     # - Simpler management (1 model to download/update)
-    unified_embedding_model: str = "all-MiniLM-L12-v2"  # 120MB, 384-dim, ~8ms
+    #
+    # Model: BAAI/bge-small-en-v1.5 (130MB, 384-dim, ~6ms)
+    # - MTEB score: 62.2 (vs 58.8 for all-MiniLM-L6-v2)
+    # - Excellent for code search (trained on code-related tasks)
+    # - CPU-optimized, works great on consumer-grade hardware
+    # - Native sentence-transformers support (no API needed)
+    unified_embedding_model: str = "BAAI/bge-small-en-v1.5"
 
     # Tool Selection Strategy
     use_semantic_tool_selection: bool = True  # Use embeddings instead of keywords (DEFAULT)
@@ -158,7 +164,7 @@ class Settings(BaseSettings):
     embedding_model: str = unified_embedding_model  # Shared with codebase search
 
     # Codebase Semantic Search (Air-gapped by Default)
-    codebase_vector_store: str = "lancedb"  # lancedb (recommended), chromadb, proximadb
+    codebase_vector_store: str = "lancedb"  # lancedb (recommended), chromadb
     codebase_embedding_provider: str = "sentence-transformers"  # Local, offline, fast
     codebase_embedding_model: str = unified_embedding_model  # Shared with tool selection
     codebase_persist_directory: Optional[str] = None  # Default: ~/.victor/embeddings/codebase
@@ -182,7 +188,10 @@ class Settings(BaseSettings):
     tool_call_budget_warning_threshold: int = 250  # Warn when approaching budget limit
 
     # Models known to support structured tool calls per provider
-    tool_calling_models: Dict[str, list[str]] = Field(default_factory=_default_tool_calling_models)
+    # Loaded from model_capabilities.yaml, can be extended in profiles.yaml
+    tool_calling_models: Dict[str, list[str]] = Field(
+        default_factory=_load_tool_capable_patterns_from_yaml
+    )
 
     # Tool Retry Settings
     tool_retry_enabled: bool = True  # Enable automatic retry for failed tool executions
@@ -234,6 +243,47 @@ class Settings(BaseSettings):
     )
     min_content_threshold: int = 150  # Minimum chars to consider "substantial" output
     max_research_iterations: int = 6  # Force synthesis after N consecutive web searches
+
+    # ==========================================================================
+    # Conversation Memory (Multi-turn Context Retention)
+    # ==========================================================================
+    conversation_memory_enabled: bool = True  # Enable SQLite-backed conversation persistence
+    conversation_memory_db: str = "~/.victor/conversations.db"  # Database path
+    max_context_tokens: int = 100000  # Maximum tokens in context window
+    response_token_reserve: int = 4096  # Tokens reserved for model response
+
+    # ==========================================================================
+    # Provider Resilience (Circuit Breaker, Retry, Fallback)
+    # ==========================================================================
+    resilience_enabled: bool = True  # Enable circuit breaker and retry logic
+
+    # Circuit Breaker Settings
+    circuit_breaker_failure_threshold: int = 5  # Failures before circuit opens
+    circuit_breaker_success_threshold: int = 2  # Successes before circuit closes
+    circuit_breaker_timeout: float = 60.0  # Seconds before half-open state
+    circuit_breaker_half_open_max: int = 3  # Max requests in half-open state
+
+    # Retry Settings
+    retry_max_attempts: int = 3  # Maximum retry attempts
+    retry_base_delay: float = 1.0  # Base delay in seconds
+    retry_max_delay: float = 60.0  # Maximum delay between retries
+    retry_exponential_base: float = 2.0  # Exponential backoff multiplier
+
+    # ==========================================================================
+    # Rate Limiting (Request Throttling)
+    # ==========================================================================
+    rate_limiting_enabled: bool = True  # Enable rate limiting
+    rate_limit_requests_per_minute: int = 50  # Requests per minute limit
+    rate_limit_tokens_per_minute: int = 50000  # Tokens per minute limit
+    rate_limit_max_concurrent: int = 5  # Maximum concurrent requests
+    rate_limit_queue_size: int = 100  # Maximum pending requests in queue
+    rate_limit_num_workers: int = 3  # Number of queue worker tasks
+
+    # ==========================================================================
+    # Streaming Metrics (Performance Monitoring)
+    # ==========================================================================
+    streaming_metrics_enabled: bool = True  # Enable streaming performance metrics
+    streaming_metrics_history_size: int = 1000  # Number of metrics samples to retain
 
     # Analytics
     analytics_enabled: bool = True

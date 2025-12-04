@@ -32,6 +32,67 @@ logger = logging.getLogger(__name__)
 CLOUD_PROVIDERS: Set[str] = {"anthropic", "openai", "google", "xai"}
 LOCAL_PROVIDERS: Set[str] = {"ollama", "lmstudio", "vllm"}
 
+# Critical grounding rules to prevent hallucination
+GROUNDING_RULES = """
+CRITICAL - TOOL OUTPUT GROUNDING:
+When you receive tool output in <TOOL_OUTPUT> tags:
+1. The content between ═══ markers is ACTUAL file/command output - NEVER ignore it
+2. You MUST base your analysis ONLY on this actual content
+3. NEVER fabricate, invent, or imagine file contents that differ from tool output
+4. If you need more information, call another tool - do NOT guess
+5. When citing code, quote EXACTLY from the tool output
+6. If tool output is empty or truncated, acknowledge this limitation
+
+VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
+""".strip()
+
+# Task-type-specific prompt hints
+# These are appended to system prompts when task type is detected
+TASK_TYPE_HINTS = {
+    "create_simple": """
+TASK TYPE: Simple Code Generation
+This is a standalone code generation task. Follow these rules:
+1. Generate the code DIRECTLY using write_file - do NOT explore the codebase first.
+2. Do NOT call list_directory or code_search unless the user asks about existing code.
+3. Create a new file with the requested functionality immediately.
+4. After writing the file, you're DONE. Do not make additional tool calls.
+""",
+    "create": """
+TASK TYPE: Code Creation with Context
+This task requires creating new code that integrates with existing code:
+1. Examine relevant existing files to understand patterns and context.
+2. After reading 1-2 files, create the new code with write_file.
+3. Ensure the new code follows existing patterns and conventions.
+""",
+    "edit": """
+TASK TYPE: Code Modification
+This task requires modifying existing code:
+1. First read the target file(s) to understand the current state.
+2. After reading, use edit_files or write_file to make changes.
+3. Make focused changes - only modify what's needed for the task.
+""",
+    "search": """
+TASK TYPE: Code Search/Discovery
+This task requires finding information in the codebase:
+1. Use code_search or semantic_code_search for content searches.
+2. Use list_directory for structure exploration.
+3. Summarize findings clearly after 2-4 tool calls.
+""",
+}
+
+
+def get_task_type_hint(task_type: str) -> str:
+    """Get prompt hint for a specific task type.
+
+    Args:
+        task_type: The detected task type (e.g., "create_simple", "edit")
+
+    Returns:
+        Task-specific prompt hint or empty string if not found
+    """
+    return TASK_TYPE_HINTS.get(task_type.lower(), "")
+
+
 # Models with known good native tool calling support
 NATIVE_TOOL_MODELS = [
     "qwen2.5",
@@ -122,14 +183,10 @@ class SystemPromptBuilder:
         base_prompt = "You are a code analyst for this repository."
 
         # Get adapter-specific hints
-        hints = (
-            self.tool_adapter.get_system_prompt_hints()
-            if self.tool_adapter
-            else None
-        )
+        hints = self.tool_adapter.get_system_prompt_hints() if self.tool_adapter else None
 
         if hints:
-            return f"{base_prompt}\n\n{hints}"
+            return f"{base_prompt}\n\n{hints}\n\n{GROUNDING_RULES}"
 
         # For providers with robust native tool calling, use minimal prompt
         caps = self.capabilities or (
@@ -141,11 +198,11 @@ class SystemPromptBuilder:
                 "Use the available tools to explore and modify code effectively:\n"
                 "1. Use list_directory and read_file to examine code before conclusions.\n"
                 "2. If asked to modify code, use write_file or edit_files after understanding context.\n"
-                "3. Provide clear responses based on actual file contents.\n"
-                "4. Do not invent or assume file contents—only report what tools return."
+                "3. Provide clear responses based on actual file contents.\n\n"
+                f"{GROUNDING_RULES}"
             )
 
-        return base_prompt
+        return f"{base_prompt}\n\n{GROUNDING_RULES}"
 
     def _build_for_provider(self) -> str:
         """Build an appropriate system prompt based on the provider type.
@@ -181,8 +238,8 @@ class SystemPromptBuilder:
             "2. If asked to modify code, use write_file or edit_files after understanding context.\n"
             "3. Provide clear, actionable responses based on actual file contents.\n"
             "4. Always cite specific file paths and line numbers when referencing code.\n"
-            "5. Do not invent or assume file contents—only report what tools return.\n"
-            "6. You may call multiple tools in parallel when they are independent."
+            "5. You may call multiple tools in parallel when they are independent.\n\n"
+            f"{GROUNDING_RULES}"
         )
 
     def _build_vllm_prompt(self) -> str:
@@ -201,7 +258,8 @@ class SystemPromptBuilder:
             "IMPORTANT:\n"
             "- Do not output raw JSON tool calls in your text response.\n"
             "- Do not output XML tags like </function> or </parameter>.\n"
-            "- When you're done using tools, provide a human-readable answer."
+            "- When you're done using tools, provide a human-readable answer.\n\n"
+            f"{GROUNDING_RULES}"
         )
 
     def _build_lmstudio_prompt(self) -> str:
@@ -221,7 +279,8 @@ class SystemPromptBuilder:
                 "STOP CRITERIA:\n"
                 "- Stop when you have enough information to answer.\n"
                 "- After 3+ calls to any tool, stop and summarize.\n"
-                "- Always end with a clear, human-readable answer."
+                "- Always end with a clear, human-readable answer.\n\n"
+                f"{GROUNDING_RULES}"
             )
         else:
             # Default/non-native mode - stricter guidance needed
@@ -230,8 +289,7 @@ class SystemPromptBuilder:
                 "CRITICAL RULES:\n"
                 "1. Call tools ONE AT A TIME. Wait for each result.\n"
                 "2. After reading 2-3 files, STOP and provide your answer.\n"
-                "3. Do NOT repeat the same tool call.\n"
-                "4. Do NOT invent or guess file contents.\n\n"
+                "3. Do NOT repeat the same tool call.\n\n"
                 "OUTPUT FORMAT:\n"
                 "1. Your answer must be in plain English text.\n"
                 "2. Do NOT output JSON objects in your response.\n"
@@ -240,7 +298,8 @@ class SystemPromptBuilder:
                 "WHEN TO STOP:\n"
                 "1. When you have read the relevant files.\n"
                 "2. When you can answer the user's question.\n"
-                "3. After calling any tool 3 times."
+                "3. After calling any tool 3 times.\n\n"
+                f"{GROUNDING_RULES}"
             )
 
     def _build_ollama_prompt(self) -> str:
@@ -261,7 +320,8 @@ class SystemPromptBuilder:
                 "COMPLETION:\n"
                 "- Stop calling tools when you have enough information.\n"
                 "- If you've called a tool 3+ times, stop and summarize.\n"
-                "- Always end with a human-readable answer."
+                "- Always end with a human-readable answer.\n\n"
+                f"{GROUNDING_RULES}"
             )
             # Add Qwen3-specific thinking mode guidance
             if "qwen3" in self.model_lower or "qwen-3" in self.model_lower:
@@ -278,8 +338,7 @@ class SystemPromptBuilder:
                 "CRITICAL TOOL RULES:\n"
                 "1. Call tools ONE AT A TIME. Never batch calls.\n"
                 "2. After reading 2-3 files, STOP and answer.\n"
-                "3. Do NOT repeat the same tool call.\n"
-                "4. Do NOT invent file contents.\n\n"
+                "3. Do NOT repeat the same tool call.\n\n"
                 "CRITICAL OUTPUT RULES:\n"
                 "1. Write your answer in plain English.\n"
                 '2. Do NOT output JSON objects like {"name": ...}.\n'
@@ -289,7 +348,8 @@ class SystemPromptBuilder:
                 "STOP IMMEDIATELY WHEN:\n"
                 "1. You have read the relevant files.\n"
                 "2. You can answer the user's question.\n"
-                "3. You have called any tool 3+ times."
+                "3. You have called any tool 3+ times.\n\n"
+                f"{GROUNDING_RULES}"
             )
 
     def _build_default_prompt(self) -> str:
@@ -300,8 +360,7 @@ class SystemPromptBuilder:
             "- Use list_directory or read_file to inspect files before answering.\n"
             "- Call tools ONE AT A TIME. Wait for results before calling the next tool.\n"
             "- After reading 2-3 relevant files, STOP and provide your answer.\n"
-            "- Do NOT repeatedly call the same tool with similar arguments.\n"
-            "- Do NOT invent file contents. Only cite actual tool results.\n\n"
+            "- Do NOT repeatedly call the same tool with similar arguments.\n\n"
             "RESPONSE FORMAT:\n"
             "- After gathering information, provide a CLEAR ANSWER in plain text.\n"
             "- Do NOT output raw JSON, XML tags, or tool call syntax in your response.\n"
@@ -309,7 +368,8 @@ class SystemPromptBuilder:
             "WHEN TO STOP:\n"
             "- Stop calling tools when you have enough information to answer.\n"
             "- If you've called the same tool 3+ times, stop and summarize.\n"
-            "- Always end with a human-readable answer, not more tool calls."
+            "- Always end with a human-readable answer, not more tool calls.\n\n"
+            f"{GROUNDING_RULES}"
         )
 
 

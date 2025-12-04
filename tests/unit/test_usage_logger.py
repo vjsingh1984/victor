@@ -82,3 +82,26 @@ def test_handles_non_serializable_data(log_file: Path):
 
     # The file should be empty as the write failed
     assert os.stat(log_file).st_size == 0
+
+
+def test_prepare_log_file_exception(tmp_path: Path):
+    """Tests that file preparation failure disables logging (covers lines 33-35)."""
+    log_file = tmp_path / "usage_log.jsonl"
+
+    with patch("pathlib.Path.mkdir", side_effect=PermissionError("Cannot create")):
+        logger = UsageLogger(log_file=log_file, enabled=True)
+
+    # Logger should be disabled after failure
+    assert not logger.is_enabled()
+
+
+def test_log_event_write_exception(log_file: Path):
+    """Tests that write failure is handled gracefully (covers lines 67-68)."""
+    logger = UsageLogger(log_file=log_file, enabled=True)
+
+    # Mock open to raise an IOError (not TypeError)
+    with patch("builtins.open", side_effect=IOError("Disk full")):
+        with patch.object(logger._logger, "error") as mock_error:
+            logger.log_event("test_event", {"data": "value"})
+            mock_error.assert_called_once()
+            assert "Failed to write to log file" in mock_error.call_args[0][0]

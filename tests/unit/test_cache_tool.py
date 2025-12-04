@@ -12,22 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for cache_tool module."""
+"""Tests for unified cache tool module."""
 
 import pytest
 from unittest.mock import patch, MagicMock
 
-from victor.tools.cache_tool import cache_stats, cache_clear, cache_info, set_cache_manager
+from victor.tools.cache_tool import cache, set_cache_manager
 
 
 class TestCacheStats:
-    """Tests for cache_stats function."""
+    """Tests for cache stats action."""
 
     @pytest.mark.asyncio
     async def test_cache_stats_no_manager(self):
-        """Test cache_stats when no manager is set."""
+        """Test cache stats when no manager is set."""
         with patch("victor.tools.cache_tool._cache_manager", None):
-            result = await cache_stats()
+            result = await cache(action="stats")
             assert result["success"] is False
             assert "not initialized" in result["error"]
 
@@ -45,20 +45,20 @@ class TestCacheStats:
             "sets": 200,
         }
         with patch("victor.tools.cache_tool._cache_manager", mock_manager):
-            result = await cache_stats()
+            result = await cache(action="stats")
             assert result["success"] is True
             assert "stats" in result
             assert "formatted_report" in result
 
 
 class TestCacheClear:
-    """Tests for cache_clear function."""
+    """Tests for cache clear action."""
 
     @pytest.mark.asyncio
     async def test_cache_clear_no_manager(self):
-        """Test cache_clear when no manager is set."""
+        """Test cache clear when no manager is set."""
         with patch("victor.tools.cache_tool._cache_manager", None):
-            result = await cache_clear()
+            result = await cache(action="clear")
             assert result["success"] is False
             assert "not initialized" in result["error"]
 
@@ -68,7 +68,7 @@ class TestCacheClear:
         mock_manager = MagicMock()
         mock_manager.clear.return_value = 10
         with patch("victor.tools.cache_tool._cache_manager", mock_manager):
-            result = await cache_clear()
+            result = await cache(action="clear")
             assert result["success"] is True
             mock_manager.clear.assert_called_once()
 
@@ -78,18 +78,18 @@ class TestCacheClear:
         mock_manager = MagicMock()
         mock_manager.clear.return_value = 5
         with patch("victor.tools.cache_tool._cache_manager", mock_manager):
-            result = await cache_clear(namespace="test")
+            result = await cache(action="clear", namespace="test")
             assert result["success"] is True
 
 
 class TestCacheInfo:
-    """Tests for cache_info function."""
+    """Tests for cache info action."""
 
     @pytest.mark.asyncio
     async def test_cache_info_no_manager(self):
-        """Test cache_info when no manager is set."""
+        """Test cache info when no manager is set."""
         with patch("victor.tools.cache_tool._cache_manager", None):
-            result = await cache_info()
+            result = await cache(action="info")
             assert result["success"] is False
             assert "not initialized" in result["error"]
 
@@ -105,8 +105,19 @@ class TestCacheInfo:
         mock_manager.config.disk_ttl = 86400
         mock_manager.config.disk_path = "/tmp/cache"
         with patch("victor.tools.cache_tool._cache_manager", mock_manager):
-            result = await cache_info()
+            result = await cache(action="info")
             assert result["success"] is True
+
+
+class TestCacheUnknownAction:
+    """Tests for unknown action handling."""
+
+    @pytest.mark.asyncio
+    async def test_unknown_action(self):
+        """Test unknown action returns error."""
+        result = await cache(action="invalid_action")
+        assert result["success"] is False
+        assert "Unknown action" in result["error"]
 
 
 class TestSetCacheManager:

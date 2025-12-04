@@ -16,11 +16,15 @@
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch, MagicMock, AsyncMock
+
+import pytest
 
 from victor.tools.code_search_tool import (
     _latest_mtime,
     _gather_files,
     _keyword_score,
+    code_search,
 )
 
 
@@ -111,3 +115,298 @@ class TestKeywordScore:
         """Test scoring with no matches."""
         score = _keyword_score("foo bar", "xyz")
         assert score == 0
+
+
+class TestCodeSearch:
+    """Tests for code_search function."""
+
+    @pytest.mark.asyncio
+    async def test_code_search_basic(self):
+        """Test basic code search."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(f"{tmpdir}/test.py").write_text("def hello():\n    pass")
+            Path(f"{tmpdir}/other.py").write_text("def world():\n    pass")
+
+            result = await code_search("hello", root=tmpdir, k=5)
+            assert result["success"] is True
+            assert result["count"] >= 1
+
+    @pytest.mark.asyncio
+    async def test_code_search_no_results(self):
+        """Test code search with no matches."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(f"{tmpdir}/test.py").write_text("def foo():\n    pass")
+
+            result = await code_search("nonexistent_query_xyz", root=tmpdir, k=5)
+            assert result["success"] is True
+            assert result["count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_code_search_with_extensions(self):
+        """Test code search with specific extensions."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(f"{tmpdir}/test.py").write_text("hello python")
+            Path(f"{tmpdir}/test.js").write_text("hello javascript")
+
+            result = await code_search("hello", root=tmpdir, exts=[".py"], k=5)
+            assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_code_search_file_read_error(self):
+        """Test code search handles file read errors gracefully."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(f"{tmpdir}/test.py").write_text("hello")
+
+            original_open = open
+
+            def mock_open_error(path, *args, **kwargs):
+                if str(path).endswith(".py"):
+                    raise IOError("Read error")
+                return original_open(path, *args, **kwargs)
+
+            with patch("builtins.open", mock_open_error):
+                result = await code_search("hello", root=tmpdir, k=5)
+                # Should still succeed but with no results
+                assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_code_search_empty_dir(self):
+        """Test code search with empty directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = await code_search("query", root=tmpdir, k=5)
+            assert result["success"] is True
+            assert result["count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_code_search_max_files_limit(self):
+        """Test code search respects max_files limit."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for i in range(20):
+                Path(f"{tmpdir}/file{i}.py").write_text(f"hello {i}")
+
+            result = await code_search("hello", root=tmpdir, max_files=5, k=10)
+            assert result["success"] is True
+            # Should be limited by max_files
+            assert result["count"] <= 5
+
+    @pytest.mark.asyncio
+    async def test_code_search_results_sorted(self):
+        """Test that results are sorted by score."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(f"{tmpdir}/low.py").write_text("hello")
+            Path(f"{tmpdir}/high.py").write_text("hello hello hello hello")
+
+            result = await code_search("hello", root=tmpdir, k=5)
+            assert result["success"] is True
+            if result["count"] >= 2:
+                assert result["results"][0]["score"] >= result["results"][1]["score"]
+
+    @pytest.mark.asyncio
+    async def test_code_search_exception_handling(self):
+        """Test code_search handles general exceptions (covers lines 116-117)."""
+        with patch("victor.tools.code_search_tool._gather_files") as mock_gather:
+            mock_gather.side_effect = OSError("Permission denied")
+            result = await code_search("query", root="/some/path", k=5)
+
+            assert result["success"] is False
+            assert "error" in result
+            assert "Permission denied" in result["error"]
+
+
+class TestSemanticCodeSearch:
+    """Tests for semantic_code_search function."""
+
+    @pytest.mark.asyncio
+    async def test_semantic_search_no_root(self):
+        """Test semantic search with non-existent root."""
+        from victor.tools.code_search_tool import semantic_code_search
+
+        result = await semantic_code_search(
+            "query", root="/nonexistent/path/xyz", context={"settings": MagicMock()}
+        )
+        assert result["success"] is False
+        assert "not found" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_semantic_search_no_settings(self):
+        """Test semantic search without settings."""
+        from victor.tools.code_search_tool import semantic_code_search
+
+        result = await semantic_code_search("query", root=".", context={})
+        assert result["success"] is False
+        assert "settings" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_semantic_search_no_context(self):
+        """Test semantic search without context."""
+        from victor.tools.code_search_tool import semantic_code_search
+
+        result = await semantic_code_search("query", root=".", context=None)
+        assert result["success"] is False
+        assert "settings" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_semantic_search_import_error(self):
+        """Test semantic search handles missing dependencies."""
+        from victor.tools.code_search_tool import semantic_code_search
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("victor.tools.code_search_tool._get_or_build_index") as mock_index:
+                mock_index.side_effect = ImportError("lancedb not installed")
+                result = await semantic_code_search(
+                    "query", root=tmpdir, context={"settings": MagicMock()}
+                )
+                assert result["success"] is False
+                assert "dependencies" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_semantic_search_general_error(self):
+        """Test semantic search handles general errors."""
+        from victor.tools.code_search_tool import semantic_code_search
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("victor.tools.code_search_tool._get_or_build_index") as mock_index:
+                mock_index.side_effect = Exception("Some error")
+                result = await semantic_code_search(
+                    "query", root=tmpdir, context={"settings": MagicMock()}
+                )
+                assert result["success"] is False
+
+    @pytest.mark.asyncio
+    async def test_semantic_search_success(self):
+        """Test successful semantic search."""
+        from victor.tools.code_search_tool import semantic_code_search, _INDEX_CACHE
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(f"{tmpdir}/test.py").write_text("print('hello')")
+            root_key = str(Path(tmpdir).resolve())
+
+            mock_index = MagicMock()
+            mock_index.semantic_search = AsyncMock(return_value=[{"path": "test.py", "score": 0.9}])
+
+            with patch("victor.tools.code_search_tool._get_or_build_index") as mock_get:
+                mock_get.return_value = (mock_index, True)
+                # Set up cache entry
+                _INDEX_CACHE[root_key] = {"indexed_at": 123456}
+                try:
+                    result = await semantic_code_search(
+                        "hello", root=tmpdir, context={"settings": MagicMock()}
+                    )
+                    assert result["success"] is True
+                    assert result["count"] == 1
+                finally:
+                    # Clean up cache
+                    if root_key in _INDEX_CACHE:
+                        del _INDEX_CACHE[root_key]
+
+
+class TestGetOrBuildIndex:
+    """Tests for _get_or_build_index function."""
+
+    @pytest.mark.asyncio
+    async def test_get_cached_index(self):
+        """Test returning cached index."""
+        from victor.tools.code_search_tool import _get_or_build_index, _INDEX_CACHE
+        import time
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root_path = Path(tmpdir)
+            # Use str(root_path) to match what the function uses internally
+            root_key = str(root_path)
+
+            # Create a file so directory has mtime
+            Path(f"{tmpdir}/test.py").write_text("test")
+            current_mtime = Path(f"{tmpdir}/test.py").stat().st_mtime
+
+            # Create a cached index with mtime after the file
+            mock_index = MagicMock()
+            _INDEX_CACHE[root_key] = {
+                "index": mock_index,
+                "latest_mtime": current_mtime + 1000,  # Future time so no rebuild
+                "indexed_at": time.time(),
+            }
+
+            mock_settings = MagicMock(spec=[])
+            try:
+                index, rebuilt = await _get_or_build_index(root_path, mock_settings)
+                assert index is mock_index
+                assert rebuilt is False
+            finally:
+                if root_key in _INDEX_CACHE:
+                    del _INDEX_CACHE[root_key]
+
+    @pytest.mark.asyncio
+    async def test_build_new_index(self):
+        """Test building new index."""
+        from victor.tools.code_search_tool import _get_or_build_index, _INDEX_CACHE
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root_path = Path(tmpdir)
+            root_key = str(root_path)
+            Path(f"{tmpdir}/test.py").write_text("test")
+
+            mock_index_instance = MagicMock()
+            mock_index_instance.index_codebase = AsyncMock()
+
+            mock_settings = MagicMock(spec=[])
+            mock_settings.codebase_vector_store = "lancedb"
+            mock_settings.codebase_embedding_provider = "sentence-transformers"
+            mock_settings.codebase_embedding_model = "all-MiniLM-L12-v2"
+            mock_settings.unified_embedding_model = "all-MiniLM-L12-v2"
+            mock_settings.codebase_persist_directory = None
+
+            with patch("victor.codebase.indexer.CodebaseIndex") as MockCodebaseIndex:
+                MockCodebaseIndex.return_value = mock_index_instance
+
+                try:
+                    index, rebuilt = await _get_or_build_index(root_path, mock_settings)
+                    assert rebuilt is True
+                    mock_index_instance.index_codebase.assert_called_once()
+                finally:
+                    if root_key in _INDEX_CACHE:
+                        del _INDEX_CACHE[root_key]
+
+    @pytest.mark.asyncio
+    async def test_force_reindex(self):
+        """Test force reindex."""
+        from victor.tools.code_search_tool import _get_or_build_index, _INDEX_CACHE
+        import time
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root_path = Path(tmpdir)
+            root_key = str(root_path)
+
+            # Create a file so directory has mtime
+            Path(f"{tmpdir}/test.py").write_text("test")
+            current_mtime = Path(f"{tmpdir}/test.py").stat().st_mtime
+
+            # Create a cached index
+            mock_old_index = MagicMock()
+            _INDEX_CACHE[root_key] = {
+                "index": mock_old_index,
+                "latest_mtime": current_mtime + 1000,
+                "indexed_at": time.time(),
+            }
+
+            mock_new_index = MagicMock()
+            mock_new_index.index_codebase = AsyncMock()
+
+            mock_settings = MagicMock(spec=[])
+            mock_settings.codebase_vector_store = "lancedb"
+            mock_settings.codebase_embedding_provider = "sentence-transformers"
+            mock_settings.codebase_embedding_model = "all-MiniLM-L12-v2"
+            mock_settings.unified_embedding_model = "all-MiniLM-L12-v2"
+            mock_settings.codebase_persist_directory = None
+
+            with patch("victor.codebase.indexer.CodebaseIndex") as MockCodebaseIndex:
+                MockCodebaseIndex.return_value = mock_new_index
+
+                try:
+                    index, rebuilt = await _get_or_build_index(
+                        root_path, mock_settings, force_reindex=True
+                    )
+                    assert rebuilt is True
+                    assert index is mock_new_index
+                finally:
+                    if root_key in _INDEX_CACHE:
+                        del _INDEX_CACHE[root_key]

@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0-alpha] - 2025-12-02
+
+### Added
+- **Modern TUI** - Rich terminal interface powered by Textual with markdown rendering, syntax highlighting, and status bar showing provider/model/tokens
+- **Stream Cancellation** - Press Ctrl+C to cancel streaming responses mid-generation
+- **Debug CLI Mode** - Use `--no-tui` or `--cli` flag for console output with visible debug logs
+- **Conceptual Query Detection** - Semantic tool selector now detects inheritance/pattern queries and automatically routes to `semantic_code_search` instead of keyword-based `code_search`
+- **AST-Aware Code Chunking** - Semantic search chunker uses AST parsing for more intelligent code segmentation
+- **Conversation State Machine** - Session restoration with `ConversationStateMachine` tracking conversation stages (INITIAL, EXPLORING, ANALYZING, IMPLEMENTING, REVIEWING)
+- **Gitleaks Allowlist** - Test files with fake secrets are now properly excluded from secret scanning
+
+### Changed
+- **Semantic Tool Selection** - `semantic_code_search` added to search tool category alongside `code_search`
+- **Embedding Registry** - Fixed `config.provider` → `config.vector_store` bug in registry.py
+- **Tool Descriptions** - Improved `code_search` and `semantic_code_search` descriptions to better guide LLM selection
+
+### Fixed
+- Gemini safety settings now include additional categories (HATE_SPEECH, DANGEROUS_CONTENT, CIVIC_INTEGRITY)
+- Google provider logging added for debugging safety filter issues
+- Resolved all ruff linting errors across codebase
+
+### Documentation
+- Consolidated MCP documentation (deleted redundant MCP_SETUP.md)
+- Added cross-reference from AIRGAPPED_GUIDE.md to comprehensive AIRGAPPED.md
+- Updated docs navigation structure
+
 ## [0.1.0-alpha] - 2025-02-27
 
 ### Added

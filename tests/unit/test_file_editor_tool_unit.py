@@ -115,3 +115,213 @@ class TestEditFiles:
         result = await edit_files(operations="not valid json")
         assert result["success"] is False
         assert "JSON" in result["error"]
+
+
+class TestReplaceOperation:
+    """Tests for the 'replace' operation type (surgical str_replace)."""
+
+    @pytest.mark.asyncio
+    async def test_replace_basic_success(self):
+        """Test basic string replacement in a file."""
+        temp_dir = tempfile.mkdtemp()
+        temp_path = f"{temp_dir}/replace_test.py"
+        Path(temp_path).write_text("def foo():\n    return 1\n")
+
+        try:
+            result = await edit_files(
+                operations=[
+                    {
+                        "type": "replace",
+                        "path": temp_path,
+                        "old_str": "def foo():\n    return 1",
+                        "new_str": "def foo():\n    return 42",
+                    }
+                ]
+            )
+            assert result["success"] is True
+            assert result["operations_applied"] == 1
+
+            # Verify content changed
+            content = Path(temp_path).read_text()
+            assert "return 42" in content
+            assert "return 1" not in content
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+            Path(temp_dir).rmdir()
+
+    @pytest.mark.asyncio
+    async def test_replace_insert_new_code(self):
+        """Test inserting new code after existing code."""
+        temp_dir = tempfile.mkdtemp()
+        temp_path = f"{temp_dir}/insert_test.py"
+        original = """class Foo:
+    @property
+    def name(self):
+        return "foo"
+"""
+        Path(temp_path).write_text(original)
+
+        try:
+            result = await edit_files(
+                operations=[
+                    {
+                        "type": "replace",
+                        "path": temp_path,
+                        "old_str": '    @property\n    def name(self):\n        return "foo"',
+                        "new_str": '    @property\n    def name(self):\n        return "foo"\n\n    @property\n    def version(self):\n        return "1.0.0"',
+                    }
+                ]
+            )
+            assert result["success"] is True
+
+            content = Path(temp_path).read_text()
+            assert "def version(self)" in content
+            assert 'return "1.0.0"' in content
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+            Path(temp_dir).rmdir()
+
+    @pytest.mark.asyncio
+    async def test_replace_old_str_not_found(self):
+        """Test error when old_str is not found in file."""
+        temp_dir = tempfile.mkdtemp()
+        temp_path = f"{temp_dir}/not_found_test.py"
+        Path(temp_path).write_text("def bar():\n    pass\n")
+
+        try:
+            result = await edit_files(
+                operations=[
+                    {
+                        "type": "replace",
+                        "path": temp_path,
+                        "old_str": "def foo():",  # Does not exist
+                        "new_str": "def foo_new():",
+                    }
+                ]
+            )
+            assert result["success"] is False
+            assert "not found" in result["error"].lower()
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+            Path(temp_dir).rmdir()
+
+    @pytest.mark.asyncio
+    async def test_replace_multiple_occurrences_error(self):
+        """Test error when old_str appears multiple times."""
+        temp_dir = tempfile.mkdtemp()
+        temp_path = f"{temp_dir}/multiple_test.py"
+        Path(temp_path).write_text("foo\nbar\nfoo\n")  # "foo" appears twice
+
+        try:
+            result = await edit_files(
+                operations=[
+                    {"type": "replace", "path": temp_path, "old_str": "foo", "new_str": "baz"}
+                ]
+            )
+            # Should fail because "foo" is ambiguous
+            assert result["success"] is False
+            assert "multiple" in result["error"].lower() or "ambiguous" in result["error"].lower()
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+            Path(temp_dir).rmdir()
+
+    @pytest.mark.asyncio
+    async def test_replace_missing_old_str(self):
+        """Test error when old_str is missing from operation."""
+        temp_dir = tempfile.mkdtemp()
+        temp_path = f"{temp_dir}/missing_old_test.py"
+        Path(temp_path).write_text("content")
+
+        try:
+            result = await edit_files(
+                operations=[
+                    {
+                        "type": "replace",
+                        "path": temp_path,
+                        "new_str": "new content",  # Missing old_str
+                    }
+                ]
+            )
+            assert result["success"] is False
+            assert "old_str" in result["error"].lower()
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+            Path(temp_dir).rmdir()
+
+    @pytest.mark.asyncio
+    async def test_replace_missing_new_str(self):
+        """Test error when new_str is missing from operation."""
+        temp_dir = tempfile.mkdtemp()
+        temp_path = f"{temp_dir}/missing_new_test.py"
+        Path(temp_path).write_text("old content")
+
+        try:
+            result = await edit_files(
+                operations=[
+                    {
+                        "type": "replace",
+                        "path": temp_path,
+                        "old_str": "old content",  # Missing new_str
+                    }
+                ]
+            )
+            assert result["success"] is False
+            assert "new_str" in result["error"].lower()
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+            Path(temp_dir).rmdir()
+
+    @pytest.mark.asyncio
+    async def test_replace_nonexistent_file(self):
+        """Test error when file does not exist."""
+        result = await edit_files(
+            operations=[
+                {
+                    "type": "replace",
+                    "path": "/nonexistent/path/file.py",
+                    "old_str": "foo",
+                    "new_str": "bar",
+                }
+            ]
+        )
+        assert result["success"] is False
+
+    @pytest.mark.asyncio
+    async def test_replace_preserves_rest_of_file(self):
+        """Test that replace only modifies the matched portion."""
+        temp_dir = tempfile.mkdtemp()
+        temp_path = f"{temp_dir}/preserve_test.py"
+        original = """# Header comment
+def first():
+    pass
+
+def second():
+    return 2
+
+# Footer comment
+"""
+        Path(temp_path).write_text(original)
+
+        try:
+            result = await edit_files(
+                operations=[
+                    {
+                        "type": "replace",
+                        "path": temp_path,
+                        "old_str": "def second():\n    return 2",
+                        "new_str": "def second():\n    return 42",
+                    }
+                ]
+            )
+            assert result["success"] is True
+
+            content = Path(temp_path).read_text()
+            # Changed part
+            assert "return 42" in content
+            # Preserved parts
+            assert "# Header comment" in content
+            assert "def first():" in content
+            assert "# Footer comment" in content
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+            Path(temp_dir).rmdir()

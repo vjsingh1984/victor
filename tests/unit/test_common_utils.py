@@ -223,3 +223,100 @@ class TestLatestMtime:
         # The result should be from file1.py, not from .git/config
         # (though they might be very close in time)
         assert result > 0
+
+
+class TestSafeWalkEdgeCases:
+    """Edge case tests for safe_walk function."""
+
+    def test_excludes_hidden_files(self):
+        """Test that hidden files (starting with .) are excluded (covers line 98)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a hidden file
+            Path(tmpdir, ".hidden_file").touch()
+            # Create a normal file
+            Path(tmpdir, "visible.py").touch()
+
+            files = safe_walk(tmpdir)
+            filenames = [os.path.basename(f) for f in files]
+            assert ".hidden_file" not in filenames
+            assert "visible.py" in filenames
+
+    def test_excludes_hidden_directories(self):
+        """Test that hidden directories (starting with .) are excluded."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a hidden directory
+            hidden_dir = Path(tmpdir, ".hidden_dir")
+            hidden_dir.mkdir()
+            Path(hidden_dir, "file.py").touch()
+
+            # Create a normal directory
+            normal_dir = Path(tmpdir, "normal_dir")
+            normal_dir.mkdir()
+            Path(normal_dir, "file.py").touch()
+
+            files = safe_walk(tmpdir)
+            # Should not include files from hidden directory
+            for f in files:
+                assert ".hidden_dir" not in f
+
+
+class TestLatestMtimeEdgeCases:
+    """Edge case tests for latest_mtime function."""
+
+    def test_handles_stat_error(self):
+        """Test that OSError on stat is handled gracefully (covers lines 153-154)."""
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a file
+            Path(tmpdir, "file.py").touch()
+
+            # Mock stat to raise OSError
+            original_stat = Path.stat
+
+            def mock_stat(self):
+                if str(self).endswith("file.py"):
+                    raise OSError("Permission denied")
+                return original_stat(self)
+
+            with patch.object(Path, "stat", mock_stat):
+                result = latest_mtime(Path(tmpdir))
+                # Should return 0.0 since only file raises error
+                assert result == 0.0
+
+
+class TestGatherCodeFilesEdgeCases:
+    """Edge case tests for gather_code_files function."""
+
+    def test_gather_code_files_with_defaults(self):
+        """Test gather_code_files with default parameters (covers lines 126-127)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "file.py").touch()
+            Path(tmpdir, "file.txt").touch()
+            Path(tmpdir, "file.xyz").touch()
+
+            files = gather_code_files(tmpdir)
+            filenames = [os.path.basename(f) for f in files]
+
+            assert "file.py" in filenames
+            assert "file.txt" in filenames
+            assert "file.xyz" not in filenames  # Not in DEFAULT_CODE_EXTENSIONS
+
+
+class TestSafeWalkExtensionFiltering:
+    """Tests for extension filtering in safe_walk."""
+
+    def test_safe_walk_extension_not_in_set(self):
+        """Test that files with non-matching extensions are skipped (covers lines 102-104)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "file.py").touch()
+            Path(tmpdir, "file.js").touch()
+            Path(tmpdir, "file.xyz").touch()
+
+            # Only .py files
+            files = safe_walk(tmpdir, extensions={".py"})
+            filenames = [os.path.basename(f) for f in files]
+
+            assert "file.py" in filenames
+            assert "file.js" not in filenames
+            assert "file.xyz" not in filenames

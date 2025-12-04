@@ -308,7 +308,7 @@ victor --profile gemini # Gemini
 ```python
 import asyncio
 from victor.agent.orchestrator import AgentOrchestrator
-from victor.providers.ollama import OllamaProvider
+from victor.providers.ollama_provider import OllamaProvider
 
 async def main():
     # Create provider

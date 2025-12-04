@@ -15,11 +15,11 @@
 """Embedding model providers (separate from vector stores).
 
 This module handles GENERATING embeddings (converting text to vectors).
-The vector stores (ChromaDB, ProximaDB, etc.) handle STORING and SEARCHING.
+The vector stores (ChromaDB, LanceDB, etc.) handle STORING and SEARCHING.
 
 This separation allows mixing and matching:
 - OpenAI embeddings + FAISS storage
-- Sentence-transformers + ProximaDB storage
+- Sentence-transformers + LanceDB storage
 - Cohere embeddings + ChromaDB storage
 """
 
@@ -105,11 +105,15 @@ class BaseEmbeddingModel(ABC):
 class SentenceTransformerModel(BaseEmbeddingModel):
     """Sentence-transformers embedding model (local, CPU/GPU).
 
+    Uses the shared EmbeddingService singleton for memory efficiency.
+    This allows sharing the model with IntentClassifier and SemanticToolSelector.
+
     Pros:
     - Free
     - Runs locally
     - No API limits
     - Many pre-trained models available
+    - Shares model with other components (saves ~80MB per model)
 
     Cons:
     - Slower than cloud APIs (unless you have GPU)
@@ -122,37 +126,35 @@ class SentenceTransformerModel(BaseEmbeddingModel):
     def __init__(self, config: EmbeddingModelConfig):
         """Initialize sentence-transformers model."""
         super().__init__(config)
-        self.model = None
+        self._embedding_service = None
 
     async def initialize(self) -> None:
-        """Load the sentence-transformers model."""
+        """Initialize using shared EmbeddingService singleton."""
         if self._initialized:
             return
 
-        try:
-            from sentence_transformers import SentenceTransformer
-        except ImportError:
-            raise ImportError(
-                "sentence-transformers not installed. "
-                "Install with: pip install sentence-transformers"
-            )
+        # Import here to avoid circular imports
+        from victor.embeddings.service import EmbeddingService
 
         print(f"🤖 Loading sentence-transformer model: {self.config.model_name}")
 
-        # Load model in executor (CPU-bound operation)
-        loop = asyncio.get_event_loop()
-        self.model = await loop.run_in_executor(None, SentenceTransformer, self.config.model_name)
+        # Use shared EmbeddingService singleton for memory efficiency
+        # This shares the model with IntentClassifier and SemanticToolSelector
+        self._embedding_service = EmbeddingService.get_instance(model_name=self.config.model_name)
+
+        # Ensure model is loaded (lazy loading)
+        self._embedding_service._ensure_model_loaded()
 
         self._initialized = True
-        print(f"✅ Model loaded! Dimension: {self.get_dimension()}")
+        print(f"✅ Model loaded (shared via EmbeddingService)! Dimension: {self.get_dimension()}")
 
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding for single text."""
         if not self._initialized:
             await self.initialize()
 
-        loop = asyncio.get_event_loop()
-        embedding = await loop.run_in_executor(None, self.model.encode, text)
+        # Use async method from EmbeddingService
+        embedding = await self._embedding_service.embed_text(text)
         return embedding.tolist()
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -160,24 +162,23 @@ class SentenceTransformerModel(BaseEmbeddingModel):
         if not self._initialized:
             await self.initialize()
 
-        loop = asyncio.get_event_loop()
-        embeddings = await loop.run_in_executor(
-            None,
-            lambda: self.model.encode(
-                texts, batch_size=self.config.batch_size, show_progress_bar=len(texts) > 100
-            ),
-        )
+        # Use async batch method from EmbeddingService
+        embeddings = await self._embedding_service.embed_batch(texts)
         return [emb.tolist() for emb in embeddings]
 
     def get_dimension(self) -> int:
         """Get embedding dimension."""
-        if self.model:
-            return self.model.get_sentence_embedding_dimension()
+        if self._embedding_service:
+            return self._embedding_service.dimension
         return self.config.dimension
 
     async def close(self) -> None:
-        """Clean up resources."""
-        self.model = None
+        """Clean up resources.
+
+        Note: We don't reset EmbeddingService singleton here as it may be
+        shared by other components (IntentClassifier, SemanticToolSelector).
+        """
+        self._embedding_service = None
         self._initialized = False
 
 

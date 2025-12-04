@@ -166,7 +166,7 @@ class TestObservabilityManager:
     def test_metric_hook(self, obs: ObservabilityManager) -> None:
         """Test metric recording hook."""
         recorded_metrics = []
-        obs.on_metric(lambda n, v, l: recorded_metrics.append((n, v, l)))
+        obs.on_metric(lambda name, value, labels: recorded_metrics.append((name, value, labels)))
 
         obs.record_metric("latency_ms", 42.5, {"endpoint": "/api/test"})
 
@@ -271,3 +271,41 @@ class TestGlobalObservability:
         custom = ObservabilityManager()
         set_observability(custom)
         assert get_observability() is custom
+
+
+class TestSpanEdgeCases:
+    """Edge case tests for Span class."""
+
+    def test_duration_ms_without_end_time(self) -> None:
+        """Test duration_ms returns 0 when span not ended (covers line 70)."""
+        span = Span(name="test", trace_id="t", span_id="s")
+        # Don't end the span
+        assert span.duration_ms == 0.0
+
+    def test_add_event_without_attributes(self) -> None:
+        """Test adding event without attributes."""
+        span = Span(name="test", trace_id="t", span_id="s")
+        span.add_event("simple_event")
+        assert len(span.events) == 1
+        assert span.events[0]["attributes"] == {}
+
+
+class TestObservabilityManagerEdgeCases:
+    """Edge case tests for ObservabilityManager."""
+
+    def test_span_without_trace(self) -> None:
+        """Test creating span without starting trace first."""
+        obs = ObservabilityManager()
+        # Don't start trace
+        with obs.span("test") as span:
+            assert span.trace_id is not None
+
+    def test_get_current_span_empty(self) -> None:
+        """Test get_current_span when no span active."""
+        obs = ObservabilityManager()
+        assert obs.get_current_span() is None
+
+    def test_get_current_trace_id_empty(self) -> None:
+        """Test get_current_trace_id when no trace active."""
+        obs = ObservabilityManager()
+        assert obs.get_current_trace_id() is None

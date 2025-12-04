@@ -29,6 +29,8 @@ read_file:
     - loading configuration
     - examining file contents
     - viewing code
+    - explaining file purpose
+    - describing file functionality
   keywords:
     - read
     - show
@@ -36,10 +38,17 @@ read_file:
     - view
     - examine
     - check
+    - explain
+    - describe
+    - purpose
+    - what does
+    - understand
   examples:
     - reading Python modules
     - loading config files
     - examining source code
+    - explaining what a file does
+    - describing module functionality
 
 list_directory:
   use_cases:
@@ -397,3 +406,148 @@ scaffold:
     - new project
   examples:
     - scaffolding new projects
+
+# Database Operations
+database:
+  use_cases:
+    - connecting to databases
+    - executing SQL queries
+    - inspecting database schemas
+    - listing database tables
+    - describing table structures
+    - querying data from databases
+    - PostgreSQL operations
+    - MySQL operations
+    - SQLite operations
+    - SQL Server operations
+  keywords:
+    - database
+    - sql
+    - query
+    - connect
+    - postgresql
+    - postgres
+    - mysql
+    - sqlite
+    - sqlserver
+    - table
+    - schema
+    - columns
+    - rows
+    - select
+    - insert
+    - update
+    - delete
+    - join
+    - where clause
+    - db connection
+  examples:
+    - connecting to PostgreSQL database
+    - querying rows from a table
+    - listing all database tables
+    - describing table structure
+    - getting database schema
+    - executing SQL SELECT statements
+    - inspecting column data types
+  priority_hints:
+    - Use this tool instead of execute_bash with psql or mysql commands
+    - Prefer database tool over shell commands for SQL operations
+    - This tool provides structured results rather than raw text output
+
+# LSP Operations (Language Server Protocol)
+lsp:
+  use_cases:
+    - code completions
+    - go to definition
+    - find references
+    - hover information
+    - diagnostics and errors
+    - language server management
+    - starting/stopping language servers
+    - code intelligence
+  keywords:
+    - lsp
+    - language server
+    - completions
+    - autocomplete
+    - go to definition
+    - find references
+    - hover
+    - diagnostics
+    - intellisense
+    - code navigation
+    - type hints
+    - pylsp
+    - pyright
+    - typescript server
+  examples:
+    - getting code completions at cursor position
+    - finding where a function is defined
+    - finding all usages of a variable
+    - getting type information on hover
+    - checking for errors in a file
+  priority_hints:
+    - Use this for IDE-like code intelligence features
+    - Requires language server to be installed and started
+    - More accurate than AST-based tools for complex codebases
+
+# Dependency Management
+dependency:
+  use_cases:
+    - listing installed packages
+    - checking for outdated packages
+    - security vulnerability scanning
+    - generating requirements.txt
+    - updating packages
+    - viewing dependency tree
+    - checking requirements satisfaction
+  keywords:
+    - dependencies
+    - packages
+    - pip
+    - requirements
+    - requirements.txt
+    - outdated
+    - upgrade
+    - install
+    - package manager
+    - dependency tree
+    - pipdeptree
+    - security audit
+    - vulnerable packages
+  examples:
+    - listing all installed Python packages
+    - checking which packages are outdated
+    - scanning for security vulnerabilities
+    - generating requirements.txt from installed packages
+    - updating specific packages
+    - showing dependency tree for a package
+  priority_hints:
+    - Use this instead of pip commands via execute_bash
+    - Provides structured results for better processing
+    - Security action scans against known CVE database
+
+# Cache Management
+cache:
+  use_cases:
+    - viewing cache statistics
+    - clearing cache entries
+    - cache configuration info
+    - performance monitoring
+  keywords:
+    - cache
+    - cache stats
+    - clear cache
+    - cache info
+    - memory cache
+    - disk cache
+    - cache performance
+    - hit rate
+  examples:
+    - getting cache hit rates and statistics
+    - clearing all cached data
+    - clearing specific cache namespace
+    - viewing cache configuration
+  priority_hints:
+    - Use when investigating performance issues
+    - Clear cache when embeddings or responses seem stale

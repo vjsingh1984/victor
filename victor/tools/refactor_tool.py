@@ -713,18 +713,3 @@ async def refactor_organize_imports(
         "local_count": len(local_imports),
         "formatted_report": "\n".join(report),
     }
-
-
-# Keep class for backward compatibility
-class RefactorTool:
-    """Deprecated: Use individual refactor_* functions instead."""
-
-    def __init__(self):
-        """Initialize - deprecated."""
-        import warnings
-
-        warnings.warn(
-            "RefactorTool class is deprecated. Use refactor_* functions instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )

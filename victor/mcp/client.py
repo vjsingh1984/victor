@@ -33,9 +33,6 @@ import uuid
 from typing import Any, Callable, Dict, List, Optional
 
 from victor.config.timeouts import McpTimeouts
-
-logger = logging.getLogger(__name__)
-
 from victor.mcp.protocol import (
     MCPClientInfo,
     MCPMessage,
@@ -45,6 +42,8 @@ from victor.mcp.protocol import (
     MCPTool,
     MCPToolCallResult,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class MCPClient:

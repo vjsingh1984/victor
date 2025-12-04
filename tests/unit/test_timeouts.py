@@ -100,8 +100,10 @@ class TestTimeoutConfig:
 
     def test_config_is_frozen(self):
         """TimeoutConfig should be immutable."""
+        from dataclasses import FrozenInstanceError
+
         config = TimeoutConfig()
-        with pytest.raises(Exception):  # FrozenInstanceError
+        with pytest.raises(FrozenInstanceError):
             config.HTTP_DEFAULT = 100.0  # type: ignore
 
 

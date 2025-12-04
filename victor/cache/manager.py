@@ -12,36 +12,231 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tiered cache manager with memory and disk caching."""
+"""Unified Cache Manager for Victor.
 
-import hashlib
-import json
+This module provides a centralized cache management system with:
+- Namespace-scoped access for logical separation
+- Unified interface across different cache types
+- Integration with the DI container
+- Global cache management utilities
+
+Design Principles:
+- Facade pattern: Simple interface over TieredCache
+- Namespace isolation: Each component gets its own namespace
+- Consistent API: Same interface for all cache operations
+- Observable: Statistics and monitoring support
+
+Example Usage:
+    from victor.cache.manager import get_cache_manager
+
+    # Get namespace-scoped cache
+    cache = get_cache_manager()
+    tool_cache = cache.namespace("tools")
+
+    # Use cache
+    tool_cache.set("read_file:abc123", result)
+    cached = tool_cache.get("read_file:abc123")
+
+    # Clear specific namespace
+    cache.clear_namespace("tools")
+
+    # Get statistics
+    stats = cache.get_stats()
+"""
+
+from __future__ import annotations
+
 import logging
-from typing import Any, Optional, Dict
 import threading
-
-from cachetools import TTLCache  # type: ignore[import-untyped]
-import diskcache
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
 from victor.cache.config import CacheConfig
+from victor.cache.tiered_cache import TieredCache
 
 logger = logging.getLogger(__name__)
 
 
-class CacheManager:
-    """Tiered cache manager with L1 (memory) and L2 (disk) caching.
+@runtime_checkable
+class CacheProtocol(Protocol):
+    """Protocol for cache implementations."""
 
-    Architecture:
-    - L1: Fast in-memory cache using cachetools (TTL-based)
-    - L2: Persistent disk cache using diskcache (survives restarts)
+    def get(self, key: str) -> Optional[Any]:
+        """Get a cached value."""
+        ...
 
-    Features:
-    - Automatic tiering (checks memory first, then disk)
-    - Thread-safe operations
-    - TTL support at both levels
-    - Size limits
-    - Statistics tracking
+    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
+        """Set a cached value."""
+        ...
+
+    def delete(self, key: str) -> bool:
+        """Delete a cached value."""
+        ...
+
+    def clear(self) -> int:
+        """Clear all cached values."""
+        ...
+
+
+@dataclass
+class CacheStats:
+    """Cache statistics."""
+
+    memory_hits: int = 0
+    memory_misses: int = 0
+    disk_hits: int = 0
+    disk_misses: int = 0
+    total_sets: int = 0
+    total_evictions: int = 0
+    namespaces: List[str] = field(default_factory=list)
+
+    @property
+    def hit_rate(self) -> float:
+        """Calculate overall hit rate."""
+        total_hits = self.memory_hits + self.disk_hits
+        total_requests = total_hits + self.memory_misses + self.disk_misses
+        if total_requests == 0:
+            return 0.0
+        return total_hits / total_requests
+
+    @property
+    def memory_hit_rate(self) -> float:
+        """Calculate memory cache hit rate."""
+        total = self.memory_hits + self.memory_misses
+        if total == 0:
+            return 0.0
+        return self.memory_hits / total
+
+
+class CacheNamespace:
+    """Namespace-scoped cache access.
+
+    Provides a simplified interface for cache operations within a namespace.
+    All operations are automatically scoped to the namespace.
+
+    Example:
+        cache = CacheNamespace(manager, "embeddings")
+        cache.set("model_v1", embeddings)
+        result = cache.get("model_v1")
     """
+
+    def __init__(self, manager: "CacheManager", namespace: str):
+        """Initialize namespace cache.
+
+        Args:
+            manager: Parent cache manager
+            namespace: Namespace identifier
+        """
+        self._manager = manager
+        self._namespace = namespace
+
+    @property
+    def namespace(self) -> str:
+        """Get namespace name."""
+        return self._namespace
+
+    def get(self, key: str) -> Optional[Any]:
+        """Get a cached value.
+
+        Args:
+            key: Cache key within namespace
+
+        Returns:
+            Cached value or None if not found
+        """
+        return self._manager.get(key, self._namespace)
+
+    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
+        """Set a cached value.
+
+        Args:
+            key: Cache key within namespace
+            value: Value to cache
+            ttl: Optional TTL in seconds
+
+        Returns:
+            True if successfully cached
+        """
+        return self._manager.set(key, value, self._namespace, ttl)
+
+    def delete(self, key: str) -> bool:
+        """Delete a cached value.
+
+        Args:
+            key: Cache key within namespace
+
+        Returns:
+            True if deleted
+        """
+        return self._manager.delete(key, self._namespace)
+
+    def clear(self) -> int:
+        """Clear all values in this namespace.
+
+        Returns:
+            Number of entries cleared
+        """
+        return self._manager.clear_namespace(self._namespace)
+
+    def get_or_set(
+        self,
+        key: str,
+        factory: callable,
+        ttl: Optional[int] = None,
+    ) -> Any:
+        """Get cached value or compute and cache it.
+
+        Args:
+            key: Cache key
+            factory: Callable to compute value if not cached
+            ttl: Optional TTL in seconds
+
+        Returns:
+            Cached or computed value
+        """
+        value = self.get(key)
+        if value is not None:
+            return value
+
+        value = factory()
+        self.set(key, value, ttl)
+        return value
+
+
+class CacheManager:
+    """Unified cache manager providing namespace-scoped access.
+
+    This class provides a centralized interface for all caching needs,
+    with logical separation via namespaces.
+
+    Namespaces:
+    - "tools": Tool execution results
+    - "embeddings": Embedding vectors
+    - "responses": LLM responses
+    - "code_search": Code search results
+    - "metadata": File/project metadata
+
+    Example:
+        manager = CacheManager()
+
+        # Get namespace-scoped cache
+        tool_cache = manager.namespace("tools")
+        tool_cache.set("read_file:hash123", content)
+
+        # Direct access
+        manager.set("key", value, namespace="embeddings")
+
+        # Statistics
+        stats = manager.get_stats()
+        print(f"Hit rate: {stats.hit_rate:.2%}")
+    """
+
+    # Well-known namespace names
+    NAMESPACE_TOOLS = "tools"
+    NAMESPACE_EMBEDDINGS = "embeddings"
+    NAMESPACE_RESPONSES = "responses"
+    NAMESPACE_CODE_SEARCH = "code_search"
+    NAMESPACE_METADATA = "metadata"
 
     def __init__(self, config: Optional[CacheConfig] = None):
         """Initialize cache manager.
@@ -49,90 +244,41 @@ class CacheManager:
         Args:
             config: Cache configuration (uses defaults if None)
         """
-        self.config = config or CacheConfig()
-        self._lock = threading.RLock()
+        self._config = config or CacheConfig()
+        self._cache = TieredCache(self._config)
+        self._namespaces: Dict[str, CacheNamespace] = {}
+        self._lock = threading.Lock()
 
-        # Statistics
-        self._stats: Dict[str, float | int] = {
-            "memory_hits": 0,
-            "memory_misses": 0,
-            "disk_hits": 0,
-            "disk_misses": 0,
-            "sets": 0,
-            "evictions": 0,
-        }
+    @property
+    def config(self) -> CacheConfig:
+        """Get cache configuration."""
+        return self._config
 
-        # Initialize L1 memory cache
-        if self.config.enable_memory:
-            self._memory_cache: Optional[TTLCache] = TTLCache(
-                maxsize=self.config.memory_max_size,
-                ttl=self.config.memory_ttl,
-            )
-        else:
-            self._memory_cache = None
+    def namespace(self, name: str) -> CacheNamespace:
+        """Get or create a namespace-scoped cache.
 
-        # Initialize L2 disk cache
-        if self.config.enable_disk:
-            self._disk_cache: Optional[diskcache.Cache] = diskcache.Cache(
-                directory=str(self.config.disk_path),
-                size_limit=self.config.disk_max_size,
-            )
-        else:
-            self._disk_cache = None
+        Args:
+            name: Namespace identifier
 
-        logger.info(
-            "Cache initialized: memory=%s, disk=%s",
-            self.config.enable_memory,
-            self.config.enable_disk,
-        )
+        Returns:
+            CacheNamespace for scoped operations
+        """
+        with self._lock:
+            if name not in self._namespaces:
+                self._namespaces[name] = CacheNamespace(self, name)
+            return self._namespaces[name]
 
     def get(self, key: str, namespace: str = "default") -> Optional[Any]:
-        """Get value from cache.
-
-        Checks L1 (memory) first, then L2 (disk).
-        If found in disk, promotes to memory.
+        """Get a cached value.
 
         Args:
             key: Cache key
-            namespace: Cache namespace for organization
+            namespace: Cache namespace
 
         Returns:
             Cached value or None if not found
         """
-        cache_key = self._make_key(key, namespace)
-
-        with self._lock:
-            # Try L1 memory cache
-            if self._memory_cache is not None:
-                try:
-                    value = self._memory_cache.get(cache_key)
-                    if value is not None:
-                        self._stats["memory_hits"] += 1
-                        logger.debug("Memory cache hit: %s", cache_key)
-                        return value
-                    self._stats["memory_misses"] += 1
-                except KeyError:
-                    self._stats["memory_misses"] += 1
-
-            # Try L2 disk cache
-            if self._disk_cache is not None:
-                try:
-                    value = self._disk_cache.get(cache_key)
-                    if value is not None:
-                        self._stats["disk_hits"] += 1
-                        logger.debug("Disk cache hit: %s", cache_key)
-
-                        # Promote to memory cache
-                        if self._memory_cache is not None:
-                            self._memory_cache[cache_key] = value
-
-                        return value
-                    self._stats["disk_misses"] += 1
-                except KeyError:
-                    self._stats["disk_misses"] += 1
-
-            logger.debug("Cache miss: %s", cache_key)
-            return None
+        return self._cache.get(key, namespace)
 
     def set(
         self,
@@ -141,347 +287,138 @@ class CacheManager:
         namespace: str = "default",
         ttl: Optional[int] = None,
     ) -> bool:
-        """Set value in cache.
-
-        Stores in both L1 (memory) and L2 (disk) if enabled.
+        """Set a cached value.
 
         Args:
             key: Cache key
             value: Value to cache
             namespace: Cache namespace
-            ttl: Custom TTL in seconds (uses config default if None)
+            ttl: Optional TTL in seconds
 
         Returns:
             True if successfully cached
         """
-        cache_key = self._make_key(key, namespace)
-
-        with self._lock:
-            success = False
-
-            # Store in L1 memory cache
-            if self._memory_cache is not None:
-                try:
-                    self._memory_cache[cache_key] = value
-                    success = True
-                except Exception as e:
-                    logger.warning("Failed to store in memory cache: %s", e)
-
-            # Store in L2 disk cache
-            if self._disk_cache is not None:
-                try:
-                    expire_time = ttl or self.config.disk_ttl
-                    self._disk_cache.set(cache_key, value, expire=expire_time)
-                    success = True
-                except Exception as e:
-                    logger.warning("Failed to store in disk cache: %s", e)
-
-            if success:
-                self._stats["sets"] += 1
-                logger.debug("Cached: %s", cache_key)
-
-            return success
+        return self._cache.set(key, value, namespace, ttl)
 
     def delete(self, key: str, namespace: str = "default") -> bool:
-        """Delete value from cache.
-
-        Removes from both L1 and L2 if present.
+        """Delete a cached value.
 
         Args:
             key: Cache key
             namespace: Cache namespace
 
         Returns:
-            True if deleted from at least one cache
+            True if deleted
         """
-        cache_key = self._make_key(key, namespace)
+        return self._cache.delete(key, namespace)
 
-        with self._lock:
-            deleted = False
-
-            # Remove from L1
-            if self._memory_cache is not None:
-                try:
-                    del self._memory_cache[cache_key]
-                    deleted = True
-                except KeyError:
-                    pass
-
-            # Remove from L2
-            if self._disk_cache is not None:
-                try:
-                    deleted = self._disk_cache.delete(cache_key) or deleted
-                except Exception as e:
-                    logger.warning("Failed to delete from disk cache: %s", e)
-
-            if deleted:
-                logger.debug("Deleted from cache: %s", cache_key)
-
-            return deleted
-
-    def clear(self, namespace: Optional[str] = None) -> int:
-        """Clear cache entries.
+    def clear_namespace(self, namespace: str) -> int:
+        """Clear all entries in a namespace.
 
         Args:
-            namespace: If provided, clear only this namespace. Otherwise clear all.
+            namespace: Namespace to clear
 
         Returns:
             Number of entries cleared
         """
-        with self._lock:
-            count = 0
+        return self._cache.clear(namespace)
 
-            if namespace:
-                # Clear specific namespace
-                if self._memory_cache is not None:
-                    keys_to_delete = [
-                        k for k in self._memory_cache.keys() if k.startswith(f"{namespace}:")
-                    ]
-                    for key in keys_to_delete:
-                        try:
-                            del self._memory_cache[key]
-                            count += 1
-                        except KeyError:
-                            pass
+    def clear_all(self) -> int:
+        """Clear all cached entries.
 
-                if self._disk_cache is not None:
-                    # diskcache namespace clear by iteration
-                    to_delete = [
-                        k for k in self._disk_cache.iterkeys() if k.startswith(f"{namespace}:")
-                    ]
-                    for key in to_delete:
-                        try:
-                            del self._disk_cache[key]
-                            count += 1
-                        except Exception:
-                            pass
-            else:
-                # Clear all
-                if self._memory_cache is not None:
-                    count += len(self._memory_cache)
-                    self._memory_cache.clear()
+        Returns:
+            Number of entries cleared
+        """
+        return self._cache.clear()
 
-                if self._disk_cache is not None:
-                    count += len(self._disk_cache)
-                    self._disk_cache.clear()
-
-            logger.info("Cleared %d cache entries", count)
-            return count
-
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> CacheStats:
         """Get cache statistics.
 
         Returns:
-            Dictionary with cache stats
+            CacheStats with hit/miss counts
         """
-        with self._lock:
-            stats = self._stats.copy()
-
-            # Calculate hit rates
-            total_memory = stats["memory_hits"] + stats["memory_misses"]
-            total_disk = stats["disk_hits"] + stats["disk_misses"]
-
-            stats["memory_hit_rate"] = (
-                stats["memory_hits"] / total_memory if total_memory > 0 else 0
-            )
-            stats["disk_hit_rate"] = stats["disk_hits"] / total_disk if total_disk > 0 else 0
-
-            # Add size info
-            if self._memory_cache is not None:
-                stats["memory_size"] = len(self._memory_cache)
-                stats["memory_max_size"] = self.config.memory_max_size
-
-            if self._disk_cache is not None:
-                stats["disk_size"] = len(self._disk_cache)
-                stats["disk_volume"] = self._disk_cache.volume()
-
-            return stats
-
-    def _make_key(self, key: str, namespace: str) -> str:
-        """Create cache key with namespace.
-
-        Args:
-            key: Original key
-            namespace: Namespace for organization
-
-        Returns:
-            Namespaced cache key
-        """
-        # Hash long keys to keep them manageable
-        if len(key) > 200:
-            key_hash = hashlib.sha256(key.encode()).hexdigest()[:16]
-            return f"{namespace}:{key_hash}"
-
-        return f"{namespace}:{key}"
-
-    def warmup(self, data: Dict[str, Any], namespace: str = "default") -> int:
-        """Warm up cache with data.
-
-        Args:
-            data: Dictionary of key-value pairs to cache
-            namespace: Cache namespace
-
-        Returns:
-            Number of entries cached
-        """
-        count = 0
-        for key, value in data.items():
-            if self.set(key, value, namespace):
-                count += 1
-
-        logger.info("Warmed up cache with %d entries", count)
-        return count
+        raw_stats = self._cache.get_stats()
+        return CacheStats(
+            memory_hits=int(raw_stats.get("memory_hits", 0)),
+            memory_misses=int(raw_stats.get("memory_misses", 0)),
+            disk_hits=int(raw_stats.get("disk_hits", 0)),
+            disk_misses=int(raw_stats.get("disk_misses", 0)),
+            total_sets=int(raw_stats.get("sets", 0)),
+            total_evictions=int(raw_stats.get("evictions", 0)),
+            namespaces=list(self._namespaces.keys()),
+        )
 
     def close(self) -> None:
-        """Close cache connections and cleanup."""
-        if self._disk_cache is not None:
-            try:
-                self._disk_cache.close()
-                logger.info("Disk cache closed")
-            except Exception as e:
-                logger.warning("Error closing disk cache: %s", e)
-
-    def __enter__(self) -> "CacheManager":
-        """Context manager entry."""
-        return self
-
-    def __exit__(
-        self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[Any],
-    ) -> None:
-        """Context manager exit."""
-        self.close()
+        """Close cache and release resources."""
+        self._cache.close()
 
 
-class ResponseCache:
-    """Specialized cache for LLM responses.
+# =============================================================================
+# Global Cache Manager
+# =============================================================================
 
-    Caches expensive LLM API calls to reduce costs and latency.
+_global_manager: Optional[CacheManager] = None
+_global_lock = threading.Lock()
+
+
+def get_cache_manager(config: Optional[CacheConfig] = None) -> CacheManager:
+    """Get or create the global cache manager.
+
+    Args:
+        config: Cache configuration (only used on first call)
+
+    Returns:
+        Global CacheManager instance
     """
-
-    def __init__(self, cache_manager: Optional[CacheManager] = None):
-        """Initialize response cache.
-
-        Args:
-            cache_manager: Cache manager instance (creates default if None)
-        """
-        self.cache = cache_manager or CacheManager()
-        self.namespace = "responses"
-
-    def get_response(self, prompt: str, model: str, temperature: float) -> Optional[str]:
-        """Get cached response.
-
-        Args:
-            prompt: Prompt text
-            model: Model identifier
-            temperature: Temperature setting
-
-        Returns:
-            Cached response or None
-        """
-        key = self._make_response_key(prompt, model, temperature)
-        return self.cache.get(key, self.namespace)
-
-    def cache_response(
-        self,
-        prompt: str,
-        model: str,
-        temperature: float,
-        response: str,
-        ttl: Optional[int] = None,
-    ) -> bool:
-        """Cache LLM response.
-
-        Args:
-            prompt: Prompt text
-            model: Model identifier
-            temperature: Temperature setting
-            response: Response to cache
-            ttl: Custom TTL (uses default if None)
-
-        Returns:
-            True if successfully cached
-        """
-        key = self._make_response_key(prompt, model, temperature)
-        return self.cache.set(key, response, self.namespace, ttl)
-
-    def _make_response_key(self, prompt: str, model: str, temperature: float) -> str:
-        """Create cache key for response.
-
-        Args:
-            prompt: Prompt text
-            model: Model identifier
-            temperature: Temperature setting
-
-        Returns:
-            Cache key
-        """
-        # Include model and temperature in key for uniqueness
-        key_data = {
-            "prompt": prompt,
-            "model": model,
-            "temperature": temperature,
-        }
-        key_str = json.dumps(key_data, sort_keys=True)
-        return hashlib.sha256(key_str.encode()).hexdigest()
+    global _global_manager
+    with _global_lock:
+        if _global_manager is None:
+            _global_manager = CacheManager(config)
+        return _global_manager
 
 
-class EmbeddingCache:
-    """Specialized cache for embeddings.
+def set_cache_manager(manager: CacheManager) -> None:
+    """Set the global cache manager.
 
-    Caches expensive embedding computations for semantic search.
+    Args:
+        manager: CacheManager to use as global
     """
+    global _global_manager
+    with _global_lock:
+        if _global_manager is not None:
+            _global_manager.close()
+        _global_manager = manager
 
-    def __init__(self, cache_manager: Optional[CacheManager] = None):
-        """Initialize embedding cache.
 
-        Args:
-            cache_manager: Cache manager instance
-        """
-        self.cache = cache_manager or CacheManager()
-        self.namespace = "embeddings"
+def reset_cache_manager() -> None:
+    """Reset the global cache manager (for testing)."""
+    global _global_manager
+    with _global_lock:
+        if _global_manager is not None:
+            _global_manager.close()
+            _global_manager = None
 
-    def get_embedding(self, text: str, model: str) -> Optional[list]:
-        """Get cached embedding.
 
-        Args:
-            text: Text to get embedding for
-            model: Embedding model name
+# =============================================================================
+# Convenience Functions
+# =============================================================================
 
-        Returns:
-            Cached embedding vector or None
-        """
-        key = self._make_embedding_key(text, model)
-        return self.cache.get(key, self.namespace)
 
-    def cache_embedding(
-        self, text: str, model: str, embedding: list, ttl: Optional[int] = None
-    ) -> bool:
-        """Cache embedding.
+def get_tools_cache() -> CacheNamespace:
+    """Get the tools cache namespace."""
+    return get_cache_manager().namespace(CacheManager.NAMESPACE_TOOLS)
 
-        Args:
-            text: Text
-            model: Embedding model
-            embedding: Embedding vector
-            ttl: Custom TTL
 
-        Returns:
-            True if successfully cached
-        """
-        key = self._make_embedding_key(text, model)
-        return self.cache.set(key, embedding, self.namespace, ttl)
+def get_embeddings_cache() -> CacheNamespace:
+    """Get the embeddings cache namespace."""
+    return get_cache_manager().namespace(CacheManager.NAMESPACE_EMBEDDINGS)
 
-    def _make_embedding_key(self, text: str, model: str) -> str:
-        """Create cache key for embedding.
 
-        Args:
-            text: Text
-            model: Model name
+def get_responses_cache() -> CacheNamespace:
+    """Get the LLM responses cache namespace."""
+    return get_cache_manager().namespace(CacheManager.NAMESPACE_RESPONSES)
 
-        Returns:
-            Cache key
-        """
-        key_str = f"{model}:{text}"
-        return hashlib.sha256(key_str.encode()).hexdigest()
+
+def get_code_search_cache() -> CacheNamespace:
+    """Get the code search cache namespace."""
+    return get_cache_manager().namespace(CacheManager.NAMESPACE_CODE_SEARCH)

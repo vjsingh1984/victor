@@ -25,15 +25,19 @@ import subprocess
 from typing import Any, Dict, List, Optional, Tuple
 
 from victor.config.timeouts import ProcessTimeouts
+from victor.tools.base import ToolConfig
 from victor.tools.decorators import tool
 
-# Global state for AI provider
+# Global state for AI provider (DEPRECATED: use ToolConfig via context instead)
 _provider = None
 _model: Optional[str] = None
 
 
 def set_git_provider(provider, model: Optional[str] = None) -> None:
     """Set the global provider and model for git AI operations.
+
+    DEPRECATED: Use ToolConfig via context instead. This function is kept
+    for backward compatibility but will be removed in a future version.
 
     Args:
         provider: LLM provider for AI-generated messages
@@ -42,6 +46,24 @@ def set_git_provider(provider, model: Optional[str] = None) -> None:
     global _provider, _model
     _provider = provider
     _model = model
+
+
+def _get_provider_and_model(context: Optional[Dict[str, Any]] = None) -> Tuple[Any, Optional[str]]:
+    """Get provider and model from context or fall back to globals.
+
+    Args:
+        context: Tool execution context
+
+    Returns:
+        Tuple of (provider, model) - provider may be None if not configured
+    """
+    # First try to get from context (preferred method)
+    config = ToolConfig.from_context(context) if context else None
+    if config and config.provider:
+        return config.provider, config.model
+
+    # Fall back to global state (deprecated)
+    return _provider, _model
 
 
 def _run_git(*args: str) -> Tuple[bool, str, str]:
@@ -76,6 +98,7 @@ async def git(
     staged: bool = False,
     limit: int = 10,
     options: Optional[Dict[str, Any]] = None,
+    context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Unified git operations tool.
@@ -248,11 +271,14 @@ async def git(
 
 
 @tool
-async def git_suggest_commit() -> Dict[str, Any]:
+async def git_suggest_commit(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Generate AI commit message from staged changes.
 
     Analyzes the staged diff and generates a conventional commit message
     using the configured LLM provider.
+
+    Args:
+        context: Tool execution context (injected by decorator)
 
     Returns:
         Dictionary containing:
@@ -260,7 +286,8 @@ async def git_suggest_commit() -> Dict[str, Any]:
         - output: Generated commit message
         - error: Error message if failed
     """
-    if not _provider:
+    provider, model = _get_provider_and_model(context)
+    if not provider:
         return {
             "success": False,
             "output": "",
@@ -300,8 +327,8 @@ Generate ONLY the commit message, nothing else."""
         # Call LLM
         from victor.providers.base import Message
 
-        response = await _provider.complete(
-            model=_model or "default",
+        response = await provider.complete(
+            model=model or "default",
             messages=[Message(role="user", content=prompt)],
             temperature=0.3,  # Lower temperature for consistency
             max_tokens=200,
@@ -322,7 +349,10 @@ Generate ONLY the commit message, nothing else."""
 
 @tool
 async def git_create_pr(
-    pr_title: Optional[str] = None, pr_description: Optional[str] = None, base_branch: str = "main"
+    pr_title: Optional[str] = None,
+    pr_description: Optional[str] = None,
+    base_branch: str = "main",
+    context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Create a pull request with auto-generated content.
 
@@ -333,6 +363,7 @@ async def git_create_pr(
         pr_title: PR title. If None, auto-generated
         pr_description: PR description. If None, auto-generated
         base_branch: Base branch for PR (default: "main")
+        context: Tool execution context (injected by decorator)
 
     Returns:
         Dictionary containing:
@@ -340,6 +371,8 @@ async def git_create_pr(
         - output: PR creation result with URL
         - error: Error message if failed
     """
+    provider, model = _get_provider_and_model(context)
+
     # Get current branch
     success, current_branch, stderr = _run_git("branch", "--show-current")
     if not success:
@@ -348,7 +381,7 @@ async def git_create_pr(
     current_branch = current_branch.strip()
 
     # If no title/description and AI available, generate them
-    if (not pr_title or not pr_description) and _provider:
+    if (not pr_title or not pr_description) and provider:
         # Get diff from base branch
         success, diff, stderr = _run_git("diff", f"{base_branch}...HEAD")
 
@@ -384,8 +417,8 @@ DESCRIPTION:
             try:
                 from victor.providers.base import Message
 
-                response = await _provider.complete(
-                    model=_model or "default",
+                response = await provider.complete(
+                    model=model or "default",
                     messages=[Message(role="user", content=prompt)],
                     temperature=0.5,
                     max_tokens=500,
@@ -464,11 +497,14 @@ DESCRIPTION:
 
 
 @tool
-async def git_analyze_conflicts() -> Dict[str, Any]:
+async def git_analyze_conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Analyze merge conflicts and provide resolution guidance.
 
     Detects conflicted files and provides information about the conflicts,
     including conflict markers and resolution steps.
+
+    Args:
+        context: Tool execution context (injected by decorator)
 
     Returns:
         Dictionary containing:
@@ -516,7 +552,8 @@ async def git_analyze_conflicts() -> Dict[str, Any]:
             analysis.append(f"   Error reading file: {e}")
 
     # If AI available, get resolution suggestions
-    if _provider:
+    provider, _ = _get_provider_and_model(context)
+    if provider:
         analysis.append("\n\nAI-generated resolution suggestions:")
         analysis.append("   (Using LLM to analyze conflicts...)")
         # TODO: Implement AI conflict resolution suggestions
@@ -528,23 +565,3 @@ async def git_analyze_conflicts() -> Dict[str, Any]:
     analysis.append("4. Continue: git merge --continue or git rebase --continue")
 
     return {"success": True, "output": "\n".join(analysis), "error": ""}
-
-
-# Keep class for backward compatibility
-class GitTool:
-    """Deprecated: Use git and git_* functions instead.
-
-    This class is kept for backward compatibility but will be removed
-    in a future version. Use the decorator-based git and git_* functions instead.
-    """
-
-    def __init__(self, provider=None, model: Optional[str] = None):
-        """Initialize - deprecated."""
-        import warnings
-
-        warnings.warn(
-            "GitTool class is deprecated. Use git and git_* functions instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        set_git_provider(provider, model)

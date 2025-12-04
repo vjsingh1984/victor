@@ -110,7 +110,7 @@ SpanHook = Callable[[Span], None]
 MetricHook = Callable[[str, float, Dict[str, str]], None]
 
 
-class ObservabilityManager:
+class TracingProvider:
     """Central manager for observability hooks and tracing.
 
     Provides:
@@ -120,7 +120,7 @@ class ObservabilityManager:
     - Integration points for external observability systems
 
     Usage:
-        obs = ObservabilityManager()
+        obs = TracingProvider()
 
         # Register hooks
         obs.on_span_start(lambda span: print(f"Started: {span.name}"))
@@ -130,6 +130,8 @@ class ObservabilityManager:
         with obs.span("my_operation") as span:
             span.set_attribute("key", "value")
             # ... do work ...
+
+    Note: Previously named `ObservabilityManager`. Alias kept for backward compatibility.
     """
 
     def __init__(self) -> None:
@@ -275,20 +277,30 @@ class ObservabilityManager:
         self._span_stack.clear()
 
 
+# Backward compatibility alias
+ObservabilityManager = TracingProvider
+
+
 # Global instance for convenience
-_global_observability: Optional[ObservabilityManager] = None
+_global_observability: Optional[TracingProvider] = None
 
 
-def get_observability() -> ObservabilityManager:
-    """Get the global observability manager instance."""
+def get_observability() -> TracingProvider:
+    """Get the global tracing provider instance.
+
+    Note: Function name kept for backward compatibility.
+    """
     global _global_observability
     if _global_observability is None:
-        _global_observability = ObservabilityManager()
+        _global_observability = TracingProvider()
     return _global_observability
 
 
-def set_observability(manager: ObservabilityManager) -> None:
-    """Set the global observability manager instance."""
+def set_observability(manager: TracingProvider) -> None:
+    """Set the global tracing provider instance.
+
+    Note: Function name kept for backward compatibility.
+    """
     global _global_observability
     _global_observability = manager
 

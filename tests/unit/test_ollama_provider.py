@@ -24,7 +24,7 @@ from victor.providers.base import (
     ProviderTimeoutError,
     ToolDefinition,
 )
-from victor.providers.ollama import OllamaProvider
+from victor.providers.ollama_provider import OllamaProvider
 
 
 @pytest.fixture
@@ -408,3 +408,231 @@ async def test_normalize_tool_calls_empty(ollama_provider):
     """Test tool call normalization with empty list."""
     normalized = ollama_provider._normalize_tool_calls([])
     assert normalized is None
+
+
+@pytest.mark.asyncio
+async def test_normalize_tool_calls_unknown_format(ollama_provider):
+    """Test tool call normalization skips unknown formats (covers line 445)."""
+    tool_calls = [
+        {"unknown_key": "value"},  # Unknown format
+        {"name": "valid_tool", "arguments": {}},  # Valid format
+    ]
+    normalized = ollama_provider._normalize_tool_calls(tool_calls)
+    assert normalized is not None
+    assert len(normalized) == 1
+    assert normalized[0]["name"] == "valid_tool"
+
+
+class TestJsonToolCallParsing:
+    """Tests for JSON tool call parsing from content."""
+
+    def test_parse_json_tool_call_empty_content(self, ollama_provider):
+        """Test parsing empty content returns None (covers line 465-466)."""
+        assert ollama_provider._parse_json_tool_call_from_content("") is None
+        assert ollama_provider._parse_json_tool_call_from_content(None) is None
+        assert ollama_provider._parse_json_tool_call_from_content("   ") is None
+
+    def test_parse_json_tool_call_valid_arguments(self, ollama_provider):
+        """Test parsing valid JSON with arguments (covers lines 470-478)."""
+        content = '{"name": "read_file", "arguments": {"path": "/test.py"}}'
+        result = ollama_provider._parse_json_tool_call_from_content(content)
+
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]["name"] == "read_file"
+        assert result[0]["arguments"] == {"path": "/test.py"}
+
+    def test_parse_json_tool_call_valid_parameters(self, ollama_provider):
+        """Test parsing valid JSON with parameters key (covers line 475)."""
+        content = '{"name": "list_dir", "parameters": {"path": "/home"}}'
+        result = ollama_provider._parse_json_tool_call_from_content(content)
+
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]["arguments"] == {"path": "/home"}
+
+    def test_parse_json_tool_call_invalid_json(self, ollama_provider):
+        """Test parsing invalid JSON returns None (covers lines 479-481)."""
+        result = ollama_provider._parse_json_tool_call_from_content("not json at all")
+        assert result is None
+
+    def test_parse_json_tool_call_no_name_field(self, ollama_provider):
+        """Test parsing JSON without name field returns None (covers line 473)."""
+        content = '{"arguments": {"path": "/test.py"}}'
+        result = ollama_provider._parse_json_tool_call_from_content(content)
+        assert result is None
+
+
+class TestResponseParsingFallback:
+    """Tests for response parsing with fallback tool call detection."""
+
+    def test_parse_response_with_json_tool_in_content(self, ollama_provider):
+        """Test _parse_response detects JSON tool call in content (covers lines 500-506)."""
+        raw_response = {
+            "message": {
+                "role": "assistant",
+                "content": '{"name": "read_file", "arguments": {"path": "/test.py"}}',
+            },
+            "done": True,
+        }
+        response = ollama_provider._parse_response(raw_response, "llama3:8b")
+
+        # Tool call should be extracted from content
+        assert response.tool_calls is not None
+        assert len(response.tool_calls) == 1
+        assert response.tool_calls[0]["name"] == "read_file"
+        # Content should be cleared since it was a tool call
+        assert response.content == ""
+
+    def test_parse_response_no_usage(self, ollama_provider):
+        """Test _parse_response handles missing usage stats."""
+        raw_response = {
+            "message": {
+                "role": "assistant",
+                "content": "Hello",
+            },
+            "done": True,
+        }
+        response = ollama_provider._parse_response(raw_response, "test")
+        assert response.content == "Hello"
+        assert response.usage is None
+
+
+class TestStreamChunkParsing:
+    """Tests for stream chunk parsing."""
+
+    def test_parse_stream_chunk_basic(self, ollama_provider):
+        """Test basic stream chunk parsing (covers lines 536-559)."""
+        chunk_data = {
+            "message": {"content": "Hello"},
+            "done": False,
+        }
+        chunk = ollama_provider._parse_stream_chunk(chunk_data)
+
+        assert chunk.content == "Hello"
+        assert chunk.is_final is False
+        assert chunk.tool_calls is None
+
+    def test_parse_stream_chunk_final(self, ollama_provider):
+        """Test final stream chunk parsing."""
+        chunk_data = {
+            "message": {"content": "!"},
+            "done": True,
+            "done_reason": "stop",
+        }
+        chunk = ollama_provider._parse_stream_chunk(chunk_data)
+
+        assert chunk.is_final is True
+        assert chunk.stop_reason == "stop"
+
+    def test_parse_stream_chunk_with_tool_calls(self, ollama_provider):
+        """Test stream chunk with native tool calls."""
+        chunk_data = {
+            "message": {
+                "content": "",
+                "tool_calls": [{"name": "test_tool", "arguments": {}}],
+            },
+            "done": True,
+        }
+        chunk = ollama_provider._parse_stream_chunk(chunk_data)
+
+        assert chunk.tool_calls is not None
+        assert len(chunk.tool_calls) == 1
+
+    def test_parse_stream_chunk_json_tool_fallback(self, ollama_provider):
+        """Test stream chunk parses JSON tool call from content (covers lines 543-552)."""
+        chunk_data = {
+            "message": {
+                "content": '{"name": "read_file", "arguments": {"path": "/test"}}',
+            },
+            "done": True,
+            "model": "llama3:8b",
+        }
+        chunk = ollama_provider._parse_stream_chunk(chunk_data)
+
+        # Tool call should be detected from content
+        assert chunk.tool_calls is not None
+        assert chunk.tool_calls[0]["name"] == "read_file"
+        # Content should be cleared
+        assert chunk.content == ""
+
+
+class TestEndpointDiscovery:
+    """Tests for endpoint discovery logic."""
+
+    def test_select_base_url_from_env(self):
+        """Test _select_base_url prioritizes OLLAMA_ENDPOINTS env var (covers lines 121-123)."""
+        with patch.dict(
+            "os.environ", {"OLLAMA_ENDPOINTS": "http://server1:11434,http://server2:11434"}
+        ):
+            with patch("httpx.Client") as mock_client:
+                # Make first endpoint fail
+                mock_instance = MagicMock()
+                mock_instance.__enter__ = MagicMock(return_value=mock_instance)
+                mock_instance.__exit__ = MagicMock()
+                mock_instance.get.side_effect = [Exception("Not reachable"), MagicMock()]
+                mock_client.return_value = mock_instance
+
+                # Use skip_discovery since we're testing _select_base_url directly
+                provider = OllamaProvider(base_url="http://localhost:11434", _skip_discovery=True)
+                # Now test _select_base_url directly
+                result = provider._select_base_url("http://ignored:11434", 10)
+
+                # Should try endpoints from env var
+                assert "server" in result or "localhost" in result
+
+    def test_select_base_url_comma_separated(self):
+        """Test _select_base_url handles comma-separated URL string (covers lines 133-134)."""
+        with patch.dict("os.environ", {}, clear=True):
+            with patch.object(OllamaProvider, "_select_base_url") as mock_select:
+                mock_select.return_value = "http://localhost:11434"
+                provider = OllamaProvider(base_url="http://a:11434,http://b:11434")
+
+                # Just verify it doesn't crash
+                assert provider is not None
+
+    def test_select_base_url_list_input(self):
+        """Test _select_base_url handles list input (covers lines 130-131)."""
+        with patch.dict("os.environ", {}, clear=True):
+            with patch.object(OllamaProvider, "_select_base_url") as mock_select:
+                mock_select.return_value = "http://localhost:11434"
+                provider = OllamaProvider(base_url=["http://a:11434", "http://b:11434"])
+                assert provider is not None
+
+    def test_select_base_url_none_default(self):
+        """Test _select_base_url uses default when base_url is None (covers line 125-126)."""
+        with patch.dict("os.environ", {}, clear=True):
+            with patch.object(OllamaProvider, "_select_base_url") as mock_select:
+                mock_select.return_value = "http://localhost:11434"
+                provider = OllamaProvider(base_url=None)
+                assert provider is not None
+
+    @pytest.mark.asyncio
+    async def test_select_base_url_async_factory(self):
+        """Test async factory create method (covers lines 89-90)."""
+        with patch.object(
+            OllamaProvider, "_select_base_url_async", new_callable=AsyncMock
+        ) as mock_async_select:
+            mock_async_select.return_value = "http://localhost:11434"
+
+            provider = await OllamaProvider.create(base_url="http://localhost:11434")
+
+            assert provider is not None
+            assert provider.name == "ollama"
+
+    def test_skip_discovery_with_list(self):
+        """Test _skip_discovery with list base_url (covers lines 56-60)."""
+        provider = OllamaProvider(
+            base_url=["http://server1:11434"],
+            _skip_discovery=True,
+        )
+        assert provider is not None
+
+    def test_skip_discovery_with_empty_list(self):
+        """Test _skip_discovery with empty list falls back to default."""
+        provider = OllamaProvider(
+            base_url=[],
+            _skip_discovery=True,
+        )
+        # Should fall back to default
+        assert provider is not None

@@ -13,7 +13,7 @@ from datetime import datetime
 # Add victor to path
 sys.path.insert(0, "/app")
 
-from victor.providers.ollama import OllamaProvider
+from victor.providers.ollama_provider import OllamaProvider
 from victor.providers.base import Message
 from rich.console import Console
 from rich.panel import Panel

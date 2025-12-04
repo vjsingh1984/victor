@@ -51,8 +51,9 @@ pytestmark = pytest.mark.skipif(
     not _check_vllm_available(), reason="vLLM server not available at localhost:8000/v1/models"
 )
 
-from victor.providers.base import Message, ToolDefinition
-from victor.providers.openai_provider import OpenAIProvider
+# These imports are intentionally after pytestmark to avoid loading if vLLM unavailable
+from victor.providers.base import Message, ToolDefinition  # noqa: E402
+from victor.providers.openai_provider import OpenAIProvider  # noqa: E402
 
 
 @pytest.fixture

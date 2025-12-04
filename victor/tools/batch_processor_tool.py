@@ -467,19 +467,3 @@ async def batch(
             "success": False,
             "error": f"Unknown operation: {operation}. Valid operations: search, replace, analyze, list, transform",
         }
-
-
-# Keep class for backward compatibility
-class BatchProcessorTool:
-    """Deprecated: Use batch function instead."""
-
-    def __init__(self, max_workers: int = 4):
-        """Initialize - deprecated."""
-        import warnings
-
-        warnings.warn(
-            "BatchProcessorTool class is deprecated. Use batch function instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        set_batch_processor_config(max_workers)

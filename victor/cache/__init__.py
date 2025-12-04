@@ -20,13 +20,56 @@ Tiered caching architecture:
 
 Features:
 - Automatic tiering
+- Namespace-scoped access
 - TTL support
 - Size limits
 - Thread-safe
-- No external dependencies
+
+Usage:
+    from victor.cache import get_cache_manager
+
+    # Get namespace-scoped cache
+    cache = get_cache_manager()
+    tool_cache = cache.namespace("tools")
+    tool_cache.set("key", value)
 """
 
-from victor.cache.manager import CacheManager
 from victor.cache.config import CacheConfig
+from victor.cache.tiered_cache import TieredCache
 
-__all__ = ["CacheManager", "CacheConfig"]
+# Legacy alias for backward compatibility
+from victor.cache.tiered_cache import CacheManager as LegacyCacheManager
+
+# New unified cache manager
+from victor.cache.manager import (
+    CacheManager,
+    CacheNamespace,
+    CacheStats,
+    get_cache_manager,
+    set_cache_manager,
+    reset_cache_manager,
+    get_tools_cache,
+    get_embeddings_cache,
+    get_responses_cache,
+    get_code_search_cache,
+)
+
+__all__ = [
+    # Configuration
+    "CacheConfig",
+    # Low-level cache
+    "TieredCache",
+    "LegacyCacheManager",
+    # Unified cache manager
+    "CacheManager",
+    "CacheNamespace",
+    "CacheStats",
+    "get_cache_manager",
+    "set_cache_manager",
+    "reset_cache_manager",
+    # Convenience accessors
+    "get_tools_cache",
+    "get_embeddings_cache",
+    "get_responses_cache",
+    "get_code_search_cache",
+]

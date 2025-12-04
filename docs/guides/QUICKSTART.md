@@ -22,7 +22,7 @@ Get up and running with Victor in minutes!
 ### Step 1: Create Virtual Environment
 
 ```bash
-cd /Users/vijaysingh/code/victor
+cd /path/to/victor
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
@@ -57,32 +57,66 @@ ollama pull codellama:13b
 
 ## First Run
 
-### Option 1: Interactive Mode
+### Interactive Mode (TUI - Default)
+
+Victor features a modern **Text User Interface (TUI)** with a rich terminal experience:
 
 ```bash
-# Start interactive REPL
+# Start interactive TUI mode (default)
+victor chat
+
+# Or simply
 victor
-
-# Now you can chat with the agent!
 ```
 
-Example session:
-```
-You: Write a Python function to calculate the factorial of a number
-Assistant: [Generates code and can even write it to a file for you]
+**TUI Features:**
+- Modern terminal interface with colors and formatting
+- Status bar showing provider, model, and tool budget
+- Message history with user/assistant distinction
+- Keyboard shortcuts (Ctrl+C to cancel, Ctrl+D to quit)
+- Logs written to `~/.victor/logs/victor.log`
 
-You: Now write unit tests for that function
-Assistant: [Creates test file with pytest tests]
-```
+![TUI Screenshot](../../assets/victor-tui.png)
 
-### Option 2: One-Shot Command
+### CLI Mode (For Debugging)
+
+Use `--no-tui` or `--cli` flag for classic console output with visible logs:
 
 ```bash
-# Execute a single command
+# CLI mode with debug logging
+victor chat --no-tui --log-level DEBUG
+
+# Or use the shorter alias
+victor chat --cli --log-level DEBUG
+```
+
+**When to use CLI mode:**
+- Debugging issues (see all log output in console)
+- Running in non-interactive terminals
+- Piping output to files
+- CI/CD environments
+
+### One-Shot Command
+
+```bash
+# Execute a single command (always uses CLI mode)
+victor chat "Write a hello world FastAPI application"
+
+# Or simply
 victor "Write a hello world FastAPI application"
 ```
 
-### Option 3: Run Example Script
+### Example Session
+
+```
+You > Write a Python function to calculate the factorial of a number
+Assistant: [Generates code and can even write it to a file for you]
+
+You > Now write unit tests for that function
+Assistant: [Creates test file with pytest tests]
+```
+
+### Run Example Script
 
 ```bash
 # Test with the example script
