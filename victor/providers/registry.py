@@ -104,12 +104,15 @@ def _register_default_providers() -> None:
     from victor.providers.openai_provider import OpenAIProvider
     from victor.providers.google_provider import GoogleProvider
     from victor.providers.xai_provider import XAIProvider
+    from victor.providers.lmstudio_provider import LMStudioProvider
 
     ProviderRegistry.register("ollama", OllamaProvider)
     ProviderRegistry.register("anthropic", AnthropicProvider)
     ProviderRegistry.register("openai", OpenAIProvider)
-    # LMStudio and vLLM use OpenAI-compatible endpoints
-    ProviderRegistry.register("lmstudio", OpenAIProvider)
+    # LMStudio uses dedicated provider (similar to Ollama)
+    # with httpx, tiered URL selection, and 300s timeout
+    ProviderRegistry.register("lmstudio", LMStudioProvider)
+    # vLLM uses OpenAI-compatible endpoints
     ProviderRegistry.register("vllm", OpenAIProvider)
     ProviderRegistry.register("google", GoogleProvider)
     ProviderRegistry.register("xai", XAIProvider)

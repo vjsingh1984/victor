@@ -19,10 +19,11 @@ from victor.agent.tool_calling.registry import ToolCallingAdapterRegistry
 from victor.agent.tool_calling.base import BaseToolCallingAdapter
 from victor.agent.tool_calling.adapters import (
     AnthropicToolCallingAdapter,
-    OpenAIToolCallingAdapter,
+    GoogleToolCallingAdapter,
+    LMStudioToolCallingAdapter,
     OllamaToolCallingAdapter,
     OpenAICompatToolCallingAdapter,
-    GoogleToolCallingAdapter,
+    OpenAIToolCallingAdapter,
 )
 
 
@@ -77,9 +78,9 @@ class TestToolCallingAdapterRegistry:
         assert isinstance(adapter, OllamaToolCallingAdapter)
 
     def test_get_adapter_lmstudio(self):
-        """Test getting LMStudio adapter (OpenAI-compatible)."""
+        """Test getting LMStudio adapter (dedicated adapter)."""
         adapter = ToolCallingAdapterRegistry.get_adapter("lmstudio", model="local-model")
-        assert isinstance(adapter, OpenAICompatToolCallingAdapter)
+        assert isinstance(adapter, LMStudioToolCallingAdapter)
         assert adapter.provider_name == "lmstudio"
 
     def test_get_adapter_vllm(self):

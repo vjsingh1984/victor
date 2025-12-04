@@ -680,22 +680,234 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         )
 
 
+class LMStudioToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
+    """Dedicated adapter for LMStudio local models.
+
+    LMStudio provides an OpenAI-compatible API but requires specialized handling:
+    - Native tool support for "hammer badge" models (Qwen2.5, Llama3.1, Ministral)
+    - [TOOL_REQUEST]...[END_TOOL_REQUEST] format for default mode
+    - JSON fallback parsing for unsupported models
+
+    Uses FallbackParsingMixin for common parsing logic (shared with OllamaToolCallingAdapter).
+
+    References:
+    - https://lmstudio.ai/docs/advanced/tool-use
+    - https://lmstudio.ai/docs/api/openai-api
+    """
+
+    # Models with native LMStudio tool support (hammer badge)
+    NATIVE_TOOL_MODELS = frozenset(
+        [
+            "qwen2.5",
+            "qwen-2.5",
+            "qwen3",
+            "qwen-3",
+            "llama-3.1",
+            "llama3.1",
+            "llama-3.2",
+            "llama3.2",
+            "llama-3.3",
+            "llama3.3",
+            "ministral",
+            "mistral",
+            "mixtral",
+            "command-r",
+            "hermes",
+            "functionary",
+        ]
+    )
+
+    @property
+    def provider_name(self) -> str:
+        return "lmstudio"
+
+    def _has_native_support(self) -> bool:
+        """Check if current model has native tool calling support."""
+        return any(pattern in self.model_lower for pattern in self.NATIVE_TOOL_MODELS)
+
+    def _has_thinking_mode(self) -> bool:
+        """Check if model supports Qwen3 thinking mode."""
+        return "qwen3" in self.model_lower or "qwen-3" in self.model_lower
+
+    def get_capabilities(self) -> ToolCallingCapabilities:
+        """Get capabilities for LMStudio models."""
+        has_native = self._has_native_support()
+        format_hint = (
+            ToolCallFormat.LMSTUDIO_NATIVE if has_native else ToolCallFormat.LMSTUDIO_DEFAULT
+        )
+
+        # Load from YAML config with model pattern matching
+        loader = _get_capability_loader()
+        caps = loader.get_capabilities("lmstudio", self.model, format_hint)
+
+        # Apply runtime model detection for thinking mode
+        if self._has_thinking_mode() and not caps.thinking_mode:
+            caps = ToolCallingCapabilities(
+                native_tool_calls=caps.native_tool_calls,
+                streaming_tool_calls=caps.streaming_tool_calls,
+                parallel_tool_calls=caps.parallel_tool_calls,
+                tool_choice_param=caps.tool_choice_param,
+                json_fallback_parsing=True,
+                xml_fallback_parsing=False,
+                thinking_mode=True,
+                requires_strict_prompting=caps.requires_strict_prompting,
+                tool_call_format=format_hint,
+                argument_format=caps.argument_format,
+                recommended_max_tools=caps.recommended_max_tools,
+                recommended_tool_budget=caps.recommended_tool_budget,
+            )
+
+        return caps
+
+    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+        """Convert to OpenAI format (LMStudio is OpenAI-compatible)."""
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.parameters,
+                },
+            }
+            for tool in tools
+        ]
+
+    def parse_tool_calls(
+        self,
+        content: str,
+        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+    ) -> ToolCallParseResult:
+        """Parse LMStudio tool calls with multi-format support.
+
+        Handles:
+        1. Native tool calls from API response (hammer badge models)
+        2. [TOOL_REQUEST]...[END_TOOL_REQUEST] format (default mode)
+        3. JSON fallback from content (using FallbackParsingMixin)
+        """
+        warnings = []
+
+        # 1. Try native tool calls first (using mixin method)
+        if raw_tool_calls:
+            result = self.parse_native_tool_calls(raw_tool_calls, self.is_valid_tool_name)
+            if result.tool_calls:
+                return ToolCallParseResult(
+                    tool_calls=result.tool_calls,
+                    remaining_content=content,
+                    parse_method=result.parse_method,
+                    confidence=result.confidence,
+                    warnings=result.warnings,
+                )
+
+        # 2. Try [TOOL_REQUEST] format (LMStudio default mode)
+        if content:
+            result = self._parse_tool_request_format(content)
+            if result.tool_calls:
+                return result
+
+        # 3. JSON fallback from content (using mixin method)
+        if content:
+            result = self.parse_from_content(content, self.is_valid_tool_name)
+            if result.tool_calls:
+                return result
+
+        return ToolCallParseResult(remaining_content=content)
+
+    def _parse_tool_request_format(self, content: str) -> ToolCallParseResult:
+        """Parse LMStudio [TOOL_REQUEST]...[END_TOOL_REQUEST] format.
+
+        Example:
+        [TOOL_REQUEST]{"name": "read_file", "arguments": {"path": "/etc/hosts"}}[END_TOOL_REQUEST]
+        """
+        pattern = r"\[TOOL_REQUEST\](.*?)\[END_TOOL_REQUEST\]"
+        matches = re.findall(pattern, content, re.DOTALL)
+
+        if not matches:
+            return ToolCallParseResult(remaining_content=content)
+
+        tool_calls = []
+        warnings = []
+
+        for match in matches:
+            try:
+                data = json.loads(match.strip())
+                name = data.get("name", "")
+                if self.is_valid_tool_name(name):
+                    args = data.get("arguments") or data.get("parameters", {})
+                    tool_calls.append(ToolCall(name=name, arguments=args))
+                else:
+                    warnings.append(f"Skipped invalid tool name: {name}")
+            except json.JSONDecodeError:
+                warnings.append(f"Failed to parse TOOL_REQUEST JSON: {match[:50]}...")
+
+        remaining = re.sub(pattern, "", content, flags=re.DOTALL).strip()
+
+        return ToolCallParseResult(
+            tool_calls=tool_calls,
+            remaining_content=remaining,
+            parse_method="tool_request_format",
+            confidence=0.85,
+            warnings=warnings,
+        )
+
+    def get_system_prompt_hints(self) -> str:
+        """Get system prompt hints for LMStudio models."""
+        capabilities = self.get_capabilities()
+
+        if capabilities.native_tool_calls:
+            hints = [
+                "TOOL USAGE:",
+                "- Use the available tools to gather information.",
+                "- Call tools one at a time and wait for results.",
+                "- After 2-3 successful tool calls, provide your answer.",
+                "- Do NOT repeat identical tool calls.",
+                "",
+                "RESPONSE FORMAT:",
+                "- Provide your answer in plain, readable text.",
+                "- Do NOT include JSON, XML, or tool syntax in your response.",
+                "- Be direct and answer the user's question.",
+            ]
+
+            if capabilities.thinking_mode:
+                hints.extend(
+                    [
+                        "",
+                        "QWEN3 MODE:",
+                        "- Use /no_think for simple questions.",
+                        "- Provide direct answers without excessive reasoning.",
+                    ]
+                )
+
+            return "\n".join(hints)
+        else:
+            return "\n".join(
+                [
+                    "CRITICAL RULES:",
+                    "1. Call tools ONE AT A TIME. Wait for each result.",
+                    "2. After reading 2-3 files, STOP and provide your answer.",
+                    "3. Do NOT repeat the same tool call.",
+                    "4. Do NOT invent or guess file contents.",
+                    "",
+                    "OUTPUT FORMAT:",
+                    "1. Your answer must be in plain English text.",
+                    "2. Do NOT output JSON objects in your response.",
+                    "3. Do NOT output XML tags.",
+                    "4. Do NOT output [TOOL_REQUEST] markers in your final answer.",
+                ]
+            )
+
+
 class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
-    """Adapter for OpenAI-compatible local providers (LMStudio, vLLM).
+    """Adapter for OpenAI-compatible local providers (vLLM).
 
-    These providers use the OpenAI API format but may have varying levels
-    of tool calling support based on the model.
-
-    LMStudio:
-    - Native support (hammer badge): Qwen2.5, Llama3.1, Ministral
-    - Default mode: Uses [TOOL_REQUEST] format
+    Note: LMStudio now uses the dedicated LMStudioToolCallingAdapter.
+    This adapter is retained for vLLM compatibility.
 
     vLLM:
     - Requires --enable-auto-tool-choice and --tool-call-parser flags
     - Supports many model-specific parsers (hermes, mistral, llama3_json, etc.)
 
     References:
-    - https://lmstudio.ai/docs/advanced/tool-use
     - https://docs.vllm.ai/en/stable/features/tool_calling/
     """
 

@@ -82,6 +82,7 @@ class ToolCallingAdapterRegistry:
         from victor.agent.tool_calling.adapters import (
             AnthropicToolCallingAdapter,
             GoogleToolCallingAdapter,
+            LMStudioToolCallingAdapter,
             OllamaToolCallingAdapter,
             OpenAICompatToolCallingAdapter,
             OpenAIToolCallingAdapter,
@@ -94,7 +95,9 @@ class ToolCallingAdapterRegistry:
                 "openai": OpenAIToolCallingAdapter,
                 "google": GoogleToolCallingAdapter,
                 "ollama": OllamaToolCallingAdapter,
-                "lmstudio": OpenAICompatToolCallingAdapter,
+                # LMStudio uses dedicated adapter (like Ollama) with FallbackParsingMixin
+                "lmstudio": LMStudioToolCallingAdapter,
+                # vLLM uses OpenAI-compatible adapter
                 "vllm": OpenAICompatToolCallingAdapter,
             }
 
@@ -102,7 +105,7 @@ class ToolCallingAdapterRegistry:
         if provider_key in cls._adapters:
             adapter_class = cls._adapters[provider_key]
 
-            # Handle OpenAI-compatible providers that need variant info
+            # Handle OpenAI-compatible providers (vLLM) that need variant info
             if adapter_class == OpenAICompatToolCallingAdapter:
                 return adapter_class(  # type: ignore[call-arg]
                     model=model,
