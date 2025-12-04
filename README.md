@@ -327,13 +327,16 @@ Victor includes an industry-standard evaluation harness using the **HumanEval** 
 
 | Profile | Provider/Model | Tasks | Pass Rate | Pass@1 | Pass@5 | Avg Time/Task |
 |---------|---------------|-------|-----------|--------|--------|---------------|
+| `claude-opus` | Anthropic/claude-opus-4-5 | 30 | **96.7%** | 96.67% | 100% | 1.3s |
+| `claude-sonnet` | Anthropic/claude-sonnet-4-5 | 30 | **96.7%** | 96.67% | 100% | 1.2s |
 | `claude-haiku` | Anthropic/claude-3-5-haiku | 30 | **86.7%** | 86.67% | 100% | 0.6s |
 | `default` | Ollama/qwen3-coder:30b | 20 | **85.0%** | 85.00% | 100% | 3.8s |
 
 **Key Observations:**
-- Claude 3.5 Haiku achieves 86.7% pass rate with 4x parallelism in ~18s
-- Local Ollama (Qwen3-coder:30b) achieves 85.0% pass rate sequentially in ~76s
-- Both achieve 100% Pass@5, showing robust solution quality
+- Claude Opus 4.5 and Sonnet 4.5 both achieve 96.7% pass rate (29/30 tasks)
+- Claude 3.5 Haiku achieves 86.7% pass rate - excellent cost-performance ratio
+- Local Ollama (Qwen3-coder:30b) achieves 85.0% pass rate with zero API costs
+- All models achieve 100% Pass@5, demonstrating robust solution generation
 
 ### Run Your Own Benchmark
 
