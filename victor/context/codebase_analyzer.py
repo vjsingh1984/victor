@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Smart codebase analyzer for generating comprehensive .victor.md files.
+"""Smart codebase analyzer for generating comprehensive init.md files.
 
 This module analyzes Python codebases to extract:
 - Package structure and layout
@@ -20,6 +20,8 @@ This module analyzes Python codebases to extract:
 - Architectural patterns (providers, tools, managers, etc.)
 - CLI commands from pyproject.toml
 - Configuration files and their purposes
+
+Output location: .victor/init.md (configurable via settings.py)
 """
 
 import ast
@@ -28,6 +30,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+from victor.config.settings import VICTOR_CONTEXT_FILE, VICTOR_DIR_NAME, get_project_paths
 
 logger = logging.getLogger(__name__)
 
@@ -429,21 +433,21 @@ class CodebaseAnalyzer:
 
 
 def generate_smart_victor_md(root_path: Optional[str] = None) -> str:
-    """Generate a comprehensive .victor.md using codebase analysis.
+    """Generate comprehensive project context using codebase analysis.
 
     Args:
         root_path: Root directory to analyze. Defaults to current directory.
 
     Returns:
-        Generated markdown content.
+        Generated markdown content for .victor/init.md.
     """
     analyzer = CodebaseAnalyzer(root_path)
     analysis = analyzer.analyze()
 
     sections = []
 
-    # Header
-    sections.append("# .victor.md\n")
+    # Header - use configurable file name
+    sections.append(f"# {VICTOR_CONTEXT_FILE}\n")
     sections.append(
         "This file provides guidance to Victor when working with code in this repository.\n"
     )
@@ -564,24 +568,30 @@ CONTEXT_FILE_ALIASES = {
 
 def create_context_symlinks(
     root_path: Optional[str] = None,
-    source_file: str = ".victor.md",
+    source_file: Optional[str] = None,
     aliases: Optional[List[str]] = None,
 ) -> Dict[str, str]:
-    """Create symlinks from .victor.md to other context file names.
+    """Create symlinks from .victor/init.md to other context file names.
 
-    This allows a single source of truth (.victor.md) to work with
+    This allows a single source of truth (.victor/init.md) to work with
     multiple AI coding tools that look for different filenames.
 
     Args:
         root_path: Root directory. Defaults to current directory.
-        source_file: Source file to link from (default: .victor.md)
+        source_file: Source file to link from. Defaults to settings-configured path.
         aliases: List of alias names to create. If None, creates all supported aliases.
 
     Returns:
         Dict mapping alias name to status ('created', 'exists', 'failed', 'skipped')
     """
     root = Path(root_path) if root_path else Path.cwd()
-    source = root / source_file
+    # Use settings-driven path by default
+    if source_file is None:
+        paths = get_project_paths(root)
+        source = paths.project_context_file
+        source_file = str(source.relative_to(root))
+    else:
+        source = root / source_file
     results: Dict[str, str] = {}
 
     if not source.exists():
@@ -621,7 +631,7 @@ def remove_context_symlinks(
 ) -> Dict[str, str]:
     """Remove symlinks to context files.
 
-    Only removes files that are symlinks pointing to .victor.md or similar.
+    Only removes files that are symlinks pointing to .victor/init.md or similar.
     Does not remove actual files.
 
     Args:
@@ -845,7 +855,7 @@ def gather_project_context(root_path: Optional[str] = None, max_files: int = 50)
 
 
 def build_llm_prompt_for_victor_md(context: Dict[str, any]) -> str:
-    """Build the prompt for LLM to generate .victor.md.
+    """Build the prompt for LLM to generate project context file.
 
     Args:
         context: Project context from gather_project_context()
@@ -853,7 +863,7 @@ def build_llm_prompt_for_victor_md(context: Dict[str, any]) -> str:
     Returns:
         Prompt string for the LLM.
     """
-    prompt = f"""Analyze this project and generate a comprehensive .victor.md file.
+    prompt = f"""Analyze this project and generate a comprehensive {VICTOR_CONTEXT_FILE} file.
 
 PROJECT: {context['project_name']}
 DETECTED LANGUAGES: {', '.join(context['detected_languages']) or 'Unknown'}
@@ -875,7 +885,7 @@ MAIN CONFIG CONTENT:
 
 ---
 
-Generate a .victor.md file with these sections:
+Generate a {VICTOR_CONTEXT_FILE} file with these sections:
 1. **Project Overview**: Brief description of what the project does
 2. **Package Layout**: Table showing important directories (use | Path | Status | Description | format)
 3. **Key Components**: Main modules, classes, or files with their purposes
@@ -888,9 +898,9 @@ IMPORTANT:
 - Include file paths where relevant
 - Use markdown tables for structured data
 - Don't make up information - only document what's evident from the structure
-- Start with "# .victor.md" header
+- Start with "# {VICTOR_CONTEXT_FILE}" header
 
-Output ONLY the .victor.md content, no explanations."""
+Output ONLY the {VICTOR_CONTEXT_FILE} content, no explanations."""
 
     return prompt
 
@@ -901,7 +911,7 @@ async def generate_victor_md_with_llm(
     root_path: Optional[str] = None,
     max_files: int = 50,
 ) -> str:
-    """Generate .victor.md using an LLM provider.
+    """Generate project context file using an LLM provider.
 
     This function works with any project type by gathering structural
     information and asking the LLM to analyze and document it.
@@ -913,7 +923,7 @@ async def generate_victor_md_with_llm(
         max_files: Maximum source files to include in context.
 
     Returns:
-        Generated .victor.md content.
+        Generated content for .victor/init.md.
     """
     from victor.providers.base import Message
 
@@ -926,13 +936,15 @@ async def generate_victor_md_with_llm(
     # Call the LLM
     messages = [Message(role="user", content=prompt)]
 
+    expected_header = f"# {VICTOR_CONTEXT_FILE}"
+
     try:
         response = await provider.chat(messages, model=model)
         content = response.content.strip()
 
         # Ensure it starts with the header
-        if not content.startswith("# .victor.md"):
-            content = "# .victor.md\n\n" + content
+        if not content.startswith(expected_header):
+            content = f"{expected_header}\n\n" + content
 
         return content
     except Exception as e:

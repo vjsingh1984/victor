@@ -325,18 +325,56 @@ Victor includes an industry-standard evaluation harness using the **HumanEval** 
 
 ### Latest Benchmark Run (December 2025)
 
+#### Full HumanEval (164 Tasks)
+
+| Provider/Model | Tasks | Pass Rate | Pass@1 | Pass@5 | Avg Time/Task |
+|---------------|-------|-----------|--------|--------|---------------|
+| **Anthropic/claude-sonnet-4-5** | 164 | **93.9%** | 93.90% | 100% | 1.3s |
+| **Ollama/gpt-oss:latest** | 164 | **88.4%** | 88.41% | 100% | 9.1s |
+| Anthropic/claude-3-5-haiku | 164 | **81.1%** | 81.10% | 99.98% | 1.0s |
+| Ollama/qwen3-coder:30b | 164 | **78.7%** | 78.66% | 99.97% | 3.4s |
+| Ollama/deepseek-coder-v2:16b | 164 | **76.2%** | 76.22% | 99.94% | 2.1s |
+| Ollama/deepseek-coder:33b | 164 | **72.0%** | 71.95% | 99.85% | 8.0s |
+| Ollama/llama3.1:8b | 164 | **57.9%** | 57.93% | 98.79% | 2.7s |
+
+#### Sample Benchmark (30 Tasks)
+
 | Profile | Provider/Model | Tasks | Pass Rate | Pass@1 | Pass@5 | Avg Time/Task |
 |---------|---------------|-------|-----------|--------|--------|---------------|
 | `claude-opus` | Anthropic/claude-opus-4-5 | 30 | **96.7%** | 96.67% | 100% | 1.3s |
 | `claude-sonnet` | Anthropic/claude-sonnet-4-5 | 30 | **96.7%** | 96.67% | 100% | 1.2s |
+| `gpt-oss` | Ollama/gpt-oss:latest | 30 | **93.3%** | 93.33% | 100% | 6.3s |
+| `default` | Ollama/qwen3-coder:30b | 30 | **90.0%** | 90.00% | 100% | 3.5s |
 | `claude-haiku` | Anthropic/claude-3-5-haiku | 30 | **86.7%** | 86.67% | 100% | 0.6s |
-| `default` | Ollama/qwen3-coder:30b | 20 | **85.0%** | 85.00% | 100% | 3.8s |
+| `gemma3-27b` | Ollama/gemma3:27b | 30 | **80.0%** | 80.00% | 100% | 14.8s |
 
 **Key Observations:**
-- Claude Opus 4.5 and Sonnet 4.5 both achieve 96.7% pass rate (29/30 tasks)
-- Claude 3.5 Haiku achieves 86.7% pass rate - excellent cost-performance ratio
-- Local Ollama (Qwen3-coder:30b) achieves 85.0% pass rate with zero API costs
-- All models achieve 100% Pass@5, demonstrating robust solution generation
+- **Claude Sonnet 4.5 leads at 93.9%** - the only model above 90% on full HumanEval
+- **Ollama gpt-oss:latest achieves 88.4%** - within 5.5 points of Sonnet with zero API costs
+- **Best local model (gpt-oss) delivers 94% of Sonnet's performance** at zero cost
+- **Model size matters**: llama3.1:8b (4.9GB) scores 57.9% vs 88.4% for gpt-oss (13GB)
+- All models achieve ≥98.79% Pass@5, demonstrating robust solution generation with retries
+- **qwen3-coder:30b** is 2.7x faster than gpt-oss (3.4s vs 9.1s per task)
+
+#### Cost-Performance Tradeoff
+
+| Model | Pass Rate | Latency | Cost | Best For |
+|-------|-----------|---------|------|----------|
+| Claude Sonnet 4.5 | 93.9% | Fast (1.3s) | $$$ | Production, critical code |
+| gpt-oss:latest | 88.4% | Medium (9.1s) | **FREE** | Cost-sensitive, air-gapped |
+| Claude Haiku | 81.1% | Fast (1.0s) | $ | High volume, budget conscious |
+| qwen3-coder:30b | 78.7% | Fast (3.4s) | **FREE** | Fast local iteration |
+
+> **Understanding Pass@k Metrics** (from OpenAI's Codex paper)
+>
+> | Metric | Meaning | How to Interpret |
+> |--------|---------|------------------|
+> | **Pass@1** | Probability of correct code on a single attempt | Higher = more reliable first-try results. A model with 93.9% Pass@1 succeeds 94 times out of 100 on the first generation. |
+> | **Pass@5** | Probability of at least one correct solution in 5 attempts | Higher = better with retries. Even a 72% Pass@1 model reaches ~100% Pass@5, meaning it *can* solve the problem with sampling. |
+>
+> *Formula*: `pass@k = 1 - C(n-c, k) / C(n, k)` where n=total tasks, c=correct, k=samples
+>
+> **Quick interpretation**: Pass@1 reflects production reliability (single-shot). Pass@5 shows ceiling potential with retry loops. A large gap between them indicates inconsistent but capable performance.
 
 ### Run Your Own Benchmark
 

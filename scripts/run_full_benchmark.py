@@ -13,6 +13,16 @@ Usage:
 
     # Run full benchmark (164 tasks)
     python scripts/run_full_benchmark.py --profile claude-haiku --parallel 4
+
+    # Target specific Ollama host directly (bypasses tiered URL selection)
+    python scripts/run_full_benchmark.py --profile default --base-url http://192.168.1.20:11434 --model gpt-oss:latest
+
+    # Run two benchmarks in parallel on different hosts (in separate terminals)
+    # Terminal 1: gpt-oss on 192.168.1.20
+    python scripts/run_full_benchmark.py --profile default --base-url http://192.168.1.20:11434 --model gpt-oss:latest --output /tmp/bench_gpt_oss.json
+
+    # Terminal 2: qwen3-coder on 192.168.1.73
+    python scripts/run_full_benchmark.py --profile default --base-url http://192.168.1.73:11434 --model qwen3-coder:30b --output /tmp/bench_qwen3.json
 """
 
 import argparse
@@ -61,10 +71,16 @@ def print_banner(profile: str, num_tasks: int, parallel: int):
     print()
 
 
-def create_agent_callback(profile: str, timeout: int = 120):
+def create_agent_callback(profile: str, timeout: int = 120, base_url: str = None, model_override: str = None):
     """Create an agent callback that uses Victor's providers.
 
     Returns a callback function compatible with EvaluationHarness.run_evaluation().
+
+    Args:
+        profile: Profile name from profiles.yaml
+        timeout: Request timeout in seconds
+        base_url: Override base URL (useful for targeting specific Ollama hosts)
+        model_override: Override model name from profile
     """
     # Load settings and profile
     settings = load_settings()
@@ -74,11 +90,17 @@ def create_agent_callback(profile: str, timeout: int = 120):
         raise ValueError(f"Profile '{profile}' not found. Available: {list(profiles.keys())}")
 
     profile_config = profiles[profile]
-    print(f"Provider:    {profile_config.provider}/{profile_config.model}")
+    model_name = model_override or profile_config.model
+    print(f"Provider:    {profile_config.provider}/{model_name}")
 
-    # Get provider
+    # Get provider settings
     provider_settings = settings.get_provider_settings(profile_config.provider)
-    model_name = profile_config.model
+
+    # Override base_url if specified (for direct host targeting)
+    if base_url:
+        provider_settings["base_url"] = base_url
+        print(f"Base URL:    {base_url} (override)")
+
     provider = ProviderRegistry.create(
         profile_config.provider,
         model=model_name,
@@ -137,8 +159,19 @@ async def run_benchmark(
     num_tasks: int,
     parallel: int,
     output_file: str = None,
+    base_url: str = None,
+    model_override: str = None,
 ):
-    """Run the benchmark using the existing evaluation harness."""
+    """Run the benchmark using the existing evaluation harness.
+
+    Args:
+        profile: Profile name from profiles.yaml
+        num_tasks: Number of tasks to run (None for all)
+        parallel: Parallelism level
+        output_file: Output JSON file path
+        base_url: Override base URL (for targeting specific Ollama hosts)
+        model_override: Override model name from profile
+    """
     print_banner(profile, num_tasks, parallel)
 
     # Register runner with harness
@@ -148,7 +181,7 @@ async def run_benchmark(
     # Configure evaluation
     config = EvaluationConfig(
         benchmark=BenchmarkType.HUMAN_EVAL,
-        model=profile,
+        model=model_override or profile,
         max_tasks=num_tasks,
         parallel_tasks=parallel,
         timeout_per_task=120,
@@ -156,30 +189,30 @@ async def run_benchmark(
 
     # Create agent callback
     print("Initializing provider...")
-    agent_callback = create_agent_callback(profile)
+    agent_callback = create_agent_callback(profile, base_url=base_url, model_override=model_override)
     print()
 
     # Run evaluation using the harness
     print("-" * 70)
-    print("Running benchmark (this may take a while)...")
+    print("Running benchmark (progress shown in real-time)...")
     print("-" * 70)
-    print()
+    print(flush=True)
 
-    result = await harness.run_evaluation(config, agent_callback)
-
-    # Print task-by-task results
-    for i, task_result in enumerate(result.task_results):
+    # Progress callback to print results as they complete
+    def print_progress(task_idx: int, total_tasks: int, task_result):
         status = "PASS" if task_result.is_success else "FAIL"
         quality = task_result.code_quality.get_overall_score() if task_result.code_quality else 0
         duration = task_result.duration_seconds or 0
 
-        print(f"[{i+1}/{len(result.task_results)}] {task_result.task_id}")
+        print(f"[{task_idx+1}/{total_tasks}] {task_result.task_id}")
         print(f"    Status: {status}")
         print(f"    Quality: {quality:.1f}/100")
         print(f"    Time: {duration:.1f}s")
         if task_result.error_message:
             print(f"    Error: {task_result.error_message[:80]}")
-        print()
+        print(flush=True)
+
+    result = await harness.run_evaluation(config, agent_callback, progress_callback=print_progress)
 
     # Get metrics from harness
     metrics = result.get_metrics()
@@ -276,6 +309,18 @@ async def main():
         default=None,
         help="Output JSON file for results",
     )
+    parser.add_argument(
+        "--base-url",
+        type=str,
+        default=None,
+        help="Override base URL (e.g., http://192.168.1.20:11434 for specific Ollama host)",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Override model name from profile (e.g., gpt-oss:latest)",
+    )
 
     args = parser.parse_args()
 
@@ -284,6 +329,8 @@ async def main():
         num_tasks=args.tasks,
         parallel=args.parallel,
         output_file=args.output,
+        base_url=args.base_url,
+        model_override=args.model,
     )
 
 

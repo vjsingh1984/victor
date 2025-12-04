@@ -72,7 +72,7 @@ async def _get_or_build_index(
 
     Uses intelligent caching:
     1. In-memory cache for same session
-    2. Persistent disk storage in {root}/.embeddings/
+    2. Persistent disk storage in {root}/.victor/embeddings/
     3. Incremental updates for changed files only (not full rebuild)
     """
     from victor.codebase.indexer import CodebaseIndex

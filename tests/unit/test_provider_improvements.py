@@ -1120,13 +1120,14 @@ class TestSharedInfrastructureIntegration:
 
     def test_settings_configuration(self):
         """Test that all new settings are properly configured."""
-        from victor.config.settings import Settings
+        from victor.config.settings import Settings, get_project_paths
 
         settings = Settings()
 
         # Conversation memory settings
         assert hasattr(settings, "conversation_memory_enabled")
-        assert hasattr(settings, "conversation_memory_db")
+        # conversation_memory_db now uses get_project_paths().conversation_db (project-local)
+        assert get_project_paths().conversation_db.name == "conversation.db"
         assert hasattr(settings, "max_context_tokens")
         assert hasattr(settings, "response_token_reserve")
 

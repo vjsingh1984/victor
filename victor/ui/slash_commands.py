@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from victor.config.settings import Settings
 
 from victor.agent.session import get_session_manager
+from victor.config.settings import VICTOR_CONTEXT_FILE, VICTOR_DIR_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,7 @@ class SlashCommandHandler:
         self.register(
             SlashCommand(
                 name="init",
-                description="Initialize .victor.md with smart codebase analysis",
+                description="Initialize .victor/init.md with smart codebase analysis",
                 handler=self._cmd_init,
                 usage="/init [--force] [--simple] [--smart] [--symlinks]",
             )
@@ -127,7 +128,7 @@ class SlashCommandHandler:
         self.register(
             SlashCommand(
                 name="context",
-                description="Show loaded project context (.victor.md)",
+                description="Show loaded project context (.victor/init.md)",
                 handler=self._cmd_context,
                 aliases=["ctx", "memory"],
             )
@@ -630,7 +631,7 @@ class SlashCommandHandler:
                 for alias, status in results.items():
                     tool_name = CONTEXT_FILE_ALIASES.get(alias, "Unknown")
                     if status == "created":
-                        self.console.print(f"  [green]✓[/] {alias} -> .victor.md ({tool_name})")
+                        self.console.print(f"  [green]✓[/] {alias} -> {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE} ({tool_name})")
                     elif status == "exists":
                         self.console.print(f"  [dim]○[/] {alias} (already linked)")
                     elif status == "exists_file":
@@ -648,7 +649,7 @@ class SlashCommandHandler:
                 self.console.print("[green]✓[/] Context reloaded")
 
         except Exception as e:
-            self.console.print(f"[red]Failed to create .victor.md:[/] {e}")
+            self.console.print(f"[red]Failed to create {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}:[/] {e}")
             logger.exception("Error in /init command")
 
     async def _cmd_model(self, args: List[str]) -> None:
@@ -746,12 +747,12 @@ class SlashCommandHandler:
         """Show loaded project context."""
         if not self.agent or not hasattr(self.agent, "project_context"):
             self.console.print("[yellow]No project context loaded[/]")
-            self.console.print("Run [bold]/init[/] to create .victor.md")
+            self.console.print(f"Run [bold]/init[/] to create {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}")
             return
 
         ctx = self.agent.project_context
         if not ctx.content:
-            self.console.print("[yellow]No .victor.md found in project[/]")
+            self.console.print(f"[yellow]No {VICTOR_CONTEXT_FILE} found in project[/]")
             self.console.print("Run [bold]/init[/] to create one")
             return
 
@@ -1159,7 +1160,7 @@ Provide a 2-3 sentence summary:"""
         mcp_client = getattr(self.agent, "mcp_client", None)
         if not mcp_client:
             self.console.print("[dim]No MCP servers configured[/]")
-            self.console.print("\n[dim]Configure MCP servers in your settings or .victor.md[/]")
+            self.console.print(f"\n[dim]Configure MCP servers in your settings or {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}[/]")
             return
 
         table = Table(title="MCP Servers")
@@ -2009,9 +2010,9 @@ Please think through this carefully and provide a detailed plan:"""
 
             # If agent has project context, suggest reloading
             if self.agent and hasattr(self.agent, "project_context"):
-                victor_md = Path(target) / ".victor.md"
-                if victor_md.exists():
-                    self.console.print("[dim]Found .victor.md - use /context to reload[/]")
+                context_file = Path(target) / VICTOR_DIR_NAME / VICTOR_CONTEXT_FILE
+                if context_file.exists():
+                    self.console.print(f"[dim]Found {VICTOR_CONTEXT_FILE} - use /context to reload[/]")
 
         except PermissionError:
             self.console.print(f"[red]Permission denied:[/] {target}")

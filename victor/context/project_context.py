@@ -12,11 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Project context loader for .victor.md files.
+"""Project context loader for init.md files.
 
 This module provides functionality similar to Claude Code's CLAUDE.md,
 allowing projects to define context, instructions, and configuration
 that Victor uses when working in that codebase.
+
+Configuration is driven by settings.py:
+- VICTOR_DIR_NAME: Directory name (default: .victor)
+- VICTOR_CONTEXT_FILE: Context file name (default: init.md)
+
+Primary location: {project_root}/.victor/init.md
+Legacy locations: .victor.md, VICTOR.md (for backwards compatibility)
 """
 
 import logging
@@ -25,29 +32,23 @@ from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# File names to search for (in order of priority)
-# Victor checks for its own context files first, then falls back to
-# aliases and legacy locations for interoperability
-from victor.config.settings import VICTOR_DIR_NAME, VICTOR_CONTEXT_FILE
+# Import settings for configurable paths
+from victor.config.settings import (
+    VICTOR_DIR_NAME,
+    VICTOR_CONTEXT_FILE,
+    get_project_paths,
+)
 
-CONTEXT_FILE_NAMES = [
-    # New location (preferred): .victor/init.md
-    f"{VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}",
-    # Legacy location (for backwards compatibility)
-    ".victor.md",
-    "VICTOR.md",
-    ".victor/context.md",
-    # Aliases for other AI coding tools (may be symlinks)
-    "CLAUDE.md",
-    "GEMINI.md",
-    "AGENTS.md",
-    ".cursorrules",
-    ".windsurfrules",
-]
+# Context file location: .victor/init.md (configurable via settings.py)
+# No legacy locations - clean integration for future code
+CONTEXT_FILE_PATH = f"{VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}"
 
 
 class ProjectContext:
-    """Loads and manages project-specific context from .victor.md files."""
+    """Loads and manages project-specific context from init.md files.
+
+    Location: .victor/init.md (configurable via settings.py)
+    """
 
     def __init__(self, root_path: Optional[str] = None):
         """Initialize project context loader.
@@ -64,10 +65,8 @@ class ProjectContext:
     def find_context_file(self) -> Optional[Path]:
         """Find the project context file.
 
-        Searches in the following order:
-        1. Current directory for .victor.md, VICTOR.md
-        2. .victor/context.md in current directory
-        3. Parent directories (up to git root or filesystem root)
+        Looks for .victor/init.md (configurable via settings.py).
+        Searches current directory and parent directories up to git root.
 
         Returns:
             Path to context file if found, None otherwise.
@@ -76,11 +75,11 @@ class ProjectContext:
 
         # Search up the directory tree
         while search_path != search_path.parent:
-            for filename in CONTEXT_FILE_NAMES:
-                context_file = search_path / filename
-                if context_file.exists() and context_file.is_file():
-                    logger.info(f"Found project context file: {context_file}")
-                    return context_file
+            # Use settings-driven path
+            context_file = search_path / CONTEXT_FILE_PATH
+            if context_file.exists() and context_file.is_file():
+                logger.info(f"Found project context file: {context_file}")
+                return context_file
 
             # Stop at git root if found
             if (search_path / ".git").exists():
@@ -166,9 +165,12 @@ class ProjectContext:
         if not self._content:
             return ""
 
+        # Use actual file name or default to configured name
+        file_name = self._context_file.name if self._context_file else VICTOR_CONTEXT_FILE
+
         return f"""
 <project-context>
-The following is project-specific context from {self._context_file.name if self._context_file else '.victor.md'}:
+The following is project-specific context from {file_name}:
 
 {self._content}
 </project-context>
@@ -194,20 +196,20 @@ The following is project-specific context from {self._context_file.name if self.
 
 
 def generate_victor_md(root_path: Optional[str] = None) -> str:
-    """Generate a .victor.md file by analyzing the codebase.
+    """Generate project context file by analyzing the codebase.
 
     Args:
         root_path: Root directory to analyze. Defaults to current directory.
 
     Returns:
-        Generated markdown content for .victor.md
+        Generated markdown content for init.md
     """
     root = Path(root_path) if root_path else Path.cwd()
 
     sections = []
 
-    # Header
-    sections.append("# .victor.md\n")
+    # Header - use configurable file name
+    sections.append(f"# {VICTOR_CONTEXT_FILE}\n")
     sections.append(
         "This file provides guidance to Victor when working with code in this repository.\n"
     )
@@ -350,7 +352,10 @@ def generate_victor_md(root_path: Optional[str] = None) -> str:
 
 
 def init_victor_md(root_path: Optional[str] = None, force: bool = False) -> Optional[Path]:
-    """Initialize a .victor.md file in the project.
+    """Initialize project context file in .victor/init.md.
+
+    Creates the file at the configured location (default: .victor/init.md).
+    Location is configurable via settings.py (VICTOR_DIR_NAME, VICTOR_CONTEXT_FILE).
 
     Args:
         root_path: Root directory to create file in. Defaults to current directory.
@@ -360,18 +365,24 @@ def init_victor_md(root_path: Optional[str] = None, force: bool = False) -> Opti
         Path to created file, or None if file exists and force=False.
     """
     root = Path(root_path) if root_path else Path.cwd()
-    target_file = root / ".victor.md"
+
+    # Use settings-driven path
+    paths = get_project_paths(root)
+    target_file = paths.project_context_file
+
+    # Ensure .victor directory exists
+    target_file.parent.mkdir(parents=True, exist_ok=True)
 
     if target_file.exists() and not force:
-        logger.warning(f".victor.md already exists at {target_file}")
+        logger.warning(f"{VICTOR_CONTEXT_FILE} already exists at {target_file}")
         return None
 
     content = generate_victor_md(root_path)
 
     try:
         target_file.write_text(content, encoding="utf-8")
-        logger.info(f"Created .victor.md at {target_file}")
+        logger.info(f"Created {VICTOR_CONTEXT_FILE} at {target_file}")
         return target_file
     except Exception as e:
-        logger.error(f"Failed to create .victor.md: {e}")
+        logger.error(f"Failed to create {VICTOR_CONTEXT_FILE}: {e}")
         return None

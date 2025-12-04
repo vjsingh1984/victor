@@ -38,7 +38,12 @@ def _load_tool_capable_patterns_from_yaml(
     result: Dict[str, List[str]] = {}
 
     # Load from user's profiles.yaml (the single source of truth)
-    user_path = user_profiles_path or Path.home() / ".victor" / "profiles.yaml"
+    if user_profiles_path is None:
+        from victor.config.settings import get_project_paths
+
+        user_path = get_project_paths().global_victor_dir / "profiles.yaml"
+    else:
+        user_path = user_profiles_path
     if user_path.exists():
         try:
             user_data = yaml.safe_load(user_path.read_text()) or {}

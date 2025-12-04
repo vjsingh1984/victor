@@ -191,7 +191,7 @@ class AgentOrchestrator:
             capabilities=self.tool_calling_caps,
         )
 
-        # Load project context from .victor.md (similar to Claude Code's CLAUDE.md)
+        # Load project context from .victor/init.md (similar to Claude Code's CLAUDE.md)
         self.project_context = ProjectContext()
         self.project_context.load()
 
@@ -246,8 +246,10 @@ class AgentOrchestrator:
         self._tool_capability_warned = False
 
         # Analytics
-        log_file = Path(self.settings.analytics_log_file).expanduser()
-        self.usage_logger = UsageLogger(log_file, enabled=self.settings.analytics_enabled)
+        from victor.config.settings import get_project_paths
+
+        analytics_log_file = get_project_paths().global_logs_dir / "usage.jsonl"
+        self.usage_logger = UsageLogger(analytics_log_file, enabled=self.settings.analytics_enabled)
         self.usage_logger.log_event(
             "session_start", {"model": self.model, "provider": self.provider.__class__.__name__}
         )
@@ -292,10 +294,14 @@ class AgentOrchestrator:
         self.tool_cache = None
         if getattr(self.settings, "tool_cache_enabled", True):
             from victor.cache.config import CacheConfig
+            from victor.config.settings import get_project_paths
 
-            cache_dir = Path(
-                getattr(self.settings, "tool_cache_dir", "~/.victor/cache")
-            ).expanduser()
+            # Allow explicit override of cache_dir, otherwise use centralized path
+            cache_dir = getattr(self.settings, "tool_cache_dir", None)
+            if cache_dir:
+                cache_dir = Path(cache_dir).expanduser()
+            else:
+                cache_dir = get_project_paths().global_cache_dir
             self.tool_cache = ToolCache(
                 ttl=getattr(self.settings, "tool_cache_ttl", 600),
                 allowlist=getattr(self.settings, "tool_cache_allowlist", []),
@@ -325,9 +331,12 @@ class AgentOrchestrator:
         self._memory_session_id: Optional[str] = None
         if getattr(settings, "conversation_memory_enabled", True):
             try:
-                db_path = Path(
-                    getattr(settings, "conversation_memory_db", "~/.victor/conversations.db")
-                ).expanduser()
+                from victor.config.settings import get_project_paths
+
+                paths = get_project_paths()
+                # Ensure .victor directory exists
+                paths.project_victor_dir.mkdir(parents=True, exist_ok=True)
+                db_path = paths.conversation_db
                 max_context = getattr(settings, "max_context_tokens", 100000)
                 response_reserve = getattr(settings, "response_token_reserve", 4096)
                 self.memory_manager = ConversationStore(
@@ -336,7 +345,7 @@ class AgentOrchestrator:
                     response_reserve=response_reserve,
                 )
                 # Create a session for this orchestrator instance
-                project_path = str(Path.cwd())
+                project_path = str(paths.project_root)
                 session = self.memory_manager.create_session(
                     project_path=project_path,
                     provider=self.provider_name,
@@ -1164,15 +1173,32 @@ These are the actual search results. Reference only the files and matches shown 
         excluded_files = {"__init__.py", "base.py", "decorators.py", "semantic_selector.py"}
         registered_tools_count = 0
 
+        # Import BaseTool for isinstance checks
+        from victor.tools.base import BaseTool as BaseToolClass
+
         for filename in os.listdir(tools_dir):
             if filename.endswith(".py") and filename not in excluded_files:
                 module_name = f"victor.tools.{filename[:-3]}"
                 try:
                     module = importlib.import_module(module_name)
                     for _name, obj in inspect.getmembers(module):
+                        # Register @tool decorated functions
                         if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
                             self.tools.register(obj)
                             registered_tools_count += 1
+                        # Register BaseTool class instances (class-based tools)
+                        elif (
+                            inspect.isclass(obj)
+                            and issubclass(obj, BaseToolClass)
+                            and obj is not BaseToolClass
+                            and hasattr(obj, "name")
+                        ):
+                            try:
+                                tool_instance = obj()
+                                self.tools.register(tool_instance)
+                                registered_tools_count += 1
+                            except Exception as e:
+                                logger.debug(f"Skipped registering {_name}: {e}")
                 except Exception as e:
                     logger.warning(f"Failed to load tools from {module_name}: {e}")
 
@@ -1320,10 +1346,10 @@ These are the actual search results. Reference only the files and matches shown 
     def _initialize_plugins(self) -> None:
         """Initialize and load tool plugins from configured directories."""
         try:
-            plugin_dirs = [
-                Path(d).expanduser()
-                for d in getattr(self.settings, "plugin_dirs", ["~/.victor/plugins"])
-            ]
+            from victor.config.settings import get_project_paths
+
+            # Use centralized path for plugins directory
+            plugin_dirs = [get_project_paths().global_plugins_dir]
             plugin_config = getattr(self.settings, "plugin_config", {})
             disabled_plugins = set(getattr(self.settings, "plugin_disabled", []))
 

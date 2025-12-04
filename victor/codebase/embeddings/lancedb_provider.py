@@ -122,10 +122,12 @@ class LanceDBProvider(BaseEmbeddingProvider):
             persist_dir.mkdir(parents=True, exist_ok=True)
             print(f"📁 Using persistent storage: {persist_dir}")
         else:
-            # LanceDB requires a directory, use temp directory
-            persist_dir = Path.home() / ".victor" / "embeddings" / "lancedb_temp"
+            # LanceDB requires a directory, use centralized path
+            from victor.config.settings import get_project_paths
+
+            persist_dir = get_project_paths().global_embeddings_dir / "lancedb"
             persist_dir.mkdir(parents=True, exist_ok=True)
-            print(f"📁 Using temporary storage: {persist_dir}")
+            print(f"📁 Using default storage: {persist_dir}")
 
         # Connect to LanceDB
         self.db = lancedb.connect(str(persist_dir))

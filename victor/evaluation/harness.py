@@ -418,12 +418,15 @@ class EvaluationHarness:
         self,
         config: EvaluationConfig,
         agent_callback: Any,  # Callable that takes task and returns output
+        progress_callback: Optional[Any] = None,  # Callable(task_idx, total, TaskResult)
     ) -> EvaluationResult:
         """Run a complete evaluation.
 
         Args:
             config: Evaluation configuration
             agent_callback: Async function that runs the agent on a task
+            progress_callback: Optional callback called after each task completes.
+                              Signature: (task_index: int, total_tasks: int, result: TaskResult) -> None
 
         Returns:
             EvaluationResult with all task results
@@ -442,11 +445,11 @@ class EvaluationHarness:
         # Run tasks
         if config.parallel_tasks > 1:
             results = await self._run_parallel(
-                tasks, runner, agent_callback, config
+                tasks, runner, agent_callback, config, progress_callback
             )
         else:
             results = await self._run_sequential(
-                tasks, runner, agent_callback, config
+                tasks, runner, agent_callback, config, progress_callback
             )
 
         result.task_results = results
@@ -463,6 +466,7 @@ class EvaluationHarness:
         runner: BaseBenchmarkRunner,
         agent_callback: Any,
         config: EvaluationConfig,
+        progress_callback: Optional[Any] = None,
     ) -> list[TaskResult]:
         """Run tasks sequentially."""
         results = []
@@ -479,13 +483,22 @@ class EvaluationHarness:
                 status_str = "PASS" if task_result.is_success else "FAIL"
                 logger.info(f"  Result: {status_str}")
 
+                # Call progress callback if provided
+                if progress_callback:
+                    progress_callback(i, len(tasks), task_result)
+
             except Exception as e:
                 logger.error(f"  Error: {e}")
-                results.append(TaskResult(
+                error_result = TaskResult(
                     task_id=task.task_id,
                     status=TaskStatus.ERROR,
                     error_message=str(e),
-                ))
+                )
+                results.append(error_result)
+
+                # Call progress callback for errors too
+                if progress_callback:
+                    progress_callback(i, len(tasks), error_result)
 
         return results
 
@@ -495,25 +508,37 @@ class EvaluationHarness:
         runner: BaseBenchmarkRunner,
         agent_callback: Any,
         config: EvaluationConfig,
+        progress_callback: Optional[Any] = None,
     ) -> list[TaskResult]:
         """Run tasks in parallel."""
         semaphore = asyncio.Semaphore(config.parallel_tasks)
+        completed_count = 0
+        lock = asyncio.Lock()
 
-        async def run_with_semaphore(task: BenchmarkTask) -> TaskResult:
+        async def run_with_semaphore(idx: int, task: BenchmarkTask) -> TaskResult:
+            nonlocal completed_count
             async with semaphore:
                 try:
-                    return await self._run_single_task(
+                    result = await self._run_single_task(
                         task, runner, agent_callback, config
                     )
                 except Exception as e:
-                    return TaskResult(
+                    result = TaskResult(
                         task_id=task.task_id,
                         status=TaskStatus.ERROR,
                         error_message=str(e),
                     )
 
+                # Call progress callback with lock to ensure ordered output
+                if progress_callback:
+                    async with lock:
+                        completed_count += 1
+                        progress_callback(completed_count - 1, len(tasks), result)
+
+                return result
+
         results = await asyncio.gather(
-            *[run_with_semaphore(task) for task in tasks]
+            *[run_with_semaphore(i, task) for i, task in enumerate(tasks)]
         )
         return list(results)
 

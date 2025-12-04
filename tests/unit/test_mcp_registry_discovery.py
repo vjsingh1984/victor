@@ -88,6 +88,8 @@ servers:
 
     def test_discover_from_project_local(self):
         """Test discovery from project-local .victor/mcp.yaml."""
+        from victor.config.settings import reset_project_paths
+
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = Path(tmpdir) / ".victor"
             config_dir.mkdir()
@@ -106,11 +108,15 @@ servers:
             old_cwd = os.getcwd()
             try:
                 os.chdir(tmpdir)
+                # Reset cached project paths to pick up new cwd
+                reset_project_paths()
                 registry = MCPRegistry.discover_servers()
                 servers = registry.list_servers()
                 assert "local_server" in servers
             finally:
                 os.chdir(old_cwd)
+                # Reset again to restore original cwd-based paths
+                reset_project_paths()
 
     def test_discover_priority_order(self):
         """Test that env variable takes priority over local config."""

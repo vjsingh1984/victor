@@ -860,9 +860,9 @@ async def _check_connectivity(settings: Any, profiles: dict, verbose: bool) -> N
 @app.command()
 def init() -> None:
     """Initialize configuration files."""
-    from pathlib import Path
+    from victor.config.settings import get_project_paths
 
-    config_dir = Path.home() / ".victor"
+    config_dir = get_project_paths().global_victor_dir
     config_dir.mkdir(parents=True, exist_ok=True)
 
     # Copy example profiles if they don't exist

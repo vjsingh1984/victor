@@ -596,34 +596,36 @@ class MCPRegistry:
         """Auto-discover MCP servers from standard locations.
 
         Searches for MCP configuration in:
-        1. ~/.victor/mcp.yaml
-        2. ~/.config/mcp/servers.yaml
-        3. ./.victor/mcp.yaml (project-local)
-        4. Environment variable VICTOR_MCP_CONFIG
+        1. Environment variable VICTOR_MCP_CONFIG
+        2. {project}/.victor/mcp.yaml (project-local)
+        3. ~/.victor/mcp.yaml (global)
+        4. ~/.config/mcp/servers.yaml (XDG standard)
 
         Returns:
             Configured MCPRegistry with discovered servers
         """
         import os
 
+        from victor.config.settings import get_project_paths
+
         registry = cls()
         search_paths: List[Path] = []
+        paths = get_project_paths()
 
         # Priority order of config locations
         env_config = os.environ.get("VICTOR_MCP_CONFIG")
         if env_config:
             search_paths.append(Path(env_config))
 
-        # Project-local config
-        search_paths.append(Path(".victor/mcp.yaml"))
-        search_paths.append(Path(".victor/mcp.yml"))
+        # Project-local config (highest priority)
+        search_paths.append(paths.project_victor_dir / "mcp.yaml")
+        search_paths.append(paths.project_victor_dir / "mcp.yml")
 
-        # User config
-        home = Path.home()
-        search_paths.append(home / ".victor" / "mcp.yaml")
-        search_paths.append(home / ".victor" / "mcp.yml")
-        search_paths.append(home / ".config" / "mcp" / "servers.yaml")
-        search_paths.append(home / ".config" / "mcp" / "servers.yml")
+        # Global user config
+        search_paths.append(paths.global_victor_dir / "mcp.yaml")
+        search_paths.append(paths.global_victor_dir / "mcp.yml")
+        search_paths.append(Path.home() / ".config" / "mcp" / "servers.yaml")
+        search_paths.append(Path.home() / ".config" / "mcp" / "servers.yml")
 
         # Load from first found config
         for config_path in search_paths:

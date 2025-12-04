@@ -100,14 +100,13 @@ class TestSettings:
         assert settings.stream_responses is True
 
     def test_get_config_dir(self):
-        """Test getting config directory."""
-        with patch("pathlib.Path.home") as mock_home:
-            mock_home.return_value = Path("/mock/home")
-
-            with patch("pathlib.Path.mkdir") as mock_mkdir:
+        """Test getting config directory uses GLOBAL_VICTOR_DIR."""
+        mock_dir = Path("/mock/home/.victor")
+        with patch("victor.config.settings.GLOBAL_VICTOR_DIR", mock_dir):
+            with patch.object(Path, "mkdir") as mock_mkdir:
                 config_dir = Settings.get_config_dir()
 
-                assert config_dir == Path("/mock/home") / ".victor"
+                assert config_dir == mock_dir
                 mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
     def test_load_profiles_no_file(self):

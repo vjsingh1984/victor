@@ -93,11 +93,6 @@ class ProjectPaths:
         return self.project_victor_dir / VICTOR_CONTEXT_FILE
 
     @property
-    def project_context_file_legacy(self) -> Path:
-        """Get legacy project context file path (.victor.md) for backwards compatibility."""
-        return self._project_root / ".victor.md"
-
-    @property
     def conversation_db(self) -> Path:
         """Get project-local conversation database path."""
         return self.project_victor_dir / "conversation.db"
@@ -197,30 +192,15 @@ class ProjectPaths:
         self.global_embeddings_dir.mkdir(parents=True, exist_ok=True)
 
     def find_context_file(self) -> Optional[Path]:
-        """Find project context file, checking new and legacy locations.
+        """Find project context file at .victor/init.md.
 
         Returns:
             Path to context file if found, None otherwise.
 
-        Priority:
-            1. .victor/init.md (new location)
-            2. .victor.md (legacy location)
-            3. VICTOR.md, CLAUDE.md, etc. (aliases)
+        Location: .victor/init.md (configurable via VICTOR_DIR_NAME, VICTOR_CONTEXT_FILE)
         """
-        # New location first
         if self.project_context_file.exists():
             return self.project_context_file
-
-        # Legacy location
-        if self.project_context_file_legacy.exists():
-            return self.project_context_file_legacy
-
-        # Check aliases
-        aliases = ["VICTOR.md", "CLAUDE.md", "COPILOT.md", "CURSOR.md"]
-        for alias in aliases:
-            alias_path = self._project_root / alias
-            if alias_path.exists():
-                return alias_path
 
         return None
 
@@ -261,6 +241,15 @@ def set_project_root(project_root: Path) -> ProjectPaths:
     global _current_project_paths
     _current_project_paths = ProjectPaths(project_root)
     return _current_project_paths
+
+
+def reset_project_paths() -> None:
+    """Reset the cached project paths singleton.
+
+    This is primarily useful for testing when you need to switch project roots.
+    """
+    global _current_project_paths
+    _current_project_paths = None
 
 
 class ProviderConfig(BaseSettings):
@@ -444,7 +433,7 @@ class Settings(BaseSettings):
     # Tool result caching (opt-in per tool)
     tool_cache_enabled: bool = True
     tool_cache_ttl: int = 600  # seconds
-    tool_cache_dir: str = "~/.victor/cache"
+    # Note: tool_cache_dir now uses get_project_paths().global_cache_dir
     tool_cache_allowlist: List[str] = [
         "code_search",
         "semantic_code_search",
@@ -454,7 +443,7 @@ class Settings(BaseSettings):
 
     # Plugin System
     plugin_enabled: bool = True  # Enable plugin system
-    plugin_dirs: List[str] = ["~/.victor/plugins"]  # Directories to search for plugins
+    # Note: plugin_dirs now uses get_project_paths().global_plugins_dir
     plugin_packages: List[str] = []  # Python packages to load as plugins
     plugin_disabled: List[str] = []  # List of plugin names to disable
     plugin_config: Dict[str, Dict[str, Any]] = Field(
@@ -487,7 +476,7 @@ class Settings(BaseSettings):
     # Conversation Memory (Multi-turn Context Retention)
     # ==========================================================================
     conversation_memory_enabled: bool = True  # Enable SQLite-backed conversation persistence
-    conversation_memory_db: str = "~/.victor/conversations.db"  # Database path
+    # Note: conversation_db now uses get_project_paths().conversation_db (project-local)
     max_context_tokens: int = 100000  # Maximum tokens in context window
     response_token_reserve: int = 4096  # Tokens reserved for model response
 
@@ -526,7 +515,7 @@ class Settings(BaseSettings):
 
     # Analytics
     analytics_enabled: bool = True
-    analytics_log_file: str = "~/.victor/logs/usage.jsonl"
+    # Note: analytics_log_file now uses get_project_paths().global_logs_dir / "usage.jsonl"
 
     @staticmethod
     def _estimate_model_vram_gb(model_id: str) -> Optional[float]:
@@ -674,9 +663,9 @@ class Settings(BaseSettings):
         """Get configuration directory path.
 
         Returns:
-            Path to config directory
+            Path to global config directory (~/.victor)
         """
-        config_dir = Path.home() / ".victor"
+        config_dir = GLOBAL_VICTOR_DIR
         config_dir.mkdir(parents=True, exist_ok=True)
         return config_dir
 

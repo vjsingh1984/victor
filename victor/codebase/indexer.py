@@ -456,11 +456,76 @@ class CodebaseIndex:
         is_stale = len(modified_files) > 0 or len(deleted_files) > 0
         return is_stale, modified_files, deleted_files
 
+    def _check_embeddings_integrity(self) -> bool:
+        """Check if embeddings storage exists and has data.
+
+        Supports multiple vector stores configured via settings:
+        - LanceDB (default): Creates .lance directories for tables
+        - ChromaDB: Creates chroma.sqlite3 file
+
+        Returns:
+            True if embeddings are intact, False if missing or empty
+        """
+        if not self.use_embeddings:
+            return True  # Not using embeddings, so they're "intact"
+
+        try:
+            from victor.config.settings import get_project_paths, load_settings
+
+            settings = load_settings()
+            vector_store = getattr(settings, "codebase_vector_store", "lancedb")
+            embeddings_dir = get_project_paths(self.root).embeddings_dir
+
+            # Check if directory exists
+            if not embeddings_dir.exists():
+                logger.warning(f"Embeddings directory missing: {embeddings_dir}")
+                return False
+
+            # Check if directory has content
+            contents = list(embeddings_dir.iterdir())
+            if not contents:
+                logger.warning(f"Embeddings directory is empty: {embeddings_dir}")
+                return False
+
+            # Vector store specific validation
+            if vector_store == "lancedb":
+                # LanceDB creates .lance directories for each table
+                lance_tables = [d for d in contents if d.is_dir() and d.suffix == ".lance"]
+                if not lance_tables:
+                    # Also check for any subdirectories with data (table directories)
+                    has_data = any(
+                        d.is_dir() and list(d.iterdir()) for d in contents if d.is_dir()
+                    )
+                    if not has_data:
+                        logger.warning(f"LanceDB has no tables: {embeddings_dir}")
+                        return False
+            elif vector_store == "chromadb":
+                # ChromaDB creates chroma.sqlite3 file
+                chroma_db = embeddings_dir / "chroma.sqlite3"
+                if not chroma_db.exists():
+                    logger.warning(f"ChromaDB database missing: {chroma_db}")
+                    return False
+            else:
+                # Generic check: any files or non-empty subdirectories
+                has_data = any(f.is_file() for f in contents) or any(
+                    d.is_dir() and list(d.iterdir()) for d in contents if d.is_dir()
+                )
+                if not has_data:
+                    logger.warning(f"Embeddings directory has no valid data: {embeddings_dir}")
+                    return False
+
+            return True
+
+        except Exception as e:
+            logger.warning(f"Failed to check embeddings integrity: {e}")
+            return False
+
     async def startup_check(self, auto_reindex: bool = True) -> Dict[str, Any]:
         """Check index status at startup and reindex if needed.
 
         This should be called when Victor starts to ensure the index
-        is up-to-date. It compares file mtimes with stored mtimes.
+        is up-to-date. It compares file mtimes with stored mtimes and
+        verifies embeddings storage exists if embeddings are enabled.
 
         Args:
             auto_reindex: If True, automatically reindex stale files
@@ -482,6 +547,20 @@ class CodebaseIndex:
                 "files_indexed": len(self.files) if auto_reindex else 0,
             }
 
+        # Check if embeddings are enabled but storage is missing
+        embeddings_intact = self._check_embeddings_integrity()
+        if not embeddings_intact:
+            logger.info("Embeddings storage missing or empty. Full indexing required.")
+            print("⚠️  Embeddings storage missing or corrupted. Triggering full reindex...")
+            if auto_reindex:
+                await self.index_codebase(force=True)
+            return {
+                "status": "indexed" if auto_reindex else "needs_index",
+                "action": "full_index" if auto_reindex else "none",
+                "reason": "embeddings_missing",
+                "files_indexed": len(self.files) if auto_reindex else 0,
+            }
+
         # Check for mtime-based staleness
         is_stale, modified, deleted = self.check_staleness_by_mtime()
 
@@ -490,13 +569,15 @@ class CodebaseIndex:
             # Restore in-memory state from saved metadata
             self._is_indexed = True
             self._last_indexed = saved.get("last_indexed")
+            file_count = len(saved.get("files", {}))
+            print(f"✅ Index up to date ({file_count} files)")
             return {
                 "status": "up_to_date",
                 "action": "none",
-                "files_in_index": len(saved.get("files", {})),
+                "files_in_index": file_count,
             }
 
-        logger.info(f"Index is stale: {len(modified)} modified, {len(deleted)} deleted files")
+        print(f"Index stale: {len(modified)} modified, {len(deleted)} deleted files")
 
         if auto_reindex:
             # Mark these files for reindexing
@@ -1201,29 +1282,43 @@ class CodebaseIndex:
     def _initialize_embeddings(self, config: Optional[Dict[str, Any]]) -> None:
         """Initialize embedding provider.
 
-        Embeddings are stored in {rootrepo}/.embeddings/ directory by default.
+        Embeddings are stored in {rootrepo}/.victor/embeddings/ directory by default.
         This keeps all index data co-located with the repository.
 
+        Configuration is read from settings.py with sensible defaults:
+        - vector_store: lancedb (disk-based ANN, lower memory)
+        - embedding_model: BAAI/bge-small-en-v1.5 (384-dim, excellent for code)
+
         Args:
-            config: Embedding configuration dict
+            config: Embedding configuration dict (overrides settings if provided)
         """
         try:
             from victor.codebase.embeddings import EmbeddingConfig, EmbeddingRegistry
 
-            # Create config with defaults
+            # Create config with defaults from settings
             if not config:
                 config = {}
 
-            # Default persist directory is {rootrepo}/.victor/embeddings/
-            # This keeps embeddings with the project for isolation
-            from victor.config.settings import get_project_paths
+            # Load settings for defaults
+            from victor.config.settings import get_project_paths, load_settings
 
+            settings = load_settings()
             default_persist_dir = get_project_paths(self.root).embeddings_dir
 
+            # Use settings as defaults, allow config to override
             embedding_config = EmbeddingConfig(
-                vector_store=config.get("vector_store", "chromadb"),
-                embedding_model_type=config.get("embedding_model_type", "sentence-transformers"),
-                embedding_model_name=config.get("embedding_model_name", "all-mpnet-base-v2"),
+                vector_store=config.get(
+                    "vector_store",
+                    getattr(settings, "codebase_vector_store", "lancedb"),
+                ),
+                embedding_model_type=config.get(
+                    "embedding_model_type",
+                    getattr(settings, "codebase_embedding_provider", "sentence-transformers"),
+                ),
+                embedding_model_name=config.get(
+                    "embedding_model_name",
+                    getattr(settings, "codebase_embedding_model", "BAAI/bge-small-en-v1.5"),
+                ),
                 persist_directory=config.get("persist_directory", str(default_persist_dir)),
                 extra_config=config.get("extra_config", {}),
             )
