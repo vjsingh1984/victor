@@ -16,10 +16,12 @@
 
 Implements evaluation against the SWE-bench benchmark for
 real-world software engineering tasks.
+
+NOTE: Task loading is delegated to SWEBenchLoader (swe_bench_loader.py)
+to avoid code duplication. This module focuses on task execution.
 """
 
 import asyncio
-import json
 import logging
 from pathlib import Path
 from typing import Optional
@@ -32,6 +34,7 @@ from victor.evaluation.protocol import (
     TaskResult,
     TaskStatus,
 )
+from victor.evaluation.swe_bench_loader import SWEBenchConfig, SWEBenchLoader
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +58,8 @@ class SWEBenchRunner(BaseBenchmarkRunner):
     - test: Full test set (~2294 tasks)
     - dev: Development set
     - lite: SWE-bench Lite (~300 tasks, curated subset)
+
+    Task loading is handled by SWEBenchLoader for consistency.
     """
 
     def __init__(
@@ -65,12 +70,13 @@ class SWEBenchRunner(BaseBenchmarkRunner):
         """Initialize the SWE-bench runner.
 
         Args:
-            dataset_path: Path to SWE-bench dataset (JSON file)
+            dataset_path: Path to SWE-bench dataset (JSONL file)
             split: Dataset split (test, dev, lite)
         """
         self._dataset_path = dataset_path
         self._split = split
         self._tasks_cache: Optional[list[BenchmarkTask]] = None
+        self._loader = SWEBenchLoader()
 
     @property
     def benchmark_type(self) -> BenchmarkType:
@@ -80,129 +86,35 @@ class SWEBenchRunner(BaseBenchmarkRunner):
         self,
         config: EvaluationConfig,
     ) -> list[BenchmarkTask]:
-        """Load SWE-bench tasks."""
+        """Load SWE-bench tasks using SWEBenchLoader.
+
+        Delegates to SWEBenchLoader for consistent loading across
+        the codebase. Supports both local files and HuggingFace.
+        """
         if self._tasks_cache is not None:
             return self._filter_tasks(self._tasks_cache, config)
 
         tasks = []
 
-        # Try loading from dataset file
+        # Build loader config from evaluation config
+        loader_config = SWEBenchConfig(
+            max_tasks=config.max_tasks,
+        )
+
+        # Try loading from dataset file first
         if self._dataset_path and self._dataset_path.exists():
-            tasks = self._load_from_file(self._dataset_path)
+            tasks = self._loader.load_from_file(self._dataset_path, loader_config)
         else:
-            # Try loading from Hugging Face datasets
-            tasks = await self._load_from_hf()
+            # Load from HuggingFace using the split
+            dataset_name = "lite" if self._split == "lite" else "full"
+            tasks = await self._loader.load_from_huggingface(
+                dataset_name=dataset_name,
+                split="test" if self._split == "lite" else self._split,
+                config=loader_config,
+            )
 
         self._tasks_cache = tasks
         return self._filter_tasks(tasks, config)
-
-    def _load_from_file(self, path: Path) -> list[BenchmarkTask]:
-        """Load tasks from JSON file."""
-        tasks = []
-
-        try:
-            with open(path) as f:
-                data = json.load(f)
-
-            for item in data:
-                task = BenchmarkTask(
-                    task_id=item.get("instance_id", ""),
-                    benchmark=BenchmarkType.SWE_BENCH,
-                    description=item.get("problem_statement", ""),
-                    language="python",
-                    prompt=self._build_prompt(item),
-                    repo=item.get("repo", ""),
-                    base_commit=item.get("base_commit", ""),
-                    issue_text=item.get("problem_statement", ""),
-                    hints=item.get("hints_text", "").split("\n") if item.get("hints_text") else [],
-                    patch=item.get("patch", ""),
-                    test_code=item.get("test_patch", ""),
-                    difficulty=self._determine_difficulty(item),
-                    category=item.get("repo", "").split("/")[-1] if item.get("repo") else "",
-                )
-                tasks.append(task)
-
-        except Exception as e:
-            logger.error(f"Failed to load SWE-bench from file: {e}")
-
-        return tasks
-
-    async def _load_from_hf(self) -> list[BenchmarkTask]:
-        """Load tasks from Hugging Face datasets."""
-        tasks = []
-
-        try:
-            from datasets import load_dataset
-
-            # Load SWE-bench lite (smaller subset)
-            if self._split == "lite":
-                dataset = load_dataset("princeton-nlp/SWE-bench_Lite", split="test")
-            else:
-                dataset = load_dataset("princeton-nlp/SWE-bench", split=self._split)
-
-            for item in dataset:
-                task = BenchmarkTask(
-                    task_id=item.get("instance_id", ""),
-                    benchmark=BenchmarkType.SWE_BENCH,
-                    description=item.get("problem_statement", ""),
-                    language="python",
-                    prompt=self._build_prompt(item),
-                    repo=item.get("repo", ""),
-                    base_commit=item.get("base_commit", ""),
-                    issue_text=item.get("problem_statement", ""),
-                    patch=item.get("patch", ""),
-                    test_code=item.get("test_patch", ""),
-                    difficulty=self._determine_difficulty(item),
-                    category=item.get("repo", "").split("/")[-1] if item.get("repo") else "",
-                )
-                tasks.append(task)
-
-        except ImportError:
-            logger.warning("datasets library not installed, cannot load from HF")
-        except Exception as e:
-            logger.error(f"Failed to load from Hugging Face: {e}")
-
-        return tasks
-
-    def _build_prompt(self, item: dict) -> str:
-        """Build the prompt for the agent."""
-        repo = item.get("repo", "")
-        issue = item.get("problem_statement", "")
-        hints = item.get("hints_text", "")
-
-        prompt = f"""You are working on the repository: {repo}
-
-## Issue Description
-{issue}
-
-## Instructions
-Please analyze this issue and provide a solution. Your response should be a unified diff patch that can be applied to fix the issue.
-
-The patch should:
-1. Fix the described issue
-2. Not introduce any new bugs
-3. Follow the existing code style
-4. Include minimal changes needed to fix the issue
-"""
-
-        if hints:
-            prompt += f"\n## Hints\n{hints}\n"
-
-        prompt += "\nProvide your solution as a diff patch."
-
-        return prompt
-
-    def _determine_difficulty(self, item: dict) -> str:
-        """Determine task difficulty based on patch size."""
-        patch = item.get("patch", "")
-        lines = len(patch.split("\n"))
-
-        if lines < 10:
-            return "easy"
-        elif lines < 50:
-            return "medium"
-        else:
-            return "hard"
 
     async def run_task(
         self,
