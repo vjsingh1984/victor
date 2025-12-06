@@ -73,6 +73,10 @@ from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplex
 from victor.agent.context_reminder import create_reminder_manager
 from victor.agent.stream_handler import StreamMetrics
 from victor.agent.milestone_monitor import TaskMilestoneMonitor, TASK_CONFIGS
+from victor.agent.unified_task_tracker import (
+    UnifiedTaskTracker,
+    TaskType as UnifiedTaskType,
+)
 
 # New decomposed components (facades for orchestrator responsibilities)
 from victor.agent.conversation_controller import (
@@ -547,7 +551,17 @@ class AgentOrchestrator:
         self._embedding_preload_task: Optional[asyncio.Task[None]] = None
 
         # Initialize TaskMilestoneMonitor for goal-aware orchestration
+        # DEPRECATED: Use unified_tracker instead. Kept for backward compatibility.
         self.task_tracker = TaskMilestoneMonitor()
+
+        # NEW: Initialize UnifiedTaskTracker (consolidates task_tracker + progress_tracker)
+        # This is the single source of truth for task progress, milestones, and loop detection
+        self.unified_tracker = UnifiedTaskTracker()
+        # Apply model-specific exploration settings
+        self.unified_tracker.set_model_exploration_settings(
+            exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
+            continuation_patience=self.tool_calling_caps.continuation_patience,
+        )
 
         # Initialize unified ToolSelector (handles semantic + keyword selection)
         self.tool_selector = ToolSelector(
@@ -2226,6 +2240,9 @@ These are the actual search results. Reference only the files and matches shown 
         # Reset progress tracker for new conversation turn
         self.progress_tracker.reset()
 
+        # Reset unified tracker for new conversation (single source of truth)
+        self.unified_tracker.reset()
+
         # Reset context reminder manager for new conversation turn
         self.reminder_manager.reset()
 
@@ -2240,9 +2257,12 @@ These are the actual search results. Reference only the files and matches shown 
         # Add user message to history
         self.add_message("user", user_message)
 
-        # Detect task type for goal-aware orchestration
-        self.task_tracker.reset()  # Reset for new conversation turn
+        # Detect task type using unified tracker (primary) and legacy tracker (for backward compat)
+        self.task_tracker.reset()  # Reset legacy tracker for new conversation turn
         task_type = self.task_tracker.detect_task_type(user_message)
+
+        # Also detect on unified tracker (will be the only source after full migration)
+        unified_task_type = self.unified_tracker.detect_task_type(user_message)
         logger.info(f"Task type detected: {task_type.value}")
 
         # Get exploration iterations from TASK_CONFIGS for this task type
@@ -2851,14 +2871,19 @@ These are the actual search results. Reference only the files and matches shown 
                 tool_name = tc.get("name", "")
                 tool_args = tc.get("arguments", {})
 
-                # Record tool call in unified progress tracker
-                # This consolidates loop detection and resource tracking
+                # Record tool call in legacy progress tracker
                 self.progress_tracker.record_tool_call(tool_name, tool_args)
+
+                # Record tool call in unified tracker (single source of truth)
+                self.unified_tracker.record_tool_call(tool_name, tool_args)
 
             content_length = len(full_content.strip())
 
-            # Record iteration in unified progress tracker
+            # Record iteration in legacy progress tracker
             self.progress_tracker.record_iteration(content_length)
+
+            # Record iteration in unified tracker
+            self.unified_tracker.record_iteration(content_length)
 
             # Check for loop warning (soft warning before hard stop)
             # This gives the model a chance to correct behavior before we force stop
@@ -2882,17 +2907,25 @@ These are the actual search results. Reference only the files and matches shown 
                 # Continue to give the model one more chance
                 continue
 
-            # Check if progress tracker recommends stopping
+            # Check if progress tracker recommends stopping (legacy)
             stop_reason = self.progress_tracker.should_stop()
             if stop_reason.should_stop and not force_completion:
                 force_completion = True
                 logger.info(f"LoopDetector: {stop_reason.reason}")
 
-            # Check task-aware force action (goal-oriented completion)
+            # Check task-aware force action (legacy)
             should_force, force_hint = self.task_tracker.should_force_action()
             if should_force and not force_completion:
                 force_completion = True
                 logger.info(f"Task tracker forcing action: {force_hint}")
+
+            # Check unified tracker (single source of truth - will replace above after migration)
+            unified_should_force, unified_hint = self.unified_tracker.should_force_action()
+            if unified_should_force:
+                logger.info(
+                    f"UnifiedTaskTracker: should_force={unified_should_force}, "
+                    f"hint={unified_hint}, metrics={self.unified_tracker.get_metrics()}"
+                )
 
             logger.debug(f"After streaming pass, tool_calls = {tool_calls}")
 
