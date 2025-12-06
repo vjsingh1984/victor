@@ -65,14 +65,13 @@ from victor.agent.conversation_embedding_store import (
 from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
 from victor.agent.debug_logger import get_debug_logger
 from victor.agent.action_authorizer import ActionAuthorizer, ActionIntent
-from victor.agent.loop_detector import ProgressConfig, LoopDetector, TaskType
 from victor.agent.prompt_builder import SystemPromptBuilder, get_task_type_hint
 from victor.agent.response_sanitizer import ResponseSanitizer
 from victor.agent.search_router import SearchRouter
 from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity, DEFAULT_BUDGETS
 from victor.agent.context_reminder import create_reminder_manager
 from victor.agent.stream_handler import StreamMetrics
-from victor.agent.milestone_monitor import TaskMilestoneMonitor, TASK_CONFIGS
+from victor.agent.milestone_monitor import TASK_CONFIGS
 from victor.agent.unified_task_tracker import (
     UnifiedTaskTracker,
     TaskType as UnifiedTaskType,
@@ -324,25 +323,6 @@ class AgentOrchestrator:
         self.tool_budget = getattr(settings, "tool_call_budget", default_budget)
         self.tool_calls_used = 0
 
-        # Unified progress tracker for loop detection and progress monitoring
-        # Replaces scattered loop detection variables with a single source of truth
-        self.progress_tracker = LoopDetector(
-            config=ProgressConfig(
-                tool_budget=self.tool_budget,
-                max_iterations_default=getattr(settings, "max_exploration_iterations", 5),
-                max_iterations_analysis=getattr(
-                    settings, "max_exploration_iterations_analysis", 15
-                ),
-                max_iterations_action=getattr(settings, "max_exploration_iterations_action", 6),
-                max_iterations_research=getattr(settings, "max_research_iterations", 6),
-                repeat_threshold_default=3,
-                repeat_threshold_analysis=5,
-                min_content_threshold=getattr(settings, "min_content_threshold", 150),
-                max_total_iterations=getattr(settings, "max_total_loop_iterations", 20),
-            ),
-            task_type=TaskType.DEFAULT,
-        )
-
         # Gap implementations: Complexity classifier, action authorizer, search router
         self.task_classifier = ComplexityClassifier()
         self.intent_detector = ActionAuthorizer()
@@ -565,16 +545,7 @@ class AgentOrchestrator:
         # Background embedding preload task (ToolSelector owns the _embeddings_initialized state)
         self._embedding_preload_task: Optional[asyncio.Task[None]] = None
 
-        # Initialize TaskMilestoneMonitor for goal-aware orchestration
-        # DEPRECATED: Use unified_tracker instead. Kept for backward compatibility.
-        self.task_tracker = TaskMilestoneMonitor()
-        # Apply model-specific exploration settings to legacy task tracker
-        self.task_tracker.set_model_exploration_settings(
-            exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
-            continuation_patience=self.tool_calling_caps.continuation_patience,
-        )
-
-        # NEW: Initialize UnifiedTaskTracker (consolidates task_tracker + progress_tracker)
+        # Initialize UnifiedTaskTracker (single source of truth for task tracking)
         # This is the single source of truth for task progress, milestones, and loop detection
         self.unified_tracker = UnifiedTaskTracker()
         # Apply model-specific exploration settings
@@ -584,11 +555,12 @@ class AgentOrchestrator:
         )
 
         # Initialize unified ToolSelector (handles semantic + keyword selection)
+        # Use unified_tracker as the single source of truth for task tracking
         self.tool_selector = ToolSelector(
             tools=self.tools,
             semantic_selector=self.semantic_selector,
             conversation_state=self.conversation_state,
-            task_tracker=self.task_tracker,
+            task_tracker=self.unified_tracker,
             model=self.model,
             provider_name=self.provider_name,
             tool_selection_config=self.tool_selection,
@@ -1217,13 +1189,7 @@ class AgentOrchestrator:
             )
             self.tool_calling_caps = self.tool_adapter.get_capabilities()
 
-            # Apply model-specific exploration settings to legacy task tracker
-            self.task_tracker.set_model_exploration_settings(
-                exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
-                continuation_patience=self.tool_calling_caps.continuation_patience,
-            )
-
-            # Apply model-specific exploration settings to unified tracker (primary)
+            # Apply model-specific exploration settings to unified tracker
             self.unified_tracker.set_model_exploration_settings(
                 exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
                 continuation_patience=self.tool_calling_caps.continuation_patience,
@@ -1302,13 +1268,7 @@ class AgentOrchestrator:
             )
             self.tool_calling_caps = self.tool_adapter.get_capabilities()
 
-            # Apply model-specific exploration settings to legacy task tracker
-            self.task_tracker.set_model_exploration_settings(
-                exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
-                continuation_patience=self.tool_calling_caps.continuation_patience,
-            )
-
-            # Apply model-specific exploration settings to unified tracker (primary)
+            # Apply model-specific exploration settings to unified tracker
             self.unified_tracker.set_model_exploration_settings(
                 exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
                 continuation_patience=self.tool_calling_caps.continuation_patience,
@@ -2272,10 +2232,6 @@ These are the actual search results. Reference only the files and matches shown 
         # Reset unified tracker for new conversation (single source of truth)
         self.unified_tracker.reset()
 
-        # Reset legacy trackers (kept for backward compatibility during transition)
-        self.progress_tracker.reset()
-        self.task_tracker.reset()
-
         # Reset context reminder manager for new conversation turn
         self.reminder_manager.reset()
 
@@ -2385,40 +2341,24 @@ These are the actual search results. Reference only the files and matches shown 
         ]
         is_analysis_task = any(keyword in user_message.lower() for keyword in analysis_keywords)
 
-        # SYNCHRONIZE task types between task_tracker and progress_tracker
-        # Map fine-grained TaskMilestoneMonitor task types to LoopDetector coarse types
-        from victor.embeddings.task_classifier import TaskType as MilestoneTaskType
-        milestone_to_loop_map = {
-            MilestoneTaskType.EDIT: TaskType.ACTION,
-            MilestoneTaskType.CREATE: TaskType.ACTION,
-            MilestoneTaskType.CREATE_SIMPLE: TaskType.DEFAULT,
-            MilestoneTaskType.SEARCH: TaskType.ANALYSIS,
-            MilestoneTaskType.ANALYZE: TaskType.ANALYSIS,
-            MilestoneTaskType.ANALYSIS_DEEP: TaskType.ANALYSIS,
-            MilestoneTaskType.DESIGN: TaskType.DEFAULT,
-            MilestoneTaskType.GENERAL: TaskType.DEFAULT,
-            MilestoneTaskType.ACTION: TaskType.ACTION,
-        }
-
-        # Use milestone monitor's task type as primary source, with keyword override for analysis
-        loop_task_type = milestone_to_loop_map.get(task_type, TaskType.DEFAULT)
-
-        # Override: if keywords indicate analysis, use ANALYSIS even if milestone says otherwise
-        # This handles compound prompts like "What are the components? Update the code"
+        # Determine coarse task category for logging and behavior tuning
+        # (unified_tracker uses fine-grained task type internally)
         if is_analysis_task:
-            loop_task_type = TaskType.ANALYSIS
+            coarse_task_type = "analysis"
             # For compound analysis+edit tasks, unified_tracker handles exploration limits
-            if task_type in (MilestoneTaskType.EDIT, MilestoneTaskType.CREATE):
+            if task_type.value in ("edit", "create"):
                 logger.info(
                     f"Compound task detected (analysis+{task_type.value}): "
                     f"unified_tracker will use appropriate exploration limits"
                 )
         elif is_action_task:
-            loop_task_type = TaskType.ACTION
+            coarse_task_type = "action"
+        else:
+            coarse_task_type = "default"
 
         logger.info(
-            f"Task type classification: loop_type={loop_task_type.value}, "
-            f"milestone={task_type.value}, is_analysis={is_analysis_task}, is_action={is_action_task}"
+            f"Task type classification: coarse={coarse_task_type}, "
+            f"unified={unified_task_type.value}, is_analysis={is_analysis_task}, is_action={is_action_task}"
         )
 
         # For analysis tasks: increase temperature to reduce repetition/getting stuck
@@ -2934,17 +2874,6 @@ These are the actual search results. Reference only the files and matches shown 
                     f"UnifiedTaskTracker forcing action: {unified_hint}, "
                     f"metrics={self.unified_tracker.get_metrics()}"
                 )
-
-            # LEGACY (kept for transition validation - can be removed after validation)
-            # Check if legacy progress tracker also recommends stopping
-            legacy_stop_reason = self.progress_tracker.should_stop()
-            if legacy_stop_reason.should_stop:
-                logger.debug(f"Legacy LoopDetector also recommends stop: {legacy_stop_reason.reason}")
-
-            # LEGACY: Check legacy task-aware force action
-            legacy_should_force, legacy_force_hint = self.task_tracker.should_force_action()
-            if legacy_should_force:
-                logger.debug(f"Legacy TaskTracker also recommends force: {legacy_force_hint}")
 
             logger.debug(f"After streaming pass, tool_calls = {tool_calls}")
 

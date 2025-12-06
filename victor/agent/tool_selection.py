@@ -26,11 +26,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStateMachine
     from victor.agent.milestone_monitor import TaskMilestoneMonitor, TaskToolConfigLoader
+    from victor.agent.unified_task_tracker import UnifiedTaskTracker
     from victor.providers.base import ToolDefinition
     from victor.tools.base import ToolRegistry
     from victor.tools.semantic_selector import SemanticToolSelector
@@ -48,6 +49,10 @@ CORE_TOOLS: Set[str] = {
 }
 
 # Tool categories by use case
+# DEPRECATED: This hardcoded mapping is being replaced by dynamic discovery via
+# ToolMetadataRegistry. Tools should declare their category via @tool(category="...")
+# decorator. This fallback will be removed in a future version.
+# See get_tools_for_categories() for the migration path.
 TOOL_CATEGORIES: Dict[str, List[str]] = {
     "git": ["git", "git_suggest_commit", "git_create_pr", "git_analyze_conflicts"],
     "testing": ["run_tests", "testing_generate", "testing_coverage"],
@@ -363,7 +368,7 @@ def get_tools_for_categories(categories: Set[str]) -> Set[str]:
 
     Tries to use ToolMetadataRegistry for dynamic category lookup first,
     falls back to hardcoded TOOL_CATEGORIES if registry is not initialized
-    or has no matches.
+    or has no matches for a category.
 
     Args:
         categories: Set of category names
@@ -372,6 +377,7 @@ def get_tools_for_categories(categories: Set[str]) -> Set[str]:
         Set of tool names from all categories
     """
     tools: Set[str] = set()
+    used_fallback = False
 
     # Try registry first for dynamic categories
     try:
@@ -383,14 +389,29 @@ def get_tools_for_categories(categories: Set[str]) -> Set[str]:
             registry_tools = registry.get_tools_by_category(category)
             if registry_tools:
                 tools.update(registry_tools)
+                logger.debug(f"Category '{category}' resolved dynamically: {registry_tools}")
             elif category in TOOL_CATEGORIES:
-                # Fallback to hardcoded (deprecated)
-                tools.update(TOOL_CATEGORIES[category])
-    except Exception:
+                # Fallback to hardcoded (deprecated - log for migration tracking)
+                fallback_tools = TOOL_CATEGORIES[category]
+                tools.update(fallback_tools)
+                used_fallback = True
+                logger.debug(
+                    f"Category '{category}' using hardcoded fallback: {fallback_tools}. "
+                    "Consider adding category metadata to tools via @tool(category=...)"
+                )
+    except Exception as e:
         # Fallback to hardcoded categories if registry not available
+        logger.debug(f"ToolMetadataRegistry unavailable ({e}), using hardcoded categories")
+        used_fallback = True
         for category in categories:
             if category in TOOL_CATEGORIES:
                 tools.update(TOOL_CATEGORIES[category])
+
+    if used_fallback and tools:
+        logger.debug(
+            "Some categories used hardcoded fallback. "
+            "Run 'victor tools --show-metadata' to see category coverage."
+        )
 
     return tools
 
@@ -546,7 +567,7 @@ class ToolSelector:
         tools: "ToolRegistry",
         semantic_selector: Optional["SemanticToolSelector"] = None,
         conversation_state: Optional["ConversationStateMachine"] = None,
-        task_tracker: Optional["TaskMilestoneMonitor"] = None,
+        task_tracker: Optional[Union["TaskMilestoneMonitor", "UnifiedTaskTracker"]] = None,
         model: str = "",
         provider_name: str = "",
         tool_selection_config: Optional[Dict[str, Any]] = None,
@@ -559,7 +580,7 @@ class ToolSelector:
             tools: Tool registry containing available tools
             semantic_selector: Optional semantic selector for embedding-based selection
             conversation_state: Optional conversation state machine for stage detection
-            task_tracker: Optional task progress tracker for goal-aware tool selection
+            task_tracker: Optional task progress tracker (TaskMilestoneMonitor or UnifiedTaskTracker)
             model: Model name (used for adaptive thresholds)
             provider_name: Provider name (used for small model detection)
             tool_selection_config: Optional config with base_threshold, base_max_tools
@@ -779,7 +800,7 @@ class ToolSelector:
             dedup[t.name] = t
         tools = list(dedup.values())
 
-        logger.info(
+        logger.debug(
             f"Semantic+keyword tools selected ({len(tools)}): "
             f"{', '.join(t.name for t in tools)}"
         )
@@ -913,7 +934,7 @@ class ToolSelector:
         pruned = [t for t, _ in boosted_tools if t.name in keep]
 
         if pruned:
-            logger.info(
+            logger.debug(
                 f"Stage-pruned tools ({current_stage.name}): "
                 f"{len(pruned)} tools kept from {len(tools)}"
             )
@@ -924,7 +945,7 @@ class ToolSelector:
         fallback_tools = [t for t in tools if t.name in core_fallback]
 
         if fallback_tools:
-            logger.info(f"Stage pruning fallback: {len(fallback_tools)} core tools")
+            logger.debug(f"Stage pruning fallback: {len(fallback_tools)} core tools")
             return fallback_tools
 
         # Last resort: return a small prefix

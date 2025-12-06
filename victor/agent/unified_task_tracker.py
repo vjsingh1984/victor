@@ -610,6 +610,14 @@ class UnifiedTaskTracker:
         """Set target entities (functions, classes) for the task."""
         self._progress.target_entities = entities
 
+    def get_required_tools(self) -> Set[str]:
+        """Get the required tools for the current task type.
+
+        Returns:
+            Set of tool names required for this task
+        """
+        return set(self._task_config.required_tools)
+
     # =========================================================================
     # Recording
     # =========================================================================
