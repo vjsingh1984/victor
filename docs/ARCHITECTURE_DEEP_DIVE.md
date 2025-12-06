@@ -139,6 +139,7 @@ The orchestrator follows the **facade pattern**, delegating to specialized compo
 | `TaskAnalyzer` | `victor/agent/task_analyzer.py` | Unified facade for complexity/task/intent classification |
 | `UnifiedTaskClassifier` | `victor/agent/unified_classifier.py` | Keyword + semantic classification with negation detection |
 | `ToolRegistrar` | `victor/agent/tool_registrar.py` | Dynamic tool discovery, plugin loading, MCP integration, tool dependency graph |
+| `ProviderManager` | `victor/agent/provider_manager.py` | Unified provider/model management, switching, health monitoring, fallback chains |
 
 **Benefits of Decomposition**:
 1. **Testability**: Each component can be unit tested in isolation
@@ -1415,7 +1416,7 @@ Display to User
 - Tool result caching implemented (victor/cache/tool_cache.py)
 - Dependency graph implemented (victor/tools/dependency_graph.py)
 - Conversation state machine implemented (victor/agent/conversation_state.py)
-- Orchestrator decomposition complete (ConversationController, ToolPipeline, StreamingController, MetricsCollector, ToolRegistrar extracted)
+- Orchestrator decomposition complete (ConversationController, ToolPipeline, StreamingController, MetricsCollector, ToolRegistrar, ProviderManager extracted)
 - UnifiedTaskClassifier with negation detection implemented (victor/agent/unified_classifier.py)
 - Classification caching with LRU + TTL implemented
 - Provider health check system implemented (victor/providers/health.py)

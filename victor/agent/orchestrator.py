@@ -27,12 +27,12 @@ Extracted Components (separate modules):
 - ToolRegistrar: Tool registration, plugins, MCP integration (NEW)
 
 Remaining Orchestrator Responsibilities:
-- Provider/model initialization and switching
 - High-level chat flow coordination
 - Configuration loading and validation
+- Post-switch hooks (prompt rebuilding, tracker updates)
 
-Future Extraction Candidates:
-- ProviderManager: Provider initialization, switching, health checks
+Recently Integrated:
+- ProviderManager: Provider initialization, switching, health checks (NEW)
 
 Note: Keep orchestrator as a thin facade. New logic should go into
 appropriate extracted components, not added here.
@@ -104,6 +104,7 @@ from victor.agent.streaming_controller import (
 )
 from victor.agent.task_analyzer import TaskAnalyzer, get_task_analyzer
 from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
+from victor.agent.provider_manager import ProviderManager, ProviderManagerConfig, ProviderState
 
 from victor.agent.tool_selection import (
     CORE_TOOLS,
@@ -248,27 +249,42 @@ class AgentOrchestrator:
             provider_name: Optional provider label from profile (e.g., lmstudio, vllm) to disambiguate OpenAI-compatible providers
         """
         self.settings = settings
-        self.provider = provider
-        self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.console = console or Console()
         self.tool_selection = tool_selection or {}
         self.thinking = thinking
-        self.provider_name = (provider_name or getattr(provider, "name", "") or "").lower()
         self.tool_calling_models = getattr(settings, "tool_calling_models", {})
         self.tool_capabilities = ToolCallingMatrix(
             self.tool_calling_models,
             always_allow_providers=["openai", "anthropic", "google", "xai"],
         )
 
-        # Initialize tool calling adapter for unified provider handling
-        self.tool_adapter = ToolCallingAdapterRegistry.get_adapter(
-            provider_name=self.provider_name or getattr(provider, "name", "unknown"),
-            model=model,
-            config={"settings": settings},
+        # Initialize ProviderManager for unified provider/model management
+        # This encapsulates provider state, switching, and health monitoring
+        self._provider_manager = ProviderManager(
+            settings=settings,
+            initial_provider=provider,
+            initial_model=model,
+            provider_name=provider_name,
+            config=ProviderManagerConfig(
+                enable_health_checks=getattr(settings, "provider_health_checks", True),
+                auto_fallback=getattr(settings, "provider_auto_fallback", True),
+                fallback_providers=getattr(settings, "fallback_providers", []),
+            ),
         )
-        self.tool_calling_caps = self.tool_adapter.get_capabilities()
+
+        # Initialize tool adapter through ProviderManager
+        self._provider_manager.initialize_tool_adapter()
+
+        # Expose provider attributes for backward compatibility
+        # These delegate to ProviderManager
+        self.provider = self._provider_manager.provider
+        self.model = self._provider_manager.model
+        self.provider_name = self._provider_manager.provider_name
+        self.tool_adapter = self._provider_manager.tool_adapter
+        self.tool_calling_caps = self._provider_manager.capabilities
+
         logger.info(
             f"Tool calling adapter: {self.tool_adapter.provider_name}, "
             f"native={self.tool_calling_caps.native_tool_calls}, "
@@ -696,6 +712,11 @@ class AgentOrchestrator:
         return self._task_analyzer
 
     @property
+    def provider_manager(self) -> ProviderManager:
+        """Get the provider manager component."""
+        return self._provider_manager
+
+    @property
     def messages(self) -> List[Message]:
         """Get conversation messages (backward compatibility property).
 
@@ -1003,6 +1024,9 @@ class AgentOrchestrator:
         This method reinitializes the provider, tool calling adapter, and
         prompt builder while preserving the conversation history.
 
+        Delegates core switching to ProviderManager while handling
+        orchestrator-specific post-switch hooks.
+
         Args:
             provider_name: Name of the provider (ollama, lmstudio, anthropic, etc.)
             model: Optional model name. If not provided, uses current model.
@@ -1029,21 +1053,25 @@ class AgentOrchestrator:
             # Determine model to use
             new_model = model or self.model
 
-            # Update core attributes
+            # Store old state for analytics
             old_provider_name = self.provider_name
             old_model = self.model
 
-            self.provider = new_provider
-            self.model = new_model
-            self.provider_name = provider_name.lower()
-
-            # Reinitialize tool calling adapter for the new provider/model
-            self.tool_adapter = ToolCallingAdapterRegistry.get_adapter(
-                provider_name=self.provider_name,
+            # Update ProviderManager internal state directly
+            # (Using sync update instead of async switch_provider for backward compatibility)
+            self._provider_manager._current_state = ProviderState(
+                provider=new_provider,
+                provider_name=provider_name.lower(),
                 model=new_model,
-                config={"settings": self.settings},
             )
-            self.tool_calling_caps = self.tool_adapter.get_capabilities()
+            self._provider_manager.initialize_tool_adapter()
+
+            # Sync local attributes from ProviderManager
+            self.provider = self._provider_manager.provider
+            self.model = self._provider_manager.model
+            self.provider_name = self._provider_manager.provider_name
+            self.tool_adapter = self._provider_manager.tool_adapter
+            self.tool_calling_caps = self._provider_manager.capabilities
 
             # Apply model-specific exploration settings to unified tracker
             self.unified_tracker.set_model_exploration_settings(
@@ -1106,6 +1134,9 @@ class AgentOrchestrator:
         This is a lighter-weight switch than switch_provider() - it only
         updates the model and reinitializes the tool adapter.
 
+        Delegates core switching to ProviderManager while handling
+        orchestrator-specific post-switch hooks.
+
         Args:
             model: New model name
 
@@ -1117,15 +1148,16 @@ class AgentOrchestrator:
         """
         try:
             old_model = self.model
-            self.model = model
 
-            # Reinitialize tool calling adapter for the new model
-            self.tool_adapter = ToolCallingAdapterRegistry.get_adapter(
-                provider_name=self.provider_name,
-                model=model,
-                config={"settings": self.settings},
-            )
-            self.tool_calling_caps = self.tool_adapter.get_capabilities()
+            # Update ProviderManager's model and reinitialize adapter
+            if self._provider_manager._current_state:
+                self._provider_manager._current_state.model = model
+                self._provider_manager.initialize_tool_adapter()
+
+            # Sync local attributes from ProviderManager
+            self.model = self._provider_manager.model
+            self.tool_adapter = self._provider_manager.tool_adapter
+            self.tool_calling_caps = self._provider_manager.capabilities
 
             # Apply model-specific exploration settings to unified tracker
             self.unified_tracker.set_model_exploration_settings(
@@ -1181,20 +1213,22 @@ class AgentOrchestrator:
     def get_current_provider_info(self) -> Dict[str, Any]:
         """Get information about the current provider and model.
 
+        Combines ProviderManager's provider info with orchestrator-specific
+        runtime state (tool budget, tool calls used).
+
         Returns:
             Dictionary with provider/model info and capabilities
         """
-        return {
-            "provider": self.provider_name,
-            "model": self.model,
-            "supports_tools": self.provider.supports_tools() if self.provider else False,
-            "native_tool_calls": self.tool_calling_caps.native_tool_calls,
-            "streaming_tool_calls": self.tool_calling_caps.streaming_tool_calls,
-            "parallel_tool_calls": self.tool_calling_caps.parallel_tool_calls,
-            "thinking_mode": self.tool_calling_caps.thinking_mode,
+        # Get base info from ProviderManager
+        info = self._provider_manager.get_info()
+
+        # Add orchestrator-specific runtime state
+        info.update({
             "tool_budget": self.tool_budget,
             "tool_calls_used": self.tool_calls_used,
-        }
+        })
+
+        return info
 
     def _parse_tool_calls_with_adapter(
         self, content: str, raw_tool_calls: Optional[List[Dict[str, Any]]] = None
