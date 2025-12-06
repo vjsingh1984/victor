@@ -28,6 +28,7 @@ def mock_provider():
     provider = MagicMock()
     provider.name = "mock_provider"
     provider.supports_tools.return_value = True
+    provider.get_context_window.return_value = 100000  # Return integer for context window
     provider.chat = AsyncMock(return_value=MagicMock(content="Response", tool_calls=[]))
     return provider
 
@@ -679,7 +680,7 @@ class TestChatMethod:
                 thinking=True,
             )
 
-            response = await orch.chat("Think about this")
+            await orch.chat("Think about this")
 
             # Verify thinking parameter was passed
             call_kwargs = mock_provider.chat.call_args[1]
@@ -745,6 +746,7 @@ class TestFromSettings:
         mock_provider = MagicMock()
         mock_provider.name = "mock_provider"
         mock_provider.supports_tools.return_value = True
+        mock_provider.get_context_window.return_value = 100000
 
         with patch("victor.agent.orchestrator.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider

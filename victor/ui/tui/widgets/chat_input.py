@@ -14,6 +14,8 @@
 
 """Chat input widget for Victor TUI."""
 
+from typing import Any
+
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal
@@ -69,7 +71,7 @@ class ChatInput(Static):
             super().__init__()
             self.value = value
 
-    def __init__(self, placeholder: str = "Type your message...", **kwargs) -> None:
+    def __init__(self, placeholder: str = "Type your message...", **kwargs: Any) -> None:
         """Initialize chat input.
 
         Args:

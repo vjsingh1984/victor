@@ -316,14 +316,51 @@ class VictorApp(App):
         chunk_count = 0
 
         try:
+            from victor.agent.response_sanitizer import sanitize_response
+
             async for chunk in self.agent.stream_chat(user_message):
-                # Handle content
+                # Handle status metadata (tool status, thinking indicator)
+                if chunk.metadata and "status" in chunk.metadata:
+                    status_bar.update_metrics(status=chunk.metadata["status"])
+                    continue
+
+                # Handle file preview (consistent with CLI)
+                if chunk.metadata and "file_preview" in chunk.metadata:
+                    path = chunk.metadata.get("path", "")
+                    preview = chunk.metadata["file_preview"]
+                    # Add file preview as a separate message
+                    preview_msg = messages.add_assistant_message()
+                    preview_msg.set_content(f"```\n{path}:\n{preview}\n```")
+                    messages.scroll_to_end_now()
+                    continue
+
+                # Handle edit preview (consistent with CLI)
+                if chunk.metadata and "edit_preview" in chunk.metadata:
+                    path = chunk.metadata.get("path", "")
+                    preview = chunk.metadata["edit_preview"]
+                    # Format diff with markdown
+                    diff_lines = []
+                    for line in preview.split("\n"):
+                        if line.startswith("-"):
+                            diff_lines.append(f"[red]{line}[/]")
+                        elif line.startswith("+"):
+                            diff_lines.append(f"[green]{line}[/]")
+                        else:
+                            diff_lines.append(f"[dim]{line}[/]")
+                    preview_msg = messages.add_assistant_message()
+                    preview_msg.set_content(f"[bold]{path}:[/]\n" + "\n".join(diff_lines))
+                    messages.scroll_to_end_now()
+                    continue
+
+                # Handle content - DO NOT sanitize per-chunk (consistent with CLI)
+                # Sanitize only once at the end to preserve whitespace
                 if chunk.content:
                     # Track time to first content
                     if first_content_time is None:
                         first_content_time = time.time()
                         status_bar.set_streaming()
 
+                    # Accumulate raw content (like CLI does)
                     content_buffer += chunk.content
                     self._current_assistant_msg.set_content(content_buffer)
 
@@ -348,6 +385,11 @@ class VictorApp(App):
                             tool_indicators[tool_id] = indicator
                             status_bar.set_tool_running(tool_name)
                             messages.scroll_to_end_now()
+
+            # Sanitize the full response once streaming is complete (consistent with CLI)
+            # This removes thinking tokens and artifacts without losing spaces
+            content_buffer = sanitize_response(content_buffer)
+            self._current_assistant_msg.set_content(content_buffer)
 
             # Mark all tool indicators as complete with individual elapsed times
             current_time = time.time()
@@ -417,12 +459,12 @@ class VictorApp(App):
         chat_input = self.query_one("#chat-input", ChatInput)
         chat_input.focus_input()
 
-    def action_quit(self) -> None:
+    def action_quit(self) -> None:  # type: ignore[override]
         """Quit the application."""
         self.exit()
 
     def action_toggle_theme(self) -> None:
         """Toggle between dark and light theme."""
-        self.dark = not self.dark
+        self.dark = not self.dark  # type: ignore[has-type]
         theme_name = "dark" if self.dark else "light"
         self.notify(f"Switched to {theme_name} theme", severity="information")

@@ -14,6 +14,8 @@
 
 """Status bar widget for Victor TUI."""
 
+from typing import Any
+
 from textual.reactive import reactive
 from textual.widgets import Static
 
@@ -43,7 +45,7 @@ class StatusBar(Static):
         provider: str = "ollama",
         model: str = "unknown",
         tool_budget: int = 15,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Initialize status bar.
 

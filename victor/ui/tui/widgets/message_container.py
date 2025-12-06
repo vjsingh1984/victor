@@ -14,6 +14,8 @@
 
 """Message container widgets for Victor TUI."""
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.containers import ScrollableContainer
 from textual.widgets import Static, Markdown
@@ -110,7 +112,7 @@ class AssistantMessage(Static):
         if self._markdown:
             self._markdown.update(self._content)
 
-    @property
+    @property  # type: ignore[misc]
     def content(self) -> str:
         """Get the current message content."""
         return self._content
@@ -128,7 +130,7 @@ class MessageContainer(ScrollableContainer):
     }
     """
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         """Initialize the message container.
 
         Args:
