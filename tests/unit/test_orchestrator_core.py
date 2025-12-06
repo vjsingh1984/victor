@@ -1311,3 +1311,242 @@ class TestClassifyTaskKeywords:
             assert result["is_analysis_task"] is True
             result = orch._classify_task_keywords("CREATE a file")
             assert result["is_action_task"] is True
+
+
+class TestDetermineContinuationAction:
+    """Tests for _determine_continuation_action helper method."""
+
+    @pytest.fixture
+    def mock_intent_result(self):
+        """Create a mock intent classification result."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        class MockIntentResult:
+            def __init__(self, intent_type):
+                self.intent = intent_type
+                self.confidence = 0.9
+                self.top_matches = []
+
+        return MockIntentResult
+
+    def test_asking_input_one_shot_auto_continue(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that asking_input in one_shot mode returns continue_asking_input action."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            intent = mock_intent_result(IntentType.ASKING_INPUT)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=True,
+                is_action_task=False,
+                content_length=100,
+                full_content="Would you like me to continue?",
+                continuation_prompts=0,
+                asking_input_prompts=0,
+                one_shot_mode=True,
+            )
+            assert result["action"] == "continue_asking_input"
+            assert "Yes, please continue" in result["message"]
+            assert result["updates"]["asking_input_prompts"] == 1
+
+    def test_asking_input_interactive_returns_to_user(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that asking_input in interactive mode returns return_to_user action."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            intent = mock_intent_result(IntentType.ASKING_INPUT)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=True,
+                is_action_task=False,
+                content_length=100,
+                full_content="Would you like me to continue?",
+                continuation_prompts=0,
+                asking_input_prompts=0,
+                one_shot_mode=False,
+            )
+            assert result["action"] == "return_to_user"
+            assert result["message"] is None
+
+    def test_continuation_intent_prompts_tool_call(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that continuation intent prompts for tool call."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            # Ensure budget thresholds are met
+            orch.tool_budget = 100
+            orch.tool_calls_used = 5
+            intent = mock_intent_result(IntentType.CONTINUATION)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=True,
+                is_action_task=False,
+                content_length=100,
+                full_content="Let me check more files...",
+                continuation_prompts=0,
+                asking_input_prompts=0,
+                one_shot_mode=True,
+            )
+            assert result["action"] == "prompt_tool_call"
+            assert "list_directory" in result["message"]
+            assert result["updates"]["continuation_prompts"] == 1
+
+    def test_max_continuation_prompts_requests_summary(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that max continuation prompts triggers summary request."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            orch.tool_calls_used = 5
+            intent = mock_intent_result(IntentType.CONTINUATION)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=True,
+                is_action_task=False,
+                content_length=100,
+                full_content="Let me check more...",
+                continuation_prompts=10,  # At max for analysis
+                asking_input_prompts=0,
+                one_shot_mode=True,
+            )
+            assert result["action"] == "request_summary"
+            assert "complete the task NOW" in result["message"]
+            assert result["updates"]["continuation_prompts"] == 99
+
+    def test_incomplete_output_requests_completion(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that incomplete output with tool calls requests completion."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            # Set tool_calls_used >= budget_threshold to skip prompt_tool_call
+            # Default tool_budget=20, so budget_threshold=5 for analysis
+            orch.tool_budget = 20
+            orch.tool_calls_used = 6  # >= 5, skips prompt_tool_call
+            # Make sure _final_summary_requested is not set
+            if hasattr(orch, "_final_summary_requested"):
+                delattr(orch, "_final_summary_requested")
+            intent = mock_intent_result(IntentType.NEUTRAL)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=True,
+                is_action_task=False,
+                content_length=100,  # Short - looks incomplete
+                full_content="Brief text",
+                continuation_prompts=8,  # Below max (10 for analysis), skips request_summary
+                asking_input_prompts=0,
+                one_shot_mode=True,
+            )
+            assert result["action"] == "request_completion"
+            assert "Strengths" in result["message"]
+            assert result.get("set_final_summary_requested") is True
+
+    def test_completion_intent_finishes(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that completion intent returns finish action."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            intent = mock_intent_result(IntentType.COMPLETION)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=False,
+                is_action_task=False,
+                content_length=1000,  # Long content
+                full_content="Here is the complete analysis...",
+                continuation_prompts=0,
+                asking_input_prompts=0,
+                one_shot_mode=False,
+            )
+            assert result["action"] == "finish"
+            assert result["message"] is None
+
+    def test_substantial_structured_content_finishes(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that substantial structured content returns finish action."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            intent = mock_intent_result(IntentType.NEUTRAL)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=True,
+                is_action_task=False,
+                content_length=300,  # >200
+                full_content="## Summary\n\n**Strengths**\n\nThe code is well organized.",
+                continuation_prompts=0,
+                asking_input_prompts=0,
+                one_shot_mode=False,
+            )
+            assert result["action"] == "finish"
+
+    def test_asking_input_max_prompts_exceeded(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that asking_input respects max prompts limit."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            intent = mock_intent_result(IntentType.ASKING_INPUT)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=True,
+                is_action_task=False,
+                content_length=100,
+                full_content="Would you like me to continue?",
+                continuation_prompts=0,
+                asking_input_prompts=3,  # At max
+                one_shot_mode=True,
+            )
+            # Should fall through to other logic, not continue_asking_input
+            assert result["action"] != "continue_asking_input"

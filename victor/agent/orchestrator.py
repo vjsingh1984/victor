@@ -1361,6 +1361,172 @@ class AgentOrchestrator:
 
         return f"🔧 Running {tool_name}..."
 
+    def _determine_continuation_action(
+        self,
+        intent_result: Any,  # IntentClassificationResult
+        is_analysis_task: bool,
+        is_action_task: bool,
+        content_length: int,
+        full_content: Optional[str],
+        continuation_prompts: int,
+        asking_input_prompts: int,
+        one_shot_mode: bool,
+    ) -> Dict[str, Any]:
+        """Determine what continuation action to take when model doesn't call tools.
+
+        Encapsulates the complex decision logic for handling responses without tool
+        calls, including intent classification, continuation prompting, and summary
+        requests.
+
+        Args:
+            intent_result: Result from intent classifier (has .intent, .confidence)
+            is_analysis_task: Whether task is analysis-oriented
+            is_action_task: Whether task is action-oriented
+            content_length: Length of model's response content
+            full_content: Full response content (for structure detection)
+            continuation_prompts: Current count of continuation prompts sent
+            asking_input_prompts: Current count of asking-input auto-responses
+            one_shot_mode: Whether running in non-interactive mode
+
+        Returns:
+            Dictionary with:
+            - action: str - One of: "continue_asking_input", "return_to_user",
+                          "prompt_tool_call", "request_summary",
+                          "request_completion", "finish"
+            - message: Optional[str] - System message to inject (if any)
+            - reason: str - Human-readable reason for the action
+            - updates: Dict - State updates (continuation_prompts, asking_input_prompts)
+        """
+        from victor.embeddings.intent_classifier import IntentType
+
+        # Extract intent type
+        intends_to_continue = intent_result.intent == IntentType.CONTINUATION
+        is_completion = intent_result.intent == IntentType.COMPLETION
+        is_asking_input = intent_result.intent == IntentType.ASKING_INPUT
+
+        # Configuration
+        max_asking_input_prompts = 3
+        requires_continuation_support = is_analysis_task or is_action_task or intends_to_continue
+        max_continuation_prompts = 10 if is_analysis_task else (5 if is_action_task else 3)
+
+        # Budget/iteration thresholds
+        budget_threshold = (
+            self.tool_budget // 4 if requires_continuation_support else self.tool_budget // 2
+        )
+        max_iterations = self.unified_tracker.config.get("max_total_iterations", 50)
+        iteration_threshold = (
+            max_iterations * 3 // 4 if requires_continuation_support else max_iterations // 2
+        )
+
+        # State updates to apply
+        updates: Dict[str, int] = {}
+
+        # Handle model asking for user input
+        if is_asking_input:
+            if one_shot_mode and asking_input_prompts < max_asking_input_prompts:
+                updates["asking_input_prompts"] = asking_input_prompts + 1
+                return {
+                    "action": "continue_asking_input",
+                    "message": (
+                        "Yes, please continue with the implementation. "
+                        "Proceed with the most sensible approach based on what you've learned."
+                    ),
+                    "reason": f"Model asking input (one-shot) - auto-continuing ({asking_input_prompts + 1}/{max_asking_input_prompts})",
+                    "updates": updates,
+                }
+            elif not one_shot_mode:
+                return {
+                    "action": "return_to_user",
+                    "message": None,
+                    "reason": "Model asking input (interactive) - returning to user",
+                    "updates": updates,
+                }
+
+        # Check for structured content that indicates completion
+        has_substantial_structured_content = content_length > 200 and any(
+            marker in (full_content or "")
+            for marker in ["## ", "**Summary", "**Strengths", "**Weaknesses"]
+        )
+        content_looks_incomplete = content_length < 500 and not has_substantial_structured_content
+
+        # Determine if we should prompt for continuation
+        should_prompt_continuation = intends_to_continue or (
+            intent_result.intent == IntentType.NEUTRAL
+            and content_looks_incomplete
+            and not is_completion
+        )
+
+        # Prompt model to make tool call if appropriate
+        if (
+            requires_continuation_support
+            and should_prompt_continuation
+            and self.tool_calls_used < budget_threshold
+            and self.unified_tracker.iterations < iteration_threshold
+            and continuation_prompts < max_continuation_prompts
+        ):
+            updates["continuation_prompts"] = continuation_prompts + 1
+            return {
+                "action": "prompt_tool_call",
+                "message": (
+                    "You said you would examine more files but did not call any tool. "
+                    "Either:\n"
+                    "1. Call list_directory to explore a directory, OR\n"
+                    "2. Call read_file to read a specific file, OR\n"
+                    "3. Provide your analysis NOW if you have enough information.\n\n"
+                    "Make a tool call or provide your summary."
+                ),
+                "reason": f"Prompting for tool call ({continuation_prompts + 1}/{max_continuation_prompts})",
+                "updates": updates,
+            }
+
+        # Request summary if max continuation prompts reached
+        if (
+            requires_continuation_support
+            and continuation_prompts >= max_continuation_prompts
+            and self.tool_calls_used > 0
+        ):
+            updates["continuation_prompts"] = 99  # Prevent further prompting
+            return {
+                "action": "request_summary",
+                "message": (
+                    "Please complete the task NOW based on what you have done so far. "
+                    "Provide a summary of your progress and any remaining steps."
+                ),
+                "reason": f"Max continuation prompts ({max_continuation_prompts}) reached",
+                "updates": updates,
+            }
+
+        # Request completion for incomplete output
+        if (
+            requires_continuation_support
+            and self.tool_calls_used > 0
+            and content_looks_incomplete
+            and not is_completion
+            and not getattr(self, "_final_summary_requested", False)
+        ):
+            return {
+                "action": "request_completion",
+                "message": (
+                    "You have examined several files. Please provide a complete summary "
+                    "of your analysis including:\n"
+                    "1. **Strengths** - What the codebase does well\n"
+                    "2. **Weaknesses** - Areas that need improvement\n"
+                    "3. **Recommendations** - Specific suggestions for improvement\n\n"
+                    "Provide your analysis NOW."
+                ),
+                "reason": "Incomplete output - requesting final summary",
+                "updates": updates,
+                "set_final_summary_requested": True,
+            }
+
+        # No more tool calls needed - finish
+        return {
+            "action": "finish",
+            "message": None,
+            "reason": "No more tool calls requested",
+            "updates": updates,
+        }
+
     def _extract_file_structure(self, content: str, file_path: str) -> str:
         """Extract a structural summary for very large files.
 
@@ -2769,22 +2935,14 @@ These are the actual search results. Reference only the files and matches shown 
 
             if not tool_calls:
                 # Check if model intended to continue but didn't make a tool call
-                # (common with local models that sometimes forget to actually call the tool)
-                # Use semantic intent classification instead of hardcoded phrase matching
+                # Use semantic intent classification to determine continuation action
                 # NOTE: Use the LAST portion of the response for intent classification
                 # because asking_input patterns like "Would you like me to..." typically
-                # appear at the END of a long response, and would be diluted if we use full_content
+                # appear at the END of a long response
                 intent_text = full_content or ""
                 if len(intent_text) > 500:
-                    # Use last 500 chars for intent detection (captures ending questions)
                     intent_text = intent_text[-500:]
                 intent_result = self.intent_classifier.classify_intent_sync(intent_text)
-
-                # Only consider continuation if semantically matches continuation intent
-                # and does NOT match completion intent
-                intends_to_continue = intent_result.intent == IntentType.CONTINUATION
-                is_completion = intent_result.intent == IntentType.COMPLETION
-                is_asking_input = intent_result.intent == IntentType.ASKING_INPUT
 
                 logger.debug(
                     f"Intent classification: {intent_result.intent.name} "
@@ -2793,140 +2951,62 @@ These are the actual search results. Reference only the files and matches shown 
                     f"top_matches={intent_result.top_matches[:3]})"
                 )
 
-                # Track continuation prompts to avoid infinite loops
+                # Initialize tracking variables
                 if not hasattr(self, "_continuation_prompts"):
                     self._continuation_prompts = 0
-
-                # Track asking input prompts separately
                 if not hasattr(self, "_asking_input_prompts"):
                     self._asking_input_prompts = 0
 
-                # Handle model asking for user input (e.g., "Would you like me to...")
-                # Behavior depends on one_shot_mode:
-                # - one_shot_mode=True: auto-continue with "yes" response
-                # - one_shot_mode=False (interactive): return to user to let them choose
-                max_asking_input_prompts = 3  # Prevent infinite loops
+                # Use helper to determine what action to take
                 one_shot_mode = getattr(self.settings, "one_shot_mode", False)
-
-                if is_asking_input:
-                    if one_shot_mode and self._asking_input_prompts < max_asking_input_prompts:
-                        # One-shot mode: auto-continue with recommended approach
-                        self._asking_input_prompts += 1
-                        logger.info(
-                            f"Model asking for user input (one-shot) - auto-continuing "
-                            f"(attempt {self._asking_input_prompts}/{max_asking_input_prompts})"
-                        )
-                        # Inject a "yes, continue" response as if the user said yes
-                        self.add_message(
-                            "user",
-                            "Yes, please continue with the implementation. "
-                            "Proceed with the most sensible approach based on what you've learned.",
-                        )
-                        # Continue the loop with the user's affirmative response
-                        continue
-                    elif not one_shot_mode:
-                        # Interactive mode: let user see the question and respond
-                        logger.info("Model asking for user input (interactive) - returning to user")
-                        # Don't add any message - let the user respond
-                        # Break out to yield final chunk and let user see the question
-                        break
-
-                # If the model seems to want to continue, prompt it to make a tool call
-                # Allow more continuation prompts for complex tasks, but enable for ALL tasks
-                # when the model explicitly indicates continuation intent
-                requires_continuation_support = is_analysis_task or is_action_task or intends_to_continue
-                max_continuation_prompts = 10 if is_analysis_task else (5 if is_action_task else 3)
-                budget_threshold = (
-                    self.tool_budget // 4 if requires_continuation_support else self.tool_budget // 2
-                )
-                max_iterations = self.unified_tracker.config.get("max_total_iterations", 50)
-                iteration_threshold = (
-                    max_iterations * 3 // 4 if requires_continuation_support else max_iterations // 2
+                action_result = self._determine_continuation_action(
+                    intent_result=intent_result,
+                    is_analysis_task=is_analysis_task,
+                    is_action_task=is_action_task,
+                    content_length=content_length,
+                    full_content=full_content,
+                    continuation_prompts=self._continuation_prompts,
+                    asking_input_prompts=self._asking_input_prompts,
+                    one_shot_mode=one_shot_mode,
                 )
 
-                # Also continue if intent is NEUTRAL and response looks incomplete
-                # (short content without structured output)
-                # Note: Require substantial content (>200 chars) with a structural marker
-                # to consider it "complete" - a lone "2. " doesn't count as structured output
-                has_substantial_structured_content = content_length > 200 and any(
-                    marker in (full_content or "")
-                    for marker in ["## ", "**Summary", "**Strengths", "**Weaknesses"]
-                )
-                content_looks_incomplete = content_length < 500 and not has_substantial_structured_content
-                should_prompt_continuation = intends_to_continue or (
-                    intent_result.intent == IntentType.NEUTRAL
-                    and content_looks_incomplete
-                    and not is_completion
-                )
-
-                if (
-                    requires_continuation_support
-                    and should_prompt_continuation
-                    and self.tool_calls_used < budget_threshold
-                    and self.unified_tracker.iterations < iteration_threshold
-                    and self._continuation_prompts < max_continuation_prompts
-                ):
-                    self._continuation_prompts += 1
-                    logger.info(
-                        f"Model indicated continuation intent without tool call - prompting to continue "
-                        f"(attempt {self._continuation_prompts}/{max_continuation_prompts})"
-                    )
-                    self.add_message(
-                        "system",
-                        "You said you would examine more files but did not call any tool. "
-                        "Either:\n"
-                        "1. Call list_directory to explore a directory, OR\n"
-                        "2. Call read_file to read a specific file, OR\n"
-                        "3. Provide your analysis NOW if you have enough information.\n\n"
-                        "Make a tool call or provide your summary.",
-                    )
-                    # Track this turn without tool call for productivity ratio calculation
-                    self.unified_tracker.increment_turn()
-                    # Continue the loop to give the model another chance
-                    continue
-
-                # If we hit the continuation limit, ask for a summary instead
-                if (
-                    requires_continuation_support
-                    and self._continuation_prompts >= max_continuation_prompts
-                    and self.tool_calls_used > 0
-                ):
-                    logger.info(
-                        f"Max continuation prompts ({max_continuation_prompts}) reached, requesting summary"
-                    )
-                    self.add_message(
-                        "system",
-                        "Please complete the task NOW based on what you have done so far. "
-                        "Provide a summary of your progress and any remaining steps.",
-                    )
-                    # One more iteration to get the summary
-                    self._continuation_prompts = 99  # Prevent further prompting
-                    continue
-
-                # For tasks with tool calls but incomplete output, request completion
-                if (
-                    requires_continuation_support
-                    and self.tool_calls_used > 0
-                    and content_looks_incomplete
-                    and not is_completion
-                    and not hasattr(self, "_final_summary_requested")
-                ):
+                # Apply state updates from action result
+                if "continuation_prompts" in action_result.get("updates", {}):
+                    self._continuation_prompts = action_result["updates"]["continuation_prompts"]
+                if "asking_input_prompts" in action_result.get("updates", {}):
+                    self._asking_input_prompts = action_result["updates"]["asking_input_prompts"]
+                if action_result.get("set_final_summary_requested"):
                     self._final_summary_requested = True
-                    logger.info(
-                        "Analysis task exiting with incomplete output - requesting final summary"
-                    )
-                    self.add_message(
-                        "system",
-                        "You have examined several files. Please provide a complete summary "
-                        "of your analysis including:\n"
-                        "1. **Strengths** - What the codebase does well\n"
-                        "2. **Weaknesses** - Areas that need improvement\n"
-                        "3. **Recommendations** - Specific suggestions for improvement\n\n"
-                        "Provide your analysis NOW.",
-                    )
+
+                action = action_result["action"]
+                logger.info(f"Continuation action: {action} - {action_result['reason']}")
+
+                # Handle action: continue_asking_input
+                if action == "continue_asking_input":
+                    self.add_message("user", action_result["message"])
                     continue
 
-                # No more tool calls requested; finish
+                # Handle action: return_to_user
+                if action == "return_to_user":
+                    break
+
+                # Handle action: prompt_tool_call
+                if action == "prompt_tool_call":
+                    self.add_message("system", action_result["message"])
+                    self.unified_tracker.increment_turn()
+                    continue
+
+                # Handle action: request_summary
+                if action == "request_summary":
+                    self.add_message("system", action_result["message"])
+                    continue
+
+                # Handle action: request_completion
+                if action == "request_completion":
+                    self.add_message("system", action_result["message"])
+                    continue
+
+                # Handle action: finish - No more tool calls requested
                 # Display performance metrics
                 elapsed_time = time.time() - start_time
 
