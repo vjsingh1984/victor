@@ -66,7 +66,6 @@ dependencies = [
     "typer>=0.12",
     "rich>=13.7",
     "prompt-toolkit>=3.0",
-    "textual>=0.85.0",
 
     # LLM Providers
     "anthropic>=0.34",
@@ -113,9 +112,6 @@ dev = [
     "ruff>=0.5",
     "mypy>=1.10",
     "black>=24.0",
-
-    # TUI Development
-    "textual-dev>=1.4.0",
 
     # Type stubs
     "types-pyyaml",

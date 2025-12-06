@@ -31,48 +31,9 @@ except Exception:
 import typer
 
 
-def _check_tui_compatibility() -> tuple[bool, str]:
-    """Check if the terminal supports TUI features.
-
-    Returns:
-        Tuple of (is_compatible, reason_if_not)
-    """
-    # Check if running in a TTY
-    if not sys.stdin.isatty() or not sys.stdout.isatty():
-        return False, "Not running in an interactive terminal (no TTY)"
-
-    # Check terminal size
-    try:
-        import shutil
-
-        cols, rows = shutil.get_terminal_size()
-        if cols < 40 or rows < 10:
-            return False, f"Terminal too small ({cols}x{rows}). Need at least 40x10"
-    except Exception:
-        pass  # Best effort check
-
-    # Check for TERM environment variable
-    term = os.environ.get("TERM", "")
-    if term in ("dumb", ""):
-        return False, f"Unsupported terminal type: '{term}'"
-
-    # Check for known problematic environments
-    if os.environ.get("EMACS"):
-        return False, "Running in Emacs shell (use M-x shell instead)"
-
-    # Check if Textual can import successfully
-    try:
-        from textual.app import App  # noqa: F401
-
-        return True, ""
-    except ImportError as e:
-        return False, f"Textual library not available: {e}"
-    except Exception as e:
-        return False, f"TUI initialization error: {e}"
-
-
 # These imports are after the readline try/except block intentionally
 from rich.console import Console  # noqa: E402
+from rich.live import Live  # noqa: E402
 from rich.markdown import Markdown  # noqa: E402
 from rich.panel import Panel  # noqa: E402
 from rich.prompt import Confirm, Prompt  # noqa: E402
@@ -142,9 +103,66 @@ async def _check_codebase_index(cwd: str, console_obj: Console, silent: bool = F
         logger.debug(f"Codebase index check failed: {e}")
 
 
+async def _preload_semantic_index(
+    cwd: str,
+    settings: Any,
+    console_obj: Console,
+    force: bool = False,
+) -> bool:
+    """Preload semantic codebase index with embeddings upfront.
+
+    This builds the vector embeddings for semantic_code_search at startup,
+    avoiding the 20-30 second delay on first search.
+
+    Args:
+        cwd: Current working directory (codebase root)
+        settings: Application settings
+        console_obj: Rich console for output
+        force: Force rebuild even if index exists
+
+    Returns:
+        True if index was successfully built/loaded
+    """
+    try:
+        from pathlib import Path
+        from victor.tools.code_search_tool import _get_or_build_index, _INDEX_CACHE
+        import time
+
+        root_path = Path(cwd).resolve()
+
+        # Check if already cached in memory
+        cache_entry = _INDEX_CACHE.get(str(root_path))
+        if cache_entry and not force:
+            console_obj.print("[dim]✓ Semantic index already loaded[/]")
+            return True
+
+        console_obj.print("[dim]⏳ Building semantic code index (one-time)...[/]")
+        start_time = time.time()
+
+        # Build the index with embeddings
+        index, rebuilt = await _get_or_build_index(root_path, settings, force_reindex=force)
+
+        elapsed = time.time() - start_time
+
+        if rebuilt:
+            console_obj.print(f"[green]✓ Semantic index built in {elapsed:.1f}s[/]")
+        else:
+            console_obj.print(f"[green]✓ Semantic index loaded in {elapsed:.1f}s[/]")
+
+        return True
+
+    except ImportError as e:
+        logger.warning(f"Semantic indexing dependencies not available: {e}")
+        return False
+    except Exception as e:
+        logger.warning(f"Failed to preload semantic index: {e}")
+        console_obj.print(f"[yellow]⚠ Semantic index preload failed: {e}[/]")
+        return False
+
+
 app = typer.Typer(
     name="victor",
-    help="Victor - Enterprise-Ready AI Coding Assistant. Code to Victory with Any AI.",
+    help="Victor - Enterprise-Ready AI Coding Assistant.",
     add_completion=False,
 )
 
@@ -218,94 +236,41 @@ def callback(
         is_eager=True,
         help="Show version and exit",
     ),
-    no_tui: bool = typer.Option(
-        False,
-        "--no-tui",
-        "--cli",
-        help="Disable TUI and use CLI mode with console logging.",
-    ),
 ) -> None:
-    """Victor - Enterprise-Ready AI Coding Assistant. Code to Victory with Any AI.
+    """Victor - Enterprise-Ready AI Coding Assistant.
 
     \b
     Usage:
-        victor              # Start interactive TUI mode (default)
-        victor --no-tui     # Start interactive CLI mode (for debugging)
+        victor              # Start interactive CLI mode (default)
         victor chat "msg"   # One-shot message
         victor --help       # Show this help
 
     \b
     Examples:
-        victor                          # Interactive TUI mode
-        victor --no-tui                 # Interactive CLI mode with logs
+        victor                          # Interactive CLI mode
         victor chat "hello"             # One-shot query
-        victor chat --no-tui "hello"    # One-shot with debug output
+        victor chat --log-level DEBUG   # With debug logging
     """
     # Only run if no subcommand is being invoked
     if ctx.invoked_subcommand is None:
-        # Default: run interactive mode (TUI unless --no-tui)
-        _run_default_interactive(force_cli=no_tui)
+        _run_default_interactive()
 
 
-def _configure_tui_logging() -> None:
-    """Configure logging for TUI mode.
-
-    In TUI mode:
-    - Default log level is WARNING (unless overridden by VICTOR_LOG_LEVEL)
-    - Logs go to a file (~/.victor/logs/victor.log) instead of stdout
-    """
-    from pathlib import Path
-    from victor.config.settings import get_project_paths
-
-    # TUI mode defaults to WARNING level to avoid cluttering the UI
+def _run_default_interactive() -> None:
+    """Run the default interactive CLI mode with default options."""
+    # Configure console logging
     log_level = os.getenv("VICTOR_LOG_LEVEL", "WARNING").upper()
     if log_level == "WARN":
         log_level = "WARNING"
-
-    # Create logs directory
-    log_dir = get_project_paths().global_logs_dir
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_file = log_dir / "victor.log"
-
-    # Configure logging to file only for TUI mode
     logging.basicConfig(
         level=getattr(logging, log_level),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.FileHandler(log_file, mode="a", encoding="utf-8"),
-        ],
         force=True,
     )
 
-    # Suppress noisy third-party loggers
-    from victor.agent.debug_logger import configure_logging_levels
-
-    configure_logging_levels(log_level)
-
-
-def _run_default_interactive(force_cli: bool = False) -> None:
-    """Run the default interactive mode with default options.
-
-    Args:
-        force_cli: If True, use CLI mode instead of TUI.
-    """
-    if force_cli:
-        # CLI mode - configure console logging
-        log_level = os.getenv("VICTOR_LOG_LEVEL", "INFO").upper()
-        if log_level == "WARN":
-            log_level = "WARNING"
-        logging.basicConfig(
-            level=getattr(logging, log_level),
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            force=True,
-        )
-    else:
-        # TUI mode - configure file-based logging
-        _configure_tui_logging()
-
     settings = load_settings()
     _setup_safety_confirmation()
-    asyncio.run(run_interactive(settings, "default", True, False, force_cli=force_cli))
+    asyncio.run(run_interactive(settings, "default", True, False))
 
 
 @app.command()
@@ -329,7 +294,7 @@ def chat(
         None,
         "--log-level",
         "-l",
-        help="Set logging level (DEBUG, INFO, WARN, ERROR). Defaults to INFO or VICTOR_LOG_LEVEL env var.",
+        help="Set logging level (DEBUG, INFO, WARN, ERROR). Defaults to WARNING or VICTOR_LOG_LEVEL env var.",
         case_sensitive=False,
     ),
     thinking: bool = typer.Option(
@@ -337,24 +302,56 @@ def chat(
         "--thinking/--no-thinking",
         help="Enable extended thinking/reasoning mode (Claude models). Shows model's reasoning process.",
     ),
-    no_tui: bool = typer.Option(
+    # Automation-friendly options
+    json_output: bool = typer.Option(
         False,
-        "--no-tui",
-        "--cli",
-        help="Disable TUI and use CLI mode. Useful for debugging with console logs.",
+        "--json",
+        help="Output response as JSON object (for automation/scripting).",
+    ),
+    plain: bool = typer.Option(
+        False,
+        "--plain",
+        help="Output plain text without Rich formatting.",
+    ),
+    code_only: bool = typer.Option(
+        False,
+        "--code-only",
+        help="Extract and output only code blocks from response.",
+    ),
+    stdin: bool = typer.Option(
+        False,
+        "--stdin",
+        help="Read input from stdin (supports multi-line).",
+    ),
+    quiet: bool = typer.Option(
+        False,
+        "--quiet",
+        "-q",
+        help="Suppress status messages (only output response).",
+    ),
+    input_file: Optional[str] = typer.Option(
+        None,
+        "--input-file",
+        "-f",
+        help="Read input from file instead of argument.",
+    ),
+    preindex: bool = typer.Option(
+        False,
+        "--preindex",
+        help="Preload semantic code index at startup (avoids 20-30s delay on first search).",
     ),
 ) -> None:
     """Start interactive chat or send a one-shot message.
 
-    By default, Victor uses a modern TUI (Text User Interface) for interactive mode.
-    Use --no-tui or --cli to switch to classic CLI mode with console log output.
+    For automation/scripting, use --json, --plain, or --code-only to get
+    machine-parseable output.
 
     Examples:
-        # Interactive TUI mode (default)
+        # Interactive CLI mode (default)
         victor chat
 
-        # CLI mode with debug logging (for debugging)
-        victor chat --no-tui --log-level DEBUG
+        # CLI mode with debug logging
+        victor chat --log-level DEBUG
 
         # One-shot command
         victor chat "Write a Python function to calculate Fibonacci numbers"
@@ -364,10 +361,32 @@ def chat(
 
         # Enable thinking mode (shows reasoning process)
         victor chat --thinking "Explain the best way to implement a caching layer"
+
+        # Automation: JSON output for scripting
+        victor chat --json "What is 2+2?"
+
+        # Automation: Extract only code blocks
+        victor chat --code-only "Write a function to check if a number is prime"
+
+        # Automation: Read multi-line prompt from stdin
+        echo "Write a Python function" | victor chat --stdin --code-only
+
+        # Automation: Read prompt from file
+        victor chat --input-file prompt.txt --json
+
+        # Pipeline: quiet mode (no status messages)
+        victor chat -q --plain "Summarize this" | head -10
     """
+    # Import output formatter
+    from victor.ui.output_formatter import InputReader, create_formatter
+
+    # Determine if this is automation mode (non-interactive output)
+    automation_mode = json_output or plain or code_only
+
     # Configure logging based on CLI argument or environment variable
     if log_level is None:
-        log_level = os.getenv("VICTOR_LOG_LEVEL", "INFO")
+        # Use ERROR level for automation, WARNING for interactive to reduce clutter
+        log_level = os.getenv("VICTOR_LOG_LEVEL", "ERROR" if automation_mode else "WARNING")
 
     log_level = log_level.upper()
     valid_levels = ["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"]
@@ -382,23 +401,34 @@ def chat(
     if log_level == "WARN":
         log_level = "WARNING"
 
-    # Configure logging based on mode
-    # TUI mode: log to file at WARNING level by default (unless overridden)
-    # CLI mode: log to console at specified level
-    if not no_tui and not message:
-        # TUI mode - use file-based logging to avoid cluttering the UI
-        _configure_tui_logging()
-    else:
-        # CLI/one-shot mode - log to console
-        logging.basicConfig(
-            level=getattr(logging, log_level),
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            force=True,  # Override any existing configuration
-        )
-        # Silence noisy third-party loggers
-        from victor.agent.debug_logger import configure_logging_levels
+    # Configure logging - log to stderr for automation compatibility
+    log_stream = sys.stderr if automation_mode else None
+    logging.basicConfig(
+        level=getattr(logging, log_level),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        force=True,  # Override any existing configuration
+        stream=log_stream,
+    )
+    # Silence noisy third-party loggers
+    from victor.agent.debug_logger import configure_logging_levels
 
-        configure_logging_levels(log_level)
+    configure_logging_levels(log_level)
+
+    # Create output formatter based on flags
+    formatter = create_formatter(
+        json_mode=json_output,
+        plain=plain,
+        code_only=code_only,
+        quiet=quiet,
+        stream=stream and not json_output,  # Don't stream for JSON mode
+    )
+
+    # Read input from various sources
+    actual_message = InputReader.read_message(
+        argument=message,
+        from_stdin=stdin,
+        input_file=input_file,
+    )
 
     # Load settings
     settings = load_settings()
@@ -406,12 +436,28 @@ def chat(
     # Set up safety confirmation callbacks for dangerous operations
     _setup_safety_confirmation()
 
-    if message:
+    if actual_message:
         # One-shot mode
-        asyncio.run(run_oneshot(message, settings, profile, stream, thinking))
+        asyncio.run(
+            run_oneshot(
+                actual_message,
+                settings,
+                profile,
+                stream and not json_output,  # Don't stream for JSON
+                thinking,
+                formatter=formatter,
+                preindex=preindex,
+            )
+        )
+    elif stdin or input_file:
+        # --stdin or --input-file was specified but no input received
+        formatter.error("No input received from stdin or file")
+        raise typer.Exit(1)
     else:
-        # Interactive mode (TUI by default, CLI with --no-tui)
-        asyncio.run(run_interactive(settings, profile, stream, thinking, force_cli=no_tui))
+        # Interactive CLI mode
+        asyncio.run(
+            run_interactive(settings, profile, stream, thinking, preindex=preindex)
+        )
 
 
 async def run_oneshot(
@@ -420,6 +466,8 @@ async def run_oneshot(
     profile: str,
     stream: bool,
     thinking: bool = False,
+    formatter: Optional[Any] = None,
+    preindex: bool = False,
 ) -> None:
     """Run a single message and exit.
 
@@ -429,7 +477,18 @@ async def run_oneshot(
         profile: Profile name
         stream: Whether to stream response
         thinking: Whether to enable thinking mode
+        formatter: Optional OutputFormatter for automation-friendly output
+        preindex: Whether to preload semantic code index upfront
     """
+    from victor.ui.output_formatter import OutputFormatter, OutputMode, create_formatter
+
+    # Use provided formatter or create default
+    if formatter is None:
+        formatter = create_formatter()
+
+    # Set one-shot mode in settings (orchestrator reads this to auto-continue on ASKING_INPUT)
+    settings.one_shot_mode = True
+
     try:
         # Create agent with thinking mode if requested
         agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
@@ -440,22 +499,73 @@ async def run_oneshot(
         # Check codebase index at startup (silent - only log if changes)
         await _check_codebase_index(os.getcwd(), console, silent=True)
 
+        # Preload semantic code index if requested (avoids delay on first search)
+        if preindex:
+            await _preload_semantic_index(os.getcwd(), settings, console)
+
         # Start background embedding preload to avoid blocking first query
         agent.start_embedding_preload()
 
+        content_buffer = ""
+        usage_stats = None
+        model_name = None
+
         if stream and agent.provider.supports_streaming():
+            # Start live markdown rendering (RICH mode only)
+            formatter.start_streaming()
             async for chunk in agent.stream_chat(message):
-                if chunk.content:
-                    console.print(chunk.content, end="")
-            console.print()  # New line at end
+                # Handle status messages separately (tool status, thinking indicator)
+                if chunk.metadata and "status" in chunk.metadata:
+                    # Temporarily pause live rendering to show status
+                    formatter.end_streaming()
+                    formatter.status(chunk.metadata["status"])
+                    formatter.start_streaming()
+                elif chunk.metadata and "file_preview" in chunk.metadata:
+                    # Show file content preview (like Claude Code)
+                    formatter.end_streaming()
+                    path = chunk.metadata.get("path", "")
+                    preview = chunk.metadata["file_preview"]
+                    # Display as a code block with syntax highlighting
+                    from rich.syntax import Syntax
+                    from rich.panel import Panel
+                    ext = path.split(".")[-1] if "." in path else "txt"
+                    syntax = Syntax(preview, ext, theme="monokai", line_numbers=False)
+                    console.print(Panel(syntax, title=f"[dim]{path}[/]", border_style="dim"))
+                    formatter.start_streaming()
+                elif chunk.metadata and "edit_preview" in chunk.metadata:
+                    # Show edit diff preview
+                    formatter.end_streaming()
+                    path = chunk.metadata.get("path", "")
+                    preview = chunk.metadata["edit_preview"]
+                    console.print(f"[dim]{path}:[/]")
+                    for line in preview.split("\n"):
+                        if line.startswith("-"):
+                            console.print(f"[red]{line}[/]")
+                        elif line.startswith("+"):
+                            console.print(f"[green]{line}[/]")
+                        else:
+                            console.print(f"[dim]{line}[/]")
+                    formatter.start_streaming()
+                elif chunk.content:
+                    formatter.stream_chunk(chunk.content)
+                    content_buffer += chunk.content
+            # Finalize response (also ends streaming)
+            formatter.response(content=content_buffer)
         else:
             response = await agent.chat(message)
-            console.print(Markdown(response.content))
+            content_buffer = response.content
+            usage_stats = response.usage
+            model_name = response.model
+            formatter.response(
+                content=content_buffer,
+                usage=usage_stats,
+                model=model_name,
+            )
 
         await agent.provider.close()
 
     except Exception as e:
-        console.print(f"[bold red]Error:[/] {str(e)}")
+        formatter.error(str(e))
         raise typer.Exit(1)
 
 
@@ -464,16 +574,16 @@ async def run_interactive(
     profile: str,
     stream: bool,
     thinking: bool = False,
-    force_cli: bool = False,
+    preindex: bool = False,
 ) -> None:
-    """Run interactive mode (TUI or CLI fallback).
+    """Run interactive CLI mode.
 
     Args:
         settings: Application settings
         profile: Profile name
-        stream: Whether to stream responses (used in TUI)
+        stream: Whether to stream responses
         thinking: Whether to enable thinking mode
-        force_cli: Force CLI mode even if TUI is available
+        preindex: Whether to preload semantic code index upfront
     """
     agent = None
     try:
@@ -499,44 +609,18 @@ async def run_interactive(
         # Check codebase index at startup (show output in interactive mode)
         await _check_codebase_index(os.getcwd(), console, silent=False)
 
+        # Preload semantic code index if requested (avoids delay on first search)
+        if preindex:
+            await _preload_semantic_index(os.getcwd(), settings, console)
+
         # Start background embedding preload to avoid blocking first query
         agent.start_embedding_preload()
 
         # Initialize slash command handler
         cmd_handler = SlashCommandHandler(console, settings, agent)
 
-        # Check if TUI is supported
-        tui_compatible, tui_reason = _check_tui_compatibility()
-
-        if force_cli or not tui_compatible:
-            if not force_cli and tui_reason:
-                console.print(
-                    Panel(
-                        f"[yellow]TUI mode unavailable:[/] {tui_reason}\n\n"
-                        "[dim]Falling back to CLI mode. For full TUI experience:[/]\n"
-                        "  - Use a modern terminal (iTerm2, Windows Terminal, etc.)\n"
-                        "  - Ensure terminal size is at least 40x10\n"
-                        "  - Run in an interactive shell (not piped)\n\n"
-                        "[dim]You can also use:[/]\n"
-                        '  [cyan]victor chat "your message"[/] for one-shot queries',
-                        title="Victor - CLI Mode",
-                        border_style="yellow",
-                    )
-                )
-            # Run CLI fallback mode
-            await _run_cli_repl(agent, settings, cmd_handler, profile_config, stream)
-        else:
-            # Run full TUI mode
-            from victor.ui.tui import VictorApp
-
-            app = VictorApp(
-                agent=agent,
-                settings=settings,
-                cmd_handler=cmd_handler,
-                provider=profile_config.provider,
-                model=profile_config.model,
-            )
-            await app.run_async()
+        # Run CLI REPL
+        await _run_cli_repl(agent, settings, cmd_handler, profile_config, stream)
 
     except Exception as e:
         console.print(f"[bold red]Error:[/] {str(e)}")
@@ -605,13 +689,68 @@ async def _run_cli_repl(
             console.print("[blue]Assistant:[/]")
 
             if stream:
-                # Stream the response
+                from victor.agent.response_sanitizer import sanitize_response
+
+                # Stream the response with live markdown rendering
                 content_buffer = ""
-                async for chunk in agent.stream_chat(user_input):
-                    if chunk.content:
-                        console.print(chunk.content, end="")
-                        content_buffer += chunk.content
-                console.print()  # Newline after streaming
+                live_display = None
+                try:
+                    live_display = Live(Markdown(""), console=console, refresh_per_second=10)
+                    live_display.start()
+
+                    async for chunk in agent.stream_chat(user_input):
+                        # Handle status messages separately (tool status, thinking indicator)
+                        if chunk.metadata and "status" in chunk.metadata:
+                            live_display.stop()
+                            console.print(f"[dim]{chunk.metadata['status']}[/]")
+                            live_display = Live(
+                                Markdown(content_buffer), console=console, refresh_per_second=10
+                            )
+                            live_display.start()
+                        elif chunk.metadata and "file_preview" in chunk.metadata:
+                            # Show file content preview (like Claude Code)
+                            live_display.stop()
+                            path = chunk.metadata.get("path", "")
+                            preview = chunk.metadata["file_preview"]
+                            from rich.syntax import Syntax
+                            from rich.panel import Panel
+                            ext = path.split(".")[-1] if "." in path else "txt"
+                            syntax = Syntax(preview, ext, theme="monokai", line_numbers=False)
+                            console.print(Panel(syntax, title=f"[dim]{path}[/]", border_style="dim"))
+                            live_display = Live(
+                                Markdown(content_buffer), console=console, refresh_per_second=10
+                            )
+                            live_display.start()
+                        elif chunk.metadata and "edit_preview" in chunk.metadata:
+                            # Show edit diff preview
+                            live_display.stop()
+                            path = chunk.metadata.get("path", "")
+                            preview = chunk.metadata["edit_preview"]
+                            console.print(f"[dim]{path}:[/]")
+                            for line in preview.split("\n"):
+                                if line.startswith("-"):
+                                    console.print(f"[red]{line}[/]")
+                                elif line.startswith("+"):
+                                    console.print(f"[green]{line}[/]")
+                                else:
+                                    console.print(f"[dim]{line}[/]")
+                            live_display = Live(
+                                Markdown(content_buffer), console=console, refresh_per_second=10
+                            )
+                            live_display.start()
+                        elif chunk.content:
+                            # Accumulate raw content - don't sanitize per-chunk
+                            # as that strips whitespace-only chunks (spaces between words)
+                            content_buffer += chunk.content
+                            # Update live display with accumulated markdown
+                            live_display.update(Markdown(content_buffer))
+                finally:
+                    if live_display:
+                        live_display.stop()
+
+                # Sanitize the full response once streaming is complete
+                # This removes thinking tokens and artifacts without losing spaces
+                content_buffer = sanitize_response(content_buffer)
             else:
                 # Non-streaming response
                 response = await agent.chat(user_input)
@@ -626,6 +765,68 @@ async def _run_cli_repl(
         except Exception as e:
             console.print(f"[red]Error:[/] {e}")
             logger.exception("Error in CLI REPL")
+
+
+@app.command()
+def index(
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Force rebuild index even if up-to-date",
+    ),
+    path: str = typer.Option(
+        ".",
+        "--path",
+        "-p",
+        help="Path to codebase root directory",
+    ),
+) -> None:
+    """Build semantic code search index for the codebase.
+
+    This command builds vector embeddings for semantic_code_search,
+    eliminating the 20-30 second delay on first search.
+
+    The index is stored in {codebase}/.victor/embeddings/ and is
+    automatically updated on subsequent runs if files changed.
+
+    Examples:
+        # Build index for current directory
+        victor index
+
+        # Force rebuild
+        victor index --force
+
+        # Build for specific path
+        victor index --path /path/to/project
+    """
+    import time
+
+    settings = load_settings()
+    cwd = os.path.abspath(path)
+
+    if not os.path.isdir(cwd):
+        console.print(f"[red]Error:[/] Path '{path}' is not a directory")
+        raise typer.Exit(1)
+
+    console.print(f"[dim]Indexing codebase at: {cwd}[/]")
+
+    async def _build_index() -> bool:
+        return await _preload_semantic_index(cwd, settings, console, force=force)
+
+    start_time = time.time()
+    success = asyncio.run(_build_index())
+    elapsed = time.time() - start_time
+
+    if success:
+        console.print(f"\n[green]✓ Indexing complete in {elapsed:.1f}s[/]")
+        console.print(
+            "[dim]Run [cyan]victor chat --preindex[/cyan] to use pre-loaded index, "
+            "or index will load from disk on first semantic search.[/]"
+        )
+    else:
+        console.print(f"\n[red]✗ Indexing failed[/]")
+        raise typer.Exit(1)
 
 
 @app.command(name="config-validate")
@@ -858,17 +1059,42 @@ async def _check_connectivity(settings: Any, profiles: dict, verbose: bool) -> N
 
 
 @app.command()
-def init() -> None:
-    """Initialize configuration files."""
-    from victor.config.settings import get_project_paths
+def init(
+    update: bool = typer.Option(False, "--update", "-u", help="Update existing init.md preserving user edits"),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing init.md completely"),
+    learn: bool = typer.Option(False, "--learn", "-L", help="Enhance with conversation history insights"),
+    index: bool = typer.Option(False, "--index", "-i", help="Use SQLite symbol store for multi-language analysis"),
+    deep: bool = typer.Option(False, "--deep", "-d", help="Use LLM for deep analysis (any language)"),
+    symlinks: bool = typer.Option(False, "--symlinks", "-l", help="Create CLAUDE.md and other tool aliases"),
+    config_only: bool = typer.Option(False, "--config", "-c", help="Only setup global config, skip project analysis"),
+) -> None:
+    """Initialize project context and configuration.
 
-    config_dir = get_project_paths().global_victor_dir
+    This command does two things:
+    1. Creates global config files (~/.victor/profiles.yaml) if missing
+    2. Analyzes your codebase and creates .victor/init.md (like CLAUDE.md)
+
+    Examples:
+        victor init              # Full initialization (config + project analysis)
+        victor init --update     # Update analysis, preserve user edits
+        victor init --force      # Regenerate init.md completely
+        victor init --learn      # Include conversation history insights
+        victor init --index      # Multi-language symbol indexing
+        victor init --deep       # Use LLM for comprehensive analysis
+        victor init --symlinks   # Also create CLAUDE.md symlink
+        victor init --config     # Only setup global config
+    """
+    from victor.config.settings import get_project_paths, VICTOR_CONTEXT_FILE, VICTOR_DIR_NAME
+
+    paths = get_project_paths()
+
+    # Step 1: Global config setup
+    config_dir = paths.global_victor_dir
     config_dir.mkdir(parents=True, exist_ok=True)
 
-    # Copy example profiles if they don't exist
     profiles_file = config_dir / "profiles.yaml"
     if not profiles_file.exists():
-        console.print(f"Creating default configuration at {profiles_file}")
+        console.print(f"[dim]Creating default configuration at {profiles_file}[/]")
 
         # Create a basic default profile
         default_config = """profiles:
@@ -883,12 +1109,624 @@ providers:
     base_url: http://localhost:11434
 """
         profiles_file.write_text(default_config)
-        console.print("[green]✓[/] Configuration created successfully!")
+        console.print(f"[green]✓[/] Global config created at {config_dir}")
     else:
-        console.print("[yellow]Configuration already exists[/]")
+        console.print(f"[dim]Global config exists at {config_dir}[/]")
 
-    console.print(f"\nConfiguration directory: {config_dir}")
-    console.print(f"Edit {profiles_file} to customize profiles")
+    if config_only:
+        console.print(f"\nEdit {profiles_file} to customize profiles")
+        return
+
+    # Step 2: Project codebase analysis
+    console.print("")
+    target_path = paths.project_context_file
+    paths.project_victor_dir.mkdir(parents=True, exist_ok=True)
+
+    existing_content = None
+    if target_path.exists():
+        existing_content = target_path.read_text(encoding="utf-8")
+
+        if not force and not update:
+            console.print(f"[yellow]{VICTOR_CONTEXT_FILE} already exists at {target_path}[/]")
+            console.print("")
+            console.print("[bold]Options:[/]")
+            console.print("  [cyan]victor init --update[/]   Merge new analysis (preserves your edits)")
+            console.print("  [cyan]victor init --force[/]    Overwrite completely")
+            console.print("  [cyan]victor init --learn[/]    Enhance with conversation history insights")
+            console.print("  [cyan]victor init --index[/]    Multi-language symbol indexing")
+            console.print("  [cyan]victor init --deep[/]     LLM-powered deep analysis")
+            return
+
+    if deep:
+        console.print("[yellow]--deep requires an interactive session. Use 'victor' then '/init --deep'[/]")
+        console.print("[dim]Running quick analysis instead...[/]")
+
+    # Determine analysis mode
+    if learn:
+        console.print("[dim]Analyzing codebase + learning from conversation history...[/]")
+    elif index:
+        console.print("[dim]Indexing codebase (multi-language symbol analysis)...[/]")
+    else:
+        console.print("[dim]Analyzing codebase (quick mode)...[/]")
+
+    try:
+        import asyncio
+
+        if learn:
+            # Use SymbolStore + conversation history insights
+            from victor.context.codebase_analyzer import generate_enhanced_init_md
+            new_content = asyncio.run(generate_enhanced_init_md())
+        elif index:
+            # Use SymbolStore for accurate multi-language symbol extraction
+            from victor.context.codebase_analyzer import generate_victor_md_from_index
+            new_content = asyncio.run(generate_victor_md_from_index())
+        else:
+            # Quick regex-based analysis
+            from victor.context.codebase_analyzer import generate_smart_victor_md
+            new_content = generate_smart_victor_md()
+
+        # Handle update mode
+        if update and existing_content:
+            # Import merge function from slash commands
+            from victor.ui.slash_commands import SlashCommandHandler
+            handler = SlashCommandHandler(console, None)
+            content = handler._merge_init_content(existing_content, new_content)
+            console.print("[dim]  Merged with existing content[/]")
+        else:
+            content = new_content
+
+        # Write the file
+        target_path.write_text(content, encoding="utf-8")
+        console.print(f"[green]✓[/] Created {target_path}")
+
+        # Show what was detected
+        component_count = content.count("| `")
+        pattern_count = content.count(". **") + content.count("Pattern:")
+        console.print(f"[dim]  - Detected {component_count} key components[/]")
+        console.print(f"[dim]  - Found {pattern_count} architecture patterns[/]")
+
+        # Create symlinks if requested
+        if symlinks:
+            from victor.context.codebase_analyzer import (
+                CONTEXT_FILE_ALIASES,
+                create_context_symlinks,
+            )
+
+            console.print("\n[dim]Creating symlinks for other AI tools...[/]")
+            results = create_context_symlinks()
+
+            for alias, status in results.items():
+                tool_name = CONTEXT_FILE_ALIASES.get(alias, "Unknown")
+                if status == "created":
+                    console.print(f"  [green]✓[/] {alias} -> {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE} ({tool_name})")
+                elif status == "exists":
+                    console.print(f"  [dim]○[/] {alias} (already linked)")
+                elif status == "exists_file":
+                    console.print(f"  [yellow]![/] {alias} (file exists, not a symlink)")
+
+        console.print(f"\n[dim]Review and customize {target_path} as needed.[/]")
+
+    except Exception as e:
+        console.print(f"[red]Failed to create {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}:[/] {e}")
+        import traceback
+        traceback.print_exc()
+
+
+@app.command()
+def keys(
+    setup: bool = typer.Option(False, "--setup", "-s", help="Create API keys template file"),
+    list_keys: bool = typer.Option(False, "--list", "-l", help="List configured providers"),
+    provider: Optional[str] = typer.Option(None, "--set", help="Set API key for a provider"),
+    keyring: bool = typer.Option(False, "--keyring", "-k", help="Store key in system keyring (secure)"),
+    migrate: bool = typer.Option(False, "--migrate", help="Migrate keys from file to keyring"),
+    delete_keyring: Optional[str] = typer.Option(None, "--delete-keyring", help="Delete key from keyring"),
+) -> None:
+    """Manage API keys for cloud providers.
+
+    API keys can be stored in:
+    - System keyring (recommended - encrypted storage)
+    - File (~/.victor/api_keys.yaml)
+    - Environment variables
+
+    Keyring Support by Platform:
+    - macOS: Keychain (built-in)
+    - Windows: Credential Manager (built-in)
+    - Linux: Secret Service (GNOME Keyring, KWallet)
+    - iOS/Android: Not directly supported (use env vars)
+
+    Examples:
+        victor keys --setup                  # Create template file
+        victor keys --list                   # Show configured providers
+        victor keys --set anthropic          # Set key in file
+        victor keys --set anthropic --keyring  # Set key in keyring (secure)
+        victor keys --migrate                # Migrate all keys to keyring
+        victor keys --delete-keyring openai  # Remove key from keyring
+    """
+    from victor.config.api_keys import (
+        APIKeyManager,
+        get_configured_providers,
+        create_api_keys_template,
+        DEFAULT_KEYS_FILE,
+        PROVIDER_ENV_VARS,
+        is_keyring_available,
+        _get_key_from_keyring,
+        _set_key_in_keyring,
+        _delete_key_from_keyring,
+    )
+    from rich.table import Table
+    import platform
+
+    manager = APIKeyManager()
+
+    # Show keyring platform info
+    def get_keyring_info() -> tuple[str, str]:
+        """Get keyring backend and platform info."""
+        system = platform.system()
+        if system == "Darwin":
+            return "macOS Keychain", "[green]Supported[/]"
+        elif system == "Windows":
+            return "Windows Credential Manager", "[green]Supported[/]"
+        elif system == "Linux":
+            return "Secret Service (GNOME Keyring/KWallet)", "[green]Supported[/]"
+        else:
+            return "Unknown", "[yellow]May not be supported[/]"
+
+    if delete_keyring:
+        # Delete key from keyring
+        provider_name = delete_keyring.lower()
+        if not is_keyring_available():
+            console.print("[red]Keyring not available.[/] Install with: pip install keyring")
+            raise typer.Exit(1)
+
+        if _delete_key_from_keyring(provider_name):
+            console.print(f"[green]✓[/] Deleted [cyan]{provider_name}[/] from keyring")
+        else:
+            console.print(f"[yellow]Key for {provider_name} not found in keyring[/]")
+        return
+
+    if migrate:
+        # Migrate keys from file to keyring
+        if not is_keyring_available():
+            console.print("[red]Keyring not available.[/] Install with: pip install keyring")
+            console.print("\n[dim]Platform requirements:[/]")
+            console.print("  macOS: Built-in Keychain support")
+            console.print("  Windows: Built-in Credential Manager")
+            console.print("  Linux: Install gnome-keyring or kwallet")
+            raise typer.Exit(1)
+
+        backend_name, status = get_keyring_info()
+        console.print(f"[cyan]Keyring backend:[/] {backend_name} {status}")
+        console.print()
+
+        if not DEFAULT_KEYS_FILE.exists():
+            console.print(f"[yellow]No keys file found at {DEFAULT_KEYS_FILE}[/]")
+            raise typer.Exit(1)
+
+        # Load keys from file
+        import yaml
+        with open(DEFAULT_KEYS_FILE) as f:
+            data = yaml.safe_load(f) or {}
+
+        api_keys = data.get("api_keys", data)
+        migrated = 0
+        failed = 0
+
+        for prov, key in api_keys.items():
+            if key and not key.startswith("your_"):
+                if _set_key_in_keyring(prov, key):
+                    console.print(f"  [green]✓[/] Migrated [cyan]{prov}[/]")
+                    migrated += 1
+                else:
+                    console.print(f"  [red]✗[/] Failed: [cyan]{prov}[/]")
+                    failed += 1
+
+        console.print()
+        console.print(f"[green]Migrated {migrated} keys to keyring[/]")
+        if failed:
+            console.print(f"[red]Failed to migrate {failed} keys[/]")
+
+        if migrated > 0:
+            console.print()
+            console.print("[yellow]Security recommendation:[/]")
+            console.print(f"  Delete the file: rm {DEFAULT_KEYS_FILE}")
+            console.print("  Keys are now stored securely in system keyring")
+        return
+
+    if setup:
+        # Create template file
+        if DEFAULT_KEYS_FILE.exists():
+            if not Confirm.ask(f"[yellow]{DEFAULT_KEYS_FILE} already exists. Overwrite?[/]"):
+                console.print("[dim]Cancelled[/]")
+                return
+
+        DEFAULT_KEYS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        template = create_api_keys_template()
+        DEFAULT_KEYS_FILE.write_text(template)
+
+        # Set secure permissions
+        import os
+
+        os.chmod(DEFAULT_KEYS_FILE, 0o600)
+
+        console.print(f"[green]✓[/] Created API keys template at [cyan]{DEFAULT_KEYS_FILE}[/]")
+        console.print("\n[yellow]Next steps:[/]")
+        console.print(f"  1. Edit [cyan]{DEFAULT_KEYS_FILE}[/]")
+        console.print("  2. Replace placeholder values with your actual API keys")
+        console.print("  3. File permissions already set to 0600 (owner-only)")
+        console.print()
+        console.print("[dim]Or use keyring for more secure storage:[/]")
+        console.print("  victor keys --set anthropic --keyring")
+        return
+
+    if provider:
+        # Set API key for a provider
+        provider = provider.lower()
+        if provider not in PROVIDER_ENV_VARS:
+            console.print(f"[red]Unknown provider:[/] {provider}")
+            console.print(f"Valid providers: {', '.join(sorted(PROVIDER_ENV_VARS.keys()))}")
+            raise typer.Exit(1)
+
+        # Check keyring availability if requested
+        if keyring and not is_keyring_available():
+            console.print("[red]Keyring not available.[/] Install with: pip install keyring")
+            console.print("[dim]Falling back to file storage...[/]")
+            keyring = False
+
+        storage_type = "keyring" if keyring else "file"
+        console.print(f"[cyan]Setting API key for {provider}[/] (storage: {storage_type})")
+        console.print("[dim]Paste your API key (input hidden):[/]")
+
+        import getpass
+
+        key = getpass.getpass("")
+
+        if not key.strip():
+            console.print("[red]No key provided. Cancelled.[/]")
+            raise typer.Exit(1)
+
+        if manager.set_key(provider, key.strip(), use_keyring=keyring):
+            location = "system keyring" if keyring else str(DEFAULT_KEYS_FILE)
+            console.print(f"[green]✓[/] API key for [cyan]{provider}[/] saved to {location}")
+        else:
+            console.print("[red]Failed to save API key[/]")
+            raise typer.Exit(1)
+        return
+
+    # Default: list configured providers with source info
+    configured = get_configured_providers()
+
+    table = Table(title="API Keys Status", show_header=True)
+    table.add_column("Provider", style="cyan")
+    table.add_column("Status")
+    table.add_column("Source")
+    table.add_column("Env Var")
+
+    provider_models = {
+        "anthropic": "claude-3-opus, claude-sonnet-4",
+        "openai": "gpt-4o, gpt-4-turbo",
+        "google": "gemini-2.0-flash-exp, gemini-1.5-pro",
+        "xai": "grok-beta, grok-2",
+        "moonshot": "kimi-k2-thinking, kimi-k2-instruct",
+        "deepseek": "deepseek-chat, deepseek-reasoner",
+    }
+
+    import os
+    for prov, env_var in sorted(PROVIDER_ENV_VARS.items()):
+        if prov in ("kimi",):  # Skip aliases
+            continue
+
+        # Determine source
+        source = "[dim]--[/]"
+        if os.environ.get(env_var):
+            source = "[green]env[/]"
+        elif is_keyring_available() and _get_key_from_keyring(prov):
+            source = "[blue]keyring[/]"
+        elif prov in configured:
+            source = "[yellow]file[/]"
+
+        status = "[green]✓ Configured[/]" if prov in configured else "[dim]Not set[/]"
+        table.add_row(prov, status, source, env_var)
+
+    console.print(table)
+
+    # Show keyring status
+    console.print()
+    backend_name, status = get_keyring_info()
+    keyring_status = "[green]✓ Available[/]" if is_keyring_available() else "[yellow]Not installed[/]"
+    console.print(f"[dim]Keyring:[/] {backend_name} {keyring_status}")
+    console.print(f"[dim]Keys file:[/] {DEFAULT_KEYS_FILE}")
+
+    if not configured:
+        console.print()
+        console.print("[yellow]No API keys configured.[/]")
+        console.print("  [cyan]victor keys --setup[/]          Create template file")
+        console.print("  [cyan]victor keys --set anthropic --keyring[/]  Store in keyring (secure)")
+
+
+@app.command()
+def security(
+    status: bool = typer.Option(True, "--status", "-s", help="Show security status"),
+    trust_plugin: Optional[str] = typer.Option(None, "--trust-plugin", help="Trust a plugin by path"),
+    untrust_plugin: Optional[str] = typer.Option(None, "--untrust-plugin", help="Remove plugin from trust store"),
+    list_plugins: bool = typer.Option(False, "--list-plugins", "-l", help="List trusted plugins"),
+    verify_cache: bool = typer.Option(False, "--verify-cache", help="Verify embedding cache integrity"),
+    verify_all: bool = typer.Option(False, "--verify-all", "-a", help="Run comprehensive security verification"),
+) -> None:
+    """Security status and plugin trust management.
+
+    View security posture and manage trusted plugins.
+
+    Examples:
+        victor security                    # Show security status
+        victor security --verify-all       # Comprehensive security check
+        victor security --verify-cache     # Verify cache integrity
+        victor security --trust-plugin ./my_plugin
+        victor security --list-plugins
+    """
+    from victor.config.secure_paths import (
+        get_security_status,
+        trust_plugin as do_trust_plugin,
+        untrust_plugin as do_untrust_plugin,
+        list_trusted_plugins,
+        verify_cache_integrity,
+        get_victor_dir,
+        create_cache_manifest,
+        get_sandbox_summary,
+        validate_victor_dir_name,
+        get_secure_home,
+        get_secure_xdg_config_home,
+        get_secure_xdg_data_home,
+    )
+    from victor.config.api_keys import is_keyring_available, get_configured_providers
+    from rich.table import Table
+    from rich.panel import Panel
+
+    if trust_plugin:
+        # Trust a plugin
+        plugin_path = Path(trust_plugin).expanduser().resolve()
+        if not plugin_path.exists():
+            console.print(f"[red]Plugin not found:[/] {plugin_path}")
+            raise typer.Exit(1)
+
+        if do_trust_plugin(plugin_path):
+            console.print(f"[green]✓[/] Trusted plugin: [cyan]{plugin_path.name}[/]")
+        else:
+            console.print("[red]Failed to trust plugin[/]")
+            raise typer.Exit(1)
+        return
+
+    if untrust_plugin:
+        # Untrust a plugin
+        if do_untrust_plugin(untrust_plugin):
+            console.print(f"[green]✓[/] Removed [cyan]{untrust_plugin}[/] from trust store")
+        else:
+            console.print(f"[yellow]Plugin {untrust_plugin} not found in trust store[/]")
+        return
+
+    if list_plugins:
+        # List trusted plugins
+        plugins = list_trusted_plugins()
+        if not plugins:
+            console.print("[dim]No trusted plugins[/]")
+            return
+
+        table = Table(title="Trusted Plugins", show_header=True)
+        table.add_column("Name", style="cyan")
+        table.add_column("Hash (truncated)")
+        table.add_column("Path")
+
+        for plugin in plugins:
+            table.add_row(
+                plugin["name"],
+                plugin.get("hash", "")[:16] + "...",
+                plugin.get("path", "")
+            )
+
+        console.print(table)
+        return
+
+    if verify_cache:
+        # Verify cache integrity
+        embeddings_dir = get_victor_dir() / "embeddings"
+        if not embeddings_dir.exists():
+            console.print("[dim]No embeddings cache found[/]")
+            return
+
+        console.print("[cyan]Verifying cache integrity...[/]")
+        is_valid, tampered = verify_cache_integrity(embeddings_dir)
+
+        if is_valid:
+            console.print("[green]✓ Cache integrity verified[/]")
+        else:
+            console.print("[red]✗ Cache integrity check failed![/]")
+            for file in tampered[:5]:
+                console.print(f"  [red]Tampered:[/] {file}")
+            if len(tampered) > 5:
+                console.print(f"  ... and {len(tampered) - 5} more")
+
+        # Offer to recreate manifest
+        if not is_valid:
+            if Confirm.ask("[yellow]Recreate manifest with current files?[/]"):
+                if create_cache_manifest(embeddings_dir):
+                    console.print("[green]✓ Manifest recreated[/]")
+                else:
+                    console.print("[red]Failed to recreate manifest[/]")
+        return
+
+    if verify_all:
+        # Comprehensive security verification
+        import os
+        console.print(Panel.fit("[bold cyan]Comprehensive Security Verification[/]"))
+        console.print()
+
+        all_passed = True
+        issues = []
+
+        # 1. HOME manipulation check
+        console.print("[cyan]1. Checking HOME environment validation...[/]")
+        secure_home = get_secure_home()
+        env_home = os.environ.get("HOME", "")
+        if str(secure_home) == env_home:
+            console.print("   [green]✓ HOME environment matches passwd database[/]")
+        else:
+            console.print(f"   [yellow]⚠ HOME differs: env={env_home}, passwd={secure_home}[/]")
+            issues.append("HOME environment may be manipulated")
+
+        # 2. VICTOR_DIR_NAME validation
+        console.print("[cyan]2. Checking VICTOR_DIR_NAME validation...[/]")
+        dir_name = os.environ.get("VICTOR_DIR_NAME", ".victor")
+        validated_name, is_safe = validate_victor_dir_name(dir_name)
+        if is_safe:
+            console.print(f"   [green]✓ VICTOR_DIR_NAME '{validated_name}' is valid[/]")
+        else:
+            console.print(f"   [red]✗ VICTOR_DIR_NAME blocked: {dir_name}[/]")
+            all_passed = False
+            issues.append(f"VICTOR_DIR_NAME contains path traversal: {dir_name}")
+
+        # 3. XDG path validation
+        console.print("[cyan]3. Checking XDG path validation...[/]")
+        xdg_config = get_secure_xdg_config_home()
+        xdg_data = get_secure_xdg_data_home()
+        console.print(f"   [green]✓ XDG_CONFIG_HOME: {xdg_config}[/]")
+        console.print(f"   [green]✓ XDG_DATA_HOME: {xdg_data}[/]")
+
+        # 4. Keyring availability
+        console.print("[cyan]4. Checking keyring availability...[/]")
+        if is_keyring_available():
+            console.print("   [green]✓ System keyring is available[/]")
+        else:
+            console.print("   [yellow]⚠ System keyring not available (install keyring package)[/]")
+            issues.append("Keyring not installed - API keys stored in plaintext file")
+
+        # 5. Cache integrity
+        console.print("[cyan]5. Checking cache integrity...[/]")
+        embeddings_dir = get_victor_dir() / "embeddings"
+        if embeddings_dir.exists():
+            is_valid, tampered = verify_cache_integrity(embeddings_dir)
+            if is_valid:
+                console.print("   [green]✓ Embeddings cache integrity verified[/]")
+            else:
+                console.print(f"   [red]✗ Cache integrity failed: {len(tampered)} tampered files[/]")
+                all_passed = False
+                issues.append(f"Cache tampering detected: {len(tampered)} files modified")
+        else:
+            console.print("   [dim]• No embeddings cache found[/]")
+
+        # 6. Plugin sandbox status
+        console.print("[cyan]6. Checking plugin sandbox configuration...[/]")
+        sandbox = get_sandbox_summary()
+        policy = sandbox["policy"]
+        console.print(f"   • Trust required: {'[green]Yes[/]' if policy['require_trust'] else '[yellow]No[/]'}")
+        console.print(f"   • Network allowed: {'[yellow]Yes[/]' if policy['allow_network'] else '[green]Restricted[/]'}")
+        console.print(f"   • Subprocess allowed: {'[yellow]Yes[/]' if policy['allow_subprocess'] else '[green]Restricted[/]'}")
+        console.print(f"   • Trusted plugins: {sandbox['trusted_plugins']['count']}")
+
+        # 7. API key source check
+        console.print("[cyan]7. Checking API key sources...[/]")
+        configured = get_configured_providers()
+        for provider in configured[:5]:
+            # Check source
+            env_var = os.environ.get(f"{provider.upper()}_API_KEY")
+            if env_var:
+                console.print(f"   • {provider}: [green]environment (secure)[/]")
+            else:
+                console.print(f"   • {provider}: [yellow]file-based[/]")
+        if len(configured) > 5:
+            console.print(f"   ... and {len(configured) - 5} more")
+
+        # Summary
+        console.print()
+        if all_passed and not issues:
+            console.print("[bold green]✓ All security checks passed![/]")
+        else:
+            console.print("[bold yellow]Security Issues Found:[/]")
+            for issue in issues:
+                console.print(f"  [red]•[/] {issue}")
+
+        return
+
+    # Default: show security status
+    sec_status = get_security_status()
+
+    # Platform info
+    console.print(Panel.fit(
+        f"[cyan]Platform:[/] {sec_status['platform']['system']} {sec_status['platform']['release']}",
+        title="Security Status"
+    ))
+
+    # Security checks table
+    table = Table(show_header=True)
+    table.add_column("Component", style="cyan")
+    table.add_column("Status")
+    table.add_column("Details")
+
+    # Home security
+    table.add_row(
+        "Home Validation",
+        "[green]✓ Secure[/]",
+        sec_status["home_security"]["secure_home"]
+    )
+
+    # Keyring
+    if sec_status["keyring"]["available"]:
+        table.add_row(
+            "System Keyring",
+            "[green]✓ Available[/]",
+            sec_status["keyring"]["backend"]
+        )
+    else:
+        table.add_row(
+            "System Keyring",
+            "[yellow]Not installed[/]",
+            "pip install keyring"
+        )
+
+    # API keys
+    configured = get_configured_providers()
+    table.add_row(
+        "API Keys",
+        f"[green]{len(configured)} configured[/]" if configured else "[dim]None[/]",
+        ", ".join(configured[:3]) + ("..." if len(configured) > 3 else "")
+    )
+
+    # Plugin trust
+    trusted_plugins = sec_status["plugins"]["trusted_count"]
+    table.add_row(
+        "Trusted Plugins",
+        f"[green]{trusted_plugins}[/]" if trusted_plugins else "[dim]None[/]",
+        f"{len(sec_status['plugins']['plugin_dirs'])} plugin dirs"
+    )
+
+    # Cache integrity
+    if sec_status["cache_integrity"]["embeddings_verified"]:
+        table.add_row(
+            "Cache Integrity",
+            "[green]✓ Verified[/]",
+            "Embeddings cache valid"
+        )
+    else:
+        table.add_row(
+            "Cache Integrity",
+            "[dim]Not verified[/]",
+            "Run --verify-cache"
+        )
+
+    console.print(table)
+
+    # Recommendations
+    recommendations = []
+    if not sec_status["keyring"]["available"]:
+        recommendations.append("Install keyring: [cyan]pip install keyring[/]")
+    if not configured:
+        recommendations.append("Configure API keys: [cyan]victor keys --setup[/]")
+    if not sec_status["cache_integrity"]["embeddings_verified"]:
+        recommendations.append("Verify cache: [cyan]victor security --verify-cache[/]")
+
+    if recommendations:
+        console.print()
+        console.print("[yellow]Recommendations:[/]")
+        for rec in recommendations:
+            console.print(f"  • {rec}")
 
 
 @app.command()
@@ -911,6 +1749,12 @@ def providers() -> None:
         "google": ("✅ Ready", "Gemini, 1M context, Multimodal"),
         "xai": ("✅ Ready", "Grok, Real-time info, Vision"),
         "grok": ("✅ Ready", "Alias for xai"),
+        "lmstudio": ("✅ Ready", "Local models via LMStudio"),
+        "vllm": ("✅ Ready", "High-throughput local inference"),
+        "moonshot": ("✅ Ready", "Kimi K2, 256K context, Reasoning"),
+        "kimi": ("✅ Ready", "Alias for moonshot"),
+        "deepseek": ("✅ Ready", "DeepSeek-V3, 128K, Cheap"),
+        "groqcloud": ("✅ Ready", "Ultra-fast LPU, Free tier, Tool calling"),
     }
 
     for provider in sorted(available_providers):
