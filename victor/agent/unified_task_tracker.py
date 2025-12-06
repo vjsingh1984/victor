@@ -618,6 +618,11 @@ class UnifiedTaskTracker:
         """
         return set(self._task_config.required_tools)
 
+    @property
+    def max_exploration_iterations(self) -> int:
+        """Get max exploration iterations for current task type."""
+        return self._task_config.max_exploration_iterations
+
     # =========================================================================
     # Recording
     # =========================================================================

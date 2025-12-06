@@ -71,12 +71,10 @@ from victor.agent.search_router import SearchRouter
 from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity, DEFAULT_BUDGETS
 from victor.agent.context_reminder import create_reminder_manager
 from victor.agent.stream_handler import StreamMetrics
-from victor.agent.milestone_monitor import TASK_CONFIGS
 from victor.agent.unified_task_tracker import (
     UnifiedTaskTracker,
     TaskType as UnifiedTaskType,
 )
-from victor.embeddings.task_classifier import TaskType as ClassifierTaskType
 
 # New decomposed components (facades for orchestrator responsibilities)
 from victor.agent.conversation_controller import (
@@ -213,26 +211,6 @@ class AgentOrchestrator:
         max_chars = int(context_tokens * 3.5 * 0.8)
         logger.info(f"Model context: {context_tokens:,} tokens -> {max_chars:,} chars limit")
         return max_chars
-
-    @staticmethod
-    def _map_unified_to_legacy_task_type(unified_type: "UnifiedTaskType") -> "ClassifierTaskType":
-        """Map UnifiedTaskTracker TaskType to task_classifier TaskType.
-
-        Both enums have the same string values, so we look up by value.
-        This maintains backward compatibility with TASK_CONFIGS.
-
-        Args:
-            unified_type: TaskType from UnifiedTaskTracker
-
-        Returns:
-            TaskType from task_classifier for TASK_CONFIGS lookup
-        """
-        # Map unified enum to classifier enum by matching string values
-        try:
-            return ClassifierTaskType(unified_type.value)
-        except ValueError:
-            # Fallback to GENERAL if the value doesn't exist in classifier enum
-            return ClassifierTaskType.GENERAL
 
     def __init__(
         self,
@@ -2247,19 +2225,16 @@ These are the actual search results. Reference only the files and matches shown 
 
         # Detect task type using unified tracker (single source of truth)
         unified_task_type = self.unified_tracker.detect_task_type(user_message)
-        # Map to legacy task type for backward compatibility with TASK_CONFIGS
-        task_type = self._map_unified_to_legacy_task_type(unified_task_type)
         logger.info(f"Task type detected: {unified_task_type.value}")
 
-        # Get exploration iterations from TASK_CONFIGS for this task type
-        task_config = TASK_CONFIGS.get(task_type)
-        max_exploration_iterations = task_config.max_exploration_iterations if task_config else 8
+        # Get exploration iterations from unified tracker (replaces TASK_CONFIGS lookup)
+        max_exploration_iterations = self.unified_tracker.max_exploration_iterations
 
         # Inject task-specific prompt hint for better guidance
-        task_hint = get_task_type_hint(task_type.value)
+        task_hint = get_task_type_hint(unified_task_type.value)
         if task_hint:
             self.add_message("system", task_hint.strip())
-            logger.debug(f"Injected task hint for task type: {task_type.value}")
+            logger.debug(f"Injected task hint for task type: {unified_task_type.value}")
 
         # Gap 1: Classify task complexity and adjust tool budget
         task_classification = self.task_classifier.classify(user_message)
@@ -2346,9 +2321,9 @@ These are the actual search results. Reference only the files and matches shown 
         if is_analysis_task:
             coarse_task_type = "analysis"
             # For compound analysis+edit tasks, unified_tracker handles exploration limits
-            if task_type.value in ("edit", "create"):
+            if unified_task_type.value in ("edit", "create"):
                 logger.info(
-                    f"Compound task detected (analysis+{task_type.value}): "
+                    f"Compound task detected (analysis+{unified_task_type.value}): "
                     f"unified_tracker will use appropriate exploration limits"
                 )
         elif is_action_task:
