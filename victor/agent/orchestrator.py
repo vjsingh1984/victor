@@ -2407,23 +2407,18 @@ These are the actual search results. Reference only the files and matches shown 
         # This handles compound prompts like "What are the components? Update the code"
         if is_analysis_task:
             loop_task_type = TaskType.ANALYSIS
-            # Also update milestone monitor for compound analysis+edit tasks
-            # Use the higher exploration limit to allow thorough exploration before action
+            # For compound analysis+edit tasks, unified_tracker handles exploration limits
             if task_type in (MilestoneTaskType.EDIT, MilestoneTaskType.CREATE):
-                # For compound tasks, override to GENERAL which has max_exploration=15
-                # This prevents forcing after only 3 iterations for EDIT
-                self.task_tracker.progress.task_type = MilestoneTaskType.GENERAL
                 logger.info(
                     f"Compound task detected (analysis+{task_type.value}): "
-                    f"overriding task_tracker to GENERAL (max_exploration=15)"
+                    f"unified_tracker will use appropriate exploration limits"
                 )
         elif is_action_task:
             loop_task_type = TaskType.ACTION
 
-        self.progress_tracker.task_type = loop_task_type
         logger.info(
-            f"LoopDetector task_type: {self.progress_tracker.task_type.value} "
-            f"(from milestone={task_type.value}, is_analysis={is_analysis_task}, is_action={is_action_task})"
+            f"Task type classification: loop_type={loop_task_type.value}, "
+            f"milestone={task_type.value}, is_analysis={is_analysis_task}, is_action={is_action_task}"
         )
 
         # For analysis tasks: increase temperature to reduce repetition/getting stuck
@@ -2522,7 +2517,7 @@ These are the actual search results. Reference only the files and matches shown 
 
             # Check hard iteration limit
             total_iterations += 1
-            unique_resources = self.progress_tracker.unique_resources
+            unique_resources = self.unified_tracker.unique_resources
             logger.debug(
                 f"Iteration {total_iterations}/{max_total_iterations}: "
                 f"tool_calls_used={self.tool_calls_used}/{self.tool_budget}, "
@@ -2881,7 +2876,7 @@ These are the actual search results. Reference only the files and matches shown 
                 # All recovery attempts failed - provide helpful error
                 if is_analysis_task and self.tool_calls_used > 0:
                     # Generate a minimal summary from what we know
-                    unique_resources = self.progress_tracker.unique_resources
+                    unique_resources = self.unified_tracker.unique_resources
                     files_examined = list(unique_resources)[:10]
                     fallback_msg = (
                         f"\n\n**Analysis Summary** (auto-generated)\n\n"
@@ -2901,18 +2896,12 @@ These are the actual search results. Reference only the files and matches shown 
                 tool_name = tc.get("name", "")
                 tool_args = tc.get("arguments", {})
 
-                # Record tool call in legacy progress tracker
-                self.progress_tracker.record_tool_call(tool_name, tool_args)
-
                 # Record tool call in unified tracker (single source of truth)
                 self.unified_tracker.record_tool_call(tool_name, tool_args)
 
             content_length = len(full_content.strip())
 
-            # Record iteration in legacy progress tracker
-            self.progress_tracker.record_iteration(content_length)
-
-            # Record iteration in unified tracker
+            # Record iteration in unified tracker (single source of truth)
             self.unified_tracker.record_iteration(content_length)
 
             # Check for loop warning using UnifiedTaskTracker (primary)
@@ -3031,7 +3020,7 @@ These are the actual search results. Reference only the files and matches shown 
                 budget_threshold = (
                     self.tool_budget // 4 if requires_continuation_support else self.tool_budget // 2
                 )
-                max_iterations = self.progress_tracker.config.max_total_iterations
+                max_iterations = self.unified_tracker.config.get("max_total_iterations", 50)
                 iteration_threshold = (
                     max_iterations * 3 // 4 if requires_continuation_support else max_iterations // 2
                 )
@@ -3055,7 +3044,7 @@ These are the actual search results. Reference only the files and matches shown 
                     requires_continuation_support
                     and should_prompt_continuation
                     and self.tool_calls_used < budget_threshold
-                    and self.progress_tracker.iterations < iteration_threshold
+                    and self.unified_tracker.iterations < iteration_threshold
                     and self._continuation_prompts < max_continuation_prompts
                 ):
                     self._continuation_prompts += 1
@@ -3073,7 +3062,7 @@ These are the actual search results. Reference only the files and matches shown 
                         "Make a tool call or provide your summary.",
                     )
                     # Track this turn without tool call for productivity ratio calculation
-                    self.task_tracker.increment_turn()
+                    self.unified_tracker.increment_turn()
                     # Continue the loop to give the model another chance
                     continue
 
@@ -3239,9 +3228,12 @@ These are the actual search results. Reference only the files and matches shown 
 
             # Force completion if too many low-output iterations or research calls
             if force_completion:
-                # Check stop reason from progress tracker to determine message type
-                stop_reason = self.progress_tracker.should_stop()
-                is_research_loop = "research" in stop_reason.reason.lower()
+                # Check stop reason from unified tracker to determine message type
+                stop_decision = self.unified_tracker.should_stop()
+                is_research_loop = (
+                    stop_decision.reason.value == "loop_detected"
+                    and "research" in stop_decision.hint.lower()
+                )
 
                 if is_research_loop:
                     yield StreamChunk(
@@ -3294,7 +3286,7 @@ These are the actual search results. Reference only the files and matches shown 
             for tc in tool_calls:
                 tc_name = tc.get("name", "")
                 tc_args = tc.get("arguments", {})
-                block_reason = self.progress_tracker.is_blocked_after_warning(tc_name, tc_args)
+                block_reason = self.unified_tracker.is_blocked_after_warning(tc_name, tc_args)
                 if block_reason:
                     yield StreamChunk(
                         content=f"\n[loop] ⛔ {block_reason}\n"
@@ -3688,12 +3680,11 @@ These are the actual search results. Reference only the files and matches shown 
             # Update conversation state machine for stage detection
             self.conversation_state.record_tool_execution(tool_name, normalized_args)
 
-            # Update task progress tracker for milestone tracking
+            # Update unified tracker for milestone tracking (single source of truth)
             result_dict = {"success": success}
             if hasattr(exec_result, "result") and exec_result.result:
                 result_dict["result"] = exec_result.result
-            self.task_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
-            self.task_tracker.increment_iteration()
+            self.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
 
             # ToolExecutionResult stores actual output in .result field
             output = exec_result.result if success else None
