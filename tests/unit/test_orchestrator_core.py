@@ -1027,3 +1027,169 @@ class TestHandleToolCalls:
             )
 
             assert "/test.py" in orch.observed_files
+
+
+class TestGetToolStatusMessage:
+    """Tests for _get_tool_status_message helper method."""
+
+    def test_execute_bash_with_command(self, mock_provider, orchestrator_settings):
+        """Test status message for execute_bash tool."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message(
+                "execute_bash", {"command": "ls -la"}
+            )
+            assert result == "🔧 Running execute_bash: `ls -la`"
+
+    def test_execute_bash_long_command_truncation(self, mock_provider, orchestrator_settings):
+        """Test long command truncation for execute_bash."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            long_cmd = "a" * 100
+            result = orch._get_tool_status_message(
+                "execute_bash", {"command": long_cmd}
+            )
+            assert result == f"🔧 Running execute_bash: `{'a' * 80}...`"
+
+    def test_list_directory(self, mock_provider, orchestrator_settings):
+        """Test status message for list_directory tool."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message(
+                "list_directory", {"path": "/src"}
+            )
+            assert result == "🔧 Listing directory: /src"
+
+    def test_list_directory_default_path(self, mock_provider, orchestrator_settings):
+        """Test list_directory with default path."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message("list_directory", {})
+            assert result == "🔧 Listing directory: ."
+
+    def test_read_file(self, mock_provider, orchestrator_settings):
+        """Test status message for read_file tool."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message(
+                "read_file", {"path": "/src/main.py"}
+            )
+            assert result == "🔧 Reading file: /src/main.py"
+
+    def test_edit_files_single(self, mock_provider, orchestrator_settings):
+        """Test status message for edit_files with single file."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message(
+                "edit_files", {"files": [{"path": "/src/main.py"}]}
+            )
+            assert result == "🔧 Editing: /src/main.py"
+
+    def test_edit_files_multiple(self, mock_provider, orchestrator_settings):
+        """Test status message for edit_files with multiple files."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message(
+                "edit_files",
+                {
+                    "files": [
+                        {"path": "/a.py"},
+                        {"path": "/b.py"},
+                        {"path": "/c.py"},
+                        {"path": "/d.py"},
+                    ]
+                },
+            )
+            assert result == "🔧 Editing: /a.py, /b.py, /c.py (+1 more)"
+
+    def test_edit_files_empty(self, mock_provider, orchestrator_settings):
+        """Test status message for edit_files with empty files list."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message("edit_files", {"files": []})
+            assert result == "🔧 Running edit_files..."
+
+    def test_write_file(self, mock_provider, orchestrator_settings):
+        """Test status message for write_file tool."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message(
+                "write_file", {"path": "/new_file.py"}
+            )
+            assert result == "🔧 Writing file: /new_file.py"
+
+    def test_code_search(self, mock_provider, orchestrator_settings):
+        """Test status message for code_search tool."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message(
+                "code_search", {"query": "def main"}
+            )
+            assert result == "🔧 Searching: def main"
+
+    def test_code_search_long_query_truncation(self, mock_provider, orchestrator_settings):
+        """Test long query truncation for code_search."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            long_query = "a" * 60
+            result = orch._get_tool_status_message(
+                "code_search", {"query": long_query}
+            )
+            assert result == f"🔧 Searching: {'a' * 50}..."
+
+    def test_unknown_tool(self, mock_provider, orchestrator_settings):
+        """Test status message for unknown tools."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message(
+                "some_custom_tool", {"arg": "value"}
+            )
+            assert result == "🔧 Running some_custom_tool..."
