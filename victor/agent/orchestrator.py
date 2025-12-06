@@ -1265,8 +1265,10 @@ class AgentOrchestrator:
     def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
         """Classify task type based on keywords in the user message.
 
-        Analyzes the user message to determine if it's an action-oriented task
-        (create, execute, run) or an analysis/exploration task (analyze, review).
+        Uses UnifiedTaskClassifier for robust classification with:
+        - Negation detection (handles "don't analyze", "skip the review")
+        - Confidence scoring for better decisions
+        - Weighted keyword matching
 
         Args:
             user_message: The user's input message
@@ -1277,42 +1279,51 @@ class AgentOrchestrator:
             - is_analysis_task: bool - True if task requires analysis/exploration
             - needs_execution: bool - True if task specifically requires execution
             - coarse_task_type: str - "analysis", "action", or "default"
+            - confidence: float - Classification confidence (0.0-1.0)
+            - source: str - Classification source ("keyword", "context", "ensemble")
+            - task_type: str - Detailed task type
         """
-        message_lower = user_message.lower()
+        from victor.agent.unified_classifier import get_unified_classifier
 
-        # Action-oriented keywords (create, execute, run)
-        action_keywords = ["create", "generate", "write", "execute", "run", "make", "build"]
-        is_action_task = any(keyword in message_lower for keyword in action_keywords)
+        classifier = get_unified_classifier()
+        result = classifier.classify(user_message)
 
-        # Execution-specific keywords
-        execution_keywords = ["execute", "run"]
-        needs_execution = any(keyword in message_lower for keyword in execution_keywords)
+        # Log negated keywords for debugging
+        if result.negated_keywords:
+            negated_strs = [f"{m.keyword}" for m in result.negated_keywords]
+            logger.debug(f"Negated keywords detected: {negated_strs}")
 
-        # Analysis/exploration keywords
-        analysis_keywords = [
-            "analyze", "analysis", "review", "examine", "understand", "explore",
-            "audit", "inspect", "investigate", "survey", "comprehensive", "thorough",
-            "entire codebase", "all files", "full analysis", "deep dive",
-            # Question patterns that require exploration
-            "what are the", "how does", "how do", "explain the", "describe the",
-            "key components", "architecture", "structure",
-        ]
-        is_analysis_task = any(keyword in message_lower for keyword in analysis_keywords)
+        return result.to_legacy_dict()
 
-        # Determine coarse task category
-        if is_analysis_task:
-            coarse_task_type = "analysis"
-        elif is_action_task:
-            coarse_task_type = "action"
+    def _classify_task_with_context(
+        self, user_message: str, history: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
+        """Classify task with conversation context for improved accuracy.
+
+        Uses conversation history to boost classification confidence when
+        the current message is ambiguous but context suggests a task type.
+
+        Args:
+            user_message: The user's input message
+            history: Optional conversation history for context boosting
+
+        Returns:
+            Dictionary with classification results (same as _classify_task_keywords
+            but with potential context boosting applied)
+        """
+        from victor.agent.unified_classifier import get_unified_classifier
+
+        classifier = get_unified_classifier()
+
+        if history:
+            result = classifier.classify_with_context(user_message, history)
         else:
-            coarse_task_type = "default"
+            result = classifier.classify(user_message)
 
-        return {
-            "is_action_task": is_action_task,
-            "is_analysis_task": is_analysis_task,
-            "needs_execution": needs_execution,
-            "coarse_task_type": coarse_task_type,
-        }
+        if result.context_signals:
+            logger.debug(f"Context signals applied: {result.context_signals}")
+
+        return result.to_legacy_dict()
 
     def _get_tool_status_message(self, tool_name: str, tool_args: Dict[str, Any]) -> str:
         """Generate a user-friendly status message for a tool execution.
