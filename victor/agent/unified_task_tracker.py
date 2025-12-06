@@ -597,6 +597,15 @@ class UnifiedTaskTracker:
         """Set target files for the task."""
         self._progress.target_files = files
 
+    def set_tool_budget(self, budget: int) -> None:
+        """Set the tool budget for this task.
+
+        Args:
+            budget: Maximum number of tool calls allowed
+        """
+        self._progress.tool_budget = budget
+        logger.debug(f"UnifiedTaskTracker: tool_budget set to {budget}")
+
     def set_target_entities(self, entities: Set[str]) -> None:
         """Set target entities (functions, classes) for the task."""
         self._progress.target_entities = entities

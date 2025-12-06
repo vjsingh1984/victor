@@ -77,6 +77,7 @@ from victor.agent.unified_task_tracker import (
     UnifiedTaskTracker,
     TaskType as UnifiedTaskType,
 )
+from victor.embeddings.task_classifier import TaskType as ClassifierTaskType
 
 # New decomposed components (facades for orchestrator responsibilities)
 from victor.agent.conversation_controller import (
@@ -213,6 +214,26 @@ class AgentOrchestrator:
         max_chars = int(context_tokens * 3.5 * 0.8)
         logger.info(f"Model context: {context_tokens:,} tokens -> {max_chars:,} chars limit")
         return max_chars
+
+    @staticmethod
+    def _map_unified_to_legacy_task_type(unified_type: "UnifiedTaskType") -> "ClassifierTaskType":
+        """Map UnifiedTaskTracker TaskType to task_classifier TaskType.
+
+        Both enums have the same string values, so we look up by value.
+        This maintains backward compatibility with TASK_CONFIGS.
+
+        Args:
+            unified_type: TaskType from UnifiedTaskTracker
+
+        Returns:
+            TaskType from task_classifier for TASK_CONFIGS lookup
+        """
+        # Map unified enum to classifier enum by matching string values
+        try:
+            return ClassifierTaskType(unified_type.value)
+        except ValueError:
+            # Fallback to GENERAL if the value doesn't exist in classifier enum
+            return ClassifierTaskType.GENERAL
 
     def __init__(
         self,
@@ -2248,33 +2269,31 @@ These are the actual search results. Reference only the files and matches shown 
         self.executed_tools = []
         self.failed_tool_signatures = set()
 
-        # Reset progress tracker for new conversation turn
-        self.progress_tracker.reset()
-
         # Reset unified tracker for new conversation (single source of truth)
         self.unified_tracker.reset()
+
+        # Reset legacy trackers (kept for backward compatibility during transition)
+        self.progress_tracker.reset()
+        self.task_tracker.reset()
 
         # Reset context reminder manager for new conversation turn
         self.reminder_manager.reset()
 
-        # Local aliases for frequently-used progress tracker values
-        # These are derived from the progress tracker config for convenience in logs
-        max_total_iterations = self.progress_tracker.config.max_total_iterations
-        # Note: progress_tracker.unique_resources tracks all resources (files, dirs, web, bash)
-        # Use that property instead of maintaining a separate set
+        # Local aliases for frequently-used values
+        max_total_iterations = self.unified_tracker.config.get(
+            "max_total_iterations", 50
+        )
         total_iterations = 0
         force_completion = False
 
         # Add user message to history
         self.add_message("user", user_message)
 
-        # Detect task type using unified tracker (primary) and legacy tracker (for backward compat)
-        self.task_tracker.reset()  # Reset legacy tracker for new conversation turn
-        task_type = self.task_tracker.detect_task_type(user_message)
-
-        # Also detect on unified tracker (will be the only source after full migration)
+        # Detect task type using unified tracker (single source of truth)
         unified_task_type = self.unified_tracker.detect_task_type(user_message)
-        logger.info(f"Task type detected: {task_type.value}")
+        # Map to legacy task type for backward compatibility with TASK_CONFIGS
+        task_type = self._map_unified_to_legacy_task_type(unified_task_type)
+        logger.info(f"Task type detected: {unified_task_type.value}")
 
         # Get exploration iterations from TASK_CONFIGS for this task type
         task_config = TASK_CONFIGS.get(task_type)
@@ -2291,18 +2310,18 @@ These are the actual search results. Reference only the files and matches shown 
         complexity_tool_budget = DEFAULT_BUDGETS.get(task_classification.complexity, 15)
         if task_classification.complexity == TaskComplexity.SIMPLE:
             # Override with simpler budget for simple tasks
-            self.progress_tracker.config.max_total_iterations = min(
-                complexity_tool_budget, self.progress_tracker.config.max_total_iterations
-            )
+            current_max = self.unified_tracker.config.get("max_total_iterations", 50)
+            new_max = min(complexity_tool_budget, current_max)
+            self.unified_tracker.set_tool_budget(new_max)
             logger.info(
                 f"Task complexity: {task_classification.complexity.value}, "
                 f"adjusted max_iterations to {complexity_tool_budget}"
             )
         elif task_classification.complexity == TaskComplexity.GENERATION:
             # Generation tasks should complete in 1-2 tool calls
-            self.progress_tracker.config.max_total_iterations = min(
-                complexity_tool_budget + 1, self.progress_tracker.config.max_total_iterations
-            )
+            current_max = self.unified_tracker.config.get("max_total_iterations", 50)
+            new_max = min(complexity_tool_budget + 1, current_max)
+            self.unified_tracker.set_tool_budget(new_max)
             logger.info(
                 f"Generation task detected, limiting iterations to {complexity_tool_budget + 1}"
             )
