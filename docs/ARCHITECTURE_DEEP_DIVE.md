@@ -138,6 +138,7 @@ The orchestrator follows the **facade pattern**, delegating to specialized compo
 | `MetricsCollector` | `victor/agent/metrics_collector.py` | Stream metrics (TTFT, throughput), tool selection stats, cost tracking |
 | `TaskAnalyzer` | `victor/agent/task_analyzer.py` | Unified facade for complexity/task/intent classification |
 | `UnifiedTaskClassifier` | `victor/agent/unified_classifier.py` | Keyword + semantic classification with negation detection |
+| `ToolRegistrar` | `victor/agent/tool_registrar.py` | Dynamic tool discovery, plugin loading, MCP integration, tool dependency graph |
 
 **Benefits of Decomposition**:
 1. **Testability**: Each component can be unit tested in isolation
@@ -1414,17 +1415,21 @@ Display to User
 - Tool result caching implemented (victor/cache/tool_cache.py)
 - Dependency graph implemented (victor/tools/dependency_graph.py)
 - Conversation state machine implemented (victor/agent/conversation_state.py)
-- Orchestrator decomposition complete (ConversationController, ToolPipeline, StreamingController, MetricsCollector extracted)
+- Orchestrator decomposition complete (ConversationController, ToolPipeline, StreamingController, MetricsCollector, ToolRegistrar extracted)
 - UnifiedTaskClassifier with negation detection implemented (victor/agent/unified_classifier.py)
 - Classification caching with LRU + TTL implemented
+- Provider health check system implemented (victor/providers/health.py)
+- Resilience metrics export implemented (victor/providers/metrics_export.py)
+- Classification-aware tool selection implemented in SemanticToolSelector
 
 **Future Vision**:
 - Perfect tool selection (no wasted context)
 - Full MCP bidirectional bridge
 - Plugin ecosystem for community tools
 - Intelligent caching and dependency tracking
+- ProviderManager extraction (remaining orchestrator responsibility)
 
 ---
 
 **Last Updated**: 2025-12-06
-**Next Review**: After orchestrator decomposition complete
+**Next Review**: After ProviderManager extraction

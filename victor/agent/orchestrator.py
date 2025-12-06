@@ -24,20 +24,25 @@ Extracted Components (separate modules):
 - StreamingController: Session lifecycle, metrics collection, cancellation
 - TaskAnalyzer: Unified facade for complexity/task/intent classification
 - ToolSelector: Semantic and keyword-based tool selection
+- ToolRegistrar: Tool registration, plugins, MCP integration (NEW)
 
 Remaining Orchestrator Responsibilities:
 - Provider/model initialization and switching
-- Tool registration and MCP integration
 - High-level chat flow coordination
 - Configuration loading and validation
 
 Future Extraction Candidates:
-- ProviderManager: Provider initialization, switching, health checks (lines ~1101-1287)
-- ToolRegistrar: Tool registration, plugins, MCP setup (lines ~1527-1775)
-- MCPIntegration: MCP server setup and registry management (lines ~1601-1676)
+- ProviderManager: Provider initialization, switching, health checks
 
 Note: Keep orchestrator as a thin facade. New logic should go into
 appropriate extracted components, not added here.
+
+Recent Refactoring (December 2025):
+- Extracted ToolRegistrar from _register_default_tools, _initialize_plugins,
+  _setup_mcp_integration, _plan_tools, and _goal_hints_for_message
+- Added ProviderHealthChecker for proactive health monitoring
+- Added ResilienceMetricsExporter for dashboard integration
+- Added classification-aware tool selection in SemanticToolSelector
 """
 
 import ast
@@ -98,6 +103,7 @@ from victor.agent.streaming_controller import (
     StreamingSession,
 )
 from victor.agent.task_analyzer import TaskAnalyzer, get_task_analyzer
+from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
 
 from victor.agent.tool_selection import (
     CORE_TOOLS,
@@ -455,11 +461,35 @@ class AgentOrchestrator:
 
         # Tool registry
         self.tools = ToolRegistry()
-        self._register_default_tools()
+
+        # Initialize ToolRegistrar (extracted component for tool registration)
+        # Encapsulates: dynamic tool discovery, plugins, MCP integration
+        self.tool_registrar = ToolRegistrar(
+            tools=self.tools,
+            settings=settings,
+            provider=provider,
+            model=model,
+            tool_graph=self.tool_graph,
+            config=ToolRegistrarConfig(
+                enable_plugins=getattr(settings, "plugin_enabled", True),
+                enable_mcp=getattr(settings, "use_mcp_tools", False),
+                enable_tool_graph=True,
+                airgapped_mode=getattr(settings, "airgapped_mode", False),
+                plugin_dirs=getattr(settings, "plugin_dirs", []),
+                disabled_plugins=set(getattr(settings, "disabled_plugins", [])),
+                plugin_packages=getattr(settings, "plugin_packages", []),
+                max_workers=4,
+                max_complexity=10,
+            ),
+        )
+        self.tool_registrar.set_background_task_callback(self._create_background_task)
+
+        # Synchronous registration (dynamic tools, configs)
+        self._register_default_tools()  # Delegates to ToolRegistrar
         self._load_tool_configurations()  # Load tool enable/disable states from config
         self.tools.register_before_hook(self._log_tool_call)
 
-        # Plugin system for extensible tools
+        # Plugin system for extensible tools (delegates to ToolRegistrar)
         self.plugin_manager: Optional[ToolPluginRegistry] = None
         if getattr(settings, "plugin_enabled", True):
             self._initialize_plugins()
@@ -1713,72 +1743,24 @@ These are the actual search results. Reference only the files and matches shown 
         self.workflow_registry.register(NewFeatureWorkflow())
 
     def _register_default_tools(self) -> None:
-        """Dynamically discovers and registers all tools from the victor.tools directory."""
-        # --- Pre-registration setup ---
-        # Some tools have functions that need to be called before registration to set
-        # providers or configurations.
+        """Dynamically discovers and registers all tools.
 
-        # Set git provider
-        set_git_provider(self.provider, self.model)
+        Delegates to ToolRegistrar for:
+        - Pre-registration provider setup
+        - Dynamic tool discovery from victor/tools directory
+        - MCP integration (if enabled)
 
-        # Set batch processor config
-        set_batch_processor_config(max_workers=4)
+        Note: This is a thin wrapper that delegates to ToolRegistrar.
+        The method is kept for backwards compatibility.
+        """
+        # Delegate to ToolRegistrar for provider setup
+        self.tool_registrar._setup_providers()
 
-        # Set code review config
-        set_code_review_config(max_complexity=10)
+        # Delegate to ToolRegistrar for dynamic tool registration
+        registered_count = self.tool_registrar._register_dynamic_tools()
+        logger.debug(f"Dynamically registered {registered_count} tools via ToolRegistrar")
 
-        # Set web search provider and defaults (if not in air-gapped mode)
-        if not self.settings.airgapped_mode:
-            set_web_search_provider(self.provider, self.model)
-            try:
-                tool_config = self.settings.load_tool_config()
-                web_cfg = tool_config.get("web_tools", {}) or tool_config.get("web", {}) or {}
-                set_web_tool_defaults(
-                    fetch_top=web_cfg.get("summarize_fetch_top"),
-                    fetch_pool=web_cfg.get("summarize_fetch_pool"),
-                    max_content_length=web_cfg.get("summarize_max_content_length"),
-                )
-            except Exception as exc:
-                logger.warning(f"Failed to apply web tool defaults: {exc}")
-
-        # --- Dynamic Tool Discovery and Registration ---
-        tools_dir = os.path.join(os.path.dirname(__file__), "..", "tools")
-        excluded_files = {"__init__.py", "base.py", "decorators.py", "semantic_selector.py"}
-        registered_tools_count = 0
-
-        # Import BaseTool for isinstance checks
-        from victor.tools.base import BaseTool as BaseToolClass
-
-        for filename in os.listdir(tools_dir):
-            if filename.endswith(".py") and filename not in excluded_files:
-                module_name = f"victor.tools.{filename[:-3]}"
-                try:
-                    module = importlib.import_module(module_name)
-                    for _name, obj in inspect.getmembers(module):
-                        # Register @tool decorated functions
-                        if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
-                            self.tools.register(obj)
-                            registered_tools_count += 1
-                        # Register BaseTool class instances (class-based tools)
-                        elif (
-                            inspect.isclass(obj)
-                            and issubclass(obj, BaseToolClass)
-                            and obj is not BaseToolClass
-                            and hasattr(obj, "name")
-                        ):
-                            try:
-                                tool_instance = obj()
-                                self.tools.register(tool_instance)
-                                registered_tools_count += 1
-                            except Exception as e:
-                                logger.debug(f"Skipped registering {_name}: {e}")
-                except Exception as e:
-                    logger.warning(f"Failed to load tools from {module_name}: {e}")
-
-        logger.debug(f"Dynamically registered {registered_tools_count} tools from victor.tools/")
-
-        # --- Post-registration setup for special tools (like MCP) ---
-        # Register MCP tools if configured (supports both legacy and new registry approach)
+        # MCP integration (handled separately via registrar config)
         if getattr(self.settings, "use_mcp_tools", False):
             self._setup_mcp_integration()
 
@@ -1917,80 +1899,32 @@ These are the actual search results. Reference only the files and matches shown 
             logger.debug(f"Failed to register tool dependencies: {exc}")
 
     def _initialize_plugins(self) -> None:
-        """Initialize and load tool plugins from configured directories."""
-        try:
-            from victor.config.settings import get_project_paths
+        """Initialize and load tool plugins from configured directories.
 
-            # Use centralized path for plugins directory
-            plugin_dirs = [get_project_paths().global_plugins_dir]
-            plugin_config = getattr(self.settings, "plugin_config", {})
-            disabled_plugins = set(getattr(self.settings, "plugin_disabled", []))
-
-            self.plugin_manager = ToolPluginRegistry(
-                plugin_dirs=plugin_dirs,
-                config=plugin_config,
-            )
-
-            # Disable specified plugins
-            for plugin_name in disabled_plugins:
-                self.plugin_manager.disable_plugin(plugin_name)
-
-            # Discover and load plugins from directories
-            loaded_count = self.plugin_manager.discover_and_load()
-
-            # Load plugins from packages
-            for package_name in getattr(self.settings, "plugin_packages", []):
-                plugin = self.plugin_manager.load_plugin_from_package(package_name)
-                if plugin:
-                    self.plugin_manager.register_plugin(plugin)
-
-            # Register plugin tools with our tool registry
-            if loaded_count > 0 or self.plugin_manager.loaded_plugins:
-                tool_count = self.plugin_manager.register_tools(self.tools)
-                logger.info(
-                    f"Plugins loaded: {len(self.plugin_manager.loaded_plugins)} plugins, "
-                    f"{tool_count} tools"
-                )
-
-        except Exception as e:
-            logger.warning(f"Failed to initialize plugin system: {e}")
-            self.plugin_manager = None
+        Delegates to ToolRegistrar for plugin discovery and loading.
+        The method is kept for backwards compatibility.
+        """
+        tool_count = self.tool_registrar._initialize_plugins()
+        # Store reference to plugin_manager for backwards compatibility
+        self.plugin_manager = self.tool_registrar.plugin_manager
+        if tool_count > 0:
+            logger.info(f"Plugins initialized via ToolRegistrar: {tool_count} tools")
 
     def _plan_tools(
         self, goals: List[str], available_inputs: Optional[List[str]] = None
     ) -> List[ToolDefinition]:
-        """Plan a sequence of tools to satisfy goals using the dependency graph."""
-        if not goals or not self.tool_graph:
-            return []
+        """Plan a sequence of tools to satisfy goals using the dependency graph.
 
-        available = available_inputs or []
-        plan_names = self.tool_graph.plan(goals, available)
-        tool_defs: List[ToolDefinition] = []
-        for name in plan_names:
-            tool = self.tools.get(name)
-            if tool and self.tools.is_tool_enabled(name):
-                tool_defs.append(
-                    ToolDefinition(
-                        name=tool.name, description=tool.description, parameters=tool.parameters
-                    )
-                )
-        return tool_defs
+        Delegates to ToolRegistrar for tool planning.
+        """
+        return self.tool_registrar.plan_tools(goals, available_inputs)
 
     def _goal_hints_for_message(self, user_message: str) -> List[str]:
-        """Infer planning goals from the user request."""
-        text = user_message.lower()
-        goals: List[str] = []
-        if any(kw in text for kw in ["summarize", "summary", "analyze", "overview"]):
-            goals.append("summary")
-        if any(kw in text for kw in ["review", "code review", "audit"]):
-            goals.append("summary")
-        if any(kw in text for kw in ["doc", "documentation", "readme"]):
-            goals.append("documentation")
-        if any(kw in text for kw in ["security", "vulnerability", "secret", "scan"]):
-            goals.append("security_report")
-        if any(kw in text for kw in ["complexity", "metrics", "maintainability", "technical debt"]):
-            goals.append("metrics_report")
-        return goals
+        """Infer planning goals from the user request.
+
+        Delegates to ToolRegistrar for goal inference.
+        """
+        return self.tool_registrar.infer_goals_from_message(user_message)
 
     def _load_tool_configurations(self) -> None:
         """Load tool configurations from profiles.yaml.
