@@ -43,9 +43,12 @@ from collections import Counter, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 import yaml
+
+if TYPE_CHECKING:
+    from victor.agent.unified_classifier import UnifiedTaskClassifier, ClassificationResult
 
 logger = logging.getLogger(__name__)
 
@@ -1151,6 +1154,107 @@ class UnifiedTaskTracker:
         self.set_task_type(task_type)
         return task_type
 
+    def detect_task_type_with_negation(
+        self,
+        message: str,
+        history: Optional[List[Dict[str, Any]]] = None,
+    ) -> Tuple[TaskType, "ClassificationResult"]:
+        """Detect task type using negation-aware keyword classification.
+
+        Uses UnifiedTaskClassifier for robust classification that handles:
+        - Negation patterns ("don't analyze" won't classify as analysis)
+        - Positive overrides ("don't analyze, just run" classifies as action)
+        - Context boosting from conversation history
+        - Confidence scoring for reliability assessment
+
+        Args:
+            message: User message to classify
+            history: Optional conversation history for context boosting
+
+        Returns:
+            Tuple of (TaskType, ClassificationResult) for detailed inspection
+        """
+        from victor.agent.unified_classifier import (
+            UnifiedTaskClassifier,
+            TaskType as UnifiedTaskType,
+            get_unified_classifier,
+        )
+
+        classifier = get_unified_classifier()
+
+        # Use context-aware classification if history provided
+        if history:
+            result = classifier.classify_with_context(message, history)
+        else:
+            result = classifier.classify(message)
+
+        # Map UnifiedTaskClassifier.TaskType to UnifiedTaskTracker.TaskType
+        type_map = {
+            UnifiedTaskType.EDIT: TaskType.EDIT,
+            UnifiedTaskType.SEARCH: TaskType.SEARCH,
+            UnifiedTaskType.ANALYSIS: TaskType.ANALYZE,
+            UnifiedTaskType.GENERATION: TaskType.CREATE,
+            UnifiedTaskType.ACTION: TaskType.GENERAL,  # ACTION maps to GENERAL for broad tool access
+            UnifiedTaskType.DEFAULT: TaskType.GENERAL,
+        }
+
+        task_type = type_map.get(result.task_type, TaskType.GENERAL)
+
+        # Use recommended tool budget from classifier
+        self.set_task_type(task_type)
+        if result.recommended_tool_budget:
+            self.set_tool_budget(result.recommended_tool_budget)
+
+        # Log negation info for debugging
+        if result.negated_keywords:
+            negated_kws = [m.keyword for m in result.negated_keywords]
+            logger.info(
+                f"UnifiedTaskTracker: Negated keywords detected: {negated_kws}, "
+                f"final task_type={task_type.value}, confidence={result.confidence:.2f}"
+            )
+
+        return task_type, result
+
+    def classify_with_negation_awareness(
+        self,
+        message: str,
+        history: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """Classify message with full negation awareness and return detailed results.
+
+        Combines UnifiedTaskClassifier (keyword + negation) with UnifiedTaskTracker
+        (budget + milestone tracking) for comprehensive task analysis.
+
+        Args:
+            message: User message to classify
+            history: Optional conversation history
+
+        Returns:
+            Dictionary with classification details:
+            - task_type: TaskType enum value
+            - confidence: Classification confidence (0-1)
+            - is_action_task: Whether task involves actions
+            - is_analysis_task: Whether task involves analysis
+            - negated_keywords: List of negated keyword strings
+            - recommended_budget: Tool call budget
+            - source: Classification source (keyword/semantic/context)
+        """
+        task_type, result = self.detect_task_type_with_negation(message, history)
+
+        return {
+            "task_type": task_type.value,
+            "confidence": result.confidence,
+            "is_action_task": result.is_action_task,
+            "is_analysis_task": result.is_analysis_task,
+            "is_generation_task": result.is_generation_task,
+            "needs_execution": result.needs_execution,
+            "negated_keywords": [m.keyword for m in result.negated_keywords],
+            "matched_keywords": [m.keyword for m in result.matched_keywords],
+            "recommended_budget": result.recommended_tool_budget,
+            "source": result.source,
+            "context_boost": result.context_boost,
+        }
+
     def update_from_tool_call(
         self,
         tool_name: str,
@@ -1208,6 +1312,22 @@ class CompatConfig:
 
     def __init__(self, tracker: UnifiedTaskTracker) -> None:
         self._tracker = tracker
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a configuration value by key (dict-like interface).
+
+        Args:
+            key: Configuration key name
+            default: Default value if key not found
+
+        Returns:
+            Configuration value or default
+        """
+        if key == "max_total_iterations":
+            return self._tracker._max_total_iterations
+        elif key == "tool_budget":
+            return self._tracker._progress.tool_budget
+        return default
 
     @property
     def max_total_iterations(self) -> int:
@@ -1278,3 +1398,46 @@ def create_tracker_from_message(message: str) -> Tuple[UnifiedTaskTracker, TaskT
     tracker.set_task_type(task_type)
 
     return tracker, task_type
+
+
+def create_tracker_with_negation_awareness(
+    message: str,
+    history: Optional[List[Dict[str, Any]]] = None,
+) -> Tuple[UnifiedTaskTracker, TaskType, Dict[str, Any]]:
+    """Create a tracker using negation-aware keyword classification.
+
+    This is the recommended way to create a tracker when negation detection
+    is important (e.g., "don't analyze, just run the tests").
+
+    Args:
+        message: User message to classify
+        history: Optional conversation history for context boosting
+
+    Returns:
+        Tuple of (tracker, task_type, classification_details)
+
+    Example:
+        tracker, task_type, details = create_tracker_with_negation_awareness(
+            "Don't analyze the code, just run the tests"
+        )
+        print(task_type)  # TaskType.GENERAL (not ANALYZE)
+        print(details["negated_keywords"])  # ["analyze"]
+        print(details["matched_keywords"])  # ["run"]
+    """
+    tracker = UnifiedTaskTracker()
+    task_type, result = tracker.detect_task_type_with_negation(message, history)
+
+    details = {
+        "task_type": task_type.value,
+        "confidence": result.confidence,
+        "is_action_task": result.is_action_task,
+        "is_analysis_task": result.is_analysis_task,
+        "is_generation_task": result.is_generation_task,
+        "needs_execution": result.needs_execution,
+        "negated_keywords": [m.keyword for m in result.negated_keywords],
+        "matched_keywords": [m.keyword for m in result.matched_keywords],
+        "recommended_budget": result.recommended_tool_budget,
+        "source": result.source,
+    }
+
+    return tracker, task_type, details
