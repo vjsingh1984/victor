@@ -3,7 +3,7 @@
 **For Newbies: A Comprehensive Guide to Understanding Victor's Design**
 
 > Created: 2025-11-26
-> Updated: 2025-11-30
+> Updated: 2025-12-06
 > Author: Architecture Analysis
 > Audience: New developers, contributors, and system designers
 
@@ -97,6 +97,44 @@ Victor is an **enterprise-ready, terminal-based AI coding assistant** that acts 
 - `self.tools`: ToolRegistry with all 43 tools
 - `self.provider`: Current LLM provider (Claude, Ollama, etc.)
 - `self.semantic_selector`: Optional embedding-based tool selector
+
+**Decomposed Components** (as of December 2025):
+
+The orchestrator follows the **facade pattern**, delegating to specialized components:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          AgentOrchestrator (Facade)                         │
+│                                                                             │
+│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐ │
+│  │ ConversationController│ │    ToolPipeline     │  │ StreamingController │ │
+│  │ - Message history    │  │ - Tool validation   │  │ - Session lifecycle │ │
+│  │ - Context tracking   │  │ - Execution coord   │  │ - Cancellation     │ │
+│  │ - Stage management   │  │ - Budget enforcement│  │ - Metrics          │ │
+│  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘ │
+│                                                                             │
+│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐ │
+│  │   MetricsCollector   │  │    TaskAnalyzer     │  │   ModelSwitcher     │ │
+│  │ - Stream metrics     │  │ - Complexity class. │  │ - Provider swap     │ │
+│  │ - Tool selection     │  │ - Task/intent class.│  │ - Fallback chains   │ │
+│  │ - Cost tracking      │  │ - Unified facade    │  │ - Hot-swap support  │ │
+│  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Component | Location | Responsibility |
+|-----------|----------|----------------|
+| `ConversationController` | `victor/agent/conversation_controller.py` | Message history, context size tracking, conversation stage management |
+| `ToolPipeline` | `victor/agent/tool_pipeline.py` | Tool validation, execution coordination, budget enforcement |
+| `StreamingController` | `victor/agent/streaming_controller.py` | Session lifecycle, cancellation handling |
+| `MetricsCollector` | `victor/agent/metrics_collector.py` | Stream metrics (TTFT, throughput), tool selection stats, cost tracking |
+| `TaskAnalyzer` | `victor/agent/task_analyzer.py` | Unified facade for complexity/task/intent classification |
+
+**Benefits of Decomposition**:
+1. **Testability**: Each component can be unit tested in isolation
+2. **Maintainability**: Changes are localized to specific modules
+3. **Clarity**: Single responsibility per component
+4. **Scalability**: New functionality via new components, not god-class expansion
 
 #### B. Provider System
 **Location**: `victor/providers/`
@@ -1277,12 +1315,13 @@ Display to User
 - Intelligent tool selection (not broadcasting all 43 tools)
 - Enterprise-grade tools (security scanning, CI/CD, testing, etc.)
 
-**Current Limitations** (as of 2025-11-30):
+**Current Limitations** (as of 2025-12-06):
 - Tool selection fallback improved but still needs refinement
 - MCP registry implemented (victor/mcp/registry.py) but auto-discovery pending
 - Tool result caching implemented (victor/cache/tool_cache.py)
 - Dependency graph implemented (victor/tools/dependency_graph.py)
 - Conversation state machine implemented (victor/agent/conversation_state.py)
+- Orchestrator decomposition in progress (MetricsCollector extracted, stream_chat refactoring planned)
 
 **Future Vision**:
 - Perfect tool selection (no wasted context)
@@ -1292,5 +1331,5 @@ Display to User
 
 ---
 
-**Last Updated**: 2025-11-30
-**Next Review**: After Phase 4 implementation
+**Last Updated**: 2025-12-06
+**Next Review**: After orchestrator decomposition complete
