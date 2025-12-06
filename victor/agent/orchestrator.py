@@ -1262,6 +1262,53 @@ class AgentOrchestrator:
         # Move verbose argument logging to debug level - not user-facing
         logger.debug(f"Tool call: {name} with args: {kwargs}")
 
+    def _get_tool_status_message(self, tool_name: str, tool_args: Dict[str, Any]) -> str:
+        """Generate a user-friendly status message for a tool execution.
+
+        Provides context-aware status messages showing relevant details
+        (command, path, query, etc.) for different tool types.
+
+        Args:
+            tool_name: Name of the tool being executed
+            tool_args: Arguments passed to the tool
+
+        Returns:
+            Status message string with emoji prefix
+        """
+        if tool_name == "execute_bash" and "command" in tool_args:
+            cmd = tool_args["command"]
+            cmd_display = cmd[:80] + "..." if len(cmd) > 80 else cmd
+            return f"🔧 Running {tool_name}: `{cmd_display}`"
+
+        if tool_name == "list_directory":
+            path = tool_args.get("path", ".")
+            return f"🔧 Listing directory: {path}"
+
+        if tool_name == "read_file":
+            path = tool_args.get("path", "file")
+            return f"🔧 Reading file: {path}"
+
+        if tool_name == "edit_files":
+            files = tool_args.get("files", [])
+            if files and isinstance(files, list):
+                paths = [f.get("path", "?") for f in files[:3]]
+                path_display = ", ".join(paths)
+                if len(files) > 3:
+                    path_display += f" (+{len(files) - 3} more)"
+                return f"🔧 Editing: {path_display}"
+            return f"🔧 Running {tool_name}..."
+
+        if tool_name == "write_file":
+            path = tool_args.get("path", "file")
+            return f"🔧 Writing file: {path}"
+
+        if tool_name == "code_search":
+            query = tool_args.get("query", "")
+            query_display = query[:50] + "..." if len(query) > 50 else query
+            return f"🔧 Searching: {query_display}"
+
+        return f"🔧 Running {tool_name}..."
+
     def _extract_file_structure(self, content: str, file_path: str) -> str:
         """Extract a structural summary for very large files.
 
@@ -3069,62 +3116,9 @@ These are the actual search results. Reference only the files and matches shown 
             for tool_call in tool_calls:
                 tool_name = tool_call.get("name", "tool")
                 tool_args = tool_call.get("arguments", {})
-                # Clean user-friendly message without internal [tool] prefix
-                # Show relevant context for observability (command, path, file, etc.)
-                if tool_name == "execute_bash" and "command" in tool_args:
-                    cmd = tool_args["command"]
-                    # Truncate long commands for readability
-                    cmd_display = cmd[:80] + "..." if len(cmd) > 80 else cmd
-                    yield StreamChunk(
-                        content="",
-                        metadata={"status": f"🔧 Running {tool_name}: `{cmd_display}`"},
-                    )
-                elif tool_name == "list_directory":
-                    path = tool_args.get("path", ".")
-                    yield StreamChunk(
-                        content="",
-                        metadata={"status": f"🔧 Listing directory: {path}"},
-                    )
-                elif tool_name == "read_file":
-                    path = tool_args.get("path", "file")
-                    yield StreamChunk(
-                        content="",
-                        metadata={"status": f"🔧 Reading file: {path}"},
-                    )
-                elif tool_name == "edit_files":
-                    files = tool_args.get("files", [])
-                    if files and isinstance(files, list):
-                        paths = [f.get("path", "?") for f in files[:3]]
-                        path_display = ", ".join(paths)
-                        if len(files) > 3:
-                            path_display += f" (+{len(files) - 3} more)"
-                        yield StreamChunk(
-                            content="",
-                            metadata={"status": f"🔧 Editing: {path_display}"},
-                        )
-                    else:
-                        yield StreamChunk(
-                            content="",
-                            metadata={"status": f"🔧 Running {tool_name}..."},
-                        )
-                elif tool_name == "write_file":
-                    path = tool_args.get("path", "file")
-                    yield StreamChunk(
-                        content="",
-                        metadata={"status": f"🔧 Writing file: {path}"},
-                    )
-                elif tool_name == "code_search":
-                    query = tool_args.get("query", "")
-                    query_display = query[:50] + "..." if len(query) > 50 else query
-                    yield StreamChunk(
-                        content="",
-                        metadata={"status": f"🔧 Searching: {query_display}"},
-                    )
-                else:
-                    yield StreamChunk(
-                        content="",
-                        metadata={"status": f"🔧 Running {tool_name}..."},
-                    )
+                # Generate user-friendly status message with relevant context
+                status_msg = self._get_tool_status_message(tool_name, tool_args)
+                yield StreamChunk(content="", metadata={"status": status_msg})
 
             tool_results = await self._handle_tool_calls(tool_calls)
             for result in tool_results:
