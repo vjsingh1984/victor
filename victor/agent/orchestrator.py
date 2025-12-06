@@ -71,6 +71,10 @@ from victor.agent.search_router import SearchRouter
 from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity, DEFAULT_BUDGETS
 from victor.agent.context_reminder import create_reminder_manager
 from victor.agent.stream_handler import StreamMetrics
+from victor.agent.metrics_collector import (
+    MetricsCollector,
+    MetricsCollectorConfig,
+)
 from victor.agent.unified_task_tracker import (
     UnifiedTaskTracker,
     TaskType as UnifiedTaskType,
@@ -349,21 +353,18 @@ class AgentOrchestrator:
         # Background task tracking for graceful shutdown
         self._background_tasks: set[asyncio.Task] = set()
 
-        # Tool usage analytics
-        self._tool_usage_stats: Dict[str, Dict[str, Any]] = {}
-        self._tool_selection_stats: Dict[str, int] = {
-            "semantic_selections": 0,
-            "keyword_selections": 0,
-            "fallback_selections": 0,
-            "total_tools_selected": 0,
-            "total_tools_executed": 0,
-        }
-        # Cost tracking
-        self._cost_tracking: Dict[str, Any] = {
-            "total_cost_weight": 0.0,
-            "cost_by_tier": {tier.value: 0.0 for tier in CostTier},
-            "calls_by_tier": {tier.value: 0 for tier in CostTier},
-        }
+        # Metrics collection (extracted component)
+        self._metrics_collector = MetricsCollector(
+            config=MetricsCollectorConfig(
+                model=model,
+                provider=self.provider_name,
+                analytics_enabled=bool(self.streaming_metrics_collector),
+            ),
+            usage_logger=self.usage_logger,
+            debug_logger=self.debug_logger,
+            streaming_metrics_collector=self.streaming_metrics_collector,
+            tool_cost_lookup=lambda name: self.tools.get_tool_cost(name) if hasattr(self, 'tools') else CostTier.FREE,
+        )
         # Result cache for pure/idempotent tools
         self.tool_cache = None
         if getattr(self.settings, "tool_cache_enabled", True):
@@ -629,40 +630,16 @@ class AgentOrchestrator:
 
     def _on_tool_start_callback(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Callback when tool execution starts (from ToolPipeline)."""
-        # Use the pipeline's calls_used as the iteration count
         iteration = self._tool_pipeline.calls_used if hasattr(self, "_tool_pipeline") else 0
-        self.debug_logger.log_tool_call(tool_name, arguments, iteration)
+        self._metrics_collector.on_tool_start(tool_name, arguments, iteration)
 
     def _on_tool_complete_callback(self, result: ToolCallResult) -> None:
         """Callback when tool execution completes (from ToolPipeline)."""
-        # Update tool usage stats
-        if result.tool_name not in self._tool_usage_stats:
-            self._tool_usage_stats[result.tool_name] = {
-                "calls": 0,
-                "successes": 0,
-                "failures": 0,
-                "total_time_ms": 0.0,
-            }
-        stats = self._tool_usage_stats[result.tool_name]
-        stats["calls"] += 1
-        if result.success:
-            stats["successes"] += 1
-        else:
-            stats["failures"] += 1
-        stats["total_time_ms"] += result.execution_time_ms
+        self._metrics_collector.on_tool_complete(result)
 
     def _on_streaming_session_complete(self, session: StreamingSession) -> None:
         """Callback when streaming session completes (from StreamingController)."""
-        self.usage_logger.log_event(
-            "stream_completed",
-            {
-                "session_id": session.session_id,
-                "model": session.model,
-                "provider": session.provider,
-                "duration": session.duration,
-                "cancelled": session.cancelled,
-            },
-        )
+        self._metrics_collector.on_streaming_session_complete(session)
 
     # =====================================================================
     # Component accessors for external use
@@ -791,8 +768,7 @@ class AgentOrchestrator:
 
     def _init_stream_metrics(self) -> StreamMetrics:
         """Initialize fresh stream metrics for a new streaming session."""
-        self._current_stream_metrics = StreamMetrics(start_time=time.time())
-        return self._current_stream_metrics
+        return self._metrics_collector.init_stream_metrics()
 
     def _init_conversation_embedding_store(self) -> None:
         """Initialize LanceDB embedding store for semantic conversation retrieval.
@@ -835,57 +811,15 @@ class AgentOrchestrator:
 
     def _record_first_token(self) -> None:
         """Record the time of first token received."""
-        if hasattr(self, "_current_stream_metrics") and self._current_stream_metrics:
-            if self._current_stream_metrics.first_token_time is None:
-                self._current_stream_metrics.first_token_time = time.time()
+        self._metrics_collector.record_first_token()
 
     def _finalize_stream_metrics(self) -> Optional[StreamMetrics]:
         """Finalize stream metrics at end of streaming session."""
-        if hasattr(self, "_current_stream_metrics") and self._current_stream_metrics:
-            self._current_stream_metrics.end_time = time.time()
-            metrics = self._current_stream_metrics
-
-            # Log stream metrics
-            self.usage_logger.log_event(
-                "stream_completed",
-                {
-                    "ttft": metrics.time_to_first_token,
-                    "total_duration": metrics.total_duration,
-                    "tokens_per_second": metrics.tokens_per_second,
-                    "total_chunks": metrics.total_chunks,
-                },
-            )
-
-            # Record to streaming metrics collector if available
-            if self.streaming_metrics_collector:
-                try:
-                    from victor.analytics.streaming_metrics import StreamMetrics as AnalyticsMetrics
-                    import uuid
-
-                    # Estimate total tokens from content length (roughly 4 chars per token)
-                    estimated_tokens = metrics.total_content_length // 4
-
-                    # Convert to analytics format and record
-                    analytics_metrics = AnalyticsMetrics(
-                        request_id=str(uuid.uuid4()),
-                        start_time=metrics.start_time,
-                        first_token_time=metrics.first_token_time,
-                        last_token_time=metrics.end_time,
-                        total_chunks=metrics.total_chunks,
-                        total_tokens=estimated_tokens,
-                        model=self.model,
-                        provider=self.provider_name,
-                    )
-                    self.streaming_metrics_collector.record_metrics(analytics_metrics)
-                except Exception as e:
-                    logger.debug(f"Failed to record to metrics collector: {e}")
-
-            return metrics
-        return None
+        return self._metrics_collector.finalize_stream_metrics()
 
     def get_last_stream_metrics(self) -> Optional[StreamMetrics]:
         """Get metrics from the last streaming session."""
-        return getattr(self, "_current_stream_metrics", None)
+        return self._metrics_collector.get_last_stream_metrics()
 
     def get_streaming_metrics_summary(self) -> Optional[Dict[str, Any]]:
         """Get comprehensive streaming metrics summary.
@@ -893,14 +827,7 @@ class AgentOrchestrator:
         Returns:
             Dictionary with aggregated metrics or None if metrics disabled.
         """
-        if not self.streaming_metrics_collector:
-            return None
-
-        summary = self.streaming_metrics_collector.get_summary()
-        # Convert MetricsSummary dataclass to dict if needed
-        if hasattr(summary, "__dict__"):
-            return vars(summary)
-        return summary  # type: ignore[return-value]
+        return self._metrics_collector.get_streaming_metrics_summary()
 
     def get_streaming_metrics_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent streaming metrics history.
@@ -911,12 +838,7 @@ class AgentOrchestrator:
         Returns:
             List of recent metrics dictionaries
         """
-        if not self.streaming_metrics_collector:
-            return []
-
-        metrics_list = self.streaming_metrics_collector.get_recent_metrics(count=limit)
-        # Convert StreamMetrics to dictionaries
-        return [vars(m) if hasattr(m, "__dict__") else m for m in metrics_list]  # type: ignore[misc]
+        return self._metrics_collector.get_streaming_metrics_history(limit)
 
     async def _preload_embeddings(self) -> None:
         """Preload tool embeddings in background to avoid blocking first query.
@@ -994,20 +916,7 @@ class AgentOrchestrator:
             method: Selection method used ('semantic', 'keyword', 'fallback')
             num_tools: Number of tools selected
         """
-        if method == "semantic":
-            self._tool_selection_stats["semantic_selections"] += 1
-        elif method == "keyword":
-            self._tool_selection_stats["keyword_selections"] += 1
-        elif method == "fallback":
-            self._tool_selection_stats["fallback_selections"] += 1
-
-        self._tool_selection_stats["total_tools_selected"] += num_tools
-        self.usage_logger.log_event("tool_selection", {"method": method, "tool_count": num_tools})
-
-        logger.debug(
-            f"Tool selection: method={method}, num_tools={num_tools}, "
-            f"stats={self._tool_selection_stats}"
-        )
+        self._metrics_collector.record_tool_selection(method, num_tools)
 
     def _record_tool_execution(self, tool_name: str, success: bool, elapsed_ms: float) -> None:
         """Record tool execution statistics.
@@ -1017,47 +926,7 @@ class AgentOrchestrator:
             success: Whether execution succeeded
             elapsed_ms: Execution time in milliseconds
         """
-        # Get tool cost tier
-        tool_cost = self.tools.get_tool_cost(tool_name)
-        cost_tier = tool_cost if tool_cost else CostTier.FREE
-        cost_weight = cost_tier.weight
-
-        if tool_name not in self._tool_usage_stats:
-            self._tool_usage_stats[tool_name] = {
-                "total_calls": 0,
-                "successful_calls": 0,
-                "failed_calls": 0,
-                "total_time_ms": 0.0,
-                "avg_time_ms": 0.0,
-                "min_time_ms": float("inf"),
-                "max_time_ms": 0.0,
-                "cost_tier": cost_tier.value,
-                "total_cost_weight": 0.0,
-            }
-
-        stats = self._tool_usage_stats[tool_name]
-        stats["total_calls"] += 1
-        stats["successful_calls"] += 1 if success else 0
-        stats["failed_calls"] += 0 if success else 1
-        stats["total_time_ms"] += elapsed_ms
-        stats["avg_time_ms"] = stats["total_time_ms"] / stats["total_calls"]
-        stats["min_time_ms"] = min(stats["min_time_ms"], elapsed_ms)
-        stats["max_time_ms"] = max(stats["max_time_ms"], elapsed_ms)
-        stats["total_cost_weight"] += cost_weight
-
-        # Update global cost tracking
-        self._cost_tracking["total_cost_weight"] += cost_weight
-        self._cost_tracking["cost_by_tier"][cost_tier.value] += cost_weight
-        self._cost_tracking["calls_by_tier"][cost_tier.value] += 1
-
-        self._tool_selection_stats["total_tools_executed"] += 1
-
-        logger.debug(
-            f"Tool executed: {tool_name} "
-            f"(success={success}, time={elapsed_ms:.1f}ms, "
-            f"total_calls={stats['total_calls']}, "
-            f"success_rate={stats['successful_calls']/stats['total_calls']*100:.1f}%)"
-        )
+        self._metrics_collector.record_tool_execution(tool_name, success, elapsed_ms)
 
     def get_tool_usage_stats(self) -> Dict[str, Any]:
         """Get comprehensive tool usage statistics.
@@ -1069,30 +938,9 @@ class AgentOrchestrator:
             - Cost tracking (by tier and total)
             - Overall metrics
         """
-        return {
-            "selection_stats": self._tool_selection_stats,
-            "tool_stats": self._tool_usage_stats,
-            "cost_tracking": self._cost_tracking,
-            "top_tools_by_usage": sorted(
-                [(name, stats["total_calls"]) for name, stats in self._tool_usage_stats.items()],
-                key=lambda x: x[1],
-                reverse=True,
-            )[:10],
-            "top_tools_by_time": sorted(
-                [(name, stats["total_time_ms"]) for name, stats in self._tool_usage_stats.items()],
-                key=lambda x: x[1],
-                reverse=True,
-            )[:10],
-            "top_tools_by_cost": sorted(
-                [
-                    (name, stats.get("total_cost_weight", 0.0))
-                    for name, stats in self._tool_usage_stats.items()
-                ],
-                key=lambda x: x[1],
-                reverse=True,
-            )[:10],
-            "conversation_state": self.conversation_state.get_state_summary(),
-        }
+        return self._metrics_collector.get_tool_usage_stats(
+            conversation_state_summary=self.conversation_state.get_state_summary()
+        )
 
     def get_conversation_stage(self) -> ConversationStage:
         """Get the current conversation stage.
@@ -1213,6 +1061,9 @@ class AgentOrchestrator:
                 },
             )
 
+            # Update metrics collector with new model info
+            self._metrics_collector.update_model_info(new_model, self.provider_name)
+
             return True
 
         except Exception as e:
@@ -1287,6 +1138,9 @@ class AgentOrchestrator:
                     "native_tool_calls": self.tool_calling_caps.native_tool_calls,
                 },
             )
+
+            # Update metrics collector with new model info
+            self._metrics_collector.update_model_info(model, self.provider_name)
 
             return True
 
@@ -3695,6 +3549,10 @@ These are the actual search results. Reference only the files and matches shown 
         # Reset context reminder manager
         if hasattr(self, "reminder_manager"):
             self.reminder_manager.reset()
+
+        # Reset metrics collector
+        if hasattr(self, "_metrics_collector"):
+            self._metrics_collector.reset_stats()
 
         logger.debug("Conversation and session state reset")
 

@@ -59,29 +59,28 @@ class TestStreamMetrics:
 
     def test_record_first_token_time(self, orchestrator):
         """Test _record_first_token records time correctly."""
-        import time
-
-        orchestrator._current_stream_metrics = StreamMetrics()
-        orchestrator._current_stream_metrics.start_time = time.time()
-        assert orchestrator._current_stream_metrics.first_token_time is None
+        # Initialize stream metrics through the public API
+        stream_metrics = orchestrator._init_stream_metrics()
+        assert stream_metrics.first_token_time is None
 
         orchestrator._record_first_token()
 
-        assert orchestrator._current_stream_metrics.first_token_time is not None
+        # Access through the metrics collector's internal state
+        assert orchestrator._metrics_collector._current_stream_metrics.first_token_time is not None
 
     def test_record_first_token_no_metrics(self, orchestrator):
         """Test _record_first_token does nothing when no metrics."""
-        # Should not raise
+        # Should not raise even without initialized metrics
         orchestrator._record_first_token()
 
     def test_finalize_stream_metrics(self, orchestrator):
         """Test _finalize_stream_metrics returns metrics (covers lines 306-321)."""
         import time
 
-        orchestrator._current_stream_metrics = StreamMetrics()
-        orchestrator._current_stream_metrics.start_time = time.time()
-        orchestrator._current_stream_metrics.first_token_time = time.time()
-        orchestrator._current_stream_metrics.total_chunks = 10
+        # Initialize metrics through the API
+        stream_metrics = orchestrator._init_stream_metrics()
+        stream_metrics.first_token_time = time.time()
+        stream_metrics.total_chunks = 10
 
         result = orchestrator._finalize_stream_metrics()
 
@@ -96,7 +95,8 @@ class TestStreamMetrics:
 
     def test_get_last_stream_metrics(self, orchestrator):
         """Test get_last_stream_metrics returns stored metrics (covers line 325)."""
-        orchestrator._current_stream_metrics = StreamMetrics()
+        # Initialize metrics first
+        orchestrator._init_stream_metrics()
         result = orchestrator.get_last_stream_metrics()
         assert result is not None
 
@@ -222,22 +222,22 @@ class TestToolSelection:
 
     def test_record_tool_selection_semantic(self, orchestrator):
         """Test _record_tool_selection records semantic stats (covers lines 381-388)."""
-        initial = orchestrator._tool_selection_stats["semantic_selections"]
+        initial = orchestrator._metrics_collector._selection_stats.semantic_selections
         orchestrator._record_tool_selection("semantic", 5)
-        assert orchestrator._tool_selection_stats["semantic_selections"] == initial + 1
-        assert orchestrator._tool_selection_stats["total_tools_selected"] >= 5
+        assert orchestrator._metrics_collector._selection_stats.semantic_selections == initial + 1
+        assert orchestrator._metrics_collector._selection_stats.total_tools_selected >= 5
 
     def test_record_tool_selection_keyword(self, orchestrator):
         """Test _record_tool_selection records keyword stats."""
-        initial = orchestrator._tool_selection_stats["keyword_selections"]
+        initial = orchestrator._metrics_collector._selection_stats.keyword_selections
         orchestrator._record_tool_selection("keyword", 3)
-        assert orchestrator._tool_selection_stats["keyword_selections"] == initial + 1
+        assert orchestrator._metrics_collector._selection_stats.keyword_selections == initial + 1
 
     def test_record_tool_selection_fallback(self, orchestrator):
         """Test _record_tool_selection records fallback stats."""
-        initial = orchestrator._tool_selection_stats["fallback_selections"]
+        initial = orchestrator._metrics_collector._selection_stats.fallback_selections
         orchestrator._record_tool_selection("fallback", 2)
-        assert orchestrator._tool_selection_stats["fallback_selections"] == initial + 1
+        assert orchestrator._metrics_collector._selection_stats.fallback_selections == initial + 1
 
     def test_get_tool_usage_stats(self, orchestrator):
         """Test get_tool_usage_stats returns stats (covers lines 446-457+)."""
@@ -339,7 +339,7 @@ class TestToolExecution:
         """Test _record_tool_execution with success (covers lines 400-444)."""
         orchestrator._record_tool_execution("test_tool", success=True, elapsed_ms=100.0)
 
-        stats = orchestrator._tool_usage_stats.get("test_tool")
+        stats = orchestrator._metrics_collector._tool_usage_stats.get("test_tool")
         assert stats is not None
         assert stats["total_calls"] == 1
         assert stats["successful_calls"] == 1
@@ -349,7 +349,7 @@ class TestToolExecution:
         """Test _record_tool_execution with failure."""
         orchestrator._record_tool_execution("failing_tool", success=False, elapsed_ms=50.0)
 
-        stats = orchestrator._tool_usage_stats.get("failing_tool")
+        stats = orchestrator._metrics_collector._tool_usage_stats.get("failing_tool")
         assert stats is not None
         assert stats["total_calls"] == 1
         assert stats["successful_calls"] == 0
@@ -360,7 +360,7 @@ class TestToolExecution:
         orchestrator._record_tool_execution("timed_tool", success=True, elapsed_ms=100.0)
         orchestrator._record_tool_execution("timed_tool", success=True, elapsed_ms=200.0)
 
-        stats = orchestrator._tool_usage_stats.get("timed_tool")
+        stats = orchestrator._metrics_collector._tool_usage_stats.get("timed_tool")
         assert stats["total_calls"] == 2
         assert stats["total_time_ms"] == 300.0
         assert stats["avg_time_ms"] == 150.0
