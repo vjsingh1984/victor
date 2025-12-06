@@ -1,0 +1,55 @@
+# MANIFEST.in - Controls what goes into source distributions
+# https://packaging.python.org/en/latest/guides/using-manifest-in/
+
+# Include essential files
+include LICENSE
+include README.md
+include CLAUDE.md
+include pyproject.toml
+include requirements.txt
+
+# Include all config files
+recursive-include victor/config *.yaml *.yml *.json
+
+# Include example configurations
+recursive-include examples *.yaml *.yml *.example *.json *.md
+
+# Include documentation
+recursive-include docs *.md *.rst *.txt
+
+# Exclude development files
+exclude .gitignore
+exclude .pre-commit-config.yaml
+exclude Makefile
+
+# Exclude test files from distribution (they're in dev extras)
+prune tests
+prune htmlcov
+prune .pytest_cache
+
+# Exclude build artifacts
+prune build
+prune dist
+prune *.egg-info
+prune __pycache__
+prune .mypy_cache
+prune .ruff_cache
+
+# Exclude IDE/editor files
+prune .vscode
+prune .idea
+prune *.swp
+prune *.swo
+
+# Exclude archive/legacy code
+prune archive
+
+# Exclude virtual environments
+prune venv
+prune .venv
+prune env
+
+# Exclude Docker files (separate distribution)
+exclude Dockerfile
+exclude docker-compose.yml
+prune docker

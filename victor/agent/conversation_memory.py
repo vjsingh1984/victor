@@ -43,13 +43,15 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-import hashlib
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 import json
 import logging
 import sqlite3
-import statistics
 import uuid
+
+if TYPE_CHECKING:
+    from victor.embeddings.service import EmbeddingService
+    from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
 
 logger = logging.getLogger(__name__)
 
@@ -464,12 +466,55 @@ class ConversationStore:
         self._persist_message(session_id, message)
         self._update_session_activity(session_id)
 
+        # Sync to LanceDB embedding store if configured
+        self._sync_message_embedding(session_id, message)
+
         logger.debug(
             f"Added {role.value} message to {session_id}. "
             f"Tokens: {token_count}, Total: {session.current_tokens}"
         )
 
         return message
+
+    def _sync_message_embedding(
+        self,
+        session_id: str,
+        message: "ConversationMessage",
+    ) -> None:
+        """Sync a message embedding to LanceDB (async, fire-and-forget).
+
+        Args:
+            session_id: Session ID
+            message: Message to sync
+        """
+        if not hasattr(self, "_embedding_store") or self._embedding_store is None:
+            return
+
+        # Skip very short messages
+        if len(message.content) < 20:
+            return
+
+        import asyncio
+
+        async def _sync():
+            try:
+                await self._embedding_store.add_message_embedding(
+                    message_id=message.id,
+                    session_id=session_id,
+                    role=message.role.value,
+                    content=message.content,
+                    timestamp=message.timestamp,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to sync message embedding: {e}")
+
+        # Run async embedding sync in background
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(_sync())
+        except RuntimeError:
+            # No running loop, run synchronously
+            asyncio.run(_sync())
 
     def add_system_message(
         self,
@@ -878,6 +923,383 @@ class ConversationStore:
     def _generate_message_id() -> str:
         """Generate unique message ID."""
         return f"msg_{uuid.uuid4().hex[:12]}"
+
+    # =========================================================================
+    # SEMANTIC RETRIEVAL METHODS
+    # For enhanced context compaction using embeddings
+    # =========================================================================
+
+    def set_embedding_service(self, service: "EmbeddingService") -> None:
+        """Set the embedding service for semantic operations.
+
+        Args:
+            service: EmbeddingService instance for computing embeddings
+        """
+        self._embedding_service = service
+
+    def set_embedding_store(self, store: "ConversationEmbeddingStore") -> None:
+        """Set the LanceDB embedding store for efficient vector search.
+
+        When set, message embeddings are synced to LanceDB on add_message(),
+        and semantic retrieval uses LanceDB vector search instead of
+        on-the-fly embedding computation.
+
+        Args:
+            store: ConversationEmbeddingStore instance
+        """
+        self._embedding_store = store
+        logger.info("ConversationStore: LanceDB embedding store configured")
+
+    def get_semantically_relevant_messages(
+        self,
+        session_id: str,
+        query: str,
+        limit: int = 10,
+        min_similarity: float = 0.3,
+        exclude_recent: int = 5,
+    ) -> List[Tuple[ConversationMessage, float]]:
+        """Retrieve messages semantically relevant to a query from the full history.
+
+        This enables enhanced context compaction by finding relevant historical
+        messages that may have been pruned from in-memory context.
+
+        Uses LanceDB vector search when available (O(log n)), falling back to
+        on-the-fly embedding computation (O(n)) if not configured.
+
+        Args:
+            session_id: Session to search in
+            query: Query text to find similar messages for
+            limit: Maximum messages to return
+            min_similarity: Minimum cosine similarity threshold (0-1)
+            exclude_recent: Skip N most recent messages (already in context)
+
+        Returns:
+            List of (message, similarity_score) tuples sorted by similarity
+        """
+        # Try LanceDB vector search first (much faster)
+        if hasattr(self, "_embedding_store") and self._embedding_store is not None:
+            return self._get_relevant_messages_via_lancedb(
+                session_id, query, limit, min_similarity, exclude_recent
+            )
+
+        # Fall back to on-the-fly embedding (slower but works without LanceDB)
+        return self._get_relevant_messages_via_embedding(
+            session_id, query, limit, min_similarity, exclude_recent
+        )
+
+    def _get_relevant_messages_via_lancedb(
+        self,
+        session_id: str,
+        query: str,
+        limit: int,
+        min_similarity: float,
+        exclude_recent: int,
+    ) -> List[Tuple[ConversationMessage, float]]:
+        """Retrieve relevant messages using LanceDB vector search.
+
+        Much faster than on-the-fly embedding - O(log n) vs O(n).
+        """
+        import asyncio
+
+        # Get recent message IDs to exclude
+        exclude_ids: List[str] = []
+        if exclude_recent > 0:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                recent_rows = conn.execute(
+                    """
+                    SELECT id FROM messages
+                    WHERE session_id = ?
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                    """,
+                    (session_id, exclude_recent),
+                ).fetchall()
+                exclude_ids = [row["id"] for row in recent_rows]
+
+        # Run async search
+        async def _search():
+            return await self._embedding_store.search_similar(
+                query=query,
+                session_id=session_id,
+                limit=limit,
+                min_similarity=min_similarity,
+                exclude_message_ids=exclude_ids,
+            )
+
+        try:
+            loop = asyncio.get_running_loop()
+            future = asyncio.ensure_future(_search())
+            search_results = loop.run_until_complete(future)
+        except RuntimeError:
+            search_results = asyncio.run(_search())
+
+        # Fetch full messages from SQLite for the matching IDs
+        if not search_results:
+            return []
+
+        result_ids = [r.message_id for r in search_results]
+        similarity_map = {r.message_id: r.similarity for r in search_results}
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            placeholders = ",".join("?" * len(result_ids))
+            rows = conn.execute(
+                f"""
+                SELECT * FROM messages
+                WHERE id IN ({placeholders})
+                """,
+                result_ids,
+            ).fetchall()
+
+        # Build result list with similarity scores
+        results: List[Tuple[ConversationMessage, float]] = []
+        for row in rows:
+            message = self._message_from_row(row)
+            similarity = similarity_map.get(message.id, 0.0)
+            results.append((message, similarity))
+
+        # Sort by similarity (descending)
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results
+
+    def _get_relevant_messages_via_embedding(
+        self,
+        session_id: str,
+        query: str,
+        limit: int,
+        min_similarity: float,
+        exclude_recent: int,
+    ) -> List[Tuple[ConversationMessage, float]]:
+        """Retrieve relevant messages using on-the-fly embedding computation.
+
+        Fallback when LanceDB is not available. Slower but works without setup.
+        """
+        if not hasattr(self, "_embedding_service") or self._embedding_service is None:
+            logger.warning("No embedding service set for semantic retrieval")
+            return []
+
+        try:
+            # Load all messages from session (excluding recent ones already in context)
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    """
+                    SELECT * FROM messages
+                    WHERE session_id = ?
+                    ORDER BY timestamp DESC
+                    """,
+                    (session_id,),
+                ).fetchall()
+
+            if not rows or len(rows) <= exclude_recent:
+                return []
+
+            # Skip recent messages (already in active context)
+            historical_rows = rows[exclude_recent:]
+
+            # Get query embedding
+            query_embedding = self._embedding_service.embed_text_sync(query[:2000])
+
+            # Compute embeddings and similarities for historical messages
+            scored_messages: List[Tuple[ConversationMessage, float]] = []
+
+            for row in historical_rows:
+                message = self._message_from_row(row)
+
+                # Skip very short messages
+                if len(message.content) < 20:
+                    continue
+
+                # Compute similarity
+                msg_embedding = self._embedding_service.embed_text_sync(message.content[:2000])
+                similarity = self._cosine_similarity(
+                    query_embedding.tolist(), msg_embedding.tolist()
+                )
+
+                if similarity >= min_similarity:
+                    scored_messages.append((message, similarity))
+
+            # Sort by similarity (descending) and limit
+            scored_messages.sort(key=lambda x: x[1], reverse=True)
+            return scored_messages[:limit]
+
+        except Exception as e:
+            logger.warning(f"Semantic retrieval failed: {e}")
+            return []
+
+    def get_relevant_summaries(
+        self,
+        session_id: str,
+        query: str,
+        limit: int = 3,
+        min_similarity: float = 0.25,
+    ) -> List[Tuple[str, float]]:
+        """Retrieve context summaries relevant to current query.
+
+        Searches the context_summaries table for summaries that might
+        contain relevant historical context.
+
+        Args:
+            session_id: Session to search in
+            query: Query text to find relevant summaries for
+            limit: Maximum summaries to return
+            min_similarity: Minimum similarity threshold
+
+        Returns:
+            List of (summary_text, similarity_score) tuples
+        """
+        if not hasattr(self, "_embedding_service") or self._embedding_service is None:
+            return []
+
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    """
+                    SELECT summary, created_at FROM context_summaries
+                    WHERE session_id = ?
+                    ORDER BY created_at DESC
+                    LIMIT 20
+                    """,
+                    (session_id,),
+                ).fetchall()
+
+            if not rows:
+                return []
+
+            query_embedding = self._embedding_service.embed(query[:2000])
+            scored_summaries: List[Tuple[str, float]] = []
+
+            for row in rows:
+                summary = row["summary"]
+                if len(summary) < 10:
+                    continue
+
+                summary_embedding = self._embedding_service.embed(summary[:2000])
+                similarity = self._cosine_similarity(query_embedding, summary_embedding)
+
+                if similarity >= min_similarity:
+                    scored_summaries.append((summary, similarity))
+
+            scored_summaries.sort(key=lambda x: x[1], reverse=True)
+            return scored_summaries[:limit]
+
+        except Exception as e:
+            logger.warning(f"Summary retrieval failed: {e}")
+            return []
+
+    def store_compaction_summary(
+        self,
+        session_id: str,
+        summary: str,
+        messages_summarized: List[str],
+    ) -> None:
+        """Store a compaction summary for later retrieval.
+
+        When context is compacted, store a summary of what was removed
+        so it can be retrieved later if needed.
+
+        Args:
+            session_id: Session the summary belongs to
+            summary: Summary text describing compacted content
+            messages_summarized: List of message IDs that were summarized
+        """
+        if not summary or len(summary) < 5:
+            return
+
+        token_count = len(summary) // self.chars_per_token
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO context_summaries
+                (id, session_id, summary, token_count, messages_summarized, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    f"sum_{uuid.uuid4().hex[:12]}",
+                    session_id,
+                    summary,
+                    token_count,
+                    json.dumps(messages_summarized),
+                    datetime.now().isoformat(),
+                ),
+            )
+
+        logger.debug(f"Stored compaction summary for session {session_id}")
+
+    def get_historical_tool_results(
+        self,
+        session_id: str,
+        tool_names: Optional[List[str]] = None,
+        limit: int = 20,
+    ) -> List[ConversationMessage]:
+        """Retrieve historical tool results from the session.
+
+        Useful for finding relevant previous tool outputs that might
+        inform the current task.
+
+        Args:
+            session_id: Session to search in
+            tool_names: Optional list of tool names to filter by
+            limit: Maximum results to return
+
+        Returns:
+            List of tool result messages
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+
+            if tool_names:
+                placeholders = ",".join("?" * len(tool_names))
+                rows = conn.execute(
+                    f"""
+                    SELECT * FROM messages
+                    WHERE session_id = ?
+                    AND role = 'tool_result'
+                    AND tool_name IN ({placeholders})
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                    """,
+                    (session_id, *tool_names, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM messages
+                    WHERE session_id = ?
+                    AND role = 'tool_result'
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                    """,
+                    (session_id, limit),
+                ).fetchall()
+
+            return [self._message_from_row(row) for row in rows]
+
+    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
+        """Compute cosine similarity between two vectors.
+
+        Args:
+            vec1: First embedding vector
+            vec2: Second embedding vector
+
+        Returns:
+            Cosine similarity score (0-1)
+        """
+        try:
+            import numpy as np
+            v1 = np.array(vec1)
+            v2 = np.array(vec2)
+            dot = np.dot(v1, v2)
+            norm1 = np.linalg.norm(v1)
+            norm2 = np.linalg.norm(v2)
+            if norm1 > 0 and norm2 > 0:
+                return float(dot / (norm1 * norm2))
+        except Exception:
+            pass
+        return 0.0
 
 
 # Convenience function to get global store

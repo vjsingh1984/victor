@@ -33,6 +33,10 @@ from victor.agent.conversation_memory import (
     ConversationStore,
     MessageRole,
 )
+from victor.agent.conversation_embedding_store import (
+    ConversationEmbeddingStore,
+    get_conversation_embedding_store,
+)
 from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
 from victor.agent.debug_logger import get_debug_logger
 from victor.agent.action_authorizer import ActionAuthorizer, ActionIntent
@@ -41,6 +45,7 @@ from victor.agent.prompt_builder import SystemPromptBuilder, get_task_type_hint
 from victor.agent.response_sanitizer import ResponseSanitizer
 from victor.agent.search_router import SearchRouter
 from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity, DEFAULT_BUDGETS
+from victor.agent.context_reminder import ContextReminderManager, create_reminder_manager
 from victor.agent.stream_handler import StreamMetrics
 from victor.agent.milestone_monitor import TaskMilestoneMonitor
 
@@ -49,6 +54,7 @@ from victor.agent.conversation_controller import (
     ConversationController,
     ConversationConfig,
     ContextMetrics,
+    CompactionStrategy,
 )
 from victor.agent.tool_pipeline import (
     ToolPipeline,
@@ -70,7 +76,7 @@ from victor.agent.tool_calling import (
     ToolCallingAdapterRegistry,
     ToolCallParseResult,
 )
-from victor.agent.tool_executor import ToolExecutor
+from victor.agent.tool_executor import ToolExecutor, ValidationMode
 from victor.agent.parallel_executor import (
     create_parallel_executor,
 )
@@ -126,6 +132,62 @@ PROGRESSIVE_TOOLS = {
 
 class AgentOrchestrator:
     """Orchestrates agent interactions, tool execution, and provider communication."""
+
+    # Known provider context windows (in tokens)
+    PROVIDER_CONTEXT_WINDOWS = {
+        "anthropic": 200000,  # Claude models
+        "openai": 128000,  # GPT-4 Turbo
+        "google": 1000000,  # Gemini 1.5 Pro
+        "xai": 131072,  # Grok models
+        "deepseek": 131072,  # DeepSeek V3
+        "moonshot": 262144,  # Kimi K2
+        "ollama": 32768,  # Local models (conservative)
+        "lmstudio": 32768,  # Local models (conservative)
+        "vllm": 32768,  # Local models (conservative)
+    }
+
+    @staticmethod
+    def _calculate_max_context_chars(
+        settings: "Settings",
+        provider: "BaseProvider",
+        model: str,
+    ) -> int:
+        """Calculate maximum context size in characters for a model.
+
+        Args:
+            settings: Application settings
+            provider: LLM provider instance
+            model: Model identifier
+
+        Returns:
+            Maximum context size in characters
+        """
+        # Check settings override first
+        settings_max = getattr(settings, "max_context_chars", None)
+        if settings_max and settings_max > 0:
+            return settings_max
+
+        # Try to get context window from provider
+        context_tokens = None
+        if hasattr(provider, "get_context_window"):
+            try:
+                context_tokens = provider.get_context_window(model)
+            except Exception:
+                pass
+
+        # Fall back to provider defaults
+        if context_tokens is None:
+            provider_name = getattr(provider, "name", "").lower()
+            context_tokens = AgentOrchestrator.PROVIDER_CONTEXT_WINDOWS.get(
+                provider_name, 100000
+            )
+
+        # Convert tokens to chars: ~3.5 chars per token with 80% safety margin
+        max_chars = int(context_tokens * 3.5 * 0.8)
+        logger.info(
+            f"Model context: {context_tokens:,} tokens -> {max_chars:,} chars limit"
+        )
+        return max_chars
 
     def __init__(
         self,
@@ -245,6 +307,14 @@ class AgentOrchestrator:
         self.failed_tool_signatures: set[tuple[str, str]] = set()
         self._tool_capability_warned = False
 
+        # Context reminder manager for intelligent system message injection
+        # Reduces token waste by consolidating reminders and only injecting when context changes
+        self.reminder_manager = create_reminder_manager(
+            provider=self.provider_name,
+            task_complexity="medium",  # Will be updated per-task
+            tool_budget=self.tool_budget,
+        )
+
         # Analytics
         from victor.config.settings import get_project_paths
 
@@ -357,6 +427,16 @@ class AgentOrchestrator:
                     f"ConversationStore initialized. "
                     f"Session: {session.session_id[:8]}..., DB: {db_path}"
                 )
+
+                # Initialize LanceDB embedding store for efficient semantic retrieval
+                # This stores message embeddings for O(log n) vector search
+                if getattr(settings, "conversation_embeddings_enabled", True):
+                    try:
+                        self._init_conversation_embedding_store()
+                    except Exception as embed_err:
+                        logger.warning(
+                            f"Failed to initialize ConversationEmbeddingStore: {embed_err}"
+                        )
             except Exception as e:
                 logger.warning(f"Failed to initialize ConversationStore: {e}")
                 self.memory_manager = None
@@ -366,7 +446,7 @@ class AgentOrchestrator:
 
         # Intent classifier for semantic continuation/completion detection
         # Uses embeddings instead of hardcoded phrase matching
-        self.intent_classifier = IntentClassifier()
+        self.intent_classifier = IntentClassifier.get_instance()
 
         # Tool registry
         self.tools = ToolRegistry()
@@ -384,12 +464,22 @@ class AgentOrchestrator:
         self.argument_normalizer = ArgumentNormalizer(provider_name=provider_name)
 
         # Tool executor for centralized tool execution with retry, caching, and metrics
+        # Parse validation mode from settings
+        validation_mode_str = getattr(settings, "tool_validation_mode", "lenient").lower()
+        validation_mode_map = {
+            "strict": ValidationMode.STRICT,
+            "lenient": ValidationMode.LENIENT,
+            "off": ValidationMode.OFF,
+        }
+        validation_mode = validation_mode_map.get(validation_mode_str, ValidationMode.LENIENT)
+
         self.tool_executor = ToolExecutor(
             tool_registry=self.tools,
             argument_normalizer=self.argument_normalizer,
             tool_cache=self.tool_cache,
             max_retries=getattr(settings, "tool_retry_max_attempts", 3),
             retry_delay=getattr(settings, "tool_retry_base_delay", 1.0),
+            validation_mode=validation_mode,
         )
 
         # Parallel tool executor for concurrent independent tool calls
@@ -451,14 +541,38 @@ class AgentOrchestrator:
         # =================================================================
 
         # ConversationController: Manages message history and conversation state
+        # Calculate model-aware context limit
+        model_context_chars = self._calculate_max_context_chars(settings, provider, model)
+
+        # Parse compaction strategy from settings
+        compaction_strategy_str = getattr(settings, "context_compaction_strategy", "tiered").lower()
+        compaction_strategy_map = {
+            "simple": CompactionStrategy.SIMPLE,
+            "tiered": CompactionStrategy.TIERED,
+            "semantic": CompactionStrategy.SEMANTIC,
+            "hybrid": CompactionStrategy.HYBRID,
+        }
+        compaction_strategy = compaction_strategy_map.get(
+            compaction_strategy_str, CompactionStrategy.TIERED
+        )
+
         self._conversation_controller = ConversationController(
             config=ConversationConfig(
-                max_context_chars=getattr(settings, "max_context_chars", 200000),
+                max_context_chars=model_context_chars,
                 enable_stage_tracking=True,
                 enable_context_monitoring=True,
+                # Smart compaction settings from Settings
+                compaction_strategy=compaction_strategy,
+                min_messages_to_keep=getattr(settings, "context_min_messages_to_keep", 6),
+                tool_result_retention_weight=getattr(settings, "context_tool_retention_weight", 1.5),
+                recent_message_weight=getattr(settings, "context_recency_weight", 2.0),
+                semantic_relevance_threshold=getattr(settings, "context_semantic_threshold", 0.3),
             ),
             message_history=self.conversation,
             state_machine=self.conversation_state,
+            # Pass SQLite store for persistent semantic memory
+            conversation_store=self.memory_manager,
+            session_id=self._memory_session_id,
         )
         self._conversation_controller.set_system_prompt(self._system_prompt)
 
@@ -580,6 +694,55 @@ class AgentOrchestrator:
         metrics = self._conversation_controller.get_context_metrics()
         return metrics.char_count, metrics.estimated_tokens
 
+    def _get_model_context_window(self) -> int:
+        """Get context window size for the current model.
+
+        Queries the provider for model-specific context window.
+        Falls back to settings or default if provider doesn't support it.
+
+        Returns:
+            Context window size in tokens
+        """
+        # Try to get context window from provider
+        if hasattr(self.provider, "get_context_window"):
+            try:
+                return self.provider.get_context_window(self.model)
+            except Exception:
+                pass
+
+        # Known provider defaults (in tokens)
+        provider_defaults = {
+            "anthropic": 200000,  # Claude models
+            "openai": 128000,  # GPT-4 Turbo
+            "google": 1000000,  # Gemini 1.5 Pro
+            "xai": 131072,  # Grok models
+            "deepseek": 131072,  # DeepSeek V3
+            "moonshot": 262144,  # Kimi K2
+            "ollama": 32768,  # Local models (conservative)
+            "lmstudio": 32768,  # Local models (conservative)
+        }
+
+        return provider_defaults.get(self.provider_name, 100000)
+
+    def _get_max_context_chars(self) -> int:
+        """Get maximum context size in characters.
+
+        Derives from model context window, converting tokens to chars.
+        Average ~4 chars per token, with safety margin.
+
+        Returns:
+            Maximum context size in characters
+        """
+        # Check settings override first
+        settings_max = getattr(self.settings, "max_context_chars", None)
+        if settings_max and settings_max > 0:
+            return settings_max
+
+        # Calculate from model context window
+        # Use ~3.5 chars per token with 80% safety margin
+        context_tokens = self._get_model_context_window()
+        return int(context_tokens * 3.5 * 0.8)
+
     def _check_context_overflow(self, max_context_chars: int = 200000) -> bool:
         """Check if context is at risk of overflow.
 
@@ -617,6 +780,45 @@ class AgentOrchestrator:
         """Initialize fresh stream metrics for a new streaming session."""
         self._current_stream_metrics = StreamMetrics(start_time=time.time())
         return self._current_stream_metrics
+
+    def _init_conversation_embedding_store(self) -> None:
+        """Initialize LanceDB embedding store for semantic conversation retrieval.
+
+        This creates a ConversationEmbeddingStore that:
+        - Stores pre-computed message embeddings in LanceDB
+        - Enables O(log n) vector search instead of O(n) on-the-fly embedding
+        - Syncs automatically when messages are added to ConversationStore
+        """
+        if self.memory_manager is None:
+            return
+
+        try:
+            from victor.embeddings.service import EmbeddingService
+
+            # Get the shared embedding service
+            embedding_service = EmbeddingService.get_instance()
+
+            # Create the embedding store
+            self._conversation_embedding_store = ConversationEmbeddingStore(
+                embedding_service=embedding_service,
+            )
+
+            # Wire it to the memory manager for automatic sync
+            self.memory_manager.set_embedding_store(self._conversation_embedding_store)
+
+            # Also set the embedding service for fallback
+            self.memory_manager.set_embedding_service(embedding_service)
+
+            # Initialize async (fire and forget for faster startup)
+            asyncio.create_task(self._conversation_embedding_store.initialize())
+
+            logger.info(
+                "[AgentOrchestrator] ConversationEmbeddingStore configured. "
+                "Message embeddings will sync to LanceDB."
+            )
+        except Exception as e:
+            logger.warning(f"Failed to initialize ConversationEmbeddingStore: {e}")
+            self._conversation_embedding_store = None
 
     def _record_first_token(self) -> None:
         """Record the time of first token received."""
@@ -894,6 +1096,196 @@ class AgentOrchestrator:
             Set of tool names recommended for current stage
         """
         return self.conversation_state.get_stage_tools()
+
+    # =========================================================================
+    # Provider/Model Hot-Swap Methods
+    # =========================================================================
+
+    def switch_provider(
+        self,
+        provider_name: str,
+        model: Optional[str] = None,
+        **provider_kwargs: Any,
+    ) -> bool:
+        """Switch to a different provider mid-conversation.
+
+        This method reinitializes the provider, tool calling adapter, and
+        prompt builder while preserving the conversation history.
+
+        Args:
+            provider_name: Name of the provider (ollama, lmstudio, anthropic, etc.)
+            model: Optional model name. If not provided, uses current model.
+            **provider_kwargs: Additional provider-specific arguments (base_url, api_key, etc.)
+
+        Returns:
+            True if switch was successful, False otherwise
+
+        Example:
+            # Switch from ollama to lmstudio
+            orchestrator.switch_provider("lmstudio", "qwen2.5-coder:14b", base_url="http://localhost:1234")
+
+            # Switch provider with profile config
+            orchestrator.switch_provider("anthropic", "claude-sonnet-4-20250514")
+        """
+        try:
+            # Get provider settings from settings if not provided
+            if not provider_kwargs:
+                provider_kwargs = self.settings.get_provider_settings(provider_name)
+
+            # Create new provider instance
+            new_provider = ProviderRegistry.create(provider_name, **provider_kwargs)
+
+            # Determine model to use
+            new_model = model or self.model
+
+            # Update core attributes
+            old_provider_name = self.provider_name
+            old_model = self.model
+
+            self.provider = new_provider
+            self.model = new_model
+            self.provider_name = provider_name.lower()
+
+            # Reinitialize tool calling adapter for the new provider/model
+            self.tool_adapter = ToolCallingAdapterRegistry.get_adapter(
+                provider_name=self.provider_name,
+                model=new_model,
+                config={"settings": self.settings},
+            )
+            self.tool_calling_caps = self.tool_adapter.get_capabilities()
+
+            # Reinitialize prompt builder
+            self.prompt_builder = SystemPromptBuilder(
+                provider_name=self.provider_name,
+                model=new_model,
+                tool_adapter=self.tool_adapter,
+                capabilities=self.tool_calling_caps,
+            )
+
+            # Rebuild system prompt with new adapter hints
+            base_system_prompt = self._build_system_prompt_with_adapter()
+            if self.project_context.content:
+                self._system_prompt = (
+                    base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
+                )
+            else:
+                self._system_prompt = base_system_prompt
+
+            # Update tool budget based on new adapter's recommendation
+            default_budget = max(self.tool_calling_caps.recommended_tool_budget, 50)
+            self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
+
+            # Log the switch
+            logger.info(
+                f"Switched provider: {old_provider_name}:{old_model} -> "
+                f"{self.provider_name}:{new_model} "
+                f"(native_tools={self.tool_calling_caps.native_tool_calls})"
+            )
+
+            # Log analytics event
+            self.usage_logger.log_event(
+                "provider_switch",
+                {
+                    "old_provider": old_provider_name,
+                    "old_model": old_model,
+                    "new_provider": self.provider_name,
+                    "new_model": new_model,
+                    "native_tool_calls": self.tool_calling_caps.native_tool_calls,
+                },
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to switch provider to {provider_name}: {e}")
+            return False
+
+    def switch_model(self, model: str) -> bool:
+        """Switch to a different model on the current provider.
+
+        This is a lighter-weight switch than switch_provider() - it only
+        updates the model and reinitializes the tool adapter.
+
+        Args:
+            model: New model name
+
+        Returns:
+            True if switch was successful, False otherwise
+
+        Example:
+            orchestrator.switch_model("qwen2.5-coder:32b")
+        """
+        try:
+            old_model = self.model
+            self.model = model
+
+            # Reinitialize tool calling adapter for the new model
+            self.tool_adapter = ToolCallingAdapterRegistry.get_adapter(
+                provider_name=self.provider_name,
+                model=model,
+                config={"settings": self.settings},
+            )
+            self.tool_calling_caps = self.tool_adapter.get_capabilities()
+
+            # Reinitialize prompt builder
+            self.prompt_builder = SystemPromptBuilder(
+                provider_name=self.provider_name,
+                model=model,
+                tool_adapter=self.tool_adapter,
+                capabilities=self.tool_calling_caps,
+            )
+
+            # Rebuild system prompt
+            base_system_prompt = self._build_system_prompt_with_adapter()
+            if self.project_context.content:
+                self._system_prompt = (
+                    base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
+                )
+            else:
+                self._system_prompt = base_system_prompt
+
+            # Update tool budget
+            default_budget = max(self.tool_calling_caps.recommended_tool_budget, 50)
+            self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
+
+            logger.info(
+                f"Switched model: {old_model} -> {model} "
+                f"(native_tools={self.tool_calling_caps.native_tool_calls})"
+            )
+
+            self.usage_logger.log_event(
+                "model_switch",
+                {
+                    "provider": self.provider_name,
+                    "old_model": old_model,
+                    "new_model": model,
+                    "native_tool_calls": self.tool_calling_caps.native_tool_calls,
+                },
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to switch model to {model}: {e}")
+            return False
+
+    def get_current_provider_info(self) -> Dict[str, Any]:
+        """Get information about the current provider and model.
+
+        Returns:
+            Dictionary with provider/model info and capabilities
+        """
+        return {
+            "provider": self.provider_name,
+            "model": self.model,
+            "supports_tools": self.provider.supports_tools() if self.provider else False,
+            "native_tool_calls": self.tool_calling_caps.native_tool_calls,
+            "streaming_tool_calls": self.tool_calling_caps.streaming_tool_calls,
+            "parallel_tool_calls": self.tool_calling_caps.parallel_tool_calls,
+            "thinking_mode": self.tool_calling_caps.thinking_mode,
+            "tool_budget": self.tool_budget,
+            "tool_calls_used": self.tool_calls_used,
+        }
 
     def _parse_tool_calls_with_adapter(
         self, content: str, raw_tool_calls: Optional[List[Dict[str, Any]]] = None
@@ -1758,6 +2150,9 @@ These are the actual search results. Reference only the files and matches shown 
         # Reset progress tracker for new conversation turn
         self.progress_tracker.reset()
 
+        # Reset context reminder manager for new conversation turn
+        self.reminder_manager.reset()
+
         # Local aliases for frequently-used progress tracker values
         # These are derived from the progress tracker config for convenience in logs
         max_total_iterations = self.progress_tracker.config.max_total_iterations
@@ -1805,6 +2200,13 @@ These are the actual search results. Reference only the files and matches shown 
                 f"Task complexity: {task_classification.complexity.value}, "
                 f"confidence: {task_classification.confidence:.2f}"
             )
+
+        # Update reminder manager with task complexity and hint
+        self.reminder_manager.update_state(
+            task_complexity=task_classification.complexity.value,
+            task_hint=task_classification.prompt_hint,
+            tool_budget=complexity_tool_budget,
+        )
 
         # Gap 4: Detect intent and inject prompt guard for non-write tasks
         intent_result = self.intent_detector.detect(user_message)
@@ -1971,35 +2373,50 @@ These are the actual search results. Reference only the files and matches shown 
                 is_analysis_task=is_analysis_task,
             )
 
-            # Check for context overflow
-            max_context = getattr(self.settings, "max_context_chars", 200000)
+            # Check for context overflow (using model-aware limit)
+            max_context = self._get_max_context_chars()
             if self._check_context_overflow(max_context):
-                logger.warning("Context overflow detected. Forcing completion.")
-                yield StreamChunk(
-                    content="\n[tool] ⚠ Context size limit reached. Providing summary.\n"
+                # Try smart compaction first before forcing completion
+                logger.warning("Context overflow detected. Attempting smart compaction...")
+                removed = self._conversation_controller.smart_compact_history(
+                    current_query=user_message
                 )
-                # Force completion due to context overflow
-                self.add_message(
-                    "system",
-                    "CRITICAL: Context size limit reached. Provide a concise summary of findings.",
-                )
-                try:
-                    response = await self.provider.chat(
-                        messages=self.messages,
-                        model=self.model,
-                        temperature=self.temperature,
-                        max_tokens=self.max_tokens,
-                        tools=None,
+                if removed > 0:
+                    logger.info(f"Smart compaction removed {removed} messages")
+                    yield StreamChunk(
+                        content=f"\n[context] Compacted history ({removed} messages) to continue.\n"
                     )
-                    if response and response.content:
-                        sanitized = self._sanitize_response(response.content)
-                        if sanitized:
-                            self.add_message("assistant", sanitized)
-                            yield StreamChunk(content=sanitized)
-                except Exception as e:
-                    logger.warning(f"Final response after context overflow failed: {e}")
-                yield StreamChunk(content="", is_final=True)
-                return
+                    # Inject context reminder about compacted content
+                    self._conversation_controller.inject_compaction_context()
+
+                # Check if still overflowing after compaction
+                if self._check_context_overflow(max_context):
+                    logger.warning("Still overflowing after compaction. Forcing completion.")
+                    yield StreamChunk(
+                        content="\n[tool] ⚠ Context size limit reached. Providing summary.\n"
+                    )
+                    # Force completion due to context overflow
+                    self.add_message(
+                        "system",
+                        "CRITICAL: Context size limit reached. Provide a concise summary of findings.",
+                    )
+                    try:
+                        response = await self.provider.chat(
+                            messages=self.messages,
+                            model=self.model,
+                            temperature=self.temperature,
+                            max_tokens=self.max_tokens,
+                            tools=None,
+                        )
+                        if response and response.content:
+                            sanitized = self._sanitize_response(response.content)
+                            if sanitized:
+                                self.add_message("assistant", sanitized)
+                                yield StreamChunk(content=sanitized)
+                    except Exception as e:
+                        logger.warning(f"Final response after context overflow failed: {e}")
+                    yield StreamChunk(content="", is_final=True)
+                    return
 
             if total_iterations > max_total_iterations:
                 logger.warning(
@@ -2525,33 +2942,93 @@ These are the actual search results. Reference only the files and matches shown 
             tool_calls = tool_calls[:remaining]
             for tool_call in tool_calls:
                 tool_name = tool_call.get("name", "tool")
+                tool_args = tool_call.get("arguments", {})
                 # Clean user-friendly message without internal [tool] prefix
-                yield StreamChunk(content=f"🔧 Running {tool_name}...\n")
+                # Show relevant context for observability (command, path, file, etc.)
+                if tool_name == "execute_bash" and "command" in tool_args:
+                    cmd = tool_args["command"]
+                    # Truncate long commands for readability
+                    cmd_display = cmd[:80] + "..." if len(cmd) > 80 else cmd
+                    yield StreamChunk(
+                        content="",
+                        metadata={"status": f"🔧 Running {tool_name}: `{cmd_display}`"},
+                    )
+                elif tool_name == "list_directory":
+                    path = tool_args.get("path", ".")
+                    yield StreamChunk(
+                        content="",
+                        metadata={"status": f"🔧 Listing directory: {path}"},
+                    )
+                elif tool_name == "read_file":
+                    path = tool_args.get("path", "file")
+                    yield StreamChunk(
+                        content="",
+                        metadata={"status": f"🔧 Reading file: {path}"},
+                    )
+                elif tool_name == "edit_files":
+                    files = tool_args.get("files", [])
+                    if files and isinstance(files, list):
+                        paths = [f.get("path", "?") for f in files[:3]]
+                        path_display = ", ".join(paths)
+                        if len(files) > 3:
+                            path_display += f" (+{len(files) - 3} more)"
+                        yield StreamChunk(
+                            content="",
+                            metadata={"status": f"🔧 Editing: {path_display}"},
+                        )
+                    else:
+                        yield StreamChunk(
+                            content="",
+                            metadata={"status": f"🔧 Running {tool_name}..."},
+                        )
+                elif tool_name == "write_file":
+                    path = tool_args.get("path", "file")
+                    yield StreamChunk(
+                        content="",
+                        metadata={"status": f"🔧 Writing file: {path}"},
+                    )
+                elif tool_name == "code_search":
+                    query = tool_args.get("query", "")
+                    query_display = query[:50] + "..." if len(query) > 50 else query
+                    yield StreamChunk(
+                        content="",
+                        metadata={"status": f"🔧 Searching: {query_display}"},
+                    )
+                else:
+                    yield StreamChunk(
+                        content="",
+                        metadata={"status": f"🔧 Running {tool_name}..."},
+                    )
 
             tool_results = await self._handle_tool_calls(tool_calls)
             for result in tool_results:
                 tool_name = result.get("name", "tool")
                 elapsed = result.get("elapsed", 0.0)
                 if result.get("success"):
-                    yield StreamChunk(content=f"   ✓ {tool_name} ({elapsed:.1f}s)\n")
+                    yield StreamChunk(
+                        content="",
+                        metadata={"status": f"✓ {tool_name} ({elapsed:.1f}s)"},
+                    )
                 else:
-                    yield StreamChunk(content=f"   ✗ {tool_name} failed\n")
+                    yield StreamChunk(
+                        content="",
+                        metadata={"status": f"✗ {tool_name} failed"},
+                    )
 
-            yield StreamChunk(content="💭 Thinking...\n")
+            yield StreamChunk(content="", metadata={"status": "💭 Thinking..."})
 
-            if self.observed_files:
-                evidence_note = "Evidence files read: " + ", ".join(
-                    sorted(set(self.observed_files))
-                )
-                self.add_message(
-                    "system",
-                    evidence_note + " Only cite these or tool outputs; do not invent paths.",
-                )
-            else:
-                self.add_message(
-                    "system",
-                    "No files read yet. Avoid file-specific claims; suggest using tools if needed.",
-                )
+            # Update reminder manager state and inject consolidated reminder if needed
+            # This replaces the previous per-tool-call evidence injection with smart throttling
+            self.reminder_manager.update_state(
+                observed_files=set(self.observed_files) if self.observed_files else set(),
+                executed_tool=tool_name,
+                tool_calls=self.tool_calls_used,
+            )
+
+            # Get consolidated reminder (only returns content when injection is due)
+            reminder = self.reminder_manager.get_consolidated_reminder()
+            if reminder:
+                self.add_message("system", reminder)
 
             context_msg = full_content or user_message
 
@@ -2890,6 +3367,10 @@ These are the actual search results. Reference only the files and matches shown 
         # Reset conversation state machine
         if hasattr(self, "conversation_state"):
             self.conversation_state.reset()
+
+        # Reset context reminder manager
+        if hasattr(self, "reminder_manager"):
+            self.reminder_manager.reset()
 
         logger.debug("Conversation and session state reset")
 

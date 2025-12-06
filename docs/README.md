@@ -6,22 +6,26 @@ Comprehensive documentation for Victor - Enterprise-Ready AI Coding Assistant.
 
 | Document | Description |
 |----------|-------------|
-| [Quick Start](guides/QUICKSTART.md) | Installation and first steps |
+| [Installation](guides/INSTALLATION.md) | Complete installation guide |
+| [Quick Start](guides/QUICKSTART.md) | First steps with Victor |
 | [User Guide](USER_GUIDE.md) | Complete usage guide |
-| [Tool Catalog](TOOL_CATALOG.md) | All 43 available tools |
+| [Tool Catalog](TOOL_CATALOG.md) | All 54+ available tools |
 | [Model Comparison](MODEL_COMPARISON.md) | Ollama model benchmarks |
+| [Releasing](RELEASING.md) | Release process for maintainers |
 
 ## Documentation Structure
 
 ```
 docs/
 ├── USER_GUIDE.md           # Comprehensive user guide
-├── TOOL_CATALOG.md         # All 43 tools with examples
+├── TOOL_CATALOG.md         # All 54+ tools with examples
 ├── MODEL_COMPARISON.md     # Ollama model benchmarks
 ├── DEVELOPER_GUIDE.md      # Contributing and development
+├── RELEASING.md            # Release process for maintainers
 ├── ENTERPRISE.md           # Enterprise deployment
 │
 ├── guides/                 # How-to guides
+│   ├── INSTALLATION.md     # Complete installation guide
 │   ├── QUICKSTART.md       # Step-by-step quickstart
 │   ├── MCP_GUIDE.md        # MCP server setup
 │   ├── PLUGIN_GUIDE.md     # Writing plugins
@@ -52,8 +56,9 @@ docs/
 ## By Topic
 
 ### Getting Started
-- [Quick Start Guide](guides/QUICKSTART.md)
-- [User Guide](USER_GUIDE.md)
+- [Installation Guide](guides/INSTALLATION.md) - All installation methods
+- [Quick Start Guide](guides/QUICKSTART.md) - First steps
+- [User Guide](USER_GUIDE.md) - Complete usage
 - [Configuration](guides/QUICKSTART.md#configuration)
 
 ### Using Victor
@@ -74,6 +79,10 @@ docs/
 - [Developer Guide](DEVELOPER_GUIDE.md)
 - [Plugin Development](guides/PLUGIN_GUIDE.md)
 - [MCP Integration](guides/MCP_GUIDE.md)
+
+### Releasing & Distribution
+- [Releasing Guide](RELEASING.md) - Creating releases
+- [Installation Methods](guides/INSTALLATION.md#installation-methods)
 
 ### Architecture
 - [Architecture Deep Dive](ARCHITECTURE_DEEP_DIVE.md)

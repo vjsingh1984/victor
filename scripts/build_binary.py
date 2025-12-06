@@ -91,6 +91,9 @@ def get_hidden_imports() -> list[str]:
         "victor.agent.modes",
         "victor.agent.model_switcher",
         "victor.agent.change_tracker",
+        "victor.agent.conversation_embedding_store",
+        "victor.agent.conversation_memory",
+        "victor.agent.conversation_controller",
         "victor.providers",
         "victor.providers.anthropic_provider",
         "victor.providers.openai_provider",
@@ -126,6 +129,10 @@ def get_hidden_imports() -> list[str]:
         # Async
         "asyncio",
         "aiofiles",
+
+        # Vector storage
+        "lancedb",
+        "pyarrow",
 
         # Other
         "git",

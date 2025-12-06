@@ -350,6 +350,8 @@ class Settings(BaseSettings):
     anthropic_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
     google_api_key: Optional[str] = None
+    moonshot_api_key: Optional[str] = None  # Moonshot AI for Kimi K2 models
+    deepseek_api_key: Optional[str] = None  # DeepSeek for DeepSeek-V3 models
 
     # Local server URLs
     # Can be overridden via environment variables:
@@ -441,6 +443,21 @@ class Settings(BaseSettings):
         "plan_files",
     ]
 
+    # Tool Argument Validation
+    # Controls pre-execution JSON Schema validation of tool arguments
+    # Options: "strict" (block on errors), "lenient" (warn only), "off" (disable)
+    tool_validation_mode: str = "lenient"
+
+    # Context Compaction Settings
+    # Controls how conversation history is managed when context grows too large
+    # Options: "simple" (keep N recent), "tiered" (prioritize tool results),
+    #          "semantic" (use embeddings), "hybrid" (combine tiered + semantic)
+    context_compaction_strategy: str = "tiered"
+    context_min_messages_to_keep: int = 6  # Minimum messages to retain after compaction
+    context_tool_retention_weight: float = 1.5  # Boost for tool result retention
+    context_recency_weight: float = 2.0  # Boost for recent messages
+    context_semantic_threshold: float = 0.3  # Min similarity for semantic retention
+
     # Plugin System
     plugin_enabled: bool = True  # Enable plugin system
     # Note: plugin_dirs now uses get_project_paths().global_plugins_dir
@@ -476,7 +493,9 @@ class Settings(BaseSettings):
     # Conversation Memory (Multi-turn Context Retention)
     # ==========================================================================
     conversation_memory_enabled: bool = True  # Enable SQLite-backed conversation persistence
+    conversation_embeddings_enabled: bool = True  # Enable LanceDB embeddings for semantic retrieval
     # Note: conversation_db now uses get_project_paths().conversation_db (project-local)
+    # Embeddings stored at get_project_paths().embeddings_dir / "conversations"
     max_context_tokens: int = 100000  # Maximum tokens in context window
     response_token_reserve: int = 4096  # Tokens reserved for model response
 
@@ -775,22 +794,40 @@ class Settings(BaseSettings):
         if provider_config:
             settings.update(provider_config.model_dump(exclude_none=True))
 
-        # Override with environment variables and default settings
+        # Use secure API key manager for provider isolation
+        # Only loads the specific provider's key, not all keys
+        from victor.config.api_keys import get_api_key
+
+        # Set provider-specific defaults and load API key
         if provider == "anthropic":
-            settings["api_key"] = self.anthropic_api_key or settings.get("api_key")
+            api_key = get_api_key("anthropic")
+            if api_key:
+                settings["api_key"] = api_key
             settings.setdefault("base_url", "https://api.anthropic.com")
 
         elif provider == "openai":
-            settings["api_key"] = self.openai_api_key or settings.get("api_key")
+            api_key = get_api_key("openai")
+            if api_key:
+                settings["api_key"] = api_key
             settings.setdefault("base_url", "https://api.openai.com/v1")
 
         elif provider == "google":
-            settings["api_key"] = self.google_api_key or settings.get("api_key")
+            api_key = get_api_key("google")
+            if api_key:
+                settings["api_key"] = api_key
+
+        elif provider == "xai":
+            api_key = get_api_key("xai")
+            if api_key:
+                settings["api_key"] = api_key
+            settings.setdefault("base_url", "https://api.x.ai/v1")
 
         elif provider == "ollama":
+            # Local provider - no API key needed
             settings.setdefault("base_url", self.ollama_base_url)
 
         elif provider == "lmstudio":
+            # Local provider - no API key needed
             urls = getattr(self, "lmstudio_base_urls", []) or []
             # If provider config supplied a list, merge/override
             if "base_url" in settings:
@@ -816,7 +853,20 @@ class Settings(BaseSettings):
             settings["base_url"] = f"{(chosen or urls[0]).rstrip('/')}/v1"
 
         elif provider == "vllm":
+            # Local provider - no API key needed
             settings.setdefault("base_url", self.vllm_base_url)
+
+        elif provider in ("moonshot", "kimi"):
+            api_key = get_api_key("moonshot")
+            if api_key:
+                settings["api_key"] = api_key
+            settings.setdefault("base_url", "https://api.moonshot.cn/v1")
+
+        elif provider == "deepseek":
+            api_key = get_api_key("deepseek")
+            if api_key:
+                settings["api_key"] = api_key
+            settings.setdefault("base_url", "https://api.deepseek.com/v1")
 
         return settings
 

@@ -93,6 +93,10 @@ dependencies = [
 
     # Semantic Tool Selection (Default: local embeddings)
     "sentence-transformers>=2.2.0",
+
+    # Vector Storage (conversation embeddings, codebase search)
+    "lancedb>=0.6.0",
+    "pyarrow>=14.0",
 ]
 
 [project.optional-dependencies]
