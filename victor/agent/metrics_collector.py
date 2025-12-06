@@ -63,6 +63,70 @@ class ToolSelectionStats:
 
 
 @dataclass
+class ClassificationStats:
+    """Statistics for task classification.
+
+    Tracks how tasks are being classified and which patterns
+    are being triggered, useful for understanding user intent
+    patterns and classification accuracy.
+    """
+
+    # Task type distribution
+    action_tasks: int = 0
+    analysis_tasks: int = 0
+    generation_tasks: int = 0
+    search_tasks: int = 0
+    edit_tasks: int = 0
+    default_tasks: int = 0
+
+    # Classification source distribution
+    keyword_classifications: int = 0
+    semantic_classifications: int = 0
+    context_classifications: int = 0
+    ensemble_classifications: int = 0
+
+    # Negation detection
+    negations_detected: int = 0
+    positive_overrides: int = 0
+
+    # Confidence tracking
+    total_confidence: float = 0.0
+    classification_count: int = 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        avg_confidence = (
+            self.total_confidence / self.classification_count
+            if self.classification_count > 0
+            else 0.0
+        )
+        return {
+            "task_types": {
+                "action": self.action_tasks,
+                "analysis": self.analysis_tasks,
+                "generation": self.generation_tasks,
+                "search": self.search_tasks,
+                "edit": self.edit_tasks,
+                "default": self.default_tasks,
+            },
+            "sources": {
+                "keyword": self.keyword_classifications,
+                "semantic": self.semantic_classifications,
+                "context": self.context_classifications,
+                "ensemble": self.ensemble_classifications,
+            },
+            "negation_handling": {
+                "negations_detected": self.negations_detected,
+                "positive_overrides": self.positive_overrides,
+            },
+            "confidence": {
+                "average": avg_confidence,
+                "total_classifications": self.classification_count,
+            },
+        }
+
+
+@dataclass
 class CostTracking:
     """Tracks cost by tier for tool executions."""
 
@@ -132,6 +196,9 @@ class MetricsCollector:
 
         # Tool selection stats
         self._selection_stats = ToolSelectionStats()
+
+        # Classification stats
+        self._classification_stats = ClassificationStats()
 
         # Tool usage stats (per-tool breakdown)
         self._tool_usage_stats: Dict[str, Dict[str, Any]] = {}
@@ -274,6 +341,90 @@ class MetricsCollector:
         )
 
     # =========================================================================
+    # Classification Stats
+    # =========================================================================
+
+    def record_classification(
+        self,
+        task_type: str,
+        source: str,
+        confidence: float,
+        negated_count: int = 0,
+        had_positive_override: bool = False,
+    ) -> None:
+        """Record task classification statistics.
+
+        Args:
+            task_type: The classified task type ('action', 'analysis', etc.)
+            source: Classification source ('keyword', 'semantic', 'context', 'ensemble')
+            confidence: Confidence score (0-1)
+            negated_count: Number of negated keywords detected
+            had_positive_override: Whether a positive override was used
+        """
+        # Track task type distribution
+        task_type_lower = task_type.lower()
+        if task_type_lower == "action":
+            self._classification_stats.action_tasks += 1
+        elif task_type_lower == "analysis":
+            self._classification_stats.analysis_tasks += 1
+        elif task_type_lower == "generation":
+            self._classification_stats.generation_tasks += 1
+        elif task_type_lower == "search":
+            self._classification_stats.search_tasks += 1
+        elif task_type_lower == "edit":
+            self._classification_stats.edit_tasks += 1
+        else:
+            self._classification_stats.default_tasks += 1
+
+        # Track source distribution
+        source_lower = source.lower()
+        if source_lower == "keyword":
+            self._classification_stats.keyword_classifications += 1
+        elif source_lower == "semantic":
+            self._classification_stats.semantic_classifications += 1
+        elif source_lower == "context":
+            self._classification_stats.context_classifications += 1
+        elif source_lower == "ensemble":
+            self._classification_stats.ensemble_classifications += 1
+
+        # Track negation handling
+        self._classification_stats.negations_detected += negated_count
+        if had_positive_override:
+            self._classification_stats.positive_overrides += 1
+
+        # Track confidence
+        self._classification_stats.total_confidence += confidence
+        self._classification_stats.classification_count += 1
+
+        # Log event
+        self.usage_logger.log_event(
+            "task_classification",
+            {
+                "task_type": task_type,
+                "source": source,
+                "confidence": confidence,
+                "negated_count": negated_count,
+            },
+        )
+
+        logger.debug(
+            f"Classification: type={task_type}, source={source}, "
+            f"confidence={confidence:.2f}, negated={negated_count}"
+        )
+
+    def get_classification_stats(self) -> Dict[str, Any]:
+        """Get comprehensive classification statistics.
+
+        Returns:
+            Dictionary with classification metrics including:
+            - Task type distribution
+            - Classification source distribution
+            - Negation handling stats
+            - Confidence metrics
+        """
+        return self._classification_stats.to_dict()
+
+    # =========================================================================
     # Tool Execution Stats
     # =========================================================================
 
@@ -346,6 +497,7 @@ class MetricsCollector:
         """
         result: Dict[str, Any] = {
             "selection_stats": self._selection_stats.to_dict(),
+            "classification_stats": self._classification_stats.to_dict(),
             "tool_stats": self._tool_usage_stats.copy(),
             "cost_tracking": self._cost_tracking.to_dict(),
             "top_tools_by_usage": sorted(
@@ -452,6 +604,7 @@ class MetricsCollector:
     def reset_stats(self) -> None:
         """Reset all statistics (e.g., after conversation reset)."""
         self._selection_stats = ToolSelectionStats()
+        self._classification_stats = ClassificationStats()
         self._tool_usage_stats.clear()
         self._cost_tracking = CostTracking()
         self._current_stream_metrics = None

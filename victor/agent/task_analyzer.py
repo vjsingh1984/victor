@@ -53,6 +53,11 @@ from victor.agent.complexity_classifier import (
     TaskClassification,
     TaskComplexity,
 )
+from victor.agent.unified_classifier import (
+    UnifiedTaskClassifier,
+    ClassificationResult,
+    TaskType as UnifiedTaskType,
+)
 
 if TYPE_CHECKING:
     from victor.embeddings.task_classifier import TaskType
@@ -77,6 +82,15 @@ class TaskAnalysis:
     task_type: Optional["TaskType"] = None
     task_type_confidence: float = 0.0
     has_file_context: bool = False
+
+    # Unified classification (keyword-based with negation detection)
+    unified_task_type: UnifiedTaskType = UnifiedTaskType.DEFAULT
+    unified_confidence: float = 0.0
+    is_action_task: bool = False
+    is_analysis_task: bool = False
+    is_generation_task: bool = False
+    needs_execution: bool = False
+    negated_keywords: List[str] = field(default_factory=list)
 
     # Action authorization (for permissions)
     action_intent: ActionIntent = ActionIntent.AMBIGUOUS
@@ -144,6 +158,7 @@ class TaskAnalyzer:
         """Initialize analyzer with lazy-loaded classifiers."""
         self._complexity_classifier: Optional[ComplexityClassifier] = None
         self._action_authorizer: Optional[ActionAuthorizer] = None
+        self._unified_classifier: Optional[UnifiedTaskClassifier] = None
         self._task_classifier: Optional[Any] = None  # Lazy import
         self._intent_classifier: Optional[Any] = None  # Lazy import
 
@@ -162,13 +177,23 @@ class TaskAnalyzer:
         return self._action_authorizer
 
     @property
+    def unified_classifier(self) -> UnifiedTaskClassifier:
+        """Get or create unified task classifier."""
+        if self._unified_classifier is None:
+            self._unified_classifier = UnifiedTaskClassifier(
+                task_analyzer=self,
+                enable_semantic=True,
+            )
+        return self._unified_classifier
+
+    @property
     def task_classifier(self) -> Any:
-        """Get or create task type classifier (lazy import)."""
+        """Get or create task type classifier (uses singleton)."""
         if self._task_classifier is None:
             try:
                 from victor.embeddings.task_classifier import TaskTypeClassifier
 
-                self._task_classifier = TaskTypeClassifier()
+                self._task_classifier = TaskTypeClassifier.get_instance()
             except ImportError:
                 logger.warning("TaskTypeClassifier not available")
                 self._task_classifier = None
@@ -176,12 +201,12 @@ class TaskAnalyzer:
 
     @property
     def intent_classifier(self) -> Any:
-        """Get or create intent classifier (lazy import)."""
+        """Get or create intent classifier (uses singleton)."""
         if self._intent_classifier is None:
             try:
                 from victor.embeddings.intent_classifier import IntentClassifier
 
-                self._intent_classifier = IntentClassifier()
+                self._intent_classifier = IntentClassifier.get_instance()
             except ImportError:
                 logger.warning("IntentClassifier not available")
                 self._intent_classifier = None
@@ -206,6 +231,7 @@ class TaskAnalyzer:
             TaskAnalysis with combined results
         """
         context = context or {}
+        history = context.get("history", [])
 
         # 1. Complexity classification (always run - lightweight)
         complexity_result = self.complexity_classifier.classify(message)
@@ -213,11 +239,26 @@ class TaskAnalyzer:
         # 2. Action authorization (always run - lightweight)
         action_result = self.action_authorizer.detect(message)
 
-        # Build base analysis
+        # 3. Unified classification (keyword + negation detection - always run)
+        if history:
+            unified_result = self.unified_classifier.classify_with_context(message, history)
+        else:
+            unified_result = self.unified_classifier.classify(message)
+
+        # Build base analysis with unified classification
         analysis = TaskAnalysis(
             complexity=complexity_result.complexity,
             tool_budget=complexity_result.tool_budget,
             complexity_confidence=complexity_result.confidence,
+            # Unified classification fields
+            unified_task_type=unified_result.task_type,
+            unified_confidence=unified_result.confidence,
+            is_action_task=unified_result.is_action_task,
+            is_analysis_task=unified_result.is_analysis_task,
+            is_generation_task=unified_result.is_generation_task,
+            needs_execution=unified_result.needs_execution,
+            negated_keywords=[m.keyword for m in unified_result.negated_keywords],
+            # Action authorization fields
             action_intent=action_result.intent,
             can_write_files=action_result.intent == ActionIntent.WRITE_ALLOWED,
             requires_confirmation=action_result.intent == ActionIntent.AMBIGUOUS,
@@ -225,10 +266,12 @@ class TaskAnalyzer:
             analysis_details={
                 "complexity_hint": complexity_result.prompt_hint,
                 "action_signals": action_result.matched_signals,
+                "unified_source": unified_result.source,
+                "unified_matched_keywords": [m.keyword for m in unified_result.matched_keywords],
             },
         )
 
-        # 3. Task type classification (optional - uses embeddings)
+        # 4. Semantic task type classification (optional - uses embeddings)
         if include_task_type and self.task_classifier:
             try:
                 task_result = self.task_classifier.classify(message)
@@ -239,7 +282,7 @@ class TaskAnalyzer:
             except Exception as e:
                 logger.warning(f"Task type classification failed: {e}")
 
-        # 4. Intent classification (optional - uses embeddings)
+        # 5. Intent classification (optional - uses embeddings)
         if include_intent and self.intent_classifier:
             try:
                 intent_result = self.intent_classifier.classify(message)
@@ -309,6 +352,73 @@ class TaskAnalyzer:
         """
         result = self.complexity_classifier.classify(message)
         return result.tool_budget
+
+    def classify_unified(
+        self,
+        message: str,
+        history: Optional[List[Dict[str, Any]]] = None,
+    ) -> ClassificationResult:
+        """Get unified classification with negation detection.
+
+        This method provides robust keyword-based classification with:
+        - Negation detection ("don't analyze" properly handled)
+        - Positive override patterns ("but do run" properly handled)
+        - Contextual boosting from conversation history
+        - Confidence scoring for ensemble decisions
+
+        Args:
+            message: User message
+            history: Optional conversation history for context boosting
+
+        Returns:
+            ClassificationResult with detailed metadata
+        """
+        if history:
+            return self.unified_classifier.classify_with_context(message, history)
+        return self.unified_classifier.classify(message)
+
+    def is_analysis_task(self, message: str) -> bool:
+        """Quick check if message is an analysis task.
+
+        Uses unified classification with negation detection.
+
+        Args:
+            message: User message
+
+        Returns:
+            True if this is an analysis task (not negated)
+        """
+        result = self.unified_classifier.classify(message)
+        return result.is_analysis_task
+
+    def is_action_task(self, message: str) -> bool:
+        """Quick check if message is an action task.
+
+        Uses unified classification with negation detection.
+
+        Args:
+            message: User message
+
+        Returns:
+            True if this is an action task (not negated)
+        """
+        result = self.unified_classifier.classify(message)
+        return result.is_action_task
+
+    def get_negated_keywords(self, message: str) -> List[str]:
+        """Get list of negated keywords in message.
+
+        Useful for debugging and understanding why certain
+        classifications were made.
+
+        Args:
+            message: User message
+
+        Returns:
+            List of negated keyword strings
+        """
+        result = self.unified_classifier.classify(message)
+        return [m.keyword for m in result.negated_keywords]
 
 
 # =============================================================================
