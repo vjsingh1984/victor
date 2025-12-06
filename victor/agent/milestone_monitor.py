@@ -14,6 +14,11 @@
 
 """Goal-aware milestone tracking for intelligent orchestration.
 
+.. deprecated::
+    This module is deprecated. Use `victor.agent.unified_task_tracker.UnifiedTaskTracker`
+    instead, which consolidates TaskMilestoneMonitor and LoopDetector into a single
+    unified system.
+
 This module provides task type detection and milestone tracking to enable
 the orchestrator to make smarter decisions about when to force action,
 when exploration is complete, and what tools are needed.
