@@ -1103,9 +1103,14 @@ class UnifiedTaskTracker:
             Detected TaskType
         """
         from victor.embeddings.task_classifier import TaskType as ClassifierTaskType
-        from victor.embeddings.task_classifier import classify_task_type
+        from victor.embeddings.task_classifier import TaskTypeClassifier
 
-        classifier_type = classify_task_type(message)
+        # Use the singleton classifier instance
+        classifier = TaskTypeClassifier.get_instance()
+        # Initialize synchronously if not already initialized
+        classifier.initialize_sync()
+        result = classifier.classify_sync(message)
+        classifier_type = result.task_type
 
         type_map = {
             ClassifierTaskType.EDIT: TaskType.EDIT,
@@ -1115,6 +1120,9 @@ class UnifiedTaskTracker:
             ClassifierTaskType.ANALYZE: TaskType.ANALYZE,
             ClassifierTaskType.DESIGN: TaskType.DESIGN,
             ClassifierTaskType.GENERAL: TaskType.GENERAL,
+            # Map additional types to closest match
+            ClassifierTaskType.ACTION: TaskType.GENERAL,  # Actions use general limits
+            ClassifierTaskType.ANALYSIS_DEEP: TaskType.ANALYZE,  # Deep analysis uses analyze limits
         }
 
         task_type = type_map.get(classifier_type, TaskType.GENERAL)
