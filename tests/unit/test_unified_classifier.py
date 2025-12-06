@@ -344,6 +344,87 @@ class TestModuleFunctions:
         assert result.task_type == TaskType.ANALYSIS
 
 
+class TestCaching:
+    """Tests for classification caching functionality."""
+
+    @pytest.fixture
+    def classifier(self):
+        return UnifiedTaskClassifier(enable_semantic=False)
+
+    def test_cache_hit(self, classifier):
+        """Test that repeated classifications are cached."""
+        message = "Analyze the code thoroughly"
+
+        # First call - cache miss
+        result1 = classifier.classify(message)
+        stats1 = classifier.get_cache_stats()
+        assert stats1["cache_misses"] == 1
+        assert stats1["cache_hits"] == 0
+
+        # Second call - cache hit
+        result2 = classifier.classify(message)
+        stats2 = classifier.get_cache_stats()
+        assert stats2["cache_hits"] == 1
+        assert stats2["cache_misses"] == 1
+
+        # Results should be the same
+        assert result1.task_type == result2.task_type
+        assert result1.confidence == result2.confidence
+
+    def test_cache_disabled(self, classifier):
+        """Test that cache can be bypassed."""
+        message = "Run the tests"
+
+        # First call with cache
+        classifier.classify(message)
+
+        # Second call with cache disabled - doesn't touch cache
+        classifier.classify(message, use_cache=False)
+        stats = classifier.get_cache_stats()
+
+        # Should have 0 hits and 1 miss (disabled call doesn't touch cache)
+        assert stats["cache_misses"] == 1
+        assert stats["cache_hits"] == 0
+
+        # Third call with cache - should hit cache
+        classifier.classify(message)
+        stats = classifier.get_cache_stats()
+        assert stats["cache_hits"] == 1
+
+    def test_cache_clear(self, classifier):
+        """Test cache clearing."""
+        classifier.classify("Analyze the code")
+        classifier.classify("Run the tests")
+
+        stats = classifier.get_cache_stats()
+        assert stats["cache_size"] == 2
+
+        classifier.clear_cache()
+        stats = classifier.get_cache_stats()
+        assert stats["cache_size"] == 0
+        assert stats["cache_hits"] == 0
+        assert stats["cache_misses"] == 0
+
+    def test_cache_stats(self, classifier):
+        """Test cache statistics reporting."""
+        stats = classifier.get_cache_stats()
+        assert "cache_size" in stats
+        assert "cache_hits" in stats
+        assert "cache_misses" in stats
+        assert "hit_rate" in stats
+        assert "max_size" in stats
+        assert "ttl_seconds" in stats
+
+    def test_different_messages_not_cached_together(self, classifier):
+        """Test that different messages have separate cache entries."""
+        classifier.classify("Analyze the code")
+        classifier.classify("Run the tests")
+
+        stats = classifier.get_cache_stats()
+        assert stats["cache_size"] == 2
+        assert stats["cache_misses"] == 2
+
+
 class TestEdgeCases:
     """Tests for edge cases and boundary conditions."""
 

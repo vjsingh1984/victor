@@ -43,10 +43,13 @@ Example Usage:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from enum import Enum
+from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -54,6 +57,10 @@ if TYPE_CHECKING:
     from victor.agent.task_analyzer import TaskAnalyzer
 
 logger = logging.getLogger(__name__)
+
+# Cache configuration
+CLASSIFICATION_CACHE_SIZE = 256  # Max cached classifications
+CLASSIFICATION_CACHE_TTL = 300  # 5 minutes TTL
 
 
 class TaskType(Enum):
@@ -411,6 +418,11 @@ class UnifiedTaskClassifier:
         # Lazy-loaded semantic classifier
         self._semantic_classifier: Optional["TaskTypeClassifier"] = None
 
+        # Classification cache with TTL
+        self._cache: Dict[str, Tuple[ClassificationResult, float]] = {}
+        self._cache_hits = 0
+        self._cache_misses = 0
+
     @property
     def semantic_classifier(self) -> Optional["TaskTypeClassifier"]:
         """Get semantic classifier, loading lazily."""
@@ -424,15 +436,97 @@ class UnifiedTaskClassifier:
                 self._semantic_classifier = None
         return self._semantic_classifier
 
-    def classify(self, message: str) -> ClassificationResult:
+    def _get_cache_key(self, message: str) -> str:
+        """Generate a cache key for a message.
+
+        Args:
+            message: Message to hash
+
+        Returns:
+            Hash string suitable for cache key
+        """
+        # Use MD5 for speed (not security-sensitive)
+        return hashlib.md5(message.encode()).hexdigest()
+
+    def _check_cache(self, message: str) -> Optional[ClassificationResult]:
+        """Check cache for a classification result.
+
+        Args:
+            message: Message to look up
+
+        Returns:
+            Cached result if valid, None if miss or expired
+        """
+        key = self._get_cache_key(message)
+        if key in self._cache:
+            result, timestamp = self._cache[key]
+            if time.time() - timestamp < CLASSIFICATION_CACHE_TTL:
+                self._cache_hits += 1
+                logger.debug(f"Cache hit for message hash {key[:8]}...")
+                return result
+            else:
+                # Expired, remove from cache
+                del self._cache[key]
+
+        self._cache_misses += 1
+        return None
+
+    def _add_to_cache(self, message: str, result: ClassificationResult) -> None:
+        """Add a classification result to cache.
+
+        Args:
+            message: Original message
+            result: Classification result to cache
+        """
+        # Evict oldest entries if cache is full
+        if len(self._cache) >= CLASSIFICATION_CACHE_SIZE:
+            # Remove oldest entry (first inserted)
+            oldest_key = next(iter(self._cache))
+            del self._cache[oldest_key]
+
+        key = self._get_cache_key(message)
+        self._cache[key] = (result, time.time())
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache performance statistics.
+
+        Returns:
+            Dictionary with cache hit/miss rates and size
+        """
+        total = self._cache_hits + self._cache_misses
+        hit_rate = self._cache_hits / total if total > 0 else 0.0
+        return {
+            "cache_size": len(self._cache),
+            "cache_hits": self._cache_hits,
+            "cache_misses": self._cache_misses,
+            "hit_rate": hit_rate,
+            "max_size": CLASSIFICATION_CACHE_SIZE,
+            "ttl_seconds": CLASSIFICATION_CACHE_TTL,
+        }
+
+    def clear_cache(self) -> None:
+        """Clear the classification cache."""
+        self._cache.clear()
+        self._cache_hits = 0
+        self._cache_misses = 0
+        logger.debug("Classification cache cleared")
+
+    def classify(self, message: str, use_cache: bool = True) -> ClassificationResult:
         """Classify a message using keyword analysis with negation detection.
 
         Args:
             message: User message to classify
+            use_cache: Whether to use caching (default True)
 
         Returns:
             ClassificationResult with task type and confidence
         """
+        # Check cache first
+        if use_cache:
+            cached = self._check_cache(message)
+            if cached is not None:
+                return cached
+
         # Find all keyword matches
         action_matches = _find_keywords_with_positions(message, ACTION_KEYWORDS)
         for m in action_matches:
@@ -523,7 +617,7 @@ class UnifiedTaskClassifier:
         has_analysis = any(not m.negated for m in analysis_matches)
         has_execution = any(not m.negated for m in exec_matches)
 
-        return ClassificationResult(
+        result = ClassificationResult(
             task_type=best_type,
             confidence=confidence,
             is_action_task=has_action or has_gen,  # Generation is a form of action
@@ -537,6 +631,12 @@ class UnifiedTaskClassifier:
             recommended_tool_budget=budget_map[best_type],
             temperature_adjustment=temp_adjustment,
         )
+
+        # Cache the result
+        if use_cache:
+            self._add_to_cache(message, result)
+
+        return result
 
     def classify_with_context(
         self,
