@@ -1197,8 +1197,14 @@ class AgentOrchestrator:
             )
             self.tool_calling_caps = self.tool_adapter.get_capabilities()
 
-            # Apply model-specific exploration settings to task tracker
+            # Apply model-specific exploration settings to legacy task tracker
             self.task_tracker.set_model_exploration_settings(
+                exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
+                continuation_patience=self.tool_calling_caps.continuation_patience,
+            )
+
+            # Apply model-specific exploration settings to unified tracker (primary)
+            self.unified_tracker.set_model_exploration_settings(
                 exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
                 continuation_patience=self.tool_calling_caps.continuation_patience,
             )
@@ -1276,8 +1282,14 @@ class AgentOrchestrator:
             )
             self.tool_calling_caps = self.tool_adapter.get_capabilities()
 
-            # Apply model-specific exploration settings to task tracker
+            # Apply model-specific exploration settings to legacy task tracker
             self.task_tracker.set_model_exploration_settings(
+                exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
+                continuation_patience=self.tool_calling_caps.continuation_patience,
+            )
+
+            # Apply model-specific exploration settings to unified tracker (primary)
+            self.unified_tracker.set_model_exploration_settings(
                 exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
                 continuation_patience=self.tool_calling_caps.continuation_patience,
             )
@@ -2885,13 +2897,13 @@ These are the actual search results. Reference only the files and matches shown 
             # Record iteration in unified tracker
             self.unified_tracker.record_iteration(content_length)
 
-            # Check for loop warning (soft warning before hard stop)
+            # Check for loop warning using UnifiedTaskTracker (primary)
             # This gives the model a chance to correct behavior before we force stop
-            loop_warning = self.progress_tracker.check_loop_warning()
-            if loop_warning and not force_completion:
-                logger.warning(f"LoopDetector WARNING: {loop_warning}")
+            unified_loop_warning = self.unified_tracker.check_loop_warning()
+            if unified_loop_warning and not force_completion:
+                logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
                 yield StreamChunk(
-                    content=f"\n[loop] ⚠ Warning: Approaching loop limit - {loop_warning}\n"
+                    content=f"\n[loop] ⚠ Warning: Approaching loop limit - {unified_loop_warning}\n"
                 )
                 # Inject system message to warn the model
                 self.add_message(
@@ -2907,25 +2919,25 @@ These are the actual search results. Reference only the files and matches shown 
                 # Continue to give the model one more chance
                 continue
 
-            # Check if progress tracker recommends stopping (legacy)
-            stop_reason = self.progress_tracker.should_stop()
-            if stop_reason.should_stop and not force_completion:
-                force_completion = True
-                logger.info(f"LoopDetector: {stop_reason.reason}")
-
-            # Check task-aware force action (legacy)
-            should_force, force_hint = self.task_tracker.should_force_action()
-            if should_force and not force_completion:
-                force_completion = True
-                logger.info(f"Task tracker forcing action: {force_hint}")
-
-            # Check unified tracker (single source of truth - will replace above after migration)
+            # PRIMARY: Check UnifiedTaskTracker for stop decision (single source of truth)
             unified_should_force, unified_hint = self.unified_tracker.should_force_action()
-            if unified_should_force:
+            if unified_should_force and not force_completion:
+                force_completion = True
                 logger.info(
-                    f"UnifiedTaskTracker: should_force={unified_should_force}, "
-                    f"hint={unified_hint}, metrics={self.unified_tracker.get_metrics()}"
+                    f"UnifiedTaskTracker forcing action: {unified_hint}, "
+                    f"metrics={self.unified_tracker.get_metrics()}"
                 )
+
+            # LEGACY (kept for transition validation - can be removed after validation)
+            # Check if legacy progress tracker also recommends stopping
+            legacy_stop_reason = self.progress_tracker.should_stop()
+            if legacy_stop_reason.should_stop:
+                logger.debug(f"Legacy LoopDetector also recommends stop: {legacy_stop_reason.reason}")
+
+            # LEGACY: Check legacy task-aware force action
+            legacy_should_force, legacy_force_hint = self.task_tracker.should_force_action()
+            if legacy_should_force:
+                logger.debug(f"Legacy TaskTracker also recommends force: {legacy_force_hint}")
 
             logger.debug(f"After streaming pass, tool_calls = {tool_calls}")
 
