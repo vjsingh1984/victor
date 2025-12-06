@@ -1262,6 +1262,58 @@ class AgentOrchestrator:
         # Move verbose argument logging to debug level - not user-facing
         logger.debug(f"Tool call: {name} with args: {kwargs}")
 
+    def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
+        """Classify task type based on keywords in the user message.
+
+        Analyzes the user message to determine if it's an action-oriented task
+        (create, execute, run) or an analysis/exploration task (analyze, review).
+
+        Args:
+            user_message: The user's input message
+
+        Returns:
+            Dictionary with:
+            - is_action_task: bool - True if task requires action (create/execute/run)
+            - is_analysis_task: bool - True if task requires analysis/exploration
+            - needs_execution: bool - True if task specifically requires execution
+            - coarse_task_type: str - "analysis", "action", or "default"
+        """
+        message_lower = user_message.lower()
+
+        # Action-oriented keywords (create, execute, run)
+        action_keywords = ["create", "generate", "write", "execute", "run", "make", "build"]
+        is_action_task = any(keyword in message_lower for keyword in action_keywords)
+
+        # Execution-specific keywords
+        execution_keywords = ["execute", "run"]
+        needs_execution = any(keyword in message_lower for keyword in execution_keywords)
+
+        # Analysis/exploration keywords
+        analysis_keywords = [
+            "analyze", "analysis", "review", "examine", "understand", "explore",
+            "audit", "inspect", "investigate", "survey", "comprehensive", "thorough",
+            "entire codebase", "all files", "full analysis", "deep dive",
+            # Question patterns that require exploration
+            "what are the", "how does", "how do", "explain the", "describe the",
+            "key components", "architecture", "structure",
+        ]
+        is_analysis_task = any(keyword in message_lower for keyword in analysis_keywords)
+
+        # Determine coarse task category
+        if is_analysis_task:
+            coarse_task_type = "analysis"
+        elif is_action_task:
+            coarse_task_type = "action"
+        else:
+            coarse_task_type = "default"
+
+        return {
+            "is_action_task": is_action_task,
+            "is_analysis_task": is_analysis_task,
+            "needs_execution": needs_execution,
+            "coarse_task_type": coarse_task_type,
+        }
+
     def _get_tool_status_message(self, tool_name: str, tool_args: Dict[str, Any]) -> str:
         """Generate a user-friendly status message for a tool execution.
 
@@ -2183,54 +2235,19 @@ These are the actual search results. Reference only the files and matches shown 
         # Iteratively stream → run tools → stream follow-up until no tool calls or budget exhausted
         context_msg = user_message
 
-        # Detect action-oriented tasks (create, execute, run) - should allow more exploration before action
-        action_keywords = ["create", "generate", "write", "execute", "run", "make", "build"]
-        is_action_task = any(keyword in user_message.lower() for keyword in action_keywords)
+        # Classify task type based on keywords
+        task_keywords = self._classify_task_keywords(user_message)
+        is_action_task = task_keywords["is_action_task"]
+        is_analysis_task = task_keywords["is_analysis_task"]
+        needs_execution = task_keywords["needs_execution"]
+        coarse_task_type = task_keywords["coarse_task_type"]
 
-        # Detect analysis/exploration tasks that need extensive reading
-        analysis_keywords = [
-            "analyze",
-            "analysis",
-            "review",
-            "examine",
-            "understand",
-            "explore",
-            "audit",
-            "inspect",
-            "investigate",
-            "survey",
-            "comprehensive",
-            "thorough",
-            "entire codebase",
-            "all files",
-            "full analysis",
-            "deep dive",
-            # Question patterns that require exploration
-            "what are the",
-            "how does",
-            "how do",
-            "explain the",
-            "describe the",
-            "key components",
-            "architecture",
-            "structure",
-        ]
-        is_analysis_task = any(keyword in user_message.lower() for keyword in analysis_keywords)
-
-        # Determine coarse task category for logging and behavior tuning
-        # (unified_tracker uses fine-grained task type internally)
-        if is_analysis_task:
-            coarse_task_type = "analysis"
-            # For compound analysis+edit tasks, unified_tracker handles exploration limits
-            if unified_task_type.value in ("edit", "create"):
-                logger.info(
-                    f"Compound task detected (analysis+{unified_task_type.value}): "
-                    f"unified_tracker will use appropriate exploration limits"
-                )
-        elif is_action_task:
-            coarse_task_type = "action"
-        else:
-            coarse_task_type = "default"
+        # For compound analysis+edit tasks, unified_tracker handles exploration limits
+        if is_analysis_task and unified_task_type.value in ("edit", "create"):
+            logger.info(
+                f"Compound task detected (analysis+{unified_task_type.value}): "
+                f"unified_tracker will use appropriate exploration limits"
+            )
 
         logger.info(
             f"Task type classification: coarse={coarse_task_type}, "
@@ -2283,10 +2300,7 @@ These are the actual search results. Reference only the files and matches shown 
                 f"Detected action-oriented task - allowing up to {max_exploration_iterations} exploration iterations"
             )
 
-            # Detect if this is specifically about executing/running scripts
-            execution_keywords = ["execute", "run"]
-            needs_execution = any(keyword in user_message.lower() for keyword in execution_keywords)
-
+            # needs_execution is already computed by _classify_task_keywords
             if needs_execution:
                 self.add_message(
                     "system",

@@ -1193,3 +1193,121 @@ class TestGetToolStatusMessage:
                 "some_custom_tool", {"arg": "value"}
             )
             assert result == "🔧 Running some_custom_tool..."
+
+
+class TestClassifyTaskKeywords:
+    """Tests for _classify_task_keywords helper method."""
+
+    def test_action_task_create(self, mock_provider, orchestrator_settings):
+        """Test detection of action task with 'create' keyword."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("Create a Python function")
+            assert result["is_action_task"] is True
+            assert result["coarse_task_type"] == "action"
+            assert result["needs_execution"] is False
+
+    def test_action_task_execute(self, mock_provider, orchestrator_settings):
+        """Test detection of action task with execution keywords."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("Execute the script")
+            assert result["is_action_task"] is True
+            assert result["needs_execution"] is True
+            assert result["coarse_task_type"] == "action"
+
+    def test_action_task_run(self, mock_provider, orchestrator_settings):
+        """Test detection of action task with 'run' keyword."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("Run the tests")
+            assert result["is_action_task"] is True
+            assert result["needs_execution"] is True
+
+    def test_analysis_task_analyze(self, mock_provider, orchestrator_settings):
+        """Test detection of analysis task with 'analyze' keyword."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("Analyze the codebase")
+            assert result["is_analysis_task"] is True
+            assert result["coarse_task_type"] == "analysis"
+
+    def test_analysis_task_review(self, mock_provider, orchestrator_settings):
+        """Test detection of analysis task with 'review' keyword."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("Review the code for bugs")
+            assert result["is_analysis_task"] is True
+
+    def test_analysis_task_question_pattern(self, mock_provider, orchestrator_settings):
+        """Test detection of analysis task with question patterns."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("How does the authentication work?")
+            assert result["is_analysis_task"] is True
+            assert result["coarse_task_type"] == "analysis"
+
+    def test_default_task(self, mock_provider, orchestrator_settings):
+        """Test default classification for generic messages."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("Hello there")
+            assert result["is_action_task"] is False
+            assert result["is_analysis_task"] is False
+            assert result["coarse_task_type"] == "default"
+
+    def test_analysis_takes_precedence(self, mock_provider, orchestrator_settings):
+        """Test that analysis classification takes precedence over action."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            # Message with both action and analysis keywords
+            result = orch._classify_task_keywords("Analyze and create a report")
+            # Both should be true but coarse type should be analysis
+            assert result["is_action_task"] is True
+            assert result["is_analysis_task"] is True
+            assert result["coarse_task_type"] == "analysis"
+
+    def test_case_insensitive(self, mock_provider, orchestrator_settings):
+        """Test that keyword detection is case insensitive."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("ANALYZE THE CODE")
+            assert result["is_analysis_task"] is True
+            result = orch._classify_task_keywords("CREATE a file")
+            assert result["is_action_task"] is True
