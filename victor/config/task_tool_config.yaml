@@ -13,7 +13,7 @@
 task_types:
   edit:
     description: "Modify existing code/files"
-    max_exploration_iterations: 3
+    max_exploration_iterations: 8  # Increased from 3 - edits often need context gathering
     force_action_after_target_read: true
 
     # Tools required to complete this task type
@@ -75,7 +75,7 @@ task_types:
 
   create:
     description: "Write new files"
-    max_exploration_iterations: 3
+    max_exploration_iterations: 8  # Increased from 3 - creates often need context gathering
     force_action_after_target_read: false
 
     required_tools:
@@ -103,7 +103,7 @@ task_types:
 
   analyze:
     description: "Count, measure, analyze code"
-    max_exploration_iterations: 10
+    max_exploration_iterations: 20
     force_action_after_target_read: false
 
     required_tools:
@@ -148,7 +148,7 @@ task_types:
 
   general:
     description: "Ambiguous or general help"
-    max_exploration_iterations: 8
+    max_exploration_iterations: 15
     force_action_after_target_read: false
 
     required_tools:
