@@ -33,6 +33,12 @@ from victor.providers.base import ToolDefinition
 from victor.tools.base import CostTier, ToolMetadataRegistry, ToolRegistry
 from victor.embeddings.service import EmbeddingService
 
+# Import for type checking only (avoid circular imports)
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from victor.agent.unified_classifier import ClassificationResult, TaskType
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,7 +82,8 @@ class SemanticToolSelector:
             Dictionary mapping tool names to their knowledge (use_cases, keywords, examples)
         """
         if cls._tool_knowledge_loaded:
-            return cls._tool_knowledge or {}
+            # Return cached value (don't use `or {}` as empty dict is falsy)
+            return cls._tool_knowledge if cls._tool_knowledge is not None else {}
 
         # tool_knowledge.yaml is deprecated and archived
         # Return empty dict - all metadata now comes from get_metadata()
@@ -86,7 +93,7 @@ class SemanticToolSelector:
             "tool_knowledge.yaml is deprecated. All tools should use get_metadata() "
             "for metadata discovery (auto-generated or explicit)."
         )
-        return {}
+        return cls._tool_knowledge
 
     @classmethod
     def _build_use_case_text(cls, tool_name: str) -> str:
@@ -189,6 +196,8 @@ class SemanticToolSelector:
 
         # Phase 6: Store last cost warnings for retrieval
         self._last_cost_warnings: List[str] = []
+        # Track which tools have already been warned about (warn once per session)
+        self._warned_tools: set = set()
 
     async def initialize_tool_embeddings(self, tools: ToolRegistry) -> None:
         """Pre-compute embeddings for all tools (called once at startup).
@@ -503,7 +512,7 @@ class SemanticToolSelector:
                     fallback.append(tool_name)
                 if len(fallback) >= max_tools:
                     break
-            logger.info(f"Using CONCEPTUAL fallback tools ({len(fallback)}): {fallback}")
+            logger.debug(f"Using CONCEPTUAL fallback tools ({len(fallback)}): {fallback}")
             return fallback
 
         # Standard fallback for non-conceptual queries
@@ -514,7 +523,7 @@ class SemanticToolSelector:
             if len(fallback) >= max_tools:
                 break
 
-        logger.info(f"Using fallback tools ({len(fallback)}): {fallback}")
+        logger.debug(f"Using fallback tools ({len(fallback)}): {fallback}")
         return fallback
 
     def _is_conceptual_query(self, query: str) -> bool:
@@ -958,11 +967,16 @@ class SemanticToolSelector:
 
         warnings = []
         for tool, _ in selected_tools:
+            # Skip if we've already warned about this tool (warn once per session)
+            if tool.name in self._warned_tools:
+                continue
+
             cost_tier = tools.get_tool_cost(tool.name)
             if cost_tier and cost_tier in COST_TIER_WARNINGS:
                 warning_msg = f"[{tool.name}] {COST_TIER_WARNINGS[cost_tier]}"
                 warnings.append(warning_msg)
-                logger.info(f"Cost warning for user: {warning_msg}")
+                self._warned_tools.add(tool.name)
+                logger.debug(f"Cost warning: {warning_msg}")
 
         return warnings
 
@@ -976,8 +990,9 @@ class SemanticToolSelector:
         return self._last_cost_warnings.copy()
 
     def clear_cost_warnings(self) -> None:
-        """Clear stored cost warnings."""
+        """Clear stored cost warnings and reset warned tools tracking."""
         self._last_cost_warnings = []
+        self._warned_tools.clear()
 
     async def select_relevant_tools_with_context(
         self,
@@ -1008,7 +1023,8 @@ class SemanticToolSelector:
         pending_actions = []
         if conversation_history:
             pending_actions = self._extract_pending_actions(conversation_history)
-            logger.info(f"Pending actions: {pending_actions}")
+            if pending_actions:
+                logger.debug(f"Pending actions: {pending_actions}")
 
         # Phase 2: Build contextual query
         enhanced_query = user_message
@@ -1032,16 +1048,17 @@ class SemanticToolSelector:
         for action in pending_actions:
             if action in pending_action_tools:
                 mandatory_tool_names.extend(pending_action_tools[action])
-                logger.info(
+                logger.debug(
                     f"Added mandatory tools for pending '{action}': {pending_action_tools[action]}"
                 )
 
         mandatory_tool_names = list(set(mandatory_tool_names))
-        logger.info(f"Total mandatory tools: {mandatory_tool_names}")
+        if mandatory_tool_names:
+            logger.debug(f"Total mandatory tools: {mandatory_tool_names}")
 
         # Phase 1: Get relevant categories
         category_tools = self._get_relevant_categories(enhanced_query)
-        logger.info(f"Category tools ({len(category_tools)}): {category_tools[:5]}...")
+        logger.debug(f"Category tools ({len(category_tools)}): {category_tools[:5]}...")
 
         # Get embedding for enhanced query
         query_embedding = await self._get_embedding(enhanced_query)
@@ -1113,14 +1130,14 @@ class SemanticToolSelector:
                     if fallback_tool:
                         selected_tools.append((fallback_tool, 0.5))
                         selected_names.add(fallback_name)
-            logger.info(
+            logger.debug(
                 f"Added {len(fallback_names)} fallback tools (selection returned < {MIN_TOOLS_THRESHOLD})"
             )
 
         # Log selection
         tool_names = [t.name for t, _ in selected_tools]
         scores = [f"{s:.3f}" for _, s in selected_tools]
-        logger.info(
+        logger.debug(
             f"Context-aware selection: {len(selected_tools)} tools (mandatory={len(mandatory_tools)}, "
             f"pending_actions={len(pending_actions)}): "
             f"{', '.join(f'{name}({score})' for name, score in zip(tool_names, scores, strict=False))}"
@@ -1133,8 +1150,7 @@ class SemanticToolSelector:
         # Phase 6: Generate and store cost warnings for high-cost tools
         self._last_cost_warnings = self._generate_cost_warnings(selected_tools, tools)
         if self._last_cost_warnings:
-            # Use INFO level - this is informational, not a production warning
-            logger.info(f"Cost info: {len(self._last_cost_warnings)} high-cost tools selected")
+            logger.debug(f"Cost info: {len(self._last_cost_warnings)} high-cost tools selected")
 
         # Convert to ToolDefinition
         return [
@@ -1166,11 +1182,12 @@ class SemanticToolSelector:
         """
         # Phase 1: Get mandatory tools (always included)
         mandatory_tool_names = self._get_mandatory_tools(user_message)
-        logger.info(f"Mandatory tools: {mandatory_tool_names}")
+        if mandatory_tool_names:
+            logger.debug(f"Mandatory tools: {mandatory_tool_names}")
 
         # Phase 1: Get relevant categories
         category_tools = self._get_relevant_categories(user_message)
-        logger.info(f"Category tools ({len(category_tools)}): {category_tools[:5]}...")
+        logger.debug(f"Category tools ({len(category_tools)}): {category_tools[:5]}...")
 
         # Get embedding for user message
         query_embedding = await self._get_embedding(user_message)
@@ -1239,14 +1256,14 @@ class SemanticToolSelector:
                     if fallback_tool:
                         selected_tools.append((fallback_tool, 0.5))  # Default score for fallback
                         selected_names.add(fallback_name)
-            logger.info(
+            logger.debug(
                 f"Added {len(fallback_names)} fallback tools (semantic selection returned < {MIN_TOOLS_THRESHOLD})"
             )
 
         # Log selection
         tool_names = [t.name for t, _ in selected_tools]
         scores = [f"{s:.3f}" for _, s in selected_tools]
-        logger.info(
+        logger.debug(
             f"Selected {len(selected_tools)} tools (mandatory={len(mandatory_tools)}): "
             f"{', '.join(f'{name}({score})' for name, score in zip(tool_names, scores, strict=False))}"
         )
@@ -1254,8 +1271,7 @@ class SemanticToolSelector:
         # Phase 6: Generate and store cost warnings for high-cost tools
         self._last_cost_warnings = self._generate_cost_warnings(selected_tools, tools)
         if self._last_cost_warnings:
-            # Use INFO level - this is informational, not a production warning
-            logger.info(f"Cost info: {len(self._last_cost_warnings)} high-cost tools selected")
+            logger.debug(f"Cost info: {len(self._last_cost_warnings)} high-cost tools selected")
 
         # Convert to ToolDefinition
         return [
@@ -1416,6 +1432,272 @@ class SemanticToolSelector:
         # Fallback to empty string if not found in YAML
         # The tool's description from the tool definition will still be used
         return ""
+
+    # ========================================================================
+    # Classification-Aware Tool Selection (UnifiedTaskClassifier Integration)
+    # ========================================================================
+
+    # Task type to logical category mapping
+    TASK_TYPE_CATEGORIES = {
+        "analysis": ["analysis", "code_intel", "file_ops"],
+        "action": ["execution", "git_ops", "file_ops"],
+        "generation": ["file_ops", "generation", "refactoring"],
+        "search": ["code_intel", "file_ops"],
+        "edit": ["file_ops", "refactoring", "git_ops"],
+        "default": ["file_ops", "execution"],
+    }
+
+    # Tools to exclude based on negated keywords
+    KEYWORD_TOOL_MAPPING = {
+        "analyze": ["analyze_docs", "analyze_metrics", "code_review"],
+        "review": ["code_review", "analyze_docs"],
+        "test": ["run_tests", "execute_bash"],
+        "run": ["execute_bash", "run_tests"],
+        "execute": ["execute_bash", "execute_python_in_sandbox"],
+        "search": ["code_search", "semantic_code_search", "web_search"],
+        "find": ["find_symbol", "find_references", "code_search"],
+        "create": ["write_file", "generate_docs"],
+        "generate": ["generate_docs", "write_file"],
+        "refactor": ["refactor_extract_function", "refactor_inline_variable", "rename_symbol"],
+        "edit": ["edit_files", "edit_file", "write_file"],
+        "commit": ["git_suggest_commit", "execute_bash"],
+        "deploy": ["execute_bash"],
+    }
+
+    def _get_tools_for_task_type(self, task_type_str: str) -> List[str]:
+        """Get relevant tools based on task type.
+
+        Args:
+            task_type_str: Task type as string (e.g., "analysis", "action")
+
+        Returns:
+            List of tool names relevant to this task type
+        """
+        categories = self.TASK_TYPE_CATEGORIES.get(task_type_str, ["file_ops", "execution"])
+        tools = []
+        for category in categories:
+            tools.extend(self.get_tools_for_logical_category(category))
+        return list(set(tools))
+
+    def _get_excluded_tools_from_negations(
+        self,
+        negated_keywords: List[Any],
+    ) -> set:
+        """Get tools that should be excluded based on negated keywords.
+
+        Args:
+            negated_keywords: List of KeywordMatch objects with negated keywords
+
+        Returns:
+            Set of tool names to exclude from selection
+        """
+        excluded = set()
+        for match in negated_keywords:
+            keyword = match.keyword if hasattr(match, "keyword") else str(match)
+            if keyword in self.KEYWORD_TOOL_MAPPING:
+                excluded.update(self.KEYWORD_TOOL_MAPPING[keyword])
+                logger.debug(f"Excluding tools for negated '{keyword}': {self.KEYWORD_TOOL_MAPPING[keyword]}")
+        return excluded
+
+    def _adjust_threshold_by_confidence(
+        self,
+        base_threshold: float,
+        classification_confidence: float,
+    ) -> float:
+        """Adjust similarity threshold based on classification confidence.
+
+        Higher confidence = stricter threshold (more focused selection)
+        Lower confidence = looser threshold (broader selection)
+
+        Args:
+            base_threshold: Base similarity threshold
+            classification_confidence: Confidence from classifier (0.0 - 1.0)
+
+        Returns:
+            Adjusted threshold
+        """
+        # High confidence (>0.7): tighten threshold by up to 0.05
+        # Low confidence (<0.3): loosen threshold by up to 0.05
+        confidence_adjustment = (classification_confidence - 0.5) * 0.1
+        adjusted = base_threshold + confidence_adjustment
+        # Clamp between reasonable bounds
+        return max(0.1, min(0.3, adjusted))
+
+    async def select_tools_with_classification(
+        self,
+        user_message: str,
+        tools: ToolRegistry,
+        classification_result: "ClassificationResult",
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        max_tools: int = 5,
+        base_similarity_threshold: float = 0.15,
+    ) -> List[ToolDefinition]:
+        """Select tools using classification result for smarter selection.
+
+        Integrates with UnifiedTaskClassifier to:
+        1. Use task type for category filtering
+        2. Exclude tools related to negated keywords
+        3. Adjust thresholds based on classification confidence
+        4. Include context from conversation history
+
+        Args:
+            user_message: Current user message
+            tools: Tool registry
+            classification_result: Result from UnifiedTaskClassifier
+            conversation_history: Optional conversation history
+            max_tools: Maximum tools to return
+            base_similarity_threshold: Base minimum similarity score
+
+        Returns:
+            List of relevant ToolDefinition objects
+        """
+        # Get task type and confidence
+        task_type_str = classification_result.task_type.value
+        confidence = classification_result.confidence
+
+        logger.debug(
+            f"Classification-aware selection: type={task_type_str}, "
+            f"confidence={confidence:.2f}"
+        )
+
+        # Get tools excluded by negated keywords
+        excluded_tools = self._get_excluded_tools_from_negations(
+            classification_result.negated_keywords
+        )
+        if excluded_tools:
+            logger.debug(f"Tools excluded by negation: {excluded_tools}")
+
+        # Adjust threshold based on confidence
+        similarity_threshold = self._adjust_threshold_by_confidence(
+            base_similarity_threshold, confidence
+        )
+        logger.debug(f"Adjusted similarity threshold: {similarity_threshold:.3f}")
+
+        # Get task-type-specific tools
+        task_tools = self._get_tools_for_task_type(task_type_str)
+        logger.debug(f"Task-type tools ({len(task_tools)}): {task_tools[:5]}...")
+
+        # Get mandatory tools from keywords
+        mandatory_tool_names = self._get_mandatory_tools(user_message)
+
+        # Remove negated tools from mandatory
+        mandatory_tool_names = [t for t in mandatory_tool_names if t not in excluded_tools]
+
+        # Get query embedding
+        query_embedding = await self._get_embedding(user_message)
+
+        # Calculate similarity scores
+        similarities: List[Tuple[Any, float]] = []
+
+        for tool in tools.list_tools():
+            # Skip excluded tools
+            if tool.name in excluded_tools:
+                continue
+
+            # Skip if not in task-type tools or mandatory (unless default type)
+            if (
+                task_type_str != "default"
+                and tool.name not in task_tools
+                and tool.name not in mandatory_tool_names
+            ):
+                continue
+
+            # Get cached embedding or compute on-demand
+            if tool.name in self._tool_embedding_cache:
+                tool_embedding = self._tool_embedding_cache[tool.name]
+            else:
+                tool_text = self._create_tool_text(tool)
+                tool_embedding = await self._get_embedding(tool_text)
+
+            # Cosine similarity
+            similarity = self._cosine_similarity(query_embedding, tool_embedding)
+
+            # Boost mandatory tools
+            if tool.name in mandatory_tool_names:
+                similarity = max(similarity, 0.9)
+
+            # Apply usage boost
+            usage_boost = await self._get_usage_boost(tool.name, user_message)
+            similarity += usage_boost
+
+            # Apply cost penalty
+            cost_penalty = self._get_cost_penalty(tool, tools)
+            similarity -= cost_penalty
+
+            # Boost tools matching task type
+            if tool.name in task_tools:
+                similarity += 0.05  # Small boost for task-type alignment
+
+            if similarity >= similarity_threshold:
+                similarities.append((tool, similarity))
+
+        # Sort by similarity
+        similarities.sort(key=lambda x: x[1], reverse=True)
+
+        # Build final selection
+        selected_tools = []
+        selected_names = set()
+
+        # Add mandatory tools first
+        mandatory_tools = [tool for tool in tools.list_tools() if tool.name in mandatory_tool_names]
+        for tool in mandatory_tools:
+            if tool.name not in selected_names:
+                selected_tools.append((tool, 0.9))
+                selected_names.add(tool.name)
+
+        # Add top semantic matches
+        for tool, score in similarities:
+            if tool.name not in selected_names and len(selected_tools) < max_tools:
+                selected_tools.append((tool, score))
+                selected_names.add(tool.name)
+
+        # Smart fallback if too few tools
+        MIN_TOOLS = 2
+        if len(selected_tools) < MIN_TOOLS:
+            fallback_names = self._get_fallback_tools(
+                tools, max_tools - len(selected_tools), query=user_message
+            )
+            for fallback_name in fallback_names:
+                if fallback_name not in selected_names and fallback_name not in excluded_tools:
+                    fallback_tool = tools.get(fallback_name)
+                    if fallback_tool:
+                        selected_tools.append((fallback_tool, 0.5))
+                        selected_names.add(fallback_name)
+
+        # Log selection
+        tool_names = [t.name for t, _ in selected_tools]
+        scores = [f"{s:.3f}" for _, s in selected_tools]
+        logger.info(
+            f"Classification-aware selection: {len(selected_tools)} tools "
+            f"(type={task_type_str}, excluded={len(excluded_tools)}): "
+            f"{', '.join(f'{name}({score})' for name, score in zip(tool_names, scores, strict=False))}"
+        )
+
+        # Record usage for learning
+        for tool_name in tool_names:
+            self._record_tool_usage(tool_name, user_message, success=True)
+
+        # Generate cost warnings
+        self._last_cost_warnings = self._generate_cost_warnings(selected_tools, tools)
+
+        # Convert to ToolDefinition
+        return [
+            ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters)
+            for tool, _ in selected_tools
+        ]
+
+    def get_classification_tool_stats(self) -> Dict[str, Any]:
+        """Get statistics about classification-aware tool selection.
+
+        Returns:
+            Dictionary with selection statistics
+        """
+        return {
+            "task_type_categories": len(self.TASK_TYPE_CATEGORIES),
+            "keyword_tool_mappings": len(self.KEYWORD_TOOL_MAPPING),
+            "usage_cache_size": len(self._tool_usage_cache),
+            "embedding_cache_size": len(self._tool_embedding_cache),
+        }
 
     async def close(self) -> None:
         """Close HTTP client and save usage cache (Phase 3)."""
