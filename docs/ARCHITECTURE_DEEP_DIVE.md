@@ -117,8 +117,16 @@ The orchestrator follows the **facade pattern**, delegating to specialized compo
 │  │   MetricsCollector   │  │    TaskAnalyzer     │  │   ModelSwitcher     │ │
 │  │ - Stream metrics     │  │ - Complexity class. │  │ - Provider swap     │ │
 │  │ - Tool selection     │  │ - Task/intent class.│  │ - Fallback chains   │ │
-│  │ - Cost tracking      │  │ - Unified facade    │  │ - Hot-swap support  │ │
-│  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘ │
+│  │ - Classification     │  │ - Unified facade    │  │ - Hot-swap support  │ │
+│  │ - Cost tracking      │  │         │           │  │                     │ │
+│  └─────────────────────┘  └─────────┼───────────┘  └─────────────────────┘ │
+│                                     │                                       │
+│                           ┌─────────▼───────────┐                           │
+│                           │UnifiedTaskClassifier│                           │
+│                           │ - Negation detection│                           │
+│                           │ - Context boosting  │                           │
+│                           │ - LRU cache (TTL)   │                           │
+│                           └─────────────────────┘                           │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -129,12 +137,97 @@ The orchestrator follows the **facade pattern**, delegating to specialized compo
 | `StreamingController` | `victor/agent/streaming_controller.py` | Session lifecycle, cancellation handling |
 | `MetricsCollector` | `victor/agent/metrics_collector.py` | Stream metrics (TTFT, throughput), tool selection stats, cost tracking |
 | `TaskAnalyzer` | `victor/agent/task_analyzer.py` | Unified facade for complexity/task/intent classification |
+| `UnifiedTaskClassifier` | `victor/agent/unified_classifier.py` | Keyword + semantic classification with negation detection |
 
 **Benefits of Decomposition**:
 1. **Testability**: Each component can be unit tested in isolation
 2. **Maintainability**: Changes are localized to specific modules
 3. **Clarity**: Single responsibility per component
 4. **Scalability**: New functionality via new components, not god-class expansion
+
+**UnifiedTaskClassifier Architecture** (as of December 2025):
+
+The `UnifiedTaskClassifier` provides robust task classification with negation detection:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         UnifiedTaskClassifier                               │
+│                                                                             │
+│  Input: "Don't analyze this, just run the tests"                           │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ 1. Keyword Detection                                                  │  │
+│  │    ├─ "analyze" (position: 7, category: ANALYSIS, weight: 1.0)       │  │
+│  │    └─ "run" (position: 24, category: ACTION, weight: 0.9)            │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                 │                                           │
+│                                 ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ 2. Negation Detection                                                 │  │
+│  │    ├─ "Don't" detected before "analyze" → NEGATED                    │  │
+│  │    └─ ", just" override pattern before "run" → NOT NEGATED           │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                 │                                           │
+│                                 ▼                                           │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ 3. Score Calculation                                                  │  │
+│  │    ├─ ACTION score: 0.9 (run)                                        │  │
+│  │    └─ ANALYSIS score: -0.5 (negated analyze reduces score)           │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                 │                                           │
+│                                 ▼                                           │
+│  Output: ClassificationResult(task_type=ACTION, confidence=0.78,           │
+│          is_action_task=True, is_analysis_task=False,                       │
+│          negated_keywords=["analyze"])                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Features**:
+
+| Feature | Description |
+|---------|-------------|
+| **Negation Patterns** | Detects "don't", "do not", "skip", "without", "avoid", "never" within 30-char window |
+| **Positive Overrides** | ", just", ", instead", "but do" cancel earlier negation for subsequent keywords |
+| **Weighted Keywords** | Keywords have weights (0.5-1.0) based on signal strength |
+| **LRU Cache with TTL** | 256-entry cache, 5-minute TTL, MD5-based keys |
+| **Context Boosting** | Conversation history boosts confidence for consistent task types |
+| **Ensemble Voting** | Combines keyword, semantic, and context signals |
+
+**Classification Types** (`TaskType` enum):
+- `ACTION`: Execute commands, deploy, build, install
+- `ANALYSIS`: Analyze, review, audit, explain
+- `GENERATION`: Create, generate, write, implement
+- `SEARCH`: Find, search, locate, grep
+- `EDIT`: Refactor, modify, update, rename
+- `DEFAULT`: Ambiguous or conversational messages
+
+**Integration with TaskAnalyzer**:
+```python
+# TaskAnalyzer uses UnifiedTaskClassifier for robust classification
+analyzer = TaskAnalyzer()
+result = analyzer.analyze("Don't analyze, just run tests")
+
+print(result.unified_task_type)      # TaskType.ACTION
+print(result.is_action_task)         # True
+print(result.is_analysis_task)       # False
+print(result.negated_keywords)       # ["analyze"]
+print(result.needs_execution)        # True
+```
+
+**Caching Behavior**:
+```python
+classifier = UnifiedTaskClassifier()
+
+# First call - cache miss (computed)
+result1 = classifier.classify("Analyze the code")
+
+# Second call - cache hit (instant)
+result2 = classifier.classify("Analyze the code")
+
+# Stats
+stats = classifier.get_cache_stats()
+# {"cache_size": 1, "cache_hits": 1, "cache_misses": 1, "hit_rate": 0.5}
+```
 
 #### B. Provider System
 **Location**: `victor/providers/`
@@ -1321,7 +1414,9 @@ Display to User
 - Tool result caching implemented (victor/cache/tool_cache.py)
 - Dependency graph implemented (victor/tools/dependency_graph.py)
 - Conversation state machine implemented (victor/agent/conversation_state.py)
-- Orchestrator decomposition in progress (MetricsCollector extracted, stream_chat refactoring planned)
+- Orchestrator decomposition complete (ConversationController, ToolPipeline, StreamingController, MetricsCollector extracted)
+- UnifiedTaskClassifier with negation detection implemented (victor/agent/unified_classifier.py)
+- Classification caching with LRU + TTL implemented
 
 **Future Vision**:
 - Perfect tool selection (no wasted context)
