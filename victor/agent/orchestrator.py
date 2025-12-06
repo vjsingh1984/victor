@@ -267,12 +267,6 @@ class AgentOrchestrator:
             f"format={self.tool_calling_caps.tool_call_format.value}"
         )
 
-        # Apply model-specific exploration settings to task tracker
-        self.task_tracker.set_model_exploration_settings(
-            exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
-            continuation_patience=self.tool_calling_caps.continuation_patience,
-        )
-
         # Response sanitizer for cleaning model output
         self.sanitizer = ResponseSanitizer()
 
@@ -553,6 +547,11 @@ class AgentOrchestrator:
         # Initialize TaskMilestoneMonitor for goal-aware orchestration
         # DEPRECATED: Use unified_tracker instead. Kept for backward compatibility.
         self.task_tracker = TaskMilestoneMonitor()
+        # Apply model-specific exploration settings to legacy task tracker
+        self.task_tracker.set_model_exploration_settings(
+            exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
+            continuation_patience=self.tool_calling_caps.continuation_patience,
+        )
 
         # NEW: Initialize UnifiedTaskTracker (consolidates task_tracker + progress_tracker)
         # This is the single source of truth for task progress, milestones, and loop detection
