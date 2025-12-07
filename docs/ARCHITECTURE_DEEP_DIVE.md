@@ -140,6 +140,7 @@ The orchestrator follows the **facade pattern**, delegating to specialized compo
 | `UnifiedTaskClassifier` | `victor/agent/unified_classifier.py` | Keyword + semantic classification with negation detection |
 | `ToolRegistrar` | `victor/agent/tool_registrar.py` | Dynamic tool discovery, plugin loading, MCP integration, tool dependency graph |
 | `ProviderManager` | `victor/agent/provider_manager.py` | Unified provider/model management, switching, health monitoring, fallback chains |
+| `ToolSequenceTracker` | `victor/agent/tool_sequence_tracker.py` | Workflow pattern detection, transition probability tracking, 15-20% tool selection boost |
 
 **Benefits of Decomposition**:
 1. **Testability**: Each component can be unit tested in isolation
@@ -1416,8 +1417,9 @@ Display to User
 - Tool result caching implemented (victor/cache/tool_cache.py)
 - Dependency graph implemented (victor/tools/dependency_graph.py)
 - Conversation state machine implemented (victor/agent/conversation_state.py)
-- Orchestrator decomposition complete (ConversationController, ToolPipeline, StreamingController, MetricsCollector, ToolRegistrar, ProviderManager extracted)
+- Orchestrator decomposition complete (ConversationController, ToolPipeline, StreamingController, MetricsCollector, ToolRegistrar, ProviderManager, ToolSequenceTracker extracted)
 - UnifiedTaskClassifier with negation detection implemented (victor/agent/unified_classifier.py)
+- ToolSequenceTracker integrated into SemanticToolSelector for 15-20% tool selection boost
 - Classification caching with LRU + TTL implemented
 - Provider health check system implemented (victor/providers/health.py)
 - Resilience metrics export implemented (victor/providers/metrics_export.py)
@@ -1428,9 +1430,9 @@ Display to User
 - Full MCP bidirectional bridge
 - Plugin ecosystem for community tools
 - Intelligent caching and dependency tracking
-- ProviderManager extraction (remaining orchestrator responsibility)
+- Usage analytics for data-driven optimization
 
 ---
 
 **Last Updated**: 2025-12-06
-**Next Review**: After ProviderManager extraction
+**Next Review**: After usage analytics implementation
