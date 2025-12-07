@@ -92,6 +92,12 @@ from victor.agent.conversation_controller import (
     ContextMetrics,
     CompactionStrategy,
 )
+from victor.agent.context_compactor import (
+    ContextCompactor,
+    CompactorConfig,
+    TruncationStrategy,
+    create_context_compactor,
+)
 from victor.agent.tool_pipeline import (
     ToolPipeline,
     ToolPipelineConfig,
@@ -665,9 +671,37 @@ class AgentOrchestrator:
         # TaskAnalyzer: Unified task analysis facade
         self._task_analyzer = get_task_analyzer()
 
+        # ContextCompactor: Proactive context management and tool result truncation
+        # This component provides:
+        # - Proactive compaction before context overflow (triggers at 70% utilization)
+        # - Smart tool result truncation with content-aware strategies
+        # - Token estimation with content-type-specific factors
+        truncation_strategy_str = getattr(settings, "tool_truncation_strategy", "smart").lower()
+        truncation_strategy_map = {
+            "head": TruncationStrategy.HEAD,
+            "tail": TruncationStrategy.TAIL,
+            "both": TruncationStrategy.BOTH,
+            "smart": TruncationStrategy.SMART,
+        }
+        truncation_strategy = truncation_strategy_map.get(
+            truncation_strategy_str, TruncationStrategy.SMART
+        )
+
+        self._context_compactor = create_context_compactor(
+            controller=self._conversation_controller,
+            proactive_threshold=getattr(settings, "context_proactive_threshold", 0.70),
+            min_messages_after_compact=getattr(settings, "context_min_messages_after_compact", 8),
+            tool_result_max_chars=getattr(settings, "max_tool_output_chars", 8000),
+            tool_result_max_lines=getattr(settings, "max_tool_output_lines", 200),
+            truncation_strategy=truncation_strategy,
+            preserve_code_blocks=True,
+            enable_proactive=getattr(settings, "context_proactive_compaction", True),
+            enable_tool_truncation=getattr(settings, "tool_result_truncation", True),
+        )
+
         logger.info(
             "Orchestrator initialized with decomposed components: "
-            "ConversationController, ToolPipeline, StreamingController, TaskAnalyzer"
+            "ConversationController, ToolPipeline, StreamingController, TaskAnalyzer, ContextCompactor"
         )
 
     # =====================================================================
@@ -715,6 +749,11 @@ class AgentOrchestrator:
     def provider_manager(self) -> ProviderManager:
         """Get the provider manager component."""
         return self._provider_manager
+
+    @property
+    def context_compactor(self) -> ContextCompactor:
+        """Get the context compactor component."""
+        return self._context_compactor
 
     @property
     def messages(self) -> List[Message]:
@@ -1693,16 +1732,27 @@ class AgentOrchestrator:
         Returns:
             Formatted string with clear TOOL_OUTPUT boundaries
         """
-        # Maximum output size to prevent context overflow (reduced from 50K to 15K)
-        max_output_chars = getattr(self.settings, "max_tool_output_chars", 15000)
-
         output_str = str(output) if output is not None else ""
         original_len = len(output_str)
         truncated = False
 
-        if original_len > max_output_chars:
-            truncated = True
-            output_str = output_str[:max_output_chars]
+        # Use ContextCompactor for smart truncation if available
+        if hasattr(self, "_context_compactor") and self._context_compactor:
+            truncation_result = self._context_compactor.truncate_tool_result(output_str)
+            if truncation_result.truncated:
+                truncated = True
+                output_str = truncation_result.content
+                logger.debug(
+                    f"Smart truncated tool output for {tool_name}: "
+                    f"{original_len:,} -> {len(output_str):,} chars "
+                    f"(strategy: {truncation_result.strategy})"
+                )
+        else:
+            # Fallback to simple truncation if compactor not available
+            max_output_chars = getattr(self.settings, "max_tool_output_chars", 15000)
+            if original_len > max_output_chars:
+                truncated = True
+                output_str = output_str[:max_output_chars]
 
         # Special formatting for file reading tools - make content unmistakably clear
         if tool_name == "read_file":
@@ -2489,6 +2539,27 @@ These are the actual search results. Reference only the files and matches shown 
                     is_final=True,
                 )
                 return
+
+            # Proactive context compaction check (triggers before overflow)
+            # This prevents context overflow by compacting at 70% utilization
+            if hasattr(self, "_context_compactor") and self._context_compactor:
+                compaction_action = self._context_compactor.check_and_compact(
+                    current_query=user_message
+                )
+                if compaction_action.action_taken:
+                    logger.info(
+                        f"Proactive compaction: {compaction_action.trigger.value}, "
+                        f"removed {compaction_action.messages_removed} messages, "
+                        f"freed {compaction_action.chars_freed:,} chars"
+                    )
+                    if compaction_action.messages_removed > 0:
+                        yield StreamChunk(
+                            content=f"\n[context] Proactively compacted history "
+                            f"({compaction_action.messages_removed} messages, "
+                            f"{compaction_action.chars_freed:,} chars freed).\n"
+                        )
+                        # Inject context reminder about compacted content
+                        self._conversation_controller.inject_compaction_context()
 
             # Check hard iteration limit
             total_iterations += 1

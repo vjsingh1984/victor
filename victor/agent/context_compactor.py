@@ -575,20 +575,38 @@ class ContextCompactor:
 def create_context_compactor(
     controller: "ConversationController",
     proactive_threshold: float = 0.70,
+    min_messages_after_compact: int = 8,
+    tool_result_max_chars: int = 8000,
+    tool_result_max_lines: int = 200,
+    truncation_strategy: TruncationStrategy = TruncationStrategy.SMART,
+    preserve_code_blocks: bool = True,
     enable_proactive: bool = True,
+    enable_tool_truncation: bool = True,
 ) -> ContextCompactor:
     """Factory function to create a configured ContextCompactor.
 
     Args:
         controller: The ConversationController to wrap
-        proactive_threshold: Utilization % to trigger proactive compaction
-        enable_proactive: Enable proactive compaction
+        proactive_threshold: Utilization % to trigger proactive compaction (default: 0.70)
+        min_messages_after_compact: Minimum messages to keep after compaction (default: 8)
+        tool_result_max_chars: Maximum characters for tool results (default: 8000)
+        tool_result_max_lines: Maximum lines for tool results (default: 200)
+        truncation_strategy: Strategy for truncating tool results (default: SMART)
+        preserve_code_blocks: Preserve code blocks during truncation (default: True)
+        enable_proactive: Enable proactive compaction (default: True)
+        enable_tool_truncation: Enable tool result truncation (default: True)
 
     Returns:
         Configured ContextCompactor instance
     """
     config = CompactorConfig(
         proactive_threshold=proactive_threshold,
+        min_messages_after_compact=min_messages_after_compact,
+        tool_result_max_chars=tool_result_max_chars,
+        tool_result_max_lines=tool_result_max_lines,
+        truncation_strategy=truncation_strategy,
+        preserve_code_blocks=preserve_code_blocks,
         enable_proactive=enable_proactive,
+        enable_tool_truncation=enable_tool_truncation,
     )
     return ContextCompactor(controller, config)
