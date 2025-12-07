@@ -46,36 +46,36 @@ Victor is an **enterprise-ready, terminal-based AI coding assistant** that acts 
 
 ### 2.1 High-Level Layered Design
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     USER INTERFACES                          │
-│   - CLI (victor/ui/cli.py)                                  │
-│   - MCP Server (exposes tools to Claude Desktop, VS Code)   │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│              AGENT ORCHESTRATOR (Brain)                      │
-│   victor/agent/orchestrator.py                              │
-│                                                              │
-│   Responsibilities:                                         │
-│   - Manage conversation history                            │
-│   - Select relevant tools intelligently                     │
-│   - Execute tool calls from LLM                             │
-│   - Handle streaming responses                              │
-│   - Enforce tool budget limits                              │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-         ┌─────────────┼─────────────┐
-         │             │             │
-         ▼             ▼             ▼
-┌────────────┐  ┌─────────────┐  ┌─────────────┐
-│  PROVIDER  │  │    TOOLS    │  │     MCP     │
-│  SYSTEM    │  │   SYSTEM    │  │  BRIDGE     │
-│            │  │             │  │             │
-│ Normalize  │  │ 43 tools    │  │ Client +    │
-│ different  │  │ registered  │  │ Server      │
-│ LLM APIs   │  │ in registry │  │             │
-└────────────┘  └─────────────┘  └─────────────┘
+```mermaid
+flowchart TB
+    subgraph UI["USER INTERFACES"]
+        CLI["CLI<br/>(victor/ui/cli.py)"]
+        MCP_UI["MCP Server<br/>(Claude Desktop, VS Code)"]
+    end
+
+    subgraph ORCH["AGENT ORCHESTRATOR (Brain)"]
+        direction TB
+        ORC["victor/agent/orchestrator.py"]
+        RESP["• Manage conversation history<br/>• Select relevant tools intelligently<br/>• Execute tool calls from LLM<br/>• Handle streaming responses<br/>• Enforce tool budget limits"]
+    end
+
+    subgraph SYSTEMS[""]
+        direction LR
+        PROV["PROVIDER SYSTEM<br/>━━━━━━━━━━━━<br/>Normalize different<br/>LLM APIs"]
+        TOOLS["TOOLS SYSTEM<br/>━━━━━━━━━━━━<br/>47 tools<br/>registered in registry"]
+        MCP_B["MCP BRIDGE<br/>━━━━━━━━━━━━<br/>Client +<br/>Server"]
+    end
+
+    UI --> ORCH
+    ORCH --> PROV
+    ORCH --> TOOLS
+    ORCH --> MCP_B
+
+    style UI fill:#e0e7ff,stroke:#4f46e5
+    style ORCH fill:#d1fae5,stroke:#10b981
+    style PROV fill:#fef3c7,stroke:#f59e0b
+    style TOOLS fill:#fef3c7,stroke:#f59e0b
+    style MCP_B fill:#fef3c7,stroke:#f59e0b
 ```
 
 ### 2.2 Key Components Explained
@@ -102,32 +102,38 @@ Victor is an **enterprise-ready, terminal-based AI coding assistant** that acts 
 
 The orchestrator follows the **facade pattern**, delegating to specialized components:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          AgentOrchestrator (Facade)                         │
-│                                                                             │
-│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐ │
-│  │ ConversationController│ │    ToolPipeline     │  │ StreamingController │ │
-│  │ - Message history    │  │ - Tool validation   │  │ - Session lifecycle │ │
-│  │ - Context tracking   │  │ - Execution coord   │  │ - Cancellation     │ │
-│  │ - Stage management   │  │ - Budget enforcement│  │ - Metrics          │ │
-│  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘ │
-│                                                                             │
-│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐ │
-│  │   MetricsCollector   │  │    TaskAnalyzer     │  │   ModelSwitcher     │ │
-│  │ - Stream metrics     │  │ - Complexity class. │  │ - Provider swap     │ │
-│  │ - Tool selection     │  │ - Task/intent class.│  │ - Fallback chains   │ │
-│  │ - Classification     │  │ - Unified facade    │  │ - Hot-swap support  │ │
-│  │ - Cost tracking      │  │         │           │  │                     │ │
-│  └─────────────────────┘  └─────────┼───────────┘  └─────────────────────┘ │
-│                                     │                                       │
-│                           ┌─────────▼───────────┐                           │
-│                           │UnifiedTaskClassifier│                           │
-│                           │ - Negation detection│                           │
-│                           │ - Context boosting  │                           │
-│                           │ - LRU cache (TTL)   │                           │
-│                           └─────────────────────┘                           │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph FACADE["AgentOrchestrator (Facade)"]
+        direction TB
+
+        subgraph ROW1[" "]
+            direction LR
+            CC["**ConversationController**<br/>• Message history<br/>• Context tracking<br/>• Stage management"]
+            TP["**ToolPipeline**<br/>• Tool validation<br/>• Execution coord<br/>• Budget enforcement"]
+            SC["**StreamingController**<br/>• Session lifecycle<br/>• Cancellation<br/>• Metrics"]
+        end
+
+        subgraph ROW2[" "]
+            direction LR
+            MC["**MetricsCollector**<br/>• Stream metrics<br/>• Tool selection<br/>• Cost tracking"]
+            TA["**TaskAnalyzer**<br/>• Complexity class.<br/>• Task/intent class.<br/>• Unified facade"]
+            MS["**ModelSwitcher**<br/>• Provider swap<br/>• Fallback chains<br/>• Hot-swap support"]
+        end
+
+        UTC["**UnifiedTaskClassifier**<br/>• Negation detection<br/>• Context boosting<br/>• LRU cache (TTL)"]
+
+        TA --> UTC
+    end
+
+    style FACADE fill:#f0f9ff,stroke:#0284c7
+    style CC fill:#d1fae5,stroke:#10b981
+    style TP fill:#d1fae5,stroke:#10b981
+    style SC fill:#d1fae5,stroke:#10b981
+    style MC fill:#fef3c7,stroke:#f59e0b
+    style TA fill:#fef3c7,stroke:#f59e0b
+    style MS fill:#fef3c7,stroke:#f59e0b
+    style UTC fill:#e0e7ff,stroke:#4f46e5
 ```
 
 | Component | Location | Responsibility |
@@ -154,37 +160,40 @@ The orchestrator follows the **facade pattern**, delegating to specialized compo
 
 The `UnifiedTaskClassifier` provides robust task classification with negation detection:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         UnifiedTaskClassifier                               │
-│                                                                             │
-│  Input: "Don't analyze this, just run the tests"                           │
-│                                                                             │
-│  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │ 1. Keyword Detection                                                  │  │
-│  │    ├─ "analyze" (position: 7, category: ANALYSIS, weight: 1.0)       │  │
-│  │    └─ "run" (position: 24, category: ACTION, weight: 0.9)            │  │
-│  └──────────────────────────────────────────────────────────────────────┘  │
-│                                 │                                           │
-│                                 ▼                                           │
-│  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │ 2. Negation Detection                                                 │  │
-│  │    ├─ "Don't" detected before "analyze" → NEGATED                    │  │
-│  │    └─ ", just" override pattern before "run" → NOT NEGATED           │  │
-│  └──────────────────────────────────────────────────────────────────────┘  │
-│                                 │                                           │
-│                                 ▼                                           │
-│  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │ 3. Score Calculation                                                  │  │
-│  │    ├─ ACTION score: 0.9 (run)                                        │  │
-│  │    └─ ANALYSIS score: -0.5 (negated analyze reduces score)           │  │
-│  └──────────────────────────────────────────────────────────────────────┘  │
-│                                 │                                           │
-│                                 ▼                                           │
-│  Output: ClassificationResult(task_type=ACTION, confidence=0.78,           │
-│          is_action_task=True, is_analysis_task=False,                       │
-│          negated_keywords=["analyze"])                                      │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph UTC["UnifiedTaskClassifier"]
+        INPUT["📥 **Input**<br/>\"Don't analyze this, just run the tests\""]
+
+        subgraph STEP1["1. Keyword Detection"]
+            KW1["\"analyze\" → ANALYSIS, weight: 1.0"]
+            KW2["\"run\" → ACTION, weight: 0.9"]
+        end
+
+        subgraph STEP2["2. Negation Detection"]
+            NEG1["\"Don't\" before \"analyze\" → ❌ NEGATED"]
+            NEG2["\", just\" before \"run\" → ✅ NOT NEGATED"]
+        end
+
+        subgraph STEP3["3. Score Calculation"]
+            SCORE1["ACTION score: 0.9 (run)"]
+            SCORE2["ANALYSIS score: -0.5 (negated)"]
+        end
+
+        OUTPUT["📤 **Output**<br/>ClassificationResult(<br/>  task_type=ACTION,<br/>  confidence=0.78,<br/>  negated_keywords=[\"analyze\"]<br/>)"]
+
+        INPUT --> STEP1
+        STEP1 --> STEP2
+        STEP2 --> STEP3
+        STEP3 --> OUTPUT
+    end
+
+    style UTC fill:#f0f9ff,stroke:#0284c7
+    style INPUT fill:#e0e7ff,stroke:#4f46e5
+    style OUTPUT fill:#d1fae5,stroke:#10b981
+    style STEP1 fill:#fef3c7,stroke:#f59e0b
+    style STEP2 fill:#fee2e2,stroke:#ef4444
+    style STEP3 fill:#dbeafe,stroke:#3b82f6
 ```
 
 **Key Features**:
