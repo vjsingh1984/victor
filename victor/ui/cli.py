@@ -527,7 +527,6 @@ async def run_oneshot(
                     preview = chunk.metadata["file_preview"]
                     # Display as a code block with syntax highlighting
                     from rich.syntax import Syntax
-                    from rich.panel import Panel
                     ext = path.split(".")[-1] if "." in path else "txt"
                     syntax = Syntax(preview, ext, theme="monokai", line_numbers=False)
                     console.print(Panel(syntax, title=f"[dim]{path}[/]", border_style="dim"))
@@ -713,7 +712,6 @@ async def _run_cli_repl(
                             path = chunk.metadata.get("path", "")
                             preview = chunk.metadata["file_preview"]
                             from rich.syntax import Syntax
-                            from rich.panel import Panel
                             ext = path.split(".")[-1] if "." in path else "txt"
                             syntax = Syntax(preview, ext, theme="monokai", line_numbers=False)
                             console.print(Panel(syntax, title=f"[dim]{path}[/]", border_style="dim"))
