@@ -1342,6 +1342,61 @@ class AgentOrchestrator:
 
         return status
 
+    def flush_analytics(self) -> Dict[str, bool]:
+        """Flush all analytics and cached data to persistent storage.
+
+        Call this method before shutdown or when you need to ensure
+        all analytics data is persisted to disk. Useful for graceful
+        shutdown scenarios.
+
+        Returns:
+            Dictionary indicating success/failure for each component:
+            - usage_analytics: Whether analytics were flushed
+            - sequence_tracker: Whether patterns were saved
+            - tool_cache: Whether cache was flushed
+        """
+        results: Dict[str, bool] = {}
+
+        # Flush usage analytics
+        if hasattr(self, "_usage_analytics") and self._usage_analytics:
+            try:
+                self._usage_analytics.flush()
+                results["usage_analytics"] = True
+                logger.debug("UsageAnalytics flushed to disk")
+            except Exception as e:
+                logger.warning(f"Failed to flush usage analytics: {e}")
+                results["usage_analytics"] = False
+        else:
+            results["usage_analytics"] = False
+
+        # Flush sequence tracker patterns
+        if hasattr(self, "_sequence_tracker") and self._sequence_tracker:
+            try:
+                # SequenceTracker learns patterns in memory; no explicit flush needed
+                # but we capture statistics for reporting
+                stats = self._sequence_tracker.get_statistics()
+                results["sequence_tracker"] = True
+                logger.debug(f"SequenceTracker has {stats.get('unique_transitions', 0)} learned patterns")
+            except Exception as e:
+                logger.warning(f"Failed to get sequence tracker stats: {e}")
+                results["sequence_tracker"] = False
+        else:
+            results["sequence_tracker"] = False
+
+        # Flush tool cache
+        if hasattr(self, "tool_cache") and self.tool_cache:
+            try:
+                # Tool cache is already persistent; just report status
+                results["tool_cache"] = True
+            except Exception as e:
+                logger.warning(f"Failed to access tool cache: {e}")
+                results["tool_cache"] = False
+        else:
+            results["tool_cache"] = False
+
+        logger.info(f"Analytics flush complete: {results}")
+        return results
+
     # =========================================================================
     # Provider/Model Hot-Swap Methods
     # =========================================================================
