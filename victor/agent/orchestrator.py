@@ -1255,6 +1255,93 @@ class AgentOrchestrator:
         """
         return self.conversation_state.get_stage_tools()
 
+    def get_optimization_status(self) -> Dict[str, Any]:
+        """Get comprehensive status of all integrated optimization components.
+
+        Provides visibility into the health and statistics of all optimization
+        components for debugging, monitoring, and observability.
+
+        Returns:
+            Dictionary with component status and statistics:
+            - context_compactor: Compaction stats, utilization, threshold
+            - usage_analytics: Tool/provider metrics, session info
+            - sequence_tracker: Pattern learning stats, suggestions
+            - code_correction: Enabled status, correction stats
+            - safety_checker: Enabled status, pattern counts
+            - auto_committer: Enabled status, commit history
+            - search_router: Routing stats, pattern matches
+        """
+        status: Dict[str, Any] = {
+            "timestamp": time.time(),
+            "components": {},
+        }
+
+        # Context Compactor
+        if self._context_compactor:
+            status["components"]["context_compactor"] = self._context_compactor.get_statistics()
+
+        # Usage Analytics
+        if self._usage_analytics:
+            try:
+                status["components"]["usage_analytics"] = {
+                    "session_active": self._usage_analytics._current_session is not None,
+                    "tool_records_count": len(self._usage_analytics._tool_records),
+                    "provider_records_count": len(self._usage_analytics._provider_records),
+                }
+            except Exception:
+                status["components"]["usage_analytics"] = {"status": "error"}
+
+        # Sequence Tracker
+        if self._sequence_tracker:
+            try:
+                status["components"]["sequence_tracker"] = self._sequence_tracker.get_statistics()
+            except Exception:
+                status["components"]["sequence_tracker"] = {"status": "error"}
+
+        # Code Correction Middleware
+        status["components"]["code_correction"] = {
+            "enabled": self._code_correction_middleware is not None,
+        }
+        if self._code_correction_middleware:
+            status["components"]["code_correction"]["config"] = {
+                "auto_fix": self._code_correction_middleware.config.auto_fix,
+                "max_iterations": self._code_correction_middleware.config.max_iterations,
+            }
+
+        # Safety Checker
+        status["components"]["safety_checker"] = {
+            "enabled": self._safety_checker is not None,
+            "has_confirmation_callback": (
+                self._safety_checker.confirmation_callback is not None
+                if self._safety_checker else False
+            ),
+        }
+
+        # Auto Committer
+        status["components"]["auto_committer"] = {
+            "enabled": self._auto_committer is not None,
+        }
+        if self._auto_committer:
+            status["components"]["auto_committer"]["auto_commit"] = self._auto_committer.auto_commit
+
+        # Search Router
+        status["components"]["search_router"] = {
+            "enabled": self.search_router is not None,
+        }
+
+        # Overall health
+        enabled_count = sum(
+            1 for c in status["components"].values()
+            if c.get("enabled", True) and c.get("status") != "error"
+        )
+        status["health"] = {
+            "enabled_components": enabled_count,
+            "total_components": len(status["components"]),
+            "status": "healthy" if enabled_count >= 4 else "degraded",
+        }
+
+        return status
+
     # =========================================================================
     # Provider/Model Hot-Swap Methods
     # =========================================================================
