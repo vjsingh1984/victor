@@ -64,7 +64,7 @@ class TestCompactorConfig:
         """Test default configuration values."""
         config = CompactorConfig()
 
-        assert config.proactive_threshold == 0.70
+        assert config.proactive_threshold == 0.90
         assert config.min_messages_after_compact == 8
         assert config.tool_result_max_chars == 8000
         assert config.tool_result_max_lines == 200
@@ -123,7 +123,7 @@ class TestContextCompactorInit:
         compactor = ContextCompactor(mock_controller)
 
         assert compactor.controller is mock_controller
-        assert compactor.config.proactive_threshold == 0.70
+        assert compactor.config.proactive_threshold == 0.90
         assert compactor._compaction_count == 0
 
     def test_custom_config(self, mock_controller):
@@ -154,8 +154,8 @@ class TestShouldCompact:
     def test_should_compact_at_threshold(self, compactor, mock_controller):
         """Test compaction triggered at threshold."""
         mock_controller.get_context_metrics.return_value = ContextMetrics(
-            char_count=150000,  # 75% utilization
-            estimated_tokens=37500,
+            char_count=185000,  # 92.5% utilization (exceeds 90% threshold)
+            estimated_tokens=46250,
             message_count=30,
             is_overflow_risk=False,
             max_context_chars=200000,
@@ -184,10 +184,10 @@ class TestShouldCompact:
         config = CompactorConfig(enable_proactive=False)
         compactor = ContextCompactor(mock_controller, config)
 
-        # Even at 75% utilization, should not trigger
+        # Even at 92.5% utilization, should not trigger when proactive disabled
         mock_controller.get_context_metrics.return_value = ContextMetrics(
-            char_count=150000,
-            estimated_tokens=37500,
+            char_count=185000,
+            estimated_tokens=46250,
             message_count=30,
             is_overflow_risk=False,
             max_context_chars=200000,
@@ -218,11 +218,11 @@ class TestCheckAndCompact:
 
     def test_compaction_at_threshold(self, compactor, mock_controller):
         """Test compaction at threshold."""
-        # First call returns high utilization
+        # First call returns high utilization (92.5%, above 90% threshold)
         mock_controller.get_context_metrics.side_effect = [
             ContextMetrics(
-                char_count=150000,
-                estimated_tokens=37500,
+                char_count=185000,
+                estimated_tokens=46250,
                 message_count=30,
                 is_overflow_risk=False,
                 max_context_chars=200000,
@@ -240,7 +240,7 @@ class TestCheckAndCompact:
 
         assert action.trigger == CompactionTrigger.THRESHOLD
         assert action.messages_removed == 10
-        assert action.chars_freed == 70000
+        assert action.chars_freed == 105000  # 185000 - 80000
         mock_controller.smart_compact_history.assert_called_once()
 
     def test_forced_compaction(self, compactor, mock_controller):
@@ -272,8 +272,8 @@ class TestCheckAndCompact:
         """Test that statistics are updated after compaction."""
         mock_controller.get_context_metrics.side_effect = [
             ContextMetrics(
-                char_count=150000,
-                estimated_tokens=37500,
+                char_count=185000,  # 92.5% utilization (exceeds 90% threshold)
+                estimated_tokens=46250,
                 message_count=30,
                 is_overflow_risk=False,
                 max_context_chars=200000,
@@ -447,11 +447,11 @@ class TestStatistics:
 
     def test_reset_statistics(self, compactor, mock_controller):
         """Test resetting statistics."""
-        # Perform a compaction
+        # Perform a compaction (92.5% utilization exceeds 90% threshold)
         mock_controller.get_context_metrics.side_effect = [
             ContextMetrics(
-                char_count=150000,
-                estimated_tokens=37500,
+                char_count=185000,
+                estimated_tokens=46250,
                 message_count=30,
                 is_overflow_risk=False,
                 max_context_chars=200000,

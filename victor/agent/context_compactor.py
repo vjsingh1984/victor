@@ -87,7 +87,7 @@ class CompactorConfig:
         enable_tool_truncation: Enable automatic tool result truncation
     """
 
-    proactive_threshold: float = 0.70  # Compact at 70% utilization
+    proactive_threshold: float = 0.90  # Compact at 90% utilization (configurable)
     min_messages_after_compact: int = 8
     tool_result_max_chars: int = 8000  # ~2000 tokens
     tool_result_max_lines: int = 200
@@ -574,7 +574,7 @@ class ContextCompactor:
 
 def create_context_compactor(
     controller: "ConversationController",
-    proactive_threshold: float = 0.70,
+    proactive_threshold: float = 0.90,
     min_messages_after_compact: int = 8,
     tool_result_max_chars: int = 8000,
     tool_result_max_lines: int = 200,
@@ -587,7 +587,7 @@ def create_context_compactor(
 
     Args:
         controller: The ConversationController to wrap
-        proactive_threshold: Utilization % to trigger proactive compaction (default: 0.70)
+        proactive_threshold: Utilization % to trigger proactive compaction (default: 0.90)
         min_messages_after_compact: Minimum messages to keep after compaction (default: 8)
         tool_result_max_chars: Maximum characters for tool results (default: 8000)
         tool_result_max_lines: Maximum lines for tool results (default: 200)

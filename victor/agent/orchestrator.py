@@ -689,7 +689,7 @@ class AgentOrchestrator:
 
         self._context_compactor = create_context_compactor(
             controller=self._conversation_controller,
-            proactive_threshold=getattr(settings, "context_proactive_threshold", 0.70),
+            proactive_threshold=getattr(settings, "context_proactive_threshold", 0.90),
             min_messages_after_compact=getattr(settings, "context_min_messages_after_compact", 8),
             tool_result_max_chars=getattr(settings, "max_tool_output_chars", 8000),
             tool_result_max_lines=getattr(settings, "max_tool_output_lines", 200),
