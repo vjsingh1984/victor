@@ -59,8 +59,8 @@ flowchart TB
 
 | What You Get | Why It Matters |
 |--------------|----------------|
-| **7 LLM Providers** | Claude, GPT, Gemini, Grok, Ollama, LMStudio, vLLM |
-| **65 Enterprise Tools** | Git, refactoring, security scanning, batch ops—all work with any model |
+| **25+ LLM Providers** | Claude, GPT, Gemini, Grok, Groq, DeepSeek, Mistral, Together, Ollama, LMStudio + more |
+| **47 Enterprise Tools** | Git, refactoring, security scanning, batch ops—all work with any model |
 | **100% Air-Gapped Option** | Local embeddings, local models, zero network calls |
 | **Apache 2.0 License** | Truly open source, safe for commercial use |
 
@@ -194,19 +194,25 @@ graph LR
 | Provider | Models | Local | Cost |
 |----------|--------|-------|------|
 | Anthropic | Claude Opus 4.5, Sonnet, Haiku | No | $$$ |
-| OpenAI | GPT-5, GPT-5 Pro | No | $$$ |
-| Google | Gemini 3 Pro | No | $$ |
-| xAI | Grok | No | $$ |
-| **Ollama** | Qwen3, Llama, CodeLlama, +100 | **Yes** | **Free** |
+| OpenAI | GPT-4o, GPT-4 | No | $$$ |
+| Google | Gemini 2.5 Pro/Flash | No | $$ |
+| xAI | Grok 2, Grok 3 | No | $$ |
+| DeepSeek | DeepSeek-V3, R1 | No | $ |
+| Groq | Llama, Mixtral (ultra-fast) | No | **Free tier** |
+| Mistral | Mistral Large, Codestral | No | $ |
+| Together | 100+ open models | No | $ |
+| **Ollama** | Qwen3, Llama, DeepSeek, +100 | **Yes** | **Free** |
 | **LMStudio** | Any GGUF model | **Yes** | **Free** |
 | **vLLM** | Any HuggingFace model | **Yes** | **Free** |
+
+See [Provider Setup Guide](docs/guides/PROVIDER_SETUP.md) for complete list of 25+ providers.
 
 ### 🛠️ Enterprise Tools
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#8B5CF6'}}}%%
 mindmap
-  root((Victor<br/>65 Tools))
+  root((Victor<br/>47 Tools))
     Code
       Multi-file Editor
       Batch Processor
@@ -229,7 +235,7 @@ mindmap
 ```
 
 <details>
-<summary><b>View all 65 tools by category</b></summary>
+<summary><b>View all 47 tools by category</b></summary>
 
 **Code Management:** Multi-file editor, batch processor, refactoring engine, git integration
 
@@ -341,7 +347,7 @@ See [Installation Guide](docs/guides/INSTALLATION.md) for detailed instructions.
 | [Installation](docs/guides/INSTALLATION.md) | All installation methods |
 | [Quick Start](docs/guides/QUICKSTART.md) | First steps with Victor |
 | [User Guide](docs/USER_GUIDE.md) | Complete usage documentation |
-| [Tool Catalog](docs/TOOL_CATALOG.md) | All 65 tools with examples |
+| [Tool Catalog](docs/TOOL_CATALOG.md) | All 47 tools with examples |
 | [Model Comparison](docs/MODEL_COMPARISON.md) | Ollama model benchmarks |
 | [Air-Gapped Mode](docs/embeddings/AIRGAPPED.md) | Offline operation |
 | [Docker Deployment](docker/README.md) | Container deployment |
@@ -363,7 +369,7 @@ pie showData
     "Planned" : 10
 ```
 
-**What works today:** 65 tools, 7 providers, semantic search, TUI, Docker deployment
+**What works today:** 47 tools, 25+ providers, semantic search, TUI, Docker deployment
 
 **In progress:** Test generation, coverage analysis, additional CI/CD platforms
 

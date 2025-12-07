@@ -4,26 +4,49 @@
 
 Victor supports all major LLM providers through a unified interface. This guide covers setup and usage for each provider.
 
-## Supported Providers
+## Supported Providers (25+)
 
-### ✅ Fully Implemented
+Victor supports 25+ LLM providers organized by category. For detailed setup instructions, see [Provider Setup Guide](../guides/PROVIDER_SETUP.md).
 
-| Provider | Status | Models | Tool Calling | Streaming |
-|----------|--------|--------|--------------|-----------|
-| **Ollama** | ✅ Ready | All Ollama models | ✅ Yes | ✅ Yes |
-| **Anthropic** | ✅ Ready | Claude 3.5, 3 Opus/Sonnet/Haiku | ✅ Yes | ✅ Yes |
-| **OpenAI** | ✅ Ready | GPT-4, GPT-3.5, etc. | ✅ Yes | ✅ Yes |
-| **Google** | ✅ Ready | Gemini 1.5 Pro/Flash | ✅ Yes | ✅ Yes |
-| **xAI (Grok)** | ✅ Ready | Grok Beta, Grok Vision | ✅ Yes | ✅ Yes |
-| **LMStudio** | ✅ Ready | Any GGUF model | ✅ Yes | ✅ Yes |
-| **vLLM** | ✅ Ready | HuggingFace models | ✅ Yes | ✅ Yes |
+### Local Providers (Free, Private)
 
-### 🚧 Coming Soon
+| Provider | Models | Tool Calling | Streaming |
+|----------|--------|--------------|-----------|
+| **Ollama** | 100+ models (Llama, Qwen, DeepSeek, etc.) | ✅ | ✅ |
+| **LMStudio** | Any GGUF model | ✅ | ✅ |
+| **vLLM** | Any HuggingFace model | ✅ | ✅ |
 
-| Provider | Status | ETA |
-|----------|--------|-----|
-| **Cohere** | 📋 Planned | v0.3.0 |
-| **Mistral** | 📋 Planned | v0.3.0 |
+### Premium Cloud Providers
+
+| Provider | Models | Tool Calling | Streaming |
+|----------|--------|--------------|-----------|
+| **Anthropic** | Claude Opus 4.5, Sonnet, Haiku | ✅ | ✅ |
+| **OpenAI** | GPT-4o, GPT-4, GPT-4o-mini | ✅ | ✅ |
+| **Google** | Gemini 2.5 Pro/Flash | ✅ | ✅ |
+| **xAI** | Grok 2, Grok 3 | ✅ | ✅ |
+
+### Free-Tier Cloud Providers
+
+| Provider | Free Tier | Models | Tool Calling | Streaming |
+|----------|-----------|--------|--------------|-----------|
+| **Groq** | 14K TPM | Llama, Mixtral | ✅ | ✅ |
+| **DeepSeek** | 1M tokens | DeepSeek-V3, R1 | ✅ | ✅ |
+| **Mistral** | 500K TPM | Mistral Large, Codestral | ✅ | ✅ |
+| **Together** | $25 credits | 100+ models | ✅ | ✅ |
+| **Moonshot** | 1M tokens | Kimi K2 | ✅ | ✅ |
+| **Fireworks** | $1 credits | Llama, Mixtral | ✅ | ✅ |
+| **OpenRouter** | Daily limits | Gateway to 100+ | ✅ | ✅ |
+| **Cerebras** | Unlimited | Llama 3.1, 3.3 | ✅ | ✅ |
+
+### Enterprise Cloud Providers
+
+| Provider | Models | Tool Calling | Streaming |
+|----------|--------|--------------|-----------|
+| **Google Vertex AI** | Gemini (enterprise) | ✅ | ✅ |
+| **Azure OpenAI** | GPT-4, Phi models | ✅ | ✅ |
+| **AWS Bedrock** | Claude, Llama, Mistral, Titan | ✅ | ✅ |
+| **HuggingFace** | 1000s of open models | ✅ | ✅ |
+| **Replicate** | Open models (pay-per-second) | ✅ | ✅ |
 
 ---
 
