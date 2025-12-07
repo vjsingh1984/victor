@@ -141,6 +141,8 @@ The orchestrator follows the **facade pattern**, delegating to specialized compo
 | `ToolRegistrar` | `victor/agent/tool_registrar.py` | Dynamic tool discovery, plugin loading, MCP integration, tool dependency graph |
 | `ProviderManager` | `victor/agent/provider_manager.py` | Unified provider/model management, switching, health monitoring, fallback chains |
 | `ToolSequenceTracker` | `victor/agent/tool_sequence_tracker.py` | Workflow pattern detection, transition probability tracking, 15-20% tool selection boost |
+| `UsageAnalytics` | `victor/agent/usage_analytics.py` | Tool/provider performance tracking, Prometheus/JSON export, optimization recommendations |
+| `ContextCompactor` | `victor/agent/context_compactor.py` | Proactive context compaction (70% threshold), smart tool result truncation |
 
 **Benefits of Decomposition**:
 1. **Testability**: Each component can be unit tested in isolation
@@ -1424,13 +1426,14 @@ Display to User
 - Provider health check system implemented (victor/providers/health.py)
 - Resilience metrics export implemented (victor/providers/metrics_export.py)
 - Classification-aware tool selection implemented in SemanticToolSelector
+- UsageAnalytics implemented (victor/agent/usage_analytics.py) with Prometheus/JSON export and optimization recommendations
+- ContextCompactor implemented (victor/agent/context_compactor.py) with proactive compaction and smart truncation
 
 **Future Vision**:
 - Perfect tool selection (no wasted context)
 - Full MCP bidirectional bridge
 - Plugin ecosystem for community tools
 - Intelligent caching and dependency tracking
-- Usage analytics for data-driven optimization
 
 ---
 
