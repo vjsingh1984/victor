@@ -98,6 +98,10 @@ from victor.agent.context_compactor import (
     TruncationStrategy,
     create_context_compactor,
 )
+from victor.agent.usage_analytics import (
+    UsageAnalytics,
+    AnalyticsConfig,
+)
 from victor.agent.tool_pipeline import (
     ToolPipeline,
     ToolPipelineConfig,
@@ -699,9 +703,18 @@ class AgentOrchestrator:
             enable_tool_truncation=getattr(settings, "tool_result_truncation", True),
         )
 
+        # Initialize UsageAnalytics singleton for data-driven optimization
+        analytics_cache_dir = Path(settings.cache_dir) if hasattr(settings, "cache_dir") and settings.cache_dir else None
+        self._usage_analytics = UsageAnalytics.get_instance(
+            AnalyticsConfig(
+                cache_dir=analytics_cache_dir,
+                enable_prometheus_export=getattr(settings, "enable_prometheus_export", True),
+            )
+        )
+
         logger.info(
             "Orchestrator initialized with decomposed components: "
-            "ConversationController, ToolPipeline, StreamingController, TaskAnalyzer, ContextCompactor"
+            "ConversationController, ToolPipeline, StreamingController, TaskAnalyzer, ContextCompactor, UsageAnalytics"
         )
 
     # =====================================================================
@@ -720,6 +733,10 @@ class AgentOrchestrator:
     def _on_streaming_session_complete(self, session: StreamingSession) -> None:
         """Callback when streaming session completes (from StreamingController)."""
         self._metrics_collector.on_streaming_session_complete(session)
+
+        # End UsageAnalytics session
+        if hasattr(self, "_usage_analytics") and self._usage_analytics:
+            self._usage_analytics.end_session()
 
     # =====================================================================
     # Component accessors for external use
@@ -754,6 +771,11 @@ class AgentOrchestrator:
     def context_compactor(self) -> ContextCompactor:
         """Get the context compactor component."""
         return self._context_compactor
+
+    @property
+    def usage_analytics(self) -> UsageAnalytics:
+        """Get the usage analytics singleton."""
+        return self._usage_analytics
 
     @property
     def messages(self) -> List[Message]:
@@ -1008,15 +1030,33 @@ class AgentOrchestrator:
         """
         self._metrics_collector.record_tool_selection(method, num_tools)
 
-    def _record_tool_execution(self, tool_name: str, success: bool, elapsed_ms: float) -> None:
+    def _record_tool_execution(
+        self,
+        tool_name: str,
+        success: bool,
+        elapsed_ms: float,
+        error_type: Optional[str] = None,
+    ) -> None:
         """Record tool execution statistics.
 
         Args:
             tool_name: Name of the tool executed
             success: Whether execution succeeded
             elapsed_ms: Execution time in milliseconds
+            error_type: Type of error if execution failed
         """
         self._metrics_collector.record_tool_execution(tool_name, success, elapsed_ms)
+
+        # Also record to UsageAnalytics for data-driven optimization
+        if hasattr(self, "_usage_analytics") and self._usage_analytics:
+            context_metrics = self._conversation_controller.get_context_metrics()
+            self._usage_analytics.record_tool_execution(
+                tool_name=tool_name,
+                success=success,
+                execution_time_ms=elapsed_ms,
+                error_type=error_type,
+                context_tokens=context_metrics.estimated_tokens,
+            )
 
     def get_tool_usage_stats(self) -> Dict[str, Any]:
         """Get comprehensive tool usage statistics.
@@ -1745,7 +1785,7 @@ class AgentOrchestrator:
                 logger.debug(
                     f"Smart truncated tool output for {tool_name}: "
                     f"{original_len:,} -> {len(output_str):,} chars "
-                    f"(strategy: {truncation_result.strategy})"
+                    f"(removed {truncation_result.truncated_chars:,} chars)"
                 )
         else:
             # Fallback to simple truncation if compactor not available
@@ -2361,6 +2401,10 @@ These are the actual search results. Reference only the files and matches shown 
         # Reset context reminder manager for new conversation turn
         self.reminder_manager.reset()
 
+        # Start UsageAnalytics session for this conversation
+        if hasattr(self, "_usage_analytics") and self._usage_analytics:
+            self._usage_analytics.start_session()
+
         # Local aliases for frequently-used values
         max_total_iterations = self.unified_tracker.config.get(
             "max_total_iterations", 50
@@ -2370,6 +2414,10 @@ These are the actual search results. Reference only the files and matches shown 
 
         # Add user message to history
         self.add_message("user", user_message)
+
+        # Record this turn in UsageAnalytics
+        if hasattr(self, "_usage_analytics") and self._usage_analytics:
+            self._usage_analytics.record_turn()
 
         # Detect task type using unified tracker (single source of truth)
         unified_task_type = self.unified_tracker.detect_task_type(user_message)
@@ -3570,8 +3618,9 @@ These are the actual search results. Reference only the files and matches shown 
             # Calculate execution time
             elapsed_ms = (time.monotonic() - start) * 1000  # Convert to milliseconds
 
-            # Record tool execution analytics
-            self._record_tool_execution(tool_name, success, elapsed_ms)
+            # Record tool execution analytics (including error type for UsageAnalytics)
+            error_type = type(exec_result.error).__name__ if exec_result.error and not success else None
+            self._record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
 
             # Update conversation state machine for stage detection
             self.conversation_state.record_tool_execution(tool_name, normalized_args)
