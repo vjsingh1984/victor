@@ -1397,6 +1397,123 @@ class AgentOrchestrator:
         logger.info(f"Analytics flush complete: {results}")
         return results
 
+    async def start_health_monitoring(self) -> bool:
+        """Start background provider health monitoring.
+
+        Enables automatic health checks at configured intervals and
+        auto-failover to healthy providers when enabled.
+
+        Returns:
+            True if monitoring started, False if already running or unavailable
+        """
+        if not hasattr(self, "_provider_manager") or not self._provider_manager:
+            logger.warning("Provider manager not available for health monitoring")
+            return False
+
+        try:
+            await self._provider_manager.start_health_monitoring()
+            logger.info("Provider health monitoring started")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to start health monitoring: {e}")
+            return False
+
+    async def stop_health_monitoring(self) -> bool:
+        """Stop background provider health monitoring.
+
+        Call this during graceful shutdown to clean up monitoring tasks.
+
+        Returns:
+            True if monitoring stopped, False if not running or error
+        """
+        if not hasattr(self, "_provider_manager") or not self._provider_manager:
+            return False
+
+        try:
+            await self._provider_manager.stop_health_monitoring()
+            logger.debug("Provider health monitoring stopped")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to stop health monitoring: {e}")
+            return False
+
+    async def get_provider_health(self) -> Dict[str, Any]:
+        """Get health status of all registered providers.
+
+        Returns:
+            Dictionary with provider health information:
+            - current_provider: Name of current provider
+            - is_healthy: Current provider health status
+            - healthy_providers: List of healthy provider names
+            - can_failover: Whether failover is possible
+        """
+        result: Dict[str, Any] = {
+            "current_provider": self.provider_name,
+            "is_healthy": True,
+            "healthy_providers": [self.provider_name] if self.provider_name else [],
+            "can_failover": False,
+        }
+
+        if hasattr(self, "_provider_manager") and self._provider_manager:
+            try:
+                # Get current state
+                state = self._provider_manager.get_current_state()
+                if state:
+                    result["is_healthy"] = state.is_healthy
+                    result["switch_count"] = state.switch_count
+
+                # Get healthy providers for failover
+                healthy = await self._provider_manager.get_healthy_providers()
+                result["healthy_providers"] = healthy
+                result["can_failover"] = len(healthy) > 1
+
+            except Exception as e:
+                logger.warning(f"Failed to get provider health: {e}")
+                result["error"] = str(e)
+
+        return result
+
+    async def graceful_shutdown(self) -> Dict[str, bool]:
+        """Perform graceful shutdown of all orchestrator components.
+
+        Flushes analytics, stops health monitoring, and cleans up resources.
+        Call this before application exit.
+
+        Returns:
+            Dictionary with shutdown status for each component
+        """
+        results: Dict[str, bool] = {}
+
+        # Flush analytics data
+        try:
+            flush_results = self.flush_analytics()
+            results["analytics_flushed"] = all(flush_results.values())
+        except Exception as e:
+            logger.warning(f"Failed to flush analytics during shutdown: {e}")
+            results["analytics_flushed"] = False
+
+        # Stop health monitoring
+        try:
+            results["health_monitoring_stopped"] = await self.stop_health_monitoring()
+        except Exception as e:
+            logger.warning(f"Failed to stop health monitoring: {e}")
+            results["health_monitoring_stopped"] = False
+
+        # End usage analytics session
+        if hasattr(self, "_usage_analytics") and self._usage_analytics:
+            try:
+                if self._usage_analytics._current_session is not None:
+                    self._usage_analytics.end_session()
+                results["session_ended"] = True
+            except Exception as e:
+                logger.warning(f"Failed to end analytics session: {e}")
+                results["session_ended"] = False
+        else:
+            results["session_ended"] = True
+
+        logger.info(f"Graceful shutdown complete: {results}")
+        return results
+
     # =========================================================================
     # Provider/Model Hot-Swap Methods
     # =========================================================================
