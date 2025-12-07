@@ -3977,6 +3977,11 @@ These are the actual search results. Reference only the files and matches shown 
         - Observed files list
         - Executed tools list
         - Conversation state machine
+        - Context reminder manager
+        - Metrics collector stats
+        - Context compactor statistics
+        - Sequence tracker history (preserves learned patterns)
+        - Usage analytics session (ends current, starts fresh)
         """
         self.conversation.clear()
         self._system_added = False
@@ -3999,7 +4004,20 @@ These are the actual search results. Reference only the files and matches shown 
         if hasattr(self, "_metrics_collector"):
             self._metrics_collector.reset_stats()
 
-        logger.debug("Conversation and session state reset")
+        # Reset optimization components for clean session
+        if hasattr(self, "_context_compactor") and self._context_compactor:
+            self._context_compactor.reset_statistics()
+
+        if hasattr(self, "_sequence_tracker") and self._sequence_tracker:
+            self._sequence_tracker.clear_history()
+
+        if hasattr(self, "_usage_analytics") and self._usage_analytics:
+            # End current session if active, start fresh
+            if self._usage_analytics._current_session is not None:
+                self._usage_analytics.end_session()
+            self._usage_analytics.start_session()
+
+        logger.debug("Conversation and session state reset (including optimization components)")
 
     def request_cancellation(self) -> None:
         """Request cancellation of the current streaming operation.
