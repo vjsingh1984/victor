@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="localGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#22c55e"/>
+      <stop offset="100%" style="stop-color:#16a34a"/>
+    </linearGradient>
+    <linearGradient id="freeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#eab308"/>
+      <stop offset="100%" style="stop-color:#ca8a04"/>
+    </linearGradient>
+    <linearGradient id="premiumGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#2563eb"/>
+    </linearGradient>
+    <linearGradient id="enterpriseGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#7c3aed"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1000" height="700" fill="url(#bgGradient)"/>
+
+  <!-- Title -->
+  <text x="500" y="40" text-anchor="middle" fill="#ffffff" font-size="26" font-weight="700" letter-spacing="1">
+    VICTOR PROVIDER ECOSYSTEM
+  </text>
+  <text x="500" y="62" text-anchor="middle" fill="#94a3b8" font-size="13">
+    26 Providers • Organized by Cost • Free Options First
+  </text>
+
+  <!-- LOCAL PROVIDERS SECTION -->
+  <g filter="url(#shadow)">
+    <rect x="25" y="85" width="230" height="270" rx="12" fill="url(#localGrad)" opacity="0.95"/>
+    <text x="140" y="112" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="700">LOCAL PROVIDERS</text>
+    <text x="140" y="130" text-anchor="middle" fill="#ffffff" font-size="10" opacity="0.85">100% Free • Unlimited • Private</text>
+
+    <!-- Ollama -->
+    <rect x="35" y="145" width="210" height="60" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="50" y="168" fill="#ffffff" font-size="13" font-weight="600">Ollama</text>
+    <text x="50" y="185" fill="#ffffff" font-size="9" opacity="0.9">Easiest setup • 100+ models</text>
+    <text x="50" y="198" fill="#bbf7d0" font-size="9" font-weight="500">macOS • Linux • Windows</text>
+
+    <!-- LM Studio -->
+    <rect x="35" y="215" width="210" height="60" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="50" y="238" fill="#ffffff" font-size="13" font-weight="600">LM Studio</text>
+    <text x="50" y="255" fill="#ffffff" font-size="9" opacity="0.9">Desktop GUI • GGUF models</text>
+    <text x="50" y="268" fill="#bbf7d0" font-size="9" font-weight="500">Visual interface • Offline</text>
+
+    <!-- vLLM -->
+    <rect x="35" y="285" width="210" height="60" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="50" y="308" fill="#ffffff" font-size="13" font-weight="600">vLLM</text>
+    <text x="50" y="325" fill="#ffffff" font-size="9" opacity="0.9">High-throughput • Production</text>
+    <text x="50" y="338" fill="#bbf7d0" font-size="9" font-weight="500">GPU clusters • OpenAI-compat</text>
+  </g>
+
+  <!-- FREE-TIER PROVIDERS SECTION -->
+  <g filter="url(#shadow)">
+    <rect x="265" y="85" width="470" height="270" rx="12" fill="url(#freeGrad)" opacity="0.95"/>
+    <text x="500" y="112" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="700">FREE-TIER CLOUD PROVIDERS</text>
+    <text x="500" y="130" text-anchor="middle" fill="#ffffff" font-size="10" opacity="0.85">No Credit Card Required • Generous Limits</text>
+
+    <!-- Row 1 -->
+    <rect x="275" y="145" width="145" height="60" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="290" y="165" fill="#ffffff" font-size="12" font-weight="600">Groq Cloud</text>
+    <text x="290" y="180" fill="#fef9c3" font-size="9" font-weight="500">14.4K req/day</text>
+    <text x="290" y="193" fill="#ffffff" font-size="8" opacity="0.9">300-1K tok/s • FASTEST!</text>
+
+    <rect x="430" y="145" width="145" height="60" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="445" y="165" fill="#ffffff" font-size="12" font-weight="600">Cerebras</text>
+    <text x="445" y="180" fill="#fef9c3" font-size="9" font-weight="500">14.4K req/day</text>
+    <text x="445" y="193" fill="#ffffff" font-size="8" opacity="0.9">1-2K tok/s • WSE chip</text>
+
+    <rect x="585" y="145" width="140" height="60" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="600" y="165" fill="#ffffff" font-size="12" font-weight="600">Google AI</text>
+    <text x="600" y="180" fill="#fef9c3" font-size="9" font-weight="500">250 req/day</text>
+    <text x="600" y="193" fill="#ffffff" font-size="8" opacity="0.9">Gemini 2.5 • 1M context</text>
+
+    <!-- Row 2 -->
+    <rect x="275" y="215" width="145" height="60" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="290" y="235" fill="#ffffff" font-size="12" font-weight="600">Mistral AI</text>
+    <text x="290" y="250" fill="#fef9c3" font-size="9" font-weight="500">500K tok/min</text>
+    <text x="290" y="263" fill="#ffffff" font-size="8" opacity="0.9">EU data • GDPR compliant</text>
+
+    <rect x="430" y="215" width="145" height="60" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="445" y="235" fill="#ffffff" font-size="12" font-weight="600">Together AI</text>
+    <text x="445" y="250" fill="#fef9c3" font-size="9" font-weight="500">$25 free credits</text>
+    <text x="445" y="263" fill="#ffffff" font-size="8" opacity="0.9">Llama 3.3 • DeepSeek V3</text>
+
+    <rect x="585" y="215" width="140" height="60" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="600" y="235" fill="#ffffff" font-size="12" font-weight="600">OpenRouter</text>
+    <text x="600" y="250" fill="#fef9c3" font-size="9" font-weight="500">50+ req/day</text>
+    <text x="600" y="263" fill="#ffffff" font-size="8" opacity="0.9">100+ models • Gateway</text>
+
+    <!-- Row 3 -->
+    <rect x="275" y="285" width="145" height="60" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="290" y="305" fill="#ffffff" font-size="12" font-weight="600">Fireworks AI</text>
+    <text x="290" y="320" fill="#fef9c3" font-size="9" font-weight="500">$1 free credits</text>
+    <text x="290" y="333" fill="#ffffff" font-size="8" opacity="0.9">Fast inference • Llama 405B</text>
+
+    <rect x="430" y="285" width="145" height="60" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="445" y="305" fill="#ffffff" font-size="12" font-weight="600">Hugging Face</text>
+    <text x="445" y="320" fill="#fef9c3" font-size="9" font-weight="500">Rate limited</text>
+    <text x="445" y="333" fill="#ffffff" font-size="8" opacity="0.9">1000s of models</text>
+
+    <rect x="585" y="285" width="140" height="60" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="600" y="305" fill="#ffffff" font-size="12" font-weight="600">Replicate</text>
+    <text x="600" y="320" fill="#fef9c3" font-size="9" font-weight="500">Pay-per-second</text>
+    <text x="600" y="333" fill="#ffffff" font-size="8" opacity="0.9">Any public model</text>
+  </g>
+
+  <!-- PREMIUM PROVIDERS SECTION -->
+  <g filter="url(#shadow)">
+    <rect x="745" y="85" width="230" height="270" rx="12" fill="url(#premiumGrad)" opacity="0.95"/>
+    <text x="860" y="112" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="700">PREMIUM API</text>
+    <text x="860" y="130" text-anchor="middle" fill="#ffffff" font-size="10" opacity="0.85">Pay-per-token • Best Quality</text>
+
+    <rect x="755" y="145" width="210" height="45" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="770" y="168" fill="#ffffff" font-size="12" font-weight="600">Anthropic</text>
+    <text x="770" y="183" fill="#bfdbfe" font-size="9">Claude 4 • Best reasoning</text>
+
+    <rect x="755" y="198" width="210" height="45" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="770" y="221" fill="#ffffff" font-size="12" font-weight="600">OpenAI</text>
+    <text x="770" y="236" fill="#bfdbfe" font-size="9">GPT-4o • o1-preview • DALL-E</text>
+
+    <rect x="755" y="251" width="210" height="45" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="770" y="274" fill="#ffffff" font-size="12" font-weight="600">xAI (Grok)</text>
+    <text x="770" y="289" fill="#bfdbfe" font-size="9">Grok 2 • Real-time knowledge</text>
+
+    <rect x="755" y="304" width="102" height="45" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="770" y="327" fill="#ffffff" font-size="11" font-weight="600">DeepSeek</text>
+    <text x="770" y="340" fill="#bfdbfe" font-size="8">V3 • R1</text>
+
+    <rect x="863" y="304" width="102" height="45" rx="8" fill="rgba(255,255,255,0.2)"/>
+    <text x="878" y="327" fill="#ffffff" font-size="11" font-weight="600">Moonshot</text>
+    <text x="878" y="340" fill="#bfdbfe" font-size="8">Kimi K2</text>
+  </g>
+
+  <!-- ENTERPRISE PROVIDERS SECTION -->
+  <g filter="url(#shadow)">
+    <rect x="25" y="370" width="950" height="145" rx="12" fill="url(#enterpriseGrad)" opacity="0.95"/>
+    <text x="500" y="397" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="700">ENTERPRISE CLOUD PROVIDERS</text>
+    <text x="500" y="415" text-anchor="middle" fill="#ffffff" font-size="10" opacity="0.85">SSO • Compliance • SLAs • Data Residency</text>
+
+    <!-- Enterprise cards -->
+    <rect x="40" y="430" width="290" height="70" rx="8" fill="rgba(255,255,255,0.15)"/>
+    <text x="60" y="455" fill="#ffffff" font-size="13" font-weight="600">Google Cloud Vertex AI</text>
+    <text x="60" y="473" fill="#ddd6fe" font-size="10">Gemini 2.0 • 2M context • $300 free trial</text>
+    <text x="60" y="488" fill="#ffffff" font-size="9" opacity="0.8">GCP integration • IAM • VPC Service Controls</text>
+
+    <rect x="355" y="430" width="290" height="70" rx="8" fill="rgba(255,255,255,0.15)"/>
+    <text x="375" y="455" fill="#ffffff" font-size="13" font-weight="600">Azure OpenAI Service</text>
+    <text x="375" y="473" fill="#ddd6fe" font-size="10">GPT-4o • o1 • Phi-4 • Content filtering</text>
+    <text x="375" y="488" fill="#ffffff" font-size="9" opacity="0.8">Azure AD • Private endpoints • Managed ID</text>
+
+    <rect x="670" y="430" width="290" height="70" rx="8" fill="rgba(255,255,255,0.15)"/>
+    <text x="690" y="455" fill="#ffffff" font-size="13" font-weight="600">AWS Bedrock</text>
+    <text x="690" y="473" fill="#ddd6fe" font-size="10">Claude 3.5 • Llama 3.2 • Titan • Guardrails</text>
+    <text x="690" y="488" fill="#ffffff" font-size="9" opacity="0.8">IAM roles • VPC • KMS encryption</text>
+  </g>
+
+  <!-- QUICK DECISION -->
+  <g filter="url(#shadow)">
+    <rect x="25" y="530" width="950" height="150" rx="12" fill="rgba(30,41,59,0.9)" stroke="#475569" stroke-width="1"/>
+    <text x="500" y="558" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="700">QUICK DECISION GUIDE</text>
+
+    <!-- Decision boxes -->
+    <g font-size="11" fill="#ffffff">
+      <rect x="40" y="575" width="180" height="90" rx="8" fill="#22c55e" opacity="0.9"/>
+      <text x="130" y="600" text-anchor="middle" font-weight="600" font-size="12">Privacy First?</text>
+      <text x="130" y="620" text-anchor="middle" font-size="10">Use Ollama or LM Studio</text>
+      <text x="130" y="638" text-anchor="middle" font-size="9" opacity="0.8">100% local, no API keys</text>
+      <text x="130" y="653" text-anchor="middle" font-size="9" opacity="0.8">Air-gapped compatible</text>
+
+      <rect x="235" y="575" width="180" height="90" rx="8" fill="#eab308" opacity="0.9"/>
+      <text x="325" y="600" text-anchor="middle" font-weight="600" font-size="12" fill="#1c1917">Fastest Speed?</text>
+      <text x="325" y="620" text-anchor="middle" font-size="10" fill="#1c1917">Use Groq or Cerebras</text>
+      <text x="325" y="638" text-anchor="middle" font-size="9" fill="#1c1917" opacity="0.8">300-2000+ tokens/sec</text>
+      <text x="325" y="653" text-anchor="middle" font-size="9" fill="#1c1917" opacity="0.8">14.4K free req/day</text>
+
+      <rect x="430" y="575" width="180" height="90" rx="8" fill="#3b82f6" opacity="0.9"/>
+      <text x="520" y="600" text-anchor="middle" font-weight="600" font-size="12">Best Quality?</text>
+      <text x="520" y="620" text-anchor="middle" font-size="10">Use Claude or GPT-4</text>
+      <text x="520" y="638" text-anchor="middle" font-size="9" opacity="0.8">Top reasoning ability</text>
+      <text x="520" y="653" text-anchor="middle" font-size="9" opacity="0.8">Pay-per-token pricing</text>
+
+      <rect x="625" y="575" width="180" height="90" rx="8" fill="#8b5cf6" opacity="0.9"/>
+      <text x="715" y="600" text-anchor="middle" font-weight="600" font-size="12">Enterprise?</text>
+      <text x="715" y="620" text-anchor="middle" font-size="10">Use Cloud Providers</text>
+      <text x="715" y="638" text-anchor="middle" font-size="9" opacity="0.8">Vertex • Azure • Bedrock</text>
+      <text x="715" y="653" text-anchor="middle" font-size="9" opacity="0.8">SSO, compliance, SLAs</text>
+
+      <rect x="820" y="575" width="145" height="90" rx="8" fill="#06b6d4" opacity="0.9"/>
+      <text x="892" y="600" text-anchor="middle" font-weight="600" font-size="12">Just Exploring?</text>
+      <text x="892" y="620" text-anchor="middle" font-size="10">Use Google AI</text>
+      <text x="892" y="638" text-anchor="middle" font-size="9" opacity="0.8">Free Gemini 2.5</text>
+      <text x="892" y="653" text-anchor="middle" font-size="9" opacity="0.8">Instant API key</text>
+    </g>
+  </g>
+</svg>
