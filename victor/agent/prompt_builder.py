@@ -65,7 +65,13 @@ TASK_TYPE_HINTS = {
     "action": """[ACTION] Execute git/test/build operations. Multiple tool calls allowed. Continue until complete.""",
     "analysis_deep": """[ANALYSIS] Thorough codebase exploration. Read all relevant modules. Comprehensive output.""",
     "analyze": """[ANALYZE] Examine code carefully. Read related files. Structured findings.""",
-    "design": """[DESIGN] Conceptual task. Minimal tools needed. Focus on architecture/planning.""",
+    "design": """[ARCHITECTURE] For architecture/component questions:
+1. FIRST: Read README.md, CLAUDE.md, or project docs to understand high-level structure
+2. THEN: List main src/ directories to identify actual modules
+3. Filter out test/, demo/, examples/, clients/ when listing "key" components
+4. Rank by: file size, import frequency, centrality - NOT alphabetically
+5. Improvements must reference ACTUAL code patterns (e.g., "line 150 uses X, could be Y")
+Do NOT list components alphabetically. Prioritize by architectural importance.""",
     "general": """[GENERAL] Moderate exploration. 3-6 tool calls. Answer concisely.""",
 }
 

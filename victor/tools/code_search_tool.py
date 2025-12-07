@@ -12,6 +12,63 @@ DEFAULT_EXTS = DEFAULT_CODE_EXTENSIONS
 # Cache for semantic indexes to avoid re-embedding on every call
 _INDEX_CACHE: Dict[str, Dict[str, Any]] = {}
 
+# Directories that indicate non-core code (lower importance)
+NON_CORE_DIRS = {
+    "test", "tests", "testing", "spec", "specs",
+    "demo", "demos", "example", "examples", "sample", "samples",
+    "client", "clients", "sdk",
+    "benchmark", "benchmarks", "bench",
+    "doc", "docs", "documentation",
+    "script", "scripts", "tool", "tools", "util", "utils",
+    "mock", "mocks", "fixture", "fixtures", "stub", "stubs",
+}
+
+# Directories that indicate core code (higher importance)
+CORE_DIRS = {
+    "src", "lib", "core", "pkg", "internal", "main",
+    "engine", "engines", "service", "services",
+    "storage", "index", "compute", "network", "api",
+}
+
+
+def _calculate_importance_score(file_path: str, symbol_type: Optional[str] = None) -> float:
+    """Calculate importance score for a search result.
+
+    Higher scores = more architecturally important.
+
+    Scoring factors:
+    - Core directories: +0.3
+    - Non-core directories: -0.4
+    - Class/struct definitions: +0.2
+    - Test files: -0.3
+    """
+    score = 1.0
+    path_lower = file_path.lower()
+    parts = set(path_lower.replace("\\", "/").split("/"))
+
+    # Check for core directories
+    if parts & CORE_DIRS:
+        score += 0.3
+
+    # Check for non-core directories
+    if parts & NON_CORE_DIRS:
+        score -= 0.4
+
+    # Explicit test file patterns
+    if any(p in path_lower for p in ["test_", "_test.", ".test.", "/test/", "/tests/"]):
+        score -= 0.3
+
+    # Symbol type bonus
+    if symbol_type in ("class", "struct", "trait", "interface", "impl"):
+        score += 0.2
+
+    # Depth penalty - deeper nesting = less core
+    depth = len([p for p in parts if p and p not in {".", ".."}])
+    if depth > 5:
+        score -= 0.1
+
+    return max(0.1, score)  # Floor at 0.1
+
 
 def _latest_mtime(root: Path) -> float:
     """Find latest modification time under root, respecting EXCLUDE_DIRS."""
@@ -279,19 +336,35 @@ async def semantic_code_search(
                     content[:MAX_CONTENT_CHARS] + f"... [truncated, {len(content)} chars total]"
                 )
                 result_dict["content_truncated"] = True
+
+            # Calculate importance score for ranking
+            file_path = result_dict.get("file_path", "")
+            symbol_type = result_dict.get("symbol_type")
+            importance = _calculate_importance_score(file_path, symbol_type)
+            result_dict["importance_score"] = round(importance, 2)
+
+            # Combine semantic similarity with importance for final ranking
+            semantic_score = result_dict.get("score", result_dict.get("similarity", 0.5))
+            result_dict["combined_score"] = round(semantic_score * importance, 3)
+
             truncated_results.append(result_dict)
+
+        # Re-sort by combined score (importance-weighted semantic relevance)
+        truncated_results.sort(key=lambda x: x.get("combined_score", 0), reverse=True)
 
         return {
             "success": True,
             "results": truncated_results,
             "count": len(truncated_results),
             "hint": "Use read_file with line_start/line_end to see full content of specific results.",
+            "ranking_note": "Results ranked by combined_score (semantic_similarity × importance). Core src/ code ranked higher than test/demo files.",
             "metadata": {
                 "rebuilt": rebuilt,
                 "root": str(root_path),
                 "indexed_at": _INDEX_CACHE[str(root_path)]["indexed_at"],
                 "filters_applied": filters_applied if filters_applied else None,
                 "chunking_strategy": "BODY_AWARE",
+                "importance_weighted": True,
                 "available_filters": [
                     "file_path",
                     "symbol_type",
