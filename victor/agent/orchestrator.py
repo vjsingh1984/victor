@@ -72,7 +72,7 @@ from victor.agent.debug_logger import get_debug_logger
 from victor.agent.action_authorizer import ActionAuthorizer, ActionIntent
 from victor.agent.prompt_builder import SystemPromptBuilder, get_task_type_hint
 from victor.agent.response_sanitizer import ResponseSanitizer
-from victor.agent.search_router import SearchRouter
+from victor.agent.search_router import SearchRouter, SearchRoute, SearchType
 from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity, DEFAULT_BUDGETS
 from victor.agent.context_reminder import create_reminder_manager
 from victor.agent.stream_handler import StreamMetrics
@@ -1129,6 +1129,60 @@ class AgentOrchestrator:
             num_tools: Number of tools selected
         """
         self._metrics_collector.record_tool_selection(method, num_tools)
+
+    def route_search_query(self, query: str) -> Dict[str, Any]:
+        """Route a search query to the optimal search tool using SearchRouter.
+
+        Analyzes the query to determine whether keyword search (code_search)
+        or semantic search (semantic_code_search) would yield better results.
+
+        Args:
+            query: The search query
+
+        Returns:
+            Dictionary with routing recommendation:
+                - recommended_tool: "code_search" or "semantic_code_search" or "both"
+                - confidence: Confidence in the recommendation (0.0-1.0)
+                - reason: Human-readable explanation
+                - search_type: SearchType enum value
+
+        Example:
+            route = orchestrator.route_search_query("class BaseTool")
+            # Returns: {"recommended_tool": "code_search", "confidence": 1.0, ...}
+
+            route = orchestrator.route_search_query("how does error handling work")
+            # Returns: {"recommended_tool": "semantic_code_search", "confidence": 0.9, ...}
+        """
+        route: SearchRoute = self.search_router.route(query)
+
+        # Map SearchType to tool name
+        tool_map = {
+            SearchType.KEYWORD: "code_search",
+            SearchType.SEMANTIC: "semantic_code_search",
+            SearchType.HYBRID: "both",
+        }
+
+        return {
+            "recommended_tool": tool_map.get(route.search_type, "code_search"),
+            "confidence": route.confidence,
+            "reason": route.reason,
+            "search_type": route.search_type.value,
+            "matched_patterns": route.matched_patterns,
+            "transformed_query": route.transformed_query,
+        }
+
+    def get_recommended_search_tool(self, query: str) -> str:
+        """Get the recommended search tool name for a query.
+
+        Convenience method that returns just the tool name.
+
+        Args:
+            query: The search query
+
+        Returns:
+            Tool name: "code_search", "semantic_code_search", or "both"
+        """
+        return self.route_search_query(query)["recommended_tool"]
 
     def _record_tool_execution(
         self,
