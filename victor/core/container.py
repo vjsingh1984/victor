@@ -47,22 +47,17 @@ from __future__ import annotations
 
 import logging
 import threading
-import weakref
-from abc import ABC, abstractmethod
-from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import (
     Any,
     Callable,
     Dict,
     Generic,
-    Iterator,
     Optional,
     Protocol,
     Type,
     TypeVar,
-    Union,
     runtime_checkable,
 )
 
@@ -152,9 +147,7 @@ class ServiceScope:
         if descriptor.lifetime == ServiceLifetime.SCOPED:
             with self._lock:
                 if service_type not in self._scoped_instances:
-                    self._scoped_instances[service_type] = descriptor.create_instance(
-                        self._parent
-                    )
+                    self._scoped_instances[service_type] = descriptor.create_instance(self._parent)
                 return self._scoped_instances[service_type]
 
         # Transient - always create new
@@ -419,9 +412,7 @@ class ServiceContainer:
         self._disposed = True
         with self._lock:
             for descriptor in self._descriptors.values():
-                if descriptor.instance is not None and isinstance(
-                    descriptor.instance, Disposable
-                ):
+                if descriptor.instance is not None and isinstance(descriptor.instance, Disposable):
                     try:
                         descriptor.instance.dispose()
                     except Exception as e:

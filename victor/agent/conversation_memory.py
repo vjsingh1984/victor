@@ -566,7 +566,7 @@ class ConversationStore:
         selected = []
         token_budget = max_tokens
 
-        for msg, score in scored_messages:
+        for msg, _score in scored_messages:
             if msg.token_count <= token_budget:
                 selected.append(msg)
                 token_budget -= msg.token_count
@@ -1290,6 +1290,7 @@ class ConversationStore:
         """
         try:
             import numpy as np
+
             v1 = np.array(vec1)
             v2 = np.array(vec2)
             dot = np.dot(v1, v2)

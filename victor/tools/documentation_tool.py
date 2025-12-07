@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional
 import logging
 
 from victor.tools.decorators import tool
+from victor.tools.common import gather_files_by_pattern
 
 logger = logging.getLogger(__name__)
 
@@ -582,7 +583,11 @@ async def generate_docs(
 
 @tool
 async def analyze_docs(
-    path: str, check_coverage: bool = True, check_quality: bool = False, file_pattern: str = "*.py"
+    path: str,
+    check_coverage: bool = True,
+    check_quality: bool = False,
+    file_pattern: str = "*.py",
+    max_files: int = 50,
 ) -> Dict[str, Any]:
     """
     Analyze documentation coverage and quality.
@@ -595,6 +600,8 @@ async def analyze_docs(
         check_coverage: Analyze documentation coverage (default: True).
         check_quality: Analyze docstring quality (default: False).
         file_pattern: Glob pattern for files to analyze (default: *.py).
+        max_files: Maximum number of files to analyze (default: 50). Use to prevent
+            context overflow on large codebases. Set to 0 for unlimited.
 
     Returns:
         Dictionary containing:
@@ -625,12 +632,18 @@ async def analyze_docs(
     if not path_obj.exists():
         return {"success": False, "error": f"Path not found: {path}"}
 
-    # Collect files to analyze
-    files_to_analyze = []
+    # Collect files to analyze (excluding venv, node_modules, etc.)
     if path_obj.is_file():
         files_to_analyze = [path_obj]
     else:
-        files_to_analyze = list(path_obj.rglob(file_pattern))
+        files_to_analyze = gather_files_by_pattern(path_obj, file_pattern)
+
+    # Apply file limit to prevent context overflow
+    files_truncated = False
+    total_files_found = len(files_to_analyze)
+    if max_files > 0 and len(files_to_analyze) > max_files:
+        files_to_analyze = files_to_analyze[:max_files]
+        files_truncated = True
 
     total_functions = 0
     documented_functions = 0
@@ -704,7 +717,15 @@ async def analyze_docs(
     report.append("=" * 70)
     report.append("")
     report.append(f"Path: {path}")
-    report.append(f"Files analyzed: {len(files_to_analyze)}")
+    if files_truncated:
+        report.append(
+            f"Files analyzed: {len(files_to_analyze)} of {total_files_found} (limited by max_files={max_files})"
+        )
+        report.append(
+            "⚠️  Increase max_files to analyze more files, or specify a more specific path"
+        )
+    else:
+        report.append(f"Files analyzed: {len(files_to_analyze)}")
     report.append("")
     report.append(f"Coverage: {coverage:.1f}%")
     report.append("")
@@ -735,13 +756,29 @@ async def analyze_docs(
         emoji = "🔴" if coverage < 50 else ("🟡" if coverage < 80 else "🟢")
         report.append(f"  {emoji} {rec}")
 
+    # Truncate lists to prevent context overflow
+    MAX_MISSING_ITEMS = 20
+    MAX_QUALITY_ISSUES = 15
+    missing_truncated = missing[:MAX_MISSING_ITEMS]
+    if len(missing) > MAX_MISSING_ITEMS:
+        missing_truncated.append(f"... and {len(missing) - MAX_MISSING_ITEMS} more items")
+
+    quality_truncated = quality_issues[:MAX_QUALITY_ISSUES] if check_quality else None
+    if check_quality and len(quality_issues) > MAX_QUALITY_ISSUES:
+        quality_truncated.append(f"... and {len(quality_issues) - MAX_QUALITY_ISSUES} more issues")
+
     return {
         "success": True,
         "coverage": round(coverage, 1),
         "total_items": total_items,
         "documented_items": documented_items,
-        "missing": missing,
-        "quality_issues": quality_issues if check_quality else None,
+        "files_analyzed": len(files_to_analyze),
+        "files_found": total_files_found,
+        "files_truncated": files_truncated,
+        "missing_count": len(missing),
+        "missing": missing_truncated,
+        "quality_issues_count": len(quality_issues) if check_quality else 0,
+        "quality_issues": quality_truncated,
         "recommendations": recommendations,
         "formatted_report": "\n".join(report),
     }

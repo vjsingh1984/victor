@@ -16,7 +16,7 @@
 
 import time
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from victor.agent.metrics_collector import (
     MetricsCollector,
@@ -149,6 +149,7 @@ class TestMetricsCollectorInit:
 
     def test_initialization_with_tool_cost_lookup(self, mock_usage_logger):
         """Test initialization with custom tool cost lookup."""
+
         def custom_lookup(name):
             return CostTier.HIGH if name == "expensive" else CostTier.FREE
 

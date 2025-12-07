@@ -56,6 +56,75 @@ class ActionIntent(Enum):
     READ_ONLY = "read_only"
 
 
+# =============================================================================
+# Tool Categories for Intent-Based Filtering
+# =============================================================================
+# These constants define which tools are allowed/blocked for each intent.
+# Single source of truth for tool filtering - update here when adding new tools.
+
+# Tools that modify files - blocked for DISPLAY_ONLY and READ_ONLY intents
+# IMPORTANT: Keep in sync with victor.agent.safety.WRITE_TOOL_NAMES
+WRITE_TOOLS: frozenset[str] = frozenset(
+    {
+        # Direct file modifications
+        "write_file",  # filesystem.py
+        "edit_files",  # file_editor_tool.py
+        # Patch/diff application
+        "apply_patch",  # patch_tool.py
+        # Bash execution (can modify files)
+        "execute_bash",  # bash.py
+        # Git write operations
+        "git",  # git_tool.py (commit, push, etc.)
+        # Refactoring (modifies files)
+        "refactor_rename_symbol",
+        "refactor_extract_function",
+        "refactor_inline_variable",
+        "refactor_organize_imports",
+        "rename_symbol",
+        # Scaffolding (creates files)
+        "scaffold",
+        # Batch operations
+        "batch",
+    }
+)
+
+# Tools that are safe for all intents (read-only operations)
+READ_ONLY_TOOLS: frozenset[str] = frozenset(
+    {
+        "read_file",
+        "list_directory",
+        "code_search",
+        "semantic_code_search",
+        "grep_search",
+        "find_files",
+        "git_status",
+        "git_log",
+        "git_diff",
+        "analyze_code",
+        "analyze_docs",
+        "web_search",
+        "web_fetch",
+    }
+)
+
+# Tools blocked for READ_ONLY intent (no code generation at all)
+GENERATION_TOOLS: frozenset[str] = frozenset(
+    {
+        "generate_code",
+        "generate_docs",
+        "refactor_code",
+    }
+)
+
+# Mapping of intent to blocked tool sets
+INTENT_BLOCKED_TOOLS: dict[ActionIntent, frozenset[str]] = {
+    ActionIntent.DISPLAY_ONLY: WRITE_TOOLS,
+    ActionIntent.READ_ONLY: WRITE_TOOLS | GENERATION_TOOLS,
+    ActionIntent.WRITE_ALLOWED: frozenset(),  # No restrictions
+    ActionIntent.AMBIGUOUS: frozenset(),  # Rely on prompt guard
+}
+
+
 @dataclass
 class IntentClassification:
     """Result of intent detection.
@@ -120,6 +189,31 @@ READ_ONLY_SIGNALS: List[Tuple[str, float, str]] = [
     (r"\bgit\s+(status|log|branch|diff)\b", 1.0, "git_read"),
 ]
 
+# Compound signals: "analyze AND fix" patterns that authorize writes after analysis
+# These take precedence over READ_ONLY signals when both analysis and action words present
+COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
+    # Analyze/review + fix/update/modify
+    (
+        r"\b(analyze|review|check|find)\b.*\b(and|then)\s+(fix|update|modify|correct|improve)\b",
+        1.0,
+        "analyze_then_fix",
+    ),
+    (r"\b(identify|detect|find)\b.*\b(and\s+)?(fix|correct|resolve)\b", 1.0, "find_and_fix"),
+    (
+        r"\b(fix|correct|resolve)\s+(any|all|the)?\s*(bugs?|issues?|errors?|problems?)\b",
+        0.9,
+        "fix_bugs",
+    ),
+    # "Fix the bug in X" patterns
+    (r"\bfix\s+(the\s+)?(bug|issue|error|problem)\s+(in|with)\b", 0.9, "fix_in"),
+    # "Apply the fix/changes" patterns
+    (r"\b(apply|implement)\s+(the\s+)?(fix|changes?|improvements?)\b", 0.9, "apply_fix"),
+    # "Make the changes" / "make it work"
+    (r"\bmake\s+(the\s+)?(changes?|it\s+work|corrections?)\b", 0.8, "make_changes"),
+    # "Refactor and improve"
+    (r"\b(refactor|clean\s*up)\s+(and\s+)?(improve|optimize)?\b", 0.8, "refactor_improve"),
+]
+
 # Safe actions by intent type
 SAFE_ACTIONS: dict[ActionIntent, Set[str]] = {
     ActionIntent.READ_ONLY: {"read_file", "list_directory", "code_search", "git_status"},
@@ -158,10 +252,15 @@ IMPORTANT: The user wants to SEE code, not save it to a file.
 - Do NOT use write_file or create_file tools
 - Do NOT modify any existing files
 - Present code in markdown code blocks
+- Be concise and complete the task in one response
+- Do NOT ask follow-up questions like "Would you like me to elaborate?" or "Should I explain more?"
+- Simply provide the answer and stop
 """,
     ActionIntent.READ_ONLY: """
 IMPORTANT: This is a read-only query.
 - Only use read operations (read_file, list_directory, code_search)
+- Be concise and answer directly
+- Do NOT ask follow-up questions - just provide the information requested
 - Do NOT write, create, or modify any files
 - Do NOT generate new code unless specifically asked
 """,
@@ -209,10 +308,12 @@ class IntentDetector:
         self._display_patterns: List[Tuple[re.Pattern, float, str]] = []
         self._write_patterns: List[Tuple[re.Pattern, float, str]] = []
         self._read_only_patterns: List[Tuple[re.Pattern, float, str]] = []
+        self._compound_write_patterns: List[Tuple[re.Pattern, float, str]] = []
 
         self._compile_patterns(DISPLAY_SIGNALS, self._display_patterns)
         self._compile_patterns(WRITE_SIGNALS, self._write_patterns)
         self._compile_patterns(READ_ONLY_SIGNALS, self._read_only_patterns)
+        self._compile_patterns(COMPOUND_WRITE_SIGNALS, self._compound_write_patterns)
 
         if custom_display_signals:
             self._compile_patterns(custom_display_signals, self._display_patterns)
@@ -251,10 +352,20 @@ class IntentDetector:
         display_score, display_matched = self._score_patterns(message, self._display_patterns)
         write_score, write_matched = self._score_patterns(message, self._write_patterns)
         read_only_score, read_only_matched = self._score_patterns(message, self._read_only_patterns)
+        compound_score, compound_matched = self._score_patterns(
+            message, self._compound_write_patterns
+        )
 
         # Determine intent based on scores
+        # Compound write signals (e.g., "analyze and fix") take highest precedence
+        # They indicate user wants both analysis AND file modifications
+        if compound_score > 0:
+            intent = ActionIntent.WRITE_ALLOWED
+            confidence = min(1.0, compound_score)
+            matched = compound_matched
+            logger.debug(f"Compound write intent detected: {compound_matched}")
         # Write signals are explicit and take precedence when strong
-        if write_score > 0.5 and write_score > display_score:
+        elif write_score > 0.5 and write_score > display_score:
             intent = ActionIntent.WRITE_ALLOWED
             confidence = min(1.0, write_score)
             matched = write_matched

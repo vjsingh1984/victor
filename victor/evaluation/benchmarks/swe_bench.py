@@ -160,9 +160,7 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                 await env.apply_patch(task.test_code)
 
             # Run tests
-            passed, total, stdout, stderr = await env.run_tests(
-                timeout=config.timeout_per_task
-            )
+            passed, total, stdout, stderr = await env.run_tests(timeout=config.timeout_per_task)
 
             result.tests_passed = passed
             result.tests_total = total
@@ -213,6 +211,7 @@ class SWEBenchRunner(BaseBenchmarkRunner):
 
         # Try to extract from code blocks
         import re
+
         code_blocks = re.findall(r"```(?:diff)?\n(.*?)```", output, re.DOTALL)
         for block in code_blocks:
             if "diff" in block or "---" in block or "+++" in block:
@@ -269,10 +268,7 @@ class HumanEvalRunner(BaseBenchmarkRunner):
                 tasks.append(task)
 
         except ImportError:
-            logger.error(
-                "datasets library not installed. "
-                "Install with: pip install datasets"
-            )
+            logger.error("datasets library not installed. " "Install with: pip install datasets")
             raise RuntimeError(
                 "Cannot load HumanEval: datasets library required. "
                 "Install with: pip install datasets"
@@ -298,6 +294,7 @@ class HumanEvalRunner(BaseBenchmarkRunner):
 
         # Extract function name from the prompt to call the check function
         import re
+
         func_match = re.search(r"def\s+(\w+)\s*\(", task.prompt)
         func_name = func_match.group(1) if func_match else "solution"
 
@@ -315,7 +312,8 @@ class HumanEvalRunner(BaseBenchmarkRunner):
 
             # Run tests
             proc = await asyncio.create_subprocess_exec(
-                "python", str(code_file),
+                "python",
+                str(code_file),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -419,13 +417,9 @@ class MBPPRunner(BaseBenchmarkRunner):
                 tasks.append(task)
 
         except ImportError:
-            logger.error(
-                "datasets library not installed. "
-                "Install with: pip install datasets"
-            )
+            logger.error("datasets library not installed. " "Install with: pip install datasets")
             raise RuntimeError(
-                "Cannot load MBPP: datasets library required. "
-                "Install with: pip install datasets"
+                "Cannot load MBPP: datasets library required. " "Install with: pip install datasets"
             )
         except Exception as e:
             logger.error(f"Failed to load MBPP from HuggingFace: {e}")
@@ -489,7 +483,8 @@ class MBPPRunner(BaseBenchmarkRunner):
 
             # Run tests
             proc = await asyncio.create_subprocess_exec(
-                "python", str(code_file),
+                "python",
+                str(code_file),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )

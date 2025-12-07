@@ -34,8 +34,6 @@ from typing import Any, Callable, Optional
 from victor.evaluation.protocol import (
     BenchmarkTask,
     EvaluationConfig,
-    TaskResult,
-    TaskStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -128,7 +126,8 @@ class AggregatePassAtKResult:
             "total_tasks": self.total_tasks,
             "k_values": self.k_values,
             "mean_pass_at_k": self.mean_pass_at_k,
-            "mean_pass_rate": sum(r.pass_rate for r in self.task_results) / max(1, self.total_tasks),
+            "mean_pass_rate": sum(r.pass_rate for r in self.task_results)
+            / max(1, self.total_tasks),
         }
 
 
@@ -209,9 +208,7 @@ class PassAtKEvaluator:
 
         # Run all samples
         logger.info(f"Generating {n} samples for task {task.task_id}")
-        results = await asyncio.gather(
-            *[generate_and_evaluate(i) for i in range(n)]
-        )
+        results = await asyncio.gather(*[generate_and_evaluate(i) for i in range(n)])
         sample_results = list(results)
 
         # Count correct samples

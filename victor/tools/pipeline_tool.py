@@ -37,23 +37,10 @@ class PipelineAnalyzerTool(BaseTool):
     """Tool for analyzing CI/CD pipelines and coverage."""
 
     name = "pipeline_analyzer"
-    description = """Analyze CI/CD pipelines and code coverage.
+    description = """Analyze CI/CD pipelines (GitHub Actions, GitLab) and coverage.
 
-Supports multiple CI/CD platforms:
-- GitHub Actions (.github/workflows/)
-- GitLab CI (.gitlab-ci.yml)
-
-Supports multiple coverage formats:
-- Cobertura XML
-- LCOV
-- JaCoCo XML
-
-Actions:
-- analyze: Full pipeline analysis with issues and recommendations
-- coverage: Get current coverage metrics
-- compare_coverage: Compare coverage against baseline
-- summary: Get high-level pipeline health summary
-- detect: Detect which CI/CD platforms are configured"""
+    Actions: analyze, coverage, compare_coverage, summary, detect.
+    Coverage formats: Cobertura, LCOV, JaCoCo."""
 
     parameters = {
         "type": "object",
@@ -95,9 +82,19 @@ Actions:
         return ToolMetadata(
             category="pipeline",
             keywords=[
-                "pipeline", "ci/cd", "coverage", "github actions", "gitlab ci",
-                "cobertura", "lcov", "jacoco", "test coverage", "pipeline health",
-                "build analysis", "workflow analysis", "coverage trend"
+                "pipeline",
+                "ci/cd",
+                "coverage",
+                "github actions",
+                "gitlab ci",
+                "cobertura",
+                "lcov",
+                "jacoco",
+                "test coverage",
+                "pipeline health",
+                "build analysis",
+                "workflow analysis",
+                "coverage trend",
             ],
             use_cases=[
                 "analyzing CI/CD pipelines",

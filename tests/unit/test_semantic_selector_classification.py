@@ -193,7 +193,14 @@ class TestClassificationAwareSelection:
         tools = MagicMock()
 
         mock_tool_list = []
-        for name in ["read_file", "write_file", "execute_bash", "code_search", "analyze_docs", "run_tests"]:
+        for name in [
+            "read_file",
+            "write_file",
+            "execute_bash",
+            "code_search",
+            "analyze_docs",
+            "run_tests",
+        ]:
             tool = MagicMock()
             tool.name = name
             tool.description = f"Mock {name} tool"
@@ -226,7 +233,7 @@ class TestClassificationAwareSelection:
         self, selector, mock_tools, mock_classification_result
     ):
         """Test that analysis classification selects analysis-related tools."""
-        with patch.object(selector, '_get_embedding', new_callable=AsyncMock) as mock_embed:
+        with patch.object(selector, "_get_embedding", new_callable=AsyncMock) as mock_embed:
             mock_embed.return_value = np.random.randn(384).astype(np.float32)
 
             tools = await selector.select_tools_with_classification(
@@ -238,9 +245,7 @@ class TestClassificationAwareSelection:
             assert len(tools) > 0
 
     @pytest.mark.asyncio
-    async def test_negation_excludes_tools(
-        self, selector, mock_tools
-    ):
+    async def test_negation_excludes_tools(self, selector, mock_tools):
         """Test that negated keywords exclude related tools."""
         from victor.agent.unified_classifier import TaskType, ClassificationResult, KeywordMatch
 
@@ -253,7 +258,7 @@ class TestClassificationAwareSelection:
             matched_keywords=[],
         )
 
-        with patch.object(selector, '_get_embedding', new_callable=AsyncMock) as mock_embed:
+        with patch.object(selector, "_get_embedding", new_callable=AsyncMock) as mock_embed:
             mock_embed.return_value = np.random.randn(384).astype(np.float32)
 
             tools = await selector.select_tools_with_classification(
@@ -267,9 +272,7 @@ class TestClassificationAwareSelection:
             assert "analyze_docs" not in tool_names
 
     @pytest.mark.asyncio
-    async def test_high_confidence_stricter_selection(
-        self, selector, mock_tools
-    ):
+    async def test_high_confidence_stricter_selection(self, selector, mock_tools):
         """Test that high confidence leads to stricter selection."""
         from victor.agent.unified_classifier import TaskType, ClassificationResult
 
@@ -281,7 +284,7 @@ class TestClassificationAwareSelection:
             matched_keywords=[],
         )
 
-        with patch.object(selector, '_get_embedding', new_callable=AsyncMock) as mock_embed:
+        with patch.object(selector, "_get_embedding", new_callable=AsyncMock) as mock_embed:
             mock_embed.return_value = np.random.randn(384).astype(np.float32)
 
             tools = await selector.select_tools_with_classification(
@@ -294,9 +297,7 @@ class TestClassificationAwareSelection:
             assert len(tools) >= 2  # Fallback ensures minimum
 
     @pytest.mark.asyncio
-    async def test_low_confidence_broader_selection(
-        self, selector, mock_tools
-    ):
+    async def test_low_confidence_broader_selection(self, selector, mock_tools):
         """Test that low confidence leads to broader selection."""
         from victor.agent.unified_classifier import TaskType, ClassificationResult
 
@@ -307,7 +308,7 @@ class TestClassificationAwareSelection:
             matched_keywords=[],
         )
 
-        with patch.object(selector, '_get_embedding', new_callable=AsyncMock) as mock_embed:
+        with patch.object(selector, "_get_embedding", new_callable=AsyncMock) as mock_embed:
             mock_embed.return_value = np.random.randn(384).astype(np.float32)
 
             tools = await selector.select_tools_with_classification(

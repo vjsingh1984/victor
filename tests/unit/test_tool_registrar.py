@@ -24,7 +24,6 @@ Tests cover:
 - Statistics collection
 """
 
-import asyncio
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from dataclasses import asdict
@@ -724,9 +723,7 @@ class TestInitializeMethod:
         with patch.object(registrar, "_setup_providers"):
             with patch.object(registrar, "_register_dynamic_tools", return_value=10):
                 with patch.object(registrar, "_load_tool_configurations"):
-                    with patch.object(
-                        registrar, "_initialize_plugins", return_value=5
-                    ):
+                    with patch.object(registrar, "_initialize_plugins", return_value=5):
                         stats = await registrar.initialize()
 
         assert stats.dynamic_tools == 10

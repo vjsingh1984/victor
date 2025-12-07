@@ -15,7 +15,7 @@
 """Tests for the command registry system."""
 
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 from typing import List
 
 from rich.console import Console
@@ -33,6 +33,7 @@ from victor.ui.commands.base import (
 
 class MockSettings:
     """Mock settings for testing."""
+
     pass
 
 

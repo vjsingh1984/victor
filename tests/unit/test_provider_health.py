@@ -26,8 +26,7 @@ Tests cover:
 
 import pytest
 import asyncio
-from unittest.mock import MagicMock, AsyncMock, patch
-from datetime import datetime
+from unittest.mock import MagicMock, AsyncMock
 
 from victor.providers.health import (
     ProviderHealthChecker,
@@ -328,21 +327,27 @@ class TestProviderHealthChecker:
     def test_get_healthy_providers(self, checker):
         """Test getting healthy providers sorted by latency."""
         # Record results with different latencies
-        checker._record_result(HealthCheckResult(
-            provider_name="slow_healthy",
-            status=HealthStatus.HEALTHY,
-            latency_ms=1000,
-        ))
-        checker._record_result(HealthCheckResult(
-            provider_name="fast_healthy",
-            status=HealthStatus.HEALTHY,
-            latency_ms=100,
-        ))
-        checker._record_result(HealthCheckResult(
-            provider_name="unhealthy",
-            status=HealthStatus.UNHEALTHY,
-            latency_ms=50,
-        ))
+        checker._record_result(
+            HealthCheckResult(
+                provider_name="slow_healthy",
+                status=HealthStatus.HEALTHY,
+                latency_ms=1000,
+            )
+        )
+        checker._record_result(
+            HealthCheckResult(
+                provider_name="fast_healthy",
+                status=HealthStatus.HEALTHY,
+                latency_ms=100,
+            )
+        )
+        checker._record_result(
+            HealthCheckResult(
+                provider_name="unhealthy",
+                status=HealthStatus.UNHEALTHY,
+                latency_ms=50,
+            )
+        )
 
         healthy = checker.get_healthy_providers()
 
@@ -351,21 +356,27 @@ class TestProviderHealthChecker:
 
     def test_get_available_providers(self, checker):
         """Test getting available providers (healthy + degraded)."""
-        checker._record_result(HealthCheckResult(
-            provider_name="healthy",
-            status=HealthStatus.HEALTHY,
-            latency_ms=100,
-        ))
-        checker._record_result(HealthCheckResult(
-            provider_name="degraded",
-            status=HealthStatus.DEGRADED,
-            latency_ms=5000,
-        ))
-        checker._record_result(HealthCheckResult(
-            provider_name="unhealthy",
-            status=HealthStatus.UNHEALTHY,
-            latency_ms=50,
-        ))
+        checker._record_result(
+            HealthCheckResult(
+                provider_name="healthy",
+                status=HealthStatus.HEALTHY,
+                latency_ms=100,
+            )
+        )
+        checker._record_result(
+            HealthCheckResult(
+                provider_name="degraded",
+                status=HealthStatus.DEGRADED,
+                latency_ms=5000,
+            )
+        )
+        checker._record_result(
+            HealthCheckResult(
+                provider_name="unhealthy",
+                status=HealthStatus.UNHEALTHY,
+                latency_ms=50,
+            )
+        )
 
         available = checker.get_available_providers()
 
@@ -377,11 +388,13 @@ class TestProviderHealthChecker:
     def test_health_history_tracking(self, checker):
         """Test that health history is tracked."""
         for i in range(5):
-            checker._record_result(HealthCheckResult(
-                provider_name="test",
-                status=HealthStatus.HEALTHY,
-                latency_ms=100 + i,
-            ))
+            checker._record_result(
+                HealthCheckResult(
+                    provider_name="test",
+                    status=HealthStatus.HEALTHY,
+                    latency_ms=100 + i,
+                )
+            )
 
         history = checker.get_provider_history("test")
 
@@ -390,11 +403,13 @@ class TestProviderHealthChecker:
     def test_health_history_limit(self, checker):
         """Test that health history respects limit."""
         for i in range(20):  # More than history_size (10)
-            checker._record_result(HealthCheckResult(
-                provider_name="test",
-                status=HealthStatus.HEALTHY,
-                latency_ms=100 + i,
-            ))
+            checker._record_result(
+                HealthCheckResult(
+                    provider_name="test",
+                    status=HealthStatus.HEALTHY,
+                    latency_ms=100 + i,
+                )
+            )
 
         history = checker.get_provider_history("test")
 
@@ -403,18 +418,18 @@ class TestProviderHealthChecker:
     def test_calculate_uptime(self, checker):
         """Test uptime calculation."""
         # 3 healthy, 1 unhealthy
-        checker._record_result(HealthCheckResult(
-            provider_name="test", status=HealthStatus.HEALTHY, latency_ms=100
-        ))
-        checker._record_result(HealthCheckResult(
-            provider_name="test", status=HealthStatus.HEALTHY, latency_ms=100
-        ))
-        checker._record_result(HealthCheckResult(
-            provider_name="test", status=HealthStatus.HEALTHY, latency_ms=100
-        ))
-        checker._record_result(HealthCheckResult(
-            provider_name="test", status=HealthStatus.UNHEALTHY, latency_ms=0
-        ))
+        checker._record_result(
+            HealthCheckResult(provider_name="test", status=HealthStatus.HEALTHY, latency_ms=100)
+        )
+        checker._record_result(
+            HealthCheckResult(provider_name="test", status=HealthStatus.HEALTHY, latency_ms=100)
+        )
+        checker._record_result(
+            HealthCheckResult(provider_name="test", status=HealthStatus.HEALTHY, latency_ms=100)
+        )
+        checker._record_result(
+            HealthCheckResult(provider_name="test", status=HealthStatus.UNHEALTHY, latency_ms=0)
+        )
 
         uptime = checker.calculate_uptime("test")
 
@@ -436,18 +451,22 @@ class TestProviderHealthChecker:
         checker.add_health_change_callback(callback)
 
         # First result - unknown -> healthy
-        checker._record_result(HealthCheckResult(
-            provider_name="test",
-            status=HealthStatus.HEALTHY,
-            latency_ms=100,
-        ))
+        checker._record_result(
+            HealthCheckResult(
+                provider_name="test",
+                status=HealthStatus.HEALTHY,
+                latency_ms=100,
+            )
+        )
 
         # Second result - healthy -> unhealthy
-        checker._record_result(HealthCheckResult(
-            provider_name="test",
-            status=HealthStatus.UNHEALTHY,
-            latency_ms=0,
-        ))
+        checker._record_result(
+            HealthCheckResult(
+                provider_name="test",
+                status=HealthStatus.UNHEALTHY,
+                latency_ms=0,
+            )
+        )
 
         assert len(callback_calls) == 2
         assert callback_calls[0] == ("test", HealthStatus.UNKNOWN, HealthStatus.HEALTHY)
@@ -456,11 +475,13 @@ class TestProviderHealthChecker:
     def test_get_stats(self, checker, mock_provider):
         """Test getting checker statistics."""
         checker.register_provider("test", mock_provider)
-        checker._record_result(HealthCheckResult(
-            provider_name="test",
-            status=HealthStatus.HEALTHY,
-            latency_ms=100,
-        ))
+        checker._record_result(
+            HealthCheckResult(
+                provider_name="test",
+                status=HealthStatus.HEALTHY,
+                latency_ms=100,
+            )
+        )
 
         stats = checker.get_stats()
 
@@ -531,5 +552,6 @@ class TestProviderHealthConfig:
     def test_thresholds_are_ordered(self):
         """Test that degraded < unhealthy thresholds."""
         for name, config in PROVIDER_HEALTH_CONFIG.items():
-            assert config["degraded_threshold_ms"] < config["unhealthy_threshold_ms"], \
-                f"{name}: degraded threshold should be less than unhealthy"
+            assert (
+                config["degraded_threshold_ms"] < config["unhealthy_threshold_ms"]
+            ), f"{name}: degraded threshold should be less than unhealthy"

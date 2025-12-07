@@ -35,22 +35,10 @@ class MergeConflictTool(BaseTool):
     """Tool for detecting and resolving merge conflicts."""
 
     name = "merge_conflicts"
-    description = """Detect and resolve git merge conflicts intelligently.
+    description = """Detect and resolve git merge conflicts.
 
-Supports:
-- Automatic conflict detection from git status
-- Smart resolution strategies:
-  - Trivial: whitespace-only differences
-  - Import: combine and sort import statements
-  - Union: combine non-overlapping additions
-- Complexity analysis and resolution ordering
-
-Actions:
-- detect: Find all merge conflicts
-- analyze: Analyze conflict complexity and resolution effort
-- resolve: Attempt automatic resolution
-- apply: Apply a specific strategy (ours/theirs) to a file
-- abort: Abort the current merge/rebase"""
+    Actions: detect, analyze, resolve (auto), apply (ours/theirs), abort.
+    Smart strategies: trivial (whitespace), import (sort/combine), union."""
 
     parameters = {
         "type": "object",
@@ -87,8 +75,14 @@ Actions:
         return ToolMetadata(
             category="merge",
             keywords=[
-                "merge conflict", "conflict", "resolve conflict", "git conflict",
-                "rebase conflict", "merge resolution", "conflict markers", "git merge"
+                "merge conflict",
+                "conflict",
+                "resolve conflict",
+                "git conflict",
+                "rebase conflict",
+                "merge resolution",
+                "conflict markers",
+                "git merge",
             ],
             use_cases=[
                 "detecting merge conflicts",

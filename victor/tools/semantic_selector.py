@@ -33,12 +33,13 @@ from victor.providers.base import ToolDefinition
 from victor.tools.base import CostTier, ToolMetadataRegistry, ToolRegistry
 from victor.embeddings.service import EmbeddingService
 from victor.agent.tool_sequence_tracker import ToolSequenceTracker, create_sequence_tracker
+from victor.agent.debug_logger import TRACE  # Import TRACE level
 
 # Import for type checking only (avoid circular imports)
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.agent.unified_classifier import ClassificationResult, TaskType
+    from victor.agent.unified_classifier import ClassificationResult
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +196,7 @@ class SemanticToolSelector:
         # Phase 3: Tool usage tracking and learning
         self._usage_cache_file = self.cache_dir / "tool_usage_stats.pkl"
         self._tool_usage_cache: Dict[str, Dict[str, Any]] = {}
+        self._usage_cache_dirty = False  # Dirty flag - only save when changed
         self._load_usage_cache()
 
         # Phase 6: Store last cost warnings for retrieval
@@ -548,7 +550,7 @@ class SemanticToolSelector:
         query_lower = query.lower()
         for pattern in self.CONCEPTUAL_QUERY_PATTERNS:
             if pattern in query_lower:
-                logger.debug(f"Conceptual query detected via pattern: '{pattern}'")
+                logger.log(TRACE, f"Conceptual query detected via pattern: '{pattern}'")
                 return True
         return False
 
@@ -574,12 +576,13 @@ class SemanticToolSelector:
                 if is_conceptual and keyword in ["search", "find"]:
                     filtered_tools = [t for t in tools if t != "code_search"]
                     mandatory.extend(filtered_tools)
-                    logger.debug(
-                        f"Mandatory tools for '{keyword}' (conceptual, excluding code_search): {filtered_tools}"
+                    logger.log(
+                        TRACE,
+                        f"Mandatory tools for '{keyword}' (conceptual, excluding code_search): {filtered_tools}",
                     )
                 else:
                     mandatory.extend(tools)
-                    logger.debug(f"Mandatory tools for '{keyword}': {tools}")
+                    logger.log(TRACE, f"Mandatory tools for '{keyword}': {tools}")
 
         return list(set(mandatory))
 
@@ -692,7 +695,7 @@ class SemanticToolSelector:
                 completed = self._was_action_completed(action_type, conversation_history)
                 if not completed:
                     pending.append(action_type)
-                    logger.debug(f"Pending action detected: {action_type}")
+                    logger.log(TRACE, f"Pending action detected: {action_type}")
 
         return pending
 
@@ -797,11 +800,22 @@ class SemanticToolSelector:
             logger.warning(f"Failed to load usage cache: {e}")
             self._tool_usage_cache = {}
 
-    def _save_usage_cache(self) -> None:
-        """Save tool usage statistics to disk cache (Phase 3)."""
+    def _save_usage_cache(self, force: bool = False) -> None:
+        """Save tool usage statistics to disk cache (Phase 3).
+
+        Uses dirty flag pattern to avoid redundant disk writes.
+        Only saves when data has changed or force=True (e.g., on shutdown).
+
+        Args:
+            force: Force save even if not dirty (for shutdown)
+        """
+        if not force and not self._usage_cache_dirty:
+            return  # Nothing changed, skip save
+
         try:
             with open(self._usage_cache_file, "wb") as f:
                 pickle.dump(self._tool_usage_cache, f)
+            self._usage_cache_dirty = False  # Clear dirty flag after save
             logger.debug(f"Saved usage stats for {len(self._tool_usage_cache)} tools")
         except Exception as e:
             logger.warning(f"Failed to save usage cache: {e}")
@@ -833,15 +847,18 @@ class SemanticToolSelector:
                 f"Pre-initialized usage stats for {initialized_count} new tools "
                 f"(total: {len(self._tool_usage_cache)} tools)"
             )
-            self._save_usage_cache()
+            self._usage_cache_dirty = True  # Mark dirty, save on shutdown
 
     def _record_tool_usage(self, tool_name: str, query: str, success: bool = True) -> None:
-        """Record tool usage for learning (Phase 3) and sequence tracking (Phase 9).
+        """Record tool selection for learning (Phase 3).
+
+        NOTE: This records tool SELECTION, not execution. Actual execution
+        should be tracked separately via record_tool_execution().
 
         Args:
-            tool_name: Name of the tool that was used
-            query: The query context where it was used
-            success: Whether the tool was successfully used
+            tool_name: Name of the tool that was selected
+            query: The query context where it was selected
+            success: Whether the tool selection was valid
         """
         import time
 
@@ -865,13 +882,27 @@ class SemanticToolSelector:
         if len(stats["recent_contexts"]) > 50:
             stats["recent_contexts"] = stats["recent_contexts"][-50:]
 
-        # Save periodically (every 5 uses)
-        if sum(s["usage_count"] for s in self._tool_usage_cache.values()) % 5 == 0:
-            self._save_usage_cache()
+        # Mark dirty - save will happen on shutdown via close()
+        self._usage_cache_dirty = True
 
-        # Phase 9: Record in sequence tracker for workflow pattern detection
+    def record_tool_execution(
+        self,
+        tool_name: str,
+        success: bool = True,
+        execution_time: float = 0.0,
+    ) -> None:
+        """Record actual tool execution for sequence tracking (Phase 9).
+
+        This should be called AFTER a tool is actually executed, not just selected.
+        Updates the sequence tracker to build workflow patterns.
+
+        Args:
+            tool_name: Name of the tool that was executed
+            success: Whether the execution succeeded
+            execution_time: Time taken for execution
+        """
         if self._sequence_tracker:
-            self._sequence_tracker.record_execution(tool_name, success=success)
+            self._sequence_tracker.record_execution(tool_name, success, execution_time)
 
     async def _get_usage_boost(self, tool_name: str, query: str) -> float:
         """Calculate similarity boost based on usage history (Phase 3).
@@ -924,10 +955,12 @@ class SemanticToolSelector:
                 logger.debug(f"Context boost calculation failed: {e}")
 
         total_boost = usage_boost + success_boost + recency_boost + context_boost
-        logger.debug(
+        # Use TRACE for per-tool verbose logging
+        logger.log(
+            TRACE,
             f"Usage boost for {tool_name}: {total_boost:.3f} "
             f"(usage={usage_boost:.3f}, success={success_boost:.3f}, "
-            f"recency={recency_boost:.3f}, context={context_boost:.3f})"
+            f"recency={recency_boost:.3f}, context={context_boost:.3f})",
         )
 
         return min(0.2, total_boost)  # Cap total boost at 0.2
@@ -956,9 +989,10 @@ class SemanticToolSelector:
             if suggested_tool == tool_name:
                 # Scale confidence to boost value (max 0.15)
                 boost = confidence * 0.15
-                logger.debug(
+                logger.log(
+                    TRACE,
                     f"Sequence boost for {tool_name}: +{boost:.3f} "
-                    f"(confidence={confidence:.2f})"
+                    f"(confidence={confidence:.2f})",
                 )
                 return boost
 
@@ -1014,7 +1048,9 @@ class SemanticToolSelector:
         penalty = cost_tier.weight * self.cost_penalty_factor
 
         if penalty > 0:
-            logger.debug(f"Cost penalty for {tool.name}: -{penalty:.3f} (tier={cost_tier.value})")
+            logger.log(
+                TRACE, f"Cost penalty for {tool.name}: -{penalty:.3f} (tier={cost_tier.value})"
+            )
 
         return penalty
 
@@ -1044,7 +1080,7 @@ class SemanticToolSelector:
                 warning_msg = f"[{tool.name}] {COST_TIER_WARNINGS[cost_tier]}"
                 warnings.append(warning_msg)
                 self._warned_tools.add(tool.name)
-                logger.debug(f"Cost warning: {warning_msg}")
+                logger.log(TRACE, f"Cost warning: {warning_msg}")
 
         return warnings
 
@@ -1572,7 +1608,10 @@ class SemanticToolSelector:
             keyword = match.keyword if hasattr(match, "keyword") else str(match)
             if keyword in self.KEYWORD_TOOL_MAPPING:
                 excluded.update(self.KEYWORD_TOOL_MAPPING[keyword])
-                logger.debug(f"Excluding tools for negated '{keyword}': {self.KEYWORD_TOOL_MAPPING[keyword]}")
+                logger.log(
+                    TRACE,
+                    f"Excluding tools for negated '{keyword}': {self.KEYWORD_TOOL_MAPPING[keyword]}",
+                )
         return excluded
 
     def _adjust_threshold_by_confidence(
@@ -1632,8 +1671,7 @@ class SemanticToolSelector:
         confidence = classification_result.confidence
 
         logger.debug(
-            f"Classification-aware selection: type={task_type_str}, "
-            f"confidence={confidence:.2f}"
+            f"Classification-aware selection: type={task_type_str}, " f"confidence={confidence:.2f}"
         )
 
         # Get tools excluded by negated keywords
@@ -1837,8 +1875,8 @@ class SemanticToolSelector:
 
     async def close(self) -> None:
         """Close HTTP client and save usage cache (Phase 3)."""
-        # Phase 3: Save usage statistics before shutdown
-        self._save_usage_cache()
+        # Phase 3: Save usage statistics before shutdown (force save)
+        self._save_usage_cache(force=True)
 
         if self._client:
             await self._client.aclose()

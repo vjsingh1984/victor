@@ -606,6 +606,9 @@ class ToolSelector:
         # Selection statistics
         self.stats = ToolSelectionStats()
 
+        # Cache last selection to avoid redundant logging
+        self._last_selection: Optional[Set[str]] = None
+
     def _record_selection(self, method: str, num_tools: int) -> None:
         """Record a selection event.
 
@@ -869,10 +872,17 @@ class ToolSelector:
             selected_tools = core_tools + other_tools[: max(0, 10 - len(core_tools))]
 
         tool_names = [t.name for t in selected_tools]
-        logger.info(
-            f"Selected {len(selected_tools)} tools (small_model={small_model}): "
-            f"{', '.join(tool_names)}"
-        )
+        tool_names_set = set(tool_names)
+
+        # Only log at INFO level if selection changed, otherwise DEBUG
+        if self._last_selection != tool_names_set:
+            self._last_selection = tool_names_set
+            logger.info(
+                f"Selected {len(selected_tools)} tools (small_model={small_model}): "
+                f"{', '.join(tool_names)}"
+            )
+        else:
+            logger.debug(f"Tool selection unchanged: {len(selected_tools)} tools")
 
         self._record_selection("keyword", len(selected_tools))
         return selected_tools

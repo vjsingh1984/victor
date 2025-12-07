@@ -131,12 +131,12 @@ class CostTracking:
     """Tracks cost by tier for tool executions."""
 
     total_cost_weight: float = 0.0
-    cost_by_tier: Dict[str, float] = field(default_factory=lambda: {
-        "free": 0.0, "low": 0.0, "medium": 0.0, "high": 0.0
-    })
-    calls_by_tier: Dict[str, int] = field(default_factory=lambda: {
-        "free": 0, "low": 0, "medium": 0, "high": 0
-    })
+    cost_by_tier: Dict[str, float] = field(
+        default_factory=lambda: {"free": 0.0, "low": 0.0, "medium": 0.0, "high": 0.0}
+    )
+    calls_by_tier: Dict[str, int] = field(
+        default_factory=lambda: {"free": 0, "low": 0, "medium": 0, "high": 0}
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -331,9 +331,7 @@ class MetricsCollector:
             self._selection_stats.fallback_selections += 1
 
         self._selection_stats.total_tools_selected += num_tools
-        self.usage_logger.log_event(
-            "tool_selection", {"method": method, "tool_count": num_tools}
-        )
+        self.usage_logger.log_event("tool_selection", {"method": method, "tool_count": num_tools})
 
         logger.debug(
             f"Tool selection: method={method}, num_tools={num_tools}, "
@@ -428,9 +426,7 @@ class MetricsCollector:
     # Tool Execution Stats
     # =========================================================================
 
-    def record_tool_execution(
-        self, tool_name: str, success: bool, elapsed_ms: float
-    ) -> None:
+    def record_tool_execution(self, tool_name: str, success: bool, elapsed_ms: float) -> None:
         """Record tool execution statistics.
 
         Args:
@@ -501,18 +497,12 @@ class MetricsCollector:
             "tool_stats": self._tool_usage_stats.copy(),
             "cost_tracking": self._cost_tracking.to_dict(),
             "top_tools_by_usage": sorted(
-                [
-                    (name, stats["total_calls"])
-                    for name, stats in self._tool_usage_stats.items()
-                ],
+                [(name, stats["total_calls"]) for name, stats in self._tool_usage_stats.items()],
                 key=lambda x: x[1],
                 reverse=True,
             )[:10],
             "top_tools_by_time": sorted(
-                [
-                    (name, stats["total_time_ms"])
-                    for name, stats in self._tool_usage_stats.items()
-                ],
+                [(name, stats["total_time_ms"]) for name, stats in self._tool_usage_stats.items()],
                 key=lambda x: x[1],
                 reverse=True,
             )[:10],
@@ -535,9 +525,7 @@ class MetricsCollector:
     # Component Callbacks
     # =========================================================================
 
-    def on_tool_start(
-        self, tool_name: str, arguments: Dict[str, Any], iteration: int = 0
-    ) -> None:
+    def on_tool_start(self, tool_name: str, arguments: Dict[str, Any], iteration: int = 0) -> None:
         """Callback when tool execution starts (from ToolPipeline).
 
         Args:

@@ -47,7 +47,7 @@ class TestReadFileSearch:
             f.write("line 1\nline 2\nMATCH HERE\nline 4\nline 5\n")
             f.flush()
 
-            result = await read_file(f.name, search="MATCH", context=2)
+            result = await read_file(f.name, search="MATCH", context_lines=2)
 
             assert "MATCH HERE" in result
             # Should include context

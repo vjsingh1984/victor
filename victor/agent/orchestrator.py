@@ -47,11 +47,8 @@ Recent Refactoring (December 2025):
 
 import ast
 import asyncio
-import importlib
-import inspect
 import json
 import logging
-import os
 import time
 from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional, Set
@@ -69,7 +66,11 @@ from victor.agent.conversation_embedding_store import (
 )
 from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
 from victor.agent.debug_logger import get_debug_logger
-from victor.agent.action_authorizer import ActionAuthorizer, ActionIntent
+from victor.agent.action_authorizer import (
+    ActionAuthorizer,
+    ActionIntent,
+    INTENT_BLOCKED_TOOLS,
+)
 from victor.agent.prompt_builder import SystemPromptBuilder, get_task_type_hint
 from victor.agent.response_sanitizer import ResponseSanitizer
 from victor.agent.search_router import SearchRouter, SearchRoute, SearchType
@@ -82,7 +83,6 @@ from victor.agent.metrics_collector import (
 )
 from victor.agent.unified_task_tracker import (
     UnifiedTaskTracker,
-    TaskType as UnifiedTaskType,
 )
 
 # New decomposed components (facades for orchestrator responsibilities)
@@ -94,7 +94,6 @@ from victor.agent.conversation_controller import (
 )
 from victor.agent.context_compactor import (
     ContextCompactor,
-    CompactorConfig,
     TruncationStrategy,
     create_context_compactor,
 )
@@ -104,9 +103,9 @@ from victor.agent.usage_analytics import (
 )
 from victor.agent.tool_sequence_tracker import (
     ToolSequenceTracker,
-    SequenceTrackerConfig,
     create_sequence_tracker,
 )
+
 # CodeCorrectionMiddleware imported lazily to avoid circular import
 # (code_correction_middleware -> evaluation.correction -> evaluation.__init__ -> agent_adapter -> orchestrator)
 from victor.agent.tool_pipeline import (
@@ -128,12 +127,11 @@ from victor.agent.tool_selection import (
     ToolSelector,
 )
 from victor.agent.tool_calling import (
-    ToolCallingAdapterRegistry,
     ToolCallParseResult,
 )
 from victor.agent.tool_executor import ToolExecutor, ValidationMode
-from victor.agent.safety import SafetyChecker, get_safety_checker, RiskLevel
-from victor.agent.auto_commit import AutoCommitter, get_auto_committer, CommitResult
+from victor.agent.safety import SafetyChecker, get_safety_checker
+from victor.agent.auto_commit import AutoCommitter, get_auto_committer
 from victor.agent.parallel_executor import (
     create_parallel_executor,
 )
@@ -155,19 +153,21 @@ from victor.providers.base import (
     ToolDefinition,
 )
 from victor.providers.registry import ProviderRegistry
-from victor.tools.batch_processor_tool import set_batch_processor_config
 from victor.tools.base import CostTier, ToolRegistry
 from victor.tools.code_executor_tool import CodeExecutionManager
-from victor.tools.code_review_tool import set_code_review_config
 from victor.tools.dependency_graph import ToolDependencyGraph
-from victor.tools.git_tool import set_git_provider
 from victor.tools.mcp_bridge_tool import configure_mcp_client, get_mcp_tool_definitions
 from victor.tools.plugin_registry import ToolPluginRegistry
 from victor.tools.semantic_selector import SemanticToolSelector
-from victor.tools.web_search_tool import set_web_search_provider, set_web_tool_defaults
 from victor.embeddings.intent_classifier import IntentClassifier, IntentType
 from victor.workflows.base import WorkflowRegistry
 from victor.workflows.new_feature_workflow import NewFeatureWorkflow
+
+# Token-optimized serialization for tool outputs
+from victor.serialization import (
+    get_adaptive_serializer,
+    SerializationContext,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -404,7 +404,9 @@ class AgentOrchestrator:
             usage_logger=self.usage_logger,
             debug_logger=self.debug_logger,
             streaming_metrics_collector=self.streaming_metrics_collector,
-            tool_cost_lookup=lambda name: self.tools.get_tool_cost(name) if hasattr(self, 'tools') else CostTier.FREE,
+            tool_cost_lookup=lambda name: (
+                self.tools.get_tool_cost(name) if hasattr(self, "tools") else CostTier.FREE
+            ),
         )
         # Result cache for pure/idempotent tools
         self.tool_cache = None
@@ -557,6 +559,7 @@ class AgentOrchestrator:
                     CodeCorrectionMiddleware,
                     CodeCorrectionConfig,
                 )
+
                 self._code_correction_middleware = CodeCorrectionMiddleware(
                     config=CodeCorrectionConfig(
                         enabled=True,
@@ -581,7 +584,11 @@ class AgentOrchestrator:
         auto_commit_enabled = getattr(settings, "auto_commit_enabled", False)
         self._auto_committer: Optional[AutoCommitter] = None
         if auto_commit_enabled:
-            workspace_root = Path(settings.workspace_root) if hasattr(settings, "workspace_root") and settings.workspace_root else None
+            workspace_root = (
+                Path(settings.workspace_root)
+                if hasattr(settings, "workspace_root") and settings.workspace_root
+                else None
+            )
             self._auto_committer = AutoCommitter(
                 workspace_root=workspace_root,
                 auto_commit=True,
@@ -765,7 +772,11 @@ class AgentOrchestrator:
         )
 
         # Initialize UsageAnalytics singleton for data-driven optimization
-        analytics_cache_dir = Path(settings.cache_dir) if hasattr(settings, "cache_dir") and settings.cache_dir else None
+        analytics_cache_dir = (
+            Path(settings.cache_dir)
+            if hasattr(settings, "cache_dir") and settings.cache_dir
+            else None
+        )
         self._usage_analytics = UsageAnalytics.get_instance(
             AnalyticsConfig(
                 cache_dir=analytics_cache_dir,
@@ -1313,7 +1324,8 @@ class AgentOrchestrator:
             "enabled": self._safety_checker is not None,
             "has_confirmation_callback": (
                 self._safety_checker.confirmation_callback is not None
-                if self._safety_checker else False
+                if self._safety_checker
+                else False
             ),
         }
 
@@ -1331,7 +1343,8 @@ class AgentOrchestrator:
 
         # Overall health
         enabled_count = sum(
-            1 for c in status["components"].values()
+            1
+            for c in status["components"].values()
             if c.get("enabled", True) and c.get("status") != "error"
         )
         status["health"] = {
@@ -1376,7 +1389,9 @@ class AgentOrchestrator:
                 # but we capture statistics for reporting
                 stats = self._sequence_tracker.get_statistics()
                 results["sequence_tracker"] = True
-                logger.debug(f"SequenceTracker has {stats.get('unique_transitions', 0)} learned patterns")
+                logger.debug(
+                    f"SequenceTracker has {stats.get('unique_transitions', 0)} learned patterns"
+                )
             except Exception as e:
                 logger.warning(f"Failed to get sequence tracker stats: {e}")
                 results["sequence_tracker"] = False
@@ -1728,10 +1743,12 @@ class AgentOrchestrator:
         info = self._provider_manager.get_info()
 
         # Add orchestrator-specific runtime state
-        info.update({
-            "tool_budget": self.tool_budget,
-            "tool_calls_used": self.tool_calls_used,
-        })
+        info.update(
+            {
+                "tool_budget": self.tool_budget,
+                "tool_calls_used": self.tool_calls_used,
+            }
+        )
 
         return info
 
@@ -1830,6 +1847,52 @@ class AgentOrchestrator:
         """A hook that logs information before a tool is called."""
         # Move verbose argument logging to debug level - not user-facing
         logger.debug(f"Tool call: {name} with args: {kwargs}")
+
+    def _filter_tools_by_intent(self, tools: List[Any]) -> List[Any]:
+        """Filter tools based on detected user intent.
+
+        This method enforces intent-based tool restrictions:
+        - DISPLAY_ONLY: Blocks write tools (write_file, edit_files, etc.)
+        - READ_ONLY: Blocks write tools AND generation tools
+        - WRITE_ALLOWED: No restrictions
+        - AMBIGUOUS: No restrictions (relies on prompt guard)
+
+        The blocked tools are defined in action_authorizer.INTENT_BLOCKED_TOOLS,
+        which is the single source of truth for tool filtering.
+
+        Args:
+            tools: List of tool definitions (ToolDefinition objects or dicts)
+
+        Returns:
+            Filtered list of tools, excluding blocked tools for current intent
+        """
+        if not hasattr(self, "_current_intent"):
+            return tools
+
+        blocked_tools = INTENT_BLOCKED_TOOLS.get(self._current_intent, frozenset())
+        if not blocked_tools:
+            return tools
+
+        def get_tool_name(tool: Any) -> str:
+            """Extract tool name from ToolDefinition object or dict."""
+            if hasattr(tool, "name"):
+                return tool.name
+            elif isinstance(tool, dict):
+                return tool.get("name", "")
+            return ""
+
+        original_count = len(tools)
+        filtered = [t for t in tools if get_tool_name(t) not in blocked_tools]
+        filtered_count = original_count - len(filtered)
+
+        if filtered_count > 0:
+            blocked_names = blocked_tools & {get_tool_name(t) for t in tools}
+            logger.info(
+                f"Intent {self._current_intent.value}: filtered {filtered_count} "
+                f"write/generation tools (blocked: {blocked_names})"
+            )
+
+        return filtered
 
     def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
         """Classify task type based on keywords in the user message.
@@ -1977,7 +2040,6 @@ class AgentOrchestrator:
             - reason: str - Human-readable reason for the action
             - updates: Dict - State updates (continuation_prompts, asking_input_prompts)
         """
-        from victor.embeddings.intent_classifier import IntentType
 
         # Extract intent type
         intends_to_continue = intent_result.intent == IntentType.CONTINUATION
@@ -2184,11 +2246,95 @@ class AgentOrchestrator:
 
         return "\n".join(summary_parts)
 
+    def _serialize_structured_output(
+        self,
+        tool_name: str,
+        output: Any,
+        tool_args: Optional[Dict[str, Any]] = None,
+    ) -> tuple[str, Optional[str]]:
+        """Serialize structured tool output for token efficiency.
+
+        Uses adaptive serialization to convert lists and dicts to compact formats
+        like TOON or CSV, achieving 30-60% token savings for tabular data.
+
+        Full context awareness includes:
+        - Provider and model capabilities
+        - Tool-specific serialization preferences
+        - Current context token pressure (remaining/max tokens)
+        - Tool operation (e.g., git log vs git diff)
+
+        Args:
+            tool_name: Name of the tool (for context)
+            output: Raw output from the tool
+            tool_args: Optional tool arguments (for extracting operation)
+
+        Returns:
+            Tuple of (serialized_string, format_hint_or_none)
+        """
+        # Only serialize structured data (lists, dicts)
+        # Strings, numbers, and other primitives are kept as-is
+        if not isinstance(output, (list, dict)):
+            return str(output) if output is not None else "", None
+
+        # Skip serialization if output is too small (overhead not worth it)
+        if isinstance(output, list) and len(output) < 3:
+            return str(output), None
+        if isinstance(output, dict) and len(output) < 3:
+            return str(output), None
+
+        try:
+            # Get provider name for context-aware serialization
+            provider_name = self.provider.name if self.provider else None
+
+            # Extract tool operation from arguments (e.g., "log" for git)
+            tool_operation = None
+            if tool_args:
+                tool_operation = tool_args.get("operation") or tool_args.get("subcommand")
+
+            # Get context metrics for token pressure awareness
+            context_metrics = self.get_context_metrics()
+            max_context_tokens = self._get_model_context_window()
+            remaining_tokens = max_context_tokens - context_metrics.estimated_tokens
+
+            # Create serialization context with full information
+            context = SerializationContext(
+                provider=provider_name,
+                model=self.model,
+                tool_name=tool_name,
+                tool_operation=tool_operation,
+                remaining_context_tokens=remaining_tokens,
+                max_context_tokens=max_context_tokens,
+                response_token_reserve=self.max_tokens,  # Reserve for response generation
+            )
+
+            # Serialize using adaptive serializer
+            serializer = get_adaptive_serializer()
+            result = serializer.serialize(output, context)
+
+            # Only use if we got meaningful savings
+            if result.estimated_savings_percent >= 0.15:  # 15% threshold
+                format_hint = result.format_hint
+                logger.debug(
+                    f"Serialized {tool_name} output: {result.format.value}, "
+                    f"saved {result.estimated_savings_percent*100:.1f}% tokens"
+                )
+                return result.content, format_hint
+
+            # Fall back to JSON for low savings
+            return str(output), None
+
+        except Exception as e:
+            logger.debug(f"Serialization failed for {tool_name}, using str(): {e}")
+            return str(output), None
+
     def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
         """Format tool output with clear boundaries to prevent model hallucination.
 
         Uses structured markers that models recognize as authoritative tool output.
         This prevents the model from ignoring or fabricating tool results.
+
+        For structured data (lists, dicts), uses token-optimized serialization
+        to achieve 30-60% savings on tabular data.
 
         Args:
             tool_name: Name of the tool that was executed
@@ -2198,9 +2344,14 @@ class AgentOrchestrator:
         Returns:
             Formatted string with clear TOOL_OUTPUT boundaries
         """
-        output_str = str(output) if output is not None else ""
+        # Use adaptive serialization for structured outputs
+        # Pass args for tool operation detection (e.g., git log vs git diff)
+        output_str, format_hint = self._serialize_structured_output(tool_name, output, args)
         original_len = len(output_str)
         truncated = False
+
+        # Default max_output_chars for truncation messages
+        max_output_chars = getattr(self.settings, "max_tool_output_chars", 15000)
 
         # Use ContextCompactor for smart truncation if available
         if hasattr(self, "_context_compactor") and self._context_compactor:
@@ -2215,7 +2366,6 @@ class AgentOrchestrator:
                 )
         else:
             # Fallback to simple truncation if compactor not available
-            max_output_chars = getattr(self.settings, "max_tool_output_chars", 15000)
             if original_len > max_output_chars:
                 truncated = True
                 output_str = output_str[:max_output_chars]
@@ -2282,9 +2432,10 @@ These are the actual search results. Reference only the files and matches shown 
 </TOOL_OUTPUT>"""
 
         else:
-            # Generic tool output format
+            # Generic tool output format with optional format hint
             truncation_note = " [OUTPUT TRUNCATED]" if truncated else ""
-            return f"""<TOOL_OUTPUT tool="{tool_name}">
+            format_note = f"\n{format_hint}" if format_hint else ""
+            return f"""<TOOL_OUTPUT tool="{tool_name}">{format_note}
 {output_str}{truncation_note}
 </TOOL_OUTPUT>"""
 
@@ -2836,9 +2987,7 @@ These are the actual search results. Reference only the files and matches shown 
             self._sequence_tracker.clear_history()
 
         # Local aliases for frequently-used values
-        max_total_iterations = self.unified_tracker.config.get(
-            "max_total_iterations", 50
-        )
+        max_total_iterations = self.unified_tracker.config.get("max_total_iterations", 50)
         total_iterations = 0
         force_completion = False
 
@@ -2897,6 +3046,8 @@ These are the actual search results. Reference only the files and matches shown 
 
         # Gap 4: Detect intent and inject prompt guard for non-write tasks
         intent_result = self.intent_detector.detect(user_message)
+        # Store intent for tool filtering (accessible throughout session)
+        self._current_intent = intent_result.intent
         if intent_result.intent in (ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY):
             if intent_result.prompt_guard:
                 self.add_message("system", intent_result.prompt_guard.strip())
@@ -3093,8 +3244,12 @@ These are the actual search results. Reference only the files and matches shown 
                     )
 
                     # Take only recent context (last 8 messages) for the completion request
-                    recent_messages = self.messages[-8:] if len(self.messages) > 8 else self.messages[:]
-                    completion_messages = recent_messages + [Message(role="user", content=completion_prompt)]
+                    recent_messages = (
+                        self.messages[-8:] if len(self.messages) > 8 else self.messages[:]
+                    )
+                    completion_messages = recent_messages + [
+                        Message(role="user", content=completion_prompt)
+                    ]
 
                     try:
                         response = await self.provider.chat(
@@ -3130,8 +3285,12 @@ These are the actual search results. Reference only the files and matches shown 
                 )
 
                 # Take only recent context (last 10 messages) for the completion request
-                recent_messages = self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
-                completion_messages = recent_messages + [Message(role="user", content=iteration_prompt)]
+                recent_messages = (
+                    self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
+                )
+                completion_messages = recent_messages + [
+                    Message(role="user", content=iteration_prompt)
+                ]
 
                 # Make one final call without tools
                 try:
@@ -3182,6 +3341,9 @@ These are the actual search results. Reference only the files and matches shown 
                     planned_tools=planned_tools,
                 )
                 tools = self.tool_selector.prioritize_by_stage(context_msg, tools)
+
+                # Filter tools based on detected intent (display_only/read_only blocks writes)
+                tools = self._filter_tools_by_intent(tools)
 
             # Prepare optional thinking parameter for providers that support it (Anthropic)
             provider_kwargs = {}
@@ -3362,7 +3524,9 @@ These are the actual search results. Reference only the files and matches shown 
 
                     # Create temporary message list to avoid polluting conversation history
                     # Include only recent context (last 5 exchanges) to reduce token load
-                    recent_messages = self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
+                    recent_messages = (
+                        self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
+                    )
                     recovery_messages = recent_messages + [Message(role="user", content=prompt)]
 
                     try:
@@ -3392,7 +3556,30 @@ These are the actual search results. Reference only the files and matches shown 
                         else:
                             logger.debug(f"Recovery attempt {attempt}: empty response")
                     except Exception as exc:
+                        exc_str = str(exc)
                         logger.warning(f"Recovery attempt {attempt} failed: {exc}")
+
+                        # Check for rate limit errors and extract wait time
+                        if "rate_limit" in exc_str.lower() or "429" in exc_str:
+                            import re
+
+                            # Try to extract "try again in X.XXs" or similar patterns
+                            wait_match = re.search(
+                                r"try again in (\d+(?:\.\d+)?)\s*s", exc_str, re.I
+                            )
+                            if wait_match:
+                                wait_time = float(wait_match.group(1))
+                                logger.info(
+                                    f"Rate limited. Waiting {wait_time:.1f}s before retry..."
+                                )
+                                await asyncio.sleep(
+                                    min(wait_time + 0.5, 30.0)
+                                )  # Add 0.5s buffer, cap at 30s
+                            else:
+                                # Default exponential backoff for rate limits
+                                backoff = min(2**attempt, 15)  # 2, 4, 8 seconds
+                                logger.info(f"Rate limited. Waiting {backoff}s before retry...")
+                                await asyncio.sleep(backoff)
 
                 if recovery_success:
                     return
@@ -3485,6 +3672,10 @@ These are the actual search results. Reference only the files and matches shown 
                 if not hasattr(self, "_asking_input_prompts"):
                     self._asking_input_prompts = 0
 
+                # Check for response loop using UnifiedTaskTracker
+                # (detects when model keeps responding with similar text without tool calls)
+                is_repeated_response = self.unified_tracker.check_response_loop(full_content or "")
+
                 # Use helper to determine what action to take
                 one_shot_mode = getattr(self.settings, "one_shot_mode", False)
                 action_result = self._determine_continuation_action(
@@ -3507,7 +3698,16 @@ These are the actual search results. Reference only the files and matches shown 
                     self._final_summary_requested = True
 
                 action = action_result["action"]
-                logger.info(f"Continuation action: {action} - {action_result['reason']}")
+
+                # Override: If repeated response detected, force completion to prevent loop
+                if is_repeated_response and action in ("prompt_tool_call", "request_summary"):
+                    action = "finish"
+                    logger.info(
+                        f"Continuation action: {action} - "
+                        "Overriding to finish due to repeated response"
+                    )
+                else:
+                    logger.info(f"Continuation action: {action} - {action_result['reason']}")
 
                 # Handle action: continue_asking_input
                 if action == "continue_asking_input":
@@ -3544,7 +3744,7 @@ These are the actual search results. Reference only the files and matches shown 
                     # Provider-reported tokens (accurate)
                     input_tokens = cumulative_usage["prompt_tokens"]
                     output_tokens = cumulative_usage["completion_tokens"]
-                    display_tokens = cumulative_usage["total_tokens"]
+                    _display_tokens = cumulative_usage["total_tokens"]
                     cache_read = cumulative_usage.get("cache_read_input_tokens", 0)
                     cache_create = cumulative_usage.get("cache_creation_input_tokens", 0)
 
@@ -3558,10 +3758,12 @@ These are the actual search results. Reference only the files and matches shown 
                         metrics_parts.append(f"cached={cache_read:,}")
                     if cache_create > 0:
                         metrics_parts.append(f"cache_new={cache_create:,}")
-                    metrics_parts.extend([
-                        f"| {elapsed_time:.1f}s",
-                        f"| {tokens_per_second:.1f} tok/s",
-                    ])
+                    metrics_parts.extend(
+                        [
+                            f"| {elapsed_time:.1f}s",
+                            f"| {tokens_per_second:.1f} tok/s",
+                        ]
+                    )
                     metrics_line = " ".join(metrics_parts)
                 else:
                     # Fallback to estimate
@@ -3643,7 +3845,9 @@ These are the actual search results. Reference only the files and matches shown 
                 # Action tasks may do web searches, directory listings, bash commands - not just file reads
                 requires_lenient_progress = is_analysis_task or is_action_task
                 progress_threshold = (
-                    self.tool_calls_used // 4 if requires_lenient_progress else self.tool_calls_used // 2
+                    self.tool_calls_used // 4
+                    if requires_lenient_progress
+                    else self.tool_calls_used // 2
                 )
                 if len(unique_resources) < progress_threshold:
                     # Not making good progress - force completion
@@ -3715,9 +3919,7 @@ These are the actual search results. Reference only the files and matches shown 
                 tc_args = tc.get("arguments", {})
                 block_reason = self.unified_tracker.is_blocked_after_warning(tc_name, tc_args)
                 if block_reason:
-                    yield StreamChunk(
-                        content=f"\n[loop] ⛔ {block_reason}\n"
-                    )
+                    yield StreamChunk(content=f"\n[loop] ⛔ {block_reason}\n")
                     # Inject message to guide model to different approach
                     self.add_message(
                         "system",
@@ -4016,10 +4218,12 @@ These are the actual search results. Reference only the files and matches shown 
             }
 
             # Execute tool via centralized ToolExecutor (handles retry, caching, metrics)
+            # Note: skip_normalization=True since we already normalized above
             exec_result = await self.tool_executor.execute(
                 tool_name=tool_name,
                 arguments=normalized_args,
                 context=context,
+                skip_normalization=True,
             )
             success = exec_result.success
             error_msg = exec_result.error
@@ -4049,7 +4253,9 @@ These are the actual search results. Reference only the files and matches shown 
             elapsed_ms = (time.monotonic() - start) * 1000  # Convert to milliseconds
 
             # Record tool execution analytics (including error type for UsageAnalytics)
-            error_type = type(exec_result.error).__name__ if exec_result.error and not success else None
+            error_type = (
+                type(exec_result.error).__name__ if exec_result.error and not success else None
+            )
             self._record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
 
             # Update conversation state machine for stage detection
@@ -4423,6 +4629,17 @@ These are the actual search results. Reference only the files and matches shown 
                 logger.debug("Semantic selector closed")
             except Exception as e:
                 logger.warning(f"Error closing semantic selector: {e}")
+
+        # Signal shutdown to EmbeddingService singleton
+        # This prevents post-shutdown embedding operations
+        try:
+            from victor.embeddings.service import EmbeddingService
+
+            if EmbeddingService._instance is not None:
+                EmbeddingService._instance.shutdown()
+                logger.debug("EmbeddingService shutdown signaled")
+        except Exception as e:
+            logger.debug(f"Error signaling EmbeddingService shutdown: {e}")
 
         logger.info("AgentOrchestrator shutdown complete")
 

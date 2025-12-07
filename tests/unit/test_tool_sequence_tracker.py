@@ -14,7 +14,6 @@
 
 """Tests for ToolSequenceTracker."""
 
-import pytest
 
 from victor.agent.tool_sequence_tracker import (
     COMMON_TOOL_SEQUENCES,
@@ -186,10 +185,7 @@ class TestGetNextSuggestions:
         tracker = ToolSequenceTracker()
         tracker.record_execution("read_file")
 
-        suggestions = tracker.get_next_suggestions(
-            top_k=10,
-            exclude_tools={"edit_files"}
-        )
+        suggestions = tracker.get_next_suggestions(top_k=10, exclude_tools={"edit_files"})
 
         tool_names = [s[0] for s in suggestions]
         assert "edit_files" not in tool_names

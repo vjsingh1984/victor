@@ -211,11 +211,18 @@ class ConversationStateMachine:
     - Tool execution patterns
     - Message content analysis
     - Conversation progression
+
+    Includes cooldown mechanism to prevent rapid stage thrashing.
     """
+
+    # Minimum seconds between stage transitions (prevents thrashing)
+    TRANSITION_COOLDOWN_SECONDS: float = 3.0
 
     def __init__(self) -> None:
         """Initialize the state machine."""
         self.state = ConversationState()
+        self._last_transition_time: float = 0.0
+        self._transition_count: int = 0
 
     def reset(self) -> None:
         """Reset state for a new conversation."""
@@ -345,7 +352,12 @@ class ConversationStateMachine:
         Args:
             new_stage: Stage to transition to
             confidence: Confidence in this transition
+
+        Note: Transitions are rate-limited by TRANSITION_COOLDOWN_SECONDS to
+        prevent rapid stage thrashing observed in analysis tasks.
         """
+        import time
+
         old_stage = self.state.stage
 
         # Don't transition backwards unless confidence is high
@@ -353,12 +365,25 @@ class ConversationStateMachine:
             return
 
         if new_stage != old_stage:
+            # Enforce cooldown to prevent stage thrashing
+            current_time = time.time()
+            time_since_last = current_time - self._last_transition_time
+
+            if time_since_last < self.TRANSITION_COOLDOWN_SECONDS:
+                logger.debug(
+                    f"Stage transition blocked by cooldown: {old_stage.name} -> {new_stage.name} "
+                    f"(waited {time_since_last:.1f}s, need {self.TRANSITION_COOLDOWN_SECONDS}s)"
+                )
+                return
+
             logger.info(
                 f"Stage transition: {old_stage.name} -> {new_stage.name} "
                 f"(confidence: {confidence:.2f})"
             )
             self.state.stage = new_stage
             self.state._stage_confidence = confidence
+            self._last_transition_time = current_time
+            self._transition_count += 1
 
     def should_include_tool(self, tool_name: str) -> bool:
         """Check if a tool should be included based on current stage.

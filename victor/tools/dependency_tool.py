@@ -390,50 +390,10 @@ async def dependency(
     requirements_file: str = "requirements.txt",
     dry_run: bool = True,
 ) -> Dict[str, Any]:
-    """
-    Unified dependency management tool for Python projects.
+    """Python dependency management: list, outdated, security, generate, update, tree, check.
 
-    Actions:
-    - list: List all installed packages
-    - outdated: Check for outdated packages
-    - security: Scan for security vulnerabilities
-    - generate: Generate requirements.txt file (uses output param)
-    - update: Update packages (requires packages, uses dry_run)
-    - tree: Show dependency tree (optional package param)
-    - check: Verify requirements file satisfaction (uses requirements_file)
-
-    Args:
-        action: Operation to perform.
-        packages: List of packages for update action.
-        package: Optional package name for tree action.
-        output: Output filename for generate (default: requirements.txt).
-        requirements_file: Requirements file for check (default: requirements.txt).
-        dry_run: If True, show what would be updated without updating (default: True).
-
-    Returns:
-        Dictionary with operation results.
-
-    Examples:
-        # List installed packages
-        dependency(action="list")
-
-        # Check for outdated packages
-        dependency(action="outdated")
-
-        # Security audit
-        dependency(action="security")
-
-        # Generate requirements.txt
-        dependency(action="generate", output="requirements.txt")
-
-        # Update packages (dry run)
-        dependency(action="update", packages=["requests", "numpy"], dry_run=True)
-
-        # Show dependency tree
-        dependency(action="tree", package="requests")
-
-        # Check requirements satisfaction
-        dependency(action="check", requirements_file="requirements.txt")
+    Actions: list (packages), outdated, security (vulns), generate (requirements.txt),
+    update (packages, dry_run), tree (package), check (requirements_file).
     """
     action_lower = action.lower().strip()
 

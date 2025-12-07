@@ -177,6 +177,67 @@ class TestGitTool:
             assert result["success"] is False
 
     @pytest.mark.asyncio
+    async def test_git_commit_with_custom_author(self):
+        """Test git commit with custom author name and email."""
+        with patch("victor.tools.git_tool._run_git") as mock:
+            mock.return_value = (True, "committed", "")
+            result = await git(
+                operation="commit",
+                message="test commit",
+                author_name="Custom Author",
+                author_email="custom@example.com",
+            )
+            assert result["success"] is True
+            assert "Custom Author" in result["output"]
+            assert "custom@example.com" in result["output"]
+            # Verify env_overrides were passed
+            call_kwargs = mock.call_args.kwargs
+            assert call_kwargs.get("env_overrides") is not None
+            assert call_kwargs["env_overrides"]["GIT_AUTHOR_NAME"] == "Custom Author"
+            assert call_kwargs["env_overrides"]["GIT_AUTHOR_EMAIL"] == "custom@example.com"
+            assert call_kwargs["env_overrides"]["GIT_COMMITTER_NAME"] == "Custom Author"
+            assert call_kwargs["env_overrides"]["GIT_COMMITTER_EMAIL"] == "custom@example.com"
+
+    @pytest.mark.asyncio
+    async def test_git_commit_with_author_name_only(self):
+        """Test git commit with only author name."""
+        with patch("victor.tools.git_tool._run_git") as mock:
+            mock.return_value = (True, "committed", "")
+            result = await git(
+                operation="commit", message="test commit", author_name="Custom Author"
+            )
+            assert result["success"] is True
+            call_kwargs = mock.call_args.kwargs
+            assert call_kwargs.get("env_overrides") is not None
+            assert call_kwargs["env_overrides"]["GIT_AUTHOR_NAME"] == "Custom Author"
+            assert "GIT_AUTHOR_EMAIL" not in call_kwargs["env_overrides"]
+
+    @pytest.mark.asyncio
+    async def test_git_commit_with_author_email_only(self):
+        """Test git commit with only author email."""
+        with patch("victor.tools.git_tool._run_git") as mock:
+            mock.return_value = (True, "committed", "")
+            result = await git(
+                operation="commit", message="test commit", author_email="custom@example.com"
+            )
+            assert result["success"] is True
+            call_kwargs = mock.call_args.kwargs
+            assert call_kwargs.get("env_overrides") is not None
+            assert call_kwargs["env_overrides"]["GIT_AUTHOR_EMAIL"] == "custom@example.com"
+            assert "GIT_AUTHOR_NAME" not in call_kwargs["env_overrides"]
+
+    @pytest.mark.asyncio
+    async def test_git_commit_without_custom_author(self):
+        """Test git commit without custom author uses default."""
+        with patch("victor.tools.git_tool._run_git") as mock:
+            mock.return_value = (True, "committed", "")
+            result = await git(operation="commit", message="test commit")
+            assert result["success"] is True
+            call_kwargs = mock.call_args.kwargs
+            # env_overrides should be None when no author specified
+            assert call_kwargs.get("env_overrides") is None
+
+    @pytest.mark.asyncio
     async def test_git_commit_failure(self):
         """Test git commit when git fails."""
         with patch("victor.tools.git_tool._run_git") as mock:
@@ -259,6 +320,44 @@ class TestRunGit:
             success, stdout, stderr = _run_git("status")
             assert success is False
             assert "timed out" in stderr.lower()
+
+    def test_run_git_with_env_overrides(self):
+        """Test _run_git with environment overrides."""
+        from victor.tools.git_tool import _run_git
+
+        with patch("subprocess.run") as mock:
+            mock.return_value.returncode = 0
+            mock.return_value.stdout = "output"
+            mock.return_value.stderr = ""
+
+            env_overrides = {
+                "GIT_AUTHOR_NAME": "Custom Author",
+                "GIT_AUTHOR_EMAIL": "custom@example.com",
+            }
+            success, stdout, stderr = _run_git("commit", "-m", "test", env_overrides=env_overrides)
+            assert success is True
+
+            # Verify subprocess.run was called with the correct env
+            call_kwargs = mock.call_args.kwargs
+            assert "env" in call_kwargs
+            assert call_kwargs["env"]["GIT_AUTHOR_NAME"] == "Custom Author"
+            assert call_kwargs["env"]["GIT_AUTHOR_EMAIL"] == "custom@example.com"
+
+    def test_run_git_without_env_overrides(self):
+        """Test _run_git without environment overrides passes None env."""
+        from victor.tools.git_tool import _run_git
+
+        with patch("subprocess.run") as mock:
+            mock.return_value.returncode = 0
+            mock.return_value.stdout = "output"
+            mock.return_value.stderr = ""
+
+            success, stdout, stderr = _run_git("status")
+            assert success is True
+
+            # Verify subprocess.run was called with env=None
+            call_kwargs = mock.call_args.kwargs
+            assert call_kwargs.get("env") is None
 
     def test_run_git_exception(self):
         """Test _run_git exception handling."""

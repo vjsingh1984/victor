@@ -16,14 +16,12 @@
 
 import pytest
 import time
-from unittest.mock import MagicMock
 
 from victor.agent.streaming_controller import (
     StreamingController,
     StreamingControllerConfig,
     StreamingSession,
 )
-from victor.agent.stream_handler import StreamMetrics
 
 
 class TestStreamingSession:

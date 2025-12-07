@@ -23,6 +23,7 @@ This reduces false positives and handles variations better.
 """
 
 import logging
+import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -34,11 +35,157 @@ from victor.embeddings.service import EmbeddingService
 logger = logging.getLogger(__name__)
 
 
+# Compiled regex patterns for explicit continuation detection
+# These are strong signals that the model wants to continue working
+CONTINUATION_HEURISTIC_PATTERNS = [
+    # "Let me read/check/examine/look at..."
+    re.compile(
+        r"\blet\s+me\s+(read|check|examine|look\s+at|analyze|review|explore|investigate)\b",
+        re.IGNORECASE,
+    ),
+    # "First, let me..." or "Now let me..."
+    re.compile(r"\b(first|now|next),?\s+let\s+me\b", re.IGNORECASE),
+    # "I'll read/check/examine..."
+    re.compile(
+        r"\bi['']ll\s+(read|check|examine|look\s+at|analyze|review|explore)\b", re.IGNORECASE
+    ),
+    # "I need to read/check..."
+    re.compile(r"\bi\s+need\s+to\s+(read|check|examine|look\s+at|analyze|review)\b", re.IGNORECASE),
+    # "I should read/check..."
+    re.compile(r"\bi\s+should\s+(read|check|examine|look\s+at|analyze|review)\b", re.IGNORECASE),
+    # "Let me start by..."
+    re.compile(r"\blet\s+me\s+start\s+by\b", re.IGNORECASE),
+]
+
+
+# Compiled regex patterns for explicit asking-for-input detection
+# These are strong signals that should override semantic classification
+ASKING_INPUT_HEURISTIC_PATTERNS = [
+    # "Would you like me to..." with question context
+    re.compile(r"\bwould\s+you\s+like\s+(me\s+to|to\s+see)\b", re.IGNORECASE),
+    # "Do you want me to..."
+    re.compile(r"\bdo\s+you\s+want\s+(me\s+to|to\s+see)\b", re.IGNORECASE),
+    # "Should I..." at start of sentence or after newline/period
+    re.compile(r"(?:^|[.\n])\s*should\s+i\s+\w+", re.IGNORECASE | re.MULTILINE),
+    # "Shall I..."
+    re.compile(r"(?:^|[.\n])\s*shall\s+i\s+\w+", re.IGNORECASE | re.MULTILINE),
+    # "Let me know if you..."
+    re.compile(r"\blet\s+me\s+know\s+if\s+you\b", re.IGNORECASE),
+    # "Which.*would you like" or "What.*would you like"
+    re.compile(r"\b(which|what)\s+.*\bwould\s+you\s+like\b", re.IGNORECASE),
+    # "How would you like me to..."
+    re.compile(r"\bhow\s+would\s+you\s+like\s+(me\s+to|to)\b", re.IGNORECASE),
+]
+
+
+# Compiled regex patterns for detecting "task complete + optional elaboration" offers
+# These questions indicate the task is DONE and model is just offering to go deeper
+# Should be treated as COMPLETION, not ASKING_INPUT
+COMPLETION_OFFER_HEURISTIC_PATTERNS = [
+    # "Would you like me to elaborate/expand/go deeper..."
+    re.compile(
+        r"\bwould\s+you\s+like\s+(me\s+to\s+)?(elaborate|expand|go\s+deeper|dive\s+deeper|explain\s+further|provide\s+more\s+detail)\b",
+        re.IGNORECASE,
+    ),
+    # "Do you want me to elaborate/expand..."
+    re.compile(
+        r"\bdo\s+you\s+want\s+(me\s+to\s+)?(elaborate|expand|go\s+deeper|dive\s+deeper|explain\s+further)\b",
+        re.IGNORECASE,
+    ),
+    # "Let me know if you'd like more details on any of these"
+    re.compile(
+        r"\blet\s+me\s+know\s+if\s+you.*(more\s+details?|elaborate|go\s+deeper)\b", re.IGNORECASE
+    ),
+    # "Would you like more details on any of..."
+    re.compile(
+        r"\bwould\s+you\s+like\s+more\s+(details?|information)\s+on\s+(any|these|this)\b",
+        re.IGNORECASE,
+    ),
+    # "I can elaborate on any of these if you'd like"
+    re.compile(
+        r"\bi\s+can\s+(elaborate|expand|explain\s+further|provide\s+more\s+detail)\b", re.IGNORECASE
+    ),
+]
+
+
+def _has_completion_offer_heuristic(text: str) -> bool:
+    """Check if text contains 'task complete + optional elaboration' patterns.
+
+    These patterns indicate the model has finished the task and is offering
+    to elaborate further. This should be treated as COMPLETION, not ASKING_INPUT,
+    because the core task is done.
+
+    Args:
+        text: Text to check (usually last ~500 chars of response)
+
+    Returns:
+        True if text contains completion offer patterns
+    """
+    # Quick check: must have a question mark or "if you" to be offering something
+    if "?" not in text and "if you" not in text.lower():
+        return False
+
+    # Check all heuristic patterns
+    for pattern in COMPLETION_OFFER_HEURISTIC_PATTERNS:
+        if pattern.search(text):
+            logger.debug(f"Completion-offer heuristic matched: {pattern.pattern[:40]}...")
+            return True
+
+    return False
+
+
+def _has_continuation_heuristic(text: str) -> bool:
+    """Check if text contains strong continuation heuristic patterns.
+
+    These patterns are unambiguous indicators that the model wants to continue
+    exploring/reading, so they should override semantic classification when detected.
+
+    Args:
+        text: Text to check (usually last ~500 chars of response)
+
+    Returns:
+        True if text contains strong continuation patterns
+    """
+    # Check all heuristic patterns
+    for pattern in CONTINUATION_HEURISTIC_PATTERNS:
+        if pattern.search(text):
+            logger.debug(f"Continuation heuristic matched: {pattern.pattern[:40]}...")
+            return True
+
+    return False
+
+
+def _has_asking_input_heuristic(text: str) -> bool:
+    """Check if text contains strong asking-for-input heuristic patterns.
+
+    These patterns are unambiguous indicators that the model is asking for user input,
+    so they should override semantic classification when detected.
+
+    Args:
+        text: Text to check (usually last ~500 chars of response)
+
+    Returns:
+        True if text contains strong asking-for-input patterns
+    """
+    # Quick check: must have a question mark to be asking something
+    if "?" not in text:
+        return False
+
+    # Check all heuristic patterns
+    for pattern in ASKING_INPUT_HEURISTIC_PATTERNS:
+        if pattern.search(text):
+            logger.debug(f"Asking-input heuristic matched: {pattern.pattern[:40]}...")
+            return True
+
+    return False
+
+
 class IntentType(Enum):
     """Types of intent that can be classified."""
 
     CONTINUATION = "continuation"  # Model wants to continue (future-looking)
     COMPLETION = "completion"  # Model has finished (summary/conclusion)
+    ASKING_INPUT = "asking_input"  # Model is asking for user input/confirmation
     NEUTRAL = "neutral"  # Neither clear continuation nor completion
 
 
@@ -62,6 +209,9 @@ CONTINUATION_PHRASES = [
     "Let me investigate",
     "Let me start by reading",
     "Let me begin with",
+    "Let me review the file",
+    "Let me review the contents",
+    "Let me fetch the contents",
     # "I'll" patterns
     "I'll examine the code next",
     "I'll look at the implementation",
@@ -69,6 +219,10 @@ CONTINUATION_PHRASES = [
     "I'll check this",
     "I'll analyze this",
     "I'll investigate further",
+    "I'll review the contents",
+    "I'll review the file",
+    "I'll fetch the contents",
+    "I'll review this",
     # "Now let's" patterns
     "Now let's look at",
     "Now let's examine",
@@ -116,6 +270,56 @@ COMPLETION_PHRASES = [
     "2. The second issue is",
 ]
 
+# Canonical phrases for asking for user input (questions/confirmation requests)
+ASKING_INPUT_PHRASES = [
+    # "Would you like" patterns
+    "Would you like me to help you",
+    "Would you like me to implement",
+    "Would you like me to continue",
+    "Would you like me to develop",
+    "Would you like me to create",
+    "Would you like me to proceed",
+    "Would you like me to explore",
+    "Would you like me to explain",
+    "Would you like more details",
+    "Would you like to see",
+    # "Do you want" patterns
+    "Do you want me to help",
+    "Do you want me to implement",
+    "Do you want me to continue",
+    "Do you want me to proceed",
+    "Do you want me to create",
+    "Do you want me to develop",
+    "Do you want more information",
+    # "Should I" patterns
+    "Should I continue with",
+    "Should I implement",
+    "Should I proceed",
+    "Should I help you",
+    "Should I develop",
+    "Should I create",
+    # "Shall I" patterns
+    "Shall I continue",
+    "Shall I implement",
+    "Shall I proceed",
+    "Shall I help",
+    # Question patterns asking for direction
+    "What would you like me to focus on",
+    "Which component should I start with",
+    "How would you like me to proceed",
+    "Where should I begin",
+    "What area should I explore first",
+    # "Let me know" patterns
+    "Let me know if you would like",
+    "Let me know if you want",
+    "Let me know if you need",
+    "Please let me know",
+    # Offer patterns
+    "I can help you with",
+    "I can implement this if you",
+    "I can proceed with",
+]
+
 
 class IntentClassifier:
     """Semantic intent classifier using embeddings.
@@ -127,7 +331,8 @@ class IntentClassifier:
     - More robust to model output variations
 
     Usage:
-        classifier = IntentClassifier()
+        # Use singleton to avoid duplicate initialization
+        classifier = IntentClassifier.get_instance()
         await classifier.initialize()
 
         result = await classifier.classify_intent(
@@ -137,12 +342,56 @@ class IntentClassifier:
         print(result.confidence)  # 0.85
     """
 
+    _instance: Optional["IntentClassifier"] = None
+    _lock = __import__("threading").Lock()
+
+    @classmethod
+    def get_instance(
+        cls,
+        cache_dir: Optional[Path] = None,
+        embedding_service: Optional[EmbeddingService] = None,
+        continuation_threshold: float = 0.30,
+        completion_threshold: float = 0.30,
+        asking_input_threshold: float = 0.35,
+    ) -> "IntentClassifier":
+        """Get or create the singleton IntentClassifier instance.
+
+        Args:
+            cache_dir: Directory for cache files (only used on first call)
+            embedding_service: Shared embedding service (only used on first call)
+            continuation_threshold: Min similarity for continuation (only used on first call)
+            completion_threshold: Min similarity for completion (only used on first call)
+            asking_input_threshold: Min similarity for asking input (only used on first call)
+
+        Returns:
+            The singleton IntentClassifier instance
+        """
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls(
+                        cache_dir=cache_dir,
+                        embedding_service=embedding_service,
+                        continuation_threshold=continuation_threshold,
+                        completion_threshold=completion_threshold,
+                        asking_input_threshold=asking_input_threshold,
+                    )
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Reset the singleton instance (mainly for testing)."""
+        with cls._lock:
+            cls._instance = None
+            logger.debug("Reset IntentClassifier singleton")
+
     def __init__(
         self,
         cache_dir: Optional[Path] = None,
         embedding_service: Optional[EmbeddingService] = None,
         continuation_threshold: float = 0.30,
         completion_threshold: float = 0.30,
+        asking_input_threshold: float = 0.35,
     ):
         """Initialize intent classifier.
 
@@ -154,6 +403,8 @@ class IntentClassifier:
                 Lower values (0.25-0.35) catch more matches but may have false positives.
                 Higher values (0.5+) are more conservative but may miss legitimate cases.
             completion_threshold: Minimum similarity for completion intent (default 0.30)
+            asking_input_threshold: Minimum similarity for asking input intent (default 0.35)
+                Slightly higher threshold to avoid false positives on questions.
         """
         from victor.config.settings import get_project_paths
 
@@ -161,6 +412,7 @@ class IntentClassifier:
         self.embedding_service = embedding_service or EmbeddingService.get_instance()
         self.continuation_threshold = continuation_threshold
         self.completion_threshold = completion_threshold
+        self.asking_input_threshold = asking_input_threshold
 
         # Create collections
         self._continuation_collection = StaticEmbeddingCollection(
@@ -170,6 +422,11 @@ class IntentClassifier:
         )
         self._completion_collection = StaticEmbeddingCollection(
             name="intent_completion",
+            cache_dir=self.cache_dir,
+            embedding_service=self.embedding_service,
+        )
+        self._asking_input_collection = StaticEmbeddingCollection(
+            name="intent_asking_input",
             cache_dir=self.cache_dir,
             embedding_service=self.embedding_service,
         )
@@ -208,10 +465,21 @@ class IntentClassifier:
         ]
         await self._completion_collection.initialize(completion_items)
 
+        # Build asking_input collection
+        asking_input_items = [
+            CollectionItem(
+                id=f"ask_{i}",
+                text=phrase,
+                metadata={"intent": "asking_input"},
+            )
+            for i, phrase in enumerate(ASKING_INPUT_PHRASES)
+        ]
+        await self._asking_input_collection.initialize(asking_input_items)
+
         self._initialized = True
         logger.info(
-            f"IntentClassifier initialized with {len(CONTINUATION_PHRASES)} continuation "
-            f"and {len(COMPLETION_PHRASES)} completion phrases"
+            f"IntentClassifier initialized with {len(CONTINUATION_PHRASES)} continuation, "
+            f"{len(COMPLETION_PHRASES)} completion, and {len(ASKING_INPUT_PHRASES)} asking_input phrases"
         )
 
     def initialize_sync(self) -> None:
@@ -241,10 +509,21 @@ class IntentClassifier:
         ]
         self._completion_collection.initialize_sync(completion_items)
 
+        # Build asking_input collection
+        asking_input_items = [
+            CollectionItem(
+                id=f"ask_{i}",
+                text=phrase,
+                metadata={"intent": "asking_input"},
+            )
+            for i, phrase in enumerate(ASKING_INPUT_PHRASES)
+        ]
+        self._asking_input_collection.initialize_sync(asking_input_items)
+
         self._initialized = True
         logger.info(
-            f"IntentClassifier initialized with {len(CONTINUATION_PHRASES)} continuation "
-            f"and {len(COMPLETION_PHRASES)} completion phrases"
+            f"IntentClassifier initialized with {len(CONTINUATION_PHRASES)} continuation, "
+            f"{len(COMPLETION_PHRASES)} completion, and {len(ASKING_INPUT_PHRASES)} asking_input phrases"
         )
 
     async def classify_intent(
@@ -253,6 +532,10 @@ class IntentClassifier:
         top_k: int = 3,
     ) -> IntentResult:
         """Classify the intent of text.
+
+        Uses a hybrid approach:
+        1. Semantic similarity matching against canonical phrases
+        2. Heuristic pattern matching as override for unambiguous cases
 
         Args:
             text: Text to classify (usually model's response start)
@@ -264,13 +547,15 @@ class IntentClassifier:
         if not self._initialized:
             await self.initialize()
 
-        # Search both collections
+        # Search all collections
         continuation_results = await self._continuation_collection.search(text, top_k=top_k)
         completion_results = await self._completion_collection.search(text, top_k=top_k)
+        asking_input_results = await self._asking_input_collection.search(text, top_k=top_k)
 
         # Get best scores
         best_continuation = continuation_results[0][1] if continuation_results else 0.0
         best_completion = completion_results[0][1] if completion_results else 0.0
+        best_asking_input = asking_input_results[0][1] if asking_input_results else 0.0
 
         # Build top matches for debugging
         top_matches = []
@@ -278,9 +563,84 @@ class IntentClassifier:
             top_matches.append((f"cont:{item.text[:50]}", score))
         for item, score in completion_results[:2]:
             top_matches.append((f"comp:{item.text[:50]}", score))
+        for item, score in asking_input_results[:2]:
+            top_matches.append((f"ask:{item.text[:50]}", score))
+
+        # HEURISTIC OVERRIDE 1: Check for explicit continuation patterns
+        # Patterns like "let me read", "let me check" are unambiguous
+        if _has_continuation_heuristic(text):
+            heuristic_confidence = max(best_continuation, 0.75)
+            top_matches.append(("heuristic:continuation_pattern", heuristic_confidence))
+            logger.debug(
+                f"CONTINUATION detected via heuristic override (conf={heuristic_confidence:.2f})"
+            )
+            return IntentResult(
+                intent=IntentType.CONTINUATION,
+                confidence=heuristic_confidence,
+                top_matches=top_matches,
+            )
+
+        # HEURISTIC OVERRIDE 2: Check for "task done + optional elaboration" patterns
+        # These indicate the model has FINISHED and is just offering to explain more
+        # Must check BEFORE asking_input since patterns overlap (both use "Would you like")
+        if _has_completion_offer_heuristic(text):
+            heuristic_confidence = max(best_completion, 0.85)
+            top_matches.append(("heuristic:completion_offer_pattern", heuristic_confidence))
+            logger.debug(
+                f"COMPLETION detected via elaboration-offer heuristic (conf={heuristic_confidence:.2f})"
+            )
+            return IntentResult(
+                intent=IntentType.COMPLETION,
+                confidence=heuristic_confidence,
+                top_matches=top_matches,
+            )
+
+        # HEURISTIC OVERRIDE 3: Check for explicit asking-for-input patterns
+        # These patterns are unambiguous, so they override semantic classification
+        if _has_asking_input_heuristic(text):
+            # Use higher confidence when heuristic matches
+            heuristic_confidence = max(best_asking_input, 0.75)
+            top_matches.append(("heuristic:asking_input_pattern", heuristic_confidence))
+            logger.debug(
+                f"ASKING_INPUT detected via heuristic override (conf={heuristic_confidence:.2f})"
+            )
+            return IntentResult(
+                intent=IntentType.ASKING_INPUT,
+                confidence=heuristic_confidence,
+                top_matches=top_matches,
+            )
 
         # Determine intent based on thresholds and relative scores
-        if best_continuation >= self.continuation_threshold and best_continuation > best_completion:
+        # If scores are too close (within 0.05), it's ambiguous -> NEUTRAL
+        TIE_THRESHOLD = 0.05
+        max_score = max(best_continuation, best_completion, best_asking_input)
+        scores_are_tied = (
+            abs(best_continuation - max_score) < TIE_THRESHOLD
+            and abs(best_completion - max_score) < TIE_THRESHOLD
+        )
+
+        if scores_are_tied:
+            # Scores too close to call
+            return IntentResult(
+                intent=IntentType.NEUTRAL,
+                confidence=max_score,
+                top_matches=top_matches,
+            )
+
+        # Check asking_input first (highest priority if it matches well)
+        if (
+            best_asking_input >= self.asking_input_threshold
+            and best_asking_input >= best_continuation
+            and best_asking_input >= best_completion
+        ):
+            return IntentResult(
+                intent=IntentType.ASKING_INPUT,
+                confidence=best_asking_input,
+                top_matches=top_matches,
+            )
+        elif (
+            best_continuation >= self.continuation_threshold and best_continuation > best_completion
+        ):
             return IntentResult(
                 intent=IntentType.CONTINUATION,
                 confidence=best_continuation,
@@ -296,7 +656,7 @@ class IntentClassifier:
             # Neither meets threshold or too close to call
             return IntentResult(
                 intent=IntentType.NEUTRAL,
-                confidence=max(best_continuation, best_completion),
+                confidence=max(best_continuation, best_completion, best_asking_input),
                 top_matches=top_matches,
             )
 
@@ -306,6 +666,10 @@ class IntentClassifier:
         top_k: int = 3,
     ) -> IntentResult:
         """Classify the intent of text (sync version).
+
+        Uses a hybrid approach:
+        1. Semantic similarity matching against canonical phrases
+        2. Heuristic pattern matching as override for unambiguous cases
 
         Args:
             text: Text to classify
@@ -317,13 +681,15 @@ class IntentClassifier:
         if not self._initialized:
             self.initialize_sync()
 
-        # Search both collections
+        # Search all collections
         continuation_results = self._continuation_collection.search_sync(text, top_k=top_k)
         completion_results = self._completion_collection.search_sync(text, top_k=top_k)
+        asking_input_results = self._asking_input_collection.search_sync(text, top_k=top_k)
 
         # Get best scores
         best_continuation = continuation_results[0][1] if continuation_results else 0.0
         best_completion = completion_results[0][1] if completion_results else 0.0
+        best_asking_input = asking_input_results[0][1] if asking_input_results else 0.0
 
         # Build top matches for debugging
         top_matches = []
@@ -331,9 +697,84 @@ class IntentClassifier:
             top_matches.append((f"cont:{item.text[:50]}", score))
         for item, score in completion_results[:2]:
             top_matches.append((f"comp:{item.text[:50]}", score))
+        for item, score in asking_input_results[:2]:
+            top_matches.append((f"ask:{item.text[:50]}", score))
+
+        # HEURISTIC OVERRIDE 1: Check for explicit continuation patterns
+        # Patterns like "let me read", "let me check" are unambiguous
+        if _has_continuation_heuristic(text):
+            heuristic_confidence = max(best_continuation, 0.75)
+            top_matches.append(("heuristic:continuation_pattern", heuristic_confidence))
+            logger.debug(
+                f"CONTINUATION detected via heuristic override (conf={heuristic_confidence:.2f})"
+            )
+            return IntentResult(
+                intent=IntentType.CONTINUATION,
+                confidence=heuristic_confidence,
+                top_matches=top_matches,
+            )
+
+        # HEURISTIC OVERRIDE 2: Check for "task done + optional elaboration" patterns
+        # These indicate the model has FINISHED and is just offering to explain more
+        # Must check BEFORE asking_input since patterns overlap (both use "Would you like")
+        if _has_completion_offer_heuristic(text):
+            heuristic_confidence = max(best_completion, 0.85)
+            top_matches.append(("heuristic:completion_offer_pattern", heuristic_confidence))
+            logger.debug(
+                f"COMPLETION detected via elaboration-offer heuristic (conf={heuristic_confidence:.2f})"
+            )
+            return IntentResult(
+                intent=IntentType.COMPLETION,
+                confidence=heuristic_confidence,
+                top_matches=top_matches,
+            )
+
+        # HEURISTIC OVERRIDE 3: Check for explicit asking-for-input patterns
+        # These patterns are unambiguous, so they override semantic classification
+        if _has_asking_input_heuristic(text):
+            # Use higher confidence when heuristic matches
+            heuristic_confidence = max(best_asking_input, 0.75)
+            top_matches.append(("heuristic:asking_input_pattern", heuristic_confidence))
+            logger.debug(
+                f"ASKING_INPUT detected via heuristic override (conf={heuristic_confidence:.2f})"
+            )
+            return IntentResult(
+                intent=IntentType.ASKING_INPUT,
+                confidence=heuristic_confidence,
+                top_matches=top_matches,
+            )
 
         # Determine intent based on thresholds and relative scores
-        if best_continuation >= self.continuation_threshold and best_continuation > best_completion:
+        # If scores are too close (within 0.05), it's ambiguous -> NEUTRAL
+        TIE_THRESHOLD = 0.05
+        max_score = max(best_continuation, best_completion, best_asking_input)
+        scores_are_tied = (
+            abs(best_continuation - max_score) < TIE_THRESHOLD
+            and abs(best_completion - max_score) < TIE_THRESHOLD
+        )
+
+        if scores_are_tied:
+            # Scores too close to call
+            return IntentResult(
+                intent=IntentType.NEUTRAL,
+                confidence=max_score,
+                top_matches=top_matches,
+            )
+
+        # Check asking_input first (highest priority if it matches well)
+        if (
+            best_asking_input >= self.asking_input_threshold
+            and best_asking_input >= best_continuation
+            and best_asking_input >= best_completion
+        ):
+            return IntentResult(
+                intent=IntentType.ASKING_INPUT,
+                confidence=best_asking_input,
+                top_matches=top_matches,
+            )
+        elif (
+            best_continuation >= self.continuation_threshold and best_continuation > best_completion
+        ):
             return IntentResult(
                 intent=IntentType.CONTINUATION,
                 confidence=best_continuation,
@@ -348,7 +789,7 @@ class IntentClassifier:
         else:
             return IntentResult(
                 intent=IntentType.NEUTRAL,
-                confidence=max(best_continuation, best_completion),
+                confidence=max(best_continuation, best_completion, best_asking_input),
                 top_matches=top_matches,
             )
 
@@ -379,9 +820,25 @@ class IntentClassifier:
         result = self.classify_intent_sync(text)
         return result.intent == IntentType.COMPLETION
 
+    def is_asking_for_input(self, text: str) -> bool:
+        """Quick check if text indicates the model is asking for user input.
+
+        This detects patterns like "Would you like me to...", "Should I...", etc.
+        Useful for auto-continuing in one-shot mode.
+
+        Args:
+            text: Text to check
+
+        Returns:
+            True if text indicates asking for user input
+        """
+        result = self.classify_intent_sync(text)
+        return result.intent == IntentType.ASKING_INPUT
+
     def clear_cache(self) -> None:
         """Clear cached collections."""
         self._continuation_collection.clear_cache()
         self._completion_collection.clear_cache()
+        self._asking_input_collection.clear_cache()
         self._initialized = False
         logger.info("IntentClassifier cache cleared")

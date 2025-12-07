@@ -152,7 +152,7 @@ def grep_lines(
         flags = 0 if case_sensitive else re.IGNORECASE
         try:
             regex = re.compile(pattern, flags)
-        except re.error as e:
+        except re.error:
             # Invalid regex - treat as literal string
             regex = re.compile(re.escape(pattern), flags)
     else:

@@ -52,7 +52,6 @@ import inspect
 import logging
 import os
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from victor.providers.base import BaseProvider, ToolDefinition
@@ -175,9 +174,7 @@ class ToolRegistrar:
 
         logger.debug("ToolRegistrar initialized")
 
-    def set_background_task_callback(
-        self, callback: Callable[[Any, str], asyncio.Task]
-    ) -> None:
+    def set_background_task_callback(self, callback: Callable[[Any, str], asyncio.Task]) -> None:
         """Set callback for creating background tasks.
 
         Args:
@@ -269,11 +266,7 @@ class ToolRegistrar:
 
                 try:
                     tool_config = self.settings.load_tool_config()
-                    web_cfg = (
-                        tool_config.get("web_tools", {})
-                        or tool_config.get("web", {})
-                        or {}
-                    )
+                    web_cfg = tool_config.get("web_tools", {}) or tool_config.get("web", {}) or {}
                     set_web_tool_defaults(
                         fetch_top=web_cfg.get("summarize_fetch_top"),
                         fetch_pool=web_cfg.get("summarize_fetch_pool"),
@@ -479,9 +472,7 @@ class ToolRegistrar:
                 mcp_client = MCPClient()
                 cmd_parts = mcp_command.split()
                 self._create_task(mcp_client.connect(cmd_parts), "mcp_legacy_connect")
-                configure_mcp_client(
-                    mcp_client, prefix=getattr(self.settings, "mcp_prefix", "mcp")
-                )
+                configure_mcp_client(mcp_client, prefix=getattr(self.settings, "mcp_prefix", "mcp"))
             except Exception as exc:
                 logger.warning(f"Failed to start MCP client: {exc}")
 
@@ -635,10 +626,7 @@ class ToolRegistrar:
             goals.append("documentation")
         if any(kw in text for kw in ["security", "vulnerability", "secret", "scan"]):
             goals.append("security_report")
-        if any(
-            kw in text
-            for kw in ["complexity", "metrics", "maintainability", "technical debt"]
-        ):
+        if any(kw in text for kw in ["complexity", "metrics", "maintainability", "technical debt"]):
             goals.append("metrics_report")
 
         return goals
@@ -687,8 +675,7 @@ class ToolRegistrar:
                 {
                     "name": s.name,
                     "description": s.description,
-                    "connected": s.name
-                    in getattr(self.mcp_registry, "_connected_servers", {}),
+                    "connected": s.name in getattr(self.mcp_registry, "_connected_servers", {}),
                 }
                 for s in servers
             ],

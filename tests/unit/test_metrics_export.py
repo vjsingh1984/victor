@@ -128,9 +128,7 @@ class TestDashboardReport:
     def test_to_dict(self):
         """Test converting report to dictionary."""
         report = DashboardReport(
-            circuit_breakers={
-                "test": CircuitBreakerMetrics(name="test", state="closed")
-            }
+            circuit_breakers={"test": CircuitBreakerMetrics(name="test", state="closed")}
         )
 
         d = report.to_dict()
@@ -304,9 +302,7 @@ class TestResilienceMetricsExporter:
         assert "health" in report.summary
         assert "resilience" in report.summary
 
-    def test_export_json(
-        self, exporter, mock_circuit_breaker
-    ):
+    def test_export_json(self, exporter, mock_circuit_breaker):
         """Test JSON export."""
         exporter.register_circuit_breaker("test", mock_circuit_breaker)
 

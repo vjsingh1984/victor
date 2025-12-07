@@ -49,7 +49,6 @@ import re
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -304,11 +303,11 @@ def _is_keyword_negated(message: str, keyword: str, position: int) -> bool:
         match = pattern.search(window)
         if match:
             # For simple negation patterns (don't, skip, without), check proximity
-            negation_start = match.start()
+            _negation_start = match.start()
             negation_text = match.group()
 
             # Skip if there's a positive override between negation and keyword
-            text_after_negation = window[match.end():]
+            text_after_negation = window[match.end() :]
             for override_pattern in POSITIVE_OVERRIDE_PATTERNS:
                 if override_pattern.search(text_after_negation):
                     logger.debug(
@@ -318,7 +317,9 @@ def _is_keyword_negated(message: str, keyword: str, position: int) -> bool:
 
             # Check if negation is close enough (within 15 chars after negation ends)
             if len(window) - match.end() < 15:
-                logger.debug(f"Keyword '{keyword}' negated by '{negation_text}' in window: '{window}'")
+                logger.debug(
+                    f"Keyword '{keyword}' negated by '{negation_text}' in window: '{window}'"
+                )
                 return True
 
     return False
@@ -562,7 +563,9 @@ class UnifiedTaskClassifier:
         exec_score, exec_count = _calculate_category_score(exec_matches)
 
         # Collect all matches for debugging
-        all_matches = action_matches + gen_matches + analysis_matches + search_matches + edit_matches
+        all_matches = (
+            action_matches + gen_matches + analysis_matches + search_matches + edit_matches
+        )
         negated = [m for m in all_matches if m.negated]
         non_negated = [m for m in all_matches if not m.negated]
 
@@ -672,7 +675,9 @@ class UnifiedTaskClassifier:
             if msg.get("role") == "user":
                 hist_result = self.classify(msg.get("content", ""))
                 if hist_result.task_type != TaskType.DEFAULT:
-                    history_types[hist_result.task_type] = history_types.get(hist_result.task_type, 0) + 1
+                    history_types[hist_result.task_type] = (
+                        history_types.get(hist_result.task_type, 0) + 1
+                    )
 
         # Find dominant type in history
         dominant_type = None
@@ -700,7 +705,7 @@ class UnifiedTaskClassifier:
                     result.confidence = 0.5 + (self._context_boost * dominant_count / max_history)
                     result.context_boost = result.confidence - 0.5
                     result.source = "context"
-                    context_signals.append(f"type_switched_from_default")
+                    context_signals.append("type_switched_from_default")
 
         result.context_signals = context_signals
         return result
@@ -762,7 +767,10 @@ class UnifiedTaskClassifier:
                 recommended_tool_budget=keyword_result.recommended_tool_budget,
                 temperature_adjustment=keyword_result.temperature_adjustment,
             )
-        elif context_result.source == "context" and context_result.confidence > keyword_result.confidence:
+        elif (
+            context_result.source == "context"
+            and context_result.confidence > keyword_result.confidence
+        ):
             # Context-boosted wins
             final_result = context_result
             final_result.semantic_confidence = semantic_confidence
@@ -774,9 +782,7 @@ class UnifiedTaskClassifier:
                 final_result.source = "ensemble"
                 # Slight boost if semantic agrees
                 if semantic_type == keyword_result.task_type:
-                    final_result.confidence = min(
-                        final_result.confidence + 0.1, 0.95
-                    )
+                    final_result.confidence = min(final_result.confidence + 0.1, 0.95)
 
         return final_result
 
@@ -831,9 +837,7 @@ def classify_task(message: str) -> ClassificationResult:
     return get_unified_classifier().classify(message)
 
 
-def classify_task_with_context(
-    message: str, history: List[Dict[str, Any]]
-) -> ClassificationResult:
+def classify_task_with_context(message: str, history: List[Dict[str, Any]]) -> ClassificationResult:
     """Convenience function for context-aware classification.
 
     Args:

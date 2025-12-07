@@ -29,9 +29,9 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from victor.config.settings import VICTOR_CONTEXT_FILE, VICTOR_DIR_NAME, get_project_paths
+from victor.config.settings import VICTOR_CONTEXT_FILE, get_project_paths
 
 logger = logging.getLogger(__name__)
 
@@ -77,18 +77,46 @@ class CodebaseAnalysis:
 
 
 class CodebaseAnalyzer:
-    """Analyzes Python codebases to extract structure and architecture."""
+    """Analyzes codebases to extract structure and architecture (language-agnostic)."""
 
-    # Patterns that indicate key architectural components
+    # Patterns that indicate key architectural components (universal across languages)
     KEY_CLASS_PATTERNS = {
-        "provider": ["Provider", "Backend", "Client", "Connector"],
-        "tool": ["Tool", "Command", "Action", "Handler"],
-        "manager": ["Manager", "Orchestrator", "Controller", "Coordinator"],
-        "model": ["Model", "Schema", "Entity", "Record"],
-        "config": ["Config", "Settings", "Options", "Preferences"],
-        "base": ["Base", "Abstract", "Interface"],
-        "registry": ["Registry", "Repository", "Store", "Cache"],
-        "service": ["Service", "Worker", "Processor"],
+        "provider": ["Provider", "Backend", "Client", "Connector", "Adapter"],
+        "tool": ["Tool", "Command", "Action", "Handler", "Executor"],
+        "manager": ["Manager", "Orchestrator", "Controller", "Coordinator", "Director"],
+        "model": ["Model", "Schema", "Entity", "Record", "DTO", "ViewModel"],
+        "config": ["Config", "Settings", "Options", "Preferences", "Environment"],
+        "base": ["Base", "Abstract", "Interface", "I[A-Z]"],  # IService, IRepository etc.
+        "registry": ["Registry", "Repository", "Store", "Cache", "Factory"],
+        "service": ["Service", "Worker", "Processor", "UseCase", "Interactor"],
+        "component": ["Component", "Widget", "View", "Screen", "Page"],
+        "middleware": ["Middleware", "Interceptor", "Filter", "Guard"],
+        "router": ["Router", "Route", "Endpoint", "Controller"],
+    }
+
+    # Source file extensions by language
+    LANGUAGE_EXTENSIONS = {
+        ".py": "Python",
+        ".js": "JavaScript",
+        ".jsx": "JavaScript React",
+        ".ts": "TypeScript",
+        ".tsx": "TypeScript React",
+        ".java": "Java",
+        ".kt": "Kotlin",
+        ".scala": "Scala",
+        ".go": "Go",
+        ".rs": "Rust",
+        ".rb": "Ruby",
+        ".php": "PHP",
+        ".cs": "C#",
+        ".cpp": "C++",
+        ".c": "C",
+        ".swift": "Swift",
+        ".dart": "Dart",
+        ".ex": "Elixir",
+        ".exs": "Elixir",
+        ".vue": "Vue",
+        ".svelte": "Svelte",
     }
 
     # Files to skip during analysis
@@ -104,6 +132,12 @@ class CodebaseAnalyzer:
         "build",
         "dist",
         "egg-info",
+        ".next",
+        ".nuxt",
+        "target",
+        "out",
+        "coverage",
+        ".cache",
     }
 
     def __init__(self, root_path: Optional[str] = None):
@@ -116,23 +150,23 @@ class CodebaseAnalyzer:
         self.analysis = CodebaseAnalysis(project_name=self.root.name, root_path=self.root)
 
     def analyze(self) -> CodebaseAnalysis:
-        """Perform full codebase analysis.
+        """Perform full codebase analysis (language-agnostic).
 
         Returns:
             Complete CodebaseAnalysis object.
         """
         logger.info(f"Analyzing codebase at {self.root}")
 
-        # Step 1: Detect package layout
+        # Step 1: Detect package/source layout (any language)
         self._detect_package_layout()
 
-        # Step 2: Parse Python files and extract classes
-        self._analyze_python_files()
+        # Step 2: Analyze source files (Python AST or regex for other languages)
+        self._analyze_source_files()
 
         # Step 3: Identify key components
         self._identify_key_components()
 
-        # Step 4: Extract entry points from pyproject.toml
+        # Step 4: Extract entry points from config files
         self._extract_entry_points()
 
         # Step 5: Detect architecture patterns
@@ -144,61 +178,194 @@ class CodebaseAnalyzer:
         return self.analysis
 
     def _detect_package_layout(self) -> None:
-        """Detect the package layout (src vs flat)."""
+        """Detect the package/source layout (language-agnostic)."""
 
         def is_python_package(path: Path) -> bool:
             return path.is_dir() and (path / "__init__.py").exists()
 
-        # Find root-level Python packages
-        root_packages = []
+        def is_source_directory(path: Path) -> bool:
+            """Check if directory contains source files."""
+            if not path.is_dir():
+                return False
+            for ext in self.LANGUAGE_EXTENSIONS.keys():
+                if list(path.glob(f"*{ext}")):
+                    return True
+            return False
+
+        # Find root-level packages/source directories
+        source_dirs = []
+        python_packages = []
+
         for item in self.root.iterdir():
             if item.name in self.SKIP_DIRS or item.name.startswith("."):
                 continue
             if is_python_package(item):
-                root_packages.append(item.name)
+                python_packages.append(item.name)
+            elif is_source_directory(item):
+                source_dirs.append(item.name)
 
         has_src = (self.root / "src").is_dir()
+        has_lib = (self.root / "lib").is_dir()
+        has_app = (self.root / "app").is_dir()
 
-        if root_packages:
-            # Prefer non-test packages
-            main_candidates = [p for p in root_packages if not p.startswith("test")]
-            self.analysis.main_package = main_candidates[0] if main_candidates else root_packages[0]
-
-            if has_src:
+        # Prioritize Python packages, then common source dirs
+        if python_packages:
+            main_candidates = [p for p in python_packages if not p.startswith("test")]
+            self.analysis.main_package = (
+                main_candidates[0] if main_candidates else python_packages[0]
+            )
+            if has_src and "src" not in python_packages:
                 self.analysis.deprecated_paths.append("src/")
         elif has_src:
             # Check for packages inside src/
             src_packages = [d.name for d in (self.root / "src").iterdir() if is_python_package(d)]
             if src_packages:
                 self.analysis.main_package = f"src/{src_packages[0]}"
+            elif is_source_directory(self.root / "src"):
+                self.analysis.main_package = "src"
+        elif has_lib and is_source_directory(self.root / "lib"):
+            self.analysis.main_package = "lib"
+        elif has_app and is_source_directory(self.root / "app"):
+            self.analysis.main_package = "app"
+        elif source_dirs:
+            # Use first source directory found
+            main_candidates = [d for d in source_dirs if d not in ("tests", "test", "spec")]
+            self.analysis.main_package = main_candidates[0] if main_candidates else source_dirs[0]
 
-    def _analyze_python_files(self) -> None:
-        """Parse all Python files and extract class/function info."""
-        if not self.analysis.main_package:
-            return
+    def _analyze_source_files(self) -> None:
+        """Analyze source files across all supported languages."""
+        # Determine search paths
+        search_paths = []
+        if self.analysis.main_package:
+            main_path = self.root / self.analysis.main_package.replace("/", "/")
+            if main_path.exists():
+                search_paths.append(main_path)
 
-        package_path = self.root / self.analysis.main_package.replace("/", "/")
-        if not package_path.exists():
-            return
+        # Also search common source directories if no main package
+        if not search_paths:
+            for common_dir in ["src", "lib", "app", "components", "pages", "api"]:
+                path = self.root / common_dir
+                if path.exists():
+                    search_paths.append(path)
 
-        for py_file in package_path.rglob("*.py"):
-            if any(skip in py_file.parts for skip in self.SKIP_DIRS):
-                continue
+        # If still nothing, search root (but limit depth)
+        if not search_paths:
+            search_paths.append(self.root)
 
-            rel_path = py_file.relative_to(self.root)
-            module_info = self._parse_python_file(py_file, str(rel_path))
+        for search_path in search_paths:
+            self._scan_directory_for_sources(search_path)
 
-            if module_info:
-                # Organize by subpackage
-                parts = rel_path.parts
-                if len(parts) > 1:
-                    subpackage = parts[1] if parts[0] == self.analysis.main_package else parts[0]
+    def _scan_directory_for_sources(self, directory: Path, max_depth: int = 5) -> None:
+        """Scan directory for source files of any language."""
+        for ext, lang in self.LANGUAGE_EXTENSIONS.items():
+            for source_file in directory.rglob(f"*{ext}"):
+                if any(skip in source_file.parts for skip in self.SKIP_DIRS):
+                    continue
+
+                # Check depth
+                try:
+                    rel_path = source_file.relative_to(self.root)
+                    if len(rel_path.parts) > max_depth:
+                        continue
+                except ValueError:
+                    continue
+
+                # Parse based on language
+                if ext == ".py":
+                    module_info = self._parse_python_file(source_file, str(rel_path))
                 else:
-                    subpackage = "root"
+                    module_info = self._parse_generic_file(source_file, str(rel_path), lang)
 
-                if subpackage not in self.analysis.packages:
-                    self.analysis.packages[subpackage] = []
-                self.analysis.packages[subpackage].append(module_info)
+                if module_info:
+                    # Organize by subpackage/directory
+                    parts = rel_path.parts
+                    if len(parts) > 1:
+                        subpackage = parts[0]
+                    else:
+                        subpackage = "root"
+
+                    if subpackage not in self.analysis.packages:
+                        self.analysis.packages[subpackage] = []
+                    self.analysis.packages[subpackage].append(module_info)
+
+    def _parse_generic_file(
+        self, file_path: Path, rel_path: str, language: str
+    ) -> Optional[ModuleInfo]:
+        """Parse any source file using regex patterns to extract components.
+
+        This is language-agnostic - detects class/interface/struct/function patterns.
+        """
+        try:
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception as e:
+            logger.debug(f"Failed to read {file_path}: {e}")
+            return None
+
+        module_info = ModuleInfo(name=file_path.stem, path=rel_path)
+
+        # Universal patterns for class/component detection
+        patterns = [
+            # class ClassName, export class, public class, etc.
+            r"(?:export\s+)?(?:public\s+|private\s+|abstract\s+)?class\s+([A-Z][a-zA-Z0-9_]*)",
+            # interface IName or interface Name
+            r"(?:export\s+)?interface\s+([A-Z][a-zA-Z0-9_]*)",
+            # struct Name (Go, Rust, C)
+            r"(?:pub\s+)?struct\s+([A-Z][a-zA-Z0-9_]*)",
+            # type Name = (TypeScript type aliases)
+            r"(?:export\s+)?type\s+([A-Z][a-zA-Z0-9_]*)\s*=",
+            # enum Name
+            r"(?:export\s+)?(?:pub\s+)?enum\s+([A-Z][a-zA-Z0-9_]*)",
+            # trait Name (Rust)
+            r"(?:pub\s+)?trait\s+([A-Z][a-zA-Z0-9_]*)",
+            # module Name (Ruby, Elixir)
+            r"(?:defmodule|module)\s+([A-Z][a-zA-Z0-9_:]*)",
+            # React components: function ComponentName or const ComponentName =
+            r"(?:export\s+)?(?:const|function)\s+([A-Z][a-zA-Z0-9_]*)\s*[=\(]",
+            # Vue/Svelte component detection via filename
+        ]
+
+        for line_no, line in enumerate(content.split("\n"), 1):
+            for pattern in patterns:
+                match = re.search(pattern, line)
+                if match:
+                    class_name = match.group(1)
+                    # Get brief description from comment above or same line
+                    desc = self._extract_inline_comment(line, content, line_no)
+                    category = self._categorize_class(class_name, [])
+
+                    class_info = ClassInfo(
+                        name=class_name,
+                        file_path=rel_path,
+                        line_number=line_no,
+                        base_classes=[],
+                        docstring=desc,
+                        is_abstract="abstract" in line.lower() or "interface" in line.lower(),
+                        category=category,
+                    )
+                    module_info.classes.append(class_info)
+                    break  # One match per line
+
+        return module_info if module_info.classes else None
+
+    def _extract_inline_comment(self, line: str, content: str, line_no: int) -> Optional[str]:
+        """Extract comment from line or line above."""
+        # Check for inline comment
+        for comment_marker in ["//", "#", "--", "/*", "///"]:
+            if comment_marker in line:
+                idx = line.find(comment_marker)
+                comment = line[idx + len(comment_marker) :].strip()
+                if comment:
+                    return comment[:60]
+
+        # Check line above for doc comment
+        lines = content.split("\n")
+        if line_no > 1:
+            prev_line = lines[line_no - 2].strip()
+            for marker in ["///", "/**", "//", "#", '"""', "'''"]:
+                if prev_line.startswith(marker):
+                    return prev_line.lstrip(marker).strip("*/ ").strip()[:60]
+
+        return None
 
     def _parse_python_file(self, file_path: Path, rel_path: str) -> Optional[ModuleInfo]:
         """Parse a Python file and extract class/function information.
@@ -435,6 +602,9 @@ class CodebaseAnalyzer:
 def generate_smart_victor_md(root_path: Optional[str] = None) -> str:
     """Generate comprehensive project context using codebase analysis.
 
+    Works with Python projects (AST-based analysis) and falls back to
+    language-agnostic analysis for non-Python projects.
+
     Args:
         root_path: Root directory to analyze. Defaults to current directory.
 
@@ -443,6 +613,10 @@ def generate_smart_victor_md(root_path: Optional[str] = None) -> str:
     """
     analyzer = CodebaseAnalyzer(root_path)
     analysis = analyzer.analyze()
+
+    # If no Python package found, use language-agnostic analysis
+    if not analysis.main_package and not analysis.key_components:
+        return _generate_generic_victor_md(root_path)
 
     sections = []
 
@@ -554,6 +728,141 @@ def generate_smart_victor_md(root_path: Optional[str] = None) -> str:
     sections.append("")
 
     return "\n".join(sections)
+
+
+def _generate_generic_victor_md(root_path: Optional[str] = None) -> str:
+    """Generate init.md for non-Python projects using language-agnostic analysis.
+
+    Args:
+        root_path: Root directory to analyze. Defaults to current directory.
+
+    Returns:
+        Generated markdown content.
+    """
+    context = gather_project_context(root_path, max_files=100)
+    _root = Path(root_path) if root_path else Path.cwd()
+
+    sections = []
+
+    # Header
+    sections.append(f"# {VICTOR_CONTEXT_FILE}\n")
+    sections.append(
+        "This file provides guidance to Victor when working with code in this repository.\n"
+    )
+
+    # Project Overview
+    sections.append("## Project Overview\n")
+    if context["readme_content"]:
+        # Extract first paragraph from README
+        paragraphs = context["readme_content"].split("\n\n")
+        for para in paragraphs:
+            stripped = para.strip()
+            if stripped and not stripped.startswith(("#", "![", "<", "[!", "---", "```", "|")):
+                sections.append(f"**{context['project_name']}**: {stripped[:300]}\n")
+                break
+        else:
+            sections.append(f"**{context['project_name']}**: [Add project description here]\n")
+    else:
+        sections.append(f"**{context['project_name']}**: [Add project description here]\n")
+
+    # Languages detected
+    if context["detected_languages"]:
+        sections.append(f"**Languages**: {', '.join(context['detected_languages'][:5])}\n")
+
+    # Package Layout
+    sections.append("## Package Layout\n")
+    sections.append("| Path | Description |")
+    sections.append("|------|-------------|")
+
+    # Add directories from structure
+    for dir_path in context["directory_structure"][:15]:
+        if "/" not in dir_path.rstrip("/"):  # Top-level directories only
+            desc = _infer_directory_purpose(dir_path.rstrip("/"))
+            sections.append(f"| `{dir_path}` | {desc} |")
+
+    sections.append("")
+
+    # Key Files (source files)
+    if context["source_files"]:
+        sections.append("## Key Files\n")
+        for f in context["source_files"][:15]:
+            sections.append(f"- `{f}`")
+        sections.append("")
+
+    # Common Commands based on detected project type
+    sections.append("## Common Commands\n")
+    sections.append("```bash")
+
+    if "pyproject.toml" in context["config_files"] or "requirements.txt" in list(
+        context["config_files"]
+    ):
+        sections.append("# Python project")
+        sections.append("pip install -r requirements.txt")
+        sections.append("python main.py")
+    elif "package.json" in context["config_files"]:
+        sections.append("# Node.js project")
+        sections.append("npm install")
+        sections.append("npm start")
+    elif "Cargo.toml" in context["config_files"]:
+        sections.append("# Rust project")
+        sections.append("cargo build")
+        sections.append("cargo run")
+    elif "go.mod" in context["config_files"]:
+        sections.append("# Go project")
+        sections.append("go build")
+        sections.append("go run .")
+    else:
+        sections.append("# Add your build/run commands here")
+
+    sections.append("```\n")
+
+    # Config files found
+    if context["config_files"]:
+        sections.append("## Configuration\n")
+        sections.append(
+            "Key config files: " + ", ".join(f"`{f}`" for f in context["config_files"][:5])
+        )
+        sections.append("")
+
+    # Important Notes
+    sections.append("## Important Notes\n")
+    sections.append("- Review and customize this file based on your project specifics")
+    sections.append("- Use `/init --deep` for LLM-powered comprehensive analysis")
+    sections.append("")
+
+    return "\n".join(sections)
+
+
+def _infer_directory_purpose(dirname: str) -> str:
+    """Infer the purpose of a directory from its name."""
+    purposes = {
+        "src": "Source code",
+        "lib": "Library code",
+        "app": "Application code",
+        "api": "API endpoints",
+        "components": "UI components",
+        "pages": "Page components",
+        "views": "View templates",
+        "models": "Data models",
+        "utils": "Utility functions",
+        "helpers": "Helper functions",
+        "config": "Configuration",
+        "configs": "Configuration",
+        "tests": "Test files",
+        "test": "Test files",
+        "spec": "Test specifications",
+        "docs": "Documentation",
+        "public": "Public/static assets",
+        "static": "Static files",
+        "assets": "Asset files",
+        "scripts": "Script files",
+        "bin": "Executable scripts",
+        "data": "Data files",
+        "migrations": "Database migrations",
+        "styles": "Stylesheets",
+        "css": "CSS styles",
+    }
+    return purposes.get(dirname.lower(), "Project files")
 
 
 # Supported context file aliases for other AI coding tools
@@ -951,3 +1260,354 @@ async def generate_victor_md_with_llm(
         logger.error(f"LLM generation failed: {e}")
         # Fall back to basic generation
         return generate_smart_victor_md(root_path)
+
+
+async def generate_victor_md_from_index(root_path: Optional[str] = None) -> str:
+    """Generate init.md from the SymbolStore (pre-indexed symbols).
+
+    This uses the SQLite symbol store for fast, accurate init.md generation.
+    The symbol store should be indexed first via `/init --index` or automatically
+    during first run.
+
+    Args:
+        root_path: Root directory. Defaults to current directory.
+
+    Returns:
+        Generated markdown content for .victor/init.md.
+    """
+    from victor.codebase.symbol_store import SymbolStore
+
+    root = Path(root_path) if root_path else Path.cwd()
+    store = SymbolStore(str(root))
+
+    # Index if needed (quick operation if already indexed)
+    await store.index_codebase()
+
+    stats = store.get_stats()
+    key_components = store.find_key_components(limit=15)
+    patterns = store.get_detected_patterns()
+
+    sections = []
+
+    # Header
+    sections.append(f"# {VICTOR_CONTEXT_FILE}\n")
+    sections.append(
+        "This file provides guidance to Victor when working with code in this repository.\n"
+    )
+
+    # Project Overview
+    sections.append("## Project Overview\n")
+    readme_desc = _extract_readme_description(root)
+    if readme_desc:
+        sections.append(f"**{root.name}**: {readme_desc}\n")
+    else:
+        sections.append(f"**{root.name}**: [Add project description here]\n")
+
+    # Languages
+    if stats.get("files_by_language"):
+        langs = [f"{lang} ({count})" for lang, count in stats["files_by_language"].items()]
+        sections.append(f"**Languages**: {', '.join(langs)}\n")
+
+    # Package Layout
+    sections.append("## Package Layout\n")
+    sections.append("| Path | Type | Description |")
+    sections.append("|------|------|-------------|")
+
+    # Infer main directories from key components
+    dirs_seen = set()
+    for comp in key_components:
+        dir_parts = Path(comp.file_path).parts
+        if len(dir_parts) > 1:
+            main_dir = dir_parts[0]
+            if main_dir not in dirs_seen:
+                dirs_seen.add(main_dir)
+                sections.append(f"| `{main_dir}/` | **ACTIVE** | Source code |")
+
+    if (root / "tests").is_dir():
+        sections.append("| `tests/` | Active | Unit and integration tests |")
+    if (root / "docs").is_dir():
+        sections.append("| `docs/` | Active | Documentation |")
+
+    sections.append("")
+
+    # Key Components (from indexed symbols)
+    if key_components:
+        sections.append("## Key Components\n")
+        sections.append("| Component | Type | Path | Description |")
+        sections.append("|-----------|------|------|-------------|")
+
+        for comp in key_components[:12]:
+            desc = (
+                comp.docstring or comp.category.title()
+                if comp.category
+                else comp.symbol_type.title()
+            )
+            path_with_line = f"`{comp.file_path}:{comp.line_number}`"
+            sections.append(
+                f"| {comp.name} | {comp.symbol_type} | {path_with_line} | {desc[:50]} |"
+            )
+
+        sections.append("")
+
+    # Architecture Patterns (from detected patterns)
+    if patterns:
+        sections.append("## Architecture\n")
+        for i, pattern in enumerate(patterns[:8], 1):
+            sections.append(f"{i}. **{pattern['name']}**: {pattern['description']}")
+        sections.append("")
+
+    # Symbol Summary by Type
+    if stats.get("symbols_by_type"):
+        sections.append("## Code Structure\n")
+        for sym_type, count in stats["symbols_by_type"].items():
+            # Proper pluralization
+            plural = sym_type + "es" if sym_type.endswith("s") else sym_type + "s"
+            sections.append(f"- {count} {plural}")
+        sections.append("")
+
+    # Common Commands (inferred from detected languages)
+    sections.append("## Common Commands\n")
+    sections.append("```bash")
+
+    langs = stats.get("files_by_language", {})
+    if "python" in langs:
+        sections.append("# Python project")
+        sections.append('pip install -e ".[dev]"')
+        sections.append("pytest")
+    if "typescript" in langs or "javascript" in langs:
+        sections.append("# Node.js project")
+        sections.append("npm install")
+        sections.append("npm test")
+    if "go" in langs:
+        sections.append("# Go project")
+        sections.append("go build")
+        sections.append("go test ./...")
+    if "rust" in langs:
+        sections.append("# Rust project")
+        sections.append("cargo build")
+        sections.append("cargo test")
+
+    if not any(lang in langs for lang in ["python", "typescript", "javascript", "go", "rust"]):
+        sections.append("# Add your build/run commands here")
+
+    sections.append("```\n")
+
+    # Important Notes
+    sections.append("## Important Notes\n")
+    sections.append(
+        f"- Indexed {stats.get('total_files', 0)} files, {stats.get('total_symbols', 0)} symbols"
+    )
+    sections.append("- Check component paths above for exact file:line references")
+    sections.append("- Run `/init --update` to refresh after code changes")
+    sections.append("")
+
+    return "\n".join(sections)
+
+
+async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict[str, Any]:
+    """Extract insights from conversation history to enhance init.md.
+
+    Analyzes stored conversations to identify:
+    - Frequently asked questions/topics
+    - Common file references
+    - Learned patterns and hot spots
+
+    Args:
+        root_path: Root directory containing .victor/conversation.db
+
+    Returns:
+        Dictionary with extracted insights
+    """
+    import sqlite3
+    from collections import Counter
+
+    root = Path(root_path) if root_path else Path.cwd()
+    db_path = root / ".victor" / "conversation.db"
+
+    if not db_path.exists():
+        return {"error": "No conversation history found"}
+
+    insights = {
+        "common_topics": [],
+        "hot_files": [],
+        "faq": [],
+        "learned_patterns": [],
+        "session_count": 0,
+        "message_count": 0,
+    }
+
+    try:
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+
+        # Get session and message counts
+        cursor.execute("SELECT COUNT(DISTINCT session_id) FROM messages")
+        insights["session_count"] = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM messages")
+        insights["message_count"] = cursor.fetchone()[0]
+
+        # Extract common user queries (deduplicated, excluding benchmarks)
+        cursor.execute(
+            """
+            SELECT content FROM messages
+            WHERE role = 'user'
+              AND content NOT LIKE '%<TOOL_OUTPUT%'
+              AND content NOT LIKE '%Complete this Python function%'
+              AND content NOT LIKE '%Complete the following Python%'
+              AND length(content) BETWEEN 20 AND 500
+        """
+        )
+
+        queries = [row[0] for row in cursor.fetchall()]
+        query_counter = Counter()
+
+        # Extract key topics from queries
+        topic_keywords = [
+            "component",
+            "architecture",
+            "test",
+            "bug",
+            "fix",
+            "add",
+            "create",
+            "refactor",
+            "improve",
+            "explain",
+            "how",
+            "what",
+            "why",
+            "where",
+            "error",
+            "issue",
+            "implement",
+            "feature",
+            "config",
+            "setup",
+        ]
+
+        for query in queries:
+            query_lower = query.lower()
+            for keyword in topic_keywords:
+                if keyword in query_lower:
+                    query_counter[keyword] += 1
+
+        insights["common_topics"] = query_counter.most_common(10)
+
+        # Extract frequently referenced files from assistant responses
+        cursor.execute(
+            """
+            SELECT content FROM messages
+            WHERE role = 'assistant'
+              AND (content LIKE '%.py%' OR content LIKE '%.ts%' OR content LIKE '%.js%')
+        """
+        )
+
+        file_counter = Counter()
+        file_pattern = re.compile(r"`([a-zA-Z_/]+\.(py|ts|js|go|rs))[:`]")
+
+        for row in cursor.fetchall():
+            matches = file_pattern.findall(row[0])
+            for match in matches:
+                file_path = match[0]
+                # Normalize and count
+                if "/" in file_path and not file_path.startswith("/"):
+                    file_counter[file_path] += 1
+
+        insights["hot_files"] = file_counter.most_common(15)
+
+        # Get architectural patterns from patterns table
+        cursor.execute(
+            """
+            SELECT pattern_name, pattern_type, COUNT(*) as count
+            FROM patterns
+            GROUP BY pattern_type
+            ORDER BY count DESC
+        """
+        )
+        insights["learned_patterns"] = [
+            {"name": row[0], "type": row[1], "count": row[2]} for row in cursor.fetchall()
+        ]
+
+        # Extract FAQ-like questions (questions asked multiple times)
+        cursor.execute(
+            """
+            SELECT content, COUNT(*) as times
+            FROM messages
+            WHERE role = 'user'
+              AND content LIKE '%?%'
+              AND content NOT LIKE '%Complete%function%'
+              AND length(content) BETWEEN 15 AND 200
+            GROUP BY content
+            HAVING times > 1
+            ORDER BY times DESC
+            LIMIT 5
+        """
+        )
+        insights["faq"] = [{"question": row[0], "times_asked": row[1]} for row in cursor.fetchall()]
+
+        conn.close()
+
+    except Exception as e:
+        insights["error"] = str(e)
+
+    return insights
+
+
+async def generate_enhanced_init_md(root_path: Optional[str] = None) -> str:
+    """Generate init.md enhanced with conversation history insights.
+
+    Combines static codebase analysis with dynamic insights from
+    conversation history to create a more useful project context.
+
+    Args:
+        root_path: Root directory to analyze
+
+    Returns:
+        Enhanced init.md content
+    """
+    # Get base init.md from symbol store
+    base_content = await generate_victor_md_from_index(root_path)
+
+    # Extract conversation insights
+    insights = await extract_conversation_insights(root_path)
+
+    if "error" in insights or insights["session_count"] == 0:
+        return base_content
+
+    # Build enhancement sections
+    enhancements = []
+
+    # Add conversation-derived insights section
+    enhancements.append("\n## Learned from Conversations\n")
+    enhancements.append(
+        f"*Based on {insights['session_count']} sessions, {insights['message_count']} messages*\n"
+    )
+
+    # Hot files (frequently discussed)
+    if insights.get("hot_files"):
+        enhancements.append("### Frequently Referenced Files\n")
+        for file_path, count in insights["hot_files"][:8]:
+            enhancements.append(f"- `{file_path}` ({count} references)")
+        enhancements.append("")
+
+    # Common topics
+    if insights.get("common_topics"):
+        topics = [t[0] for t in insights["common_topics"][:6]]
+        enhancements.append("### Common Topics\n")
+        enhancements.append(f"Keywords: {', '.join(topics)}\n")
+
+    # FAQ section
+    if insights.get("faq"):
+        enhancements.append("### Frequently Asked Questions\n")
+        for faq in insights["faq"][:3]:
+            q = faq["question"][:100] + "..." if len(faq["question"]) > 100 else faq["question"]
+            enhancements.append(f"- {q}")
+        enhancements.append("")
+
+    # Insert enhancements before "Important Notes" section
+    if "## Important Notes" in base_content:
+        parts = base_content.split("## Important Notes")
+        return parts[0] + "\n".join(enhancements) + "\n## Important Notes" + parts[1]
+    else:
+        return base_content + "\n" + "\n".join(enhancements)

@@ -48,7 +48,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 import yaml
 
 if TYPE_CHECKING:
-    from victor.agent.unified_classifier import UnifiedTaskClassifier, ClassificationResult
+    from victor.agent.unified_classifier import ClassificationResult
 
 logger = logging.getLogger(__name__)
 
@@ -107,9 +107,7 @@ class StopReason(Enum):
 
 
 # Tools that indicate research activity
-RESEARCH_TOOLS = frozenset(
-    {"web_search", "web_fetch", "tavily_search", "search_web", "fetch_url"}
-)
+RESEARCH_TOOLS = frozenset({"web_search", "web_fetch", "tavily_search", "search_web", "fetch_url"})
 
 # Progressive tools - different params indicate progress, not loops
 PROGRESSIVE_PARAMS = {
@@ -220,6 +218,13 @@ class UnifiedTaskProgress:
 
     # Manual stop
     forced_stop: Optional[str] = None
+
+    # Log deduplication - only log forcing completion once
+    completion_forcing_logged: bool = False
+
+    # Response loop detection - tracks last response content to detect repeated responses
+    last_response_content: str = ""
+    response_loop_detected: bool = False
 
 
 # =============================================================================
@@ -402,9 +407,7 @@ class UnifiedTaskConfigLoader:
         - model_capabilities.yaml for model-specific settings (via capabilities loader)
         """
         # Load task config from existing task_tool_config.yaml
-        task_config_path = (
-            Path(__file__).parent.parent / "config" / "task_tool_config.yaml"
-        )
+        task_config_path = Path(__file__).parent.parent / "config" / "task_tool_config.yaml"
 
         if task_config_path.exists():
             try:
@@ -445,9 +448,7 @@ class UnifiedTaskConfigLoader:
 
         return TaskConfig(
             max_exploration_iterations=task_data.get("max_exploration_iterations", 8),
-            force_action_after_target_read=task_data.get(
-                "force_action_after_target_read", False
-            ),
+            force_action_after_target_read=task_data.get("force_action_after_target_read", False),
             tool_budget=task_data.get("tool_budget", 50),
             loop_repeat_threshold=task_data.get("loop_repeat_threshold", 3),
             needs_tools=task_data.get("needs_tools", True),
@@ -520,12 +521,8 @@ class UnifiedTaskTracker:
         global_config = self._config_loader.get_global_config()
         self._max_total_iterations = global_config.get("max_total_iterations", 50)
         self._min_content_threshold = global_config.get("min_content_threshold", 150)
-        self._max_overlapping_reads = global_config.get(
-            "max_overlapping_reads_per_file", 3
-        )
-        self._max_searches_per_prefix = global_config.get(
-            "max_searches_per_query_prefix", 2
-        )
+        self._max_overlapping_reads = global_config.get("max_overlapping_reads_per_file", 3)
+        self._max_searches_per_prefix = global_config.get("max_searches_per_query_prefix", 2)
 
     # =========================================================================
     # Properties
@@ -734,13 +731,16 @@ class UnifiedTaskTracker:
         effective_max = self._calculate_effective_max()
         if self._progress.iteration_count > effective_max:
             hint = self._get_completion_hint()
-            logger.info(
-                f"UnifiedTaskTracker: Forcing completion at iteration {self._progress.iteration_count} "
-                f"(task_type={self._progress.task_type.value}, "
-                f"base_max={self._get_base_max()}, effective_max={effective_max}, "
-                f"total_turns={self._progress.total_turns}, "
-                f"multiplier={self._exploration_multiplier})"
-            )
+            # Only log once to avoid duplicate messages
+            if not self._progress.completion_forcing_logged:
+                self._progress.completion_forcing_logged = True
+                logger.info(
+                    f"UnifiedTaskTracker: Forcing completion at iteration {self._progress.iteration_count} "
+                    f"(task_type={self._progress.task_type.value}, "
+                    f"base_max={self._get_base_max()}, effective_max={effective_max}, "
+                    f"total_turns={self._progress.total_turns}, "
+                    f"multiplier={self._exploration_multiplier})"
+                )
             return StopDecision(
                 should_stop=True,
                 reason=StopReason.MAX_ITERATIONS,
@@ -765,7 +765,7 @@ class UnifiedTaskTracker:
 
         threshold = self._get_loop_threshold()
         recent = list(self._progress.signature_history)[
-            -min(len(self._progress.signature_history), 8):
+            -min(len(self._progress.signature_history), 8) :
         ]
 
         if recent:
@@ -778,9 +778,7 @@ class UnifiedTaskTracker:
 
         return None
 
-    def is_blocked_after_warning(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> Optional[str]:
+    def is_blocked_after_warning(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
         """Check if a tool call is blocked due to matching warned signature."""
         if not self._progress.loop_warning_given or not self._progress.warned_signature:
             return None
@@ -927,7 +925,7 @@ class UnifiedTaskTracker:
 
         threshold = self._get_loop_threshold()
         recent = list(self._progress.signature_history)[
-            -min(len(self._progress.signature_history), 8):
+            -min(len(self._progress.signature_history), 8) :
         ]
 
         if recent:
@@ -951,11 +949,52 @@ class UnifiedTaskTracker:
                 total = overlap_count + 1
                 if total > self._max_overlapping_reads:
                     return (
-                        f"Same file region read {total} times: {path} "
-                        f"[offset={current.offset}]"
+                        f"Same file region read {total} times: {path} " f"[offset={current.offset}]"
                     )
 
         return None
+
+    def check_response_loop(self, content: str, similarity_threshold: float = 0.7) -> bool:
+        """Check if response content is a repeat of the previous response.
+
+        This detects when the model keeps responding with similar text but makes
+        no tool calls - a different type of loop than tool call loops.
+
+        Args:
+            content: The current response content to check
+            similarity_threshold: Word overlap ratio to consider as repeated (default 0.7)
+
+        Returns:
+            True if a response loop is detected, False otherwise
+        """
+        content_for_comparison = (content or "").strip()[:500]
+        last_content = self._progress.last_response_content
+
+        is_repeated = False
+        if last_content and content_for_comparison:
+            # Simple word overlap similarity check
+            current_words = set(content_for_comparison.lower().split())
+            last_words = set(last_content.lower().split())
+            if current_words and last_words:
+                overlap = len(current_words & last_words)
+                max_words = max(len(current_words), len(last_words))
+                similarity = overlap / max_words if max_words > 0 else 0
+                if similarity > similarity_threshold:
+                    is_repeated = True
+                    self._progress.response_loop_detected = True
+                    logger.warning(
+                        f"Response loop detected (similarity={similarity:.2f}), "
+                        "forcing completion to prevent infinite loop"
+                    )
+
+        # Track content for next iteration's comparison
+        self._progress.last_response_content = content_for_comparison
+        return is_repeated
+
+    @property
+    def response_loop_detected(self) -> bool:
+        """Check if a response loop has been detected."""
+        return self._progress.response_loop_detected
 
     def _check_goal_forcing(self) -> Optional[StopDecision]:
         """Check for goal-based forcing (EDIT after target read)."""
@@ -1045,9 +1084,7 @@ class UnifiedTaskTracker:
             args_str = str(sorted(arguments.items()))
             return f"{tool_name}:{hashlib.md5(args_str.encode()).hexdigest()[:8]}"
 
-    def _get_resource_key(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> Optional[str]:
+    def _get_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
         """Generate resource key for tracking unique resources."""
         if tool_name == "read_file":
             path = arguments.get("path", "")
@@ -1065,9 +1102,7 @@ class UnifiedTaskTracker:
             return f"bash:{command[:50]}" if command else None
         return None
 
-    def _get_base_resource_key(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> Optional[str]:
+    def _get_base_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
         """Generate base resource key for loop detection."""
         if tool_name == "list_directory":
             path = arguments.get("path", "")
@@ -1175,7 +1210,6 @@ class UnifiedTaskTracker:
             Tuple of (TaskType, ClassificationResult) for detailed inspection
         """
         from victor.agent.unified_classifier import (
-            UnifiedTaskClassifier,
             TaskType as UnifiedTaskType,
             get_unified_classifier,
         )

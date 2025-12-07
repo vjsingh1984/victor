@@ -133,10 +133,10 @@ class CodeQualityMetrics:
         maint_score = self.maintainability_index
 
         return (
-            weights["syntax"] * syntax_score +
-            weights["style"] * style_score +
-            weights["complexity"] * complexity_score +
-            weights["maintainability"] * maint_score
+            weights["syntax"] * syntax_score
+            + weights["style"] * style_score
+            + weights["complexity"] * complexity_score
+            + weights["maintainability"] * maint_score
         )
 
 
@@ -201,7 +201,7 @@ class TaskResult:
     def tokens_per_test(self) -> float:
         """Token efficiency: tokens used per test passed."""
         if self.tests_passed == 0:
-            return float('inf')
+            return float("inf")
         return self.tokens_used / self.tests_passed
 
     @property
@@ -260,6 +260,11 @@ class EvaluationConfig:
     docker_image: str = "python:3.11"
     workspace_dir: Optional[Path] = None
 
+    # Self-correction settings (generic iterative refinement)
+    enable_self_correction: bool = False
+    self_correction_max_iterations: int = 3
+    auto_fix_imports: bool = True
+
 
 @dataclass
 class EvaluationResult:
@@ -269,6 +274,9 @@ class EvaluationResult:
     task_results: list[TaskResult] = field(default_factory=list)
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
+
+    # Self-correction metrics (populated when enable_self_correction=True)
+    correction_metrics: Optional[dict[str, Any]] = None
 
     @property
     def total_tasks(self) -> int:

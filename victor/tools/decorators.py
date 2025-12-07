@@ -15,11 +15,62 @@
 
 import inspect
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, get_origin, get_args
 
 from docstring_parser import parse
 
+from victor.core.errors import ToolExecutionError, ToolValidationError
 from victor.tools.base import BaseTool, CostTier, ToolMetadata, ToolResult
+
+
+def _get_json_schema_type(annotation: Any) -> Dict[str, Any]:
+    """Convert Python type annotation to JSON Schema type.
+
+    Args:
+        annotation: Python type annotation
+
+    Returns:
+        JSON Schema type definition
+    """
+    if annotation == inspect.Parameter.empty:
+        return {"type": "string"}
+
+    # Handle Optional[X] -> X with nullable
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+
+    if origin is Union:
+        # Check if it's Optional (Union with None)
+        non_none_args = [a for a in args if a is not type(None)]
+        if len(non_none_args) == 1:
+            # It's Optional[X]
+            inner_schema = _get_json_schema_type(non_none_args[0])
+            return inner_schema  # JSON Schema handles nullable differently
+        else:
+            # Complex Union - default to string
+            return {"type": "string"}
+
+    if origin is list or annotation is list:
+        if args:
+            items_schema = _get_json_schema_type(args[0])
+            return {"type": "array", "items": items_schema}
+        return {"type": "array", "items": {"type": "string"}}
+
+    if origin is dict or annotation is dict:
+        return {"type": "object"}
+
+    # Basic types
+    if annotation in (int,):
+        return {"type": "integer"}
+    if annotation in (float,):
+        return {"type": "number"}
+    if annotation is bool:
+        return {"type": "boolean"}
+    if annotation is str:
+        return {"type": "string"}
+
+    # Default to string for unknown types
+    return {"type": "string"}
 
 
 def tool(
@@ -136,17 +187,18 @@ def _create_tool_class(
         ):
             continue
 
-        param_type = "string"  # Default type
-        if param.annotation != inspect.Parameter.empty:
-            if param.annotation in (int, float):
-                param_type = "number"
-            elif param.annotation is bool:
-                param_type = "boolean"
+        # Use the enhanced type handler for proper JSON Schema generation
+        type_schema = _get_json_schema_type(param.annotation)
 
+        # Merge type schema with description
         properties[name] = {
-            "type": param_type,
+            **type_schema,
             "description": param_docs.get(name, "No description."),
         }
+
+        # Add default value if present (helps LLMs understand optional params)
+        if param.default != inspect.Parameter.empty and param.default is not None:
+            properties[name]["default"] = param.default
 
         if param.default == inspect.Parameter.empty:
             required.append(name)
@@ -232,7 +284,40 @@ def _create_tool_class(
                     result = await self._fn(**kwargs)
                 else:
                     result = self._fn(**kwargs)
+
+                # Handle dict-based error returns for backwards compatibility
+                # Tools returning {"success": False, "error": "..."} should be converted
+                # to proper ToolResult failures. This bridges legacy patterns.
+                if isinstance(result, dict):
+                    if result.get("success") is False and "error" in result:
+                        return ToolResult(
+                            success=False,
+                            output=result.get("output"),
+                            error=result.get("error"),
+                            metadata=result.get("metadata"),
+                        )
+                    # Some tools return {"error": "..."} without success field
+                    if "error" in result and "success" not in result and len(result) <= 2:
+                        return ToolResult(
+                            success=False,
+                            output=None,
+                            error=result.get("error"),
+                        )
+
                 return ToolResult(success=True, output=result)
+            except (ToolValidationError, ToolExecutionError) as e:
+                # Handle structured tool errors with recovery hints
+                return ToolResult(
+                    success=False,
+                    output=None,
+                    error=e.message,
+                    metadata={
+                        "exception": type(e).__name__,
+                        "category": e.category.value,
+                        "recovery_hint": e.recovery_hint,
+                        "tool_name": e.tool_name,
+                    },
+                )
             except Exception as e:
                 return ToolResult(
                     success=False,

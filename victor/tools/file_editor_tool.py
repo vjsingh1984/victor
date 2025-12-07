@@ -25,7 +25,48 @@ from victor.editing import FileEditor
 from victor.tools.decorators import tool
 
 
-@tool
+@tool(
+    category="filesystem",
+    keywords=[
+        "edit",
+        "modify",
+        "change",
+        "update",
+        "replace",
+        "fix",
+        "refactor",
+        "create",
+        "delete",
+        "rename",
+        "file",
+        "code",
+    ],
+    use_cases=[
+        "editing existing files",
+        "modifying source code",
+        "fixing bugs in code",
+        "creating new files",
+        "deleting files",
+        "renaming files",
+        "refactoring code",
+        "applying code changes",
+    ],
+    examples=[
+        "edit the file to fix the bug",
+        "change the function to return 42",
+        "replace 'old_value' with 'new_value' in config.py",
+        "create a new file called utils.py",
+        "delete the old_module.py file",
+        "rename temp.py to final.py",
+    ],
+    priority_hints=[
+        "PREFERRED tool for making code changes",
+        "Use 'replace' operation for surgical edits (most reliable)",
+        "Use 'create' for new files, 'modify' only for complete rewrites",
+        "Supports undo via /undo command",
+        "Can perform multiple operations atomically",
+    ],
+)
 async def edit_files(
     operations: List[Dict[str, Any]],
     preview: bool = False,
@@ -33,88 +74,64 @@ async def edit_files(
     description: str = "",
     context_lines: int = 3,
 ) -> Dict[str, Any]:
-    """
-    Unified file editing with transaction support.
+    """PRIMARY tool for code changes with transaction support and undo.
 
-    Perform multiple file operations in a single transaction with built-in
-    preview and rollback capability.
+    Operations: replace (old_str→new_str), create, modify, delete, rename.
+    Use preview=True to see changes before applying. Supports /undo command.
 
-    OPERATION TYPES:
-        - "replace" (RECOMMENDED for edits): Surgical string replacement. Only
-          changes the exact matched text, preserving the rest of the file.
-          Use this for fixing bugs, refactoring, or adding code to existing files.
-          Requires: old_str (exact text to find), new_str (replacement text).
-          FAILS if old_str not found or matches multiple times (ambiguous).
-
-        - "create": Create a new file. Use for new files only.
-          Requires: path, content.
-
-        - "modify": Replace ENTIRE file content. Use only when you need to
-          completely rewrite a file. For surgical edits, use "replace" instead.
-          Requires: path, content (or new_content).
-
-        - "delete": Remove a file.
-          Requires: path.
-
-        - "rename": Move/rename a file.
-          Requires: path, new_path.
-
-    Args:
-        operations: List of file operations. Each operation is a dict with:
-            - type: "replace", "create", "modify", "delete", or "rename" (required)
-            - path: File path (required)
-            - old_str: Text to find and replace (required for "replace")
-            - new_str: Replacement text (required for "replace")
-            - content: File content (for create/modify)
-            - new_path: New file path (required for rename)
-        preview: If True, show diff preview without applying changes (default: False).
-        auto_commit: If True, automatically commit changes after queuing (default: True).
-        description: Optional description of this edit operation.
-        context_lines: Number of context lines to show in diffs (default: 3).
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - operations_queued: Number of operations queued
-        - operations_applied: Number of operations applied (if auto_commit=True)
-        - by_type: Breakdown of operations by type
-        - message: Status message
-        - preview_output: Diff preview text (if preview=True)
-        - error: Error message if failed
-
-    Examples:
-        # RECOMMENDED: Surgical edit with replace (most token-efficient)
-        edit_files(operations=[{
-            "type": "replace",
-            "path": "foo.py",
-            "old_str": "def calculate():\\n    return 1",
-            "new_str": "def calculate():\\n    return 42"
-        }])
-
-        # Create a new file
-        edit_files(operations=[
-            {"type": "create", "path": "new_file.py", "content": "print('hello')"}
-        ])
-
-        # Delete and rename files
-        edit_files(operations=[
-            {"type": "delete", "path": "old.py"},
-            {"type": "rename", "path": "temp.py", "new_path": "final.py"}
-        ])
-
-        # Full file rewrite (use sparingly - prefer "replace" for edits)
-        edit_files(operations=[
-            {"type": "modify", "path": "config.py", "content": "# Complete new content"}
-        ])
+    Example: [{"type": "replace", "path": "main.py", "old_str": "x=1", "new_str": "x=42"}]
     """
     # Allow callers (models) to pass operations as a JSON string; normalize to list[dict]
     if isinstance(operations, str):
         import json
+        import re
 
+        # Try to parse the JSON, with recovery for common issues
         try:
             operations = json.loads(operations)
         except json.JSONDecodeError as exc:
-            return {"success": False, "error": f"Invalid JSON for operations: {exc}"}
+            # Try to provide helpful error message and recovery hints
+            error_context = ""
+
+            # Detect control character issues (common with embedded newlines)
+            if "control character" in str(exc).lower():
+                error_context = (
+                    "\n\nHINT: JSON strings cannot contain raw newlines or tabs. "
+                    "Use \\n for newlines and \\t for tabs within string values."
+                )
+                # Try to fix by escaping control characters in strings
+                try:
+                    fixed = re.sub(
+                        r'(?<!\\)\n(?=(?:[^"]*"[^"]*")*[^"]*"[^"]*$)', r"\\n", operations
+                    )
+                    fixed = re.sub(r'(?<!\\)\t(?=(?:[^"]*"[^"]*")*[^"]*"[^"]*$)', r"\\t", fixed)
+                    operations = json.loads(fixed)
+                    # If fixed, log and continue
+                    import logging
+
+                    logging.getLogger(__name__).info("Auto-fixed JSON control characters")
+                except json.JSONDecodeError:
+                    pass  # Recovery failed, use original error
+
+            if isinstance(operations, str):  # Still a string = parsing failed
+                # Detect delimiter issues
+                if "delimiter" in str(exc).lower():
+                    error_context = "\n\nHINT: Check for missing commas between array elements or object properties."
+                # Detect structure issues
+                elif "Expecting" in str(exc):
+                    error_context = (
+                        "\n\nHINT: Check JSON structure - ensure arrays use [], objects use {}, "
+                        "and strings are quoted."
+                    )
+
+                example = (
+                    "\n\nCorrect format example:\n"
+                    '[{"type": "replace", "path": "file.py", "old_str": "x=1", "new_str": "x=2"}]'
+                )
+                return {
+                    "success": False,
+                    "error": f"Invalid JSON for operations: {exc}{error_context}{example}",
+                }
 
     if not operations:
         return {"success": False, "error": "No operations provided"}

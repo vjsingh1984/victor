@@ -43,7 +43,6 @@ from victor.agent.tool_executor import ToolExecutor
 from victor.agent.parallel_executor import (
     ParallelToolExecutor,
     ParallelExecutionConfig,
-    ParallelExecutionResult,
 )
 
 if TYPE_CHECKING:
@@ -214,9 +213,7 @@ class ToolPipeline:
             )
         return self._parallel_executor
 
-    def _parallel_progress_callback(
-        self, tool_name: str, status: str, success: bool
-    ) -> None:
+    def _parallel_progress_callback(self, tool_name: str, status: str, success: bool) -> None:
         """Progress callback for parallel execution."""
         if status == "started" and self.on_tool_start:
             try:
@@ -351,9 +348,8 @@ class ToolPipeline:
         start_time = time.monotonic()
 
         # Check if parallelization is worthwhile
-        should_parallelize = (
-            self.config.enable_parallel_execution
-            and (force_parallel or len(tool_calls) > 1)
+        should_parallelize = self.config.enable_parallel_execution and (
+            force_parallel or len(tool_calls) > 1
         )
 
         if not should_parallelize:
@@ -414,9 +410,7 @@ class ToolPipeline:
             validated_calls.append({"name": tool_name, "arguments": normalized_args})
 
         # Execute validated calls in parallel
-        parallel_result = await self.parallel_executor.execute_parallel(
-            validated_calls, context
-        )
+        parallel_result = await self.parallel_executor.execute_parallel(validated_calls, context)
 
         # Build pipeline result
         result = PipelineExecutionResult(

@@ -54,6 +54,41 @@ defaults:
     # Continuation patience: how many empty turns to allow before forcing completion
     continuation_patience: 3
 
+  # Token-optimized serialization settings
+  # Controls how tool outputs are formatted to minimize token usage
+  serialization:
+    # Preferred format (null = auto-select based on data)
+    # Options: json, json_minified, toon, csv, markdown_table, reference_encoded
+    preferred_format: null
+
+    # Formats to try for auto-selection (order = preference)
+    allowed_formats:
+      - toon
+      - csv
+      - json_minified
+      - json
+
+    # Minimum array size to consider tabular formats (TOON/CSV)
+    min_array_size_for_tabular: 3
+
+    # Minimum savings threshold to switch from JSON (0.0-1.0)
+    min_savings_threshold: 0.20
+
+    # Include format hint for LLM to understand the encoding
+    include_format_hint: true
+
+    # Enable reference encoding for repetitive values
+    enable_reference_encoding: true
+
+    # Minimum repetition ratio to use references (0.0-1.0)
+    min_repetition_for_references: 0.5
+
+    # Maximum nesting depth for compact formats
+    max_nesting_for_compact: 1
+
+    # Debug mode - include analysis metadata in output
+    debug_mode: false
+
 # =============================================================================
 # PROVIDER DEFAULTS
 # =============================================================================
@@ -70,6 +105,11 @@ provider_defaults:
     requires_strict_prompting: false
     recommended_max_tools: 50
     recommended_tool_budget: 20
+    # Claude handles all formats well, prefer readability
+    serialization:
+      preferred_format: null  # auto-select
+      include_format_hint: true
+      min_savings_threshold: 0.15
 
   openai:
     native_tool_calls: true
@@ -150,6 +190,28 @@ provider_defaults:
     # DeepSeek models need more "thinking" turns, give them higher exploration limit
     exploration_multiplier: 1.5
     continuation_patience: 5
+
+  # Groq Cloud - Ultra-fast inference with free tier
+  # NOTE: Groq has strict payload size limits (413 errors) due to LPU architecture
+  # Keep max_tools low to prevent payload too large errors
+  groqcloud:
+    native_tool_calls: true
+    streaming_tool_calls: true
+    parallel_tool_calls: true
+    tool_choice_param: true
+    requires_strict_prompting: false
+    recommended_max_tools: 12
+    recommended_tool_budget: 15
+    # Aggressive compression to stay within payload limits
+    serialization:
+      preferred_format: null  # auto-select most compact
+      include_format_hint: true
+      min_savings_threshold: 0.10  # use compact formats more aggressively
+      allowed_formats:
+        - csv          # most compact for tabular
+        - toon
+        - json_minified
+        - json
 
 # =============================================================================
 # MODEL CONFIGURATIONS
@@ -946,3 +1008,244 @@ models:
       recommended_max_tools: 0  # No tools
       recommended_tool_budget: 5  # Minimal, for exploration only
       argument_format: json
+
+  # ---------------------------------------------------------------------------
+  # GROQ CLOUD MODELS
+  # ---------------------------------------------------------------------------
+  # Ultra-fast inference via Groq LPU hardware
+  # Free developer tier available at https://console.groq.com
+
+  "llama-3.3-70b-versatile*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      groqcloud:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+        requires_strict_prompting: false
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 25
+      argument_format: json
+
+  "llama-3.1-8b-instant*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      groqcloud:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+        requires_strict_prompting: false
+
+    settings:
+      recommended_max_tools: 30
+      recommended_tool_budget: 15
+      argument_format: json
+
+  "openai/gpt-oss-*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      groqcloud:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: false  # GPT-OSS doesn't support parallel calls
+        requires_strict_prompting: false
+
+    settings:
+      recommended_max_tools: 30
+      recommended_tool_budget: 15
+      argument_format: json
+
+  "qwen/qwen3-32b*":
+    training:
+      tool_calling: true
+      thinking_mode: true
+      thinking_disable_prefix: "/no_think"
+      code_generation: true
+
+    providers:
+      groqcloud:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+        requires_strict_prompting: false
+
+    settings:
+      recommended_max_tools: 40
+      recommended_tool_budget: 20
+      argument_format: json
+
+  "moonshotai/kimi-k2-instruct*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      groqcloud:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+        requires_strict_prompting: false
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 30
+      argument_format: json
+
+  "meta-llama/llama-4-scout*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      groqcloud:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+        requires_strict_prompting: false
+
+    settings:
+      recommended_max_tools: 40
+      recommended_tool_budget: 20
+      argument_format: json
+
+# =============================================================================
+# TOOL SERIALIZATION CONFIGURATION
+# =============================================================================
+# Tool-specific serialization preferences and output type hints.
+# This enables smarter format selection based on what each tool produces.
+#
+# Output types:
+#   - tabular: List of uniform objects (databases, search results)
+#   - text: Plain text content (file content, bash output)
+#   - structured: Nested JSON structures
+#   - mixed: Variable output depending on operation
+
+tool_serialization:
+  # Default preferences for all tools
+  defaults:
+    output_type: mixed
+    preferred_format: null  # auto-select
+    min_rows_for_tabular: 3  # Minimum rows to use TOON/CSV
+    serialization_enabled: true
+
+  # Tool categories with shared configuration
+  categories:
+    # Database and data tools - strongly prefer tabular formats
+    data_tools:
+      tools:
+        - database_tool
+        - sql_query
+        - csv_reader
+      output_type: tabular
+      preferred_formats:
+        - csv
+        - toon
+        - json_minified
+      min_savings_threshold: 0.15
+
+    # Search tools - often return structured results
+    search_tools:
+      tools:
+        - code_search
+        - semantic_code_search
+        - web_search
+      output_type: tabular
+      preferred_formats:
+        - toon
+        - json_minified
+
+    # File tools - text content, no serialization
+    file_tools:
+      tools:
+        - read_file
+        - list_directory
+      output_type: text
+      serialization_enabled: false  # Keep as text
+
+    # Bash/command tools - text output
+    command_tools:
+      tools:
+        - execute_bash
+        - docker
+      output_type: text
+      serialization_enabled: false
+
+    # Git tools - mixed output (some tabular, some text)
+    git_tools:
+      tools:
+        - git
+      output_type: mixed
+      preferred_formats:
+        - toon
+        - json_minified
+
+    # Refactoring/analysis tools - structured JSON output
+    analysis_tools:
+      tools:
+        - refactor
+        - code_review
+        - metrics
+        - dependency_analysis
+      output_type: structured
+      preferred_formats:
+        - json_minified
+        - json
+
+  # Individual tool overrides (highest priority)
+  tools:
+    # Database tool always returns tabular data
+    database_tool:
+      output_type: tabular
+      preferred_format: csv
+      min_rows_for_tabular: 2
+
+    # Code search returns file:line matches
+    code_search:
+      output_type: tabular
+      preferred_format: toon
+
+    # Semantic search returns ranked results
+    semantic_code_search:
+      output_type: tabular
+      preferred_format: toon
+
+    # List directory is already compact
+    list_directory:
+      serialization_enabled: false
+
+    # Read file should never be serialized (code needs verbatim)
+    read_file:
+      serialization_enabled: false
+
+    # Bash output is text
+    execute_bash:
+      serialization_enabled: false
+
+    # Web search returns structured results
+    web_search:
+      output_type: tabular
+      preferred_format: toon
+      include_format_hint: true
+
+    # Git log/status can be tabular
+    git:
+      output_type: mixed
+      # Only serialize for log/status/branch operations
+      serialize_operations:
+        - log
+        - status
+        - branch
+      skip_operations:
+        - diff
+        - show

@@ -94,9 +94,20 @@ async def test_chat_server_error(xai_provider):
     """Test server error handling."""
     mock_response = MagicMock()
     mock_response.status_code = 500
+    mock_response.text = "Internal server error"
     mock_response.json.return_value = {"error": {"message": "Internal server error"}}
 
-    with patch.object(xai_provider.client, "post", return_value=mock_response):
+    # Mock raise_for_status to raise HTTPStatusError
+    def raise_status_error():
+        raise httpx.HTTPStatusError(
+            "Server error",
+            request=MagicMock(),
+            response=mock_response
+        )
+
+    mock_response.raise_for_status = raise_status_error
+
+    with patch.object(xai_provider.client, "post", new_callable=AsyncMock, return_value=mock_response):
         messages = [Message(role="user", content="Hello")]
 
         with pytest.raises(ProviderError):
@@ -314,7 +325,12 @@ async def test_stream_with_tools(xai_provider):
         async for chunk in xai_provider.stream(messages=messages, model="grok-beta", tools=tools):
             chunks.append(chunk)
 
-        assert len(chunks) == 1
+        # Should get 2 chunks: content chunk + final [DONE] chunk
+        assert len(chunks) == 2
+        assert chunks[0].content == "Using tool"
+        assert chunks[0].is_final is False
+        assert chunks[1].content == ""
+        assert chunks[1].is_final is True
 
 
 @pytest.mark.asyncio

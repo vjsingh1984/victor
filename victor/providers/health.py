@@ -309,9 +309,9 @@ class ProviderHealthChecker:
         provider = result.provider_name
 
         # Check for status change
-        old_status = self._latest.get(provider, HealthCheckResult(
-            provider_name=provider, status=HealthStatus.UNKNOWN
-        )).status
+        old_status = self._latest.get(
+            provider, HealthCheckResult(provider_name=provider, status=HealthStatus.UNKNOWN)
+        ).status
 
         if old_status != result.status:
             logger.info(
@@ -335,7 +335,7 @@ class ProviderHealthChecker:
 
         # Trim history
         if len(self._history[provider]) > self.history_size:
-            self._history[provider] = self._history[provider][-self.history_size:]
+            self._history[provider] = self._history[provider][-self.history_size :]
 
     async def check_provider(
         self,
@@ -439,10 +439,7 @@ class ProviderHealthChecker:
         start_time = time.perf_counter()
 
         # Run checks in parallel
-        tasks = [
-            self.check_provider(name, provider)
-            for name, provider in providers.items()
-        ]
+        tasks = [self.check_provider(name, provider) for name, provider in providers.items()]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Build report
@@ -550,8 +547,7 @@ class ProviderHealthChecker:
             return 0.0
 
         healthy_count = sum(
-            1 for r in history
-            if r.status in (HealthStatus.HEALTHY, HealthStatus.DEGRADED)
+            1 for r in history if r.status in (HealthStatus.HEALTHY, HealthStatus.DEGRADED)
         )
         return (healthy_count / len(history)) * 100.0
 
@@ -567,10 +563,10 @@ class ProviderHealthChecker:
             "healthy_count": len(self.get_healthy_providers()),
             "available_count": len(self.get_available_providers()),
             "total_checks": sum(len(h) for h in self._history.values()),
-            "monitoring_active": self._monitoring_task is not None and not self._monitoring_task.done(),
+            "monitoring_active": self._monitoring_task is not None
+            and not self._monitoring_task.done(),
             "uptime_by_provider": {
-                name: self.calculate_uptime(name)
-                for name in self._latest.keys()
+                name: self.calculate_uptime(name) for name in self._latest.keys()
             },
         }
 

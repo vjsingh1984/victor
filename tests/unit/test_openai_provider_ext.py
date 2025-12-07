@@ -456,8 +456,15 @@ async def test_stream_with_tools(openai_provider):
 @pytest.mark.asyncio
 async def test_stream_empty_chunks(openai_provider):
     """Test streaming with empty choices."""
+    # Create mock chunk with usage but no choices
     mock_chunk = MagicMock()
     mock_chunk.choices = []
+    # Add usage to trigger usage-only chunk behavior
+    mock_usage = MagicMock()
+    mock_usage.prompt_tokens = 1
+    mock_usage.completion_tokens = 1
+    mock_usage.total_tokens = 2
+    mock_chunk.usage = mock_usage
 
     async def async_iter():
         yield mock_chunk
@@ -478,8 +485,12 @@ async def test_stream_empty_chunks(openai_provider):
         ):
             chunks.append(chunk)
 
-        # Should handle empty choices gracefully
-        assert len(chunks) == 0
+        # Should get one usage-only chunk when choices is empty but usage is present
+        assert len(chunks) == 1
+        assert chunks[0].content == ""
+        assert chunks[0].is_final is True
+        assert chunks[0].usage is not None
+        assert chunks[0].usage["total_tokens"] == 2
 
 
 @pytest.mark.asyncio
@@ -639,13 +650,24 @@ async def test_parse_stream_chunk_final(openai_provider):
 
 @pytest.mark.asyncio
 async def test_parse_stream_chunk_no_choices(openai_provider):
-    """Test parsing stream chunk with no choices."""
+    """Test parsing stream chunk with no choices but usage."""
+    # When chunk has no choices but has usage, it should return usage-only chunk
     mock_chunk = MagicMock()
     mock_chunk.choices = []
+    mock_usage = MagicMock()
+    mock_usage.prompt_tokens = 1
+    mock_usage.completion_tokens = 1
+    mock_usage.total_tokens = 2
+    mock_chunk.usage = mock_usage
 
     chunk = openai_provider._parse_stream_chunk(mock_chunk)
 
-    assert chunk is None
+    # Should return a usage-only final chunk
+    assert chunk is not None
+    assert chunk.content == ""
+    assert chunk.is_final is True
+    assert chunk.usage is not None
+    assert chunk.usage["total_tokens"] == 2
 
 
 @pytest.mark.asyncio

@@ -99,6 +99,10 @@ class ToolCallingAdapterRegistry:
                 "lmstudio": LMStudioToolCallingAdapter,
                 # vLLM uses OpenAI-compatible adapter
                 "vllm": OpenAICompatToolCallingAdapter,
+                # DeepSeek uses OpenAI-compatible API format
+                "deepseek": OpenAIToolCallingAdapter,
+                # Groq Cloud uses OpenAI-compatible API format
+                "groqcloud": OpenAIToolCallingAdapter,
             }
 
         # Check for exact match

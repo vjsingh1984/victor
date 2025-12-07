@@ -165,7 +165,7 @@ class StaticEmbeddingCollection:
             self._item_ids = cache_data["item_ids"]
             self._items_hash = items_hash
 
-            logger.info(f"Collection '{self.name}': loaded {len(self._items)} items from cache")
+            logger.debug(f"Collection '{self.name}': loaded {len(self._items)} items from cache")
             return True
 
         except Exception as e:

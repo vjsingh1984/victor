@@ -15,14 +15,13 @@
 """Tests for ContextCompactor."""
 
 import pytest
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import MagicMock
 
 from victor.agent.context_compactor import (
     CompactionAction,
     CompactionTrigger,
     CompactorConfig,
     ContextCompactor,
-    TruncationResult,
     TruncationStrategy,
     create_context_compactor,
 )

@@ -21,6 +21,9 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+# Module-level cache to avoid re-loading the same file multiple times
+_tool_capable_patterns_cache: Optional[Dict[str, List[str]]] = None
+
 
 def _load_tool_capable_patterns_from_yaml(
     user_profiles_path: Optional[Path] = None,
@@ -34,7 +37,14 @@ def _load_tool_capable_patterns_from_yaml(
     examples/profiles.yaml.example to ~/.victor/profiles.yaml.
 
     Returns model patterns where native_tool_calls is true, organized by provider.
+    Results are cached at module level to avoid repeated file reads.
     """
+    global _tool_capable_patterns_cache
+
+    # Return cached result if available (for default path only)
+    if user_profiles_path is None and _tool_capable_patterns_cache is not None:
+        return _tool_capable_patterns_cache
+
     result: Dict[str, List[str]] = {}
 
     # Load from user's profiles.yaml (the single source of truth)
@@ -59,6 +69,10 @@ def _load_tool_capable_patterns_from_yaml(
     if not result:
         logger.debug("No model_capabilities in profiles.yaml, using minimal defaults")
         result = _minimal_builtin_defaults()
+
+    # Cache for future calls (only for default path)
+    if user_profiles_path is None:
+        _tool_capable_patterns_cache = result
 
     return result
 

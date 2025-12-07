@@ -16,6 +16,9 @@ def orchestrator(mock_usage_logger: MagicMock) -> AgentOrchestrator:
     """Fixture to create an AgentOrchestrator with a mocked logger."""
     settings = Settings(analytics_enabled=True)
     mock_provider = MagicMock()
+    # Properly configure the mock provider to avoid format string issues
+    mock_provider.name = "test-provider"
+    mock_provider.get_context_window.return_value = 100000
 
     # Patch at the import location in orchestrator module
     with patch("victor.agent.orchestrator.UsageLogger", return_value=mock_usage_logger):
@@ -33,6 +36,9 @@ def test_orchestrator_initializes_logger(mock_usage_logger: MagicMock):
     """Tests that the orchestrator initializes and uses the UsageLogger."""
     settings = Settings(analytics_enabled=True)
     mock_provider = MagicMock()
+    # Properly configure the mock provider to avoid format string issues
+    mock_provider.name = "test-provider"
+    mock_provider.get_context_window.return_value = 100000
 
     with patch(
         "victor.agent.orchestrator.UsageLogger", return_value=mock_usage_logger

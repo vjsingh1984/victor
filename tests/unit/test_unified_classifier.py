@@ -36,8 +36,6 @@ from victor.agent.unified_classifier import (
     classify_task,
     ACTION_KEYWORDS,
     ANALYSIS_KEYWORDS,
-    NEGATION_PATTERNS,
-    POSITIVE_OVERRIDE_PATTERNS,
 )
 
 
@@ -66,17 +64,11 @@ class TestKeywordMatching:
     def test_word_boundary_matching(self):
         """Test that keywords match on word boundaries."""
         # "creation" should not match "create"
-        matches = _find_keywords_with_positions(
-            "The creation of the file",
-            [("create", 1.0)]
-        )
+        matches = _find_keywords_with_positions("The creation of the file", [("create", 1.0)])
         assert len(matches) == 0
 
         # "create" should match
-        matches = _find_keywords_with_positions(
-            "Create a new file",
-            [("create", 1.0)]
-        )
+        matches = _find_keywords_with_positions("Create a new file", [("create", 1.0)])
         assert len(matches) == 1
 
 
@@ -469,5 +461,6 @@ class TestEdgeCases:
     def test_multi_word_keyword(self, classifier):
         """Test matching of multi-word keywords."""
         result = classifier.classify("Do a full analysis of the entire codebase")
-        assert "entire codebase" in [m.keyword for m in result.matched_keywords] or \
-               "full analysis" in [m.keyword for m in result.matched_keywords]
+        assert "entire codebase" in [
+            m.keyword for m in result.matched_keywords
+        ] or "full analysis" in [m.keyword for m in result.matched_keywords]

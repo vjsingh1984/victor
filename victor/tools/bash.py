@@ -127,6 +127,19 @@ async def execute_bash(
             "return_code": -1,
         }
 
+    # Validate working directory exists before execution
+    if working_dir:
+        import os
+
+        if not os.path.isdir(working_dir):
+            return {
+                "success": False,
+                "error": f"Working directory does not exist: {working_dir}",
+                "stdout": "",
+                "stderr": "",
+                "return_code": -1,
+            }
+
     try:
         # Create subprocess
         process = await asyncio.create_subprocess_shell(
@@ -156,7 +169,7 @@ async def execute_bash(
         stdout_str = stdout.decode("utf-8") if stdout else ""
         stderr_str = stderr.decode("utf-8") if stderr else ""
 
-        return {
+        result = {
             "success": process.returncode == 0,
             "stdout": stdout_str,
             "stderr": stderr_str,
@@ -164,6 +177,26 @@ async def execute_bash(
             "command": command,
             "working_dir": working_dir,
         }
+
+        # Include informative error message when command fails
+        if process.returncode != 0:
+            error_parts = []
+            error_parts.append(f"Command failed with exit code {process.returncode}")
+            if stderr_str.strip():
+                # Truncate stderr if too long, keeping first and last parts
+                stderr_preview = stderr_str.strip()
+                if len(stderr_preview) > 500:
+                    stderr_preview = stderr_preview[:250] + "\n...\n" + stderr_preview[-250:]
+                error_parts.append(f"stderr: {stderr_preview}")
+            elif stdout_str.strip():
+                # Some commands output errors to stdout
+                stdout_preview = stdout_str.strip()
+                if len(stdout_preview) > 300:
+                    stdout_preview = stdout_preview[:150] + "..." + stdout_preview[-150:]
+                error_parts.append(f"output: {stdout_preview}")
+            result["error"] = "\n".join(error_parts)
+
+        return result
 
     except FileNotFoundError:
         return {

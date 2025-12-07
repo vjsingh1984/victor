@@ -22,69 +22,349 @@ import aiofiles
 from victor.tools.decorators import tool
 
 
-@tool
+# Supported text/code file extensions
+TEXT_EXTENSIONS = {
+    # Code
+    ".py",
+    ".pyi",
+    ".pyx",
+    ".pxd",  # Python
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".mjs",
+    ".cjs",  # JavaScript/TypeScript
+    ".java",
+    ".kt",
+    ".kts",
+    ".scala",
+    ".groovy",  # JVM
+    ".go",
+    ".rs",
+    ".c",
+    ".cpp",
+    ".cc",
+    ".cxx",
+    ".h",
+    ".hpp",
+    ".hxx",  # Systems
+    ".cs",
+    ".fs",
+    ".vb",  # .NET
+    ".rb",
+    ".php",
+    ".pl",
+    ".pm",
+    ".lua",
+    ".r",
+    ".R",  # Scripting
+    ".swift",
+    ".m",
+    ".mm",  # Apple
+    ".sol",
+    ".vy",  # Blockchain
+    # Config
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".xml",
+    ".xsl",
+    ".xsd",
+    ".dtd",
+    ".env",
+    ".env.example",
+    ".env.local",
+    ".properties",
+    ".plist",
+    # Web
+    ".html",
+    ".htm",
+    ".css",
+    ".scss",
+    ".sass",
+    ".less",
+    ".vue",
+    ".svelte",
+    ".astro",
+    # Data
+    ".csv",
+    ".tsv",
+    ".sql",
+    # Docs
+    ".md",
+    ".markdown",
+    ".rst",
+    ".txt",
+    ".adoc",
+    # Shell
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".fish",
+    ".ps1",
+    ".bat",
+    ".cmd",
+    # Build
+    ".make",
+    ".cmake",
+    ".gradle",
+    ".sbt",
+    ".dockerfile",
+    ".containerfile",
+    # Other
+    ".graphql",
+    ".proto",
+    ".thrift",
+    ".avsc",
+    ".tf",
+    ".tfvars",
+    ".hcl",  # Terraform
+    ".vim",
+    ".el",
+    ".clj",
+    ".cljs",
+    ".edn",
+    ".ex",
+    ".exs",
+    ".erl",
+    ".hrl",  # Elixir/Erlang
+    ".hs",
+    ".lhs",
+    ".ml",
+    ".mli",
+    ".fsi",  # Functional
+    ".gitignore",
+    ".gitattributes",
+    ".editorconfig",
+}
+
+
+@tool(
+    category="filesystem",
+    keywords=[
+        "read",
+        "file",
+        "open",
+        "view",
+        "content",
+        "source",
+        "code",
+        "show",
+        "display",
+        "cat",
+        "look",
+        "examine",
+        "inspect",
+    ],
+    use_cases=[
+        "reading source code files",
+        "viewing configuration files",
+        "examining text documents",
+        "searching within code files",
+        "looking at specific lines",
+    ],
+    examples=[
+        "read the file src/main.py",
+        "show me the contents of config.yaml",
+        "what's in the README",
+        "search for 'def calculate' in utils.py",
+        "show first 50 lines of main.py",
+    ],
+    priority_hints=[
+        "Use for TEXT and CODE files only (.py, .js, .json, .yaml, .md, etc.)",
+        "NOT for binary files (.pdf, .docx, .db, .pyc, images, archives)",
+        "Use search parameter for efficient grep-like targeted lookups",
+        "Use list_directory first if unsure what files exist",
+    ],
+)
 async def read_file(
     path: str,
     offset: int = 0,
     limit: int = 0,
     search: str = "",
-    context: int = 2,
+    context_lines: int = 2,
     regex: bool = False,
 ) -> str:
-    """
-    Read the contents of a file from the filesystem.
+    """Read TEXT/CODE file contents with optional search and line range.
 
-    TOKEN-EFFICIENT MODES:
-    - Default: Returns full file content
-    - With search: Returns ONLY matching lines with context (huge token savings!)
-    - With offset/limit: Returns specific line range
+    SUPPORTED: .py, .js, .ts, .java, .go, .rs, .c, .cpp, .json, .yaml, .toml,
+               .xml, .html, .css, .md, .txt, .sh, .sql, .env, config files, etc.
 
-    Args:
-        path: The path to the file to read.
-        offset: Line number to start reading from (0-based). Default 0 (start of file).
-        limit: Maximum number of lines to read. Default 0 (read all lines).
-        search: Pattern to search for. If provided, returns only matching lines
-                with context instead of full file. Use this for targeted lookups!
-        context: Number of lines before/after each match when using search. Default 2.
-        regex: If True, treat search as regex pattern. Default False (literal string).
+    NOT SUPPORTED: Binary files (.pdf, .docx, .xlsx, .db, .sqlite, .pyc, .pkl,
+                   images, videos, archives). These will return an error.
 
-    Returns:
-        If search is empty: Full file content (or offset/limit range)
-        If search is provided: Only matching lines with context, formatted as:
-            [N matches in file.py (total lines: M)]
-            line_num: matching_line
-            ...
-
-    Raises:
-        FileNotFoundError: If the file doesn't exist.
-        IsADirectoryError: If the path is a directory.
-        PermissionError: If access is denied.
-
-    Examples:
-        Read a Python source file:
-            await read_file("src/main.py")
-
-        Read first 100 lines:
-            await read_file("src/main.py", limit=100)
-
-        TOKEN-EFFICIENT: Search for specific function (returns ~50 tokens instead of 5000):
-            await read_file("src/main.py", search="def calculate")
-
-        Search with more context:
-            await read_file("src/main.py", search="class User", context=5)
-
-        Regex search for all function definitions:
-            await read_file("src/main.py", search="def \\w+\\(", regex=True)
+    Use search param for efficient grep-like lookup (returns matches + context_lines).
+    Use offset/limit for line ranges. Default: returns full file.
     """
     file_path = Path(path).expanduser().resolve()
 
     if not file_path.exists():
         raise FileNotFoundError(f"File not found: {path}")
     if not file_path.is_file():
+        if file_path.is_dir():
+            raise IsADirectoryError(
+                f"Cannot read directory as file: {path}\n"
+                f"Suggestion: Use list_directory(path='{path}') to explore its contents, "
+                f"or specify a file path within this directory."
+            )
         raise IsADirectoryError(f"Path is not a file: {path}")
 
-    async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
-        content = await f.read()
+    # Binary file categories with helpful suggestions
+    BINARY_CATEGORIES = {
+        # Documents - suggest extraction approach
+        "document": {
+            "extensions": {
+                ".pdf",
+                ".doc",
+                ".docx",
+                ".xls",
+                ".xlsx",
+                ".ppt",
+                ".pptx",
+                ".odt",
+                ".ods",
+                ".odp",
+            },
+            "suggestion": "For document content, consider: 1) Convert to text externally (e.g., pdftotext), "
+            "2) Use code_search to find related text files, 3) Check for a .txt or .md version.",
+        },
+        # Images - suggest description
+        "image": {
+            "extensions": {
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".gif",
+                ".bmp",
+                ".ico",
+                ".webp",
+                ".svg",
+                ".tiff",
+                ".tif",
+            },
+            "suggestion": "Images cannot be read as text. If you need to understand image content, "
+            "describe what you expect based on filename/context, or check for alt-text in nearby HTML/MD files.",
+        },
+        # Databases - suggest querying
+        "database": {
+            "extensions": {".db", ".sqlite", ".sqlite3"},
+            "suggestion": "This is a database file. Use execute_bash with 'sqlite3' to query it, "
+            "e.g., `sqlite3 file.db '.tables'` or `sqlite3 file.db 'SELECT * FROM table LIMIT 5'`.",
+        },
+        # Python bytecode/cache
+        "python_cache": {
+            "extensions": {".pyc", ".pyo", ".pyd"},
+            "suggestion": "This is compiled Python bytecode. Read the source .py file instead.",
+        },
+        # Pickled data
+        "pickle": {
+            "extensions": {".pkl", ".pickle"},
+            "suggestion": "This is serialized Python data. To inspect, use: "
+            "`python -c \"import pickle; print(pickle.load(open('file.pkl', 'rb')))\"`",
+        },
+        # Archives
+        "archive": {
+            "extensions": {".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar", ".tgz"},
+            "suggestion": "This is an archive. Use execute_bash to list contents: "
+            "`unzip -l file.zip`, `tar -tf file.tar.gz`, etc.",
+        },
+        # Compiled/binary
+        "compiled": {
+            "extensions": {
+                ".so",
+                ".o",
+                ".a",
+                ".dylib",
+                ".dll",
+                ".exe",
+                ".bin",
+                ".whl",
+                ".egg",
+                ".class",
+                ".jar",
+                ".war",
+            },
+            "suggestion": "This is a compiled binary. Check for source code files (.py, .java, .c, etc.) instead.",
+        },
+        # Media
+        "media": {
+            "extensions": {
+                ".mp3",
+                ".mp4",
+                ".avi",
+                ".mov",
+                ".mkv",
+                ".wav",
+                ".flac",
+                ".ogg",
+                ".webm",
+            },
+            "suggestion": "Media files cannot be read as text. Check for subtitles (.srt, .vtt) or metadata files.",
+        },
+        # Lock files
+        "lock": {
+            "extensions": {".lock"},
+            "suggestion": "Lock files are often binary or auto-generated. Check the non-lock version if available.",
+        },
+        # Data files
+        "data": {
+            "extensions": {".dat", ".bin"},
+            "suggestion": "This appears to be a binary data file. Look for documentation or schema files nearby.",
+        },
+    }
+
+    # Known binary filenames (no extension)
+    BINARY_FILENAMES = {".coverage"}
+
+    def _get_binary_error(ext: str, filename: str) -> str:
+        """Generate helpful error message based on file type."""
+        ext_lower = ext.lower()
+        for category, info in BINARY_CATEGORIES.items():
+            if ext_lower in info["extensions"]:
+                return (
+                    f"Cannot read binary file: {filename}\n"
+                    f"Type: {category} ({ext})\n"
+                    f"Suggestion: {info['suggestion']}"
+                )
+        return f"Cannot read binary file: {filename} (extension: {ext}). This is not a text file."
+
+    # Flatten all binary extensions
+    ALL_BINARY_EXTENSIONS = set()
+    for info in BINARY_CATEGORIES.values():
+        ALL_BINARY_EXTENSIONS.update(info["extensions"])
+
+    # Check by extension
+    if file_path.suffix.lower() in ALL_BINARY_EXTENSIONS:
+        raise ValueError(_get_binary_error(file_path.suffix, path))
+
+    # Check by filename (for dotfiles without extensions like .coverage)
+    if file_path.name in BINARY_FILENAMES or file_path.name.startswith(".coverage."):
+        raise ValueError(
+            f"Cannot read binary file: {path}\n"
+            f"Type: coverage database\n"
+            f"Suggestion: This is a pytest-cov SQLite database. Use execute_bash with sqlite3 to query, "
+            f"or use 'coverage report' to see formatted coverage data."
+        )
+
+    # Try to read the file, handling encoding errors gracefully
+    try:
+        async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+            content = await f.read()
+    except UnicodeDecodeError as e:
+        # File contains binary content - provide helpful message
+        file_size = file_path.stat().st_size
+        raise ValueError(
+            f"Cannot read file: {path}\n"
+            f"Reason: Contains binary/non-UTF-8 content (error at byte {e.start})\n"
+            f"Size: {file_size:,} bytes\n"
+            f"Suggestion: This file appears to be binary despite its extension. "
+            f"Check if it's the correct file, or look for a text-based alternative."
+        )
 
     # Normalize parameters (handle non-int input from model)
     def _to_int(val, default: int) -> int:
@@ -96,7 +376,7 @@ async def read_file(
 
     offset = _to_int(offset, 0)
     limit = _to_int(limit, 0)
-    context = _to_int(context, 2)
+    context_lines = _to_int(context_lines, 2)
 
     # TOKEN-EFFICIENT MODE: Search/grep
     if search:
@@ -105,8 +385,8 @@ async def read_file(
         result = grep_lines(
             content=content,
             pattern=search,
-            context_before=context,
-            context_after=context,
+            context_before=context_lines,
+            context_after=context_lines,
             case_sensitive=True,
             is_regex=regex,
             max_matches=50,
@@ -138,31 +418,44 @@ async def read_file(
     return header + "\n".join(selected)
 
 
-@tool
+@tool(
+    category="filesystem",
+    keywords=[
+        "write",
+        "file",
+        "create",
+        "save",
+        "new",
+        "output",
+        "overwrite",
+        "store",
+        "put",
+        "generate",
+    ],
+    use_cases=[
+        "creating new files",
+        "writing content to files",
+        "saving generated code",
+        "creating configuration files",
+        "overwriting existing files",
+    ],
+    examples=[
+        "create a new file called utils.py",
+        "write this code to main.py",
+        "save the configuration to config.yaml",
+        "create README.md with project description",
+    ],
+    priority_hints=[
+        "Use for creating new files or completely replacing file content",
+        "For surgical edits to existing files, use edit_files with 'replace' operation instead",
+        "Supports undo via /undo command",
+    ],
+)
 async def write_file(path: str, content: str) -> str:
-    """
-    Write content to a file, creating it if it doesn't exist.
+    """Write/overwrite file with content. Creates parent dirs if needed.
 
-    Args:
-        path: The path to the file to write to.
-        content: The content to write into the file.
-
-    Returns:
-        A confirmation message upon success.
-
-    Raises:
-        IsADirectoryError: If the path is a directory.
-        PermissionError: If access is denied.
-
-    Examples:
-        Create a new Python module:
-            await write_file("src/utils.py", "def helper():\\n    pass")
-
-        Save configuration:
-            await write_file("config.yaml", "debug: true\\nport: 8000")
-
-        Create a README:
-            await write_file("README.md", "# Project Title\\n\\nDescription here")
+    For surgical edits (replace specific text), use edit_files instead.
+    Supports /undo to revert.
     """
     from victor.agent.change_tracker import ChangeType, get_change_tracker
 
@@ -204,7 +497,40 @@ async def write_file(path: str, content: str) -> str:
     return f"Successfully {action} {path} ({len(content)} characters). Use /undo to revert."
 
 
-@tool
+@tool(
+    category="filesystem",
+    keywords=[
+        "list",
+        "directory",
+        "ls",
+        "dir",
+        "files",
+        "folders",
+        "find",
+        "browse",
+        "explore",
+        "contents",
+        "tree",
+    ],
+    use_cases=[
+        "listing directory contents",
+        "finding files by pattern",
+        "exploring project structure",
+        "listing specific file types",
+    ],
+    examples=[
+        "list files in src directory",
+        "show all Python files",
+        "what files are in this folder",
+        "find all test files",
+        "list directories only",
+    ],
+    priority_hints=[
+        "Use for browsing directory contents",
+        "Use pattern parameter for efficient filtering",
+        "Use extensions parameter to filter by file type",
+    ],
+)
 async def list_directory(
     path: str,
     recursive: bool = False,
@@ -214,41 +540,10 @@ async def list_directory(
     files_only: bool = False,
     max_items: int = 500,
 ) -> List[Dict[str, Any]]:
-    """
-    List the contents of a directory with optional filtering.
+    """List directory contents with filtering.
 
-    TOKEN-EFFICIENT MODES:
-    - Default: Returns all items (can be large)
-    - With pattern: Returns only items matching glob pattern
-    - With extensions: Returns only files with specific extensions
-
-    Args:
-        path: The path to the directory to list.
-        recursive: Whether to list subdirectories recursively. Defaults to False.
-        pattern: Glob pattern to filter results (e.g., "*.py", "test_*.ts").
-        extensions: Comma-separated list of extensions to include (e.g., "py,ts,js").
-        dirs_only: If True, return only directories.
-        files_only: If True, return only files.
-        max_items: Maximum number of items to return. Default 500.
-
-    Returns:
-        A list of dictionaries, where each dictionary represents a file or directory.
-
-    Examples:
-        List files in current directory:
-            await list_directory(".")
-
-        TOKEN-EFFICIENT: List only Python files:
-            await list_directory("src", pattern="*.py")
-
-        List test files recursively:
-            await list_directory(".", recursive=True, pattern="test_*.py")
-
-        List specific extensions:
-            await list_directory(".", extensions="py,ts,js")
-
-        List only directories:
-            await list_directory(".", dirs_only=True)
+    Filters: pattern (glob), extensions (comma-separated), dirs_only, files_only.
+    Use recursive=True to traverse subdirectories. Max 500 items by default.
     """
     import fnmatch
 

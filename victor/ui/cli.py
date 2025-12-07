@@ -17,6 +17,7 @@
 import asyncio
 import logging
 import os
+import signal
 import sys
 from typing import Any, Optional
 
@@ -50,6 +51,110 @@ from victor.ui.commands import SlashCommandHandler  # noqa: E402
 
 # Configure default logging (can be overridden by CLI argument)
 logger = logging.getLogger(__name__)
+
+
+def _configure_logging(log_level: str, stream: Optional[Any] = None) -> None:
+    """Configure logging to stderr (separate from Rich console output).
+
+    Args:
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
+        stream: Optional stream override (defaults to stderr)
+    """
+    logging.basicConfig(
+        level=getattr(logging, log_level.upper(), logging.WARNING),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        stream=stream or sys.stderr,
+        force=True,
+    )
+
+
+def _flush_logging() -> None:
+    """Flush all logging handlers before shutdown messages.
+
+    This prevents log entries from interleaving with console output during shutdown.
+    """
+    for handler in logging.root.handlers:
+        handler.flush()
+
+
+# Global reference for signal handler cleanup
+_current_agent: Optional[AgentOrchestrator] = None
+
+
+async def _graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
+    """Perform graceful shutdown of the agent.
+
+    Calls the orchestrator's graceful_shutdown() method to properly clean up:
+    - Flush analytics data
+    - Stop health monitoring
+    - End usage session
+    - Close provider connections
+
+    Args:
+        agent: The agent orchestrator to shutdown (may be None)
+    """
+    if agent is None:
+        return
+
+    try:
+        # Call full graceful shutdown which handles all cleanup
+        shutdown_results = await agent.graceful_shutdown()
+        logger.debug(f"Graceful shutdown results: {shutdown_results}")
+
+        # Also call shutdown() which handles additional cleanup
+        # (background tasks, code manager, semantic selector)
+        await agent.shutdown()
+    except Exception as e:
+        logger.warning(f"Error during graceful shutdown: {e}")
+        # Fall back to just closing the provider
+        try:
+            if agent.provider:
+                await agent.provider.close()
+        except Exception as close_error:
+            logger.debug(f"Error closing provider: {close_error}")
+    finally:
+        # Flush logging handlers to prevent interleaving with console output
+        _flush_logging()
+
+
+def _setup_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
+    """Set up signal handlers for graceful shutdown.
+
+    Handles SIGINT (Ctrl+C) and SIGTERM signals to perform clean shutdown.
+
+    Args:
+        loop: The asyncio event loop
+    """
+
+    def signal_handler(sig: int, frame: Any) -> None:
+        """Handle shutdown signals."""
+        global _current_agent
+        sig_name = signal.Signals(sig).name
+        logger.info(f"Received {sig_name}, initiating graceful shutdown...")
+
+        if _current_agent is not None:
+            # Schedule shutdown in the event loop
+            try:
+                # Create a task to run the async shutdown
+                asyncio.create_task(_graceful_shutdown(_current_agent))
+            except RuntimeError:
+                # Event loop might not be running, try direct approach
+                logger.debug("Event loop not running, attempting direct cleanup")
+                try:
+                    if _current_agent.provider:
+                        # Can't await here, just try to signal shutdown
+                        pass
+                except Exception:
+                    pass
+
+        # Re-raise KeyboardInterrupt for the main loop to handle
+        if sig == signal.SIGINT:
+            raise KeyboardInterrupt()
+
+    # Only set handlers on Unix-like systems (Windows doesn't support all signals)
+    if sys.platform != "win32":
+        signal.signal(signal.SIGTERM, signal_handler)
+        # SIGINT is handled by Python's default KeyboardInterrupt
 
 
 async def _check_codebase_index(cwd: str, console_obj: Console, silent: bool = False) -> None:
@@ -258,15 +363,11 @@ def callback(
 
 def _run_default_interactive() -> None:
     """Run the default interactive CLI mode with default options."""
-    # Configure console logging
+    # Configure console logging with Rich integration
     log_level = os.getenv("VICTOR_LOG_LEVEL", "WARNING").upper()
     if log_level == "WARN":
         log_level = "WARNING"
-    logging.basicConfig(
-        level=getattr(logging, log_level),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        force=True,
-    )
+    _configure_logging(log_level, use_rich=True)
 
     settings = load_settings()
     _setup_safety_confirmation()
@@ -401,14 +502,9 @@ def chat(
     if log_level == "WARN":
         log_level = "WARNING"
 
-    # Configure logging - log to stderr for automation compatibility
-    log_stream = sys.stderr if automation_mode else None
-    logging.basicConfig(
-        level=getattr(logging, log_level),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        force=True,  # Override any existing configuration
-        stream=log_stream,
-    )
+    # Configure logging to stderr (keeps stdout clean for output parsing)
+    _configure_logging(log_level, stream=sys.stderr)
+
     # Silence noisy third-party loggers
     from victor.agent.debug_logger import configure_logging_levels
 
@@ -455,9 +551,7 @@ def chat(
         raise typer.Exit(1)
     else:
         # Interactive CLI mode
-        asyncio.run(
-            run_interactive(settings, profile, stream, thinking, preindex=preindex)
-        )
+        asyncio.run(run_interactive(settings, profile, stream, thinking, preindex=preindex))
 
 
 async def run_oneshot(
@@ -527,6 +621,7 @@ async def run_oneshot(
                     preview = chunk.metadata["file_preview"]
                     # Display as a code block with syntax highlighting
                     from rich.syntax import Syntax
+
                     ext = path.split(".")[-1] if "." in path else "txt"
                     syntax = Syntax(preview, ext, theme="monokai", line_numbers=False)
                     console.print(Panel(syntax, title=f"[dim]{path}[/]", border_style="dim"))
@@ -561,11 +656,12 @@ async def run_oneshot(
                 model=model_name,
             )
 
-        await agent.provider.close()
-
     except Exception as e:
         formatter.error(str(e))
         raise typer.Exit(1)
+    finally:
+        # Graceful shutdown - always clean up agent if created
+        await _graceful_shutdown(agent)
 
 
 async def run_interactive(
@@ -584,6 +680,7 @@ async def run_interactive(
         thinking: Whether to enable thinking mode
         preindex: Whether to preload semantic code index upfront
     """
+    global _current_agent
     agent = None
     try:
         # Load profile info
@@ -601,6 +698,9 @@ async def run_interactive(
 
         # Create agent with thinking mode if requested
         agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
+
+        # Set global reference for signal handler cleanup
+        _current_agent = agent
 
         if thinking:
             logger.info("Extended thinking mode enabled (for supported models like Claude)")
@@ -628,9 +728,9 @@ async def run_interactive(
         console.print(traceback.format_exc())
         raise typer.Exit(1)
     finally:
-        # Cleanup - always close provider if agent was created
-        if agent and agent.provider:
-            await agent.provider.close()
+        # Graceful shutdown - always clean up agent if created
+        _current_agent = None  # Clear global reference
+        await _graceful_shutdown(agent)
 
 
 async def _run_cli_repl(
@@ -712,9 +812,12 @@ async def _run_cli_repl(
                             path = chunk.metadata.get("path", "")
                             preview = chunk.metadata["file_preview"]
                             from rich.syntax import Syntax
+
                             ext = path.split(".")[-1] if "." in path else "txt"
                             syntax = Syntax(preview, ext, theme="monokai", line_numbers=False)
-                            console.print(Panel(syntax, title=f"[dim]{path}[/]", border_style="dim"))
+                            console.print(
+                                Panel(syntax, title=f"[dim]{path}[/]", border_style="dim")
+                            )
                             live_display = Live(
                                 Markdown(content_buffer), console=console, refresh_per_second=10
                             )
@@ -1058,13 +1161,27 @@ async def _check_connectivity(settings: Any, profiles: dict, verbose: bool) -> N
 
 @app.command()
 def init(
-    update: bool = typer.Option(False, "--update", "-u", help="Update existing init.md preserving user edits"),
-    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing init.md completely"),
-    learn: bool = typer.Option(False, "--learn", "-L", help="Enhance with conversation history insights"),
-    index: bool = typer.Option(False, "--index", "-i", help="Use SQLite symbol store for multi-language analysis"),
-    deep: bool = typer.Option(False, "--deep", "-d", help="Use LLM for deep analysis (any language)"),
-    symlinks: bool = typer.Option(False, "--symlinks", "-l", help="Create CLAUDE.md and other tool aliases"),
-    config_only: bool = typer.Option(False, "--config", "-c", help="Only setup global config, skip project analysis"),
+    update: bool = typer.Option(
+        False, "--update", "-u", help="Update existing init.md preserving user edits"
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Overwrite existing init.md completely"
+    ),
+    learn: bool = typer.Option(
+        False, "--learn", "-L", help="Enhance with conversation history insights"
+    ),
+    index: bool = typer.Option(
+        False, "--index", "-i", help="Use SQLite symbol store for multi-language analysis"
+    ),
+    deep: bool = typer.Option(
+        False, "--deep", "-d", help="Use LLM for deep analysis (any language)"
+    ),
+    symlinks: bool = typer.Option(
+        False, "--symlinks", "-l", help="Create CLAUDE.md and other tool aliases"
+    ),
+    config_only: bool = typer.Option(
+        False, "--config", "-c", help="Only setup global config, skip project analysis"
+    ),
 ) -> None:
     """Initialize project context and configuration.
 
@@ -1128,15 +1245,21 @@ providers:
             console.print(f"[yellow]{VICTOR_CONTEXT_FILE} already exists at {target_path}[/]")
             console.print("")
             console.print("[bold]Options:[/]")
-            console.print("  [cyan]victor init --update[/]   Merge new analysis (preserves your edits)")
+            console.print(
+                "  [cyan]victor init --update[/]   Merge new analysis (preserves your edits)"
+            )
             console.print("  [cyan]victor init --force[/]    Overwrite completely")
-            console.print("  [cyan]victor init --learn[/]    Enhance with conversation history insights")
+            console.print(
+                "  [cyan]victor init --learn[/]    Enhance with conversation history insights"
+            )
             console.print("  [cyan]victor init --index[/]    Multi-language symbol indexing")
             console.print("  [cyan]victor init --deep[/]     LLM-powered deep analysis")
             return
 
     if deep:
-        console.print("[yellow]--deep requires an interactive session. Use 'victor' then '/init --deep'[/]")
+        console.print(
+            "[yellow]--deep requires an interactive session. Use 'victor' then '/init --deep'[/]"
+        )
         console.print("[dim]Running quick analysis instead...[/]")
 
     # Determine analysis mode
@@ -1153,20 +1276,24 @@ providers:
         if learn:
             # Use SymbolStore + conversation history insights
             from victor.context.codebase_analyzer import generate_enhanced_init_md
+
             new_content = asyncio.run(generate_enhanced_init_md())
         elif index:
             # Use SymbolStore for accurate multi-language symbol extraction
             from victor.context.codebase_analyzer import generate_victor_md_from_index
+
             new_content = asyncio.run(generate_victor_md_from_index())
         else:
             # Quick regex-based analysis
             from victor.context.codebase_analyzer import generate_smart_victor_md
+
             new_content = generate_smart_victor_md()
 
         # Handle update mode
         if update and existing_content:
             # Import merge function from slash commands
             from victor.ui.slash_commands import SlashCommandHandler
+
             handler = SlashCommandHandler(console, None)
             content = handler._merge_init_content(existing_content, new_content)
             console.print("[dim]  Merged with existing content[/]")
@@ -1196,7 +1323,9 @@ providers:
             for alias, status in results.items():
                 tool_name = CONTEXT_FILE_ALIASES.get(alias, "Unknown")
                 if status == "created":
-                    console.print(f"  [green]✓[/] {alias} -> {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE} ({tool_name})")
+                    console.print(
+                        f"  [green]✓[/] {alias} -> {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE} ({tool_name})"
+                    )
                 elif status == "exists":
                     console.print(f"  [dim]○[/] {alias} (already linked)")
                 elif status == "exists_file":
@@ -1207,6 +1336,7 @@ providers:
     except Exception as e:
         console.print(f"[red]Failed to create {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}:[/] {e}")
         import traceback
+
         traceback.print_exc()
 
 
@@ -1215,9 +1345,13 @@ def keys(
     setup: bool = typer.Option(False, "--setup", "-s", help="Create API keys template file"),
     list_keys: bool = typer.Option(False, "--list", "-l", help="List configured providers"),
     provider: Optional[str] = typer.Option(None, "--set", help="Set API key for a provider"),
-    keyring: bool = typer.Option(False, "--keyring", "-k", help="Store key in system keyring (secure)"),
+    keyring: bool = typer.Option(
+        False, "--keyring", "-k", help="Store key in system keyring (secure)"
+    ),
     migrate: bool = typer.Option(False, "--migrate", help="Migrate keys from file to keyring"),
-    delete_keyring: Optional[str] = typer.Option(None, "--delete-keyring", help="Delete key from keyring"),
+    delete_keyring: Optional[str] = typer.Option(
+        None, "--delete-keyring", help="Delete key from keyring"
+    ),
 ) -> None:
     """Manage API keys for cloud providers.
 
@@ -1302,6 +1436,7 @@ def keys(
 
         # Load keys from file
         import yaml
+
         with open(DEFAULT_KEYS_FILE) as f:
             data = yaml.safe_load(f) or {}
 
@@ -1409,6 +1544,7 @@ def keys(
     }
 
     import os
+
     for prov, env_var in sorted(PROVIDER_ENV_VARS.items()):
         if prov in ("kimi",):  # Skip aliases
             continue
@@ -1430,7 +1566,9 @@ def keys(
     # Show keyring status
     console.print()
     backend_name, status = get_keyring_info()
-    keyring_status = "[green]✓ Available[/]" if is_keyring_available() else "[yellow]Not installed[/]"
+    keyring_status = (
+        "[green]✓ Available[/]" if is_keyring_available() else "[yellow]Not installed[/]"
+    )
     console.print(f"[dim]Keyring:[/] {backend_name} {keyring_status}")
     console.print(f"[dim]Keys file:[/] {DEFAULT_KEYS_FILE}")
 
@@ -1444,11 +1582,19 @@ def keys(
 @app.command()
 def security(
     status: bool = typer.Option(True, "--status", "-s", help="Show security status"),
-    trust_plugin: Optional[str] = typer.Option(None, "--trust-plugin", help="Trust a plugin by path"),
-    untrust_plugin: Optional[str] = typer.Option(None, "--untrust-plugin", help="Remove plugin from trust store"),
+    trust_plugin: Optional[str] = typer.Option(
+        None, "--trust-plugin", help="Trust a plugin by path"
+    ),
+    untrust_plugin: Optional[str] = typer.Option(
+        None, "--untrust-plugin", help="Remove plugin from trust store"
+    ),
     list_plugins: bool = typer.Option(False, "--list-plugins", "-l", help="List trusted plugins"),
-    verify_cache: bool = typer.Option(False, "--verify-cache", help="Verify embedding cache integrity"),
-    verify_all: bool = typer.Option(False, "--verify-all", "-a", help="Run comprehensive security verification"),
+    verify_cache: bool = typer.Option(
+        False, "--verify-cache", help="Verify embedding cache integrity"
+    ),
+    verify_all: bool = typer.Option(
+        False, "--verify-all", "-a", help="Run comprehensive security verification"
+    ),
 ) -> None:
     """Security status and plugin trust management.
 
@@ -1515,9 +1661,7 @@ def security(
 
         for plugin in plugins:
             table.add_row(
-                plugin["name"],
-                plugin.get("hash", "")[:16] + "...",
-                plugin.get("path", "")
+                plugin["name"], plugin.get("hash", "")[:16] + "...", plugin.get("path", "")
             )
 
         console.print(table)
@@ -1554,6 +1698,7 @@ def security(
     if verify_all:
         # Comprehensive security verification
         import os
+
         console.print(Panel.fit("[bold cyan]Comprehensive Security Verification[/]"))
         console.print()
 
@@ -1604,7 +1749,9 @@ def security(
             if is_valid:
                 console.print("   [green]✓ Embeddings cache integrity verified[/]")
             else:
-                console.print(f"   [red]✗ Cache integrity failed: {len(tampered)} tampered files[/]")
+                console.print(
+                    f"   [red]✗ Cache integrity failed: {len(tampered)} tampered files[/]"
+                )
                 all_passed = False
                 issues.append(f"Cache tampering detected: {len(tampered)} files modified")
         else:
@@ -1614,9 +1761,15 @@ def security(
         console.print("[cyan]6. Checking plugin sandbox configuration...[/]")
         sandbox = get_sandbox_summary()
         policy = sandbox["policy"]
-        console.print(f"   • Trust required: {'[green]Yes[/]' if policy['require_trust'] else '[yellow]No[/]'}")
-        console.print(f"   • Network allowed: {'[yellow]Yes[/]' if policy['allow_network'] else '[green]Restricted[/]'}")
-        console.print(f"   • Subprocess allowed: {'[yellow]Yes[/]' if policy['allow_subprocess'] else '[green]Restricted[/]'}")
+        console.print(
+            f"   • Trust required: {'[green]Yes[/]' if policy['require_trust'] else '[yellow]No[/]'}"
+        )
+        console.print(
+            f"   • Network allowed: {'[yellow]Yes[/]' if policy['allow_network'] else '[green]Restricted[/]'}"
+        )
+        console.print(
+            f"   • Subprocess allowed: {'[yellow]Yes[/]' if policy['allow_subprocess'] else '[green]Restricted[/]'}"
+        )
         console.print(f"   • Trusted plugins: {sandbox['trusted_plugins']['count']}")
 
         # 7. API key source check
@@ -1647,10 +1800,12 @@ def security(
     sec_status = get_security_status()
 
     # Platform info
-    console.print(Panel.fit(
-        f"[cyan]Platform:[/] {sec_status['platform']['system']} {sec_status['platform']['release']}",
-        title="Security Status"
-    ))
+    console.print(
+        Panel.fit(
+            f"[cyan]Platform:[/] {sec_status['platform']['system']} {sec_status['platform']['release']}",
+            title="Security Status",
+        )
+    )
 
     # Security checks table
     table = Table(show_header=True)
@@ -1660,31 +1815,21 @@ def security(
 
     # Home security
     table.add_row(
-        "Home Validation",
-        "[green]✓ Secure[/]",
-        sec_status["home_security"]["secure_home"]
+        "Home Validation", "[green]✓ Secure[/]", sec_status["home_security"]["secure_home"]
     )
 
     # Keyring
     if sec_status["keyring"]["available"]:
-        table.add_row(
-            "System Keyring",
-            "[green]✓ Available[/]",
-            sec_status["keyring"]["backend"]
-        )
+        table.add_row("System Keyring", "[green]✓ Available[/]", sec_status["keyring"]["backend"])
     else:
-        table.add_row(
-            "System Keyring",
-            "[yellow]Not installed[/]",
-            "pip install keyring"
-        )
+        table.add_row("System Keyring", "[yellow]Not installed[/]", "pip install keyring")
 
     # API keys
     configured = get_configured_providers()
     table.add_row(
         "API Keys",
         f"[green]{len(configured)} configured[/]" if configured else "[dim]None[/]",
-        ", ".join(configured[:3]) + ("..." if len(configured) > 3 else "")
+        ", ".join(configured[:3]) + ("..." if len(configured) > 3 else ""),
     )
 
     # Plugin trust
@@ -1692,22 +1837,14 @@ def security(
     table.add_row(
         "Trusted Plugins",
         f"[green]{trusted_plugins}[/]" if trusted_plugins else "[dim]None[/]",
-        f"{len(sec_status['plugins']['plugin_dirs'])} plugin dirs"
+        f"{len(sec_status['plugins']['plugin_dirs'])} plugin dirs",
     )
 
     # Cache integrity
     if sec_status["cache_integrity"]["embeddings_verified"]:
-        table.add_row(
-            "Cache Integrity",
-            "[green]✓ Verified[/]",
-            "Embeddings cache valid"
-        )
+        table.add_row("Cache Integrity", "[green]✓ Verified[/]", "Embeddings cache valid")
     else:
-        table.add_row(
-            "Cache Integrity",
-            "[dim]Not verified[/]",
-            "Run --verify-cache"
-        )
+        table.add_row("Cache Integrity", "[dim]Not verified[/]", "Run --verify-cache")
 
     console.print(table)
 

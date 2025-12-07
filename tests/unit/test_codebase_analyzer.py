@@ -17,6 +17,7 @@
 import tempfile
 from pathlib import Path
 
+from victor.config.settings import VICTOR_CONTEXT_FILE
 from victor.context.codebase_analyzer import (
     ClassInfo,
     ModuleInfo,
@@ -467,7 +468,7 @@ class TestGenerateSmartVictorMd:
 
             result = generate_smart_victor_md(tmpdir)
 
-            assert "# .victor.md" in result
+            assert f"# {VICTOR_CONTEXT_FILE}" in result
             assert "## Project Overview" in result
             assert "## Package Layout" in result
 
@@ -576,13 +577,13 @@ This is the RST description here.
 
 
 class TestCodebaseAnalyzerAnalyzePythonFiles:
-    """Tests for _analyze_python_files method."""
+    """Tests for _analyze_source_files method."""
 
     def test_analyze_files_no_package(self):
         """Test analyze files when no main package."""
         with tempfile.TemporaryDirectory() as tmpdir:
             analyzer = CodebaseAnalyzer(tmpdir)
-            analyzer._analyze_python_files()
+            analyzer._analyze_source_files()
             assert analyzer.analysis.packages == {}
 
     def test_analyze_files_with_subpackages(self):
@@ -606,9 +607,13 @@ class GitTool:
 
             analyzer = CodebaseAnalyzer(tmpdir)
             analyzer._detect_package_layout()
-            analyzer._analyze_python_files()
+            analyzer._analyze_source_files()
 
-            assert "tools" in analyzer.analysis.packages
+            # The main package should contain modules from subpackages
+            assert "mypackage" in analyzer.analysis.packages
+            # Check that git_tool module is in the package
+            module_names = [m.name for m in analyzer.analysis.packages["mypackage"]]
+            assert "git_tool" in module_names
 
 
 class TestCodebaseAnalyzerIdentifyKeyComponents:
@@ -635,7 +640,7 @@ class BaseProvider:
 
             analyzer = CodebaseAnalyzer(tmpdir)
             analyzer._detect_package_layout()
-            analyzer._analyze_python_files()
+            analyzer._analyze_source_files()
             analyzer._identify_key_components()
 
             # Orchestrator should be identified

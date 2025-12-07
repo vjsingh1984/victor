@@ -38,27 +38,10 @@ class IaCScannerTool(BaseTool):
     """Tool for scanning Infrastructure-as-Code for security issues."""
 
     name = "iac_scanner"
-    description = """Scan Infrastructure-as-Code files for security issues.
+    description = """Scan IaC files (Terraform, Docker, K8s) for security issues.
 
-Supported IaC platforms:
-- Terraform (.tf, .tfvars)
-- Docker (Dockerfile)
-- Docker Compose (docker-compose.yml)
-- Kubernetes manifests (*.yaml)
-
-Detects:
-- Hardcoded secrets (API keys, passwords, tokens)
-- Overly permissive IAM/RBAC
-- Missing encryption
-- Network exposure
-- Container security issues
-- Best practice violations
-
-Actions:
-- scan: Full security scan of all IaC files
-- scan_file: Scan a specific file
-- summary: Get security summary with risk score
-- detect: Detect which IaC platforms are used"""
+    Actions: scan, scan_file, summary, detect.
+    Detects: secrets, IAM misconfig, missing encryption, network exposure."""
 
     parameters = {
         "type": "object",
@@ -96,9 +79,19 @@ Actions:
         return ToolMetadata(
             category="iac",
             keywords=[
-                "iac", "infrastructure as code", "terraform", "docker", "kubernetes",
-                "k8s", "security scan", "secrets detection", "misconfiguration",
-                "dockerfile", "docker-compose", "helm", "security policy"
+                "iac",
+                "infrastructure as code",
+                "terraform",
+                "docker",
+                "kubernetes",
+                "k8s",
+                "security scan",
+                "secrets detection",
+                "misconfiguration",
+                "dockerfile",
+                "docker-compose",
+                "helm",
+                "security policy",
             ],
             use_cases=[
                 "infrastructure security scanning",

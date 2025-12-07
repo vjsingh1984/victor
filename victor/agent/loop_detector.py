@@ -321,7 +321,9 @@ class LoopDetector:
             lookback = self.config.signature_lookback_for_warning
             recent_sigs = list(self._signature_history)[-lookback:]
             if signature not in recent_sigs:
-                logger.debug(f"LoopDetector: Signature not in last {lookback} history, clearing loop warning")
+                logger.debug(
+                    f"LoopDetector: Signature not in last {lookback} history, clearing loop warning"
+                )
                 self._loop_warning_given = False
 
         self._signature_history.append(signature)
@@ -616,10 +618,11 @@ class LoopDetector:
 
         # Check for repeated signatures (including alternating patterns like A,B,A,B)
         # Look at ALL unique signatures in recent history, not just the last one
-        recent = list(self._signature_history)[-min(len(self._signature_history), 8):]
+        recent = list(self._signature_history)[-min(len(self._signature_history), 8) :]
         if recent:
             # Count occurrences of each signature
             from collections import Counter
+
             sig_counts = Counter(recent)
             for sig, count in sig_counts.items():
                 if count >= threshold:
@@ -653,9 +656,10 @@ class LoopDetector:
 
         # Check for approaching repeated signatures (threshold - 1)
         # Look at ALL unique signatures (catches alternating patterns like A,B,A,B)
-        recent = list(self._signature_history)[-min(len(self._signature_history), 8):]
+        recent = list(self._signature_history)[-min(len(self._signature_history), 8) :]
         if recent:
             from collections import Counter
+
             sig_counts = Counter(recent)
             for sig, count in sig_counts.items():
                 if count == threshold - 1:

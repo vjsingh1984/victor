@@ -29,8 +29,10 @@ from typing import Any, Dict, List
 import logging
 
 from victor.tools.decorators import tool
+from victor.tools.common import gather_files_by_pattern
 
 logger = logging.getLogger(__name__)
+
 
 # Common secret patterns
 SECRET_PATTERNS = {
@@ -171,7 +173,8 @@ async def security_scan(
             results["secrets"] = {"files_scanned": 1, "findings": findings, "count": len(findings)}
             all_findings.extend(findings)
         else:
-            files = list(path_obj.rglob(file_pattern))
+            # Use gather_files_by_pattern to exclude venv, node_modules, etc.
+            files = gather_files_by_pattern(path_obj, file_pattern)
             findings = []
             for file in files:
                 findings.extend(_scan_file_for_secrets(file))
@@ -189,7 +192,8 @@ async def security_scan(
             results["config"] = {"files_scanned": 1, "findings": findings, "count": len(findings)}
             all_findings.extend(findings)
         else:
-            files = list(path_obj.rglob(file_pattern))
+            # Use gather_files_by_pattern to exclude venv, node_modules, etc.
+            files = gather_files_by_pattern(path_obj, file_pattern)
             findings = []
             for file in files:
                 findings.extend(_scan_file_for_config_issues(file))

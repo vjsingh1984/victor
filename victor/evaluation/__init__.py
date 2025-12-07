@@ -98,6 +98,183 @@ from victor.evaluation.analyzers import (
     get_pass_at_k_evaluator,
 )
 
+# Code generation harness (HumanEval, MBPP - provider-only, no tools)
+from victor.evaluation.code_generation_harness import (
+    CodeGenMetrics,
+    CodeGenResult,
+    CodeGenerationRunner,
+    CodeGenerationBenchmark,
+    create_code_gen_runner,
+)
+
+# Agentic harness (SWE-bench, Aider Polyglot - with tools and file editing)
+from victor.evaluation.agentic_harness import (
+    AgenticValidationType,
+    ToolCall,
+    FileEdit,
+    AgenticExecutionTrace,
+    AgenticTaskResult,
+    AgenticMetrics,
+    AgenticValidator,
+    PatchApplicationValidator,
+    TestPassingValidator,
+    FileEditValidator,
+    ToolUsageValidator,
+    AgenticBenchmarkRunner,
+    generate_agentic_report,
+)
+
+# Agent adapter (connects Victor orchestrator to agentic benchmarks)
+from victor.evaluation.agent_adapter import (
+    AdapterConfig,
+    VictorAgentAdapter,
+    create_victor_agent_callback,
+    run_agentic_task,
+)
+
+# SWE-bench dataset loader and workspace management
+from victor.evaluation.swe_bench_loader import (
+    SWEBenchConfig,
+    SWEBenchInstance,
+    SWEBenchLoader,
+    SWEBenchWorkspaceManager,
+    load_swe_bench_tasks,
+    setup_swe_bench_workspace,
+    get_swe_bench_repos,
+)
+
+# Multi-language test runners for agentic benchmarks
+from victor.evaluation.test_runners import (
+    Language,
+    TestRunnerConfig,
+    TestResult,
+    TestRunResults,
+    BaseTestRunner,
+    PythonTestRunner,
+    JavaScriptTestRunner,
+    GoTestRunner,
+    RustTestRunner,
+    JavaTestRunner,
+    TestRunnerRegistry,
+    detect_language,
+    is_test_tool_available,
+)
+
+# Environment setup utilities
+from victor.evaluation.env_setup import (
+    SetupStrategy,
+    SetupResult,
+    EnvironmentConfig,
+    EnvironmentSetup,
+    validate_environment,
+    quick_setup,
+)
+
+# Baseline test validation for SWE-bench
+from victor.evaluation.baseline_validator import (
+    BaselineStatus,
+    TestBaseline,
+    BaselineValidationResult,
+    BaselineCache,
+    BaselineValidator,
+    quick_validate_baseline,
+    check_environment_health,
+    TestStatus,
+    get_test_status,
+)
+
+# Test result correlation and scoring
+from victor.evaluation.result_correlation import (
+    FailureCategory,
+    TestCorrelation,
+    SWEBenchScore,
+    CorrelationReport,
+    ResultCorrelator,
+    correlate_validation_results,
+    analyze_failure_patterns,
+    save_correlation_report,
+)
+
+# Evaluation orchestrator for end-to-end SWE-bench evaluation
+from victor.evaluation.evaluation_orchestrator import (
+    EvaluationStage,
+    TaskProgress,
+    OrchestratorConfig,
+    EvaluationSummary,
+    EvaluationOrchestrator,
+    run_swe_bench_evaluation,
+)
+
+# Backward compatibility aliases for deprecated multilevel harness
+# The multilevel_harness module has been removed. Use:
+# - CodeGenerationBenchmark for HumanEval/MBPP (provider-only)
+# - AgenticBenchmarkRunner for SWE-bench style tasks (with tools)
+#
+# Legacy imports are aliased to the new code_generation_harness for compatibility:
+from enum import Enum
+
+
+class BenchmarkLevel(Enum):
+    """Deprecated: Use CodeGenerationBenchmark for HumanEval."""
+
+    PROVIDER = "provider"
+
+
+# Aliases for backward compatibility
+LevelMetrics = CodeGenMetrics
+TaskExecutionResult = CodeGenResult
+BaseLevelRunner = CodeGenerationRunner
+ProviderLevelRunner = CodeGenerationRunner
+MultiLevelBenchmark = CodeGenerationBenchmark
+create_provider_runner = create_code_gen_runner
+
+
+# Stubs for removed orchestrator/cli runners (not appropriate for HumanEval)
+def create_orchestrator_runner(*args, **kwargs):
+    """Deprecated: Orchestrator mode not appropriate for HumanEval.
+
+    For agentic benchmarks (SWE-bench), use AgenticBenchmarkRunner instead.
+    """
+    raise NotImplementedError(
+        "Orchestrator mode has been removed from HumanEval benchmarks. "
+        "Use CodeGenerationBenchmark for code generation tasks or "
+        "AgenticBenchmarkRunner for agentic tasks requiring tools."
+    )
+
+
+def create_cli_runner(*args, **kwargs):
+    """Deprecated: CLI mode not appropriate for HumanEval.
+
+    For agentic benchmarks (SWE-bench), use AgenticBenchmarkRunner instead.
+    """
+    raise NotImplementedError(
+        "CLI mode has been removed from HumanEval benchmarks. "
+        "Use CodeGenerationBenchmark for code generation tasks or "
+        "AgenticBenchmarkRunner for agentic tasks requiring tools."
+    )
+
+
+# These classes don't exist anymore - raise helpful errors
+class OrchestratorLevelRunner:
+    """Deprecated: Use AgenticBenchmarkRunner for agentic tasks."""
+
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError(
+            "OrchestratorLevelRunner has been removed. "
+            "Use AgenticBenchmarkRunner for SWE-bench style agentic tasks."
+        )
+
+
+class CLILevelRunner:
+    """Deprecated: Use AgenticBenchmarkRunner for agentic tasks."""
+
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError(
+            "CLILevelRunner has been removed. "
+            "Use AgenticBenchmarkRunner for SWE-bench style agentic tasks."
+        )
+
+
 __all__ = [
     # Protocol types
     "BenchmarkMetadata",
@@ -135,4 +312,91 @@ __all__ = [
     "AnalyzerRegistry",
     "get_code_quality_analyzer",
     "get_pass_at_k_evaluator",
+    # Code generation harness (HumanEval, MBPP - provider-only)
+    "CodeGenMetrics",
+    "CodeGenResult",
+    "CodeGenerationRunner",
+    "CodeGenerationBenchmark",
+    "create_code_gen_runner",
+    # Agentic harness (SWE-bench, Aider Polyglot - with tools)
+    "AgenticValidationType",
+    "ToolCall",
+    "FileEdit",
+    "AgenticExecutionTrace",
+    "AgenticTaskResult",
+    "AgenticMetrics",
+    "AgenticValidator",
+    "PatchApplicationValidator",
+    "TestPassingValidator",
+    "FileEditValidator",
+    "ToolUsageValidator",
+    "AgenticBenchmarkRunner",
+    "generate_agentic_report",
+    # Deprecated multi-level harness (kept for backward compatibility)
+    "BenchmarkLevel",
+    "LevelMetrics",
+    "TaskExecutionResult",
+    "BaseLevelRunner",
+    "ProviderLevelRunner",
+    "OrchestratorLevelRunner",
+    "CLILevelRunner",
+    "MultiLevelBenchmark",
+    "create_provider_runner",
+    "create_orchestrator_runner",
+    "create_cli_runner",
+    # SWE-bench loader and workspace management
+    "SWEBenchConfig",
+    "SWEBenchInstance",
+    "SWEBenchLoader",
+    "SWEBenchWorkspaceManager",
+    "load_swe_bench_tasks",
+    "setup_swe_bench_workspace",
+    "get_swe_bench_repos",
+    # Multi-language test runners
+    "Language",
+    "TestRunnerConfig",
+    "TestResult",
+    "TestRunResults",
+    "BaseTestRunner",
+    "PythonTestRunner",
+    "JavaScriptTestRunner",
+    "GoTestRunner",
+    "RustTestRunner",
+    "JavaTestRunner",
+    "TestRunnerRegistry",
+    "detect_language",
+    "is_test_tool_available",
+    # Environment setup utilities
+    "SetupStrategy",
+    "SetupResult",
+    "EnvironmentConfig",
+    "EnvironmentSetup",
+    "validate_environment",
+    "quick_setup",
+    # Baseline test validation
+    "BaselineStatus",
+    "TestBaseline",
+    "BaselineValidationResult",
+    "BaselineCache",
+    "BaselineValidator",
+    "quick_validate_baseline",
+    "check_environment_health",
+    "TestStatus",
+    "get_test_status",
+    # Test result correlation and scoring
+    "FailureCategory",
+    "TestCorrelation",
+    "SWEBenchScore",
+    "CorrelationReport",
+    "ResultCorrelator",
+    "correlate_validation_results",
+    "analyze_failure_patterns",
+    "save_correlation_report",
+    # Evaluation orchestrator
+    "EvaluationStage",
+    "TaskProgress",
+    "OrchestratorConfig",
+    "EvaluationSummary",
+    "EvaluationOrchestrator",
+    "run_swe_bench_evaluation",
 ]

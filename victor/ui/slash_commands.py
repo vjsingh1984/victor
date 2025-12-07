@@ -90,9 +90,9 @@ class SlashCommandHandler:
         self.register(
             SlashCommand(
                 name="init",
-                description="Initialize .victor/init.md with smart codebase analysis",
+                description="Initialize or update .victor/init.md with codebase analysis",
                 handler=self._cmd_init,
-                usage="/init [--force] [--simple] [--smart] [--symlinks]",
+                usage="/init [--index] [--update] [--force] [--deep] [--symlinks]",
             )
         )
 
@@ -113,6 +113,16 @@ class SlashCommandHandler:
                 handler=self._cmd_profile,
                 aliases=["profiles"],
                 usage="/profile [profile_name]",
+            )
+        )
+
+        self.register(
+            SlashCommand(
+                name="provider",
+                description="Show current provider info or switch provider",
+                handler=self._cmd_provider,
+                aliases=["providers"],
+                usage="/provider [provider_name]",
             )
         )
 
@@ -441,6 +451,17 @@ class SlashCommandHandler:
             )
         )
 
+        # Serialization stats command
+        self.register(
+            SlashCommand(
+                name="serialization",
+                description="Show token-optimized serialization statistics and savings",
+                handler=self._cmd_serialization,
+                aliases=["serialize", "ser"],
+                usage="/serialization [summary|tools|formats|clear]",
+            )
+        )
+
     def register(self, command: SlashCommand) -> None:
         """Register a slash command."""
         self._commands[command.name] = command
@@ -540,12 +561,24 @@ class SlashCommandHandler:
         self.console.print("\n[dim]Type /help <command> for more details[/]")
 
     async def _cmd_init(self, args: List[str]) -> None:
-        """Initialize .victor/init.md file with smart codebase analysis."""
+        """Initialize or update .victor/init.md file with codebase analysis.
+
+        Modes:
+        - Default (quick): Fast regex-based analysis for any language
+        - --index: Use SQLite symbol store for accurate multi-language analysis
+        - --learn: Enhance with insights from conversation history
+        - --deep: LLM-powered analysis for comprehensive docs
+        - --update: Merge new analysis with existing content (preserves user edits)
+        - --force: Overwrite existing file completely
+        - --symlinks: Create CLAUDE.md and other tool aliases
+        """
         from victor.config.settings import get_project_paths
 
         force = "--force" in args or "-f" in args
-        simple = "--simple" in args or "-s" in args
-        smart = "--smart" in args or "-a" in args  # -a for AI-powered
+        update = "--update" in args or "-u" in args
+        deep = "--deep" in args or "-d" in args or "--smart" in args
+        use_index = "--index" in args or "-i" in args
+        use_learn = "--learn" in args or "-L" in args
         symlinks = "--symlinks" in args or "-l" in args
 
         paths = get_project_paths()
@@ -553,38 +586,66 @@ class SlashCommandHandler:
         # Ensure .victor directory exists
         paths.project_victor_dir.mkdir(parents=True, exist_ok=True)
 
-        if target_path.exists() and not force:
-            self.console.print(f"[yellow]{target_path.name} already exists at {target_path}[/]")
-            self.console.print("Use [bold]/init --force[/] to overwrite")
-            self.console.print("Use [bold]/init --simple[/] for basic template")
-            self.console.print("Use [bold]/init --smart[/] for LLM-powered analysis (any language)")
-            self.console.print("Use [bold]/init --symlinks[/] to create aliases for other tools")
+        existing_content = None
+        if target_path.exists():
+            existing_content = target_path.read_text(encoding="utf-8")
 
-            # Show current content preview
-            content = target_path.read_text()[:500]
-            self.console.print(
-                Panel(
-                    Markdown(
-                        content + "\n\n..." if len(target_path.read_text()) > 500 else content
-                    ),
-                    title=f"Current {target_path.name}",
-                    border_style="dim",
+            if not force and not update:
+                # Show options when file exists
+                self.console.print(f"[yellow]{target_path.name} already exists[/]")
+                self.console.print("")
+                self.console.print("[bold]Options:[/]")
+                self.console.print(
+                    "  [cyan]/init --update[/]   Merge new analysis (preserves your edits)"
                 )
-            )
-            return
+                self.console.print("  [cyan]/init --force[/]    Overwrite completely")
+                self.console.print(
+                    "  [cyan]/init --learn[/]    Enhance with conversation history insights"
+                )
+                self.console.print(
+                    "  [cyan]/init --deep[/]     LLM-powered analysis (any language)"
+                )
+                self.console.print("  [cyan]/init --symlinks[/] Create CLAUDE.md and other aliases")
 
-        if smart:
-            self.console.print("[dim]Analyzing codebase with LLM (works with any language)...[/]")
+                # Show current content preview
+                preview = existing_content[:500]
+                self.console.print(
+                    Panel(
+                        Markdown(preview + "\n\n..." if len(existing_content) > 500 else preview),
+                        title=f"Current {target_path.name}",
+                        border_style="dim",
+                    )
+                )
+                return
+
+        if use_learn:
+            self.console.print("[dim]Analyzing codebase + learning from conversation history...[/]")
+        elif use_index:
+            self.console.print("[dim]Indexing codebase (multi-language symbol analysis)...[/]")
+        elif deep:
+            self.console.print("[dim]Analyzing codebase with LLM (deep mode)...[/]")
+        elif update and existing_content:
+            self.console.print("[dim]Updating codebase analysis (preserving user sections)...[/]")
         else:
-            self.console.print("[dim]Analyzing codebase...[/]")
+            self.console.print("[dim]Analyzing codebase (quick mode)...[/]")
 
         try:
-            if smart:
+            if use_learn:
+                # Use SymbolStore + conversation history insights
+                from victor.context.codebase_analyzer import generate_enhanced_init_md
+
+                new_content = await generate_enhanced_init_md()
+            elif use_index:
+                # Use SymbolStore for accurate multi-language symbol extraction
+                from victor.context.codebase_analyzer import generate_victor_md_from_index
+
+                new_content = await generate_victor_md_from_index()
+            elif deep:
                 # Use LLM-powered generator (works with any project type)
                 if not self.agent or not self.agent.provider:
                     self.console.print("[yellow]No active provider configured.[/]")
                     self.console.print(
-                        "Use [bold]/init[/] without --smart, or configure a provider first."
+                        "Use [bold]/init[/] without --deep, or configure a provider first."
                     )
                     return
 
@@ -594,17 +655,21 @@ class SlashCommandHandler:
                 model_name = getattr(self.agent, "model", "unknown")
                 self.console.print(f"[dim]Using provider: {provider_name}, model: {model_name}[/]")
 
-                content = await generate_victor_md_with_llm(self.agent.provider, model=model_name)
-            elif simple:
-                # Use simple generator
-                from victor.context.project_context import generate_victor_md
-
-                content = generate_victor_md()
+                new_content = await generate_victor_md_with_llm(
+                    self.agent.provider, model=model_name
+                )
             else:
-                # Use smart analyzer (Python-specific, no LLM)
+                # Use smart analyzer (regex-based, no LLM) - quick mode
                 from victor.context.codebase_analyzer import generate_smart_victor_md
 
-                content = generate_smart_victor_md()
+                new_content = generate_smart_victor_md()
+
+            # Handle update mode - merge with existing content
+            if update and existing_content:
+                content = self._merge_init_content(existing_content, new_content)
+                self.console.print("[dim]  Merged with existing content[/]")
+            else:
+                content = new_content
 
             # Write the file
             target_path.write_text(content, encoding="utf-8")
@@ -631,7 +696,9 @@ class SlashCommandHandler:
                 for alias, status in results.items():
                     tool_name = CONTEXT_FILE_ALIASES.get(alias, "Unknown")
                     if status == "created":
-                        self.console.print(f"  [green]✓[/] {alias} -> {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE} ({tool_name})")
+                        self.console.print(
+                            f"  [green]✓[/] {alias} -> {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE} ({tool_name})"
+                        )
                     elif status == "exists":
                         self.console.print(f"  [dim]○[/] {alias} (already linked)")
                     elif status == "exists_file":
@@ -649,19 +716,69 @@ class SlashCommandHandler:
                 self.console.print("[green]✓[/] Context reloaded")
 
         except Exception as e:
-            self.console.print(f"[red]Failed to create {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}:[/] {e}")
+            self.console.print(
+                f"[red]Failed to create {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}:[/] {e}"
+            )
             logger.exception("Error in /init command")
 
     async def _cmd_model(self, args: List[str]) -> None:
-        """List or switch models."""
+        """List or switch models.
+
+        Supports two formats:
+        - /model <model_name>           - Switch model on current provider
+        - /model <provider>:<model>     - Switch provider and model (e.g., ollama:qwen2.5-coder:14b)
+        """
         if args:
-            # Switch to specified model
-            model_name = args[0]
-            if self.agent:
-                self.agent.model = model_name
-                self.console.print(f"[green]✓[/] Switched to model: [cyan]{model_name}[/]")
-            else:
+            model_spec = args[0]
+
+            if not self.agent:
                 self.console.print("[yellow]No active session to switch model[/]")
+                return
+
+            # Check for provider:model syntax
+            if ":" in model_spec and not model_spec.startswith(":"):
+                parts = model_spec.split(":", 1)
+                # Handle ollama:model:tag syntax (e.g., ollama:qwen2.5-coder:14b)
+                if parts[0].lower() in (
+                    "ollama",
+                    "lmstudio",
+                    "anthropic",
+                    "openai",
+                    "google",
+                    "xai",
+                    "vllm",
+                ):
+                    provider_name = parts[0].lower()
+                    model_name = parts[1]
+                    if self.agent.switch_provider(provider_name, model_name):
+                        info = self.agent.get_current_provider_info()
+                        self.console.print(
+                            f"[green]✓[/] Switched to [cyan]{provider_name}:{model_name}[/]"
+                        )
+                        self.console.print(
+                            f"  [dim]Native tools: {info['native_tool_calls']}, "
+                            f"Thinking: {info['thinking_mode']}[/]"
+                        )
+                    else:
+                        self.console.print(
+                            f"[red]Failed to switch to {provider_name}:{model_name}[/]"
+                        )
+                    return
+                # Otherwise it's a model name with a tag (e.g., qwen2.5-coder:14b)
+                model_name = model_spec
+            else:
+                model_name = model_spec
+
+            # Switch model on current provider
+            if self.agent.switch_model(model_name):
+                info = self.agent.get_current_provider_info()
+                self.console.print(f"[green]✓[/] Switched to model: [cyan]{model_name}[/]")
+                self.console.print(
+                    f"  [dim]Native tools: {info['native_tool_calls']}, "
+                    f"Thinking: {info['thinking_mode']}[/]"
+                )
+            else:
+                self.console.print(f"[red]Failed to switch model to {model_name}[/]")
             return
 
         # List available models
@@ -710,30 +827,155 @@ class SlashCommandHandler:
             self.console.print("Make sure Ollama is running")
 
     def _cmd_profile(self, args: List[str]) -> None:
-        """Show or switch profile."""
+        """Show or switch profile.
+
+        Usage:
+            /profile              - List available profiles
+            /profile <name>       - Switch to the specified profile (hot-swap)
+
+        Profile switching preserves conversation history and reinitializes
+        the provider, tool adapter, and prompt builder for the new profile.
+        """
         profiles = self.settings.load_profiles()
 
         if args:
             # Switch to specified profile
             profile_name = args[0]
-            if profile_name in profiles:
-                self.console.print("[yellow]Profile switching requires restart[/]")
-                self.console.print(f"Run: [bold]victor --profile {profile_name}[/]")
-            else:
+            if profile_name not in profiles:
                 self.console.print(f"[red]Profile not found:[/] {profile_name}")
                 self.console.print(f"Available: {', '.join(profiles.keys())}")
+                return
+
+            if not self.agent:
+                self.console.print("[yellow]No active session to switch profile[/]")
+                return
+
+            profile_config = profiles[profile_name]
+
+            # Use hot-swap to switch provider/model
+            self.console.print(
+                f"[dim]Switching to profile '{profile_name}' "
+                f"({profile_config.provider}:{profile_config.model})...[/]"
+            )
+
+            if self.agent.switch_provider(
+                provider_name=profile_config.provider,
+                model=profile_config.model,
+            ):
+                info = self.agent.get_current_provider_info()
+                self.console.print(f"[green]✓[/] Switched to profile: [cyan]{profile_name}[/]")
+                self.console.print(
+                    f"  [dim]Provider: {info['provider']}, Model: {info['model']}[/]"
+                )
+                self.console.print(
+                    f"  [dim]Native tools: {info['native_tool_calls']}, "
+                    f"Thinking: {info['thinking_mode']}[/]"
+                )
+            else:
+                self.console.print(f"[red]Failed to switch to profile {profile_name}[/]")
+                self.console.print(
+                    "[yellow]You may need to restart: "
+                    f"[bold]victor --profile {profile_name}[/][/]"
+                )
             return
 
         # Show profiles
+        current_provider = self.agent.provider_name if self.agent else None
+        current_model = self.agent.model if self.agent else None
+
         table = Table(title="Configured Profiles", show_header=True)
         table.add_column("Profile", style="cyan")
         table.add_column("Provider", style="green")
         table.add_column("Model", style="yellow")
+        table.add_column("Status", style="dim")
 
         for name, config in profiles.items():
-            table.add_row(name, config.provider, config.model)
+            # Check if this is the current active profile
+            is_current = config.provider == current_provider and config.model == current_model
+            status = "← current" if is_current else ""
+            table.add_row(name, config.provider, config.model, status)
 
         self.console.print(table)
+        self.console.print("\n[dim]Switch profile: /profile <name>[/]")
+
+    def _cmd_provider(self, args: List[str]) -> None:
+        """Show current provider info or switch provider.
+
+        Usage:
+            /provider              - Show current provider/model info
+            /provider <name>       - Switch to a different provider (keeps model)
+            /provider <name:model> - Switch to provider with specific model
+
+        Provider switching preserves conversation history and reinitializes
+        the tool adapter and prompt builder for the new provider.
+        """
+        from victor.providers.registry import ProviderRegistry
+
+        if not self.agent:
+            self.console.print("[yellow]No active session[/]")
+            return
+
+        # Get current provider info
+        info = self.agent.get_current_provider_info()
+        available_providers = ProviderRegistry.list_providers()
+
+        if not args:
+            # Show current provider info
+            self.console.print(
+                Panel(
+                    f"[bold]Provider:[/] [cyan]{info.get('provider', 'unknown')}[/]\n"
+                    f"[bold]Model:[/] [yellow]{info.get('model', 'unknown')}[/]\n"
+                    f"[bold]Supports Tools:[/] {info.get('supports_tools', False)}\n"
+                    f"[bold]Native Tool Calls:[/] {info.get('native_tool_calls', False)}\n"
+                    f"[bold]Thinking Mode:[/] {info.get('thinking_mode', False)}\n"
+                    f"[bold]Tool Budget:[/] {info.get('tool_budget', 'N/A')}",
+                    title="Current Provider",
+                    border_style="cyan",
+                )
+            )
+
+            # Show available providers
+            self.console.print("\n[bold]Available Providers:[/]")
+            for p in sorted(available_providers):
+                marker = "→ " if p == info.get("provider") else "  "
+                self.console.print(f"  {marker}[cyan]{p}[/]")
+
+            self.console.print(
+                "\n[dim]Switch provider: /provider <name> or /provider <name:model>[/]"
+            )
+            return
+
+        # Switch provider
+        provider_arg = args[0]
+
+        # Parse provider:model syntax
+        if ":" in provider_arg:
+            provider_name, model = provider_arg.split(":", 1)
+        else:
+            provider_name = provider_arg
+            model = info.get("model", "")  # Keep current model
+
+        # Validate provider
+        if provider_name not in available_providers:
+            self.console.print(f"[red]Provider not found:[/] {provider_name}")
+            self.console.print(f"Available: {', '.join(sorted(available_providers))}")
+            return
+
+        self.console.print(
+            f"[dim]Switching to provider '{provider_name}' with model '{model}'...[/]"
+        )
+
+        if self.agent.switch_provider(provider_name=provider_name, model=model):
+            new_info = self.agent.get_current_provider_info()
+            self.console.print(
+                f"[green]✓[/] Switched to [cyan]{provider_name}[/]:[yellow]{model}[/]"
+            )
+            self.console.print(
+                f"  Native tools: {new_info.get('native_tool_calls', False)}, "
+                f"Thinking: {new_info.get('thinking_mode', False)}"
+            )
+        else:
+            self.console.print(f"[red]✗[/] Failed to switch to provider: {provider_name}")
 
     def _cmd_clear(self, args: List[str]) -> None:
         """Clear conversation history."""
@@ -747,7 +989,9 @@ class SlashCommandHandler:
         """Show loaded project context."""
         if not self.agent or not hasattr(self.agent, "project_context"):
             self.console.print("[yellow]No project context loaded[/]")
-            self.console.print(f"Run [bold]/init[/] to create {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}")
+            self.console.print(
+                f"Run [bold]/init[/] to create {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}"
+            )
             return
 
         ctx = self.agent.project_context
@@ -763,6 +1007,97 @@ class SlashCommandHandler:
                 border_style="blue",
             )
         )
+
+    def _merge_init_content(self, existing: str, new: str) -> str:
+        """Merge new codebase analysis with existing init.md content.
+
+        Strategy:
+        - Keep user-added sections (those not in the new content)
+        - Update auto-generated sections (Key Components, Architecture, etc.)
+        - Preserve user's Project Overview if they customized it
+
+        Args:
+            existing: Current init.md content
+            new: Freshly generated content
+
+        Returns:
+            Merged content
+        """
+        # Section headers to identify auto-generated vs user sections
+        auto_sections = {
+            "## Package Layout",
+            "## Key Components",
+            "## Common Commands",
+            "## Architecture",
+            "## Package Structure",
+        }
+
+        def parse_sections(content: str) -> dict:
+            """Parse markdown into sections by ## headers."""
+            sections = {}
+            current_header = "header"
+            current_content = []
+
+            for line in content.split("\n"):
+                if line.startswith("## "):
+                    if current_content:
+                        sections[current_header] = "\n".join(current_content)
+                    current_header = line
+                    current_content = []
+                else:
+                    current_content.append(line)
+
+            if current_content:
+                sections[current_header] = "\n".join(current_content)
+
+            return sections
+
+        existing_sections = parse_sections(existing)
+        new_sections = parse_sections(new)
+
+        # Start with the new header/title section
+        merged_parts = []
+        if "header" in new_sections:
+            merged_parts.append(new_sections["header"])
+
+        # For each section, decide whether to use existing or new
+        all_headers = set(existing_sections.keys()) | set(new_sections.keys())
+        all_headers.discard("header")
+
+        # Order sections logically
+        ordered_headers = [
+            "## Project Overview",
+            "## Package Layout",
+            "## Key Components",
+            "## Common Commands",
+            "## Architecture",
+            "## Package Structure",
+            "## Important Notes",
+        ]
+
+        # Add ordered headers first
+        for header in ordered_headers:
+            if header in all_headers:
+                if header in auto_sections and header in new_sections:
+                    # Use new auto-generated content
+                    merged_parts.append(header)
+                    merged_parts.append(new_sections[header])
+                elif header in existing_sections:
+                    # Keep existing (user may have edited)
+                    merged_parts.append(header)
+                    merged_parts.append(existing_sections[header])
+                elif header in new_sections:
+                    merged_parts.append(header)
+                    merged_parts.append(new_sections[header])
+                all_headers.discard(header)
+
+        # Add any remaining user-added sections at the end
+        for header in sorted(all_headers):
+            if header in existing_sections:
+                merged_parts.append(header)
+                merged_parts.append(existing_sections[header])
+
+        return "\n".join(merged_parts)
 
     async def _cmd_lmstudio(self, args: List[str]) -> None:
         """Probe LMStudio endpoints and recommend a model within VRAM budget."""
@@ -1160,7 +1495,9 @@ Provide a 2-3 sentence summary:"""
         mcp_client = getattr(self.agent, "mcp_client", None)
         if not mcp_client:
             self.console.print("[dim]No MCP servers configured[/]")
-            self.console.print(f"\n[dim]Configure MCP servers in your settings or {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}[/]")
+            self.console.print(
+                f"\n[dim]Configure MCP servers in your settings or {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}[/]"
+            )
             return
 
         table = Table(title="MCP Servers")
@@ -1734,6 +2071,173 @@ Provide a 2-3 sentence summary:"""
 
         self.console.print(Panel(content, title="Streaming Metrics", border_style="green"))
 
+    def _cmd_serialization(self, args: List[str]) -> None:
+        """Show token-optimized serialization statistics and savings.
+
+        Subcommands:
+            summary - Overall serialization statistics (default)
+            tools   - Per-tool serialization breakdown
+            formats - Format usage and effectiveness
+            clear   - Clear serialization metrics
+        """
+        try:
+            from victor.serialization import (
+                get_metrics_collector,
+                is_serialization_enabled,
+            )
+        except ImportError:
+            self.console.print("[red]Serialization module not available[/]")
+            return
+
+        subcommand = args[0].lower() if args else "summary"
+
+        # Check if serialization is enabled
+        if not is_serialization_enabled():
+            self.console.print(
+                Panel(
+                    "[yellow]Serialization is globally disabled[/]\n\n"
+                    "Enable in settings with [bold]serialization_enabled=true[/]\n\n"
+                    "[dim]Serialization optimizes token usage by converting\n"
+                    "tool outputs to compact formats like TOON, CSV, etc.[/]",
+                    title="Serialization Status",
+                    border_style="yellow",
+                )
+            )
+            return
+
+        collector = get_metrics_collector()
+
+        if subcommand == "clear":
+            collector.clear_metrics()
+            self.console.print("[green]Serialization metrics cleared[/]")
+            return
+
+        if subcommand == "formats":
+            # Show per-format statistics
+            format_stats = collector.get_format_stats()
+            if not format_stats:
+                self.console.print("[yellow]No format statistics available yet[/]")
+                self.console.print("[dim]Metrics are collected during tool execution[/]")
+                return
+
+            table = Table(title="Serialization Format Statistics", show_header=True)
+            table.add_column("Format", style="cyan")
+            table.add_column("Usage Count", justify="right")
+            table.add_column("Avg Savings", justify="right")
+            table.add_column("Total Tokens Saved", justify="right")
+
+            for stat in format_stats:
+                format_name = stat.get("format", "?")
+                usage_count = stat.get("usage_count", 0)
+                avg_savings = stat.get("avg_savings_percent", 0)
+                total_saved = stat.get("total_tokens_saved", 0)
+
+                # Color code savings
+                savings_color = (
+                    "green" if avg_savings > 30 else "yellow" if avg_savings > 10 else "white"
+                )
+
+                table.add_row(
+                    format_name,
+                    str(usage_count),
+                    f"[{savings_color}]{avg_savings:.1f}%[/]",
+                    f"{total_saved:,}",
+                )
+
+            self.console.print(table)
+            return
+
+        if subcommand == "tools":
+            # Show per-tool statistics
+            overall = collector.get_overall_stats()
+            if overall.get("total_serializations", 0) == 0:
+                self.console.print("[yellow]No tool statistics available yet[/]")
+                self.console.print("[dim]Metrics are collected during tool execution[/]")
+                return
+
+            # Get tool-specific stats by querying common tools
+            common_tools = [
+                "list_directory",
+                "read_file",
+                "code_search",
+                "git",
+                "semantic_code_search",
+                "database",
+                "docker",
+            ]
+
+            table = Table(title="Per-Tool Serialization Statistics", show_header=True)
+            table.add_column("Tool", style="cyan")
+            table.add_column("Serializations", justify="right")
+            table.add_column("Avg Savings", justify="right")
+            table.add_column("Total Saved", justify="right")
+
+            for tool_name in common_tools:
+                stats = collector.get_tool_stats(tool_name)
+                if stats.get("total_serializations", 0) > 0:
+                    avg_savings = stats.get("avg_savings_percent", 0)
+                    savings_color = (
+                        "green" if avg_savings > 30 else "yellow" if avg_savings > 10 else "white"
+                    )
+
+                    table.add_row(
+                        tool_name,
+                        str(stats["total_serializations"]),
+                        f"[{savings_color}]{avg_savings:.1f}%[/]",
+                        f"{stats.get('total_tokens_saved', 0):,}",
+                    )
+
+            self.console.print(table)
+            return
+
+        # Default: show summary
+        overall = collector.get_overall_stats()
+        if overall.get("total_serializations", 0) == 0:
+            self.console.print(
+                Panel(
+                    "[yellow]No serialization metrics collected yet[/]\n\n"
+                    "[dim]Metrics are collected automatically during tool execution.\n"
+                    "Serialization activates for structured data (lists, dicts) with 3+ items.[/]",
+                    title="Serialization Statistics",
+                    border_style="yellow",
+                )
+            )
+            return
+
+        total_ser = overall.get("total_serializations", 0)
+        avg_savings = overall.get("avg_savings_percent", 0)
+        total_original = overall.get("total_original_tokens", 0)
+        total_serialized = overall.get("total_serialized_tokens", 0)
+        total_saved = overall.get("total_tokens_saved", 0)
+
+        # Calculate savings percentage color
+        savings_color = "green" if avg_savings > 30 else "yellow" if avg_savings > 10 else "white"
+
+        content = "[bold]Token-Optimized Serialization Summary[/]\n\n"
+        content += f"[bold]Total Serializations:[/] {total_ser:,}\n"
+        content += f"[bold]Average Savings:[/] [{savings_color}]{avg_savings:.1f}%[/]\n\n"
+
+        content += "[bold]Token Statistics:[/]\n"
+        content += f"  Original:   {total_original:,} tokens\n"
+        content += f"  Serialized: {total_serialized:,} tokens\n"
+        content += f"  [bold green]Saved:      {total_saved:,} tokens[/]\n\n"
+
+        # Show format breakdown if available
+        format_stats = collector.get_format_stats()
+        if format_stats:
+            content += "[bold]Top Formats:[/]\n"
+            for stat in format_stats[:4]:  # Top 4 formats
+                fmt = stat.get("format", "?")
+                usage = stat.get("usage_count", 0)
+                pct = stat.get("avg_savings_percent", 0)
+                content += f"  [cyan]{fmt}[/]: {usage} uses, {pct:.1f}% avg savings\n"
+
+        content += "\n[dim]Use /serialization tools for per-tool breakdown[/]"
+        content += "\n[dim]Use /serialization formats for format comparison[/]"
+        content += "\n[dim]Use /serialization clear to reset metrics[/]"
+
+        self.console.print(Panel(content, title="Serialization Statistics", border_style="green"))
+
     def _cmd_approvals(self, args: List[str]) -> None:
         """Configure what actions require user approval."""
         from victor.agent.safety import RiskLevel, get_safety_checker
@@ -2012,7 +2516,9 @@ Please think through this carefully and provide a detailed plan:"""
             if self.agent and hasattr(self.agent, "project_context"):
                 context_file = Path(target) / VICTOR_DIR_NAME / VICTOR_CONTEXT_FILE
                 if context_file.exists():
-                    self.console.print(f"[dim]Found {VICTOR_CONTEXT_FILE} - use /context to reload[/]")
+                    self.console.print(
+                        f"[dim]Found {VICTOR_CONTEXT_FILE} - use /context to reload[/]"
+                    )
 
         except PermissionError:
             self.console.print(f"[red]Permission denied:[/] {target}")

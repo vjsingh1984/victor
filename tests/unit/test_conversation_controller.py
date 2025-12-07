@@ -14,13 +14,13 @@
 
 """Tests for ConversationController."""
 
-import pytest
-from unittest.mock import MagicMock
 
 from victor.agent.conversation_controller import (
     ConversationController,
     ConversationConfig,
     ContextMetrics,
+    CompactionStrategy,
+    MessageImportance,
 )
 from victor.agent.conversation_state import ConversationStage
 from victor.providers.base import Message
@@ -220,6 +220,7 @@ class TestConversationController:
         controller = ConversationController(config=config)
 
         callback_called = [False]
+
         def on_overflow(metrics):
             callback_called[0] = True
 
@@ -280,3 +281,171 @@ class TestConversationController:
         tools = controller.get_stage_recommended_tools()
 
         assert isinstance(tools, set)
+
+
+class TestCompactionStrategy:
+    """Tests for CompactionStrategy enum."""
+
+    def test_compaction_strategy_values(self):
+        """Test that all strategy values exist."""
+        assert CompactionStrategy.SIMPLE.value == "simple"
+        assert CompactionStrategy.TIERED.value == "tiered"
+        assert CompactionStrategy.SEMANTIC.value == "semantic"
+        assert CompactionStrategy.HYBRID.value == "hybrid"
+
+
+class TestMessageImportance:
+    """Tests for MessageImportance dataclass."""
+
+    def test_message_importance_creation(self):
+        """Test creating a MessageImportance."""
+        msg = Message(role="user", content="Hello")
+        importance = MessageImportance(message=msg, index=0, score=5.0, reason="user")
+
+        assert importance.message == msg
+        assert importance.index == 0
+        assert importance.score == 5.0
+        assert importance.reason == "user"
+
+
+class TestSmartCompaction:
+    """Tests for smart context compaction functionality."""
+
+    def test_smart_compact_history_simple_strategy(self):
+        """Test smart compaction with SIMPLE strategy."""
+        config = ConversationConfig(compaction_strategy=CompactionStrategy.SIMPLE)
+        controller = ConversationController(config=config)
+
+        # Add many messages
+        for i in range(15):
+            controller.add_user_message(f"Message {i}")
+
+        removed = controller.smart_compact_history(target_messages=5)
+
+        assert removed > 0
+        assert controller.message_count <= 6  # 5 + potential system message
+
+    def test_smart_compact_history_tiered_strategy(self):
+        """Test smart compaction with TIERED strategy prioritizes tool results."""
+        config = ConversationConfig(compaction_strategy=CompactionStrategy.TIERED)
+        controller = ConversationController(config=config)
+
+        # Add a mix of messages
+        controller.set_system_prompt("System prompt")
+        controller.add_user_message("User message 1")
+        controller.add_assistant_message("Assistant response")
+        controller.add_tool_result("tool_1", "read_file", "File contents here - important data")
+        controller.add_user_message("User message 2")
+        controller.add_assistant_message("Another response")
+        controller.add_user_message("User message 3")
+        controller.add_assistant_message("Final response")
+
+        # Score messages
+        scored = controller._score_messages()
+
+        # Tool results should have higher scores than regular messages
+        tool_scores = [s for s in scored if s.message.role == "tool"]
+        [s for s in scored if s.message.role == "user"]
+
+        assert len(tool_scores) > 0
+        # Tool results get boosted score
+        assert any(s.score > 3.0 for s in tool_scores)
+
+    def test_smart_compact_preserves_system_message(self):
+        """Test that system message is always preserved."""
+        config = ConversationConfig(compaction_strategy=CompactionStrategy.TIERED)
+        controller = ConversationController(config=config)
+
+        controller.set_system_prompt("Always keep this")
+        for i in range(20):
+            controller.add_user_message(f"Message {i}")
+
+        controller.smart_compact_history(target_messages=5)
+
+        assert controller.messages[0].role == "system"
+        assert controller.messages[0].content == "Always keep this"
+
+    def test_score_messages_recency_boost(self):
+        """Test that recent messages get higher scores."""
+        config = ConversationConfig(compaction_strategy=CompactionStrategy.TIERED)
+        controller = ConversationController(config=config)
+
+        # Add messages
+        for i in range(10):
+            controller.add_user_message(f"Message {i}")
+
+        scored = controller._score_messages()
+
+        # Later messages should have higher scores due to recency
+        early_score = scored[0].score
+        late_score = scored[-1].score
+
+        assert late_score > early_score
+
+    def test_generate_compaction_summary(self):
+        """Test compaction summary generation."""
+        controller = ConversationController()
+
+        messages = [
+            Message(role="user", content="How do I use the FileReader class?"),
+            Message(role="tool", content="def read_file(): pass"),
+            Message(role="assistant", content="Here is how to use it."),
+        ]
+
+        summary = controller._generate_compaction_summary(messages)
+
+        assert summary != ""
+        assert "user" in summary.lower() or "tool" in summary.lower()
+
+    def test_extract_key_topics(self):
+        """Test key topic extraction."""
+        controller = ConversationController()
+
+        text = "The FileReader class handles file_operations with read_file method"
+        topics = controller._extract_key_topics(text)
+
+        assert len(topics) > 0
+        assert any("file" in t.lower() for t in topics)
+
+    def test_compaction_summaries_tracking(self):
+        """Test that compaction summaries are tracked."""
+        config = ConversationConfig(compaction_strategy=CompactionStrategy.TIERED)
+        controller = ConversationController(config=config)
+
+        # Add many messages
+        controller.set_system_prompt("System")
+        for i in range(15):
+            controller.add_user_message(f"Message {i}" * 50)  # Substantial content
+
+        # Compact
+        controller.smart_compact_history(target_messages=5)
+
+        # Should have generated a summary
+        summaries = controller.get_compaction_summaries()
+        assert isinstance(summaries, list)
+
+    def test_set_embedding_service(self):
+        """Test setting embedding service."""
+        controller = ConversationController()
+
+        # Initially None
+        assert controller._embedding_service is None
+
+        # Mock embedding service
+        class MockEmbeddingService:
+            pass
+
+        mock_service = MockEmbeddingService()
+        controller.set_embedding_service(mock_service)
+
+        assert controller._embedding_service == mock_service
+
+    def test_config_compaction_defaults(self):
+        """Test compaction configuration defaults."""
+        config = ConversationConfig()
+
+        assert config.compaction_strategy == CompactionStrategy.TIERED
+        assert config.min_messages_to_keep == 6
+        assert config.tool_result_retention_weight == 1.5
+        assert config.recent_message_weight == 2.0
+        assert config.semantic_relevance_threshold == 0.3

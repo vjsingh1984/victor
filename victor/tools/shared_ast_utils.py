@@ -371,6 +371,21 @@ def calculate_cognitive_complexity(node: ast.AST) -> int:
     nesting_level = 0
 
     class CognitiveVisitor(ast.NodeVisitor):
+        """AST visitor for calculating cognitive complexity.
+
+        This visitor traverses an AST and calculates cognitive complexity
+        by counting control flow structures with nesting penalties. Unlike
+        cyclomatic complexity, cognitive complexity penalizes deeply nested
+        code more heavily, reflecting the cognitive load on developers.
+
+        Complexity increments:
+        - If/For/While/ExceptHandler: +1 base, +nesting_level penalty
+        - BoolOp (and/or): +(num_values - 1) for chained conditions
+        - Lambda: +1 for inline function complexity
+
+        Uses nonlocal to track state across the recursive visit.
+        """
+
         nonlocal complexity, nesting_level
 
         def visit_If(self, node: ast.If) -> None:

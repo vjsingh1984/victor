@@ -21,7 +21,6 @@ Tests the dedicated LMStudioProvider which uses:
 - OpenAI-compatible API format
 """
 
-import json
 import pytest
 import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -262,7 +261,9 @@ async def test_parse_json_tool_call_from_content(lmstudio_provider):
 @pytest.mark.asyncio
 async def test_parse_tool_request_format(lmstudio_provider):
     """Test [TOOL_REQUEST] format parsing."""
-    content = '[TOOL_REQUEST]{"name": "read_file", "arguments": {"path": "/etc/hosts"}}[END_TOOL_REQUEST]'
+    content = (
+        '[TOOL_REQUEST]{"name": "read_file", "arguments": {"path": "/etc/hosts"}}[END_TOOL_REQUEST]'
+    )
     result = lmstudio_provider._parse_json_tool_call_from_content(content)
 
     assert result is not None
@@ -410,9 +411,7 @@ def test_tiered_url_selection_list():
         mock_client_instance.get.side_effect = mock_get
         mock_client.return_value = mock_client_instance
 
-        provider = LMStudioProvider(
-            base_url=["http://192.168.1.20:1234", "http://127.0.0.1:1234"]
-        )
+        provider = LMStudioProvider(base_url=["http://192.168.1.20:1234", "http://127.0.0.1:1234"])
         # Should fall back to second URL
         assert "127.0.0.1" in provider.base_url
 

@@ -229,10 +229,7 @@ class ContextCompactor:
                 new_utilization=utilization,
             )
 
-        logger.info(
-            f"Compaction triggered: {trigger.value} "
-            f"(utilization: {utilization:.1%})"
-        )
+        logger.info(f"Compaction triggered: {trigger.value} " f"(utilization: {utilization:.1%})")
 
         # Perform compaction
         chars_before = metrics.char_count
@@ -399,8 +396,8 @@ class ContextCompactor:
             if code_blocks:
                 # Mark first code block lines as priority
                 first_block = code_blocks[0]
-                start_line = content[:first_block.start()].count("\n")
-                end_line = content[:first_block.end()].count("\n")
+                start_line = content[: first_block.start()].count("\n")
+                end_line = content[: first_block.end()].count("\n")
                 for i in range(start_line, min(end_line + 1, start_line + 20)):
                     priority_indices.add(i)
 
@@ -410,7 +407,7 @@ class ContextCompactor:
         half_lines = max(1, max_lines // 2)
 
         # Keep first portion
-        for i, line in enumerate(lines[:half_lines]):
+        for _i, line in enumerate(lines[:half_lines]):
             if char_count + len(line) > max_chars // 2:
                 # Truncate this line if it's too long
                 remaining = max_chars // 2 - char_count

@@ -16,7 +16,6 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-import json
 
 from victor.mcp.client import MCPClient
 from victor.mcp.protocol import MCPTool, MCPResource, MCPToolCallResult

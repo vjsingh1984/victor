@@ -217,7 +217,8 @@ class TestCreateToolClass:
 
         params = tool_obj.parameters
         assert params["properties"]["str_param"]["type"] == "string"
-        assert params["properties"]["int_param"]["type"] == "number"
+        # int maps to "integer" per JSON Schema spec (more precise than "number")
+        assert params["properties"]["int_param"]["type"] == "integer"
         assert params["properties"]["float_param"]["type"] == "number"
         assert params["properties"]["bool_param"]["type"] == "boolean"
 

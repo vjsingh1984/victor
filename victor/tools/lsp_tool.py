@@ -308,57 +308,10 @@ async def lsp(
     max_items: int = 20,
     max_results: int = 50,
 ) -> Dict[str, Any]:
-    """
-    Unified LSP tool for code intelligence operations.
+    """Language Server Protocol operations for code intelligence.
 
-    Provides access to Language Server Protocol features like completions,
-    hover information, go-to-definition, find-references, and diagnostics.
-
-    Actions:
-    - status: Get status of all running language servers
-    - start: Start a language server (requires: language)
-    - stop: Stop a language server (requires: language)
-    - completions: Get code completions at position (requires: file_path, line, character)
-    - hover: Get hover info at position (requires: file_path, line, character)
-    - definition: Go to symbol definition (requires: file_path, line, character)
-    - references: Find all symbol references (requires: file_path, line, character)
-    - diagnostics: Get errors/warnings for file (requires: file_path)
-    - open: Open a file in language server (requires: file_path)
-    - close: Close a file in language server (requires: file_path)
-
-    Args:
-        action: Operation to perform.
-        language: Language identifier for start/stop (e.g., "python", "typescript").
-        file_path: Path to the file for most operations.
-        line: Line number (0-indexed) for position-based operations.
-        character: Character offset (0-indexed) for position-based operations.
-        max_items: Maximum completions to return (default: 20).
-        max_results: Maximum references to return (default: 50).
-
-    Returns:
-        Dictionary with operation results.
-
-    Examples:
-        # Check LSP status
-        lsp(action="status")
-
-        # Start Python LSP
-        lsp(action="start", language="python")
-
-        # Get completions
-        lsp(action="completions", file_path="src/main.py", line=10, character=15)
-
-        # Get hover info
-        lsp(action="hover", file_path="src/main.py", line=10, character=15)
-
-        # Go to definition
-        lsp(action="definition", file_path="src/main.py", line=20, character=5)
-
-        # Find references
-        lsp(action="references", file_path="src/utils.py", line=10, character=4)
-
-        # Get diagnostics
-        lsp(action="diagnostics", file_path="src/main.py")
+    Actions: status, start, stop, completions, hover, definition, references, diagnostics.
+    Position-based actions require: file_path, line, character.
     """
     action_lower = action.lower().strip()
 

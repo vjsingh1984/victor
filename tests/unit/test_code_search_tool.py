@@ -212,6 +212,35 @@ class TestCodeSearch:
             assert "error" in result
             assert "Permission denied" in result["error"]
 
+    @pytest.mark.asyncio
+    async def test_code_search_path_alias(self):
+        """Test code_search accepts 'path' as alias for 'root'.
+
+        Models often use 'path' intuitively instead of 'root'.
+        This test ensures both parameters work.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(f"{tmpdir}/test.py").write_text("def hello():\n    pass")
+
+            # Test with path parameter (alias)
+            result = await code_search("hello", path=tmpdir, k=5)
+            assert result["success"] is True
+            assert result["count"] >= 1
+
+    @pytest.mark.asyncio
+    async def test_code_search_path_overrides_root(self):
+        """Test that 'path' takes precedence over 'root' when both provided."""
+        with tempfile.TemporaryDirectory() as tmpdir1:
+            with tempfile.TemporaryDirectory() as tmpdir2:
+                # Put file in tmpdir2 only
+                Path(f"{tmpdir2}/test.py").write_text("unique_marker_xyz")
+
+                # Search with path=tmpdir2, root=tmpdir1
+                # Should find file in tmpdir2 (path takes precedence)
+                result = await code_search("unique_marker_xyz", root=tmpdir1, path=tmpdir2, k=5)
+                assert result["success"] is True
+                assert result["count"] >= 1
+
 
 class TestSemanticCodeSearch:
     """Tests for semantic_code_search function."""

@@ -49,7 +49,6 @@ Usage:
     )
 """
 
-import asyncio
 import logging
 import time
 from dataclasses import dataclass
@@ -59,7 +58,8 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 try:
     import lancedb
-    import pyarrow as pa
+    import pyarrow as pa  # noqa: F401 - Required by LanceDB
+
     LANCEDB_AVAILABLE = True
 except ImportError:
     LANCEDB_AVAILABLE = False
@@ -128,9 +128,7 @@ class ConversationEmbeddingStore:
             db_path: Path to LanceDB directory. Defaults to {project}/.victor/embeddings/conversations/
         """
         if not LANCEDB_AVAILABLE:
-            raise ImportError(
-                "LanceDB not available. Install with: pip install lancedb pyarrow"
-            )
+            raise ImportError("LanceDB not available. Install with: pip install lancedb pyarrow")
 
         self._embedding_service = embedding_service
         self._db_path = db_path
@@ -159,6 +157,7 @@ class ConversationEmbeddingStore:
         # Determine database path
         if self._db_path is None:
             from victor.config.settings import get_project_paths
+
             paths = get_project_paths()
             self._db_path = paths.embeddings_dir / "conversations"
 
@@ -173,9 +172,7 @@ class ConversationEmbeddingStore:
         existing_tables = self._db.table_names()
         if self.TABLE_NAME in existing_tables:
             self._table = self._db.open_table(self.TABLE_NAME)
-            logger.info(
-                f"[ConversationEmbeddingStore] Opened existing table '{self.TABLE_NAME}'"
-            )
+            logger.info(f"[ConversationEmbeddingStore] Opened existing table '{self.TABLE_NAME}'")
         else:
             logger.info(
                 f"[ConversationEmbeddingStore] Table '{self.TABLE_NAME}' will be created on first insert"
@@ -228,7 +225,7 @@ class ConversationEmbeddingStore:
             "id": message_id,
             "session_id": session_id,
             "role": role,
-            "content_preview": content[:self.MAX_CONTENT_PREVIEW],
+            "content_preview": content[: self.MAX_CONTENT_PREVIEW],
             "vector": embedding.tolist(),
             "timestamp": (timestamp or datetime.now()).isoformat(),
         }
@@ -285,11 +282,13 @@ class ConversationEmbeddingStore:
                 "id": msg["message_id"],
                 "session_id": msg["session_id"],
                 "role": msg["role"],
-                "content_preview": msg["content"][:self.MAX_CONTENT_PREVIEW],
+                "content_preview": msg["content"][: self.MAX_CONTENT_PREVIEW],
                 "vector": embedding.tolist(),
-                "timestamp": (msg.get("timestamp") or datetime.now()).isoformat()
-                if isinstance(msg.get("timestamp"), datetime)
-                else msg.get("timestamp", datetime.now().isoformat()),
+                "timestamp": (
+                    (msg.get("timestamp") or datetime.now()).isoformat()
+                    if isinstance(msg.get("timestamp"), datetime)
+                    else msg.get("timestamp", datetime.now().isoformat())
+                ),
             }
             records.append(record)
 
@@ -342,7 +341,9 @@ class ConversationEmbeddingStore:
         query_embedding = await self._embedding_service.embed_text(query[:2000])
 
         # Search in LanceDB
-        search_query = self._table.search(query_embedding.tolist()).limit(limit * 2)  # Over-fetch for filtering
+        search_query = self._table.search(query_embedding.tolist()).limit(
+            limit * 2
+        )  # Over-fetch for filtering
 
         # Apply session filter if provided
         if session_id:
@@ -439,10 +440,7 @@ class ConversationEmbeddingStore:
             where_clause += f" AND session_id = '{session_id}'"
 
         results = (
-            self._table.search(query_embedding.tolist())
-            .where(where_clause)
-            .limit(limit)
-            .to_list()
+            self._table.search(query_embedding.tolist()).where(where_clause).limit(limit).to_list()
         )
 
         search_results: List[ConversationSearchResult] = []
@@ -525,7 +523,9 @@ class ConversationEmbeddingStore:
             )
             return deleted
         except Exception as e:
-            logger.warning(f"[ConversationEmbeddingStore] Failed to delete session {session_id}: {e}")
+            logger.warning(
+                f"[ConversationEmbeddingStore] Failed to delete session {session_id}: {e}"
+            )
             return 0
 
     async def get_stats(self) -> Dict[str, Any]:
@@ -582,6 +582,7 @@ async def get_conversation_embedding_store(
     if _embedding_store is None:
         if embedding_service is None:
             from victor.embeddings.service import EmbeddingService
+
             embedding_service = EmbeddingService.get_instance()
 
         _embedding_store = ConversationEmbeddingStore(embedding_service)

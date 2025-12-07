@@ -14,7 +14,6 @@
 
 """Tests for the unified TaskAnalyzer."""
 
-import pytest
 
 from victor.agent.task_analyzer import (
     TaskAnalyzer,
@@ -94,9 +93,7 @@ class TestTaskAnalyzer:
     def test_analyze_complex_query(self):
         """Test analyzing a complex query."""
         analyzer = TaskAnalyzer()
-        result = analyzer.analyze(
-            "Refactor the authentication system to use JWT tokens"
-        )
+        result = analyzer.analyze("Refactor the authentication system to use JWT tokens")
 
         assert isinstance(result, TaskAnalysis)
         # Complex tasks should have higher budget
@@ -117,7 +114,11 @@ class TestTaskAnalyzer:
 
         assert isinstance(result, TaskAnalysis)
         # Display requests typically don't authorize writes
-        assert result.action_intent in [ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY, ActionIntent.AMBIGUOUS]
+        assert result.action_intent in [
+            ActionIntent.DISPLAY_ONLY,
+            ActionIntent.READ_ONLY,
+            ActionIntent.AMBIGUOUS,
+        ]
 
     def test_classify_complexity(self):
         """Test quick complexity classification."""

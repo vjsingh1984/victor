@@ -748,7 +748,9 @@ class TaskMilestoneMonitor:
             productivity_ratio = productive / total_turns
             # If model only makes tool calls 50% of turns, give it additional buffer
             # Clamp multiplier between 1.0 and 2.0 to avoid extreme values
-            productivity_multiplier = min(2.0, max(1.0, 1.0 / productivity_ratio)) if productivity_ratio > 0 else 1.5
+            productivity_multiplier = (
+                min(2.0, max(1.0, 1.0 / productivity_ratio)) if productivity_ratio > 0 else 1.5
+            )
             effective_max = int(model_adjusted_max * productivity_multiplier)
             logger.debug(
                 f"Exploration limits: base={base_max}, model_adjusted={model_adjusted_max}, "

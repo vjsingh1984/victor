@@ -99,6 +99,11 @@ class TestToolCallingAdapterRegistry:
         adapter = ToolCallingAdapterRegistry.get_adapter("xai", model="grok-1")
         assert isinstance(adapter, OpenAIToolCallingAdapter)
 
+    def test_get_adapter_deepseek(self):
+        """Test getting DeepSeek adapter uses OpenAI format."""
+        adapter = ToolCallingAdapterRegistry.get_adapter("deepseek", model="deepseek-chat")
+        assert isinstance(adapter, OpenAIToolCallingAdapter)
+
     def test_get_adapter_unknown_provider(self):
         """Test unknown provider falls back to OpenAI-compatible."""
         adapter = ToolCallingAdapterRegistry.get_adapter("unknown_provider", model="some-model")
@@ -127,6 +132,7 @@ class TestToolCallingAdapterRegistry:
         assert "ollama" in providers
         assert "lmstudio" in providers
         assert "vllm" in providers
+        assert "deepseek" in providers
 
     def test_is_registered_true(self):
         """Test is_registered returns True for registered providers."""
@@ -170,6 +176,7 @@ class TestToolCallingAdapterRegistry:
         assert "ollama" in ToolCallingAdapterRegistry._adapters
         assert "lmstudio" in ToolCallingAdapterRegistry._adapters
         assert "vllm" in ToolCallingAdapterRegistry._adapters
+        assert "deepseek" in ToolCallingAdapterRegistry._adapters
 
 
 class TestToolCallingAdapterRegistryEdgeCases:

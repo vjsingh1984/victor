@@ -41,7 +41,7 @@ Usage:
 
 import logging
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
@@ -228,20 +228,24 @@ class ToolSequenceTracker:
 
             # Update success rate with exponential moving average
             alpha = self.config.learning_rate
-            stats.success_rate = alpha * (1.0 if success else 0.0) + (1 - alpha) * stats.success_rate
+            stats.success_rate = (
+                alpha * (1.0 if success else 0.0) + (1 - alpha) * stats.success_rate
+            )
 
             # Update average time
             if stats.avg_time_between == 0:
                 stats.avg_time_between = execution_time
             else:
-                stats.avg_time_between = alpha * execution_time + (1 - alpha) * stats.avg_time_between
+                stats.avg_time_between = (
+                    alpha * execution_time + (1 - alpha) * stats.avg_time_between
+                )
 
         # Add to history
         self._history.append(tool_name)
 
         # Trim history if needed
         if len(self._history) > self.config.max_history:
-            self._history = self._history[-self.config.max_history:]
+            self._history = self._history[-self.config.max_history :]
 
         logger.debug(f"Recorded tool execution: {tool_name} (history: {len(self._history)})")
 
@@ -271,9 +275,7 @@ class ToolSequenceTracker:
             for next_tool, stats in self._transitions[last_tool].items():
                 if next_tool not in exclude:
                     # Calculate confidence based on count and success rate
-                    total_from_last = sum(
-                        s.count for s in self._transitions[last_tool].values()
-                    )
+                    total_from_last = sum(s.count for s in self._transitions[last_tool].values())
                     if total_from_last > 0:
                         base_prob = stats.count / total_from_last
                         confidence = base_prob * stats.success_rate
@@ -289,11 +291,7 @@ class ToolSequenceTracker:
                     suggestions[suggested] = max(current, weight)
 
         # Sort by confidence and return top_k
-        sorted_suggestions = sorted(
-            suggestions.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )
+        sorted_suggestions = sorted(suggestions.items(), key=lambda x: x[1], reverse=True)
 
         return sorted_suggestions[:top_k]
 
@@ -387,8 +385,7 @@ class ToolSequenceTracker:
             Dictionary with tracker stats
         """
         total_transitions = sum(
-            sum(s.count for s in targets.values())
-            for targets in self._transitions.values()
+            sum(s.count for s in targets.values()) for targets in self._transitions.values()
         )
 
         return {

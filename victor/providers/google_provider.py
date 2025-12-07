@@ -274,7 +274,7 @@ class GoogleProvider(BaseProvider):
         # differently from streaming text chunks
         if tools:
             logger.debug(
-                f"Gemini stream with tools: falling back to non-streaming for native function calling"
+                "Gemini stream with tools: falling back to non-streaming for native function calling"
             )
             response = await self.chat(
                 messages=messages,
@@ -353,7 +353,8 @@ class GoogleProvider(BaseProvider):
             # Build parameters dict for FunctionDeclaration
             params = None
             if tool.parameters and tool.parameters.get("properties"):
-                params = tool.parameters
+                # Clean parameters - Gemini doesn't support some JSON Schema fields
+                params = self._clean_schema_for_gemini(tool.parameters)
 
             # Create FunctionDeclaration using proper SDK types
             func_decl = FunctionDeclaration(
@@ -368,6 +369,35 @@ class GoogleProvider(BaseProvider):
         )
         # Wrap in Tool object - this is the proper way to pass tools to GenerativeModel
         return [Tool(function_declarations=function_declarations)]
+
+    def _clean_schema_for_gemini(self, schema: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove unsupported JSON Schema fields for Gemini API compatibility.
+
+        Gemini's Schema proto doesn't support certain standard JSON Schema fields
+        like 'default', 'examples', etc. This method recursively strips them.
+
+        Args:
+            schema: JSON Schema dictionary
+
+        Returns:
+            Cleaned schema compatible with Gemini API
+        """
+        # Fields not supported by Gemini's Schema proto
+        unsupported_fields = {"default", "examples", "$schema", "$id", "definitions"}
+
+        def clean_recursive(obj: Any) -> Any:
+            if isinstance(obj, dict):
+                cleaned = {}
+                for key, value in obj.items():
+                    if key not in unsupported_fields:
+                        cleaned[key] = clean_recursive(value)
+                return cleaned
+            elif isinstance(obj, list):
+                return [clean_recursive(item) for item in obj]
+            else:
+                return obj
+
+        return clean_recursive(schema)
 
     def _convert_messages(self, messages: List[Message]) -> tuple[List[Dict[str, str]], str]:
         """Convert messages to Gemini format.

@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
 """Run full HumanEval benchmark with Victor agent.
 
-This script uses the existing evaluation harness to run the complete
+This script uses the code generation harness to run the complete
 HumanEval benchmark using Victor's LLM providers.
 
+BENCHMARK MODE GUIDE:
+HumanEval/MBPP benchmarks test pure code generation - use provider mode only.
+This tests raw LLM capability without tools which aren't needed for code gen.
+
+  - provider: Raw LLM capability (DEFAULT - this is what you want for HumanEval)
+
+NOTE: For agentic benchmarks (SWE-bench, Aider Polyglot) that require tools,
+file editing, and multi-turn interactions, use the AgenticBenchmarkRunner
+from victor.evaluation.agentic_harness instead.
+
 Usage:
-    # Run with default (Ollama) profile, parallelism=1
-    python scripts/run_full_benchmark.py --profile default --parallel 1 --tasks 10
+    # Run with default (Ollama) profile
+    python scripts/run_full_benchmark.py --profile default --tasks 10
 
     # Run with claude-haiku profile, parallelism=4
     python scripts/run_full_benchmark.py --profile claude-haiku --parallel 4 --tasks 10
@@ -44,6 +54,9 @@ from victor.evaluation import (
     TaskStatus,
     get_harness,
     pass_at_k,
+    # Code generation harness (provider-only for HumanEval)
+    CodeGenerationBenchmark,
+    create_code_gen_runner,
 )
 from victor.evaluation.protocol import BenchmarkTask
 from victor.providers.base import Message
@@ -151,7 +164,191 @@ Complete the function above. Write the implementation that passes all the test c
             logger.warning(f"Error generating code for {task.task_id}: {e}")
             return task.prompt
 
-    return agent_callback
+    return agent_callback, provider, model_name
+
+
+def create_retry_callback(provider, model_name: str, timeout: int = 120):
+    """Create a retry callback for self-correction.
+
+    This callback is called when the generated code fails tests and
+    self-correction is enabled. It receives feedback about what went
+    wrong and generates a corrected solution.
+
+    Args:
+        provider: The LLM provider instance
+        model_name: Model name to use
+        timeout: Request timeout in seconds
+
+    Returns:
+        Async callback function for retry with feedback
+    """
+    async def retry_callback(task: BenchmarkTask, previous_code: str, feedback_prompt: str) -> str:
+        """Generate corrected code based on feedback."""
+        messages = [Message(role="user", content=feedback_prompt)]
+
+        try:
+            response = await asyncio.wait_for(
+                provider.chat(
+                    messages=messages,
+                    model=model_name,
+                    temperature=0.3,  # Slightly higher temp for exploration
+                    max_tokens=1024,
+                ),
+                timeout=timeout,
+            )
+
+            generated_code = response.content.strip()
+
+            # Clean up markdown code blocks if present
+            if "```python" in generated_code:
+                match = re.search(r"```python\n(.*?)```", generated_code, re.DOTALL)
+                if match:
+                    generated_code = match.group(1).strip()
+            elif "```" in generated_code:
+                match = re.search(r"```\n(.*?)```", generated_code, re.DOTALL)
+                if match:
+                    generated_code = match.group(1).strip()
+
+            return generated_code
+
+        except asyncio.TimeoutError:
+            return previous_code  # Return previous code on timeout
+        except Exception as e:
+            logger.warning(f"Error in retry for {task.task_id}: {e}")
+            return previous_code
+
+    return retry_callback
+
+
+async def run_code_gen_benchmark(
+    profile: str,
+    num_tasks: int,
+    output_file: str = None,
+    base_url: str = None,
+    model_override: str = None,
+):
+    """Run HumanEval code generation benchmark (provider-only).
+
+    Args:
+        profile: Profile name from profiles.yaml
+        num_tasks: Number of tasks to run (None for all)
+        output_file: Output JSON file path
+        base_url: Override base URL
+        model_override: Override model name
+    """
+    print()
+    print("=" * 70)
+    print("  VICTOR AI CODING ASSISTANT - Code Generation Benchmark")
+    print("=" * 70)
+    print()
+    print(f"Profile:     {profile}")
+    print(f"Mode:        provider (code generation)")
+    print(f"Tasks:       {num_tasks if num_tasks else 'ALL (164)'}")
+    print(f"Timestamp:   {datetime.now().isoformat()}")
+    print()
+
+    # Load tasks using HumanEvalRunner
+    harness = get_harness()
+    harness.register_runner(HumanEvalRunner())
+
+    config = EvaluationConfig(
+        benchmark=BenchmarkType.HUMAN_EVAL,
+        model=model_override or profile,
+        max_tasks=num_tasks,
+        timeout_per_task=120,
+    )
+
+    runner = harness.get_runner(config.benchmark)
+    tasks = await runner.load_tasks(config)
+    print(f"Loaded {len(tasks)} tasks")
+    print()
+
+    # Create test callback for validating generated code
+    async def test_callback(task: BenchmarkTask, code: str) -> tuple[bool, int, int]:
+        """Test generated code against task tests."""
+        try:
+            result = await runner.run_task(task, code, config)
+            passed = result.status == TaskStatus.PASSED
+            return passed, result.tests_passed or 0, result.tests_total or 1
+        except Exception as e:
+            logger.warning(f"Test error for {task.task_id}: {e}")
+            return False, 0, 1
+
+    # Create code generation runner
+    print("Initializing provider runner...")
+    code_gen_runner = create_code_gen_runner(
+        profile=profile,
+        base_url=base_url,
+        model_override=model_override,
+    )
+    benchmark = CodeGenerationBenchmark(code_gen_runner)
+
+    print()
+    print("-" * 70)
+    print("Running benchmark (progress shown in real-time)...")
+    print("-" * 70)
+    print(flush=True)
+
+    # Progress callback
+    def print_progress(task_idx, total_tasks, result):
+        status = "PASS" if result.success else "FAIL"
+        print(f"[provider] [{task_idx+1}/{total_tasks}] {result.task_id}")
+        print(f"    Status: {status}, Turns: 1, Tools: 0, Time: {result.duration_seconds:.1f}s")
+        if result.error_message:
+            print(f"    Error: {result.error_message[:60]}")
+        print(flush=True)
+
+    # Run benchmark
+    metrics = await benchmark.run_benchmark(
+        tasks=tasks,
+        test_callback=test_callback,
+        config=config,
+        progress_callback=print_progress,
+    )
+
+    # Print summary
+    print()
+    print("=" * 70)
+    print("CODE GENERATION BENCHMARK RESULTS")
+    print("=" * 70)
+    print()
+
+    print("LEVEL: PROVIDER")
+    print("-" * 40)
+    print(f"  Pass Rate:      {metrics.pass_rate:.1%} ({metrics.passed}/{metrics.total_tasks})")
+    print(f"  Errors:         {metrics.errors}")
+    print(f"  Timeouts:       {metrics.timeouts}")
+    print(f"  Avg Tokens:     {metrics.avg_tokens:.0f}")
+    print(f"  Avg Time:       {metrics.avg_time:.1f}s")
+    print()
+
+    print("=" * 70)
+
+    # Save results
+    output_data = {
+        "timestamp": datetime.now().isoformat(),
+        "profile": profile,
+        "mode": "provider",
+        "levels": {"provider": metrics.to_dict()},
+    }
+
+    if output_file:
+        output_path = Path(output_file)
+    else:
+        output_path = Path(f"/tmp/victor_codegen_{profile}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+
+    with open(output_path, 'w') as f:
+        json.dump(output_data, f, indent=2, default=str)
+
+    print(f"\nResults saved to: {output_path}")
+
+    # Also save report
+    report = benchmark.generate_report()
+    report_path = output_path.with_suffix('.txt')
+    report_path.write_text(report)
+    print(f"Report saved to: {report_path}")
+
+    return metrics
 
 
 async def run_benchmark(
@@ -161,6 +358,8 @@ async def run_benchmark(
     output_file: str = None,
     base_url: str = None,
     model_override: str = None,
+    self_correct: bool = False,
+    self_correct_iterations: int = 3,
 ):
     """Run the benchmark using the existing evaluation harness.
 
@@ -171,8 +370,14 @@ async def run_benchmark(
         output_file: Output JSON file path
         base_url: Override base URL (for targeting specific Ollama hosts)
         model_override: Override model name from profile
+        self_correct: Enable self-correction loop
+        self_correct_iterations: Max self-correction iterations
     """
     print_banner(profile, num_tasks, parallel)
+
+    if self_correct:
+        print(f"Self-Correction: ENABLED (max {self_correct_iterations} iterations)")
+        print()
 
     # Register runner with harness
     harness = get_harness()
@@ -185,11 +390,22 @@ async def run_benchmark(
         max_tasks=num_tasks,
         parallel_tasks=parallel,
         timeout_per_task=120,
+        enable_self_correction=self_correct,
+        self_correction_max_iterations=self_correct_iterations,
+        auto_fix_imports=True,
     )
 
     # Create agent callback
     print("Initializing provider...")
-    agent_callback = create_agent_callback(profile, base_url=base_url, model_override=model_override)
+    agent_callback, provider, model_name = create_agent_callback(
+        profile, base_url=base_url, model_override=model_override
+    )
+
+    # Create retry callback for self-correction
+    retry_callback = None
+    if self_correct:
+        retry_callback = create_retry_callback(provider, model_name)
+
     print()
 
     # Run evaluation using the harness
@@ -212,7 +428,9 @@ async def run_benchmark(
             print(f"    Error: {task_result.error_message[:80]}")
         print(flush=True)
 
-    result = await harness.run_evaluation(config, agent_callback, progress_callback=print_progress)
+    result = await harness.run_evaluation(
+        config, agent_callback, progress_callback=print_progress, retry_callback=retry_callback
+    )
 
     # Get metrics from harness
     metrics = result.get_metrics()
@@ -321,17 +539,68 @@ async def main():
         default=None,
         help="Override model name from profile (e.g., gpt-oss:latest)",
     )
+    parser.add_argument(
+        "--self-correct",
+        action="store_true",
+        help="Enable self-correction loop (validate→test→feedback→retry)",
+    )
+    parser.add_argument(
+        "--self-correct-iterations",
+        type=int,
+        default=3,
+        help="Max iterations for self-correction (default: 3)",
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["provider", "orchestrator", "cli", "compare"],
+        default=None,
+        help="Benchmark mode: 'provider' only (orchestrator/cli/compare deprecated for HumanEval)",
+    )
 
     args = parser.parse_args()
 
-    await run_benchmark(
-        profile=args.profile,
-        num_tasks=args.tasks,
-        parallel=args.parallel,
-        output_file=args.output,
-        base_url=args.base_url,
-        model_override=args.model,
-    )
+    # Check for deprecated modes
+    if args.mode in ["orchestrator", "cli", "compare"]:
+        print()
+        print("=" * 70)
+        print("  DEPRECATED MODE")
+        print("=" * 70)
+        print()
+        print(f"  The '{args.mode}' mode has been removed from HumanEval benchmarks.")
+        print()
+        print("  HumanEval tests pure code generation - tools add overhead without value.")
+        print()
+        print("  Options:")
+        print("    1. Remove --mode or use --mode provider for HumanEval")
+        print("    2. For agentic tasks requiring tools, use AgenticBenchmarkRunner")
+        print("       from victor.evaluation.agentic_harness")
+        print()
+        print("=" * 70)
+        sys.exit(1)
+
+    # Route to appropriate benchmark based on mode
+    if args.mode == "provider":
+        # Explicit provider mode - use code generation benchmark
+        await run_code_gen_benchmark(
+            profile=args.profile,
+            num_tasks=args.tasks,
+            output_file=args.output,
+            base_url=args.base_url,
+            model_override=args.model,
+        )
+    else:
+        # Standard benchmark (provider-level with existing harness)
+        await run_benchmark(
+            profile=args.profile,
+            num_tasks=args.tasks,
+            parallel=args.parallel,
+            output_file=args.output,
+            base_url=args.base_url,
+            model_override=args.model,
+            self_correct=args.self_correct,
+            self_correct_iterations=args.self_correct_iterations,
+        )
 
 
 if __name__ == "__main__":

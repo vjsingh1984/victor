@@ -3,15 +3,8 @@
 
 """Tests for shared_ast_utils module."""
 
-from pathlib import Path
-
-import pytest
 
 from victor.tools.shared_ast_utils import (
-    ClassInfo,
-    FunctionInfo,
-    ModuleInfo,
-    ParseResult,
     calculate_cognitive_complexity,
     calculate_complexity,
     calculate_maintainability_index,

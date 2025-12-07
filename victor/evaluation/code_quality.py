@@ -460,7 +460,7 @@ class CodeQualityAnalyzer:
         """Basic analysis for non-Python code."""
         metrics = CodeQualityMetrics()
         metrics.syntax_valid = True  # Assume valid
-        metrics.lines_of_code = len([l for l in code.split("\n") if l.strip()])
+        metrics.lines_of_code = len([ln for ln in code.split("\n") if ln.strip()])
         return metrics
 
 

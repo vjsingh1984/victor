@@ -96,7 +96,7 @@ async def test_execute_bash_working_dir_not_found():
         result = await execute_bash(command="pwd", working_dir="/nonexistent/directory")
 
         assert result["success"] is False
-        assert "Working directory not found" in result["error"]
+        assert "Working directory does not exist" in result["error"]
         assert result["return_code"] == -1
 
 

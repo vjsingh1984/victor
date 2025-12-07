@@ -148,6 +148,7 @@ async def code_search(
     max_files: int = 200,
     max_chars: int = 50000,
     exts: Optional[List[str]] = None,
+    path: Optional[str] = None,  # Alias for 'root' - models often use 'path'
 ) -> Dict[str, Any]:
     """
     Simple keyword-based code search for exact text matches.
@@ -157,17 +158,24 @@ async def code_search(
     or "find all implementations of X", use semantic_code_search instead.
 
     Scans files and scores by keyword match frequency. Fast but misses semantic meaning.
+
+    Args:
+        query: Search query string
+        root: Root directory to search (default: current directory)
+        path: Alias for 'root' - accepts either parameter name
     """
+    # Support 'path' as alias for 'root' (models often use 'path' intuitively)
+    search_root = path if path is not None else root
     try:
-        files = _gather_files(root, exts, max_files)
+        files = _gather_files(search_root, exts, max_files)
         scores: List[Dict[str, Any]] = []
-        for path in files:
+        for file_path in files:
             try:
-                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     text = f.read(max_chars)
                 score = _keyword_score(text, query)
                 if score > 0:
-                    scores.append({"path": path, "score": score, "snippet": text[:800]})
+                    scores.append({"path": file_path, "score": score, "snippet": text[:800]})
             except Exception:
                 continue
 
@@ -191,55 +199,27 @@ async def semantic_code_search(
     filter_is_test_file: Optional[bool] = None,
     filter_has_docstring: Optional[bool] = None,
     context: Optional[Dict[str, Any]] = None,
+    path: Optional[str] = None,  # Alias for 'root' - models often use 'path'
 ) -> Dict[str, Any]:
+    """AI-powered semantic code search using embeddings.
+
+    PREFERRED over code_search for conceptual queries like "find authentication",
+    "error handling patterns", or "classes inheriting from X".
+
+    Filters: filter_file_path, filter_symbol_type (class/function/method),
+    filter_visibility (public/private), filter_language, filter_is_test_file.
+
+    Args:
+        query: Semantic search query
+        root: Root directory to search (default: current directory)
+        path: Alias for 'root' - accepts either parameter name
     """
-    PREFERRED: AI-powered semantic search using embeddings for conceptual code queries.
-
-    Use this for:
-    - "Find all classes that inherit from X" or "classes implementing Y"
-    - "Find error handling patterns" or "find logging implementations"
-    - "Where is authentication/validation/caching done?"
-    - "Find similar code to X" or "find related functionality"
-    - Any conceptual or structural query about the codebase
-
-    Returns semantically relevant matches even when exact keywords don't appear.
-    Uses pre-built LanceDB vector index for fast, accurate results with line numbers.
-
-    ## Chunking Strategy (BODY_AWARE)
-
-    The codebase is indexed using intelligent chunking that respects code boundaries:
-    - FILE_SUMMARY: High-level file description with symbol counts
-    - CLASS_SUMMARY: Class overview with method list and inheritance
-    - METHOD_HEADER: Function signature + docstring
-    - METHOD_BODY: Large function bodies (>30 lines) split with overlap for context
-
-    ## Available Metadata Filters
-
-    Use these optional parameters to narrow search results:
-
-    - filter_file_path: Filter by file path pattern (e.g., "src/auth" or "tests/")
-    - filter_symbol_type: "class", "function", "method", or "function_body"
-    - filter_visibility: "public", "private", or "dunder"
-    - filter_language: "python", "javascript", "typescript", "go", "rust", etc.
-    - filter_is_test_file: True to search only tests, False to exclude tests
-    - filter_has_docstring: True to find documented code, False for undocumented
-
-    ## Metadata Available in Results
-
-    Each result includes rich metadata for context:
-    - file_path, line_start, line_end: Location
-    - symbol_name, symbol_type: Symbol info
-    - chunk_type: file_summary, class_summary, method_header, method_body
-    - visibility: public, private, dunder
-    - has_docstring, line_count, param_count: Code metrics
-    - is_async, decorator_count: Function attributes
-    - method_count, base_count: Class attributes
-    - content_hash: For deduplication
-    """
+    # Support 'path' as alias for 'root' (models often use 'path' intuitively)
+    search_root = path if path is not None else root
     try:
-        root_path = Path(root).resolve()
+        root_path = Path(search_root).resolve()
         if not root_path.exists():
-            return {"success": False, "error": f"Root not found: {root}"}
+            return {"success": False, "error": f"Root not found: {search_root}"}
 
         settings = context.get("settings") if context else None
         if settings is None:
@@ -286,10 +266,26 @@ async def semantic_code_search(
             filter_metadata=filter_metadata,
         )
 
+        # Truncate content in results to prevent context overflow
+        # Keep enough for context but not entire function bodies
+        MAX_CONTENT_CHARS = 500
+        truncated_results = []
+        for result in results:
+            # Convert to dict for serialization
+            result_dict = result.model_dump() if hasattr(result, "model_dump") else dict(result)
+            content = result_dict.get("content", "")
+            if len(content) > MAX_CONTENT_CHARS:
+                result_dict["content"] = (
+                    content[:MAX_CONTENT_CHARS] + f"... [truncated, {len(content)} chars total]"
+                )
+                result_dict["content_truncated"] = True
+            truncated_results.append(result_dict)
+
         return {
             "success": True,
-            "results": results,
-            "count": len(results),
+            "results": truncated_results,
+            "count": len(truncated_results),
+            "hint": "Use read_file with line_start/line_end to see full content of specific results.",
             "metadata": {
                 "rebuilt": rebuilt,
                 "root": str(root_path),

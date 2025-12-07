@@ -235,11 +235,16 @@ class TestStageTransitions:
 
     def test_forward_transition_allowed(self):
         """Test forward transitions are allowed."""
+        import time
+
         machine = ConversationStateMachine()
 
         # Should transition forward
         machine._transition_to(ConversationStage.PLANNING, confidence=0.6)
         assert machine.get_stage() == ConversationStage.PLANNING
+
+        # Wait for cooldown period to allow next transition
+        time.sleep(machine.TRANSITION_COOLDOWN_SECONDS + 0.1)
 
         machine._transition_to(ConversationStage.READING, confidence=0.7)
         assert machine.get_stage() == ConversationStage.READING

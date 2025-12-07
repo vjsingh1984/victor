@@ -207,7 +207,7 @@ class TestToolExecution:
         config = AnalyticsConfig(max_records_per_tool=10)
         analytics = UsageAnalytics(config)
 
-        for i in range(20):
+        for _i in range(20):
             analytics.record_tool_execution(
                 tool_name="test_tool",
                 success=True,
@@ -307,7 +307,7 @@ class TestSessions:
         """Test session summary calculation."""
         analytics = UsageAnalytics.get_instance()
 
-        for i in range(3):
+        for _i in range(3):
             analytics.start_session()
             for _ in range(5):
                 analytics.record_turn()

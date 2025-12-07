@@ -226,7 +226,7 @@ class TestStaticEmbeddingCollection:
         # Make embed_batch_sync return deterministic embeddings based on text
         def mock_embed_batch(texts):
             embeddings = []
-            for i, text in enumerate(texts):
+            for _i, text in enumerate(texts):
                 # Create deterministic embedding based on text hash
                 np.random.seed(hash(text) % 2**31)
                 embeddings.append(np.random.randn(384).astype(np.float32))

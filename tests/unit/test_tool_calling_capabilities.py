@@ -43,7 +43,7 @@ class TestModelCapabilityLoader:
     def test_get_model_patterns(self):
         """Should return list of configured model patterns."""
         loader = ModelCapabilityLoader()
-        patterns = loader.get_model_patterns()
+        patterns = loader.get_all_model_patterns()
         assert any("llama" in p.lower() for p in patterns)
         assert any("qwen" in p.lower() for p in patterns)
 
@@ -172,16 +172,16 @@ class TestAdapterSystemPromptHints:
         assert "QWEN3" in hints or "/no_think" in hints
 
     def test_anthropic_no_hints(self):
-        """Anthropic should have no hints (native support)."""
+        """Anthropic should have parallel tool calling hint."""
         adapter = ToolCallingAdapterRegistry.get_adapter("anthropic", "claude-3-opus")
         hints = adapter.get_system_prompt_hints()
-        assert hints == ""
+        assert "MULTIPLE tools in parallel" in hints
 
     def test_openai_no_hints(self):
-        """OpenAI should have no hints (native support)."""
+        """OpenAI should have parallel tool calling hint."""
         adapter = ToolCallingAdapterRegistry.get_adapter("openai", "gpt-4")
         hints = adapter.get_system_prompt_hints()
-        assert hints == ""
+        assert "MULTIPLE tools in parallel" in hints
 
     def test_vllm_has_hints(self):
         """vLLM should have tool calling hints."""

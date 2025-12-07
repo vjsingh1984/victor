@@ -12,29 +12,76 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tool execution with retry logic, caching, and metrics."""
+"""Tool execution with retry logic, caching, metrics, and schema validation.
+
+This module provides robust tool execution with:
+- Pre-execution JSON schema validation (configurable strictness)
+- Argument normalization and code correction
+- Retry logic with exponential backoff
+- Result caching for idempotent operations
+- Execution metrics and statistics
+"""
 
 import asyncio
 import logging
 import time
+from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
+
+from typing import TYPE_CHECKING
+
+from victor.agent.debug_logger import TRACE
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.safety import SafetyChecker, get_safety_checker
 from victor.cache.tool_cache import ToolCache
+from victor.core.errors import (
+    ErrorCategory,
+    ErrorHandler,
+    ErrorInfo,
+    ToolExecutionError,
+    ToolTimeoutError,
+    get_error_handler,
+)
 from victor.core.retry import (
     RetryContext,
     RetryExecutor,
     RetryStrategy,
     tool_retry_strategy,
 )
-from victor.tools.base import BaseTool, Hook, HookError, ToolRegistry, ToolResult
+from victor.tools.base import BaseTool, Hook, HookError, ToolRegistry, ToolResult, ValidationResult
+
+
+class ValidationMode(Enum):
+    """Mode for pre-execution argument validation.
+
+    Controls how strictly the executor enforces JSON Schema validation
+    before executing tools.
+
+    Modes:
+        STRICT: Validation errors block execution and return failure
+        LENIENT: Validation errors are logged as warnings but execution proceeds
+        OFF: No pre-execution validation (relies on tool's own validation)
+    """
+
+    STRICT = "strict"
+    LENIENT = "lenient"
+    OFF = "off"
+
+
+if TYPE_CHECKING:
+    from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
 
 logger = logging.getLogger(__name__)
 
 
 class ToolExecutionResult:
-    """Result of a tool execution attempt."""
+    """Result of a tool execution attempt.
+
+    Provides structured information about tool execution including success/failure,
+    timing metrics, retry counts, and error details with correlation IDs for
+    distributed tracing and debugging.
+    """
 
     def __init__(
         self,
@@ -46,7 +93,23 @@ class ToolExecutionResult:
         cached: bool = False,
         retries: int = 0,
         normalization_strategy: Optional[NormalizationStrategy] = None,
+        correlation_id: Optional[str] = None,
+        error_info: Optional[ErrorInfo] = None,
     ):
+        """Initialize tool execution result.
+
+        Args:
+            tool_name: Name of the executed tool
+            success: Whether execution succeeded
+            result: The tool's return value
+            error: Error message if execution failed
+            execution_time: Time taken in seconds
+            cached: Whether result was from cache
+            retries: Number of retry attempts made
+            normalization_strategy: Strategy used for argument normalization
+            correlation_id: Unique ID for tracking this execution across logs
+            error_info: Structured error information if execution failed
+        """
         self.tool_name = tool_name
         self.success = success
         self.result = result
@@ -55,6 +118,29 @@ class ToolExecutionResult:
         self.cached = cached
         self.retries = retries
         self.normalization_strategy = normalization_strategy
+        self.correlation_id = correlation_id
+        self.error_info = error_info
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization/logging.
+
+        Returns:
+            Dictionary with all execution result fields, including
+            error details if present.
+        """
+        result = {
+            "tool_name": self.tool_name,
+            "success": self.success,
+            "execution_time": self.execution_time,
+            "cached": self.cached,
+            "retries": self.retries,
+            "correlation_id": self.correlation_id,
+        }
+        if self.error:
+            result["error"] = self.error
+        if self.error_info:
+            result["error_details"] = self.error_info.to_dict()
+        return result
 
 
 class ToolExecutor:
@@ -100,6 +186,10 @@ class ToolExecutor:
         retry_delay: float = 1.0,
         retry_strategy: Optional[RetryStrategy] = None,
         context: Optional[Dict[str, Any]] = None,
+        code_correction_middleware: Optional["CodeCorrectionMiddleware"] = None,
+        enable_code_correction: bool = False,
+        validation_mode: ValidationMode = ValidationMode.LENIENT,
+        error_handler: Optional[ErrorHandler] = None,
     ):
         """Initialize tool executor.
 
@@ -112,6 +202,10 @@ class ToolExecutor:
             retry_delay: Initial delay between retries (exponential backoff)
             retry_strategy: Unified retry strategy (overrides max_retries/retry_delay)
             context: Shared context passed to all tools
+            code_correction_middleware: Optional middleware for code validation/fixing
+            enable_code_correction: Enable code correction for code-generating tools
+            validation_mode: Pre-execution validation strictness (STRICT, LENIENT, OFF)
+            error_handler: Centralized error handler for structured logging (uses global if None)
         """
         self.tools = tool_registry
         self.normalizer = argument_normalizer or ArgumentNormalizer()
@@ -125,14 +219,80 @@ class ToolExecutor:
         )
         self.retry_executor = RetryExecutor(self.retry_strategy)
         self.context = context or {}
+        self.code_correction_middleware = code_correction_middleware
+        self.enable_code_correction = enable_code_correction
+        self.validation_mode = validation_mode
+        self.error_handler = error_handler or get_error_handler()
 
         # Execution statistics
         self._stats: Dict[str, Dict[str, Any]] = {}
         self._failed_signatures: set[Tuple[str, str]] = set()
+        self._validation_failures: int = 0  # Track validation failures for metrics
+        self._errors_by_category: Dict[str, int] = {}  # Track errors by category
 
     def update_context(self, **kwargs: Any) -> None:
         """Update the shared context passed to tools."""
         self.context.update(kwargs)
+
+    def set_validation_mode(self, mode: ValidationMode) -> None:
+        """Change the validation mode at runtime.
+
+        Args:
+            mode: New validation mode to use
+        """
+        self.validation_mode = mode
+        logger.info(f"Validation mode changed to: {mode.value}")
+
+    def _validate_arguments(
+        self,
+        tool: BaseTool,
+        arguments: Dict[str, Any],
+    ) -> Tuple[bool, Optional[ValidationResult]]:
+        """Validate tool arguments against JSON Schema before execution.
+
+        Performs pre-execution validation based on the configured validation_mode:
+        - STRICT: Returns (False, result) on validation errors
+        - LENIENT: Logs warnings and returns (True, result)
+        - OFF: Returns (True, None) without validation
+
+        Args:
+            tool: The tool to validate arguments for
+            arguments: Arguments to validate
+
+        Returns:
+            Tuple of (should_proceed, validation_result)
+            - should_proceed: True if execution should continue
+            - validation_result: ValidationResult or None if validation was skipped
+        """
+        if self.validation_mode == ValidationMode.OFF:
+            return True, None
+
+        try:
+            validation = tool.validate_parameters_detailed(**arguments)
+
+            if not validation.valid:
+                self._validation_failures += 1
+                error_summary = "; ".join(validation.errors[:3])  # Limit to first 3 errors
+                if len(validation.errors) > 3:
+                    error_summary += f" (+{len(validation.errors) - 3} more)"
+
+                if self.validation_mode == ValidationMode.STRICT:
+                    logger.error(f"STRICT validation failed for '{tool.name}': {error_summary}")
+                    return False, validation
+                else:  # LENIENT
+                    logger.warning(
+                        f"Validation issues for '{tool.name}' (proceeding anyway): {error_summary}"
+                    )
+                    return True, validation
+
+            return True, validation
+
+        except Exception as e:
+            logger.warning(f"Validation error for '{tool.name}': {e}")
+            # On validation system error, proceed in lenient mode, block in strict
+            if self.validation_mode == ValidationMode.STRICT:
+                return False, ValidationResult.failure([f"Validation system error: {e}"])
+            return True, None
 
     async def execute(
         self,
@@ -140,6 +300,7 @@ class ToolExecutor:
         arguments: Dict[str, Any],
         skip_cache: bool = False,
         context: Optional[Dict[str, Any]] = None,
+        skip_normalization: bool = False,
     ) -> ToolExecutionResult:
         """Execute a tool with retry logic and caching.
 
@@ -148,6 +309,7 @@ class ToolExecutor:
             arguments: Tool arguments
             skip_cache: Skip cache lookup even for cacheable tools
             context: Optional context to pass to the tool (merged with default context)
+            skip_normalization: Skip argument normalization (use when already normalized)
 
         Returns:
             ToolExecutionResult with execution outcome
@@ -171,15 +333,49 @@ class ToolExecutor:
 
         self._stats[tool_name]["calls"] += 1
 
-        # Normalize arguments
-        normalized_args, strategy = self.normalizer.normalize_arguments(arguments, tool_name)
+        # Normalize arguments (skip if already normalized by caller)
+        if skip_normalization:
+            normalized_args = arguments
+            strategy = None
+        else:
+            normalized_args, strategy = self.normalizer.normalize_arguments(arguments, tool_name)
+
+        # Code correction middleware - validate and fix code arguments
+        if (
+            self.enable_code_correction
+            and self.code_correction_middleware is not None
+            and self.code_correction_middleware.should_validate(tool_name)
+        ):
+            try:
+                correction_result = self.code_correction_middleware.validate_and_fix(
+                    tool_name, normalized_args
+                )
+
+                if correction_result.was_corrected:
+                    # Apply the correction
+                    normalized_args = self.code_correction_middleware.apply_correction(
+                        normalized_args, correction_result
+                    )
+                    logger.info(
+                        f"Code auto-corrected for tool '{tool_name}': "
+                        f"{len(correction_result.validation.errors)} issues fixed"
+                    )
+
+                if not correction_result.validation.valid:
+                    # Log validation errors but proceed - tool may still work
+                    logger.warning(
+                        f"Code validation errors for tool '{tool_name}': "
+                        f"{list(correction_result.validation.errors)}"
+                    )
+            except Exception as e:
+                logger.warning(f"Code correction middleware failed: {e}")
 
         # Check cache first
         if not skip_cache and self.cache:
             cached_result = self.cache.get(tool_name, normalized_args)
             if cached_result is not None:
                 self._stats[tool_name]["cache_hits"] += 1
-                logger.debug(f"Cache hit for {tool_name}")
+                logger.log(TRACE, f"Cache hit for {tool_name}")
                 return ToolExecutionResult(
                     tool_name=tool_name,
                     success=True,
@@ -207,6 +403,19 @@ class ToolExecutor:
                 error=f"Tool '{tool_name}' is disabled",
             )
 
+        # Pre-execution schema validation
+        should_proceed, validation_result = self._validate_arguments(tool, normalized_args)
+        if not should_proceed:
+            error_msg = "Argument validation failed"
+            if validation_result and validation_result.errors:
+                error_msg = f"Invalid arguments: {'; '.join(validation_result.errors[:3])}"
+            return ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                result=None,
+                error=error_msg,
+            )
+
         # Safety check for dangerous operations
         should_proceed, rejection_reason = await self.safety_checker.check_and_confirm(
             tool_name, normalized_args
@@ -221,13 +430,16 @@ class ToolExecutor:
             )
 
         # Execute with retry
-        result, success, error, retries = await self._execute_with_retry(
+        result, success, error, retries, error_info = await self._execute_with_retry(
             tool, normalized_args, exec_context
         )
 
         execution_time = time.time() - start_time
         self._stats[tool_name]["total_time"] += execution_time
         self._stats[tool_name]["retries"] += retries
+
+        # Extract correlation ID from error_info if available
+        correlation_id = error_info.correlation_id if error_info else None
 
         if success:
             self._stats[tool_name]["successes"] += 1
@@ -253,6 +465,8 @@ class ToolExecutor:
             execution_time=execution_time,
             retries=retries,
             normalization_strategy=strategy,
+            correlation_id=correlation_id,
+            error_info=error_info,
         )
 
     def _run_before_hooks(self, tool_name: str, arguments: Dict[str, Any]) -> None:
@@ -306,11 +520,12 @@ class ToolExecutor:
         tool: BaseTool,
         arguments: Dict[str, Any],
         context: Dict[str, Any],
-    ) -> Tuple[Any, bool, Optional[str], int]:
+    ) -> Tuple[Any, bool, Optional[str], int, Optional[ErrorInfo]]:
         """Execute a tool with retry logic from unified RetryStrategy.
 
         Uses the configured retry strategy for exponential backoff and
-        retry decisions. Hooks are run before/after each attempt.
+        retry decisions. Hooks are run before/after each attempt. Errors
+        are tracked via the centralized ErrorHandler for structured logging.
 
         Args:
             tool: Tool to execute
@@ -318,11 +533,13 @@ class ToolExecutor:
             context: Context to pass to the tool
 
         Returns:
-            Tuple of (result, success, error_message, retry_count)
+            Tuple of (result, success, error_message, retry_count, error_info)
+            error_info is only populated on failure for structured error tracking
         """
         retry_context = RetryContext(
             max_attempts=getattr(self.retry_strategy, "max_attempts", self.max_retries)
         )
+        last_error_info: Optional[ErrorInfo] = None
 
         while True:
             retry_context.attempt += 1
@@ -341,21 +558,74 @@ class ToolExecutor:
                 if isinstance(result, ToolResult):
                     if result.success:
                         self.retry_strategy.on_success(retry_context)
-                        return result.output, True, None, retry_context.attempt - 1
+                        return result.output, True, None, retry_context.attempt - 1, None
                     else:
                         # Don't retry if tool explicitly returned failure
                         error = result.error or "Tool returned failure"
-                        return result.output, False, error, retry_context.attempt - 1
+                        # Create structured error info for tool failures
+                        error_info = self.error_handler.handle(
+                            ToolExecutionError(
+                                error,
+                                tool_name=tool.name,
+                                recovery_hint="Check tool arguments and try again.",
+                            ),
+                            context={"tool": tool.name, "arguments": arguments},
+                        )
+                        self._track_error_category(error_info.category)
+                        return result.output, False, error, retry_context.attempt - 1, error_info
                 else:
                     # Raw result (for tools that don't return ToolResult)
                     self.retry_strategy.on_success(retry_context)
-                    return result, True, None, retry_context.attempt - 1
+                    return result, True, None, retry_context.attempt - 1, None
+
+            except asyncio.TimeoutError as e:
+                # Handle timeout specifically
+                timeout_error = ToolTimeoutError(tool_name=tool.name)
+                last_error_info = self.error_handler.handle(
+                    timeout_error,
+                    context={
+                        "tool": tool.name,
+                        "attempt": retry_context.attempt,
+                        "arguments": arguments,
+                    },
+                )
+                self._track_error_category(last_error_info.category)
+                retry_context.record_exception(e)
+
+                if self.retry_strategy.should_retry(retry_context):
+                    self.retry_strategy.on_retry(retry_context)
+                    delay = self.retry_strategy.get_delay(retry_context)
+                    retry_context.record_delay(delay)
+                    if delay > 0:
+                        await asyncio.sleep(delay)
+                else:
+                    self.retry_strategy.on_failure(retry_context)
+                    return (
+                        None,
+                        False,
+                        str(timeout_error),
+                        retry_context.attempt - 1,
+                        last_error_info,
+                    )
 
             except Exception as e:
                 retry_context.record_exception(e)
+
+                # Use centralized error handler for structured logging
+                last_error_info = self.error_handler.handle(
+                    e,
+                    context={
+                        "tool": tool.name,
+                        "attempt": retry_context.attempt,
+                        "max_attempts": retry_context.max_attempts,
+                        "arguments": arguments,
+                    },
+                )
+                self._track_error_category(last_error_info.category)
+
                 logger.warning(
-                    f"Tool {tool.name} failed (attempt {retry_context.attempt}/"
-                    f"{retry_context.max_attempts}): {e}"
+                    f"[{last_error_info.correlation_id}] Tool {tool.name} failed "
+                    f"(attempt {retry_context.attempt}/{retry_context.max_attempts}): {e}"
                 )
 
                 if self.retry_strategy.should_retry(retry_context):
@@ -367,7 +637,20 @@ class ToolExecutor:
                         await asyncio.sleep(delay)
                 else:
                     self.retry_strategy.on_failure(retry_context)
-                    return None, False, str(e), retry_context.attempt - 1
+                    # Include recovery hint in error message
+                    error_msg = str(e)
+                    if last_error_info.recovery_hint:
+                        error_msg = f"{e}\nRecovery hint: {last_error_info.recovery_hint}"
+                    return None, False, error_msg, retry_context.attempt - 1, last_error_info
+
+    def _track_error_category(self, category: ErrorCategory) -> None:
+        """Track error occurrences by category for metrics.
+
+        Args:
+            category: The error category to track
+        """
+        key = category.value
+        self._errors_by_category[key] = self._errors_by_category.get(key, 0) + 1
 
     def has_failed_before(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
         """Check if this exact tool call has failed before."""
@@ -379,8 +662,40 @@ class ToolExecutor:
         self._failed_signatures.clear()
 
     def get_stats(self) -> Dict[str, Dict[str, Any]]:
-        """Get execution statistics for all tools."""
-        return self._stats.copy()
+        """Get execution statistics for all tools.
+
+        Returns:
+            Dictionary with per-tool stats and global metrics including
+            validation failures and error category breakdown.
+        """
+        stats = self._stats.copy()
+        stats["_global"] = {
+            "validation_failures": self._validation_failures,
+            "validation_mode": self.validation_mode.value,
+            "errors_by_category": self._errors_by_category.copy(),
+            "recent_errors": [e.to_dict() for e in self.error_handler.get_recent_errors(5)],
+        }
+        return stats
+
+    def get_error_summary(self) -> Dict[str, Any]:
+        """Get a summary of recent errors for debugging.
+
+        Returns:
+            Dictionary with error counts by category and recent error details.
+        """
+        return {
+            "errors_by_category": self._errors_by_category.copy(),
+            "total_errors": sum(self._errors_by_category.values()),
+            "recent_errors": [
+                {
+                    "correlation_id": e.correlation_id,
+                    "category": e.category.value,
+                    "message": e.message,
+                    "recovery_hint": e.recovery_hint,
+                }
+                for e in self.error_handler.get_recent_errors(10)
+            ],
+        }
 
     def get_tool_stats(self, tool_name: str) -> Dict[str, Any]:
         """Get execution statistics for a specific tool."""

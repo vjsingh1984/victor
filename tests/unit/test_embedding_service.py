@@ -23,11 +23,10 @@ Tests cover:
 - Code search quality benchmarks
 """
 
-import asyncio
 import builtins
 import pytest
 import numpy as np
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch
 
 
 class TestDefaultEmbeddingModel:

@@ -425,12 +425,17 @@ class TestToolExecutorStats:
 
     @pytest.mark.asyncio
     async def test_get_stats_empty(self):
-        """Test getting stats when empty."""
+        """Test getting stats when empty (no tool executions)."""
         registry = ToolRegistry()
         executor = ToolExecutor(tool_registry=registry)
 
         stats = executor.get_stats()
-        assert stats == {}
+        # Stats now includes _global with error tracking info
+        assert "_global" in stats
+        assert stats["_global"]["validation_failures"] == 0
+        assert stats["_global"]["errors_by_category"] == {}
+        # No tool-specific stats yet
+        assert len([k for k in stats.keys() if k != "_global"]) == 0
 
     @pytest.mark.asyncio
     async def test_get_stats_after_execution(self):
@@ -507,3 +512,307 @@ class TestToolExecutorSafetyCheck:
         assert result.success is False
         assert "safety" in result.error.lower() or "blocked" in result.error.lower()
         mock_tool.execute.assert_not_called()
+
+
+class TestToolExecutionResultEnhanced:
+    """Tests for enhanced ToolExecutionResult with error handling."""
+
+    def test_result_with_correlation_id(self):
+        """Test ToolExecutionResult with correlation_id."""
+        result = ToolExecutionResult(
+            tool_name="test_tool",
+            success=False,
+            result=None,
+            error="Test error",
+            correlation_id="abc123",
+        )
+        assert result.correlation_id == "abc123"
+
+    def test_result_with_error_info(self):
+        """Test ToolExecutionResult with error_info."""
+        from victor.core.errors import ErrorInfo, ErrorCategory, ErrorSeverity
+
+        error_info = ErrorInfo(
+            message="Test error",
+            category=ErrorCategory.TOOL_EXECUTION,
+            severity=ErrorSeverity.ERROR,
+            correlation_id="def456",
+            recovery_hint="Try again",
+        )
+        result = ToolExecutionResult(
+            tool_name="test_tool",
+            success=False,
+            result=None,
+            error="Test error",
+            error_info=error_info,
+        )
+        assert result.error_info is error_info
+        assert result.error_info.correlation_id == "def456"
+
+    def test_result_to_dict_success(self):
+        """Test ToolExecutionResult.to_dict() for success."""
+        result = ToolExecutionResult(
+            tool_name="test_tool",
+            success=True,
+            result="data",
+            execution_time=1.5,
+            retries=0,
+            correlation_id="test123",
+        )
+        d = result.to_dict()
+        assert d["tool_name"] == "test_tool"
+        assert d["success"] is True
+        assert d["execution_time"] == 1.5
+        assert d["correlation_id"] == "test123"
+        assert "error" not in d
+
+    def test_result_to_dict_failure(self):
+        """Test ToolExecutionResult.to_dict() for failure."""
+        from victor.core.errors import ErrorInfo, ErrorCategory, ErrorSeverity
+
+        error_info = ErrorInfo(
+            message="Test failure",
+            category=ErrorCategory.TOOL_EXECUTION,
+            severity=ErrorSeverity.ERROR,
+            correlation_id="fail123",
+        )
+        result = ToolExecutionResult(
+            tool_name="test_tool",
+            success=False,
+            result=None,
+            error="Test failure",
+            error_info=error_info,
+        )
+        d = result.to_dict()
+        assert d["error"] == "Test failure"
+        assert "error_details" in d
+        assert d["error_details"]["category"] == "tool_execution"
+
+
+class TestToolExecutorErrorHandling:
+    """Tests for ToolExecutor error handling integration."""
+
+    @pytest.fixture(autouse=True)
+    def reset_globals(self):
+        """Reset global singletons before each test for isolation."""
+        from victor.core.errors import get_error_handler
+        import victor.agent.safety as safety_module
+
+        # Clear error history to ensure test isolation
+        handler = get_error_handler()
+        handler.clear_history()
+
+        # Reset safety checker to avoid pollution from previous tests
+        safety_module._default_checker = None
+
+    @pytest.mark.asyncio
+    async def test_error_handler_tracks_errors(self):
+        """Test that error handler tracks errors by category."""
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "failing_tool"
+        mock_tool.execute = AsyncMock(side_effect=ValueError("Test error"))
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=1,
+            retry_delay=0.01,
+        )
+
+        await executor.execute("failing_tool", {})
+
+        # Error should be tracked
+        assert len(executor._errors_by_category) > 0
+
+    @pytest.mark.asyncio
+    async def test_error_result_has_correlation_id(self):
+        """Test that failed execution results have correlation ID."""
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "error_tool"
+        mock_tool.execute = AsyncMock(side_effect=FileNotFoundError("File missing"))
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=1,
+            retry_delay=0.01,
+        )
+
+        result = await executor.execute("error_tool", {"path": "/missing"})
+
+        assert result.success is False
+        assert result.correlation_id is not None
+        assert len(result.correlation_id) == 8  # UUID first 8 chars
+
+    @pytest.mark.asyncio
+    async def test_error_info_populated_on_failure(self):
+        """Test that error_info is populated on execution failure."""
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "error_tool"
+        mock_tool.execute = AsyncMock(side_effect=PermissionError("Access denied"))
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=1,
+            retry_delay=0.01,
+        )
+
+        result = await executor.execute("error_tool", {})
+
+        assert result.success is False
+        assert result.error_info is not None
+        assert result.error_info.message == "Access denied"
+
+    @pytest.mark.asyncio
+    async def test_recovery_hint_in_error(self):
+        """Test that recovery hints are included in error messages."""
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "error_tool"
+        mock_tool.execute = AsyncMock(side_effect=ConnectionError("Network error"))
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=1,
+            retry_delay=0.01,
+        )
+
+        result = await executor.execute("error_tool", {})
+
+        assert result.success is False
+        # Error handler adds recovery hints
+        assert result.error_info is not None
+        # ConnectionError gets a recovery hint from error handler
+
+    @pytest.mark.asyncio
+    async def test_get_error_summary(self):
+        """Test get_error_summary method."""
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "error_tool"
+        mock_tool.execute = AsyncMock(side_effect=ValueError("Error"))
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=1,
+            retry_delay=0.01,
+        )
+
+        await executor.execute("error_tool", {})
+
+        summary = executor.get_error_summary()
+
+        assert "errors_by_category" in summary
+        assert "total_errors" in summary
+        assert summary["total_errors"] >= 1
+        assert "recent_errors" in summary
+
+    @pytest.mark.asyncio
+    async def test_stats_include_error_categories(self):
+        """Test that stats include error category breakdown."""
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "error_tool"
+        mock_tool.execute = AsyncMock(side_effect=TypeError("Type error"))
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=1,
+            retry_delay=0.01,
+        )
+
+        await executor.execute("error_tool", {})
+
+        stats = executor.get_stats()
+
+        assert "_global" in stats
+        assert "errors_by_category" in stats["_global"]
+        assert "recent_errors" in stats["_global"]
+
+    def test_track_error_category(self):
+        """Test _track_error_category method."""
+        from victor.core.errors import ErrorCategory
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(tool_registry=registry)
+
+        executor._track_error_category(ErrorCategory.TOOL_EXECUTION)
+        executor._track_error_category(ErrorCategory.TOOL_EXECUTION)
+        executor._track_error_category(ErrorCategory.VALIDATION_ERROR)
+
+        assert executor._errors_by_category["tool_execution"] == 2
+        assert executor._errors_by_category["validation_error"] == 1
+
+
+class TestToolExecutorWithErrorHandler:
+    """Tests for ToolExecutor with custom error handler."""
+
+    @pytest.fixture(autouse=True)
+    def reset_globals(self):
+        """Reset global singletons before each test for isolation."""
+        from victor.core.errors import get_error_handler
+        import victor.agent.safety as safety_module
+
+        # Clear error history to ensure test isolation
+        handler = get_error_handler()
+        handler.clear_history()
+
+        # Reset safety checker to avoid pollution from previous tests
+        safety_module._default_checker = None
+
+    def test_init_with_error_handler(self):
+        """Test ToolExecutor with custom error handler."""
+        from victor.core.errors import ErrorHandler
+
+        registry = ToolRegistry()
+        custom_handler = ErrorHandler(logger_name="custom")
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            error_handler=custom_handler,
+        )
+
+        assert executor.error_handler is custom_handler
+
+    def test_init_uses_global_handler(self):
+        """Test ToolExecutor uses global handler when none provided."""
+        from victor.core.errors import get_error_handler
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(tool_registry=registry)
+
+        # Should use global handler
+        assert executor.error_handler is get_error_handler()
+
+    @pytest.mark.asyncio
+    async def test_tool_result_failure_uses_error_handler(self):
+        """Test that ToolResult failures use error handler."""
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "result_tool"
+        mock_tool.execute = AsyncMock(
+            return_value=ToolResult(success=False, output=None, error="Tool error")
+        )
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(tool_registry=registry)
+
+        result = await executor.execute("result_tool", {})
+
+        assert result.success is False
+        assert result.error_info is not None
+        assert result.error_info.category.value == "tool_execution"

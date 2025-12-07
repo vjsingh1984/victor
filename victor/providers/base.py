@@ -57,6 +57,9 @@ class CompletionResponse(BaseModel):
     usage: Optional[Dict[str, int]] = Field(None, description="Token usage stats")
     model: Optional[str] = Field(None, description="Model used")
     raw_response: Optional[Dict[str, Any]] = Field(None, description="Raw provider response")
+    metadata: Optional[Dict[str, Any]] = Field(
+        None, description="Additional metadata (e.g., reasoning_content)"
+    )
 
 
 class StreamChunk(BaseModel):
@@ -66,6 +69,13 @@ class StreamChunk(BaseModel):
     tool_calls: Optional[List[Dict[str, Any]]] = None
     stop_reason: Optional[str] = None
     is_final: bool = Field(default=False, description="Is this the final chunk")
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None, description="Additional metadata (e.g., reasoning_content)"
+    )
+    usage: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="Token usage stats (typically on final chunk). Keys: prompt_tokens, completion_tokens, total_tokens, cache_creation_input_tokens, cache_read_input_tokens",
+    )
 
 
 # Provider error classes - defined before BaseProvider so they can be referenced
@@ -237,6 +247,43 @@ class BaseProvider(ABC):
         if False:
             yield StreamChunk()
         raise NotImplementedError
+
+    async def stream_chat(
+        self,
+        messages: List[Message],
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools: Optional[List[ToolDefinition]] = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamChunk]:
+        """Stream a chat completion response (alias for stream()).
+
+        This is an alias for the stream() method, provided for compatibility
+        with different naming conventions across SDKs (OpenAI uses stream,
+        Anthropic uses stream_chat, etc.).
+
+        Args:
+            messages: List of conversation messages
+            model: Model identifier
+            temperature: Sampling temperature (0-2)
+            max_tokens: Maximum tokens to generate
+            tools: Available tools for the model to use
+            **kwargs: Additional provider-specific parameters
+
+        Yields:
+            StreamChunk objects with incremental content
+        """
+        async for chunk in self.stream(
+            messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=tools,
+            **kwargs,
+        ):
+            yield chunk
 
     @abstractmethod
     def supports_tools(self) -> bool:

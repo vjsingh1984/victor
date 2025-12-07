@@ -23,17 +23,14 @@ Tests cover:
 - Switch history tracking
 """
 
-import asyncio
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
-from dataclasses import asdict
 
 from victor.agent.provider_manager import (
     ProviderManager,
     ProviderManagerConfig,
     ProviderState,
 )
-from victor.agent.model_switcher import SwitchReason
 
 
 class TestProviderManagerConfig:
@@ -380,9 +377,7 @@ class TestProviderSwitching:
         mock_adapter_registry.get_adapter.return_value = mock_adapter
 
         # Mock health check to fail then succeed
-        with patch.object(
-            manager, "_check_provider_health", side_effect=[False, True]
-        ):
+        with patch.object(manager, "_check_provider_health", side_effect=[False, True]):
             result = await manager.switch_provider("google")
 
         # Should have fallen back

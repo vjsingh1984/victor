@@ -21,7 +21,6 @@ Tests cover:
 - Factory function with negation awareness
 """
 
-import pytest
 from victor.agent.unified_task_tracker import (
     UnifiedTaskTracker,
     TaskType,
@@ -130,9 +129,7 @@ class TestContextBoosting:
         """Test that empty history doesn't affect classification."""
         tracker = UnifiedTaskTracker()
 
-        _, result_no_history = tracker.detect_task_type_with_negation(
-            "Analyze the code"
-        )
+        _, result_no_history = tracker.detect_task_type_with_negation("Analyze the code")
 
         _, result_empty_history = tracker.detect_task_type_with_negation(
             "Analyze the code",
@@ -165,9 +162,7 @@ class TestClassifyWithNegationAwareness:
     def test_negated_keywords_in_details(self):
         """Test that negated keywords are properly reported."""
         tracker = UnifiedTaskTracker()
-        details = tracker.classify_with_negation_awareness(
-            "Skip the analysis, just run tests"
-        )
+        details = tracker.classify_with_negation_awareness("Skip the analysis, just run tests")
 
         # "analysis" should be negated
         assert "analysis" in details["negated_keywords"]

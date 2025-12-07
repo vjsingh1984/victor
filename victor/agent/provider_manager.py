@@ -48,7 +48,7 @@ Usage:
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional
 
 from victor.agent.model_switcher import ModelSwitcher, SwitchReason, ModelSwitchEvent
 from victor.agent.tool_calling import ToolCallingAdapterRegistry, ToolCallingCapabilities
@@ -426,9 +426,7 @@ class ProviderManager:
         """
         self._on_switch_callbacks.append(callback)
 
-    async def _check_provider_health(
-        self, provider: BaseProvider, provider_name: str
-    ) -> bool:
+    async def _check_provider_health(self, provider: BaseProvider, provider_name: str) -> bool:
         """Check health of a provider.
 
         Args:

@@ -245,7 +245,7 @@ class TestMockPlugin:
     @pytest.fixture
     def mock_plugin(self):
         """Create a mock plugin for testing."""
-        from victor.tools.plugin import ToolPlugin, PluginMetadata
+        from victor.tools.plugin import ToolPlugin
 
         class TestPlugin(ToolPlugin):
             name = "test_plugin"

@@ -296,46 +296,10 @@ async def apply_patch(
     fuzz: int = 2,
     backup: bool = True,
 ) -> Dict[str, Any]:
-    """
-        Apply a unified diff patch to one or more files.
+    """Apply a unified diff patch to files.
 
-        Parses and applies unified diff format patches to files. Supports
-        creating new files, deleting files, and modifying existing files.
-        Includes fuzzy matching for context lines to handle minor differences.
-
-        Args:
-            patch: The unified diff patch content to apply.
-            file_path: Optional specific file path (overrides paths in diff).
-            dry_run: If True, show what would be changed without applying (default: False).
-            fuzz: Lines of context that can be different when matching (default: 2).
-            backup: If True, create backup of modified files (default: True).
-
-        Returns:
-            Dictionary containing:
-            - success: Whether all patches were applied successfully
-            - files_modified: List of files that were modified
-            - files_created: List of files that were created
-            - files_deleted: List of files that were deleted
-            - warnings: List of warning messages
-            - preview: Preview of changes (if dry_run=True)
-
-        Examples:
-            Apply a simple patch:
-                apply_patch(patch='''
-    --- a/hello.py
-    +++ b/hello.py
-    @@ -1,3 +1,4 @@
-     def hello():
-    -    print("Hello")
-    +    print("Hello, World!")
-    +    return True
-    ''')
-
-            Preview changes without applying:
-                apply_patch(patch="...", dry_run=True)
-
-            Apply to specific file:
-                apply_patch(patch="...", file_path="src/main.py")
+    Supports creating, deleting, and modifying files with fuzzy context matching.
+    Use dry_run=True to preview changes without applying.
     """
     from victor.agent.change_tracker import ChangeType, get_change_tracker
 

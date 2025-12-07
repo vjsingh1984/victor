@@ -21,7 +21,6 @@ from victor.agent.tool_pipeline import (
     ToolPipeline,
     ToolPipelineConfig,
     ToolCallResult,
-    PipelineExecutionResult,
 )
 from victor.agent.tool_executor import ToolExecutionResult
 
@@ -38,12 +37,14 @@ def mock_tool_registry():
 def mock_tool_executor():
     """Create a mock tool executor."""
     executor = MagicMock()
-    executor.execute = AsyncMock(return_value=ToolExecutionResult(
-        tool_name="test_tool",
-        success=True,
-        result={"output": "test result"},
-        error=None,
-    ))
+    executor.execute = AsyncMock(
+        return_value=ToolExecutionResult(
+            tool_name="test_tool",
+            success=True,
+            result={"output": "test result"},
+            error=None,
+        )
+    )
     return executor
 
 

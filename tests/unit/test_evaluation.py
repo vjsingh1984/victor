@@ -14,8 +14,6 @@
 
 """Unit tests for evaluation harness and metrics."""
 
-import asyncio
-import math
 import pytest
 
 from victor.evaluation import (
@@ -26,7 +24,6 @@ from victor.evaluation import (
 )
 from victor.evaluation.code_quality import CodeQualityAnalyzer
 from victor.evaluation.pass_at_k import (
-    PassAtKEvaluator,
     PassAtKResult,
     combinations,
     estimate_required_samples,
@@ -157,14 +154,14 @@ def hello_world():
     @pytest.mark.asyncio
     async def test_type_coverage(self, analyzer):
         """Test type hint coverage detection."""
-        typed_code = '''
+        typed_code = """
 def add(a: int, b: int) -> int:
     return a + b
-'''
-        untyped_code = '''
+"""
+        untyped_code = """
 def add(a, b):
     return a + b
-'''
+"""
         typed_metrics = await analyzer.analyze(typed_code, language="python")
         untyped_metrics = await analyzer.analyze(untyped_code, language="python")
 
@@ -173,11 +170,11 @@ def add(a, b):
     @pytest.mark.asyncio
     async def test_complexity_estimation(self, analyzer):
         """Test complexity estimation without radon."""
-        simple_code = '''
+        simple_code = """
 def simple():
     return 1
-'''
-        complex_code = '''
+"""
+        complex_code = """
 def complex(x):
     if x > 0:
         for i in range(x):
@@ -187,7 +184,7 @@ def complex(x):
                 continue
             else:
                 break
-'''
+"""
         simple_metrics = await analyzer.analyze(simple_code, language="python")
         complex_metrics = await analyzer.analyze(complex_code, language="python")
 
@@ -242,7 +239,7 @@ class TestTaskResult:
             tokens_used=1000,
             tests_passed=0,
         )
-        assert result.tokens_per_test == float('inf')
+        assert result.tokens_per_test == float("inf")
 
     def test_cost_efficiency(self):
         """Test cost efficiency calculation."""

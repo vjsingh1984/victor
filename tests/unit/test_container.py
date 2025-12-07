@@ -21,11 +21,9 @@ from typing import Protocol
 from victor.core.container import (
     ServiceContainer,
     ServiceLifetime,
-    ServiceScope,
     ServiceNotFoundError,
     ServiceAlreadyRegisteredError,
     ScopeDisposedError,
-    Disposable,
     get_container,
     set_container,
     reset_container,

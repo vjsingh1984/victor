@@ -19,6 +19,7 @@ This module extracts conversation management responsibilities from AgentOrchestr
 - Context size tracking and overflow detection
 - Conversation stage tracking
 - System prompt management
+- **Smart context compaction** with tiered retention and semantic selection
 
 Design Principles:
 - Single Responsibility: Only handles conversation state
@@ -31,6 +32,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.agent.message_history import MessageHistory
@@ -38,7 +40,42 @@ from victor.agent.conversation_state import ConversationStateMachine, Conversati
 from victor.providers.base import Message
 
 if TYPE_CHECKING:
-    pass
+    from victor.embeddings.service import EmbeddingService
+    from victor.agent.conversation_memory import ConversationStore
+
+
+class CompactionStrategy(Enum):
+    """Strategy for context compaction.
+
+    Strategies:
+        SIMPLE: Keep N most recent messages (original behavior)
+        TIERED: Keep all tool results, prioritize recent discussion
+        SEMANTIC: Use embeddings to keep task-relevant messages
+        HYBRID: Combine tiered retention with semantic selection
+    """
+
+    SIMPLE = "simple"
+    TIERED = "tiered"
+    SEMANTIC = "semantic"
+    HYBRID = "hybrid"
+
+
+@dataclass
+class MessageImportance:
+    """Importance score for a message during compaction.
+
+    Attributes:
+        message: The message being scored
+        index: Original index in message list
+        score: Importance score (higher = more important to keep)
+        reason: Why this score was assigned
+    """
+
+    message: Message
+    index: int
+    score: float
+    reason: str = ""
+
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +107,13 @@ class ConversationConfig:
     enable_stage_tracking: bool = True
     enable_context_monitoring: bool = True
 
+    # Smart compaction settings
+    compaction_strategy: CompactionStrategy = CompactionStrategy.TIERED
+    min_messages_to_keep: int = 6  # Minimum messages to keep after compaction
+    tool_result_retention_weight: float = 1.5  # How much to prioritize tool results
+    recent_message_weight: float = 2.0  # Recency boost for recent messages
+    semantic_relevance_threshold: float = 0.3  # Min similarity for semantic retention
+
 
 class ConversationController:
     """Manages conversation history and state.
@@ -96,6 +140,9 @@ class ConversationController:
         config: Optional[ConversationConfig] = None,
         message_history: Optional[MessageHistory] = None,
         state_machine: Optional[ConversationStateMachine] = None,
+        embedding_service: Optional["EmbeddingService"] = None,
+        conversation_store: Optional["ConversationStore"] = None,
+        session_id: Optional[str] = None,
     ):
         """Initialize conversation controller.
 
@@ -103,13 +150,20 @@ class ConversationController:
             config: Conversation configuration
             message_history: Optional pre-existing message history
             state_machine: Optional pre-existing state machine
+            embedding_service: Optional embedding service for semantic compaction
+            conversation_store: Optional SQLite store for persistent semantic memory
+            session_id: Session ID for persistent store operations
         """
         self.config = config or ConversationConfig()
         self._history = message_history or MessageHistory()
         self._state_machine = state_machine or ConversationStateMachine()
+        self._embedding_service = embedding_service
+        self._conversation_store = conversation_store
+        self._session_id = session_id
         self._system_prompt: Optional[str] = None
         self._system_added = False
         self._context_callbacks: List[Callable[[ContextMetrics], None]] = []
+        self._compaction_summaries: List[str] = []  # Track summaries from compaction
 
     @property
     def messages(self) -> List[Message]:
@@ -294,9 +348,10 @@ class ConversationController:
         logger.info("Conversation reset")
 
     def compact_history(self, keep_recent: int = 10) -> int:
-        """Compact history by removing old messages.
+        """Compact history by removing old messages (simple strategy).
 
         Keeps system message and most recent messages.
+        For smarter compaction, use smart_compact_history().
 
         Args:
             keep_recent: Number of recent messages to keep
@@ -323,6 +378,386 @@ class ConversationController:
 
         logger.info(f"Compacted history: removed {removed} messages")
         return removed
+
+    def smart_compact_history(
+        self,
+        target_messages: Optional[int] = None,
+        current_query: Optional[str] = None,
+    ) -> int:
+        """Smart context compaction using configured strategy.
+
+        Uses the configured compaction strategy to intelligently reduce
+        context size while preserving the most important information.
+
+        Strategies:
+        - SIMPLE: Same as compact_history (keep N recent)
+        - TIERED: Prioritize tool results over discussion messages
+        - SEMANTIC: Use embeddings to keep task-relevant messages
+        - HYBRID: Combine tiered and semantic approaches
+
+        Args:
+            target_messages: Target number of messages to keep (default: min_messages_to_keep)
+            current_query: Current user query for semantic relevance scoring
+
+        Returns:
+            Number of messages removed
+        """
+        target = target_messages or self.config.min_messages_to_keep
+        strategy = self.config.compaction_strategy
+
+        if len(self.messages) <= target + 1:  # +1 for system message
+            return 0
+
+        logger.info(f"Smart compacting with strategy: {strategy.value}")
+
+        if strategy == CompactionStrategy.SIMPLE:
+            return self.compact_history(keep_recent=target)
+
+        # Score all messages for importance
+        scored_messages = self._score_messages(current_query)
+
+        # Sort by score (descending) and keep top N
+        scored_messages.sort(key=lambda x: x.score, reverse=True)
+
+        # Always keep system message
+        system_msg = None
+        if self.messages and self.messages[0].role == "system":
+            system_msg = self.messages[0]
+            # Remove system from scored list (we'll add it back)
+            scored_messages = [sm for sm in scored_messages if sm.index != 0]
+
+        # Keep top messages (up to target)
+        messages_to_keep = scored_messages[:target]
+
+        # Sort by original index to maintain conversation order
+        messages_to_keep.sort(key=lambda x: x.index)
+
+        # Generate summary of removed messages
+        removed_indices = {sm.index for sm in scored_messages[target:]}
+        removed_messages = [m for i, m in enumerate(self.messages) if i in removed_indices]
+        if removed_messages:
+            summary = self._generate_compaction_summary(removed_messages)
+            if summary:
+                self._compaction_summaries.append(summary)
+                # Persist to SQLite for future semantic retrieval
+                message_ids = [f"msg_{i}" for i in removed_indices]
+                self.persist_compaction_summary(summary, message_ids)
+
+        # Rebuild message list
+        removed_count = len(self.messages) - len(messages_to_keep) - (1 if system_msg else 0)
+        self._history.clear()
+
+        if system_msg:
+            self._history._messages.append(system_msg)
+
+        for scored_msg in messages_to_keep:
+            self._history._messages.append(scored_msg.message)
+
+        logger.info(
+            f"Smart compacted: removed {removed_count} messages, "
+            f"kept {len(messages_to_keep)} (strategy: {strategy.value})"
+        )
+        return removed_count
+
+    def _score_messages(self, current_query: Optional[str] = None) -> List[MessageImportance]:
+        """Score messages for importance during compaction.
+
+        Scoring factors:
+        - Role: Tool results score higher than discussion
+        - Recency: Recent messages get a boost
+        - Semantic: Messages similar to current query score higher
+        - Content length: Substantive messages score higher
+
+        Args:
+            current_query: Optional query for semantic relevance
+
+        Returns:
+            List of MessageImportance objects
+        """
+        scored: List[MessageImportance] = []
+        total_messages = len(self.messages)
+
+        for i, msg in enumerate(self.messages):
+            score = 0.0
+            reason_parts = []
+
+            # Skip system message in scoring (always kept)
+            if msg.role == "system":
+                scored.append(MessageImportance(msg, i, 1000.0, "system"))
+                continue
+
+            # Role-based scoring
+            if msg.role == "tool":
+                score += 3.0 * self.config.tool_result_retention_weight
+                reason_parts.append("tool_result")
+            elif msg.role == "assistant":
+                score += 2.0
+                reason_parts.append("assistant")
+            elif msg.role == "user":
+                score += 2.5  # User messages slightly more important
+                reason_parts.append("user")
+
+            # Recency scoring (exponential decay)
+            recency_position = (i + 1) / total_messages  # 0 to 1
+            recency_boost = recency_position**2 * self.config.recent_message_weight
+            score += recency_boost
+            if recency_position > 0.7:
+                reason_parts.append("recent")
+
+            # Content length scoring (prefer substantive messages)
+            content_len = len(msg.content)
+            if content_len > 500:
+                score += 1.0
+                reason_parts.append("substantive")
+            elif content_len > 100:
+                score += 0.5
+
+            # Semantic relevance (if enabled and embedding service available)
+            if (
+                current_query
+                and self._embedding_service
+                and self.config.compaction_strategy
+                in (CompactionStrategy.SEMANTIC, CompactionStrategy.HYBRID)
+            ):
+                similarity = self._compute_semantic_similarity(msg.content, current_query)
+                if similarity > self.config.semantic_relevance_threshold:
+                    score += similarity * 3.0
+                    reason_parts.append(f"semantic:{similarity:.2f}")
+
+            scored.append(MessageImportance(msg, i, score, "+".join(reason_parts)))
+
+        return scored
+
+    def _compute_semantic_similarity(self, text1: str, text2: str) -> float:
+        """Compute semantic similarity between two texts using embeddings.
+
+        Args:
+            text1: First text
+            text2: Second text
+
+        Returns:
+            Similarity score between 0 and 1
+        """
+        if not self._embedding_service:
+            return 0.0
+
+        try:
+            # Truncate long texts to avoid embedding issues
+            t1 = text1[:2000] if len(text1) > 2000 else text1
+            t2 = text2[:2000] if len(text2) > 2000 else text2
+
+            embeddings = self._embedding_service.embed_batch([t1, t2])
+            if len(embeddings) == 2:
+                import numpy as np
+
+                emb1, emb2 = embeddings[0], embeddings[1]
+                # Cosine similarity
+                dot = np.dot(emb1, emb2)
+                norm1 = np.linalg.norm(emb1)
+                norm2 = np.linalg.norm(emb2)
+                if norm1 > 0 and norm2 > 0:
+                    return float(dot / (norm1 * norm2))
+        except Exception as e:
+            logger.warning(f"Semantic similarity computation failed: {e}")
+
+        return 0.0
+
+    def _generate_compaction_summary(self, removed_messages: List[Message]) -> str:
+        """Generate a summary of removed messages for context preservation.
+
+        Creates a brief summary of what was discussed in removed messages
+        so the AI retains awareness of earlier conversation topics.
+
+        Args:
+            removed_messages: Messages being removed
+
+        Returns:
+            Summary string, or empty string if nothing noteworthy
+        """
+        if not removed_messages:
+            return ""
+
+        # Count message types
+        user_msgs = [m for m in removed_messages if m.role == "user"]
+        tool_msgs = [m for m in removed_messages if m.role == "tool"]
+
+        # Extract key topics (simple keyword extraction)
+        all_content = " ".join(m.content[:200] for m in removed_messages[:10])
+        topics = self._extract_key_topics(all_content)
+
+        parts = []
+        if user_msgs:
+            parts.append(f"{len(user_msgs)} user messages")
+        if tool_msgs:
+            parts.append(f"{len(tool_msgs)} tool results")
+        if topics:
+            parts.append(f"topics: {', '.join(topics[:3])}")
+
+        if parts:
+            return f"[Earlier conversation: {'; '.join(parts)}]"
+        return ""
+
+    def _extract_key_topics(self, text: str) -> List[str]:
+        """Extract key topics from text using simple heuristics.
+
+        Args:
+            text: Text to extract topics from
+
+        Returns:
+            List of key topic words/phrases
+        """
+        import re
+
+        # Simple keyword extraction - find capitalized words and technical terms
+        words = re.findall(r"\b[A-Z][a-z]+(?:[A-Z][a-z]+)*\b", text)  # CamelCase
+        words += re.findall(r"\b[a-z]+_[a-z_]+\b", text)  # snake_case
+        words += re.findall(r"\b(?:def|class|function|file|error|test|api)\s+\w+", text.lower())
+
+        # Deduplicate and limit
+        seen = set()
+        topics = []
+        for w in words:
+            w_lower = w.lower()
+            if w_lower not in seen and len(w) > 3:
+                seen.add(w_lower)
+                topics.append(w)
+                if len(topics) >= 5:
+                    break
+
+        return topics
+
+    def get_compaction_summaries(self) -> List[str]:
+        """Get summaries from previous compaction operations.
+
+        Returns:
+            List of summary strings
+        """
+        return self._compaction_summaries.copy()
+
+    def inject_compaction_context(self) -> bool:
+        """Inject compaction summaries as context reminder.
+
+        Adds a message summarizing compacted content if summaries exist.
+
+        Returns:
+            True if context was injected
+        """
+        if not self._compaction_summaries:
+            return False
+
+        combined = " | ".join(self._compaction_summaries[-3:])  # Last 3 summaries
+        reminder = f"[Context reminder: {combined}]"
+
+        # Insert as assistant message after system prompt
+        if len(self.messages) > 1:
+            reminder_msg = Message(role="assistant", content=reminder)
+            self._history._messages.insert(1, reminder_msg)
+            logger.debug(f"Injected compaction context: {reminder[:100]}...")
+            return True
+
+        return False
+
+    def set_embedding_service(self, service: "EmbeddingService") -> None:
+        """Set the embedding service for semantic compaction.
+
+        Args:
+            service: EmbeddingService instance
+        """
+        self._embedding_service = service
+        # Also set on conversation store if available
+        if self._conversation_store:
+            self._conversation_store.set_embedding_service(service)
+
+    def set_conversation_store(
+        self,
+        store: "ConversationStore",
+        session_id: str,
+    ) -> None:
+        """Set the persistent conversation store for enhanced compaction.
+
+        Enables semantic retrieval from full conversation history stored in SQLite.
+
+        Args:
+            store: ConversationStore instance
+            session_id: Session ID for store operations
+        """
+        self._conversation_store = store
+        self._session_id = session_id
+        # Share embedding service with store
+        if self._embedding_service:
+            store.set_embedding_service(self._embedding_service)
+
+    def retrieve_relevant_history(
+        self,
+        query: str,
+        limit: int = 5,
+    ) -> List[str]:
+        """Retrieve relevant historical context from persistent store.
+
+        Uses semantic similarity to find relevant messages and summaries
+        from the full conversation history in SQLite.
+
+        Args:
+            query: Current query to find relevant history for
+            limit: Maximum items to retrieve
+
+        Returns:
+            List of relevant historical context strings
+        """
+        if not self._conversation_store or not self._session_id:
+            return []
+
+        relevant_context: List[str] = []
+
+        try:
+            # Get semantically similar historical messages
+            relevant_msgs = self._conversation_store.get_semantically_relevant_messages(
+                self._session_id,
+                query,
+                limit=limit,
+                min_similarity=self.config.semantic_relevance_threshold,
+            )
+
+            for msg, score in relevant_msgs:
+                # Format as context reminder
+                role_label = msg.role.value if hasattr(msg.role, "value") else str(msg.role)
+                context = f"[Historical {role_label} (relevance: {score:.2f})]: {msg.content[:500]}"
+                relevant_context.append(context)
+
+            # Get relevant summaries
+            relevant_summaries = self._conversation_store.get_relevant_summaries(
+                self._session_id,
+                query,
+                limit=2,
+            )
+
+            for summary, score in relevant_summaries:
+                context = f"[Prior context summary (relevance: {score:.2f})]: {summary}"
+                relevant_context.append(context)
+
+        except Exception as e:
+            logger.warning(f"Failed to retrieve relevant history: {e}")
+
+        return relevant_context[:limit]
+
+    def persist_compaction_summary(self, summary: str, message_ids: List[str]) -> None:
+        """Persist a compaction summary to the SQLite store.
+
+        Args:
+            summary: Summary of compacted content
+            message_ids: IDs of messages that were summarized
+        """
+        if not self._conversation_store or not self._session_id:
+            return
+
+        try:
+            self._conversation_store.store_compaction_summary(
+                self._session_id,
+                summary,
+                message_ids,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to persist compaction summary: {e}")
 
     def on_context_overflow(self, callback: Callable[[ContextMetrics], None]) -> None:
         """Register callback for context overflow events.

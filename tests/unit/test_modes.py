@@ -18,7 +18,6 @@ import pytest
 
 from victor.agent.mode_controller import (
     AgentMode,
-    ModeConfig,
     AgentModeController,
     MODE_CONFIGS,
     get_mode_controller,

@@ -51,7 +51,7 @@ import pickle
 import threading
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Tuple
 
@@ -444,9 +444,7 @@ class UsageAnalytics:
                 )
 
             if agg["recent_success_rate"] < agg["success_rate"] - 0.1:
-                recommendations.append(
-                    "Recent performance degraded. Check for issues."
-                )
+                recommendations.append("Recent performance degraded. Check for issues.")
 
             insights["recommendations"] = recommendations
             insights["status"] = "ok"
@@ -489,9 +487,7 @@ class UsageAnalytics:
 
             return insights
 
-    def get_top_tools(
-        self, metric: str = "usage", limit: int = 10
-    ) -> List[Tuple[str, float]]:
+    def get_top_tools(self, metric: str = "usage", limit: int = 10) -> List[Tuple[str, float]]:
         """Get top tools by a given metric.
 
         Args:
@@ -530,19 +526,13 @@ class UsageAnalytics:
                 return {"status": "no_sessions"}
 
             total_sessions = len(self._session_history)
-            avg_turns = (
-                sum(s.turn_count for s in self._session_history) / total_sessions
+            avg_turns = sum(s.turn_count for s in self._session_history) / total_sessions
+            avg_tools = sum(s.tool_calls for s in self._session_history) / total_sessions
+            avg_tokens = sum(s.total_tokens for s in self._session_history) / total_sessions
+            avg_duration = (
+                sum((s.end_time or s.start_time) - s.start_time for s in self._session_history)
+                / total_sessions
             )
-            avg_tools = (
-                sum(s.tool_calls for s in self._session_history) / total_sessions
-            )
-            avg_tokens = (
-                sum(s.total_tokens for s in self._session_history) / total_sessions
-            )
-            avg_duration = sum(
-                (s.end_time or s.start_time) - s.start_time
-                for s in self._session_history
-            ) / total_sessions
 
             return {
                 "total_sessions": total_sessions,
@@ -564,33 +554,39 @@ class UsageAnalytics:
             # Analyze tool performance
             for tool_name, agg in self._tool_aggregates.items():
                 if agg["success_rate"] < 0.7:
-                    recommendations.append({
-                        "priority": "high",
-                        "category": "tool_reliability",
-                        "tool": tool_name,
-                        "issue": f"Low success rate: {agg['success_rate']:.0%}",
-                        "action": "Review error logs and consider deprecation",
-                    })
+                    recommendations.append(
+                        {
+                            "priority": "high",
+                            "category": "tool_reliability",
+                            "tool": tool_name,
+                            "issue": f"Low success rate: {agg['success_rate']:.0%}",
+                            "action": "Review error logs and consider deprecation",
+                        }
+                    )
 
                 if agg["avg_execution_ms"] > 2000:
-                    recommendations.append({
-                        "priority": "medium",
-                        "category": "tool_performance",
-                        "tool": tool_name,
-                        "issue": f"Slow execution: {agg['avg_execution_ms']:.0f}ms avg",
-                        "action": "Consider caching or async execution",
-                    })
+                    recommendations.append(
+                        {
+                            "priority": "medium",
+                            "category": "tool_performance",
+                            "tool": tool_name,
+                            "issue": f"Slow execution: {agg['avg_execution_ms']:.0f}ms avg",
+                            "action": "Consider caching or async execution",
+                        }
+                    )
 
             # Analyze provider performance
             for provider, agg in self._provider_aggregates.items():
                 if agg["success_rate"] < 0.9:
-                    recommendations.append({
-                        "priority": "high",
-                        "category": "provider_reliability",
-                        "provider": provider,
-                        "issue": f"Low reliability: {agg['success_rate']:.1%}",
-                        "action": "Configure automatic fallback",
-                    })
+                    recommendations.append(
+                        {
+                            "priority": "high",
+                            "category": "provider_reliability",
+                            "provider": provider,
+                            "issue": f"Low reliability: {agg['success_rate']:.1%}",
+                            "action": "Configure automatic fallback",
+                        }
+                    )
 
         # Sort by priority
         priority_order = {"high": 0, "medium": 1, "low": 2}
@@ -625,8 +621,7 @@ class UsageAnalytics:
 
             for tool_name, agg in self._tool_aggregates.items():
                 lines.append(
-                    f'victor_tool_success_rate{{tool="{tool_name}"}} '
-                    f'{agg["success_rate"]:.4f}'
+                    f'victor_tool_success_rate{{tool="{tool_name}"}} ' f'{agg["success_rate"]:.4f}'
                 )
 
             lines.append("")
@@ -723,9 +718,7 @@ class UsageAnalytics:
                 data = pickle.load(f)
 
             self._tool_records = defaultdict(list, data.get("tool_records", {}))
-            self._provider_records = defaultdict(
-                list, data.get("provider_records", {})
-            )
+            self._provider_records = defaultdict(list, data.get("provider_records", {}))
             self._session_history = data.get("session_history", [])
             self._tool_aggregates = data.get("tool_aggregates", {})
             self._provider_aggregates = data.get("provider_aggregates", {})
