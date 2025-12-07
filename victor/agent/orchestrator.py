@@ -133,6 +133,7 @@ from victor.agent.tool_calling import (
 )
 from victor.agent.tool_executor import ToolExecutor, ValidationMode
 from victor.agent.safety import SafetyChecker, get_safety_checker, RiskLevel
+from victor.agent.auto_commit import AutoCommitter, get_auto_committer, CommitResult
 from victor.agent.parallel_executor import (
     create_parallel_executor,
 )
@@ -575,6 +576,22 @@ class AgentOrchestrator:
         # Exposes via property for UI layer to set confirmation callback
         self._safety_checker = get_safety_checker()
 
+        # Initialize AutoCommitter for AI-assisted code change commits
+        # Provides conventional commits with co-authorship attribution
+        auto_commit_enabled = getattr(settings, "auto_commit_enabled", False)
+        self._auto_committer: Optional[AutoCommitter] = None
+        if auto_commit_enabled:
+            workspace_root = Path(settings.workspace_root) if hasattr(settings, "workspace_root") and settings.workspace_root else None
+            self._auto_committer = AutoCommitter(
+                workspace_root=workspace_root,
+                auto_commit=True,
+                use_conventional_commits=getattr(settings, "use_conventional_commits", True),
+            )
+            logger.debug("AutoCommitter enabled for AI-assisted commits")
+        else:
+            # Still create instance for manual use, just not auto-commit
+            self._auto_committer = get_auto_committer()
+
         self.tool_executor = ToolExecutor(
             tool_registry=self.tools,
             argument_normalizer=self.argument_normalizer,
@@ -846,6 +863,19 @@ class AgentOrchestrator:
             orchestrator.safety_checker.confirmation_callback = my_callback
         """
         return self._safety_checker
+
+    @property
+    def auto_committer(self) -> Optional[AutoCommitter]:
+        """Get the auto-committer for AI-assisted code change commits.
+
+        Usage:
+            result = orchestrator.auto_committer.commit_changes(
+                files=["src/api.py"],
+                description="Add input validation",
+                change_type="feat"
+            )
+        """
+        return self._auto_committer
 
     @property
     def messages(self) -> List[Message]:
