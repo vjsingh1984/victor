@@ -252,17 +252,17 @@ See [Tool Catalog](docs/TOOL_CATALOG.md) for the complete list.
 
 ### 🔍 Semantic Code Search
 
-Intelligent codebase indexing that runs 100% locally:
+Intelligent codebase indexing with multi-language support, running 100% locally:
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#06B6D4'}}}%%
 flowchart LR
     subgraph Input["📁 Your Code"]
-        Files["400+ Files"]
+        Files["Python, TS, Go<br/>Rust, Java +5"]
     end
 
     subgraph Process["⚡ Indexing"]
-        AST["Parallel AST<br/>8 cores"]
+        AST["Tree-sitter<br/>+ Python AST"]
         Chunk["Smart<br/>Chunking"]
         Embed["Local<br/>Embeddings"]
     end
@@ -279,11 +279,12 @@ flowchart LR
     style Output fill:#D1FAE5,stroke:#10B981
 ```
 
-- **Parallel AST parsing** (8 cores, 3-5x faster)
+- **10 languages supported** via tree-sitter: Python, TypeScript, JavaScript, Go, Rust, Java, C, HTML, JSON, YAML
+- **Python AST with regex fallback** for imperfect codebases with syntax errors
 - **Smart chunking** that respects function boundaries
 - **6 metadata filters** (symbol type, visibility, language, test files, docstrings)
 - **Incremental updates** (only re-embeds changed files)
-- **Project-local storage** (`{project}/.victor/embeddings/`)
+- **Architecture pattern detection** (providers, services, repositories, controllers)
 
 ### 🔒 Security & Privacy
 

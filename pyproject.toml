@@ -80,9 +80,22 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "lxml>=5.0",
 
-    # Code Analysis
+    # Code Analysis (core)
     "tree-sitter>=0.21",
     "pygments>=2.17",
+
+    # Tree-sitter language packages for accurate parsing
+    # These enable tree-sitter based symbol extraction (falls back to regex if not installed)
+    "tree-sitter-python>=0.23",
+    "tree-sitter-javascript>=0.23",
+    "tree-sitter-typescript>=0.23",
+    "tree-sitter-go>=0.23",
+    "tree-sitter-rust>=0.23",
+    "tree-sitter-java>=0.23",
+    "tree-sitter-c>=0.23",
+    "tree-sitter-html>=0.23",
+    "tree-sitter-json>=0.23",
+    "tree-sitter-yaml>=0.6",
 
     # Caching
     "cachetools>=5.3",
@@ -195,6 +208,8 @@ select = [
 ]
 ignore = [
     "E501",  # line too long (handled by formatter)
+    "F401",  # unused imports (often intentional re-exports)
+    "F811",  # redefined while unused (type imports shadowing runtime)
     "B008",  # do not perform function calls in argument defaults
     "B904",  # allow broad HTTPException raising for now
 ]
