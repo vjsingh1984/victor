@@ -24,8 +24,8 @@ from victor.tools.documentation_tool import (
     _generate_class_docstring,
     _extract_api_info,
     _build_markdown_docs,
-    generate_docs,
-    analyze_docs,
+    docs,
+    docs_coverage,
 )
 
 
@@ -147,7 +147,7 @@ class MyClass:
             temp_path = f.name
 
         try:
-            result = await generate_docs(path=temp_path)
+            result = await docs(path=temp_path)
             assert result["success"] is True
         finally:
             Path(temp_path).unlink(missing_ok=True)
@@ -155,7 +155,7 @@ class MyClass:
     @pytest.mark.asyncio
     async def test_generate_docs_nonexistent_file(self):
         """Test generating docs for nonexistent file."""
-        result = await generate_docs(path="/nonexistent/file.py")
+        result = await docs(path="/nonexistent/file.py")
         assert result["success"] is False
 
 
@@ -179,7 +179,7 @@ def undocumented():
             temp_path = f.name
 
         try:
-            result = await analyze_docs(path=temp_path)
+            result = await docs_coverage(path=temp_path)
             assert result["success"] is True
         finally:
             Path(temp_path).unlink(missing_ok=True)
@@ -187,5 +187,5 @@ def undocumented():
     @pytest.mark.asyncio
     async def test_analyze_docs_nonexistent(self):
         """Test analyzing nonexistent file."""
-        result = await analyze_docs(path="/nonexistent/file.py")
+        result = await docs_coverage(path="/nonexistent/file.py")
         assert result["success"] is False

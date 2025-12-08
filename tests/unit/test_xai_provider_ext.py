@@ -99,15 +99,13 @@ async def test_chat_server_error(xai_provider):
 
     # Mock raise_for_status to raise HTTPStatusError
     def raise_status_error():
-        raise httpx.HTTPStatusError(
-            "Server error",
-            request=MagicMock(),
-            response=mock_response
-        )
+        raise httpx.HTTPStatusError("Server error", request=MagicMock(), response=mock_response)
 
     mock_response.raise_for_status = raise_status_error
 
-    with patch.object(xai_provider.client, "post", new_callable=AsyncMock, return_value=mock_response):
+    with patch.object(
+        xai_provider.client, "post", new_callable=AsyncMock, return_value=mock_response
+    ):
         messages = [Message(role="user", content="Hello")]
 
         with pytest.raises(ProviderError):

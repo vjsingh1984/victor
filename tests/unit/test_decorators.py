@@ -16,8 +16,16 @@
 
 import pytest
 from typing import Dict, Any
+from unittest.mock import patch
+import logging
 
-from victor.tools.decorators import tool, _create_tool_class
+from victor.tools.decorators import (
+    tool,
+    _create_tool_class,
+    resolve_tool_name,
+    set_legacy_name_warnings,
+    _WARN_ON_LEGACY_NAMES,
+)
 from victor.tools.base import BaseTool, CostTier, ToolResult
 
 
@@ -371,3 +379,413 @@ class TestToolDecoratorCostTier:
 
         tool_obj = default_cost_tool.Tool
         assert tool_obj.cost_tier == CostTier.FREE
+
+
+class TestToolNameResolution:
+    """Tests for tool name resolution and legacy warning functions."""
+
+    def test_resolve_tool_name_legacy_to_canonical(self):
+        """Test resolving legacy tool name to canonical."""
+        # Legacy names should resolve to canonical short names
+        assert resolve_tool_name("execute_bash") == "shell"
+        assert resolve_tool_name("read_file") == "read"
+        assert resolve_tool_name("write_file") == "write"
+        assert resolve_tool_name("code_search") == "grep"
+        assert resolve_tool_name("list_directory") == "ls"
+
+    def test_resolve_tool_name_canonical_unchanged(self):
+        """Test that canonical names remain unchanged."""
+        # Canonical names should resolve to themselves
+        assert resolve_tool_name("shell") == "shell"
+        assert resolve_tool_name("read") == "read"
+        assert resolve_tool_name("write") == "write"
+        assert resolve_tool_name("grep") == "grep"
+        assert resolve_tool_name("ls") == "ls"
+
+    def test_resolve_tool_name_unknown_unchanged(self):
+        """Test that unknown names remain unchanged."""
+        # Names not in registry should pass through unchanged
+        assert resolve_tool_name("unknown_tool") == "unknown_tool"
+        assert resolve_tool_name("my_custom_tool") == "my_custom_tool"
+
+    def test_set_legacy_name_warnings_toggle(self):
+        """Test enabling and disabling legacy name warnings."""
+        import victor.tools.decorators as decorators_module
+
+        # Initially should be False
+        original_value = decorators_module._WARN_ON_LEGACY_NAMES
+
+        try:
+            # Enable warnings
+            set_legacy_name_warnings(True)
+            assert decorators_module._WARN_ON_LEGACY_NAMES is True
+
+            # Disable warnings
+            set_legacy_name_warnings(False)
+            assert decorators_module._WARN_ON_LEGACY_NAMES is False
+        finally:
+            # Restore original value
+            decorators_module._WARN_ON_LEGACY_NAMES = original_value
+
+    def test_resolve_tool_name_with_warn_on_legacy(self, caplog):
+        """Test that warnings are logged when legacy names are used."""
+        import victor.tools.decorators as decorators_module
+
+        original_value = decorators_module._WARN_ON_LEGACY_NAMES
+
+        try:
+            set_legacy_name_warnings(True)
+
+            with caplog.at_level(logging.WARNING, logger="victor.tools.decorators"):
+                result = resolve_tool_name("execute_bash")
+
+            assert result == "shell"
+            assert any("Legacy tool name 'execute_bash' used" in record.message for record in caplog.records)
+            assert any("'shell'" in record.message for record in caplog.records)
+        finally:
+            decorators_module._WARN_ON_LEGACY_NAMES = original_value
+
+    def test_resolve_tool_name_explicit_warn_param(self, caplog):
+        """Test that warn_on_legacy param triggers warning for single call."""
+        import victor.tools.decorators as decorators_module
+
+        original_value = decorators_module._WARN_ON_LEGACY_NAMES
+
+        try:
+            # Make sure global warning is OFF
+            set_legacy_name_warnings(False)
+
+            with caplog.at_level(logging.WARNING, logger="victor.tools.decorators"):
+                # Use explicit warn_on_legacy=True for this call only
+                result = resolve_tool_name("read_file", warn_on_legacy=True)
+
+            assert result == "read"
+            assert any("Legacy tool name 'read_file' used" in record.message for record in caplog.records)
+        finally:
+            decorators_module._WARN_ON_LEGACY_NAMES = original_value
+
+    def test_resolve_tool_name_no_warn_for_canonical(self, caplog):
+        """Test that no warning is logged for canonical names even when warnings enabled."""
+        import victor.tools.decorators as decorators_module
+
+        original_value = decorators_module._WARN_ON_LEGACY_NAMES
+
+        try:
+            set_legacy_name_warnings(True)
+
+            with caplog.at_level(logging.WARNING, logger="victor.tools.decorators"):
+                result = resolve_tool_name("shell")
+
+            assert result == "shell"
+            # Should not have any legacy name warnings
+            assert not any("Legacy tool name" in record.message for record in caplog.records)
+        finally:
+            decorators_module._WARN_ON_LEGACY_NAMES = original_value
+
+
+class TestToolDecoratorWithAliases:
+    """Tests for @tool decorator with name and aliases parameters."""
+
+    def test_tool_decorator_with_explicit_name(self):
+        """Test @tool decorator with explicit name parameter."""
+
+        @tool(name="short_name")
+        def long_function_name(param: str):
+            """A tool with explicit short name.
+
+            Args:
+                param: A parameter.
+            """
+            return param
+
+        tool_obj = long_function_name.Tool
+        assert tool_obj.name == "short_name"
+        assert tool_obj.original_name == "long_function_name"
+
+    def test_tool_decorator_with_aliases(self):
+        """Test @tool decorator with aliases parameter."""
+
+        @tool(name="canonical", aliases=["legacy_name", "old_name"])
+        def canonical_function(param: str):
+            """A tool with aliases.
+
+            Args:
+                param: A parameter.
+            """
+            return param
+
+        tool_obj = canonical_function.Tool
+        assert tool_obj.name == "canonical"
+        assert "legacy_name" in tool_obj.aliases
+        assert "old_name" in tool_obj.aliases
+        # Original function name should also be in aliases if different from canonical
+        assert "canonical_function" in tool_obj.aliases
+
+    def test_tool_matches_name_canonical(self):
+        """Test that matches_name works with canonical name."""
+
+        @tool(name="short", aliases=["long_name"])
+        def my_tool(param: str):
+            """Test tool.
+
+            Args:
+                param: A parameter.
+            """
+            return param
+
+        tool_obj = my_tool.Tool
+        assert tool_obj.matches_name("short") is True
+
+    def test_tool_matches_name_alias(self):
+        """Test that matches_name works with alias."""
+
+        @tool(name="short", aliases=["long_name"])
+        def my_tool(param: str):
+            """Test tool.
+
+            Args:
+                param: A parameter.
+            """
+            return param
+
+        tool_obj = my_tool.Tool
+        assert tool_obj.matches_name("long_name") is True
+        assert tool_obj.matches_name("my_tool") is True  # Original function name
+
+    def test_tool_all_names(self):
+        """Test that all_names returns canonical plus aliases."""
+
+        @tool(name="canonical", aliases=["alias1", "alias2"])
+        def function_name(param: str):
+            """Test tool.
+
+            Args:
+                param: A parameter.
+            """
+            return param
+
+        tool_obj = function_name.Tool
+        all_names = tool_obj.all_names()
+
+        assert "canonical" in all_names
+        assert "alias1" in all_names
+        assert "alias2" in all_names
+        assert "function_name" in all_names  # Original name auto-added
+
+    def test_tool_auto_resolve_from_registry(self):
+        """Test that function names in TOOL_ALIASES auto-resolve."""
+        # This tests the auto-resolution feature where function names
+        # that match entries in TOOL_ALIASES get resolved automatically
+
+        # We can't easily test this without mocking the registry,
+        # but we can verify the mechanism works with explicit name
+
+        @tool(name="shell")
+        def execute_bash(command: str):
+            """Execute shell command.
+
+            Args:
+                command: The command to run.
+            """
+            return command
+
+        tool_obj = execute_bash.Tool
+        assert tool_obj.name == "shell"
+        assert "execute_bash" in tool_obj.aliases
+
+
+class TestDecoratorDrivenSemanticSelection:
+    """Tests for new decorator-driven semantic selection attributes."""
+
+    def test_mandatory_keywords_decorator(self):
+        """Test mandatory_keywords attribute via @tool decorator."""
+
+        @tool(
+            mandatory_keywords=["show diff", "compare files"],
+            keywords=["diff", "compare"],
+        )
+        def diff_tool(file1: str, file2: str):
+            """Compare two files.
+
+            Args:
+                file1: First file path.
+                file2: Second file path.
+            """
+            return f"{file1} vs {file2}"
+
+        tool_obj = diff_tool.Tool
+        assert hasattr(tool_obj, "mandatory_keywords")
+        assert "show diff" in tool_obj.mandatory_keywords
+        assert "compare files" in tool_obj.mandatory_keywords
+
+    def test_task_types_decorator(self):
+        """Test task_types attribute via @tool decorator."""
+
+        @tool(
+            task_types=["analysis", "search"],
+            keywords=["analyze", "find"],
+        )
+        def analysis_tool(query: str):
+            """Analyze code patterns.
+
+            Args:
+                query: Search query.
+            """
+            return query
+
+        tool_obj = analysis_tool.Tool
+        assert hasattr(tool_obj, "task_types")
+        assert "analysis" in tool_obj.task_types
+        assert "search" in tool_obj.task_types
+
+    def test_progress_params_decorator(self):
+        """Test progress_params attribute via @tool decorator."""
+
+        @tool(progress_params=["path", "offset", "limit"])
+        def read_tool(path: str, offset: int = 0, limit: int = 100):
+            """Read file with pagination.
+
+            Args:
+                path: File path to read.
+                offset: Start offset.
+                limit: Number of lines.
+            """
+            return f"Reading {path} from {offset}"
+
+        tool_obj = read_tool.Tool
+        assert hasattr(tool_obj, "progress_params")
+        assert "path" in tool_obj.progress_params
+        assert "offset" in tool_obj.progress_params
+        assert "limit" in tool_obj.progress_params
+
+    def test_execution_category_decorator(self):
+        """Test execution_category attribute via @tool decorator."""
+        from victor.tools.base import ExecutionCategory
+
+        @tool(execution_category="read_only")
+        def readonly_tool(path: str):
+            """Read-only operation.
+
+            Args:
+                path: File path.
+            """
+            return path
+
+        tool_obj = readonly_tool.Tool
+        assert hasattr(tool_obj, "execution_category")
+        assert tool_obj.execution_category == ExecutionCategory.READ_ONLY
+
+    def test_execution_category_write(self):
+        """Test execution_category with write value."""
+        from victor.tools.base import ExecutionCategory
+
+        @tool(execution_category="write")
+        def write_tool(path: str, content: str):
+            """Write operation.
+
+            Args:
+                path: File path.
+                content: Content to write.
+            """
+            return f"Writing to {path}"
+
+        tool_obj = write_tool.Tool
+        assert tool_obj.execution_category == ExecutionCategory.WRITE
+
+    def test_execution_category_network(self):
+        """Test execution_category with network value."""
+        from victor.tools.base import ExecutionCategory
+
+        @tool(execution_category="network")
+        def fetch_tool(url: str):
+            """Fetch from network.
+
+            Args:
+                url: URL to fetch.
+            """
+            return url
+
+        tool_obj = fetch_tool.Tool
+        assert tool_obj.execution_category == ExecutionCategory.NETWORK
+
+    def test_all_semantic_attributes_together(self):
+        """Test all new decorator attributes work together."""
+        from victor.tools.base import ExecutionCategory
+
+        @tool(
+            mandatory_keywords=["run tests", "execute tests"],
+            task_types=["action", "verification"],
+            progress_params=["test_file", "pattern"],
+            execution_category="execute",
+            keywords=["test", "pytest", "unittest"],
+            stages=["verification", "execution"],
+        )
+        def test_runner(test_file: str, pattern: str = "test_*"):
+            """Run tests.
+
+            Args:
+                test_file: Test file or directory.
+                pattern: Test pattern.
+            """
+            return f"Running {pattern} in {test_file}"
+
+        tool_obj = test_runner.Tool
+        # Mandatory keywords
+        assert "run tests" in tool_obj.mandatory_keywords
+        assert "execute tests" in tool_obj.mandatory_keywords
+        # Task types
+        assert "action" in tool_obj.task_types
+        assert "verification" in tool_obj.task_types
+        # Progress params
+        assert "test_file" in tool_obj.progress_params
+        assert "pattern" in tool_obj.progress_params
+        # Execution category
+        assert tool_obj.execution_category == ExecutionCategory.EXECUTE
+        # Regular keywords still work
+        assert "test" in tool_obj.keywords
+        assert "pytest" in tool_obj.keywords
+        # Stages still work
+        assert "verification" in tool_obj.stages
+        assert "execution" in tool_obj.stages
+
+    def test_execution_category_invalid_defaults_to_readonly(self, caplog):
+        """Test invalid execution_category value defaults to READ_ONLY with warning."""
+        from victor.tools.base import ExecutionCategory
+
+        with caplog.at_level(logging.WARNING):
+
+            @tool(execution_category="invalid_category")
+            def bad_category_tool(path: str):
+                """Tool with invalid category.
+
+                Args:
+                    path: Path.
+                """
+                return path
+
+            tool_obj = bad_category_tool.Tool
+            # Should default to READ_ONLY
+            assert tool_obj.execution_category == ExecutionCategory.READ_ONLY
+            # Should log a warning
+            assert "Invalid execution_category" in caplog.text
+
+    def test_empty_semantic_attributes(self):
+        """Test tools without semantic attributes have empty defaults."""
+        from victor.tools.base import ExecutionCategory
+
+        @tool
+        def simple_tool(value: str):
+            """Simple tool.
+
+            Args:
+                value: A value.
+            """
+            return value
+
+        tool_obj = simple_tool.Tool
+        # Empty lists for optional attributes
+        assert tool_obj.mandatory_keywords == []
+        assert tool_obj.task_types == []
+        assert tool_obj.progress_params == []
+        # Default execution category
+        assert tool_obj.execution_category == ExecutionCategory.READ_ONLY

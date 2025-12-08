@@ -378,7 +378,7 @@ class TestToolCallParsing:
 
     def test_parse_tool_calls_with_adapter_native(self, orchestrator):
         """Test _parse_tool_calls_with_adapter with native tool calls."""
-        raw_calls = [{"name": "read_file", "arguments": {"path": "/test.py"}}]
+        raw_calls = [{"name": "read", "arguments": {"path": "/test.py"}}]
         result = orchestrator._parse_tool_calls_with_adapter("", raw_calls)
         assert result is not None
 
@@ -882,7 +882,7 @@ class TestHandleToolCalls:
         orchestrator.sanitizer.is_valid_tool_name = MagicMock(return_value=True)
         orchestrator.tools.is_tool_enabled = MagicMock(return_value=True)
 
-        result = await orchestrator._handle_tool_calls([{"name": "read_file", "arguments": {}}])
+        result = await orchestrator._handle_tool_calls([{"name": "read", "arguments": {}}])
         # Should skip because budget reached
         assert result == []
 
@@ -905,7 +905,7 @@ class TestHandleToolCalls:
 
             # Use string JSON arguments
             result = await orch._handle_tool_calls(
-                [{"name": "read_file", "arguments": '{"path": "/test.py"}'}]
+                [{"name": "read", "arguments": '{"path": "/test.py"}'}]
             )
 
             assert len(result) == 1
@@ -926,7 +926,7 @@ class TestHandleToolCalls:
                 return_value=MagicMock(success=True, result="done", error=None)
             )
 
-            result = await orch._handle_tool_calls([{"name": "read_file", "arguments": None}])
+            result = await orch._handle_tool_calls([{"name": "read", "arguments": None}])
 
             assert len(result) == 1
             assert result[0]["success"] is True
@@ -947,11 +947,11 @@ class TestHandleToolCalls:
             import json
 
             args = {"path": "/test.py"}
-            signature = ("read_file", json.dumps(args, sort_keys=True, default=str))
+            signature = ("read", json.dumps(args, sort_keys=True, default=str))
             orch.failed_tool_signatures.add(signature)
 
             # Try same call again
-            result = await orch._handle_tool_calls([{"name": "read_file", "arguments": args}])
+            result = await orch._handle_tool_calls([{"name": "read", "arguments": args}])
 
             # Should be skipped
             assert result == []
@@ -972,14 +972,14 @@ class TestHandleToolCalls:
             )
 
             result = await orch._handle_tool_calls(
-                [{"name": "read_file", "arguments": {"path": "/test.py"}}]
+                [{"name": "read", "arguments": {"path": "/test.py"}}]
             )
 
             assert len(result) == 1
             assert result[0]["success"] is True
-            assert result[0]["name"] == "read_file"
+            assert result[0]["name"] == "read"
             assert orch.tool_calls_used == 1
-            assert "read_file" in orch.executed_tools
+            assert "read" in orch.executed_tools
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_failure(self, mock_provider, orchestrator_settings):
@@ -997,7 +997,7 @@ class TestHandleToolCalls:
             )
 
             result = await orch._handle_tool_calls(
-                [{"name": "read_file", "arguments": {"path": "/nonexistent.py"}}]
+                [{"name": "read", "arguments": {"path": "/nonexistent.py"}}]
             )
 
             assert len(result) == 1
@@ -1022,7 +1022,7 @@ class TestHandleToolCalls:
             )
 
             await orch._handle_tool_calls(
-                [{"name": "read_file", "arguments": {"path": "/test.py"}}]
+                [{"name": "read", "arguments": {"path": "/test.py"}}]
             )
 
             assert "/test.py" in orch.observed_files
@@ -1084,7 +1084,7 @@ class TestGetToolStatusMessage:
                 provider=mock_provider,
                 model="test-model",
             )
-            result = orch._get_tool_status_message("read_file", {"path": "/src/main.py"})
+            result = orch._get_tool_status_message("read", {"path": "/src/main.py"})
             assert result == "🔧 Reading file: /src/main.py"
 
     def test_edit_files_single(self, mock_provider, orchestrator_settings):
@@ -1133,14 +1133,14 @@ class TestGetToolStatusMessage:
             assert result == "🔧 Running edit_files..."
 
     def test_write_file(self, mock_provider, orchestrator_settings):
-        """Test status message for write_file tool."""
+        """Test status message for write tool."""
         with patch("victor.agent.orchestrator.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
                 model="test-model",
             )
-            result = orch._get_tool_status_message("write_file", {"path": "/new_file.py"})
+            result = orch._get_tool_status_message("write", {"path": "/new_file.py"})
             assert result == "🔧 Writing file: /new_file.py"
 
     def test_code_search(self, mock_provider, orchestrator_settings):

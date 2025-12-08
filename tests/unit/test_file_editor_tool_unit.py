@@ -18,7 +18,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from victor.tools.file_editor_tool import edit_files
+from victor.tools.file_editor_tool import edit
 
 
 class TestEditFiles:
@@ -27,14 +27,14 @@ class TestEditFiles:
     @pytest.mark.asyncio
     async def test_edit_files_empty_operations(self):
         """Test editing with empty operations."""
-        result = await edit_files(operations=[])
+        result = await edit(ops=[])
         assert result["success"] is False
         assert "No operations" in result["error"]
 
     @pytest.mark.asyncio
     async def test_edit_files_invalid_operation(self):
         """Test editing with invalid operation type."""
-        result = await edit_files(operations=[{"path": "/tmp/test.txt"}])
+        result = await edit(ops=[{"path": "/tmp/test.txt"}])
         assert result["success"] is False
         assert "type" in result["error"].lower()
 
@@ -45,8 +45,8 @@ class TestEditFiles:
         temp_path = f"{temp_dir}/new_file.txt"
 
         try:
-            result = await edit_files(
-                operations=[{"type": "create", "path": temp_path, "content": "Hello World"}]
+            result = await edit(
+                ops=[{"type": "create", "path": temp_path, "content": "Hello World"}]
             )
             assert result["success"] is True
             assert result["operations_queued"] == 1
@@ -62,8 +62,8 @@ class TestEditFiles:
     @pytest.mark.asyncio
     async def test_edit_files_modify_nonexistent_file(self):
         """Test modifying nonexistent file."""
-        result = await edit_files(
-            operations=[
+        result = await edit(
+            ops=[
                 {"type": "modify", "path": "/nonexistent/file.txt", "content": "new content"}
             ]
         )
@@ -77,10 +77,10 @@ class TestEditFiles:
         Path(temp_path).write_text("original content")
 
         try:
-            result = await edit_files(
-                operations=[{"type": "modify", "path": temp_path, "content": "updated content"}],
+            result = await edit(
+                ops=[{"type": "modify", "path": temp_path, "content": "updated content"}],
                 preview=True,
-                auto_commit=False,
+                commit=False,
             )
             # Preview should succeed but not apply changes
             assert result["success"] is True
@@ -103,7 +103,7 @@ class TestEditFiles:
             import json
 
             ops_json = json.dumps([{"type": "create", "path": temp_path, "content": "From JSON"}])
-            result = await edit_files(operations=ops_json)
+            result = await edit(ops=ops_json)
             assert result["success"] is True
         finally:
             Path(temp_path).unlink(missing_ok=True)
@@ -112,7 +112,7 @@ class TestEditFiles:
     @pytest.mark.asyncio
     async def test_edit_files_invalid_json_string(self):
         """Test invalid JSON string operations."""
-        result = await edit_files(operations="not valid json")
+        result = await edit(ops="not valid json")
         assert result["success"] is False
         assert "JSON" in result["error"]
 
@@ -128,8 +128,8 @@ class TestReplaceOperation:
         Path(temp_path).write_text("def foo():\n    return 1\n")
 
         try:
-            result = await edit_files(
-                operations=[
+            result = await edit(
+                ops=[
                     {
                         "type": "replace",
                         "path": temp_path,
@@ -162,8 +162,8 @@ class TestReplaceOperation:
         Path(temp_path).write_text(original)
 
         try:
-            result = await edit_files(
-                operations=[
+            result = await edit(
+                ops=[
                     {
                         "type": "replace",
                         "path": temp_path,
@@ -189,8 +189,8 @@ class TestReplaceOperation:
         Path(temp_path).write_text("def bar():\n    pass\n")
 
         try:
-            result = await edit_files(
-                operations=[
+            result = await edit(
+                ops=[
                     {
                         "type": "replace",
                         "path": temp_path,
@@ -213,8 +213,8 @@ class TestReplaceOperation:
         Path(temp_path).write_text("foo\nbar\nfoo\n")  # "foo" appears twice
 
         try:
-            result = await edit_files(
-                operations=[
+            result = await edit(
+                ops=[
                     {"type": "replace", "path": temp_path, "old_str": "foo", "new_str": "baz"}
                 ]
             )
@@ -233,8 +233,8 @@ class TestReplaceOperation:
         Path(temp_path).write_text("content")
 
         try:
-            result = await edit_files(
-                operations=[
+            result = await edit(
+                ops=[
                     {
                         "type": "replace",
                         "path": temp_path,
@@ -256,8 +256,8 @@ class TestReplaceOperation:
         Path(temp_path).write_text("old content")
 
         try:
-            result = await edit_files(
-                operations=[
+            result = await edit(
+                ops=[
                     {
                         "type": "replace",
                         "path": temp_path,
@@ -274,8 +274,8 @@ class TestReplaceOperation:
     @pytest.mark.asyncio
     async def test_replace_nonexistent_file(self):
         """Test error when file does not exist."""
-        result = await edit_files(
-            operations=[
+        result = await edit(
+            ops=[
                 {
                     "type": "replace",
                     "path": "/nonexistent/path/file.py",
@@ -303,8 +303,8 @@ def second():
         Path(temp_path).write_text(original)
 
         try:
-            result = await edit_files(
-                operations=[
+            result = await edit(
+                ops=[
                     {
                         "type": "replace",
                         "path": temp_path,

@@ -18,7 +18,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 
-from victor.tools.http_tool import http_request, http_test
+from victor.tools.http_tool import http
 
 
 class TestHttpRequest:
@@ -41,7 +41,7 @@ class TestHttpRequest:
             mock_instance.request = AsyncMock(return_value=mock_response)
             mock_client.return_value = mock_instance
 
-            result = await http_request(method="GET", url="https://api.example.com/data")
+            result = await http(method="GET", url="https://api.example.com/data")
 
             assert result["success"] is True
             assert result["status_code"] == 200
@@ -51,7 +51,7 @@ class TestHttpRequest:
     @pytest.mark.asyncio
     async def test_http_request_missing_url(self):
         """Test http_request with missing URL."""
-        result = await http_request(method="GET", url="")
+        result = await http(method="GET", url="")
 
         assert result["success"] is False
         assert "Missing required parameter" in result["error"]
@@ -75,7 +75,7 @@ class TestHttpRequest:
             mock_client.return_value = mock_instance
 
             headers = {"X-Custom-Header": "value"}
-            result = await http_request(
+            result = await http(
                 method="GET", url="https://api.example.com", headers=headers
             )
 
@@ -99,7 +99,7 @@ class TestHttpRequest:
             mock_instance.request = AsyncMock(return_value=mock_response)
             mock_client.return_value = mock_instance
 
-            result = await http_request(
+            result = await http(
                 method="GET", url="https://api.example.com", auth="Bearer token123"
             )
 
@@ -119,7 +119,7 @@ class TestHttpRequest:
             mock_instance.request = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
             mock_client.return_value = mock_instance
 
-            result = await http_request(method="GET", url="https://api.example.com")
+            result = await http(method="GET", url="https://api.example.com")
 
             assert result["success"] is False
             assert "timed out" in result["error"]
@@ -134,7 +134,7 @@ class TestHttpRequest:
             mock_instance.request = AsyncMock(side_effect=RuntimeError("Network error"))
             mock_client.return_value = mock_instance
 
-            result = await http_request(method="GET", url="https://api.example.com")
+            result = await http(method="GET", url="https://api.example.com")
 
             assert result["success"] is False
             assert "Request failed" in result["error"]
@@ -158,7 +158,7 @@ class TestHttpRequest:
             mock_client.return_value = mock_instance
 
             json_data = {"name": "test item"}
-            result = await http_request(
+            result = await http(
                 method="POST", url="https://api.example.com/items", json=json_data
             )
 
@@ -183,8 +183,8 @@ class TestHttpTest:
             mock_instance.request = AsyncMock(return_value=mock_response)
             mock_client.return_value = mock_instance
 
-            result = await http_test(
-                method="GET", url="https://api.example.com", expected_status=200
+            result = await http(
+                method="GET", url="https://api.example.com", mode="test", expected_status=200
             )
 
             assert result["success"] is True
@@ -195,7 +195,7 @@ class TestHttpTest:
     @pytest.mark.asyncio
     async def test_http_test_missing_url(self):
         """Test http_test with missing URL."""
-        result = await http_test(method="GET", url="")
+        result = await http(method="GET", url="")
 
         assert result["success"] is False
         assert "Missing required parameter" in result["error"]
@@ -214,8 +214,8 @@ class TestHttpTest:
             mock_instance.request = AsyncMock(return_value=mock_response)
             mock_client.return_value = mock_instance
 
-            result = await http_test(
-                method="GET", url="https://api.example.com", expected_status=200
+            result = await http(
+                method="GET", url="https://api.example.com", mode="test", expected_status=200
             )
 
             assert result["success"] is False
@@ -238,7 +238,7 @@ class TestHttpTest:
             mock_instance.request = AsyncMock(return_value=mock_response)
             mock_client.return_value = mock_instance
 
-            result = await http_test(
+            result = await http(
                 method="GET", url="https://api.example.com", auth="Bearer token123"
             )
 
@@ -257,7 +257,7 @@ class TestHttpTest:
             mock_instance.request = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
             mock_client.return_value = mock_instance
 
-            result = await http_test(method="GET", url="https://api.example.com")
+            result = await http(method="GET", url="https://api.example.com")
 
             assert result["success"] is False
             assert "timed out" in result["error"]
@@ -272,7 +272,7 @@ class TestHttpTest:
             mock_instance.request = AsyncMock(side_effect=RuntimeError("Connection error"))
             mock_client.return_value = mock_instance
 
-            result = await http_test(method="GET", url="https://api.example.com")
+            result = await http(method="GET", url="https://api.example.com")
 
             assert result["success"] is False
             assert "Request failed" in result["error"]

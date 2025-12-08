@@ -395,19 +395,19 @@ class TestSetGitProvider:
 
 
 class TestGitSuggestCommit:
-    """Tests for git_suggest_commit function."""
+    """Tests for commit_msg function."""
 
     @pytest.mark.asyncio
     async def test_no_provider(self):
-        """Test git_suggest_commit without provider."""
-        from victor.tools.git_tool import git_suggest_commit
+        """Test commit_msg without provider."""
+        from victor.tools.git_tool import commit_msg
         import victor.tools.git_tool as git_module
 
         # Save and clear provider
         original = git_module._provider
         git_module._provider = None
         try:
-            result = await git_suggest_commit()
+            result = await commit_msg()
             assert result["success"] is False
             assert "provider" in result["error"].lower()
         finally:
@@ -415,8 +415,8 @@ class TestGitSuggestCommit:
 
     @pytest.mark.asyncio
     async def test_diff_failure(self):
-        """Test git_suggest_commit when diff fails."""
-        from victor.tools.git_tool import git_suggest_commit, set_git_provider
+        """Test commit_msg when diff fails."""
+        from victor.tools.git_tool import commit_msg, set_git_provider
         from unittest.mock import MagicMock
 
         mock_provider = MagicMock()
@@ -424,14 +424,14 @@ class TestGitSuggestCommit:
 
         with patch("victor.tools.git_tool._run_git") as mock:
             mock.return_value = (False, "", "error getting diff")
-            result = await git_suggest_commit()
+            result = await commit_msg()
             assert result["success"] is False
             assert "error getting diff" in result["error"]
 
     @pytest.mark.asyncio
     async def test_no_staged_changes(self):
-        """Test git_suggest_commit with no staged changes."""
-        from victor.tools.git_tool import git_suggest_commit, set_git_provider
+        """Test commit_msg with no staged changes."""
+        from victor.tools.git_tool import commit_msg, set_git_provider
         from unittest.mock import MagicMock
 
         mock_provider = MagicMock()
@@ -439,14 +439,14 @@ class TestGitSuggestCommit:
 
         with patch("victor.tools.git_tool._run_git") as mock:
             mock.return_value = (True, "", "")  # Empty diff
-            result = await git_suggest_commit()
+            result = await commit_msg()
             assert result["success"] is False
             assert "No staged changes" in result["error"]
 
     @pytest.mark.asyncio
     async def test_successful_generation(self):
         """Test successful commit message generation."""
-        from victor.tools.git_tool import git_suggest_commit, set_git_provider
+        from victor.tools.git_tool import commit_msg, set_git_provider
         from unittest.mock import MagicMock
 
         mock_provider = MagicMock()
@@ -460,14 +460,14 @@ class TestGitSuggestCommit:
                 (True, "+ new line\n- old line", ""),  # diff --staged
                 (True, "test.py\napi.py", ""),  # diff --staged --name-only
             ]
-            result = await git_suggest_commit()
+            result = await commit_msg()
             assert result["success"] is True
             assert "feat(api)" in result["output"]
 
     @pytest.mark.asyncio
     async def test_llm_error(self):
-        """Test git_suggest_commit when LLM fails."""
-        from victor.tools.git_tool import git_suggest_commit, set_git_provider
+        """Test commit_msg when LLM fails."""
+        from victor.tools.git_tool import commit_msg, set_git_provider
         from unittest.mock import MagicMock
 
         mock_provider = MagicMock()
@@ -479,29 +479,29 @@ class TestGitSuggestCommit:
                 (True, "+ new line", ""),  # diff --staged
                 (True, "test.py", ""),  # diff --staged --name-only
             ]
-            result = await git_suggest_commit()
+            result = await commit_msg()
             assert result["success"] is False
             assert "AI generation failed" in result["error"]
 
 
 class TestGitCreatePR:
-    """Tests for git_create_pr function."""
+    """Tests for pr function."""
 
     @pytest.mark.asyncio
     async def test_get_branch_failure(self):
-        """Test git_create_pr when getting branch fails."""
-        from victor.tools.git_tool import git_create_pr
+        """Test pr when getting branch fails."""
+        from victor.tools.git_tool import pr
 
         with patch("victor.tools.git_tool._run_git") as mock:
             mock.return_value = (False, "", "not a git repo")
-            result = await git_create_pr()
+            result = await pr()
             assert result["success"] is False
             assert "not a git repo" in result["error"]
 
     @pytest.mark.asyncio
     async def test_push_failure(self):
-        """Test git_create_pr when push fails."""
-        from victor.tools.git_tool import git_create_pr
+        """Test pr when push fails."""
+        from victor.tools.git_tool import pr
         import victor.tools.git_tool as git_module
 
         # Clear provider to skip AI generation
@@ -513,7 +513,7 @@ class TestGitCreatePR:
                     (True, "feature-branch\n", ""),  # branch --show-current
                     (False, "", "push rejected"),  # push
                 ]
-                result = await git_create_pr()
+                result = await pr()
                 assert result["success"] is False
                 assert "push" in result["error"].lower()
         finally:
@@ -521,8 +521,8 @@ class TestGitCreatePR:
 
     @pytest.mark.asyncio
     async def test_gh_not_found(self):
-        """Test git_create_pr when gh CLI not found."""
-        from victor.tools.git_tool import git_create_pr
+        """Test pr when gh CLI not found."""
+        from victor.tools.git_tool import pr
         import victor.tools.git_tool as git_module
 
         original = git_module._provider
@@ -535,7 +535,7 @@ class TestGitCreatePR:
                 ]
                 with patch("subprocess.run") as mock_run:
                     mock_run.side_effect = FileNotFoundError()
-                    result = await git_create_pr()
+                    result = await pr()
                     assert result["success"] is False
                     assert "gh" in result["error"].lower()
         finally:
@@ -544,7 +544,7 @@ class TestGitCreatePR:
     @pytest.mark.asyncio
     async def test_pr_creation_success(self):
         """Test successful PR creation."""
-        from victor.tools.git_tool import git_create_pr
+        from victor.tools.git_tool import pr
         import victor.tools.git_tool as git_module
 
         original = git_module._provider
@@ -560,7 +560,7 @@ class TestGitCreatePR:
                     mock_result.returncode = 0
                     mock_result.stdout = "https://github.com/user/repo/pull/1"
                     mock_run.return_value = mock_result
-                    result = await git_create_pr(pr_title="Test PR", pr_description="Test desc")
+                    result = await pr(pr_title="Test PR", pr_description="Test desc")
                     assert result["success"] is True
                     assert "PR created" in result["output"]
         finally:
@@ -569,7 +569,7 @@ class TestGitCreatePR:
     @pytest.mark.asyncio
     async def test_pr_creation_failure(self):
         """Test PR creation failure."""
-        from victor.tools.git_tool import git_create_pr
+        from victor.tools.git_tool import pr
         import victor.tools.git_tool as git_module
 
         original = git_module._provider
@@ -585,7 +585,7 @@ class TestGitCreatePR:
                     mock_result.returncode = 1
                     mock_result.stderr = "PR already exists"
                     mock_run.return_value = mock_result
-                    result = await git_create_pr(pr_title="Test", pr_description="Desc")
+                    result = await pr(pr_title="Test", pr_description="Desc")
                     assert result["success"] is False
                     assert "PR already exists" in result["error"]
         finally:
@@ -593,33 +593,33 @@ class TestGitCreatePR:
 
 
 class TestGitAnalyzeConflicts:
-    """Tests for git_analyze_conflicts function."""
+    """Tests for conflicts function."""
 
     @pytest.mark.asyncio
     async def test_status_failure(self):
-        """Test git_analyze_conflicts when status fails."""
-        from victor.tools.git_tool import git_analyze_conflicts
+        """Test conflicts when status fails."""
+        from victor.tools.git_tool import conflicts
 
         with patch("victor.tools.git_tool._run_git") as mock:
             mock.return_value = (False, "", "error")
-            result = await git_analyze_conflicts()
+            result = await conflicts()
             assert result["success"] is False
 
     @pytest.mark.asyncio
     async def test_no_conflicts(self):
-        """Test git_analyze_conflicts with no conflicts."""
-        from victor.tools.git_tool import git_analyze_conflicts
+        """Test conflicts with no conflicts."""
+        from victor.tools.git_tool import conflicts
 
         with patch("victor.tools.git_tool._run_git") as mock:
             mock.return_value = (True, " M test.py\n", "")
-            result = await git_analyze_conflicts()
+            result = await conflicts()
             assert result["success"] is True
             assert "No merge conflicts" in result["output"]
 
     @pytest.mark.asyncio
     async def test_with_conflicts(self):
-        """Test git_analyze_conflicts with conflicts."""
-        from victor.tools.git_tool import git_analyze_conflicts
+        """Test conflicts with conflicts."""
+        from victor.tools.git_tool import conflicts
         import victor.tools.git_tool as git_module
 
         original = git_module._provider
@@ -631,7 +631,7 @@ class TestGitAnalyzeConflicts:
                     mock_open.return_value.__enter__.return_value.read.return_value = (
                         "<<<<<<< HEAD\nour content\n=======\ntheir content\n>>>>>>> branch\n"
                     )
-                    result = await git_analyze_conflicts()
+                    result = await conflicts()
                     assert result["success"] is True
                     assert "1 conflicted file" in result["output"]
         finally:
@@ -639,8 +639,8 @@ class TestGitAnalyzeConflicts:
 
     @pytest.mark.asyncio
     async def test_file_read_error(self):
-        """Test git_analyze_conflicts when file read fails."""
-        from victor.tools.git_tool import git_analyze_conflicts
+        """Test conflicts when file read fails."""
+        from victor.tools.git_tool import conflicts
         import victor.tools.git_tool as git_module
 
         original = git_module._provider
@@ -650,7 +650,7 @@ class TestGitAnalyzeConflicts:
                 mock.return_value = (True, "UU missing.py\n", "")
                 with patch("builtins.open") as mock_open:
                     mock_open.side_effect = FileNotFoundError("file not found")
-                    result = await git_analyze_conflicts()
+                    result = await conflicts()
                     assert result["success"] is True
                     assert "Error reading file" in result["output"]
         finally:

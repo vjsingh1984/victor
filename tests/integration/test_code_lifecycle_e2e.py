@@ -52,8 +52,8 @@ pytestmark = pytest.mark.skipif(
 from victor.agent.orchestrator import AgentOrchestrator  # noqa: E402
 from victor.config.settings import Settings  # noqa: E402
 from victor.providers.ollama_provider import OllamaProvider  # noqa: E402
-from victor.tools.filesystem import read_file, write_file  # noqa: E402
-from victor.tools.bash import execute_bash  # noqa: E402
+from victor.tools.filesystem import read, write  # noqa: E402
+from victor.tools.bash import shell  # noqa: E402
 
 
 @pytest.fixture

@@ -84,7 +84,7 @@ class TestNegationAwareExclusion:
 
         excluded = selector._get_excluded_tools_from_negations([mock_match])
 
-        assert "analyze_docs" in excluded or "code_review" in excluded
+        assert "metrics" in excluded or "review" in excluded or "docs_coverage" in excluded
 
     def test_test_negation_excludes_test_tools(self, selector):
         """Test that negated 'test' excludes test tools."""
@@ -93,7 +93,7 @@ class TestNegationAwareExclusion:
 
         excluded = selector._get_excluded_tools_from_negations([mock_match])
 
-        assert "run_tests" in excluded
+        assert "test" in excluded
 
     def test_search_negation_excludes_search_tools(self, selector):
         """Test that negated 'search' excludes search tools."""
@@ -102,7 +102,7 @@ class TestNegationAwareExclusion:
 
         excluded = selector._get_excluded_tools_from_negations([mock_match])
 
-        assert "code_search" in excluded or "semantic_code_search" in excluded
+        assert "search" in excluded or "grep" in excluded
 
     def test_multiple_negations(self, selector):
         """Test multiple negated keywords."""
@@ -176,14 +176,14 @@ class TestClassificationAwareSelection:
     @pytest.fixture
     def selector(self):
         selector = SemanticToolSelector(cache_embeddings=False)
-        # Pre-fill embedding cache with dummy embeddings
+        # Pre-fill embedding cache with dummy embeddings (using new short names)
         selector._tool_embedding_cache = {
-            "read_file": np.random.randn(384).astype(np.float32),
-            "write_file": np.random.randn(384).astype(np.float32),
-            "execute_bash": np.random.randn(384).astype(np.float32),
-            "code_search": np.random.randn(384).astype(np.float32),
-            "analyze_docs": np.random.randn(384).astype(np.float32),
-            "run_tests": np.random.randn(384).astype(np.float32),
+            "read": np.random.randn(384).astype(np.float32),
+            "write": np.random.randn(384).astype(np.float32),
+            "shell": np.random.randn(384).astype(np.float32),
+            "search": np.random.randn(384).astype(np.float32),
+            "docs_coverage": np.random.randn(384).astype(np.float32),
+            "test": np.random.randn(384).astype(np.float32),
         }
         return selector
 
@@ -194,12 +194,12 @@ class TestClassificationAwareSelection:
 
         mock_tool_list = []
         for name in [
-            "read_file",
-            "write_file",
-            "execute_bash",
-            "code_search",
-            "analyze_docs",
-            "run_tests",
+            "read",
+            "write",
+            "shell",
+            "search",
+            "docs_coverage",
+            "test",
         ]:
             tool = MagicMock()
             tool.name = name
@@ -268,8 +268,8 @@ class TestClassificationAwareSelection:
             )
 
             tool_names = [t.name for t in tools]
-            # analyze_docs should be excluded
-            assert "analyze_docs" not in tool_names
+            # docs_coverage (analysis tool) should be excluded
+            assert "docs_coverage" not in tool_names
 
     @pytest.mark.asyncio
     async def test_high_confidence_stricter_selection(self, selector, mock_tools):

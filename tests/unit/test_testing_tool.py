@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from victor.tools.testing_tool import run_tests, _summarize_report
+from victor.tools.testing_tool import test, _summarize_report
 
 
 class TestRunTests:
@@ -70,7 +70,7 @@ class TestRunTests:
                 report_data
             )
 
-            result = await run_tests()
+            result = await test()
 
             assert result["summary"]["total_tests"] == 10
             assert result["summary"]["passed"] == 8
@@ -106,7 +106,7 @@ class TestRunTests:
                 report_data
             )
 
-            result = await run_tests(path="tests/unit")
+            result = await test(path="tests/unit")
 
             # Verify subprocess was called with correct path
             call_args = mock_run.call_args[0][0]
@@ -141,7 +141,7 @@ class TestRunTests:
                 report_data
             )
 
-            await run_tests(pytest_args=["-v", "-x"])
+            await test(pytest_args=["-v", "-x"])
 
             # Verify subprocess was called with correct args
             call_args = mock_run.call_args[0][0]
@@ -152,7 +152,7 @@ class TestRunTests:
     async def test_run_tests_missing_pytest(self):
         """Test handling of missing pytest binary."""
         with patch("subprocess.run", side_effect=FileNotFoundError("pytest not found")):
-            result = await run_tests()
+            result = await test()
 
             assert "error" in result
             assert "pytest is not installed" in result["error"]
@@ -161,7 +161,7 @@ class TestRunTests:
     async def test_run_tests_timeout(self):
         """Test handling of test execution timeout."""
         with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("pytest", 300)):
-            result = await run_tests()
+            result = await test()
 
             assert "error" in result
             assert "timed out" in result["error"]
@@ -179,7 +179,7 @@ class TestRunTests:
             patch("pathlib.Path.exists", return_value=False),
         ):
 
-            result = await run_tests()
+            result = await test()
 
             assert "error" in result
             assert "report was not generated" in result["error"]
@@ -203,7 +203,7 @@ class TestRunTests:
 
             mock_open.return_value.__enter__.return_value.read.return_value = "invalid json"
 
-            result = await run_tests()
+            result = await test()
 
             assert "error" in result
             assert "unexpected error" in result["error"].lower()
@@ -243,7 +243,7 @@ class TestRunTests:
                 report_data
             )
 
-            result = await run_tests()
+            result = await test()
 
             assert result["summary"]["total_tests"] == 15
             assert result["summary"]["passed"] == 15
@@ -279,7 +279,7 @@ class TestRunTests:
                 report_data
             )
 
-            result = await run_tests()
+            result = await test()
 
             assert result["summary"]["total_tests"] == 10
             assert result["summary"]["skipped"] == 3

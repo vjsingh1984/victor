@@ -12,16 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for tool selection module."""
+"""Tests for tool selection module.
+
+Tool selection now uses keywords defined in @tool decorators via ToolMetadataRegistry
+as the single source of truth. See test_metadata_registry.py for keyword-based
+selection tests.
+"""
 
 
 from victor.agent.tool_selection import (
-    CORE_TOOLS,
-    TOOL_CATEGORIES,
-    WEB_TOOLS,
+    get_critical_tools,
+    get_tools_from_message,
     ToolSelectionStats,
-    detect_categories_from_message,
-    get_tools_for_categories,
     is_small_model,
     needs_web_tools,
     calculate_adaptive_threshold,
@@ -29,85 +31,40 @@ from victor.agent.tool_selection import (
 )
 
 
-class TestCoreConstants:
-    """Tests for core tool selection constants."""
+class TestCriticalTools:
+    """Tests for critical tool selection."""
 
-    def test_core_tools_contains_essentials(self):
-        """Test that CORE_TOOLS contains essential tools."""
-        assert "read_file" in CORE_TOOLS
-        assert "write_file" in CORE_TOOLS
-        assert "list_directory" in CORE_TOOLS
-        assert "execute_bash" in CORE_TOOLS
-        assert "edit_files" in CORE_TOOLS
+    def test_critical_tools_contains_essentials(self):
+        """Test that get_critical_tools() returns essential tools (canonical names).
 
-    def test_tool_categories_has_expected_categories(self):
-        """Test that TOOL_CATEGORIES has expected categories."""
-        expected = [
-            "git",
-            "testing",
-            "refactor",
-            "security",
-            "docs",
-            "review",
-            "web",
-            "docker",
-            "metrics",
-            "cicd",
-            "scaffold",
-            "search",
-            "database",
-            "lsp",
-            "dependencies",
-            "cache",
-        ]
-        for category in expected:
-            assert category in TOOL_CATEGORIES
-
-    def test_web_tools_contains_web_related(self):
-        """Test that WEB_TOOLS contains web-related tools."""
-        assert "web_search" in WEB_TOOLS
-        assert "web_fetch" in WEB_TOOLS
-        assert "web_summarize" in WEB_TOOLS
+        Note: Without a registry, get_critical_tools uses _FALLBACK_CRITICAL_TOOLS.
+        """
+        critical_tools = get_critical_tools()  # Fallback returns canonical names
+        assert "read" in critical_tools
+        assert "write" in critical_tools
+        assert "ls" in critical_tools
+        assert "shell" in critical_tools
+        assert "edit" in critical_tools
+        assert "search" in critical_tools
 
 
-class TestDetectCategoriesFromMessage:
-    """Tests for detect_categories_from_message function."""
+class TestGetToolsFromMessage:
+    """Tests for get_tools_from_message function.
 
-    def test_detects_git_category(self):
-        """Test detection of git-related messages."""
-        categories = detect_categories_from_message("help me commit my changes")
-        assert "git" in categories
+    This function uses ToolMetadataRegistry to find tools whose @tool(keywords=[...])
+    match the user's message. Without registered tools, returns empty set.
+    See test_metadata_registry.py for comprehensive keyword matching tests.
+    """
 
-    def test_detects_testing_category(self):
-        """Test detection of testing-related messages."""
-        categories = detect_categories_from_message("run the tests")
-        assert "testing" in categories
+    def test_returns_set(self):
+        """Test that function returns a set."""
+        tools = get_tools_from_message("test message")
+        assert isinstance(tools, set)
 
-    def test_detects_web_category(self):
-        """Test detection of web-related messages."""
-        categories = detect_categories_from_message("search the web for tutorials")
-        assert "web" in categories
-
-    def test_detects_multiple_categories(self):
-        """Test detection of multiple categories."""
-        categories = detect_categories_from_message("run tests and commit")
-        assert "testing" in categories
-        assert "git" in categories
-
-
-class TestGetToolsForCategories:
-    """Tests for get_tools_for_categories function."""
-
-    def test_returns_tools_for_single_category(self):
-        """Test getting tools for a single category."""
-        tools = get_tools_for_categories({"git"})
-        assert "git" in tools
-
-    def test_returns_tools_for_multiple_categories(self):
-        """Test getting tools for multiple categories."""
-        tools = get_tools_for_categories({"git", "testing"})
-        assert "git" in tools
-        assert "run_tests" in tools
+    def test_handles_empty_message(self):
+        """Test that empty message returns empty set."""
+        tools = get_tools_from_message("")
+        assert tools == set()
 
 
 class TestIsSmallModel:
@@ -190,29 +147,39 @@ class TestToolSelectionStats:
 
 
 class TestSelectToolsByKeywords:
-    """Tests for select_tools_by_keywords function."""
+    """Tests for select_tools_by_keywords function.
+
+    This function now uses ToolMetadataRegistry for keyword-based selection.
+    It always includes critical tools, then adds tools whose keywords match
+    the user message.
+    """
 
     def test_includes_core_tools(self):
-        """Test that core tools are always included."""
+        """Test that core tools are always included (using canonical names)."""
         tools = select_tools_by_keywords(
             message="hello world",
-            all_tool_names={"read_file", "write_file", "git"},
+            all_tool_names={"read", "write", "git"},
         )
-        assert "read_file" in tools
-        assert "write_file" in tools
+        assert "read" in tools
+        assert "write" in tools
 
-    def test_includes_category_tools(self):
-        """Test that category-matched tools are included."""
+    def test_includes_critical_tools(self):
+        """Test that critical tools are always included regardless of message.
+
+        Note: Category-based tool selection requires ToolMetadataRegistry.
+        Without it, only critical tools are included.
+        """
         tools = select_tools_by_keywords(
             message="help me commit",
-            all_tool_names={"read_file", "git", "git_suggest_commit"},
+            all_tool_names={"read", "write", "git", "commit_msg"},
         )
-        assert "git" in tools
+        # Critical tools should be included
+        assert "read" in tools
 
     def test_limits_for_small_models(self):
         """Test that small models get limited tools."""
         all_tools = {f"tool_{i}" for i in range(20)}
-        all_tools.update(CORE_TOOLS)
+        all_tools.update(get_critical_tools())  # Use dynamic discovery
         tools = select_tools_by_keywords(
             message="do everything",
             all_tool_names=all_tools,

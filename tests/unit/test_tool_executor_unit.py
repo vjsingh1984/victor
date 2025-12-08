@@ -472,19 +472,39 @@ class TestToolExecutorStats:
 
 
 class TestToolExecutorCacheableTools:
-    """Tests for cacheable tool detection."""
+    """Tests for cacheable tool detection via registry."""
+
+    @staticmethod
+    def _ensure_tools_loaded():
+        """Force import of tool modules to populate the registry."""
+        import victor.tools.filesystem  # noqa: F401
+        import victor.tools.code_search_tool  # noqa: F401
+        import victor.tools.file_editor_tool  # noqa: F401
+        import victor.tools.bash  # noqa: F401
 
     def test_default_cacheable_tools(self):
-        """Test default cacheable tools list."""
-        assert "code_search" in ToolExecutor.DEFAULT_CACHEABLE_TOOLS
-        assert "read_file" in ToolExecutor.DEFAULT_CACHEABLE_TOOLS
-        assert "list_directory" in ToolExecutor.DEFAULT_CACHEABLE_TOOLS
+        """Test cacheable tools detection via registry.
+
+        Note: Tools are registered by function names (read, ls, search),
+        not external names (read_file, list_directory).
+        """
+        self._ensure_tools_loaded()
+        # Registry-based detection for idempotent tools
+        assert ToolExecutor.is_cacheable_tool("read")  # read_file
+        assert ToolExecutor.is_cacheable_tool("ls")  # list_directory
+        assert ToolExecutor.is_cacheable_tool("search")  # code_search
 
     def test_cache_invalidating_tools(self):
-        """Test cache invalidating tools list."""
-        assert "write_file" in ToolExecutor.CACHE_INVALIDATING_TOOLS
-        assert "edit_files" in ToolExecutor.CACHE_INVALIDATING_TOOLS
-        assert "execute_bash" in ToolExecutor.CACHE_INVALIDATING_TOOLS
+        """Test cache invalidating tools detection via registry.
+
+        Note: Tools are registered by function names (write, edit, shell),
+        not external names (write_file, edit_files, execute_bash).
+        """
+        self._ensure_tools_loaded()
+        # Registry-based detection for write-mode tools
+        assert ToolExecutor.is_cache_invalidating_tool("write")  # write_file
+        assert ToolExecutor.is_cache_invalidating_tool("edit")  # edit_files
+        assert ToolExecutor.is_cache_invalidating_tool("shell")  # execute_bash
 
 
 class TestToolExecutorSafetyCheck:
@@ -816,3 +836,747 @@ class TestToolExecutorWithErrorHandler:
         assert result.success is False
         assert result.error_info is not None
         assert result.error_info.category.value == "tool_execution"
+
+
+class TestToolExecutorValidationMode:
+    """Tests for ToolExecutor validation mode settings."""
+
+    def test_set_validation_mode_strict(self):
+        """Test setting validation mode to STRICT."""
+        from victor.agent.tool_executor import ValidationMode
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(tool_registry=registry)
+
+        # Default is LENIENT
+        assert executor.validation_mode == ValidationMode.LENIENT
+
+        # Change to STRICT
+        executor.set_validation_mode(ValidationMode.STRICT)
+        assert executor.validation_mode == ValidationMode.STRICT
+
+    def test_set_validation_mode_off(self):
+        """Test setting validation mode to OFF."""
+        from victor.agent.tool_executor import ValidationMode
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(tool_registry=registry)
+
+        executor.set_validation_mode(ValidationMode.OFF)
+        assert executor.validation_mode == ValidationMode.OFF
+
+    def test_init_with_validation_mode(self):
+        """Test initializing executor with specific validation mode."""
+        from victor.agent.tool_executor import ValidationMode
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.STRICT,
+        )
+        assert executor.validation_mode == ValidationMode.STRICT
+
+
+class TestToolExecutorValidateArguments:
+    """Tests for ToolExecutor._validate_arguments method."""
+
+    @pytest.fixture
+    def mock_tool_with_validation(self):
+        """Create a mock tool that can return validation results."""
+        from victor.tools.base import ValidationResult
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "test_tool"
+        mock_tool.validate_parameters_detailed = MagicMock()
+        return mock_tool, ValidationResult
+
+    def test_validate_arguments_off_mode(self, mock_tool_with_validation):
+        """Test that validation is skipped in OFF mode."""
+        from victor.agent.tool_executor import ValidationMode
+
+        mock_tool, _ = mock_tool_with_validation
+        registry = ToolRegistry()
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.OFF,
+        )
+
+        should_proceed, result = executor._validate_arguments(mock_tool, {"arg": "value"})
+
+        assert should_proceed is True
+        assert result is None
+        mock_tool.validate_parameters_detailed.assert_not_called()
+
+    def test_validate_arguments_strict_mode_invalid(self, mock_tool_with_validation):
+        """Test that STRICT mode blocks execution on invalid arguments."""
+        from victor.agent.tool_executor import ValidationMode
+        from victor.tools.base import ValidationResult
+
+        mock_tool, _ = mock_tool_with_validation
+        mock_tool.validate_parameters_detailed.return_value = ValidationResult.failure(
+            ["Missing required parameter: path", "Invalid type for: count", "Extra error"]
+        )
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.STRICT,
+        )
+
+        should_proceed, result = executor._validate_arguments(mock_tool, {})
+
+        assert should_proceed is False
+        assert result is not None
+        assert not result.valid
+        assert executor._validation_failures == 1
+
+    def test_validate_arguments_lenient_mode_invalid(self, mock_tool_with_validation):
+        """Test that LENIENT mode proceeds despite invalid arguments."""
+        from victor.agent.tool_executor import ValidationMode
+        from victor.tools.base import ValidationResult
+
+        mock_tool, _ = mock_tool_with_validation
+        mock_tool.validate_parameters_detailed.return_value = ValidationResult.failure(
+            ["Missing required parameter"]
+        )
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.LENIENT,
+        )
+
+        should_proceed, result = executor._validate_arguments(mock_tool, {})
+
+        assert should_proceed is True
+        assert result is not None
+        assert not result.valid
+        assert executor._validation_failures == 1
+
+    def test_validate_arguments_valid(self, mock_tool_with_validation):
+        """Test validation with valid arguments."""
+        from victor.agent.tool_executor import ValidationMode
+        from victor.tools.base import ValidationResult
+
+        mock_tool, _ = mock_tool_with_validation
+        mock_tool.validate_parameters_detailed.return_value = ValidationResult.success()
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.STRICT,
+        )
+
+        should_proceed, result = executor._validate_arguments(mock_tool, {"path": "/valid"})
+
+        assert should_proceed is True
+        assert result is not None
+        assert result.valid
+        assert executor._validation_failures == 0
+
+    def test_validate_arguments_exception_strict(self, mock_tool_with_validation):
+        """Test validation exception handling in STRICT mode."""
+        from victor.agent.tool_executor import ValidationMode
+
+        mock_tool, _ = mock_tool_with_validation
+        mock_tool.validate_parameters_detailed.side_effect = RuntimeError("Schema error")
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.STRICT,
+        )
+
+        should_proceed, result = executor._validate_arguments(mock_tool, {})
+
+        assert should_proceed is False
+        assert result is not None
+        assert "Validation system error" in result.errors[0]
+
+    def test_validate_arguments_exception_lenient(self, mock_tool_with_validation):
+        """Test validation exception handling in LENIENT mode."""
+        from victor.agent.tool_executor import ValidationMode
+
+        mock_tool, _ = mock_tool_with_validation
+        mock_tool.validate_parameters_detailed.side_effect = RuntimeError("Schema error")
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.LENIENT,
+        )
+
+        should_proceed, result = executor._validate_arguments(mock_tool, {})
+
+        # LENIENT mode proceeds even on validation system errors
+        assert should_proceed is True
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_strict_validation_blocks_execution(self):
+        """Test that STRICT validation failures block execution."""
+        from victor.agent.tool_executor import ValidationMode
+        from victor.tools.base import ValidationResult
+
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "validated_tool"
+        mock_tool.execute = AsyncMock(return_value="should not be called")
+        mock_tool.validate_parameters_detailed = MagicMock(
+            return_value=ValidationResult.failure(["path is required"])
+        )
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.STRICT,
+        )
+
+        result = await executor.execute("validated_tool", {})
+
+        assert result.success is False
+        # Error can be either "Invalid arguments" with errors or fallback message
+        assert "Invalid arguments" in result.error or "validation failed" in result.error.lower()
+        mock_tool.execute.assert_not_called()
+
+
+class TestToolExecutorHooks:
+    """Tests for ToolExecutor hook execution."""
+
+    @pytest.fixture
+    def registry_with_hooks(self):
+        """Create a registry with before/after hooks."""
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "hooked_tool"
+        mock_tool.execute = AsyncMock(return_value="success")
+        mock_tool.validate_parameters_detailed = MagicMock()
+        mock_tool.validate_parameters_detailed.return_value = MagicMock(valid=True, errors=[])
+        registry.register(mock_tool)
+
+        return registry, mock_tool
+
+    def test_run_before_hooks_success(self, registry_with_hooks):
+        """Test running before hooks successfully."""
+        registry, _ = registry_with_hooks
+
+        called = []
+        def before_hook(tool_name, arguments):
+            called.append((tool_name, arguments))
+
+        registry._before_hooks.append(before_hook)
+
+        executor = ToolExecutor(tool_registry=registry)
+        executor._run_before_hooks("test_tool", {"arg": "value"})
+
+        assert len(called) == 1
+        assert called[0] == ("test_tool", {"arg": "value"})
+
+    def test_run_before_hooks_non_critical_failure(self, registry_with_hooks):
+        """Test that non-critical hook failures are logged but don't block."""
+        registry, _ = registry_with_hooks
+
+        def failing_hook(tool_name, arguments):
+            raise ValueError("Hook failed")
+
+        registry._before_hooks.append(failing_hook)
+
+        executor = ToolExecutor(tool_registry=registry)
+        # Should not raise - non-critical hooks don't block
+        executor._run_before_hooks("test_tool", {})
+
+    def test_run_before_hooks_critical_failure(self, registry_with_hooks):
+        """Test that critical hook failures raise HookError."""
+        from victor.tools.base import Hook, HookError
+
+        registry, _ = registry_with_hooks
+
+        def critical_hook_func(tool_name, arguments):
+            raise ValueError("Critical failure")
+
+        critical_hook = Hook(callback=critical_hook_func, name="critical_hook", critical=True)
+        registry._before_hooks.append(critical_hook)
+
+        executor = ToolExecutor(tool_registry=registry)
+
+        with pytest.raises(HookError) as exc_info:
+            executor._run_before_hooks("test_tool", {})
+
+        assert exc_info.value.hook_name == "critical_hook"
+        assert exc_info.value.tool_name == "test_tool"
+
+    def test_run_after_hooks_success(self, registry_with_hooks):
+        """Test running after hooks successfully."""
+        registry, _ = registry_with_hooks
+
+        called = []
+        def after_hook(result):
+            called.append(result)
+
+        registry._after_hooks.append(after_hook)
+
+        executor = ToolExecutor(tool_registry=registry)
+        executor._run_after_hooks("test_tool", "result_value")
+
+        assert len(called) == 1
+        assert called[0] == "result_value"
+
+    def test_run_after_hooks_non_critical_failure(self, registry_with_hooks):
+        """Test that non-critical after hook failures are logged but don't raise."""
+        registry, _ = registry_with_hooks
+
+        def failing_after_hook(result):
+            raise ValueError("After hook failed")
+
+        registry._after_hooks.append(failing_after_hook)
+
+        executor = ToolExecutor(tool_registry=registry)
+        # Should not raise - non-critical hooks don't block
+        executor._run_after_hooks("test_tool", "result")
+
+    def test_run_after_hooks_critical_failure(self, registry_with_hooks):
+        """Test that critical after hook failures raise HookError."""
+        from victor.tools.base import Hook, HookError
+
+        registry, _ = registry_with_hooks
+
+        def critical_after_func(result):
+            raise RuntimeError("Critical after failure")
+
+        critical_hook = Hook(callback=critical_after_func, name="critical_after", critical=True)
+        registry._after_hooks.append(critical_hook)
+
+        executor = ToolExecutor(tool_registry=registry)
+
+        with pytest.raises(HookError) as exc_info:
+            executor._run_after_hooks("test_tool", "result")
+
+        assert exc_info.value.hook_name == "critical_after"
+
+
+class TestToolExecutorCacheManagement:
+    """Tests for ToolExecutor cache management methods."""
+
+    def test_invalidate_cache_for_paths(self):
+        """Test invalidate_cache_for_paths method."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor.invalidate_cache_for_paths(["/path/file1.py", "/path/file2.py"])
+
+        mock_cache.invalidate_paths.assert_called_once_with(["/path/file1.py", "/path/file2.py"])
+
+    def test_invalidate_cache_for_paths_no_cache(self):
+        """Test invalidate_cache_for_paths when no cache is configured."""
+        registry = ToolRegistry()
+        executor = ToolExecutor(tool_registry=registry)
+
+        # Should not raise even without cache
+        executor.invalidate_cache_for_paths(["/path/file.py"])
+
+    def test_clear_cache(self):
+        """Test clear_cache method."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor.clear_cache()
+
+        mock_cache.clear_all.assert_called_once()
+
+    def test_clear_cache_no_cache(self):
+        """Test clear_cache when no cache is configured."""
+        registry = ToolRegistry()
+        executor = ToolExecutor(tool_registry=registry)
+
+        # Should not raise even without cache
+        executor.clear_cache()
+
+    def test_clear_failed_signatures(self):
+        """Test clearing failed signatures."""
+        registry = ToolRegistry()
+        executor = ToolExecutor(tool_registry=registry)
+
+        # Add some failed signatures
+        executor._failed_signatures.add(("tool1", "[('a', 1)]"))
+        executor._failed_signatures.add(("tool2", "[('b', 2)]"))
+        assert len(executor._failed_signatures) == 2
+
+        executor.clear_failed_signatures()
+
+        assert len(executor._failed_signatures) == 0
+
+    def test_reset_stats(self):
+        """Test reset_stats method."""
+        registry = ToolRegistry()
+        executor = ToolExecutor(tool_registry=registry)
+
+        # Add some stats
+        executor._stats["tool1"] = {"calls": 5, "successes": 4, "failures": 1}
+        executor._stats["tool2"] = {"calls": 3, "successes": 3, "failures": 0}
+
+        executor.reset_stats()
+
+        assert executor._stats == {}
+
+    def test_get_tool_stats_existing(self):
+        """Test get_tool_stats for an existing tool."""
+        registry = ToolRegistry()
+        executor = ToolExecutor(tool_registry=registry)
+
+        executor._stats["my_tool"] = {
+            "calls": 10,
+            "successes": 8,
+            "failures": 2,
+            "total_time": 5.5,
+        }
+
+        stats = executor.get_tool_stats("my_tool")
+
+        assert stats["calls"] == 10
+        assert stats["successes"] == 8
+        assert stats["failures"] == 2
+
+    def test_get_tool_stats_nonexistent(self):
+        """Test get_tool_stats for a non-existent tool."""
+        registry = ToolRegistry()
+        executor = ToolExecutor(tool_registry=registry)
+
+        stats = executor.get_tool_stats("nonexistent_tool")
+
+        assert stats == {}
+
+
+class TestToolExecutorCacheInvalidation:
+    """Tests for ToolExecutor._invalidate_cache_for_write_tool method."""
+
+    def test_invalidate_cache_write_file(self):
+        """Test cache invalidation for write_file tool."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor._invalidate_cache_for_write_tool("write_file", {"path": "/tmp/test.py"})
+
+        mock_cache.invalidate_paths.assert_called_once_with(["/tmp/test.py"])
+
+    def test_invalidate_cache_edit_files_with_edits(self):
+        """Test cache invalidation for edit_files with edits list."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor._invalidate_cache_for_write_tool(
+            "edit_files",
+            {
+                "edits": [
+                    {"path": "/tmp/file1.py", "content": "new content"},
+                    {"path": "/tmp/file2.py", "content": "other content"},
+                ]
+            },
+        )
+
+        mock_cache.invalidate_paths.assert_called_once_with(["/tmp/file1.py", "/tmp/file2.py"])
+
+    def test_invalidate_cache_edit_files_with_path(self):
+        """Test cache invalidation for edit_files with single path."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor._invalidate_cache_for_write_tool("edit_files", {"path": "/tmp/single.py"})
+
+        mock_cache.invalidate_paths.assert_called_once_with(["/tmp/single.py"])
+
+    def test_invalidate_cache_execute_bash(self):
+        """Test cache invalidation for execute_bash (wide invalidation)."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor._invalidate_cache_for_write_tool("execute_bash", {"command": "rm -rf /tmp/*"})
+
+        # Bash commands invalidate file-related caches
+        assert mock_cache.invalidate_by_tool.call_count == 2
+        mock_cache.invalidate_by_tool.assert_any_call("read_file")
+        mock_cache.invalidate_by_tool.assert_any_call("list_directory")
+
+    def test_invalidate_cache_git_tool(self):
+        """Test cache invalidation for git tool (wide invalidation)."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor._invalidate_cache_for_write_tool("git", {"action": "commit"})
+
+        # Git commands invalidate many caches
+        assert mock_cache.invalidate_by_tool.call_count == 3
+        mock_cache.invalidate_by_tool.assert_any_call("read_file")
+        mock_cache.invalidate_by_tool.assert_any_call("list_directory")
+        mock_cache.invalidate_by_tool.assert_any_call("code_search")
+
+    def test_invalidate_cache_docker_tool(self):
+        """Test cache invalidation for docker tool."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor._invalidate_cache_for_write_tool("docker", {"action": "build"})
+
+        # Docker commands invalidate many caches
+        assert mock_cache.invalidate_by_tool.call_count == 3
+
+    def test_invalidate_cache_no_cache(self):
+        """Test cache invalidation when no cache is configured."""
+        registry = ToolRegistry()
+        executor = ToolExecutor(tool_registry=registry)
+
+        # Should not raise when cache is None
+        executor._invalidate_cache_for_write_tool("write_file", {"path": "/tmp/test.py"})
+
+    def test_invalidate_cache_unknown_tool(self):
+        """Test cache invalidation for unknown tool (no-op)."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor._invalidate_cache_for_write_tool("unknown_tool", {"arg": "value"})
+
+        # Should not call any invalidation for unknown tools
+        mock_cache.invalidate_paths.assert_not_called()
+        mock_cache.invalidate_by_tool.assert_not_called()
+
+
+class TestToolExecutorCodeCorrection:
+    """Tests for ToolExecutor code correction middleware integration."""
+
+    @pytest.mark.asyncio
+    async def test_code_correction_applied(self):
+        """Test that code correction middleware is applied when enabled."""
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "write_code"
+        mock_tool.execute = AsyncMock(return_value="success")
+        mock_tool.validate_parameters_detailed = MagicMock()
+        mock_tool.validate_parameters_detailed.return_value = MagicMock(valid=True, errors=[])
+        registry.register(mock_tool)
+
+        mock_middleware = MagicMock()
+        mock_middleware.should_validate.return_value = True
+
+        # Create correction result
+        mock_correction_result = MagicMock()
+        mock_correction_result.was_corrected = True
+        mock_correction_result.validation = MagicMock(valid=True, errors=[])
+        mock_middleware.validate_and_fix.return_value = mock_correction_result
+        mock_middleware.apply_correction.return_value = {"code": "fixed code"}
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            code_correction_middleware=mock_middleware,
+            enable_code_correction=True,
+        )
+
+        await executor.execute("write_code", {"code": "bad code"})
+
+        mock_middleware.should_validate.assert_called_once_with("write_code")
+        mock_middleware.validate_and_fix.assert_called_once()
+        mock_middleware.apply_correction.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_code_correction_not_applied_when_disabled(self):
+        """Test that code correction is skipped when disabled."""
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "write_code"
+        mock_tool.execute = AsyncMock(return_value="success")
+        mock_tool.validate_parameters_detailed = MagicMock()
+        mock_tool.validate_parameters_detailed.return_value = MagicMock(valid=True, errors=[])
+        registry.register(mock_tool)
+
+        mock_middleware = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            code_correction_middleware=mock_middleware,
+            enable_code_correction=False,  # Disabled
+        )
+
+        await executor.execute("write_code", {"code": "code"})
+
+        mock_middleware.should_validate.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_code_correction_validation_errors_logged(self):
+        """Test that validation errors from code correction are logged."""
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "write_code"
+        mock_tool.execute = AsyncMock(return_value="success")
+        mock_tool.validate_parameters_detailed = MagicMock()
+        mock_tool.validate_parameters_detailed.return_value = MagicMock(valid=True, errors=[])
+        registry.register(mock_tool)
+
+        mock_middleware = MagicMock()
+        mock_middleware.should_validate.return_value = True
+
+        # Correction result with validation errors but not corrected
+        mock_correction_result = MagicMock()
+        mock_correction_result.was_corrected = False
+        mock_correction_result.validation = MagicMock(valid=False, errors=["Syntax error"])
+        mock_middleware.validate_and_fix.return_value = mock_correction_result
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            code_correction_middleware=mock_middleware,
+            enable_code_correction=True,
+        )
+
+        result = await executor.execute("write_code", {"code": "bad code"})
+
+        # Tool should still execute (validation errors are logged, not blocking)
+        assert result.success is True
+        mock_middleware.apply_correction.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_code_correction_middleware_exception(self):
+        """Test that middleware exceptions are caught and logged."""
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "write_code"
+        mock_tool.execute = AsyncMock(return_value="success")
+        mock_tool.validate_parameters_detailed = MagicMock()
+        mock_tool.validate_parameters_detailed.return_value = MagicMock(valid=True, errors=[])
+        registry.register(mock_tool)
+
+        mock_middleware = MagicMock()
+        mock_middleware.should_validate.return_value = True
+        mock_middleware.validate_and_fix.side_effect = RuntimeError("Middleware crashed")
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            code_correction_middleware=mock_middleware,
+            enable_code_correction=True,
+        )
+
+        result = await executor.execute("write_code", {"code": "code"})
+
+        # Tool should still execute despite middleware failure
+        assert result.success is True
+
+
+class TestToolExecutorTimeoutHandling:
+    """Tests for ToolExecutor timeout handling."""
+
+    @pytest.fixture(autouse=True)
+    def reset_globals(self):
+        """Reset global singletons before each test."""
+        from victor.core.errors import get_error_handler
+        import victor.agent.safety as safety_module
+
+        handler = get_error_handler()
+        handler.clear_history()
+        safety_module._default_checker = None
+
+    @pytest.mark.asyncio
+    async def test_timeout_error_tracking(self):
+        """Test that timeout errors are tracked properly."""
+        import asyncio
+
+        registry = ToolRegistry()
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "slow_tool"
+
+        async def slow_execute(context, **kwargs):
+            raise asyncio.TimeoutError("Tool timed out")
+
+        mock_tool.execute = slow_execute
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=1,
+            retry_delay=0.01,
+        )
+
+        result = await executor.execute("slow_tool", {})
+
+        assert result.success is False
+        assert "timeout" in result.error.lower()
+        assert result.error_info is not None
+
+    @pytest.mark.asyncio
+    async def test_timeout_retry(self):
+        """Test that timeouts trigger retries."""
+        import asyncio
+
+        registry = ToolRegistry()
+
+        call_count = [0]
+
+        async def sometimes_timeout(context, **kwargs):
+            nonlocal call_count
+            call_count[0] += 1
+            if call_count[0] < 2:
+                raise asyncio.TimeoutError("Temporary timeout")
+            return "success"
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "timeout_tool"
+        mock_tool.execute = sometimes_timeout
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=3,
+            retry_delay=0.01,
+        )
+
+        result = await executor.execute("timeout_tool", {})
+
+        assert result.success is True
+        assert call_count[0] == 2  # First timeout, then success

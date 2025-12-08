@@ -402,3 +402,121 @@ class TestConversationStateMachineRoundTrip:
         assert restored.state.observed_files == original.state.observed_files
         assert restored.state.modified_files == original.state.modified_files
         assert restored.state.message_count == original.state.message_count
+
+
+class TestConversationStateMachineRegistryIntegration:
+    """Tests for registry integration in ConversationStateMachine."""
+
+    def test_get_tools_for_stage_uses_static_fallback(self):
+        """Test _get_tools_for_stage returns static tools when registry is empty."""
+        sm = ConversationStateMachine()
+
+        # Get tools for INITIAL stage
+        tools = sm._get_tools_for_stage(ConversationStage.INITIAL)
+
+        # Should include static tools from STAGE_TOOL_MAPPING
+        assert "code_search" in tools
+        assert "list_directory" in tools
+
+    def test_get_stage_tools_returns_static_tools(self):
+        """Test get_stage_tools returns static mapping tools."""
+        sm = ConversationStateMachine()
+        sm.state.stage = ConversationStage.EXECUTION
+
+        tools = sm.get_stage_tools()
+
+        # Should include execution stage tools from static mapping
+        assert "write_file" in tools
+        assert "execute_bash" in tools
+
+    def test_get_tools_for_stage_includes_registry_tools(self):
+        """Test _get_tools_for_stage includes tools from registry."""
+        from unittest.mock import patch
+
+        sm = ConversationStateMachine()
+
+        # Mock the registry to return additional tools
+        with patch(
+            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            return_value={"mock_tool_from_registry"},
+        ):
+            tools = sm._get_tools_for_stage(ConversationStage.INITIAL)
+
+            # Should include both registry tools and static tools
+            assert "mock_tool_from_registry" in tools
+            assert "code_search" in tools  # From static mapping
+
+    def test_get_stage_tools_union_of_registry_and_static(self):
+        """Test get_stage_tools returns union of registry and static."""
+        from unittest.mock import patch
+
+        sm = ConversationStateMachine()
+        sm.state.stage = ConversationStage.READING
+
+        with patch(
+            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            return_value={"registry_read_tool"},
+        ):
+            tools = sm.get_stage_tools()
+
+            # Union should include both
+            assert "registry_read_tool" in tools
+            assert "read_file" in tools  # From static mapping
+
+    def test_detect_stage_from_tools_uses_helper(self):
+        """Test _detect_stage_from_tools uses _get_tools_for_stage."""
+        from unittest.mock import patch, MagicMock
+
+        sm = ConversationStateMachine()
+        sm.state.last_tools = ["custom_read_tool", "custom_read_tool"]
+
+        # Mock _get_tools_for_stage to return custom_read_tool for READING
+        original_get_tools = sm._get_tools_for_stage
+
+        def mock_get_tools(stage):
+            if stage == ConversationStage.READING:
+                return {"custom_read_tool", "read_file"}
+            return original_get_tools(stage)
+
+        with patch.object(sm, "_get_tools_for_stage", side_effect=mock_get_tools):
+            stage = sm._detect_stage_from_tools()
+
+            # Should detect READING stage due to custom_read_tool overlap
+            assert stage == ConversationStage.READING
+
+    def test_should_include_tool_with_registry_tools(self):
+        """Test should_include_tool works with registry integration."""
+        from unittest.mock import patch
+
+        sm = ConversationStateMachine()
+        sm.state.stage = ConversationStage.ANALYSIS
+
+        # Mock registry to include a custom tool in ANALYSIS stage
+        with patch(
+            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            return_value={"custom_analysis_tool"},
+        ):
+            # Custom tool from registry should be included
+            assert sm.should_include_tool("custom_analysis_tool") is True
+
+            # Static tool should still work
+            assert sm.should_include_tool("code_review") is True
+
+    def test_get_tool_priority_boost_with_registry(self):
+        """Test get_tool_priority_boost works with registry integration."""
+        from unittest.mock import patch
+
+        sm = ConversationStateMachine()
+        sm.state.stage = ConversationStage.EXECUTION
+
+        with patch(
+            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            return_value={"custom_exec_tool"},
+        ):
+            # Custom tool from registry should get high boost
+            boost = sm.get_tool_priority_boost("custom_exec_tool")
+            assert boost == 0.15  # High boost for stage-relevant tools
+
+            # Static tool should also get high boost
+            boost = sm.get_tool_priority_boost("write_file")
+            assert boost == 0.15

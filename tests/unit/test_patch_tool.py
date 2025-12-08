@@ -23,8 +23,7 @@ from victor.tools.patch_tool import (
     PatchFile,
     parse_unified_diff,
     apply_patch_to_content,
-    apply_patch,
-    create_patch,
+    patch,
 )
 
 
@@ -274,7 +273,7 @@ class TestApplyPatch:
             with open(test_file, "w") as f:
                 f.write("def hello():\n    print('Hello')\n")
 
-            patch = f"""--- a/{test_file}
+            diff_content = f"""--- a/{test_file}
 +++ b/{test_file}
 @@ -1,2 +1,3 @@
  def hello():
@@ -282,7 +281,7 @@ class TestApplyPatch:
 +    print('Hello, World!')
 +    return True
 """
-            result = await apply_patch(patch=patch, file_path=test_file, backup=False)
+            result = await patch(patch_content=diff_content, file_path=test_file, backup=False)
 
             assert result["success"] is True
             # Path may be resolved differently on macOS (/var vs /private/var)
@@ -303,13 +302,13 @@ class TestApplyPatch:
             with open(test_file, "w") as f:
                 f.write(original_content)
 
-            patch = f"""--- a/{test_file}
+            diff_content = f"""--- a/{test_file}
 +++ b/{test_file}
 @@ -1 +1 @@
 -old content
 +new content
 """
-            result = await apply_patch(patch=patch, file_path=test_file, dry_run=True)
+            result = await patch(patch_content=diff_content, file_path=test_file, dry_run=True)
 
             assert "preview" in result
 
@@ -325,13 +324,13 @@ class TestApplyPatch:
             with open(test_file, "w") as f:
                 f.write("original")
 
-            patch = f"""--- a/{test_file}
+            diff_content = f"""--- a/{test_file}
 +++ b/{test_file}
 @@ -1 +1 @@
 -original
 +modified
 """
-            await apply_patch(patch=patch, file_path=test_file, backup=True)
+            await patch(patch_content=diff_content, file_path=test_file, backup=True)
 
             # Check backup exists
             backup_file = test_file + ".orig"
@@ -344,13 +343,13 @@ class TestApplyPatch:
         with tempfile.TemporaryDirectory() as tmpdir:
             new_file = os.path.join(tmpdir, "new_file.py")
 
-            patch = f"""--- /dev/null
+            diff_content = f"""--- /dev/null
 +++ b/{new_file}
 @@ -0,0 +1,2 @@
 +# New file
 +print('Hello')
 """
-            result = await apply_patch(patch=patch, backup=False)
+            result = await patch(patch_content=diff_content, backup=False)
 
             assert result["success"] is True
             assert os.path.exists(new_file)
@@ -360,7 +359,7 @@ class TestApplyPatch:
 
     async def test_apply_patch_invalid(self):
         """Test handling invalid patch."""
-        result = await apply_patch(patch="this is not a valid patch")
+        result = await patch(patch_content="this is not a valid patch")
 
         assert result["success"] is False
         assert "error" in result or "No valid patches" in str(result.get("error", ""))
@@ -377,7 +376,7 @@ class TestCreatePatch:
             with open(test_file, "w") as f:
                 f.write("line1\nline2\nline3")
 
-            result = await create_patch(
+            result = await patch(operation="create",
                 file_path=test_file,
                 new_content="line1\nline2_modified\nline3",
             )
@@ -394,7 +393,7 @@ class TestCreatePatch:
         with tempfile.TemporaryDirectory() as tmpdir:
             new_file = os.path.join(tmpdir, "nonexistent.py")
 
-            result = await create_patch(
+            result = await patch(operation="create",
                 file_path=new_file,
                 new_content="# New content\nprint('hello')",
             )
@@ -410,7 +409,7 @@ class TestCreatePatch:
             with open(test_file, "w") as f:
                 f.write("line1\nline2\nline3\nline4\nline5")
 
-            result = await create_patch(
+            result = await patch(operation="create",
                 file_path=test_file,
                 new_content="line1\nline2\nline3_modified\nline4\nline5",
                 context_lines=2,

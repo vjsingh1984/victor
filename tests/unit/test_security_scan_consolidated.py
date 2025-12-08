@@ -18,7 +18,7 @@ import pytest
 from pathlib import Path
 import tempfile
 
-from victor.tools.security_scanner_tool import security_scan
+from victor.tools.security_scanner_tool import scan
 
 
 @pytest.mark.asyncio
@@ -32,7 +32,7 @@ async def test_security_scan_secrets():
         )
 
         # Run secrets scan
-        result = await security_scan(path=tmpdir, scan_types=["secrets"], file_pattern="*.py")
+        result = await scan(path=tmpdir, scan_types=["secrets"], file_pattern="*.py")
 
         assert result["success"] is True
         assert "secrets" in result["results"]
@@ -52,7 +52,7 @@ async def test_security_scan_config():
         )
 
         # Run config scan
-        result = await security_scan(path=tmpdir, scan_types=["config"], file_pattern="*.py")
+        result = await scan(path=tmpdir, scan_types=["config"], file_pattern="*.py")
 
         assert result["success"] is True
         assert "config" in result["results"]
@@ -73,7 +73,7 @@ async def test_security_scan_dependencies():
         req_file.write_text("django==2.2.0\n" "flask==1.0.0\n" "requests==2.25.0\n")
 
         # Run dependency scan with dependency_scan=True (requires pip-audit)
-        result = await security_scan(
+        result = await scan(
             path=tmpdir,
             scan_types=["dependencies"],
             requirements_file=str(req_file),
@@ -112,7 +112,7 @@ async def test_security_scan_all():
         req_file.write_text("django==2.2.0\n")
 
         # Run all scans (dependency_scan=True to include dependency scanning)
-        result = await security_scan(
+        result = await scan(
             path=tmpdir,
             scan_types=["all"],
             requirements_file=str(req_file),
@@ -142,7 +142,7 @@ async def test_security_scan_severity_threshold():
         )
 
         # Scan with high threshold
-        result = await security_scan(path=tmpdir, scan_types=["all"], severity_threshold="high")
+        result = await scan(path=tmpdir, scan_types=["all"], severity_threshold="high")
 
         assert result["success"] is True
         # Should only report high severity issues
@@ -158,7 +158,7 @@ async def test_security_scan_single_file():
         test_file.write_text('api_key = "sk-1234567890abcdef1234567890abcdef"\n')
 
         # Scan single file
-        result = await security_scan(path=str(test_file), scan_types=["secrets"])
+        result = await scan(path=str(test_file), scan_types=["secrets"])
 
         assert result["success"] is True
         assert result["results"]["secrets"]["files_scanned"] == 1
@@ -167,7 +167,7 @@ async def test_security_scan_single_file():
 @pytest.mark.asyncio
 async def test_security_scan_nonexistent_path():
     """Test scanning nonexistent path."""
-    result = await security_scan(path="/nonexistent/path", scan_types=["all"])
+    result = await scan(path="/nonexistent/path", scan_types=["all"])
 
     assert result["success"] is False
     assert "error" in result
@@ -183,7 +183,7 @@ async def test_security_scan_no_issues():
         test_file.write_text("def hello():\n" '    return "Hello, World!"\n')
 
         # Run all scans
-        result = await security_scan(path=tmpdir, scan_types=["secrets", "config"])
+        result = await scan(path=tmpdir, scan_types=["secrets", "config"])
 
         assert result["success"] is True
         assert result["total_issues"] == 0

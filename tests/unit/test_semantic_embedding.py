@@ -492,7 +492,7 @@ class TestFallbackAndMandatoryTools:
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
         result = selector._get_mandatory_tools("please commit my changes")
-        assert "git_suggest_commit" in result or "execute_bash" in result
+        assert "commit_msg" in result or "shell" in result
 
     @pytest.mark.asyncio
     async def test_get_mandatory_tools_with_test(self, temp_cache_dir):
@@ -500,7 +500,7 @@ class TestFallbackAndMandatoryTools:
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
         result = selector._get_mandatory_tools("run the tests")
-        assert "execute_bash" in result or "run_tests" in result
+        assert "shell" in result or "test" in result
 
     @pytest.mark.asyncio
     async def test_get_mandatory_tools_no_keywords(self, temp_cache_dir):
@@ -599,10 +599,10 @@ class TestConceptualQueryRouting:
         # Create a mock registry with semantic_code_search and read_file
         registry = ToolRegistry()
 
-        class MockSemanticSearch(BaseTool):
+        class MockSearch(BaseTool):
             @property
             def name(self) -> str:
-                return "semantic_code_search"
+                return "search"
 
             @property
             def description(self) -> str:
@@ -615,10 +615,10 @@ class TestConceptualQueryRouting:
             async def execute(self, **kwargs):
                 return {"success": True}
 
-        class MockReadFile(BaseTool):
+        class MockRead(BaseTool):
             @property
             def name(self) -> str:
-                return "read_file"
+                return "read"
 
             @property
             def description(self) -> str:
@@ -631,10 +631,10 @@ class TestConceptualQueryRouting:
             async def execute(self, **kwargs):
                 return {"success": True}
 
-        class MockListDirectory(BaseTool):
+        class MockLs(BaseTool):
             @property
             def name(self) -> str:
-                return "list_directory"
+                return "ls"
 
             @property
             def description(self) -> str:
@@ -647,19 +647,19 @@ class TestConceptualQueryRouting:
             async def execute(self, **kwargs):
                 return {"success": True}
 
-        registry.register(MockSemanticSearch())
-        registry.register(MockReadFile())
-        registry.register(MockListDirectory())
+        registry.register(MockSearch())
+        registry.register(MockRead())
+        registry.register(MockLs())
 
-        # For conceptual query, should return semantic_code_search + read_file (NOT list_directory)
+        # For conceptual query, should return search + read (NOT ls)
         fallback = selector._get_fallback_tools(
             registry, max_tools=5, query="What classes inherit from BaseTool?"
         )
 
-        assert "semantic_code_search" in fallback
-        assert "read_file" in fallback
-        # list_directory should NOT be included in conceptual fallback
-        assert "list_directory" not in fallback
+        assert "search" in fallback
+        assert "read" in fallback
+        # ls should NOT be included in conceptual fallback
+        assert "ls" not in fallback
 
     @pytest.mark.asyncio
     async def test_get_fallback_tools_non_conceptual_query(self, temp_cache_dir):
@@ -669,10 +669,10 @@ class TestConceptualQueryRouting:
         # Create a mock registry
         registry = ToolRegistry()
 
-        class MockListDirectory(BaseTool):
+        class MockLs(BaseTool):
             @property
             def name(self) -> str:
-                return "list_directory"
+                return "ls"
 
             @property
             def description(self) -> str:
@@ -685,15 +685,15 @@ class TestConceptualQueryRouting:
             async def execute(self, **kwargs):
                 return {"success": True}
 
-        registry.register(MockListDirectory())
+        registry.register(MockLs())
 
         # For non-conceptual query, should use common fallback tools
         fallback = selector._get_fallback_tools(
             registry, max_tools=5, query="List files in directory"
         )
 
-        # list_directory should be in non-conceptual fallback
-        assert "list_directory" in fallback
+        # ls should be in non-conceptual fallback
+        assert "ls" in fallback
 
     @pytest.mark.asyncio
     async def test_conceptual_fallback_tools_constant_exists(self, temp_cache_dir):
@@ -702,10 +702,10 @@ class TestConceptualQueryRouting:
 
         # CONCEPTUAL_FALLBACK_TOOLS should exist and contain the right tools
         assert hasattr(selector, "CONCEPTUAL_FALLBACK_TOOLS")
-        assert "semantic_code_search" in selector.CONCEPTUAL_FALLBACK_TOOLS
-        assert "read_file" in selector.CONCEPTUAL_FALLBACK_TOOLS
+        assert "search" in selector.CONCEPTUAL_FALLBACK_TOOLS
+        assert "read" in selector.CONCEPTUAL_FALLBACK_TOOLS
         # Should NOT include exploratory tools that distract from semantic search
-        assert "list_directory" not in selector.CONCEPTUAL_FALLBACK_TOOLS
+        assert "ls" not in selector.CONCEPTUAL_FALLBACK_TOOLS
 
     @pytest.mark.asyncio
     async def test_conceptual_query_patterns_extended(self, temp_cache_dir):
