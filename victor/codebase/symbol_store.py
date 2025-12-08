@@ -285,9 +285,12 @@ class SymbolStore:
             "files_indexed": 0,
             "files_skipped": 0,
             "files_deleted": 0,
+            "files_with_errors": 0,  # Files that had parse errors but were still indexed
+            "files_failed": 0,  # Files that completely failed to index
             "symbols_found": 0,
             "patterns_detected": 0,
             "languages": {},
+            "errors": [],  # List of (file_path, error_type, error_msg) for debugging
         }
 
         print(f"🔍 Indexing symbols in {self.root}")
@@ -333,11 +336,13 @@ class SymbolStore:
                 if rel_path in indexed_files:
                     self._delete_file_data(conn, rel_path)
 
-                # Extract symbols based on language
+                # Extract symbols based on language - robust handling for imperfect codebases
                 try:
-                    symbols, imports = self._extract_symbols(file_path, language)
+                    symbols, imports, parse_error = self._extract_symbols_robust(
+                        file_path, language
+                    )
 
-                    # Store file info
+                    # Store file info (even if parsing had errors)
                     self._store_file(conn, file_path, language, len(symbols), len(imports))
 
                     # Store symbols
@@ -355,8 +360,24 @@ class SymbolStore:
                     stats["files_indexed"] += 1
                     stats["languages"][language] = stats["languages"].get(language, 0) + 1
 
+                    # Track files that had parse errors but were still indexed
+                    if parse_error:
+                        stats["files_with_errors"] += 1
+                        stats["errors"].append((rel_path, "parse_error", parse_error))
+                        logger.debug(f"Indexed {rel_path} with parse errors: {parse_error}")
+
+                except UnicodeDecodeError as e:
+                    # Binary file or encoding issue - skip but track
+                    stats["files_failed"] += 1
+                    stats["errors"].append((rel_path, "encoding", str(e)))
+                    logger.debug(f"Skipping binary/encoding issue: {rel_path}")
+
                 except Exception as e:
-                    logger.debug(f"Failed to index {file_path}: {e}")
+                    # Unexpected error - log at warning level for visibility
+                    stats["files_failed"] += 1
+                    error_type = type(e).__name__
+                    stats["errors"].append((rel_path, error_type, str(e)))
+                    logger.warning(f"Failed to index {rel_path}: {error_type}: {e}")
 
             # Step 3: Refresh architecture patterns (only if we indexed something)
             if stats["files_indexed"] > 0 or stats["files_deleted"] > 0 or force:
@@ -382,9 +403,22 @@ class SymbolStore:
         stats["elapsed_seconds"] = round(elapsed, 2)
 
         if stats["files_indexed"] > 0 or stats["files_deleted"] > 0:
-            print(
-                f"✅ Indexed {stats['files_indexed']} files, {stats['symbols_found']} symbols in {elapsed:.2f}s"
-            )
+            msg = f"✅ Indexed {stats['files_indexed']} files, {stats['symbols_found']} symbols in {elapsed:.2f}s"
+            # Add warning for files with issues
+            if stats["files_with_errors"] > 0:
+                msg += f" ({stats['files_with_errors']} with parse errors)"
+            if stats["files_failed"] > 0:
+                msg += f" ({stats['files_failed']} failed)"
+            print(msg)
+
+            # Show summary of failed files if any (helps users fix their code)
+            if stats["files_failed"] > 0 and stats["files_failed"] <= 10:
+                print("  ⚠️  Failed files:")
+                for path, error_type, error_msg in stats["errors"]:
+                    if error_type != "parse_error":
+                        print(f"     {path}: {error_type}")
+            elif stats["files_failed"] > 10:
+                print(f"  ⚠️  {stats['files_failed']} files failed to index (run with --verbose for details)")
         else:
             print(f"✅ Index up to date ({stats['files_skipped']} files unchanged)")
 
@@ -472,37 +506,129 @@ class SymbolStore:
             ),
         )
 
-    def _extract_symbols(
+    def _extract_symbols_robust(
         self, file_path: Path, language: str
-    ) -> Tuple[List[SymbolInfo], List[str]]:
-        """Extract symbols from a source file.
+    ) -> Tuple[List[SymbolInfo], List[str], Optional[str]]:
+        """Extract symbols with robust error handling for imperfect codebases.
 
-        Uses AST for Python, regex patterns for other languages.
+        Users may have codebases with syntax errors, incomplete code, or other issues.
+        This method still extracts what it can and reports errors without failing.
 
         Returns:
-            Tuple of (symbols, imports)
+            Tuple of (symbols, imports, parse_error)
+            - parse_error is None if successful, otherwise contains the error message
         """
         content = file_path.read_text(encoding="utf-8", errors="ignore")
         rel_path = str(file_path.relative_to(self.root))
+        parse_error = None
 
         if language == "python":
-            return self._extract_python_symbols(content, rel_path)
+            symbols, imports = self._extract_python_symbols_robust(content, rel_path)
+            # Check if AST parsing failed by comparing with what we should have found
+            if not symbols and "def " in content or "class " in content:
+                # AST probably failed, try to detect syntax error for reporting
+                try:
+                    ast.parse(content)
+                except SyntaxError as e:
+                    parse_error = f"SyntaxError line {e.lineno}: {e.msg}"
         else:
-            return self._extract_generic_symbols(content, rel_path, language)
+            symbols, imports = self._extract_generic_symbols(content, rel_path, language)
 
-    def _extract_python_symbols(
+        return symbols, imports, parse_error
+
+
+    def _extract_python_symbols_robust(
         self, content: str, rel_path: str
     ) -> Tuple[List[SymbolInfo], List[str]]:
-        """Extract symbols from Python code using AST."""
-        symbols = []
-        imports = []
+        """Extract Python symbols with fallback to regex for files with syntax errors.
 
+        First tries AST parsing. If that fails due to SyntaxError, falls back
+        to regex-based extraction which can still find top-level definitions.
+        """
         try:
             tree = ast.parse(content)
+            return self._extract_python_symbols_from_ast(tree, rel_path, content)
         except SyntaxError:
-            return symbols, imports
+            # AST failed - use regex fallback for partial extraction
+            return self._extract_python_symbols_regex_fallback(content, rel_path)
 
-        _current_class = None
+    def _extract_python_symbols_regex_fallback(
+        self, content: str, rel_path: str
+    ) -> Tuple[List[SymbolInfo], List[str]]:
+        """Extract Python symbols using regex when AST parsing fails.
+
+        This allows indexing files with syntax errors, which is common in
+        codebases under active development or with incomplete code.
+        """
+        symbols = []
+        imports = []
+        lines = content.split("\n")
+
+        # Regex patterns for top-level definitions
+        class_pattern = re.compile(r"^class\s+(\w+)\s*[:\(]")
+        func_pattern = re.compile(r"^(?:async\s+)?def\s+(\w+)\s*\(")
+        import_pattern = re.compile(r"^(?:from\s+[\w.]+\s+)?import\s+(.+)")
+
+        for line_num, line in enumerate(lines, start=1):
+            stripped = line.lstrip()
+
+            # Check for class definition
+            class_match = class_pattern.match(stripped)
+            if class_match and not line.startswith(" ") and not line.startswith("\t"):
+                name = class_match.group(1)
+                symbols.append(
+                    SymbolInfo(
+                        name=name,
+                        symbol_type="class",
+                        file_path=rel_path,
+                        line_number=line_num,
+                        language="python",
+                        category=self.categorize_symbol(name),
+                        docstring=None,
+                        modifiers=["regex_extracted"],  # Mark as regex-extracted
+                    )
+                )
+                continue
+
+            # Check for function definition
+            func_match = func_pattern.match(stripped)
+            if func_match and not line.startswith(" ") and not line.startswith("\t"):
+                name = func_match.group(1)
+                modifiers = ["regex_extracted"]
+                if "async " in stripped:
+                    modifiers.append("async")
+                symbols.append(
+                    SymbolInfo(
+                        name=name,
+                        symbol_type="function",
+                        file_path=rel_path,
+                        line_number=line_num,
+                        language="python",
+                        category=self.categorize_symbol(name),
+                        signature=f"{name}(...)",
+                        modifiers=modifiers,
+                    )
+                )
+                continue
+
+            # Check for imports
+            import_match = import_pattern.match(stripped)
+            if import_match:
+                import_text = import_match.group(1)
+                # Handle multiple imports: import a, b, c
+                for imp in import_text.split(","):
+                    imp = imp.strip().split(" as ")[0].strip()
+                    if imp and not imp.startswith("("):
+                        imports.append(imp)
+
+        return symbols, imports
+
+    def _extract_python_symbols_from_ast(
+        self, tree: ast.AST, rel_path: str, content: str
+    ) -> Tuple[List[SymbolInfo], List[str]]:
+        """Extract symbols from a parsed AST tree."""
+        symbols = []
+        imports = []
 
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
@@ -573,12 +699,160 @@ class SymbolStore:
     def _extract_generic_symbols(
         self, content: str, rel_path: str, language: str
     ) -> Tuple[List[SymbolInfo], List[str]]:
+        """Extract symbols from any language robustly.
+
+        Strategy:
+        1. Try tree-sitter parsing (if language package installed)
+        2. Fall back to regex patterns for unsupported languages or parse errors
+
+        This handles imperfect codebases gracefully.
+        """
+        # Try tree-sitter first for better accuracy
+        try:
+            symbols, imports = self._extract_generic_symbols_treesitter(
+                content, rel_path, language
+            )
+            if symbols:  # Got results, use them
+                return symbols, imports
+        except Exception as e:
+            # Tree-sitter failed (not installed, parse error, etc.)
+            # Fall through to regex fallback
+            logger.debug(f"Tree-sitter failed for {language}: {e}, using regex fallback")
+
+        # Regex fallback for all languages
+        return self._extract_generic_symbols_regex(content, rel_path, language)
+
+    def _extract_generic_symbols_treesitter(
+        self, content: str, rel_path: str, language: str
+    ) -> Tuple[List[SymbolInfo], List[str]]:
+        """Extract symbols using tree-sitter for accurate parsing.
+
+        Tree-sitter is error-tolerant and can parse files with syntax errors,
+        making it ideal for imperfect codebases.
+        """
+        from victor.codebase.tree_sitter_manager import get_parser, LANGUAGE_MODULES
+
+        # Check if language is supported
+        if language not in LANGUAGE_MODULES:
+            return [], []
+
+        parser = get_parser(language)
+        tree = parser.parse(content.encode("utf-8"))
+        root = tree.root_node
+
+        symbols = []
+        imports = []
+
+        # Language-specific node type queries
+        # Tree-sitter node types vary by language grammar
+        # Format: (node_type, name_field, symbol_type)
+        # name_field can be a field name or None for special handling
+        SYMBOL_QUERIES = {
+            "javascript": [
+                ("class_declaration", "name", "class"),
+                ("function_declaration", "name", "function"),
+                ("arrow_function", "name", "function"),
+                ("method_definition", "name", "method"),
+            ],
+            "typescript": [
+                ("class_declaration", "name", "class"),
+                ("interface_declaration", "name", "interface"),
+                ("type_alias_declaration", "name", "type"),
+                ("function_declaration", "name", "function"),
+                ("method_definition", "name", "method"),
+                ("enum_declaration", "name", "enum"),
+            ],
+            "go": [
+                # Go uses type_spec inside type_declaration - needs special handling
+                ("type_spec", None, "type"),  # Special: extract type_identifier child
+                ("function_declaration", "name", "function"),
+                ("method_declaration", "name", "method"),
+            ],
+            "rust": [
+                ("struct_item", "name", "struct"),
+                ("enum_item", "name", "enum"),
+                ("trait_item", "name", "trait"),
+                ("impl_item", "type", "impl"),
+                ("function_item", "name", "function"),
+                ("mod_item", "name", "module"),
+            ],
+            "java": [
+                ("class_declaration", "name", "class"),
+                ("interface_declaration", "name", "interface"),
+                ("enum_declaration", "name", "enum"),
+                ("method_declaration", "name", "method"),
+            ],
+        }
+
+        queries = SYMBOL_QUERIES.get(language, [])
+
+        def walk_tree(node):
+            """Recursively walk tree and extract symbols."""
+            for query_type, name_field, default_symbol_type in queries:
+                if node.type == query_type:
+                    name = None
+                    actual_symbol_type = default_symbol_type
+
+                    if name_field is None:
+                        # Special handling for Go type_spec: name is in type_identifier child
+                        if language == "go" and node.type == "type_spec":
+                            for child in node.children:
+                                if child.type == "type_identifier":
+                                    name = content[child.start_byte : child.end_byte]
+                                    # Determine if it's struct, interface, or other
+                                    for sibling in node.children:
+                                        if sibling.type == "struct_type":
+                                            actual_symbol_type = "struct"
+                                            break
+                                        elif sibling.type == "interface_type":
+                                            actual_symbol_type = "interface"
+                                            break
+                                    break
+                    else:
+                        # Standard field-based name extraction
+                        name_node = node.child_by_field_name(name_field)
+                        if name_node:
+                            name = content[name_node.start_byte : name_node.end_byte]
+
+                    if name:
+                        symbols.append(
+                            SymbolInfo(
+                                name=name,
+                                symbol_type=actual_symbol_type,
+                                file_path=rel_path,
+                                line_number=node.start_point[0] + 1,
+                                language=language,
+                                category=self.categorize_symbol(name),
+                                modifiers=["treesitter_extracted"],
+                            )
+                        )
+                        break
+
+            # Extract imports
+            if node.type in (
+                "import_statement",
+                "import_declaration",
+                "use_declaration",
+            ):
+                import_text = content[node.start_byte : node.end_byte]
+                # Extract module name (simplified)
+                import_match = re.search(r'["\']([^"\']+)["\']', import_text)
+                if import_match:
+                    imports.append(import_match.group(1))
+
+            for child in node.children:
+                walk_tree(child)
+
+        walk_tree(root)
+        return symbols, imports
+
+    def _extract_generic_symbols_regex(
+        self, content: str, rel_path: str, language: str
+    ) -> Tuple[List[SymbolInfo], List[str]]:
         """Extract symbols from any language using regex patterns.
 
-        This is language-agnostic and works for:
-        - OOP languages (Java, C#, TypeScript, etc.)
-        - Functional languages (Go, Rust, Elixir)
-        - Procedural code
+        This is the fallback for languages without tree-sitter support
+        or when tree-sitter parsing fails.
         """
         symbols = []
         imports = []
@@ -737,7 +1011,7 @@ class SymbolStore:
         with sqlite3.connect(str(self._db_path)) as conn:
             cursor = conn.execute(
                 """SELECT name, symbol_type, file_path, line_number, language,
-                          category, docstring, signature, parent_symbol
+                          category, docstring, signature, parent_symbol, modifiers
                    FROM symbols WHERE category = ? LIMIT ?""",
                 (category, limit),
             )
@@ -748,7 +1022,7 @@ class SymbolStore:
         with sqlite3.connect(str(self._db_path)) as conn:
             cursor = conn.execute(
                 """SELECT name, symbol_type, file_path, line_number, language,
-                          category, docstring, signature, parent_symbol
+                          category, docstring, signature, parent_symbol, modifiers
                    FROM symbols WHERE symbol_type = ? LIMIT ?""",
                 (symbol_type, limit),
             )
@@ -759,7 +1033,7 @@ class SymbolStore:
         with sqlite3.connect(str(self._db_path)) as conn:
             cursor = conn.execute(
                 """SELECT name, symbol_type, file_path, line_number, language,
-                          category, docstring, signature, parent_symbol
+                          category, docstring, signature, parent_symbol, modifiers
                    FROM symbols WHERE name LIKE ? LIMIT ?""",
                 (pattern, limit),
             )
@@ -770,7 +1044,7 @@ class SymbolStore:
         with sqlite3.connect(str(self._db_path)) as conn:
             cursor = conn.execute(
                 """SELECT name, symbol_type, file_path, line_number, language,
-                          category, docstring, signature, parent_symbol
+                          category, docstring, signature, parent_symbol, modifiers
                    FROM symbols
                    WHERE category IS NOT NULL
                    AND symbol_type IN ('class', 'interface', 'struct', 'trait')
@@ -1063,6 +1337,10 @@ class SymbolStore:
 
     def _row_to_symbol(self, row: tuple) -> SymbolInfo:
         """Convert a database row to SymbolInfo."""
+        # Parse modifiers from comma-separated string
+        modifiers_str = row[9] if len(row) > 9 else None
+        modifiers = modifiers_str.split(",") if modifiers_str else []
+
         return SymbolInfo(
             name=row[0],
             symbol_type=row[1],
@@ -1073,6 +1351,7 @@ class SymbolStore:
             docstring=row[6],
             signature=row[7],
             parent_symbol=row[8],
+            modifiers=modifiers,
         )
 
     def clear(self) -> None:
