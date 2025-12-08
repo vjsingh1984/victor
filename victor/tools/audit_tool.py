@@ -26,7 +26,15 @@ from victor.audit import (
     AuditReport,
     ComplianceFramework,
 )
-from victor.tools.base import BaseTool, CostTier, ToolMetadata, ToolResult
+from victor.tools.base import (
+    AccessMode,
+    BaseTool,
+    CostTier,
+    DangerLevel,
+    Priority,
+    ToolMetadata,
+    ToolResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -90,14 +98,39 @@ Actions:
         return CostTier.FREE
 
     @property
+    def priority(self) -> Priority:
+        """Tool priority for selection availability."""
+        return Priority.LOW  # Specialized compliance tool
+
+    @property
+    def access_mode(self) -> AccessMode:
+        """Tool access mode for approval tracking."""
+        return AccessMode.MIXED  # Reads logs and can export files
+
+    @property
+    def danger_level(self) -> DangerLevel:
+        """Danger level for warning/confirmation logic."""
+        return DangerLevel.SAFE  # No harmful side effects
+
+    @property
     def metadata(self) -> ToolMetadata:
         """Inline semantic metadata for dynamic tool selection."""
         return ToolMetadata(
             category="audit",
             keywords=[
-                "audit", "compliance", "soc2", "gdpr", "hipaa", "pci dss", "iso 27001",
-                "audit log", "security audit", "compliance report", "pii detection",
-                "data retention", "audit trail"
+                "audit",
+                "compliance",
+                "soc2",
+                "gdpr",
+                "hipaa",
+                "pci dss",
+                "iso 27001",
+                "audit log",
+                "security audit",
+                "compliance report",
+                "pii detection",
+                "data retention",
+                "audit trail",
             ],
             use_cases=[
                 "audit logging",
@@ -273,7 +306,9 @@ Actions:
         """Format audit report."""
         lines = ["**Audit Report**", ""]
 
-        lines.append(f"**Period:** {report.start_date.strftime('%Y-%m-%d')} to {report.end_date.strftime('%Y-%m-%d')}")
+        lines.append(
+            f"**Period:** {report.start_date.strftime('%Y-%m-%d')} to {report.end_date.strftime('%Y-%m-%d')}"
+        )
         if report.framework:
             lines.append(f"**Framework:** {report.framework.value.upper()}")
         lines.append(f"**Total Events:** {report.total_events}")

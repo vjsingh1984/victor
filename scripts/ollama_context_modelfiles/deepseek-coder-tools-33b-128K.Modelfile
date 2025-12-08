@@ -1,0 +1,10 @@
+# DeepSeek-Coder-Tools 33B with 128K context (up from 16K)
+# Shares weights with deepseek-coder-tools:33b (no storage duplication)
+# Target: localhost (M1 Max)
+
+FROM deepseek-coder-tools:33b
+
+PARAMETER num_ctx 131072
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.05

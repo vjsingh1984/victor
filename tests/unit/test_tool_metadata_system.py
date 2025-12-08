@@ -192,8 +192,10 @@ class TestToolMetadataAutoGeneration:
         )
         assert len(metadata.priority_hints) > 0
         # Should contain warning about resource usage
-        assert any("resource" in hint.lower() or "sparingly" in hint.lower()
-                   for hint in metadata.priority_hints)
+        assert any(
+            "resource" in hint.lower() or "sparingly" in hint.lower()
+            for hint in metadata.priority_hints
+        )
 
     def test_generate_from_tool_limits_keywords(self):
         """Should limit keywords to reasonable number."""
@@ -582,6 +584,7 @@ class TestSemanticToolSelectorIntegration:
 
         with patch.object(selector, "_get_embedding", new_callable=AsyncMock) as mock_embed:
             import numpy as np
+
             mock_embed.return_value = np.zeros(384, dtype=np.float32)
 
             await selector.initialize_tool_embeddings(tool_registry)
@@ -702,6 +705,7 @@ class TestToolUsageStatsPreInit:
     @pytest.fixture
     def mock_tools(self):
         """Create mock tools for testing."""
+
         class MockTool1(BaseTool):
             name = "tool_one"
             description = "First tool"

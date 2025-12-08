@@ -10,21 +10,102 @@
 # =============================================================================
 # PROFILES - Define your LLM configurations
 # =============================================================================
+# Profiles are ordered by: Tool Support + Context Size + Quality
+# Use -tools variants for reliable function calling
+# =============================================================================
 profiles:
+  # ---------------------------------------------------------------------------
+  # PRIMARY PROFILES (Tool-enabled + High Context)
+  # ---------------------------------------------------------------------------
+  # max_tokens = maximum OUTPUT tokens per response (not context window)
+  # Rule of thumb: 4096 for coding, 8192+ for complex, 16384+ for reasoning
+  # ---------------------------------------------------------------------------
   default:
     provider: ollama
-    model: qwen3-coder:30b
+    model: qwen3-coder-tools:30b  # 262K context, tools, best coding
     temperature: 0.7
-    max_tokens: 4096
-    description: "Default profile with Qwen3 30B coder model"
+    max_tokens: 8192  # Allow long code generations
+    description: "Default: Qwen3-Coder 30B with tools (262K context)"
+
+  local:
+    provider: ollama
+    model: deepseek-r1-tools:32b  # 131K context, tools, thinking
+    temperature: 0.7
+    max_tokens: 16384  # Reasoning chains need more output
+    description: "DeepSeek-R1 32B with tools+thinking (131K context)"
+
+  local-heavy:
+    provider: ollama
+    model: deepseek-r1-tools:70b  # 131K context, tools, thinking, 70B
+    temperature: 0.7
+    max_tokens: 16384  # 70B can generate longer coherent outputs
+    endpoint: http://192.168.1.20:11434  # Remote server with more RAM
+    description: "DeepSeek-R1 70B with tools (131K, requires remote)"
+
+  devstral:
+    provider: ollama
+    model: devstral-tools:latest  # 131K context, agentic coding
+    temperature: 0.7
+    max_tokens: 8192  # Agentic outputs can be long
+    description: "Devstral 24B - Agentic coder with tools (131K context)"
+
+  gemma:
+    provider: ollama
+    model: gemma3-tools:27b  # 131K context, multimodal
+    temperature: 1.0
+    max_tokens: 4096  # Standard for general tasks
+    description: "Gemma3 27B with tools (131K, multimodal)"
 
   quick:
     provider: ollama
-    model: qwen2.5-coder:7b
+    model: mistral-tools:7b-instruct  # Fast, lightweight, tools
     temperature: 0.5
-    max_tokens: 2048
-    description: "Quick responses with lighter model"
+    max_tokens: 2048  # Keep small for speed
+    description: "Mistral 7B with tools - fast responses"
 
+  # ---------------------------------------------------------------------------
+  # EXTENDED CONTEXT PROFILES (Build with scripts/ollama_context_modelfiles/)
+  # ---------------------------------------------------------------------------
+  deepseek-coder-128k:
+    provider: ollama
+    model: deepseek-coder-tools:33b-128K  # Extended to 128K
+    temperature: 0.7
+    max_tokens: 4096
+    description: "DeepSeek-Coder 33B with tools (128K extended)"
+
+  deepseek-r1-262k:
+    provider: ollama
+    model: deepseek-r1-tools:32b-262K  # Extended to 262K
+    temperature: 0.7
+    max_tokens: 8192
+    endpoint: http://192.168.1.20:11434  # Remote for large context
+    description: "DeepSeek-R1 32B with 262K context (remote)"
+
+  mixtral-65k:
+    provider: ollama
+    model: mixtral-tools:8x7b-65K  # Extended to 65K
+    temperature: 0.7
+    max_tokens: 4096
+    description: "Mixtral 8x7B with tools (65K extended)"
+
+  gemma-128k:
+    provider: ollama
+    model: gemma3-tools:27b-128K  # Extended to 131K
+    temperature: 1.0
+    max_tokens: 4096
+    description: "Gemma3 27B with tools (131K extended, multimodal)"
+
+  deepseek-r1-70b-262k:
+    provider: ollama
+    model: deepseek-r1-tools:70b-262K  # Extended to 262K
+    temperature: 0.7
+    max_tokens: 16384  # 70B can generate longer outputs
+    endpoint: http://192.168.1.20:11434  # Remote - needs 100GB+ memory
+    description: "DeepSeek-R1 70B with 262K context (remote, heavy)"
+
+  # ---------------------------------------------------------------------------
+  # CLOUD PROVIDERS (Already have high context + tools)
+  # ---------------------------------------------------------------------------
   claude:
     provider: anthropic
     model: claude-sonnet-4-5
@@ -38,6 +119,68 @@ profiles:
     temperature: 0.7
     max_tokens: 4096
     description: "GPT-4o for general coding"
+
+  grok:
+    provider: xai
+    model: grok-code-fast-1
+    temperature: 0.7
+    max_tokens: 4096
+    description: "xAI Grok Code Fast - cheapest with tool calling ($0.20/$1.50 per M tokens)"
+
+  grok-fast:
+    provider: xai
+    model: grok-4-1-fast-non-reasoning
+    temperature: 0.7
+    max_tokens: 4096
+    description: "xAI Grok 4.1 Fast - best tool calling model (2M context)"
+
+  kimi:
+    provider: moonshot
+    model: kimi-k2-thinking
+    temperature: 1.0  # Recommended for reasoning
+    max_tokens: 8192
+    description: "Kimi K2 Thinking for complex reasoning tasks"
+
+  kimi-fast:
+    provider: moonshot
+    model: kimi-k2-thinking-turbo
+    temperature: 0.7
+    max_tokens: 4096
+    description: "Kimi K2 Turbo for faster responses"
+
+  deepseek:
+    provider: deepseek
+    model: deepseek-chat
+    temperature: 0.7
+    max_tokens: 4096
+    description: "DeepSeek-V3 for coding with tool calling"
+
+  deepseek-reason:
+    provider: deepseek
+    model: deepseek-reasoner
+    max_tokens: 32768  # Supports up to 64K including reasoning
+    description: "DeepSeek Reasoner for complex problem solving (no tools)"
+
+  groq:
+    provider: groqcloud
+    model: llama-3.3-70b-versatile
+    temperature: 0.7
+    max_tokens: 4096
+    description: "Groq Cloud Llama 3.3 70B - Ultra-fast inference (free tier)"
+
+  groq-fast:
+    provider: groqcloud
+    model: llama-3.1-8b-instant
+    temperature: 0.7
+    max_tokens: 2048
+    description: "Groq Cloud Llama 3.1 8B - Fastest responses"
+
+  groq-qwen:
+    provider: groqcloud
+    model: qwen/qwen3-32b
+    temperature: 0.7
+    max_tokens: 4096
+    description: "Groq Cloud Qwen3 32B - Strong reasoning (preview)"
 
 # =============================================================================
 # PROVIDERS - API keys and endpoints
@@ -66,6 +209,21 @@ providers:
 
   xai:
     api_key: ${XAI_API_KEY}
+
+  moonshot:
+    api_key: ${MOONSHOT_API_KEY}
+    base_url: https://api.moonshot.cn/v1
+    timeout: 120
+
+  deepseek:
+    api_key: ${DEEPSEEK_API_KEY}
+    base_url: https://api.deepseek.com/v1
+    timeout: 120
+
+  groqcloud:
+    api_key: ${GROQCLOUD_API_KEY}
+    base_url: https://api.groq.com/openai/v1
+    timeout: 60  # Groq is very fast
 
 # =============================================================================
 # TOOLS - Enable/disable specific tools
@@ -157,6 +315,27 @@ model_capabilities:
       parallel_tool_calls: true
       requires_strict_prompting: false
       recommended_tool_budget: 15
+
+    moonshot:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 30
+
+    deepseek:
+      native_tool_calls: true  # Only deepseek-chat
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    groqcloud:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
 
   # Model-specific overrides (patterns match model names)
   models:
@@ -324,6 +503,135 @@ model_capabilities:
       native_tool_calls: false
       requires_strict_prompting: true
       recommended_tool_budget: 10
+
+    # -------------------------------------------------------------------------
+    # Moonshot Kimi K2 models - Reasoning with tool support
+    # -------------------------------------------------------------------------
+    "kimi-k2-thinking*":
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      thinking_mode: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 30
+
+    "kimi-k2-instruct*":
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    # -------------------------------------------------------------------------
+    # DeepSeek API models
+    # -------------------------------------------------------------------------
+    "deepseek-chat*":
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    "deepseek-reasoner*":
+      native_tool_calls: false  # Reasoner does NOT support function calling
+      streaming_tool_calls: true
+      thinking_mode: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 5
+
+    # -------------------------------------------------------------------------
+    # xAI Grok models
+    # -------------------------------------------------------------------------
+    "grok-code*":
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    "grok-4*":
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    "grok-2*":
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    # -------------------------------------------------------------------------
+    # Groq Cloud models - Ultra-fast inference
+    # -------------------------------------------------------------------------
+    "llama-3.3-70b-versatile*":
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 25
+
+    "llama-3.1-8b-instant*":
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "openai/gpt-oss-*":
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: false  # GPT-OSS doesn't support parallel calls
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "qwen/qwen3-32b*":
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      thinking_mode: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    # -------------------------------------------------------------------------
+    # Tool-enabled variants (-tools suffix) - Native tool calling
+    # -------------------------------------------------------------------------
+    "*-tools:*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "*-tools":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    # Devstral specifically (agentic model)
+    "devstral-tools*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    # DeepSeek-R1 tools variants (have thinking mode)
+    "deepseek-r1-tools*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      thinking_mode: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    # Qwen3-Coder tools (highest context)
+    "qwen3-coder-tools*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      thinking_mode: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
 
     # -------------------------------------------------------------------------
     # Add your custom models here

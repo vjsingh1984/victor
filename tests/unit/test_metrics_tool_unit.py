@@ -21,7 +21,7 @@ from pathlib import Path
 from victor.tools.metrics_tool import (
     _calculate_complexity_score,
     _calculate_maintainability_index,
-    analyze_metrics,
+    metrics,
 )
 
 
@@ -145,7 +145,7 @@ def goodbye():
             temp_path = f.name
 
         try:
-            result = await analyze_metrics(path=temp_path)
+            result = await metrics(path=temp_path)
             assert result["success"] is True
         finally:
             Path(temp_path).unlink(missing_ok=True)
@@ -157,13 +157,13 @@ def goodbye():
             Path(f"{tmpdir}/file1.py").write_text("def foo(): pass")
             Path(f"{tmpdir}/file2.py").write_text("def bar(): pass")
 
-            result = await analyze_metrics(path=tmpdir)
+            result = await metrics(path=tmpdir)
             assert result["success"] is True
 
     @pytest.mark.asyncio
     async def test_analyze_nonexistent_path(self):
         """Test analyzing nonexistent path."""
-        result = await analyze_metrics(path="/nonexistent/path")
+        result = await metrics(path="/nonexistent/path")
         assert result["success"] is False
 
     @pytest.mark.asyncio
@@ -174,8 +174,8 @@ def goodbye():
             temp_path = f.name
 
         try:
-            result = await analyze_metrics(
-                path=temp_path, metrics=["complexity", "maintainability"]
+            result = await metrics(
+                path=temp_path, metrics_list=["complexity", "maintainability"]
             )
             assert result["success"] is True
         finally:

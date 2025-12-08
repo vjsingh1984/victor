@@ -64,33 +64,34 @@ This guide covers deploying Victor in enterprise environments with focus on secu
 
 ### Deployment Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                   Enterprise Network                     │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │              Load Balancer (Optional)              │  │
-│  └─────────────────────┬─────────────────────────────┘  │
-│                        │                                 │
-│  ┌─────────────────────▼─────────────────────────────┐  │
-│  │           Victor Application Cluster               │  │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐        │  │
-│  │  │ Victor 1 │  │ Victor 2 │  │ Victor N │        │  │
-│  │  └────┬─────┘  └────┬─────┘  └────┬─────┘        │  │
-│  └───────┼─────────────┼─────────────┼──────────────┘  │
-│          │             │             │                   │
-│  ┌───────▼─────────────▼─────────────▼──────────────┐  │
-│  │              LLM Provider Layer                   │  │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐       │  │
-│  │  │  Ollama  │  │   vLLM   │  │ LMStudio │       │  │
-│  │  │  (Local) │  │  (Local) │  │  (Local) │       │  │
-│  │  └──────────┘  └──────────┘  └──────────┘       │  │
-│  └───────────────────────────────────────────────────┘  │
-│                                                          │
-│  Optional: Cloud API Gateway for frontier models        │
-│  └─────────────────────────────────────────────────┐    │
-│          │ (Secure tunnel to Claude/GPT/Gemini)    │    │
-│          └──────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph ENTERPRISE["🏢 Enterprise Network"]
+        LB["Load Balancer<br/>(Optional)"]
+
+        subgraph CLUSTER["Victor Application Cluster"]
+            V1["Victor 1"]
+            V2["Victor 2"]
+            VN["Victor N"]
+        end
+
+        subgraph LLM["LLM Provider Layer"]
+            OLLAMA["Ollama<br/>(Local)"]
+            VLLM["vLLM<br/>(Local)"]
+            LMSTUDIO["LMStudio<br/>(Local)"]
+        end
+
+        GATEWAY["☁️ Cloud API Gateway<br/>(Optional - Claude/GPT/Gemini)"]
+
+        LB --> V1 & V2 & VN
+        V1 & V2 & VN --> OLLAMA & VLLM & LMSTUDIO
+        V1 & V2 & VN -.->|HTTPS encrypted| GATEWAY
+    end
+
+    style ENTERPRISE fill:#f0f9ff,stroke:#0284c7
+    style CLUSTER fill:#d1fae5,stroke:#10b981
+    style LLM fill:#fef3c7,stroke:#f59e0b
+    style GATEWAY fill:#e0e7ff,stroke:#4f46e5
 ```
 
 ### Security Zones
@@ -124,18 +125,23 @@ This guide covers deploying Victor in enterprise environments with focus on secu
 - Any regulated industry
 
 **Architecture:**
-```bash
-# 100% offline, zero internet access
-┌─────────────────────────────────┐
-│   Air-Gapped Network            │
-│                                 │
-│  ┌──────────┐   ┌────────────┐ │
-│  │  Victor  │───│   Ollama   │ │
-│  │   App    │   │  (Local)   │ │
-│  └──────────┘   └────────────┘ │
-│                                 │
-│  No external connections        │
-└─────────────────────────────────┘
+
+```mermaid
+flowchart LR
+    subgraph AIRGAP["🔒 Air-Gapped Network (100% Offline)"]
+        VICTOR["Victor App"]
+        OLLAMA["Ollama<br/>(Local)"]
+        VICTOR <--> OLLAMA
+    end
+
+    INTERNET["❌ Internet"]
+
+    AIRGAP x--x INTERNET
+
+    style AIRGAP fill:#fee2e2,stroke:#ef4444
+    style VICTOR fill:#d1fae5,stroke:#10b981
+    style OLLAMA fill:#fef3c7,stroke:#f59e0b
+    style INTERNET fill:#e5e7eb,stroke:#6b7280
 ```
 
 **Setup:**
@@ -186,27 +192,28 @@ victor
 - Development/test environments
 
 **Architecture:**
-```bash
-# 90% local (free), 10% cloud (critical tasks)
-┌─────────────────────────────────────────┐
-│   Internal Network                      │
-│                                         │
-│  ┌──────────┐   ┌────────────┐         │
-│  │  Victor  │───│   Ollama   │  90%    │
-│  │   App    │   │  (Local)   │  FREE   │
-│  └────┬─────┘   └────────────┘         │
-│       │                                 │
-│       │ 10% critical tasks              │
-│       ▼                                 │
-│  ┌─────────────────────────┐           │
-│  │  Secure API Gateway     │           │
-│  └───────────┬─────────────┘           │
-└──────────────┼─────────────────────────┘
-               │
-               ▼ HTTPS (encrypted)
-        ┌──────────────┐
-        │Claude/GPT API│
-        └──────────────┘
+
+```mermaid
+flowchart TB
+    subgraph INTERNAL["🏠 Internal Network"]
+        direction TB
+        VICTOR["Victor App"]
+        OLLAMA["Ollama<br/>(Local)"]
+        GATEWAY["Secure API Gateway"]
+
+        VICTOR <-->|90% FREE| OLLAMA
+        VICTOR -->|10% critical| GATEWAY
+    end
+
+    CLOUD["☁️ Claude/GPT API"]
+
+    GATEWAY -->|HTTPS encrypted| CLOUD
+
+    style INTERNAL fill:#d1fae5,stroke:#10b981
+    style VICTOR fill:#e0e7ff,stroke:#4f46e5
+    style OLLAMA fill:#fef3c7,stroke:#f59e0b
+    style GATEWAY fill:#fee2e2,stroke:#ef4444
+    style CLOUD fill:#dbeafe,stroke:#3b82f6
 ```
 
 **Configuration:**
@@ -266,25 +273,29 @@ Potential Benefit: Cost reduction through selective API usage
 - MSP/consulting firms
 
 **Architecture:**
-```bash
-┌─────────────────────────────────────────┐
-│         Load Balancer + Auth            │
-└───────────────┬─────────────────────────┘
-                │
-     ┌──────────┼──────────┐
-     │          │          │
-     ▼          ▼          ▼
-┌─────────┐ ┌─────────┐ ┌─────────┐
-│Tenant A │ │Tenant B │ │Tenant N │
-│ Victor  │ │ Victor  │ │ Victor  │
-└────┬────┘ └────┬────┘ └────┬────┘
-     │           │           │
-     └───────────┼───────────┘
-                 ▼
-        ┌────────────────┐
-        │  Shared LLM    │
-        │  Infrastructure│
-        └────────────────┘
+
+```mermaid
+flowchart TB
+    LB["🌐 Load Balancer + Auth"]
+
+    subgraph TENANTS["Isolated Tenant Containers"]
+        direction LR
+        TA["Tenant A<br/>Victor"]
+        TB["Tenant B<br/>Victor"]
+        TN["Tenant N<br/>Victor"]
+    end
+
+    SHARED["🖥️ Shared LLM<br/>Infrastructure"]
+
+    LB --> TA & TB & TN
+    TA & TB & TN --> SHARED
+
+    style LB fill:#e0e7ff,stroke:#4f46e5
+    style TENANTS fill:#fef3c7,stroke:#f59e0b
+    style TA fill:#d1fae5,stroke:#10b981
+    style TB fill:#d1fae5,stroke:#10b981
+    style TN fill:#d1fae5,stroke:#10b981
+    style SHARED fill:#dbeafe,stroke:#3b82f6
 ```
 
 **Isolation:**

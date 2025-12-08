@@ -15,22 +15,32 @@
 """Code review tool for automated code quality analysis.
 
 Features:
+- Multi-language support (Python, JavaScript, TypeScript, Java, Go, Rust, C, C++, etc.)
 - Code quality metrics (complexity, maintainability)
-- Security vulnerability detection
-- Best practices checking
-- Performance issue detection
+- Security vulnerability detection (language-specific patterns)
+- Best practices checking (code smells, anti-patterns)
 - Documentation coverage
-- Test coverage analysis
+- Tree-sitter AST analysis for accurate complexity calculation
+
+Supported languages: Python, JavaScript, TypeScript, Java, Go, Rust, C, C++, C#,
+Ruby, PHP, Kotlin, Swift, Scala, Bash, SQL, Lua, Elixir, Haskell, R
 """
 
-import ast
-import re
-from pathlib import Path
-from typing import Any, Dict, List
 import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from victor.tools.base import CostTier
+from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
+from victor.tools.language_analyzer import (
+    AnalysisIssue,
+    detect_language,
+    get_analyzer_for_file,
+    supported_extensions,
+    supported_languages,
+    EXTENSION_TO_LANGUAGE,
+    LANGUAGE_GLOB_PATTERNS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,390 +59,176 @@ def set_code_review_config(max_complexity: int = 10) -> None:
     _max_complexity = max_complexity
 
 
-# Security patterns to detect
-SECURITY_PATTERNS = {
-    "hardcoded_password": r"password\s*=\s*['\"][\w]+['\"]",
-    "hardcoded_key": r"(api_key|secret_key|private_key)\s*=\s*['\"][\w]+['\"]",
-    "sql_injection": r"(execute|cursor\.execute)\(['\"].*%s.*['\"]",
-    "command_injection": r"(os\.system|subprocess\.call|eval|exec)\(",
-    "insecure_random": r"random\.(random|randint|choice)",
-    "weak_crypto": r"(md5|sha1)\(",
-}
-
-# Code smell patterns
-CODE_SMELLS = {
-    "print_debug": r"print\s*\(",
-    "commented_code": r"^\s*#.*[{};]",
-    "long_line": r".{121,}",  # Lines over 120 chars
-    "multiple_returns": r"return\s+",
-    "bare_except": r"except\s*:",
-    "global_variable": r"^(global|GLOBAL)\s+\w+",
-}
+def _issue_to_dict(issue: AnalysisIssue) -> Dict[str, Any]:
+    """Convert AnalysisIssue to dictionary format."""
+    return {
+        "type": issue.type,
+        "severity": issue.severity,
+        "issue": issue.issue,
+        "file": issue.file,
+        "line": issue.line,
+        "code": issue.code,
+        "recommendation": issue.recommendation,
+        "metric": issue.metric,
+    }
 
 
-# Helper functions
+def _analyze_file(
+    file_path: Path,
+    aspects: List[str],
+    max_complexity: int,
+) -> List[Dict[str, Any]]:
+    """Analyze a single file using the language analyzer.
 
+    Args:
+        file_path: Path to the file
+        aspects: List of aspects to check
+        max_complexity: Maximum complexity threshold
 
-def _check_security(content: str, file_path: Path) -> List[Dict[str, Any]]:
-    """Check for security issues."""
+    Returns:
+        List of issues found
+    """
     issues = []
-    lines = content.split("\n")
 
-    for line_num, line in enumerate(lines, 1):
-        for issue_type, pattern in SECURITY_PATTERNS.items():
-            if re.search(pattern, line, re.IGNORECASE):
-                severity = _get_security_severity(issue_type)
-                issues.append(
-                    {
-                        "type": "security",
-                        "severity": severity,
-                        "issue": issue_type.replace("_", " ").title(),
-                        "file": str(file_path),
-                        "line": line_num,
-                        "code": line.strip(),
-                        "recommendation": _get_security_recommendation(issue_type),
-                    }
-                )
-
-    return issues
-
-
-def _check_code_smells(content: str, file_path: Path) -> List[Dict[str, Any]]:
-    """Check for code smells."""
-    issues = []
-    lines = content.split("\n")
-
-    for line_num, line in enumerate(lines, 1):
-        for smell_type, pattern in CODE_SMELLS.items():
-            if re.search(pattern, line):
-                issues.append(
-                    {
-                        "type": "code_smell",
-                        "severity": "low",
-                        "issue": smell_type.replace("_", " ").title(),
-                        "file": str(file_path),
-                        "line": line_num,
-                        "code": line.strip()[:80],
-                        "recommendation": _get_smell_recommendation(smell_type),
-                    }
-                )
-
-    return issues
-
-
-def _check_complexity(content: str, file_path: Path) -> List[Dict[str, Any]]:
-    """Check cyclomatic complexity."""
-    issues = []
+    # Get language-specific analyzer
+    analyzer = get_analyzer_for_file(file_path, max_complexity=max_complexity)
+    if analyzer is None:
+        # Unsupported file type - skip silently
+        return []
 
     try:
-        tree = ast.parse(content)
+        content = file_path.read_text(encoding="utf-8")
+    except Exception as e:
+        logger.warning(f"Failed to read {file_path}: {e}")
+        return []
 
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                complexity = _calculate_complexity(node)
+    # Run analysis
+    result = analyzer.analyze(content, file_path, aspects)
 
-                if complexity > _max_complexity:
-                    issues.append(
-                        {
-                            "type": "complexity",
-                            "severity": "medium" if complexity <= 15 else "high",
-                            "issue": "High Complexity",
-                            "file": str(file_path),
-                            "line": node.lineno,
-                            "code": f"Function: {node.name}",
-                            "metric": complexity,
-                            "recommendation": f"Refactor to reduce complexity (current: {complexity}, max: {_max_complexity})",
-                        }
-                    )
+    if not result.success:
+        logger.warning(f"Analysis failed for {file_path}: {result.error}")
+        return []
 
-    except SyntaxError:
-        logger.warning("Syntax error in %s, skipping complexity check", file_path)
+    # Convert issues to dict format
+    for issue in result.issues:
+        issues.append(_issue_to_dict(issue))
 
     return issues
 
 
-def _check_documentation(content: str, file_path: Path) -> List[Dict[str, Any]]:
-    """Check documentation coverage."""
-    issues = []
+def _get_glob_patterns_for_languages(languages: Optional[List[str]] = None) -> List[str]:
+    """Get glob patterns for specified languages or all supported languages.
 
-    try:
-        tree = ast.parse(content)
+    Args:
+        languages: List of language names, or None for all
 
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                if not ast.get_docstring(node):
-                    issues.append(
-                        {
-                            "type": "documentation",
-                            "severity": "low",
-                            "issue": "Missing Docstring",
-                            "file": str(file_path),
-                            "line": node.lineno,
-                            "code": f"{node.__class__.__name__}: {node.name}",
-                            "recommendation": "Add docstring to document purpose and usage",
-                        }
-                    )
+    Returns:
+        List of glob patterns
+    """
+    if languages is None:
+        # All supported extensions
+        return [f"*{ext}" for ext in supported_extensions()]
 
-    except SyntaxError:
-        pass
-
-    return issues
-
-
-def _calculate_complexity(node: ast.AST) -> int:
-    """Calculate cyclomatic complexity of a function."""
-    complexity = 1  # Base complexity
-
-    for child in ast.walk(node):
-        # Each decision point adds 1
-        if isinstance(
-            child,
-            (
-                ast.If,
-                ast.While,
-                ast.For,
-                ast.ExceptHandler,
-                ast.With,
-                ast.Assert,
-                ast.BoolOp,
-            ),
-        ):
-            complexity += 1
-
-    return complexity
-
-
-def _get_security_severity(issue_type: str) -> str:
-    """Get severity level for security issue."""
-    critical = ["sql_injection", "command_injection"]
-    high = ["hardcoded_password", "hardcoded_key"]
-    medium = ["weak_crypto", "insecure_random"]
-
-    if issue_type in critical:
-        return "critical"
-    elif issue_type in high:
-        return "high"
-    elif issue_type in medium:
-        return "medium"
-    return "low"
-
-
-def _get_security_recommendation(issue_type: str) -> str:
-    """Get recommendation for security issue."""
-    recommendations = {
-        "hardcoded_password": "Use environment variables or secure vaults",
-        "hardcoded_key": "Store keys in environment variables or secure key management",
-        "sql_injection": "Use parameterized queries instead of string formatting",
-        "command_injection": "Validate and sanitize inputs, use subprocess with list arguments",
-        "insecure_random": "Use secrets module for cryptographic randomness",
-        "weak_crypto": "Use SHA-256 or stronger algorithms",
-    }
-    return recommendations.get(issue_type, "Review and fix security issue")
-
-
-def _get_smell_recommendation(smell_type: str) -> str:
-    """Get recommendation for code smell."""
-    recommendations = {
-        "print_debug": "Use logging module instead of print statements",
-        "commented_code": "Remove commented code, use version control",
-        "long_line": "Split long lines for better readability (PEP 8: max 79 chars)",
-        "multiple_returns": "Consider single return point or refactor",
-        "bare_except": "Catch specific exceptions instead of bare except",
-        "global_variable": "Avoid global variables, use function parameters",
-    }
-    return recommendations.get(smell_type, "Review and improve code quality")
+    patterns = []
+    for lang in languages:
+        lang = lang.lower()
+        if lang in LANGUAGE_GLOB_PATTERNS:
+            patterns.append(LANGUAGE_GLOB_PATTERNS[lang])
+        else:
+            # Try to find extensions for this language
+            for ext, lang_name in EXTENSION_TO_LANGUAGE.items():
+                if lang_name == lang:
+                    patterns.append(f"*{ext}")
+    return patterns if patterns else ["*.py"]  # Default to Python
 
 
 def _build_report(
-    file_path: Path,
-    issues: List[Dict[str, Any]],
-    include_metrics: bool,
-    content: str,
+    path: Path,
+    files_reviewed: int,
+    aspects: List[str],
+    results: Dict[str, Dict[str, Any]],
+    filtered_issues: List[Dict[str, Any]],
+    issues_by_severity: Dict[str, int],
+    languages_found: set,
 ) -> str:
-    """Build code review report."""
-    report = [f"Code Review Report: {file_path}"]
+    """Build comprehensive code review report."""
+    report = ["Code Review Report"]
     report.append("=" * 70)
     report.append("")
-
-    if not issues:
-        report.append("✓ No issues found!")
-        return "\n".join(report)
-
-    # Group by severity
-    critical = [i for i in issues if i.get("severity") == "critical"]
-    high = [i for i in issues if i.get("severity") == "high"]
-    medium = [i for i in issues if i.get("severity") == "medium"]
-    low = [i for i in issues if i.get("severity") == "low"]
-
-    report.append(f"Total Issues: {len(issues)}")
-    report.append(f"  Critical: {len(critical)}")
-    report.append(f"  High: {len(high)}")
-    report.append(f"  Medium: {len(medium)}")
-    report.append(f"  Low: {len(low)}")
+    report.append(f"Path: {path}")
+    report.append(f"Files reviewed: {files_reviewed}")
+    report.append(f"Languages found: {', '.join(sorted(languages_found)) if languages_found else 'None'}")
+    report.append(f"Aspects checked: {', '.join(aspects)}")
+    report.append("")
+    report.append(f"Total issues: {len(filtered_issues)}")
+    report.append(f"  Critical: {issues_by_severity.get('critical', 0)}")
+    report.append(f"  High: {issues_by_severity.get('high', 0)}")
+    report.append(f"  Medium: {issues_by_severity.get('medium', 0)}")
+    report.append(f"  Low: {issues_by_severity.get('low', 0)}")
     report.append("")
 
-    # Detail issues by severity
-    for severity, severity_issues in [
-        ("CRITICAL", critical),
-        ("HIGH", high),
-        ("MEDIUM", medium),
-        ("LOW", low),
-    ]:
-        if severity_issues:
-            report.append(f"{severity} Issues:")
-            report.append("-" * 70)
-            for issue in severity_issues:
-                report.append(f"  Line {issue['line']}: {issue['issue']}")
-                report.append(f"  Code: {issue['code']}")
-                report.append(f"  Recommendation: {issue['recommendation']}")
-                report.append("")
-
-    if include_metrics:
-        lines = content.split("\n")
-        report.append("Metrics:")
-        report.append(f"  Lines of code: {len(lines)}")
-        report.append(f"  Issue density: {len(issues) / max(len(lines), 1):.2f} issues/line")
-
-    return "\n".join(report)
-
-
-def _build_summary_report(
-    dir_path: Path,
-    file_count: int,
-    issues: List[Dict[str, Any]],
-    include_metrics: bool,
-) -> str:
-    """Build summary report for directory review."""
-    report = [f"Code Review Summary: {dir_path}"]
-    report.append("=" * 70)
-    report.append("")
-    report.append(f"Files Reviewed: {file_count}")
-    report.append(f"Total Issues: {len(issues)}")
-    report.append("")
-
-    # Group by severity
-    critical = [i for i in issues if i.get("severity") == "critical"]
-    high = [i for i in issues if i.get("severity") == "high"]
-    medium = [i for i in issues if i.get("severity") == "medium"]
-    low = [i for i in issues if i.get("severity") == "low"]
-
-    report.append("Issue Breakdown:")
-    report.append(f"  Critical: {len(critical)}")
-    report.append(f"  High: {len(high)}")
-    report.append(f"  Medium: {len(medium)}")
-    report.append(f"  Low: {len(low)}")
-    report.append("")
-
-    # Group by type
-    by_type: Dict[str, int] = {}
-    for issue in issues:
-        issue_type = issue.get("type", "unknown")
-        by_type[issue_type] = by_type.get(issue_type, 0) + 1
-
-    report.append("Issues by Type:")
-    for issue_type, count in sorted(by_type.items(), key=lambda x: x[1], reverse=True):
-        report.append(f"  {issue_type}: {count}")
-    report.append("")
-
-    # Top files with issues
-    by_file: Dict[str, int] = {}
-    for issue in issues:
-        file_name = issue.get("file", "unknown")
-        by_file[file_name] = by_file.get(file_name, 0) + 1
-
-    if by_file:
-        report.append("Top Files with Issues:")
-        for file_name, count in sorted(by_file.items(), key=lambda x: x[1], reverse=True)[:10]:
-            report.append(f"  {Path(file_name).name}: {count} issues")
-
-    return "\n".join(report)
-
-
-def _build_security_report(path: Path, issues: List[Dict[str, Any]]) -> str:
-    """Build security scan report."""
-    report = [f"Security Scan Report: {path}"]
-    report.append("=" * 70)
-    report.append("")
-
-    if not issues:
-        report.append("✓ No security issues found!")
-        return "\n".join(report)
-
-    report.append(f"Total Security Issues: {len(issues)}")
-    report.append("")
-
-    # Group by severity
-    critical = [i for i in issues if i.get("severity") == "critical"]
-    high = [i for i in issues if i.get("severity") == "high"]
-    medium = [i for i in issues if i.get("severity") == "medium"]
-
-    for severity, severity_issues in [
-        ("CRITICAL", critical),
-        ("HIGH", high),
-        ("MEDIUM", medium),
-    ]:
-        if severity_issues:
-            report.append(f"{severity} Security Issues:")
-            report.append("-" * 70)
-            for issue in severity_issues:
-                report.append(f"  {issue['issue']} - {issue['file']}:{issue['line']}")
-                report.append(f"  Code: {issue['code']}")
-                report.append(f"  Fix: {issue['recommendation']}")
-                report.append("")
-
-    return "\n".join(report)
-
-
-def _build_complexity_report(path: Path, complexity_data: List[Dict[str, Any]]) -> str:
-    """Build complexity analysis report."""
-    report = [f"Complexity Analysis Report: {path}"]
-    report.append("=" * 70)
-    report.append("")
-
-    if not complexity_data:
-        report.append("✓ No complexity issues found!")
-        return "\n".join(report)
-
-    report.append(f"Functions with High Complexity: {len(complexity_data)}")
-    report.append("")
-
-    # Sort by complexity
-    sorted_data = sorted(complexity_data, key=lambda x: x.get("metric", 0), reverse=True)
-
-    for item in sorted_data[:20]:  # Top 20
-        report.append(f"  {item['code']} - Complexity: {item.get('metric', 'N/A')}")
-        report.append(f"    File: {item['file']}:{item['line']}")
-        report.append(f"    Recommendation: {item['recommendation']}")
+    # Security section
+    if "security" in aspects:
+        sec_issues = results.get("security", {}).get("issues", [])
+        report.append("Security Issues:")
+        report.append(f"  Found: {len(sec_issues)}")
+        if sec_issues:
+            for issue in sec_issues[:5]:
+                report.append(
+                    f"    {issue.get('severity', 'low').upper()}: {issue.get('file', '')} "
+                    f"(line {issue.get('line', '?')})"
+                )
+                report.append(f"      {issue.get('issue', '')}: {issue.get('recommendation', '')}")
+            if len(sec_issues) > 5:
+                report.append(f"    ... and {len(sec_issues) - 5} more")
         report.append("")
 
-    return "\n".join(report)
-
-
-def _build_best_practices_report(path: Path, issues: List[Dict[str, Any]]) -> str:
-    """Build best practices report."""
-    report = [f"Best Practices Report: {path}"]
-    report.append("=" * 70)
-    report.append("")
-
-    if not issues:
-        report.append("✓ All best practices followed!")
-        return "\n".join(report)
-
-    report.append(f"Total Best Practice Issues: {len(issues)}")
-    report.append("")
-
-    # Group by issue type
-    by_type: Dict[str, List[Dict[str, Any]]] = {}
-    for issue in issues:
-        issue_type = issue.get("issue", "unknown")
-        if issue_type not in by_type:
-            by_type[issue_type] = []
-        by_type[issue_type].append(issue)
-
-    for issue_type, type_issues in sorted(by_type.items(), key=lambda x: len(x[1]), reverse=True):
-        report.append(f"{issue_type}: {len(type_issues)} occurrences")
-        report.append(f"  Recommendation: {type_issues[0]['recommendation']}")
+    # Complexity section
+    if "complexity" in aspects:
+        comp_issues = results.get("complexity", {}).get("issues", [])
+        report.append("Complexity Issues:")
+        report.append(f"  High complexity functions: {len(comp_issues)}")
+        if comp_issues:
+            for issue in comp_issues[:5]:
+                report.append(
+                    f"    {issue.get('file', '')} - {issue.get('code', '')} "
+                    f"(complexity: {issue.get('metric', '?')})"
+                )
+            if len(comp_issues) > 5:
+                report.append(f"    ... and {len(comp_issues) - 5} more")
         report.append("")
+
+    # Best practices section
+    if "best_practices" in aspects:
+        bp_issues = results.get("best_practices", {}).get("issues", [])
+        report.append("Best Practice Issues:")
+        report.append(f"  Found: {len(bp_issues)}")
+        if bp_issues:
+            for issue in bp_issues[:5]:
+                report.append(f"    {issue.get('file', '')} (line {issue.get('line', '?')})")
+                report.append(f"      {issue.get('issue', '')}: {issue.get('recommendation', '')}")
+            if len(bp_issues) > 5:
+                report.append(f"    ... and {len(bp_issues) - 5} more")
+        report.append("")
+
+    # Documentation section
+    if "documentation" in aspects:
+        doc_issues = results.get("documentation", {}).get("issues", [])
+        report.append("Documentation Issues:")
+        report.append(f"  Found: {len(doc_issues)}")
+        if doc_issues:
+            for issue in doc_issues[:5]:
+                report.append(f"    {issue.get('file', '')} - {issue.get('code', '')}")
+                report.append(f"      {issue.get('issue', '')}: {issue.get('recommendation', '')}")
+            if len(doc_issues) > 5:
+                report.append(f"    ... and {len(doc_issues) - 5} more")
+        report.append("")
+
+    # Summary
+    if len(filtered_issues) == 0:
+        report.append("No issues found. Code looks good!")
+    else:
+        report.append(f"Review complete. {len(filtered_issues)} issues require attention.")
 
     return "\n".join(report)
 
@@ -440,11 +236,22 @@ def _build_best_practices_report(path: Path, issues: List[Dict[str, Any]]) -> st
 # Consolidated Tool Function
 
 
-@tool(cost_tier=CostTier.LOW)
+@tool(
+    cost_tier=CostTier.LOW,
+    category="analysis",
+    keywords=["review", "code", "quality", "security", "complexity", "best practices", "documentation"],
+    mandatory_keywords=["review code", "code review", "analyze code"],  # Force inclusion
+    task_types=["analysis", "review"],  # Classification-aware selection
+    stages=["analysis", "reviewing"],  # Conversation stages where relevant
+    priority=Priority.MEDIUM,  # Task-specific analysis tool
+    access_mode=AccessMode.READONLY,  # Only reads files
+    danger_level=DangerLevel.SAFE,  # No side effects
+)
 async def code_review(
     path: str,
     aspects: List[str] = None,
-    file_pattern: str = "*.py",
+    file_pattern: str = None,
+    languages: List[str] = None,
     severity: str = "low",
     include_metrics: bool = False,
     max_issues: int = 50,
@@ -456,12 +263,20 @@ async def code_review(
     best practices validation, and documentation coverage. Consolidates
     multiple review aspects into a single unified interface.
 
+    Supports 20+ programming languages: Python, JavaScript, TypeScript,
+    Java, Go, Rust, C, C++, C#, Ruby, PHP, Kotlin, Swift, Scala, Bash,
+    SQL, Lua, Elixir, Haskell, R.
+
     Args:
         path: File or directory path to review.
         aspects: List of review aspects to check. Options: "security", "complexity",
             "best_practices", "documentation", "all". Defaults to ["all"].
             Can be provided as a list or JSON string representation.
-        file_pattern: Glob pattern for files to review (default: *.py).
+        file_pattern: Glob pattern for files to review (e.g., "*.py", "*.{js,ts}").
+            If not provided, auto-detects based on 'languages' parameter or reviews
+            all supported file types.
+        languages: List of languages to review (e.g., ["python", "javascript"]).
+            If not provided, reviews all supported languages.
         severity: Minimum severity to report for security issues: "low", "medium",
             "high", "critical". Defaults to "low" (report all).
         include_metrics: Include detailed metrics in report (default: False).
@@ -474,6 +289,7 @@ async def code_review(
         - results: Dictionary with results for each aspect
         - total_issues: Total number of issues found
         - files_reviewed: Number of files reviewed
+        - languages_found: List of languages detected in reviewed files
         - issues_by_severity: Count of issues grouped by severity
         - formatted_report: Human-readable comprehensive review report
         - error: Error message if failed
@@ -482,14 +298,17 @@ async def code_review(
         # Review for security only
         code_review("./src", aspects=["security"])
 
-        # Comprehensive review
+        # Comprehensive review of all files
         code_review("./", aspects=["all"])
 
-        # Complexity and best practices
-        code_review("./src", aspects=["complexity", "best_practices"])
+        # Review only JavaScript/TypeScript files
+        code_review("./src", languages=["javascript", "typescript"])
 
-        # Security with high severity only
-        code_review("./src", aspects=["security"], severity="high")
+        # Review Python and Go with high severity only
+        code_review("./src", languages=["python", "go"], severity="high")
+
+        # Review specific file pattern
+        code_review("./src", file_pattern="*.{py,js,ts}")
     """
     if not path:
         return {"success": False, "error": "Missing required parameter: path"}
@@ -519,71 +338,93 @@ async def code_review(
     if "all" in aspects:
         aspects = ["security", "complexity", "best_practices", "documentation"]
 
+    # Handle languages parameter (can be list or JSON string)
+    if isinstance(languages, str):
+        import json
+
+        try:
+            languages = json.loads(languages)
+        except json.JSONDecodeError:
+            languages = [languages]
+
     path_obj = Path(path)
     if not path_obj.exists():
         return {"success": False, "error": f"Path not found: {path}"}
+
+    # Determine file patterns
+    if file_pattern:
+        patterns = [file_pattern]
+    else:
+        patterns = _get_glob_patterns_for_languages(languages)
 
     # Collect files to review
     files_to_review = []
     if path_obj.is_file():
         files_to_review = [path_obj]
     else:
-        files_to_review = list(path_obj.rglob(file_pattern))
+        # Collect files matching any pattern
+        seen = set()
+        for pattern in patterns:
+            for f in path_obj.rglob(pattern):
+                if f not in seen and f.is_file():
+                    seen.add(f)
+                    files_to_review.append(f)
 
     if not files_to_review:
         return {
             "success": True,
             "files_reviewed": 0,
             "total_issues": 0,
-            "message": f"No files found matching pattern '{file_pattern}'",
+            "languages_found": [],
+            "message": f"No files found matching patterns",
         }
 
     # Initialize results
     results = {aspect: {"issues": [], "count": 0} for aspect in aspects}
     all_issues = []
     files_reviewed = 0
+    languages_found = set()
 
     # Review each file
     for file_path in files_to_review:
-        if not file_path.is_file():
+        # Detect language
+        lang = detect_language(file_path)
+        if lang is None:
             continue
 
+        # Filter by language if specified
+        if languages and lang not in [l.lower() for l in languages]:
+            continue
+
+        languages_found.add(lang)
+
         try:
-            content = file_path.read_text()
+            # Use language analyzer
+            file_issues = _analyze_file(file_path, aspects, _max_complexity)
             files_reviewed += 1
 
-            # Security review
-            if "security" in aspects:
-                security_issues = _check_security(content, file_path)
-                results["security"]["issues"].extend(security_issues)
-                all_issues.extend(security_issues)
+            # Sort issues by aspect
+            for issue in file_issues:
+                issue_type = issue.get("type", "")
+                all_issues.append(issue)
 
-            # Complexity analysis (Python only)
-            if "complexity" in aspects and file_path.suffix == ".py":
-                complexity_issues = _check_complexity(content, file_path)
-                results["complexity"]["issues"].extend(complexity_issues)
-                all_issues.extend(complexity_issues)
-
-            # Best practices
-            if "best_practices" in aspects:
-                smell_issues = _check_code_smells(content, file_path)
-                results["best_practices"]["issues"].extend(smell_issues)
-                all_issues.extend(smell_issues)
-
-            # Documentation (Python only)
-            if "documentation" in aspects and file_path.suffix == ".py":
-                doc_issues = _check_documentation(content, file_path)
-                results["documentation"]["issues"].extend(doc_issues)
-                all_issues.extend(doc_issues)
+                if issue_type == "security" and "security" in aspects:
+                    results["security"]["issues"].append(issue)
+                elif issue_type == "complexity" and "complexity" in aspects:
+                    results["complexity"]["issues"].append(issue)
+                elif issue_type == "smell" and "best_practices" in aspects:
+                    results["best_practices"]["issues"].append(issue)
+                elif issue_type == "documentation" and "documentation" in aspects:
+                    results["documentation"]["issues"].append(issue)
 
         except Exception as e:
-            logger.warning("Failed to review %s: %s", file_path, e)
+            logger.warning(f"Failed to review {file_path}: {e}")
 
     # Update result counts
     for aspect in aspects:
         results[aspect]["count"] = len(results[aspect]["issues"])
 
-    # Filter by severity (for security issues)
+    # Filter by severity
     severity_levels = {"low": 0, "medium": 1, "high": 2, "critical": 3}
     min_severity = severity_levels.get(severity, 0)
 
@@ -604,87 +445,15 @@ async def code_review(
         issues_by_severity[sev] = issues_by_severity.get(sev, 0) + 1
 
     # Build comprehensive report
-    report = []
-    report.append("Code Review Report")
-    report.append("=" * 70)
-    report.append("")
-    report.append(f"Path: {path}")
-    report.append(f"Files reviewed: {files_reviewed}")
-    report.append(f"Aspects checked: {', '.join(aspects)}")
-    report.append("")
-    report.append(f"Total issues: {len(filtered_issues)}")
-    report.append(f"  Critical: {issues_by_severity['critical']}")
-    report.append(f"  High: {issues_by_severity['high']}")
-    report.append(f"  Medium: {issues_by_severity['medium']}")
-    report.append(f"  Low: {issues_by_severity['low']}")
-    report.append("")
-
-    # Security section
-    if "security" in aspects:
-        sec_filtered = [
-            i
-            for i in results["security"]["issues"]
-            if severity_levels.get(i.get("severity", "low"), 0) >= min_severity
-        ]
-        report.append("Security Issues:")
-        report.append(f"  Found: {len(sec_filtered)}")
-        if sec_filtered:
-            for issue in sec_filtered[:5]:
-                report.append(
-                    f"    {issue.get('severity', 'low').upper()}: {issue.get('file', '')} "
-                    f"(line {issue.get('line', '?')})"
-                )
-                report.append(f"      {issue.get('issue', '')}: {issue.get('recommendation', '')}")
-            if len(sec_filtered) > 5:
-                report.append(f"    ... and {len(sec_filtered) - 5} more")
-        report.append("")
-
-    # Complexity section
-    if "complexity" in aspects:
-        comp_count = results["complexity"]["count"]
-        report.append("Complexity Issues:")
-        report.append(f"  High complexity functions: {comp_count}")
-        if results["complexity"]["issues"]:
-            for issue in results["complexity"]["issues"][:5]:
-                report.append(
-                    f"    {issue.get('file', '')} - {issue.get('code', '')} "
-                    f"(complexity: {issue.get('metric', '?')})"
-                )
-            if comp_count > 5:
-                report.append(f"    ... and {comp_count - 5} more")
-        report.append("")
-
-    # Best practices section
-    if "best_practices" in aspects:
-        bp_count = results["best_practices"]["count"]
-        report.append("Best Practice Issues:")
-        report.append(f"  Found: {bp_count}")
-        if results["best_practices"]["issues"]:
-            for issue in results["best_practices"]["issues"][:5]:
-                report.append(f"    {issue.get('file', '')} (line {issue.get('line', '?')})")
-                report.append(f"      {issue.get('issue', '')}: {issue.get('recommendation', '')}")
-            if bp_count > 5:
-                report.append(f"    ... and {bp_count - 5} more")
-        report.append("")
-
-    # Documentation section
-    if "documentation" in aspects:
-        doc_count = results["documentation"]["count"]
-        report.append("Documentation Issues:")
-        report.append(f"  Found: {doc_count}")
-        if results["documentation"]["issues"]:
-            for issue in results["documentation"]["issues"][:5]:
-                report.append(f"    {issue.get('file', '')} - {issue.get('code', '')}")
-                report.append(f"      {issue.get('issue', '')}: {issue.get('recommendation', '')}")
-            if doc_count > 5:
-                report.append(f"    ... and {doc_count - 5} more")
-        report.append("")
-
-    # Summary
-    if len(filtered_issues) == 0:
-        report.append("No issues found. Code looks good!")
-    else:
-        report.append(f"Review complete. {len(filtered_issues)} issues require attention.")
+    formatted_report = _build_report(
+        path_obj,
+        files_reviewed,
+        aspects,
+        results,
+        filtered_issues,
+        issues_by_severity,
+        languages_found,
+    )
 
     return {
         "success": True,
@@ -692,7 +461,8 @@ async def code_review(
         "results": results,
         "total_issues": len(filtered_issues),
         "files_reviewed": files_reviewed,
+        "languages_found": list(languages_found),
         "issues_by_severity": issues_by_severity,
         "issues": filtered_issues,
-        "formatted_report": "\n".join(report),
+        "formatted_report": formatted_report,
     }

@@ -15,38 +15,33 @@ Air-gapped mode means **completely offline operation**:
 
 ### Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│              Air-gapped Codebase Search Stack                │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    QUERY["🔍 User Query<br/>\"how to authenticate users?\""]
 
-User Query: "how to authenticate users?"
-    │
-    ▼
-┌──────────────────────────────────┐
-│  1. Query Embedding Generation   │ ← sentence-transformers (local)
-│     ~8ms                          │   all-MiniLM-L12-v2 (120MB)
-└──────────────────────────────────┘
-    │
-    ▼
-┌──────────────────────────────────┐
-│  2. Vector Search in LanceDB     │ ← LanceDB (local, disk-based)
-│     ~5-10ms for 100K vectors     │   ~/.victor/embeddings/codebase
-└──────────────────────────────────┘
-    │
-    ▼
-┌──────────────────────────────────┐
-│  3. Context Enrichment           │ ← Top-K code snippets (ranked)
-│     ~1ms                          │   auth_login.py, jwt.py, etc.
-└──────────────────────────────────┘
-    │
-    ▼
-┌──────────────────────────────────┐
-│  4. LLM Response Generation      │ ← Ollama (local)
-│     5-30 seconds                  │   qwen2.5-coder:7b
-└──────────────────────────────────┘
+    subgraph PIPELINE["Air-gapped Codebase Search Stack"]
+        STEP1["**1. Query Embedding**<br/>~8ms<br/>sentence-transformers (local)<br/>all-MiniLM-L12-v2 (120MB)"]
 
-Total: ~15ms overhead + LLM inference (all offline!)
+        STEP2["**2. Vector Search**<br/>~5-10ms for 100K vectors<br/>LanceDB (local, disk-based)<br/>~/.victor/embeddings/codebase"]
+
+        STEP3["**3. Context Enrichment**<br/>~1ms<br/>Top-K code snippets (ranked)<br/>auth_login.py, jwt.py, etc."]
+
+        STEP4["**4. LLM Response**<br/>5-30 seconds<br/>Ollama (local)<br/>qwen2.5-coder:7b"]
+
+        STEP1 --> STEP2 --> STEP3 --> STEP4
+    end
+
+    RESULT["✅ Total: ~15ms overhead + LLM inference<br/>(all offline!)"]
+
+    QUERY --> PIPELINE --> RESULT
+
+    style QUERY fill:#e0e7ff,stroke:#4f46e5
+    style PIPELINE fill:#f0f9ff,stroke:#0284c7
+    style STEP1 fill:#d1fae5,stroke:#10b981
+    style STEP2 fill:#fef3c7,stroke:#f59e0b
+    style STEP3 fill:#dbeafe,stroke:#3b82f6
+    style STEP4 fill:#fee2e2,stroke:#ef4444
+    style RESULT fill:#d1fae5,stroke:#10b981
 ```
 
 ## Default Configuration (Air-gapped by Default)

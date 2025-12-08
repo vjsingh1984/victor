@@ -42,11 +42,10 @@ import asyncio
 import logging
 import random
 import re
-import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, Generic, List, Optional, TypeVar, Union
+from typing import Any, Awaitable, Callable, Dict, List, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -675,9 +674,9 @@ class ResilientProvider:
             try:
                 logger.info(f"Trying fallback provider: {fb_name}")
 
-                async def _execute_fallback():
+                async def _execute_fallback(fb=fallback):
                     return await asyncio.wait_for(
-                        fallback.chat(messages, model=model, **kwargs),
+                        fb.chat(messages, model=model, **kwargs),
                         timeout=self.request_timeout,
                     )
 

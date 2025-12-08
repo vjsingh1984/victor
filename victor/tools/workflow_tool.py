@@ -15,12 +15,19 @@
 
 from typing import Any, Dict
 
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.workflows.base import WorkflowRegistry
 
 
-@tool
-async def run_workflow(
+@tool(
+    category="workflow",
+    priority=Priority.LOW,  # Specialized automation tool
+    access_mode=AccessMode.MIXED,  # Depends on workflow actions
+    danger_level=DangerLevel.MEDIUM,  # Workflows can modify files
+    keywords=["workflow", "automation", "task", "sequence"],
+)
+async def workflow(
     workflow_name: str, context: dict, workflow_args: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
@@ -50,3 +57,5 @@ async def run_workflow(
         return {
             "error": f"An unexpected error occurred while running workflow '{workflow_name}': {e}"
         }
+
+

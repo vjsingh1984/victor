@@ -17,18 +17,17 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from victor.agent.config_loader import (
-    ConfigLoader,
-    CORE_TOOLS,
-)
+from victor.agent.config_loader import ConfigLoader
+from victor.agent.tool_selection import get_critical_tools
 from victor.tools.base import ToolRegistry, BaseTool
 
 
 class MockTool(BaseTool):
     """Mock tool for testing."""
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, category: str = "general"):
         self._name = name
+        self._category = category
 
     @property
     def name(self) -> str:
@@ -42,19 +41,26 @@ class MockTool(BaseTool):
     def parameters(self) -> dict:
         return {}
 
+    @property
+    def category(self) -> str:
+        return self._category
+
     async def execute(self, context, **kwargs):
         return {"success": True}
 
 
-class TestCoreTools:
-    """Tests for CORE_TOOLS constant."""
+class TestCriticalTools:
+    """Tests for get_critical_tools function."""
 
-    def test_core_tools_contains_essential(self):
-        """Test that CORE_TOOLS contains essential tools."""
-        assert "read_file" in CORE_TOOLS
-        assert "write_file" in CORE_TOOLS
-        assert "list_directory" in CORE_TOOLS
-        assert "execute_bash" in CORE_TOOLS
+    def test_critical_tools_contains_essential(self):
+        """Test that get_critical_tools() returns essential tools (canonical names)."""
+        critical_tools = get_critical_tools()  # Fallback returns canonical names
+        assert "read" in critical_tools
+        assert "write" in critical_tools
+        assert "ls" in critical_tools
+        assert "shell" in critical_tools
+        assert "edit" in critical_tools
+        assert "search" in critical_tools
 
 
 class TestConfigLoaderInit:
@@ -73,10 +79,10 @@ class TestConfigLoaderLoadToolConfig:
 
     @pytest.fixture
     def registry_with_tools(self):
-        """Create a registry with test tools."""
+        """Create a registry with test tools (using canonical names)."""
         registry = ToolRegistry()
-        registry.register(MockTool("read_file"))
-        registry.register(MockTool("write_file"))
+        registry.register(MockTool("read", category="core"))
+        registry.register(MockTool("write", category="core"))
         registry.register(MockTool("code_review"))
         registry.register(MockTool("git"))
         return registry
@@ -90,8 +96,8 @@ class TestConfigLoaderLoadToolConfig:
         loader.load_tool_config(registry_with_tools)
 
         # All tools should remain enabled
-        assert registry_with_tools.is_tool_enabled("read_file")
-        assert registry_with_tools.is_tool_enabled("write_file")
+        assert registry_with_tools.is_tool_enabled("read")
+        assert registry_with_tools.is_tool_enabled("write")
 
     def test_load_with_disabled_list(self, registry_with_tools):
         """Test loading with disabled list."""
@@ -104,19 +110,19 @@ class TestConfigLoaderLoadToolConfig:
         # code_review should be disabled
         assert not registry_with_tools.is_tool_enabled("code_review")
         # Other tools should remain enabled
-        assert registry_with_tools.is_tool_enabled("read_file")
+        assert registry_with_tools.is_tool_enabled("read")
 
     def test_load_with_enabled_list(self, registry_with_tools):
         """Test loading with enabled list (exclusive mode)."""
         mock_settings = MagicMock()
-        mock_settings.load_tool_config.return_value = {"enabled": ["read_file", "write_file"]}
+        mock_settings.load_tool_config.return_value = {"enabled": ["read", "write"]}
 
         loader = ConfigLoader(settings=mock_settings)
         loader.load_tool_config(registry_with_tools)
 
         # Only enabled tools should be enabled
-        assert registry_with_tools.is_tool_enabled("read_file")
-        assert registry_with_tools.is_tool_enabled("write_file")
+        assert registry_with_tools.is_tool_enabled("read")
+        assert registry_with_tools.is_tool_enabled("write")
         assert not registry_with_tools.is_tool_enabled("code_review")
         assert not registry_with_tools.is_tool_enabled("git")
 
@@ -162,12 +168,12 @@ class TestConfigLoaderHelpers:
 
     @pytest.fixture
     def registry_with_tools(self):
-        """Create a registry with test tools."""
+        """Create a registry with test tools (using canonical names)."""
         registry = ToolRegistry()
-        registry.register(MockTool("read_file"))
-        registry.register(MockTool("write_file"))
-        registry.register(MockTool("list_directory"))
-        registry.register(MockTool("execute_bash"))
+        registry.register(MockTool("read", category="core"))
+        registry.register(MockTool("write", category="core"))
+        registry.register(MockTool("ls", category="core"))
+        registry.register(MockTool("shell", category="core"))
         registry.register(MockTool("code_review"))
         return registry
 
@@ -189,7 +195,7 @@ class TestConfigLoaderHelpers:
         mock_settings = MagicMock()
         loader = ConfigLoader(settings=mock_settings)
 
-        config = {"disabled": ["read_file"]}  # Disabling core tool
+        config = {"disabled": ["read"]}  # Disabling core tool (canonical name)
         registered = {t.name for t in registry_with_tools.list_tools(only_enabled=False)}
 
         with patch("victor.agent.config_loader.logger") as mock_logger:
@@ -204,14 +210,14 @@ class TestConfigLoaderHelpers:
 
         config = {
             "code_review": {"enabled": False},
-            "read_file": {"enabled": True},
+            "read": {"enabled": True},  # Canonical name
         }
         registered = {t.name for t in registry_with_tools.list_tools(only_enabled=False)}
 
         loader._apply_individual_settings(config, registry_with_tools, registered)
 
         assert not registry_with_tools.is_tool_enabled("code_review")
-        assert registry_with_tools.is_tool_enabled("read_file")
+        assert registry_with_tools.is_tool_enabled("read")
 
     def test_apply_individual_settings_ignores_reserved_keys(self, registry_with_tools):
         """Test that reserved keys are ignored."""

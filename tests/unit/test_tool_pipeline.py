@@ -21,7 +21,6 @@ from victor.agent.tool_pipeline import (
     ToolPipeline,
     ToolPipelineConfig,
     ToolCallResult,
-    PipelineExecutionResult,
 )
 from victor.agent.tool_executor import ToolExecutionResult
 
@@ -38,12 +37,14 @@ def mock_tool_registry():
 def mock_tool_executor():
     """Create a mock tool executor."""
     executor = MagicMock()
-    executor.execute = AsyncMock(return_value=ToolExecutionResult(
-        tool_name="test_tool",
-        success=True,
-        result={"output": "test result"},
-        error=None,
-    ))
+    executor.execute = AsyncMock(
+        return_value=ToolExecutionResult(
+            tool_name="test_tool",
+            success=True,
+            result={"output": "test result"},
+            error=None,
+        )
+    )
     return executor
 
 
@@ -302,3 +303,451 @@ class TestToolPipeline:
 
         pipeline.clear_failed_signatures()
         assert len(pipeline._failed_signatures) == 0
+
+
+class TestToolPipelineParallelExecution:
+    """Tests for parallel tool execution."""
+
+    @pytest.fixture
+    def parallel_pipeline(self, mock_tool_registry, mock_tool_executor):
+        """Create a pipeline with parallel execution enabled."""
+        config = ToolPipelineConfig(
+            tool_budget=20,
+            enable_parallel_execution=True,
+            max_concurrent_tools=5,
+        )
+        return ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            config=config,
+        )
+
+    def test_parallel_executor_property(self, parallel_pipeline):
+        """Test that parallel executor is lazily initialized."""
+        # First access creates it
+        executor = parallel_pipeline.parallel_executor
+        assert executor is not None
+
+        # Second access returns same instance
+        assert parallel_pipeline.parallel_executor is executor
+
+    @pytest.mark.asyncio
+    async def test_parallel_execution_single_tool(self, parallel_pipeline, mock_tool_executor):
+        """Test parallel execution with single tool falls back to sequential."""
+        tool_calls = [{"name": "test_tool", "arguments": {"x": 1}}]
+
+        result = await parallel_pipeline.execute_tool_calls_parallel(tool_calls, {})
+
+        # Single tool uses sequential execution
+        assert result.total_calls == 1
+        assert not result.parallel_execution_used
+
+    @pytest.mark.asyncio
+    async def test_parallel_execution_disabled(self, mock_tool_registry, mock_tool_executor):
+        """Test parallel execution when disabled."""
+        config = ToolPipelineConfig(
+            tool_budget=20,
+            enable_parallel_execution=False,
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            config=config,
+        )
+
+        tool_calls = [
+            {"name": "tool1", "arguments": {}},
+            {"name": "tool2", "arguments": {}},
+        ]
+
+        result = await pipeline.execute_tool_calls_parallel(tool_calls, {})
+
+        # Falls back to sequential
+        assert not result.parallel_execution_used
+
+    @pytest.mark.asyncio
+    async def test_parallel_skips_invalid_tools(self, parallel_pipeline, mock_tool_registry):
+        """Test that parallel execution skips invalid tool names."""
+        # Disable one tool
+        def is_tool_enabled(name):
+            return name != "disabled_tool"
+        mock_tool_registry.is_tool_enabled.side_effect = is_tool_enabled
+
+        tool_calls = [
+            {"name": "test_tool", "arguments": {}},
+            {"name": "Invalid-Name", "arguments": {}},
+            {"name": "disabled_tool", "arguments": {}},
+        ]
+
+        result = await parallel_pipeline.execute_tool_calls_parallel(
+            tool_calls, {}, force_parallel=True
+        )
+
+        # Should have skipped results for invalid tools
+        assert result.skipped_calls >= 2
+
+    @pytest.mark.asyncio
+    async def test_parallel_skips_repeated_failures(self, parallel_pipeline, mock_tool_executor):
+        """Test that parallel execution skips repeated failing calls."""
+        # Add a failed signature
+        parallel_pipeline._failed_signatures.add(
+            ("failing_tool", '{"x": 1}')
+        )
+
+        tool_calls = [
+            {"name": "test_tool", "arguments": {"a": 1}},
+            {"name": "failing_tool", "arguments": {"x": 1}},  # Should be skipped
+        ]
+
+        result = await parallel_pipeline.execute_tool_calls_parallel(
+            tool_calls, {}, force_parallel=True
+        )
+
+        # The failing_tool should be skipped
+        skip_reasons = [r.skip_reason for r in result.results if r.skipped]
+        assert any("Repeated failing" in (r or "") for r in skip_reasons)
+
+    @pytest.mark.asyncio
+    async def test_parallel_budget_enforcement(self, mock_tool_registry, mock_tool_executor):
+        """Test that parallel execution enforces budget."""
+        config = ToolPipelineConfig(
+            tool_budget=2,
+            enable_parallel_execution=True,
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            config=config,
+        )
+
+        tool_calls = [
+            {"name": "tool1", "arguments": {}},
+            {"name": "tool2", "arguments": {}},
+            {"name": "tool3", "arguments": {}},
+        ]
+
+        result = await pipeline.execute_tool_calls_parallel(
+            tool_calls, {}, force_parallel=True
+        )
+
+        # Should stop after budget exhausted
+        assert result.budget_exhausted is True
+
+    def test_parallel_progress_callback(self, parallel_pipeline):
+        """Test parallel progress callback."""
+        start_calls = []
+        parallel_pipeline.on_tool_start = lambda name, args: start_calls.append(name)
+
+        # Call the progress callback directly
+        parallel_pipeline._parallel_progress_callback("test_tool", "started", True)
+
+        assert "test_tool" in start_calls
+
+    def test_parallel_progress_callback_not_started(self, parallel_pipeline):
+        """Test parallel progress callback for non-started status."""
+        start_calls = []
+        parallel_pipeline.on_tool_start = lambda name, args: start_calls.append(name)
+
+        # Call with status other than "started"
+        parallel_pipeline._parallel_progress_callback("test_tool", "completed", True)
+
+        # Should not call on_tool_start
+        assert "test_tool" not in start_calls
+
+
+class TestToolPipelineNormalization:
+    """Tests for argument normalization."""
+
+    @pytest.fixture
+    def pipeline(self, mock_tool_registry, mock_tool_executor):
+        """Create a tool pipeline for testing."""
+        return ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+        )
+
+    def test_normalize_string_json_arguments(self, pipeline):
+        """Test normalizing JSON string arguments."""
+        args, strategy = pipeline._normalize_arguments("test_tool", '{"path": "file.py"}')
+        assert args == {"path": "file.py"}
+
+    def test_normalize_string_python_literal(self, pipeline):
+        """Test normalizing Python literal string arguments."""
+        args, strategy = pipeline._normalize_arguments("test_tool", "{'path': 'file.py'}")
+        assert args == {"path": "file.py"}
+
+    def test_normalize_invalid_string(self, pipeline):
+        """Test normalizing invalid string falls back to value wrapper."""
+        args, strategy = pipeline._normalize_arguments("test_tool", "just a string")
+        assert args == {"value": "just a string"}
+
+    def test_normalize_none_arguments(self, pipeline):
+        """Test normalizing None arguments."""
+        args, strategy = pipeline._normalize_arguments("test_tool", None)
+        assert args == {}
+
+    def test_normalize_dict_arguments(self, pipeline):
+        """Test that dict arguments are passed through normalizer."""
+        args, strategy = pipeline._normalize_arguments("test_tool", {"x": 1})
+        assert "x" in args
+
+    def test_get_call_signature_json(self, pipeline):
+        """Test generating call signature."""
+        sig = pipeline._get_call_signature("test_tool", {"a": 1, "b": 2})
+        assert sig[0] == "test_tool"
+        assert isinstance(sig[1], str)
+
+    def test_get_call_signature_non_serializable(self, pipeline):
+        """Test generating call signature with non-serializable args."""
+        class NonSerializable:
+            pass
+
+        sig = pipeline._get_call_signature("test_tool", {"obj": NonSerializable()})
+        assert sig[0] == "test_tool"
+        # Should fall back to str()
+        assert isinstance(sig[1], str)
+
+
+class TestToolPipelineCodeCorrection:
+    """Tests for code correction middleware integration."""
+
+    @pytest.fixture
+    def mock_correction_middleware(self):
+        """Create a mock code correction middleware."""
+        middleware = MagicMock()
+        middleware.should_validate.return_value = True
+
+        # Create a mock validation result
+        validation_result = MagicMock()
+        validation_result.valid = True
+        validation_result.errors = []
+
+        correction_result = MagicMock()
+        correction_result.was_corrected = False
+        correction_result.validation = validation_result
+
+        middleware.validate_and_fix.return_value = correction_result
+        middleware.apply_correction.return_value = {"path": "corrected.py"}
+
+        return middleware
+
+    @pytest.fixture
+    def pipeline_with_correction(self, mock_tool_registry, mock_tool_executor, mock_correction_middleware):
+        """Create a pipeline with code correction enabled."""
+        config = ToolPipelineConfig(
+            tool_budget=20,
+            enable_code_correction=True,
+        )
+        return ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            config=config,
+            code_correction_middleware=mock_correction_middleware,
+        )
+
+    @pytest.mark.asyncio
+    async def test_code_correction_applied(
+        self, pipeline_with_correction, mock_correction_middleware, mock_tool_executor
+    ):
+        """Test that code correction is applied when middleware corrects code."""
+        # Configure middleware to indicate correction was applied
+        validation_result = MagicMock()
+        validation_result.valid = True
+        validation_result.errors = []
+
+        correction_result = MagicMock()
+        correction_result.was_corrected = True
+        correction_result.validation = validation_result
+
+        mock_correction_middleware.validate_and_fix.return_value = correction_result
+
+        tool_calls = [{"name": "write_code", "arguments": {"code": "bad code"}}]
+        result = await pipeline_with_correction.execute_tool_calls(tool_calls, {})
+
+        assert result.successful_calls == 1
+        # Verify apply_correction was called
+        mock_correction_middleware.apply_correction.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_code_correction_validation_errors(
+        self, pipeline_with_correction, mock_correction_middleware, mock_tool_executor
+    ):
+        """Test that validation errors are collected."""
+        # Configure middleware to report validation errors
+        validation_result = MagicMock()
+        validation_result.valid = False
+        validation_result.errors = ["Syntax error", "Missing import"]
+
+        correction_result = MagicMock()
+        correction_result.was_corrected = False
+        correction_result.validation = validation_result
+
+        mock_correction_middleware.validate_and_fix.return_value = correction_result
+
+        tool_calls = [{"name": "write_code", "arguments": {"code": "invalid"}}]
+        result = await pipeline_with_correction.execute_tool_calls(tool_calls, {})
+
+        # Tool still executes, but validation errors are logged
+        assert result.total_calls == 1
+        # Check that validation errors are tracked
+        assert result.results[0].code_validation_errors is not None
+
+    @pytest.mark.asyncio
+    async def test_code_correction_middleware_exception(
+        self, pipeline_with_correction, mock_correction_middleware, mock_tool_executor
+    ):
+        """Test that middleware exceptions are handled gracefully."""
+        mock_correction_middleware.validate_and_fix.side_effect = Exception("Middleware error")
+
+        tool_calls = [{"name": "write_code", "arguments": {"code": "test"}}]
+        result = await pipeline_with_correction.execute_tool_calls(tool_calls, {})
+
+        # Should still succeed - middleware errors are logged but don't block
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_code_correction_skipped_for_non_code_tools(
+        self, mock_tool_registry, mock_tool_executor, mock_correction_middleware
+    ):
+        """Test that code correction is skipped for non-code tools."""
+        mock_correction_middleware.should_validate.return_value = False
+
+        config = ToolPipelineConfig(enable_code_correction=True)
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            config=config,
+            code_correction_middleware=mock_correction_middleware,
+        )
+
+        tool_calls = [{"name": "read_file", "arguments": {"path": "test.py"}}]
+        result = await pipeline.execute_tool_calls(tool_calls, {})
+
+        # validate_and_fix should not be called
+        mock_correction_middleware.validate_and_fix.assert_not_called()
+
+
+class TestToolPipelineAnalytics:
+    """Tests for analytics tracking."""
+
+    @pytest.fixture
+    def pipeline(self, mock_tool_registry, mock_tool_executor):
+        """Create a pipeline with analytics enabled."""
+        config = ToolPipelineConfig(enable_analytics=True)
+        return ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            config=config,
+        )
+
+    @pytest.mark.asyncio
+    async def test_analytics_updated_on_success(self, pipeline, mock_tool_executor):
+        """Test that analytics are updated on successful execution."""
+        tool_calls = [{"name": "test_tool", "arguments": {}}]
+        await pipeline.execute_tool_calls(tool_calls, {})
+
+        analytics = pipeline.get_analytics()
+        assert analytics["tools"]["test_tool"]["calls"] == 1
+        assert analytics["tools"]["test_tool"]["successes"] == 1
+        assert analytics["tools"]["test_tool"]["failures"] == 0
+
+    @pytest.mark.asyncio
+    async def test_analytics_updated_on_failure(self, pipeline, mock_tool_executor):
+        """Test that analytics are updated on failed execution."""
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            tool_name="test_tool",
+            success=False,
+            result=None,
+            error="Test error",
+        )
+
+        tool_calls = [{"name": "test_tool", "arguments": {}}]
+        await pipeline.execute_tool_calls(tool_calls, {})
+
+        analytics = pipeline.get_analytics()
+        assert analytics["tools"]["test_tool"]["failures"] == 1
+
+    @pytest.mark.asyncio
+    async def test_analytics_tracks_time(self, pipeline, mock_tool_executor):
+        """Test that analytics track execution time."""
+        tool_calls = [{"name": "test_tool", "arguments": {}}]
+        await pipeline.execute_tool_calls(tool_calls, {})
+
+        analytics = pipeline.get_analytics()
+        assert "total_time_ms" in analytics["tools"]["test_tool"]
+
+    @pytest.mark.asyncio
+    async def test_analytics_disabled(self, mock_tool_registry, mock_tool_executor):
+        """Test that analytics are not updated when disabled."""
+        config = ToolPipelineConfig(enable_analytics=False)
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            config=config,
+        )
+
+        tool_calls = [{"name": "test_tool", "arguments": {}}]
+        await pipeline.execute_tool_calls(tool_calls, {})
+
+        analytics = pipeline.get_analytics()
+        # Tools dict should be empty since analytics disabled
+        assert len(analytics["tools"]) == 0
+
+
+class TestToolPipelineCallbacks:
+    """Tests for callback error handling."""
+
+    @pytest.fixture
+    def pipeline(self, mock_tool_registry, mock_tool_executor):
+        """Create a tool pipeline for testing."""
+        return ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+        )
+
+    @pytest.mark.asyncio
+    async def test_on_tool_start_exception_handled(self, pipeline, mock_tool_executor):
+        """Test that exceptions in on_tool_start are handled."""
+        def failing_start(name, args):
+            raise Exception("Start callback error")
+
+        pipeline.on_tool_start = failing_start
+
+        tool_calls = [{"name": "test_tool", "arguments": {}}]
+        # Should not raise - exception is logged but execution continues
+        result = await pipeline.execute_tool_calls(tool_calls, {})
+
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_on_tool_complete_exception_handled(self, pipeline, mock_tool_executor):
+        """Test that exceptions in on_tool_complete are handled."""
+        def failing_complete(result):
+            raise Exception("Complete callback error")
+
+        pipeline.on_tool_complete = failing_complete
+
+        tool_calls = [{"name": "test_tool", "arguments": {}}]
+        # Should not raise - exception is logged but execution continues
+        result = await pipeline.execute_tool_calls(tool_calls, {})
+
+        assert result.successful_calls == 1
+
+
+class TestPipelineExecutionResult:
+    """Tests for PipelineExecutionResult dataclass."""
+
+    def test_default_values(self):
+        """Test default values."""
+        from victor.agent.tool_pipeline import PipelineExecutionResult
+
+        result = PipelineExecutionResult()
+
+        assert result.results == []
+        assert result.total_calls == 0
+        assert result.successful_calls == 0
+        assert result.failed_calls == 0
+        assert result.skipped_calls == 0
+        assert result.budget_exhausted is False
+        assert result.parallel_execution_used is False
+        assert result.parallel_speedup == 1.0

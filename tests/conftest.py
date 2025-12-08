@@ -41,6 +41,42 @@ def mock_docker_client():
 
 
 @pytest.fixture(autouse=True)
+def isolate_environment_variables(monkeypatch):
+    """Isolate tests from environment variables and .env files.
+
+    This fixture prevents tests from loading actual API keys from:
+    - Environment variables
+    - .env files
+    - System keyring
+    - profiles.yaml
+
+    This ensures tests are deterministic and don't leak credentials.
+    """
+    # Mock env file loading to prevent .env file from being loaded
+    monkeypatch.setenv("VICTOR_SKIP_ENV_FILE", "1")
+
+    # Clear API key environment variables
+    api_key_vars = [
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "GOOGLE_API_KEY",
+        "XAI_API_KEY",
+        "MOONSHOT_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "GROQ_API_KEY",
+        "VICTOR_ANTHROPIC_KEY",
+        "VICTOR_GOOGLE_KEY",
+        "VICTOR_OPENAI_KEY",
+    ]
+
+    for var in api_key_vars:
+        monkeypatch.delenv(var, raising=False)
+
+    # Mock the API key manager to return None for all providers
+    monkeypatch.setattr("victor.config.api_keys.get_api_key", lambda provider: None)
+
+
+@pytest.fixture(autouse=True)
 def auto_mock_docker_for_orchestrator(request):
     """Automatically mock Docker for tests that create AgentOrchestrator.
 

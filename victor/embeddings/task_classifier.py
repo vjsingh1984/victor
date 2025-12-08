@@ -35,7 +35,7 @@ Additionally provides:
 
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -56,6 +56,8 @@ class TaskType(Enum):
     ANALYZE = "analyze"  # Count, measure, analyze code
     DESIGN = "design"  # Conceptual/planning tasks (no tools needed)
     GENERAL = "general"  # Ambiguous or general help
+    ACTION = "action"  # Git operations, test runs, script execution
+    ANALYSIS_DEEP = "analysis_deep"  # Comprehensive codebase analysis
 
 
 @dataclass
@@ -182,6 +184,131 @@ NUDGE_RULES: List[NudgeRule] = [
         pattern=re.compile(r"^just\s+(write|create|make)\s+", re.IGNORECASE),
         target_type=TaskType.CREATE_SIMPLE,
         min_confidence_boost=0.1,
+    ),
+    # Git read operations → SEARCH (not ACTION)
+    NudgeRule(
+        name="git_read",
+        pattern=re.compile(r"\bgit\s+(status|log|branch|diff|show)\b", re.IGNORECASE),
+        target_type=TaskType.SEARCH,
+        override=True,
+    ),
+    # Git write operations → ACTION
+    NudgeRule(
+        name="git_commit",
+        pattern=re.compile(
+            r"\b(commit|push|pull|merge)\s+(all|the|these|my)?\s*(changes?|files?)?\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.ACTION,
+        override=True,
+    ),
+    NudgeRule(
+        name="git_command",
+        pattern=re.compile(r"\bgit\s+(add|commit|push|pull|merge|rebase|stash)\b", re.IGNORECASE),
+        target_type=TaskType.ACTION,
+        override=True,
+    ),
+    NudgeRule(
+        name="create_pr",
+        pattern=re.compile(r"\b(create|make|open)\s+(a\s+)?(pr|pull\s*request)\b", re.IGNORECASE),
+        target_type=TaskType.ACTION,
+        override=True,
+    ),
+    NudgeRule(
+        name="grouped_commits",
+        pattern=re.compile(r"\bgroup(ed)?\s+commits?\b", re.IGNORECASE),
+        target_type=TaskType.ACTION,
+        override=True,
+    ),
+    # Test execution → ACTION
+    NudgeRule(
+        name="run_tests",
+        pattern=re.compile(
+            r"\b(run|execute)\s+(the\s+)?(tests?|pytest|unittest|jest|mocha)\b", re.IGNORECASE
+        ),
+        target_type=TaskType.ACTION,
+        override=True,
+    ),
+    NudgeRule(
+        name="test_command",
+        pattern=re.compile(r"\bpytest\b|\bnpm\s+test\b|\bcargo\s+test\b", re.IGNORECASE),
+        target_type=TaskType.ACTION,
+        override=True,
+    ),
+    # Build/deploy → ACTION
+    NudgeRule(
+        name="build_deploy",
+        pattern=re.compile(
+            r"\b(build|compile|deploy)\s+(the\s+)?(project|app|code)\b", re.IGNORECASE
+        ),
+        target_type=TaskType.ACTION,
+        min_confidence_boost=0.15,
+    ),
+    # Comprehensive analysis → ANALYSIS_DEEP
+    NudgeRule(
+        name="full_codebase_analysis",
+        pattern=re.compile(
+            r"\b(analyze|review|audit)\s+(the\s+)?(entire\s+)?(codebase|project|repo)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.ANALYSIS_DEEP,
+        override=True,
+    ),
+    NudgeRule(
+        name="comprehensive_analysis",
+        pattern=re.compile(
+            r"\b(comprehensive|thorough|detailed|full)\s+(analysis|review|audit)\b", re.IGNORECASE
+        ),
+        target_type=TaskType.ANALYSIS_DEEP,
+        override=True,
+    ),
+    NudgeRule(
+        name="architecture_review",
+        pattern=re.compile(r"\barchitecture\s+(review|analysis|overview)\b", re.IGNORECASE),
+        target_type=TaskType.ANALYSIS_DEEP,
+        override=True,
+    ),
+    NudgeRule(
+        name="security_audit",
+        pattern=re.compile(r"\b(security|vulnerability)\s+(audit|scan|review)\b", re.IGNORECASE),
+        target_type=TaskType.ANALYSIS_DEEP,
+        min_confidence_boost=0.15,
+    ),
+    # Web search and API research → ACTION (requires multiple tool calls)
+    NudgeRule(
+        name="web_search_action",
+        pattern=re.compile(
+            r"\b(perform|do|run)\s+(a\s+)?(web\s*search|websearch)\b", re.IGNORECASE
+        ),
+        target_type=TaskType.ACTION,
+        override=True,
+    ),
+    NudgeRule(
+        name="web_search",
+        pattern=re.compile(r"\bweb\s*search\b", re.IGNORECASE),
+        target_type=TaskType.ACTION,
+        min_confidence_boost=0.2,
+    ),
+    NudgeRule(
+        name="search_web",
+        pattern=re.compile(r"\bsearch\s+(the\s+)?(web|internet|online)\b", re.IGNORECASE),
+        target_type=TaskType.ACTION,
+        min_confidence_boost=0.2,
+    ),
+    NudgeRule(
+        name="fetch_api",
+        pattern=re.compile(r"\bfetch\s+(for\s+)?(api|data|docs|documentation)\b", re.IGNORECASE),
+        target_type=TaskType.ACTION,
+        min_confidence_boost=0.15,
+    ),
+    NudgeRule(
+        name="research_api",
+        pattern=re.compile(
+            r"\b(research|investigate|explore)\s+(the\s+)?\w+\s+(api|library|package)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.ACTION,
+        min_confidence_boost=0.15,
     ),
 ]
 
@@ -604,6 +731,173 @@ GENERAL_PHRASES = [
     "something wrong",
 ]
 
+# Action phrases: git operations, test runs, script execution
+ACTION_PHRASES = [
+    # Git commit operations
+    "commit all changes",
+    "commit these changes",
+    "commit the changes",
+    "commit my changes",
+    "commit with message",
+    "stage and commit",
+    "git commit",
+    "make a commit",
+    "create a commit",
+    "commit the files",
+    "commit everything",
+    # Git push/pull operations
+    "push to remote",
+    "push the changes",
+    "git push",
+    "pull from remote",
+    "git pull",
+    "sync with remote",
+    "push to origin",
+    "push to main",
+    "push to master",
+    # Git branch operations
+    "create a branch",
+    "switch to branch",
+    "merge the branch",
+    "git merge",
+    "rebase onto main",
+    "cherry pick commit",
+    "git stash",
+    "stash changes",
+    # Pull request operations
+    "create a pull request",
+    "open a PR",
+    "make a PR",
+    "create PR",
+    "submit pull request",
+    "open pull request",
+    "create a PR for",
+    # Grouped commit operations
+    "group commits by",
+    "grouped commits",
+    "separate commits for",
+    "organize commits",
+    "split into commits",
+    "commit in groups",
+    # Test execution
+    "run the tests",
+    "run all tests",
+    "execute tests",
+    "run pytest",
+    "run unittest",
+    "run the test suite",
+    "npm test",
+    "cargo test",
+    "run unit tests",
+    "run integration tests",
+    "execute the test suite",
+    "run e2e tests",
+    # Script/command execution
+    "run the script",
+    "execute the script",
+    "run this script",
+    "execute this command",
+    "run the command",
+    "start the server",
+    "run the build",
+    "execute the build",
+    # Build/deploy operations
+    "build the project",
+    "compile the code",
+    "deploy the app",
+    "build and deploy",
+    "npm build",
+    "pip install",
+    "cargo build",
+    "npm install",
+    "install dependencies",
+    # File operations
+    "move all files",
+    "rename the files",
+    "copy these files",
+    "delete old files",
+    "clean up temp files",
+    "remove unused files",
+    # Web search and API research
+    "perform websearch",
+    "perform a websearch",
+    "perform web search",
+    "do a web search",
+    "run a websearch",
+    "search the web for",
+    "search the internet for",
+    "search online for",
+    "websearch for API",
+    "websearch for documentation",
+    "fetch the API documentation",
+    "fetch for API",
+    "fetch API docs",
+    "research the API",
+    "investigate the library",
+    "explore the package API",
+    "find the API documentation",
+    "look up the API",
+]
+
+# Deep analysis phrases: comprehensive codebase exploration
+ANALYSIS_DEEP_PHRASES = [
+    # Full codebase analysis
+    "analyze the entire codebase",
+    "analyze the codebase",
+    "review the entire project",
+    "audit the codebase",
+    "analyze the whole project",
+    "review the entire codebase",
+    "full codebase analysis",
+    "complete codebase review",
+    "analyze all the code",
+    "review all modules",
+    # Comprehensive analysis patterns
+    "comprehensive code analysis",
+    "thorough code review",
+    "detailed analysis of",
+    "full analysis of",
+    "comprehensive review",
+    "thorough review of",
+    "detailed code review",
+    "in-depth analysis",
+    "deep dive into the code",
+    "extensive code review",
+    # Architecture analysis
+    "architecture review",
+    "architecture analysis",
+    "architecture overview",
+    "analyze the architecture",
+    "review the architecture",
+    "understand the architecture",
+    "map the architecture",
+    "document the architecture",
+    # System understanding
+    "explain the entire system",
+    "describe the whole codebase",
+    "understand the full system",
+    "map the entire codebase",
+    "document the codebase",
+    "document all modules",
+    # Security/quality audits
+    "security audit",
+    "security review",
+    "vulnerability scan",
+    "code quality audit",
+    "quality assessment",
+    "technical debt analysis",
+    "tech debt review",
+    "performance analysis",
+    "optimization review",
+    # Find all patterns
+    "identify all issues",
+    "find all problems",
+    "find every bug",
+    "identify all bugs",
+    "find all code smells",
+    "identify technical debt",
+]
+
 
 class TaskTypeClassifier:
     """Semantic task type classifier using embeddings.
@@ -615,7 +909,8 @@ class TaskTypeClassifier:
     - Reduces false positives
 
     Usage:
-        classifier = TaskTypeClassifier()
+        # Use singleton to avoid duplicate initialization
+        classifier = TaskTypeClassifier.get_instance()
         classifier.initialize_sync()
 
         result = classifier.classify(
@@ -624,6 +919,43 @@ class TaskTypeClassifier:
         print(result.task_type)  # TaskType.CREATE_SIMPLE
         print(result.confidence)  # 0.85
     """
+
+    _instance: Optional["TaskTypeClassifier"] = None
+    _lock = __import__("threading").Lock()
+
+    @classmethod
+    def get_instance(
+        cls,
+        cache_dir: Optional[Path] = None,
+        embedding_service: Optional[EmbeddingService] = None,
+        threshold: float = 0.35,
+    ) -> "TaskTypeClassifier":
+        """Get or create the singleton TaskTypeClassifier instance.
+
+        Args:
+            cache_dir: Directory for cache files (only used on first call)
+            embedding_service: Shared embedding service (only used on first call)
+            threshold: Minimum similarity threshold (only used on first call)
+
+        Returns:
+            The singleton TaskTypeClassifier instance
+        """
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls(
+                        cache_dir=cache_dir,
+                        embedding_service=embedding_service,
+                        threshold=threshold,
+                    )
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Reset the singleton instance (mainly for testing)."""
+        with cls._lock:
+            cls._instance = None
+            logger.debug("Reset TaskTypeClassifier singleton")
 
     def __init__(
         self,
@@ -654,6 +986,8 @@ class TaskTypeClassifier:
             TaskType.ANALYZE: ANALYZE_PHRASES,
             TaskType.DESIGN: DESIGN_PHRASES,
             TaskType.GENERAL: GENERAL_PHRASES,
+            TaskType.ACTION: ACTION_PHRASES,
+            TaskType.ANALYSIS_DEEP: ANALYSIS_DEEP_PHRASES,
         }
 
         for task_type in self._phrase_lists.keys():

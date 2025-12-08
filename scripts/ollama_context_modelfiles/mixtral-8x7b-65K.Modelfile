@@ -1,0 +1,15 @@
+# Mixtral 8x7B with 65K context (up from 32K)
+# Target: localhost
+# Note: MoE architecture, only ~13B params active, memory efficient
+# Memory: ~30GB with 65K context
+
+FROM mixtral:8x7b
+
+PARAMETER num_ctx 65536
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER top_k 40
+PARAMETER repeat_penalty 1.05
+
+SYSTEM """You are Mixtral, a Mixture-of-Experts model with extended 65K context.
+You provide helpful, accurate, and detailed responses across a wide range of topics."""

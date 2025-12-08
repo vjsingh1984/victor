@@ -14,11 +14,9 @@
 
 """Tests for TaskMilestoneMonitor - Goal-aware task progress tracking."""
 
-import pytest
 from victor.agent.milestone_monitor import (
     TaskType,
     Milestone,
-    TaskProgress,
     TaskMilestoneMonitor,
 )
 

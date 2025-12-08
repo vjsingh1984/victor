@@ -669,8 +669,9 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             [
                 "TOOL USAGE:",
                 "- Use the available tools to gather information when needed.",
-                "- Call one tool at a time and wait for the result.",
-                "- After 2-3 successful tool calls, provide your complete answer.",
+                "- Call MULTIPLE tools in parallel when operations are independent.",
+                "  Example: Read multiple files simultaneously, search while listing.",
+                "- After gathering sufficient information, provide your answer.",
                 "- Do NOT repeat identical tool calls.",
                 "",
                 "RESPONSE FORMAT:",
@@ -785,7 +786,6 @@ class LMStudioToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         2. [TOOL_REQUEST]...[END_TOOL_REQUEST] format (default mode)
         3. JSON fallback from content (using FallbackParsingMixin)
         """
-        warnings = []
 
         # 1. Try native tool calls first (using mixin method)
         if raw_tool_calls:

@@ -29,6 +29,7 @@ from typing import Any, Dict, Optional
 
 import yaml
 
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
@@ -190,7 +191,13 @@ TYPE_MAPPING = {
 }
 
 
-@tool
+@tool(
+    category="cicd",
+    priority=Priority.MEDIUM,  # Task-specific CI/CD configuration
+    access_mode=AccessMode.WRITE,  # Generates configuration files
+    danger_level=DangerLevel.LOW,  # Creates new files only
+    keywords=["cicd", "pipeline", "github actions", "gitlab ci", "workflow", "deploy"],
+)
 async def cicd(
     operation: str,
     platform: str = "github",

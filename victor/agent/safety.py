@@ -24,9 +24,11 @@ This module provides:
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Awaitable
+from typing import Any, Callable, Dict, List, Optional, Awaitable, Set
 import re
 import logging
+
+from victor.tools.metadata_registry import get_write_tools as registry_get_write_tools
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,64 @@ class RiskLevel(Enum):
     MEDIUM = "medium"  # Moderate changes - multi-file operations
     HIGH = "high"  # Significant changes - deletions, overwrites
     CRITICAL = "critical"  # System-level destructive operations
+
+
+class ApprovalMode(Enum):
+    """Mode for write operation approval.
+
+    Controls when user confirmation is required for file modifications.
+    """
+
+    OFF = "off"  # No approval required - auto-approve all operations
+    RISKY_ONLY = "risky_only"  # Only require approval for HIGH/CRITICAL risk
+    ALL_WRITES = "all_writes"  # Require approval for ALL write operations
+
+
+# Static fallback for tools that perform write/modify operations.
+# PRIMARY source is decorator-driven via @tool(access_mode=AccessMode.WRITE/EXECUTE/MIXED)
+# in victor/tools/metadata_registry.py. This fallback ensures backward compatibility
+# and covers tools that may not yet have decorator metadata.
+# IMPORTANT: Only include actual @tool decorated functions from victor/tools/
+_STATIC_WRITE_TOOL_NAMES: frozenset[str] = frozenset(
+    {
+        # Direct file modifications
+        "write_file",  # filesystem.py - writes/overwrites files
+        "edit_files",  # file_editor_tool.py - edits files with transactions
+        # Patch/diff application
+        "apply_patch",  # patch_tool.py - applies unified diffs
+        # Bash execution (can run any command including destructive ones)
+        "execute_bash",  # bash.py - executes shell commands
+        # Git write operations
+        "git",  # git_tool.py - commit, push, reset, etc. (read ops are fine)
+        # Refactoring (modifies files in place)
+        "refactor_rename_symbol",  # refactor_tool.py
+        "refactor_extract_function",  # refactor_tool.py
+        "refactor_inline_variable",  # refactor_tool.py
+        "refactor_organize_imports",  # refactor_tool.py
+        "rename_symbol",  # code_intelligence_tool.py
+        # Scaffolding (creates new files/directories)
+        "scaffold",  # scaffold_tool.py
+        # Batch operations (may include writes)
+        "batch",  # batch_processor_tool.py
+    }
+)
+
+
+def get_write_tool_names() -> Set[str]:
+    """Get all write tool names from registry + static fallback.
+
+    This is the preferred way to get the full set of write tools.
+    Returns union of decorator-driven registry and static fallback.
+
+    Returns:
+        Set of tool names that perform write/modify operations.
+    """
+    registry_tools = registry_get_write_tools()
+    return registry_tools | set(_STATIC_WRITE_TOOL_NAMES)
+
+
+# Backward compatibility alias - prefer get_write_tool_names() for dynamic lookup
+WRITE_TOOL_NAMES = _STATIC_WRITE_TOOL_NAMES
 
 
 # Numeric ordering for risk level comparisons
@@ -161,6 +221,7 @@ class SafetyChecker:
         confirmation_callback: Optional[ConfirmationCallback] = None,
         auto_confirm_low_risk: bool = True,
         require_confirmation_threshold: RiskLevel = RiskLevel.HIGH,
+        approval_mode: ApprovalMode = ApprovalMode.RISKY_ONLY,
     ):
         """Initialize safety checker.
 
@@ -168,10 +229,15 @@ class SafetyChecker:
             confirmation_callback: Async callback for user confirmation
             auto_confirm_low_risk: Auto-approve LOW risk operations
             require_confirmation_threshold: Minimum risk level requiring confirmation
+            approval_mode: When to require approval for write operations
+                - OFF: Never require approval (dangerous, use for testing only)
+                - RISKY_ONLY: Only require for HIGH/CRITICAL risk (default)
+                - ALL_WRITES: Require for ALL file modifications (recommended for task mode)
         """
         self.confirmation_callback = confirmation_callback
         self.auto_confirm_low_risk = auto_confirm_low_risk
         self.require_confirmation_threshold = require_confirmation_threshold
+        self.approval_mode = approval_mode
 
         # Compile regex patterns for efficiency
         self._critical_patterns = [
@@ -271,6 +337,25 @@ class SafetyChecker:
 
         return max_risk, risks
 
+    def is_write_tool(self, tool_name: str) -> bool:
+        """Check if a tool is a write/modify operation.
+
+        Uses decorator-driven registry as primary source, with static fallback
+        for backward compatibility during migration.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            True if the tool can modify files/state
+        """
+        # Primary: check decorator-driven registry
+        registry_write_tools = registry_get_write_tools()
+        if tool_name in registry_write_tools:
+            return True
+        # Fallback: check static list for tools without decorator metadata
+        return tool_name in _STATIC_WRITE_TOOL_NAMES
+
     async def check_and_confirm(
         self,
         tool_name: str,
@@ -285,9 +370,14 @@ class SafetyChecker:
         Returns:
             Tuple of (should_proceed, optional_rejection_reason)
         """
+        # Fast path: approval mode OFF - auto-approve everything
+        if self.approval_mode == ApprovalMode.OFF:
+            return True, None
+
         risk_level = RiskLevel.SAFE
         descriptions: List[str] = []
         details: List[str] = []
+        is_write_operation = self.is_write_tool(tool_name)
 
         # Check bash commands
         if tool_name == "execute_bash":
@@ -325,10 +415,27 @@ class SafetyChecker:
                 descriptions.append(f"Git: {subcommand}")
 
         # Determine if confirmation is needed
-        # Auto-approve if below threshold
-        if _RISK_ORDER[risk_level] < _RISK_ORDER[self.require_confirmation_threshold]:
-            if self.auto_confirm_low_risk or risk_level == RiskLevel.SAFE:
-                return True, None
+        requires_confirmation = False
+
+        # ALL_WRITES mode: require confirmation for any write operation
+        if self.approval_mode == ApprovalMode.ALL_WRITES and is_write_operation:
+            requires_confirmation = True
+            # If no descriptions yet, add a generic one
+            if not descriptions:
+                descriptions.append(f"Execute write operation: {tool_name}")
+            # Set minimum risk to LOW for display purposes
+            if risk_level == RiskLevel.SAFE:
+                risk_level = RiskLevel.LOW
+                details.append("Write operation requiring approval")
+
+        # RISKY_ONLY mode: only require confirmation for high-risk operations
+        elif self.approval_mode == ApprovalMode.RISKY_ONLY:
+            if _RISK_ORDER[risk_level] >= _RISK_ORDER[self.require_confirmation_threshold]:
+                requires_confirmation = True
+
+        # Auto-approve if confirmation not required
+        if not requires_confirmation:
+            return True, None
 
         # No callback registered - log warning but proceed
         if not self.confirmation_callback:
@@ -336,6 +443,11 @@ class SafetyChecker:
                 logger.warning(
                     f"High-risk operation without confirmation callback: "
                     f"{tool_name} - {', '.join(details)}"
+                )
+            elif self.approval_mode == ApprovalMode.ALL_WRITES:
+                logger.warning(
+                    f"Write operation without confirmation callback in ALL_WRITES mode: "
+                    f"{tool_name}"
                 )
             return True, None
 
@@ -367,11 +479,37 @@ class SafetyChecker:
 _default_checker: Optional[SafetyChecker] = None
 
 
+def _resolve_approval_mode(mode_str: str) -> ApprovalMode:
+    """Resolve approval mode from string setting."""
+    mode_map = {
+        "off": ApprovalMode.OFF,
+        "risky_only": ApprovalMode.RISKY_ONLY,
+        "all_writes": ApprovalMode.ALL_WRITES,
+    }
+    return mode_map.get(mode_str.lower(), ApprovalMode.RISKY_ONLY)
+
+
 def get_safety_checker() -> SafetyChecker:
-    """Get the default safety checker instance."""
+    """Get the default safety checker instance.
+
+    The approval mode is configured via settings.write_approval_mode:
+    - "off": No approval required (dangerous)
+    - "risky_only": Only HIGH/CRITICAL risk (default)
+    - "all_writes": All write operations require approval
+    """
     global _default_checker
     if _default_checker is None:
-        _default_checker = SafetyChecker()
+        # Try to get approval mode from settings
+        try:
+            from victor.config.settings import load_settings
+
+            settings = load_settings()
+            approval_mode = _resolve_approval_mode(settings.write_approval_mode)
+        except Exception:
+            # Default to RISKY_ONLY if settings unavailable
+            approval_mode = ApprovalMode.RISKY_ONLY
+
+        _default_checker = SafetyChecker(approval_mode=approval_mode)
     return _default_checker
 
 

@@ -150,12 +150,41 @@ class MCPClient:
 
                 return True
 
+            # Cleanup on initialization failure
+            self._cleanup_process()
             return False
 
         except Exception as e:
             logger.error(f"Error connecting to MCP server: {e}")
             self._consecutive_failures += 1
+            # Cleanup on exception
+            self._cleanup_process()
             return False
+
+    def _cleanup_process(self) -> None:
+        """Clean up subprocess and its resources."""
+        if self.process:
+            try:
+                if self.process.stdin:
+                    self.process.stdin.close()
+                if self.process.stdout:
+                    self.process.stdout.close()
+                if self.process.stderr:
+                    self.process.stderr.close()
+            except Exception as e:
+                logger.debug(f"Error closing process pipes during cleanup: {e}")
+
+            try:
+                self.process.terminate()
+                self.process.wait(timeout=McpTimeouts.TERMINATE)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait()
+            except Exception as e:
+                logger.debug(f"Error terminating process during cleanup: {e}")
+
+            self.process = None
+            self.initialized = False
 
     async def initialize(self) -> bool:
         """Initialize MCP connection.
@@ -369,6 +398,17 @@ class MCPClient:
             self._health_task = None
 
         if self.process:
+            # Close file handles to prevent resource leaks
+            try:
+                if self.process.stdin:
+                    self.process.stdin.close()
+                if self.process.stdout:
+                    self.process.stdout.close()
+                if self.process.stderr:
+                    self.process.stderr.close()
+            except Exception as e:
+                logger.debug(f"Error closing process pipes: {e}")
+
             self.process.terminate()
             try:
                 self.process.wait(timeout=McpTimeouts.TERMINATE)

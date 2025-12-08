@@ -14,7 +14,6 @@
 
 """LSP Manager for managing multiple language servers."""
 
-import asyncio
 import logging
 import shutil
 from dataclasses import dataclass
@@ -25,14 +24,11 @@ from urllib.parse import quote
 from victor.lsp.client import (
     LSPClient,
     CompletionItem,
-    Diagnostic,
     Hover,
-    Location,
     Position,
 )
 from victor.lsp.config import (
     LANGUAGE_SERVERS,
-    LSPServerConfig,
     get_server_for_file,
 )
 
@@ -58,6 +54,12 @@ class LSPConnectionPool:
     language servers.
 
     Note: Previously named `LSPManager`. Alias kept for backward compatibility.
+
+    Usage:
+        async with LSPConnectionPool() as pool:
+            await pool.start_server("python")
+            completions = await pool.get_completions("file.py", 10, 5)
+        # All servers automatically stopped on exit
     """
 
     def __init__(self, workspace_root: Optional[str] = None):
@@ -70,6 +72,14 @@ class LSPConnectionPool:
         self._root_uri = self._path_to_uri(self._workspace_root)
         self._clients: Dict[str, LSPClient] = {}  # language_id -> client
         self._auto_start = True
+
+    async def __aenter__(self) -> "LSPConnectionPool":
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit - ensures all servers are stopped."""
+        await self.stop_all()
 
     @staticmethod
     def _path_to_uri(path: str) -> str:
@@ -169,7 +179,7 @@ class LSPConnectionPool:
             return None
 
         # Find client by language_id
-        for lang, client in self._clients.items():
+        for _lang, client in self._clients.items():
             if client.config.language_id == config.language_id:
                 return client
 

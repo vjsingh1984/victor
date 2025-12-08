@@ -1,0 +1,16 @@
+# Qwen2.5-Coder 32B with 262K context (MAXIMUM)
+# Target: 192.168.1.20 (RTX 4000 Ada + 128GB RAM)
+# Memory: ~80GB with 262K context (will spill to RAM via PCIe 5)
+# Note: Qwen2.5 architecture supports up to 131K natively, 262K with RoPE scaling
+
+FROM qwen2.5-coder:32b
+
+PARAMETER num_ctx 262144
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.05
+PARAMETER rope_scaling linear
+PARAMETER rope_frequency_base 1000000
+
+SYSTEM """You are Qwen2.5-Coder with 262K context window, optimized for large codebase analysis.
+Handle multi-file projects, full repository analysis, and complex software engineering tasks."""

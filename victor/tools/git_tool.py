@@ -21,11 +21,12 @@ This tool provides:
 4. Conflict detection and resolution help
 """
 
+import os
 import subprocess
 from typing import Any, Dict, List, Optional, Tuple
 
 from victor.config.timeouts import ProcessTimeouts
-from victor.tools.base import ToolConfig
+from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority, ToolConfig
 from victor.tools.decorators import tool
 
 # Global state for AI provider (DEPRECATED: use ToolConfig via context instead)
@@ -66,21 +67,30 @@ def _get_provider_and_model(context: Optional[Dict[str, Any]] = None) -> Tuple[A
     return _provider, _model
 
 
-def _run_git(*args: str) -> Tuple[bool, str, str]:
-    """Run git command.
+def _run_git(*args: str, env_overrides: Optional[Dict[str, str]] = None) -> Tuple[bool, str, str]:
+    """Run git command with optional environment variable overrides.
 
     Args:
         *args: Git command arguments
+        env_overrides: Optional dictionary of environment variables to set for this command.
+            Useful for setting GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, etc.
 
     Returns:
         Tuple of (success, stdout, stderr)
     """
     try:
+        # Prepare environment
+        cmd_env = None
+        if env_overrides:
+            cmd_env = os.environ.copy()
+            cmd_env.update(env_overrides)
+
         result = subprocess.run(
             ["git"] + list(args),
             capture_output=True,
             text=True,
             timeout=ProcessTimeouts.GIT,
+            env=cmd_env,
         )
         return result.returncode == 0, result.stdout, result.stderr
     except subprocess.TimeoutExpired:
@@ -89,7 +99,53 @@ def _run_git(*args: str) -> Tuple[bool, str, str]:
         return False, "", str(e)
 
 
-@tool
+@tool(
+    category="git",
+    priority=Priority.HIGH,  # Frequently used for version control
+    access_mode=AccessMode.MIXED,  # Reads repo state and writes commits
+    danger_level=DangerLevel.MEDIUM,  # Repository modifications
+    # Registry-driven metadata for tool selection and cache management
+    stages=["executing", "verification"],  # Conversation stages where relevant
+    task_types=["action", "analysis"],  # Task types for classification-aware selection
+    execution_category=ExecutionCategory.MIXED,  # Can both read and write
+    progress_params=["operation", "files", "branch"],  # Params indicating different operations
+    keywords=[
+        "git",
+        "commit",
+        "stage",
+        "diff",
+        "status",
+        "branch",
+        "log",
+        "version control",
+        "repository",
+        "author",
+        "changes",
+        "history",
+    ],
+    use_cases=[
+        "checking repository status",
+        "viewing file changes and diffs",
+        "staging files for commit",
+        "committing changes with custom authorship",
+        "viewing commit history",
+        "creating and switching branches",
+    ],
+    examples=[
+        "show git status",
+        "what files have changed",
+        "stage all changes",
+        "commit with message 'fix bug'",
+        "commit as John Doe john@example.com",
+        "show last 5 commits",
+        "create new branch feature/auth",
+    ],
+    priority_hints=[
+        "Use for all git version control operations",
+        "Supports custom author name and email for commits",
+        "Can stage individual files or all changes",
+    ],
+)
 async def git(
     operation: str,
     files: Optional[List[str]] = None,
@@ -98,57 +154,15 @@ async def git(
     staged: bool = False,
     limit: int = 10,
     options: Optional[Dict[str, Any]] = None,
+    author_name: Optional[str] = None,
+    author_email: Optional[str] = None,
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """
-    Unified git operations tool.
+    """Unified git operations: status, diff, stage, commit, log, branch.
 
-    Performs common git operations (status, diff, stage, commit, log, branch)
-    through a single unified interface. Consolidates basic git functionality.
-
-    Args:
-        operation: Git operation to perform. Options: "status", "diff", "stage",
-            "commit", "log", "branch".
-        files: List of file paths (for stage operation).
-        message: Commit message (for commit operation).
-        branch: Branch name (for branch operation).
-        staged: Show staged changes for diff (default: False).
-        limit: Number of commits for log (default: 10).
-        options: Additional operation-specific options.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - output: Operation result
-        - error: Error message if failed
-
-    Examples:
-        # Show repository status
-        git(operation="status")
-
-        # Show unstaged changes
-        git(operation="diff")
-
-        # Show staged changes
-        git(operation="diff", staged=True)
-
-        # Stage specific files
-        git(operation="stage", files=["src/main.py", "tests/test.py"])
-
-        # Stage all changes
-        git(operation="stage")
-
-        # Commit with message
-        git(operation="commit", message="Fix authentication bug")
-
-        # Show commit history
-        git(operation="log", limit=20)
-
-        # List branches
-        git(operation="branch")
-
-        # Create/switch to branch
-        git(operation="branch", branch="feature/new-feature")
+    Operations: status, diff (staged=True for staged), stage (files or all),
+    commit (message required), log (limit), branch (list/create/switch).
+    Supports custom author_name/author_email for commits.
     """
     if not operation:
         return {"success": False, "error": "Missing required parameter: operation"}
@@ -225,13 +239,32 @@ async def git(
                 "error": "Commit message required. Use message parameter.",
             }
 
-        # Commit with message
-        success, stdout, stderr = _run_git("commit", "-m", message)
+        # Build environment overrides for custom authorship
+        env_overrides: Dict[str, str] = {}
+        if author_name:
+            env_overrides["GIT_AUTHOR_NAME"] = author_name
+            env_overrides["GIT_COMMITTER_NAME"] = author_name
+        if author_email:
+            env_overrides["GIT_AUTHOR_EMAIL"] = author_email
+            env_overrides["GIT_COMMITTER_EMAIL"] = author_email
+
+        # Commit with message and optional author override
+        success, stdout, stderr = _run_git(
+            "commit", "-m", message, env_overrides=env_overrides if env_overrides else None
+        )
 
         if not success:
             return {"success": False, "output": "", "error": stderr}
 
-        return {"success": True, "output": f"Committed successfully:\n{stdout}", "error": ""}
+        author_info = ""
+        if author_name or author_email:
+            author_info = f" (as {author_name or 'default'} <{author_email or 'default'}>)"
+
+        return {
+            "success": True,
+            "output": f"Committed successfully{author_info}:\n{stdout}",
+            "error": "",
+        }
 
     # Log operation
     elif operation == "log":
@@ -270,21 +303,38 @@ async def git(
         }
 
 
-@tool
-async def git_suggest_commit(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Generate AI commit message from staged changes.
+@tool(
+    category="git",
+    priority=Priority.MEDIUM,  # Task-specific AI operation
+    access_mode=AccessMode.READONLY,  # Only reads diff, doesn't commit
+    danger_level=DangerLevel.SAFE,  # No side effects
+    keywords=["commit message", "ai", "generate", "suggest", "conventional commit"],
+    mandatory_keywords=["generate commit message", "suggest commit"],  # Force inclusion
+    task_types=["generation", "git"],  # Classification-aware selection
+    use_cases=["generating commit messages", "creating conventional commits"],
+    examples=["suggest a commit message", "generate commit message for staged changes"],
+)
+async def commit_msg(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Generate an AI-powered commit message from staged changes.
 
     Analyzes the staged diff and generates a conventional commit message
-    using the configured LLM provider.
+    using the configured LLM provider. The generated message follows the
+    conventional commit format: type(scope): subject
+
+    Types used: feat, fix, docs, style, refactor, test, chore
 
     Args:
-        context: Tool execution context (injected by decorator)
+        context: Tool execution context (injected by decorator, do not pass manually)
 
     Returns:
         Dictionary containing:
-        - success: Whether operation succeeded
-        - output: Generated commit message
-        - error: Error message if failed
+        - success: bool - Whether message generation succeeded
+        - output: str - The generated commit message
+        - error: str - Error message if failed (empty on success)
+
+    Note:
+        Requires staged changes (git add) before calling this tool.
+        Uses the configured LLM provider for message generation.
     """
     provider, model = _get_provider_and_model(context)
     if not provider:
@@ -347,29 +397,54 @@ Generate ONLY the commit message, nothing else."""
         return {"success": False, "output": "", "error": f"AI generation failed: {str(e)}"}
 
 
-@tool
-async def git_create_pr(
+@tool(
+    category="git",
+    priority=Priority.MEDIUM,  # Task-specific GitHub operation
+    access_mode=AccessMode.NETWORK,  # Pushes to remote, creates PR via API
+    danger_level=DangerLevel.LOW,  # PRs can be closed/reverted
+    keywords=["pull request", "pr", "github", "merge request", "create pr"],
+    mandatory_keywords=["create pr", "pull request", "open pr"],  # Force inclusion
+    task_types=["action", "git"],  # Classification-aware selection
+    use_cases=["creating pull requests", "opening PRs on GitHub"],
+    examples=[
+        "create a pull request",
+        "open PR to main branch",
+        "create pr with title 'Add feature'",
+    ],
+)
+async def pr(
     pr_title: Optional[str] = None,
     pr_description: Optional[str] = None,
     base_branch: str = "main",
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Create a pull request with auto-generated content.
+    """Create a GitHub pull request with auto-generated or custom content.
 
-    Creates a pull request using GitHub CLI. If title or description
-    are not provided and AI is available, generates them from the commits.
+    Creates a pull request using GitHub CLI (gh). Automatically pushes the
+    current branch to origin if needed. If title or description are not
+    provided and an AI provider is configured, generates them from the
+    commit history and diff.
 
     Args:
-        pr_title: PR title. If None, auto-generated
-        pr_description: PR description. If None, auto-generated
-        base_branch: Base branch for PR (default: "main")
-        context: Tool execution context (injected by decorator)
+        pr_title: Pull request title. If None and AI is available, generates
+            from commit messages. Otherwise defaults to "Merge {branch} into {base}".
+            Example: "Add user authentication feature"
+        pr_description: Pull request body/description. If None and AI is available,
+            generates from diff. Otherwise uses a default description.
+            Example: "This PR adds OAuth2 authentication support..."
+        base_branch: Target branch to merge into. Default: "main".
+            Example: "develop" or "release/v2.0"
+        context: Tool execution context (injected by decorator, do not pass manually)
 
     Returns:
         Dictionary containing:
-        - success: Whether operation succeeded
-        - output: PR creation result with URL
-        - error: Error message if failed
+        - success: bool - Whether PR creation succeeded
+        - output: str - PR URL and creation confirmation
+        - error: str - Error message if failed (empty on success)
+
+    Note:
+        Requires GitHub CLI (gh) to be installed and authenticated.
+        Install with: brew install gh (macOS) or see https://cli.github.com/
     """
     provider, model = _get_provider_and_model(context)
 
@@ -496,21 +571,36 @@ DESCRIPTION:
         }
 
 
-@tool
-async def git_analyze_conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+@tool(
+    category="git",
+    priority=Priority.MEDIUM,  # Context-specific conflict resolution
+    access_mode=AccessMode.READONLY,  # Only analyzes, doesn't modify
+    danger_level=DangerLevel.SAFE,  # No side effects
+    keywords=["merge conflict", "conflict", "resolve", "rebase", "merge"],
+    use_cases=["analyzing merge conflicts", "resolving git conflicts", "conflict resolution help"],
+    examples=["analyze conflicts", "show merge conflicts", "help resolve conflicts"],
+)
+async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Analyze merge conflicts and provide resolution guidance.
 
-    Detects conflicted files and provides information about the conflicts,
-    including conflict markers and resolution steps.
+    Detects files with merge conflicts (marked as UU in git status) and provides
+    detailed information about each conflict, including previews of conflict
+    markers and step-by-step resolution instructions.
 
     Args:
-        context: Tool execution context (injected by decorator)
+        context: Tool execution context (injected by decorator, do not pass manually)
 
     Returns:
         Dictionary containing:
-        - success: Whether operation succeeded
-        - output: Conflict analysis and resolution guidance
-        - error: Error message if failed
+        - success: bool - Whether analysis succeeded
+        - output: str - Conflict analysis with file list, conflict counts,
+            conflict previews, and resolution steps
+        - error: str - Error message if failed (empty on success)
+
+    Note:
+        Call this after a failed merge or rebase to understand what needs
+        to be resolved. After manual resolution, stage files with git add
+        and continue with git merge --continue or git rebase --continue.
     """
     # Get list of conflicted files
     success, status, stderr = _run_git("status", "--short")
@@ -565,3 +655,5 @@ async def git_analyze_conflicts(context: Optional[Dict[str, Any]] = None) -> Dic
     analysis.append("4. Continue: git merge --continue or git rebase --continue")
 
     return {"success": True, "output": "\n".join(analysis), "error": ""}
+
+

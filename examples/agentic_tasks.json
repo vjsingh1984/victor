@@ -1,0 +1,66 @@
+[
+  {
+    "task_id": "agentic/simple_function",
+    "prompt": "Create a Python file called 'utils.py' with a function 'is_palindrome(s: str) -> bool' that checks if a string is a palindrome (ignoring case and spaces).",
+    "test_code": "import utils\n\ndef test_palindrome():\n    assert utils.is_palindrome('racecar') == True\n    assert utils.is_palindrome('A man a plan a canal Panama') == True\n    assert utils.is_palindrome('hello') == False\n    assert utils.is_palindrome('') == True\n    print('All tests passed!')\n\ntest_palindrome()",
+    "metadata": {
+      "category": "file_creation",
+      "difficulty": "easy",
+      "expected_tools": ["file_write"]
+    }
+  },
+  {
+    "task_id": "agentic/fix_import_error",
+    "prompt": "The 'main.py' file has an import error. Fix it so the code runs correctly.",
+    "context_code": "# main.py\nfrom utls import process_data  # typo: should be 'utils'\n\ndef run():\n    result = process_data([1, 2, 3])\n    print(f'Result: {result}')\n\nif __name__ == '__main__':\n    run()\n\n# utils.py\ndef process_data(data):\n    return sum(data) * 2",
+    "test_code": "import main\n\n# If import works, we're good\nprint('Import fixed successfully!')",
+    "metadata": {
+      "category": "bug_fix",
+      "difficulty": "easy",
+      "expected_tools": ["file_read", "file_edit"]
+    }
+  },
+  {
+    "task_id": "agentic/add_tests",
+    "prompt": "Add comprehensive unit tests for the Calculator class in 'calculator.py'. Create a new file 'test_calculator.py' using pytest.",
+    "context_code": "# calculator.py\nclass Calculator:\n    def add(self, a: float, b: float) -> float:\n        return a + b\n    \n    def subtract(self, a: float, b: float) -> float:\n        return a - b\n    \n    def multiply(self, a: float, b: float) -> float:\n        return a * b\n    \n    def divide(self, a: float, b: float) -> float:\n        if b == 0:\n            raise ValueError('Cannot divide by zero')\n        return a / b",
+    "test_code": "import subprocess\nimport sys\nresult = subprocess.run([sys.executable, '-m', 'pytest', 'test_calculator.py', '-v'], capture_output=True, text=True)\nprint(result.stdout)\nif result.returncode == 0:\n    print('All tests passed!')\nelse:\n    print('Some tests failed')\n    sys.exit(1)",
+    "metadata": {
+      "category": "testing",
+      "difficulty": "medium",
+      "expected_tools": ["file_read", "file_write"]
+    }
+  },
+  {
+    "task_id": "agentic/refactor_function",
+    "prompt": "Refactor the 'process_orders' function in 'orders.py' to reduce code duplication and improve readability. The function should maintain the same behavior.",
+    "context_code": "# orders.py\ndef process_orders(orders):\n    result = []\n    for order in orders:\n        if order['type'] == 'standard':\n            price = order['price']\n            if price > 100:\n                discount = price * 0.1\n            else:\n                discount = 0\n            final = price - discount\n            result.append({'id': order['id'], 'final_price': final, 'type': 'standard'})\n        elif order['type'] == 'premium':\n            price = order['price']\n            if price > 100:\n                discount = price * 0.2\n            else:\n                discount = price * 0.05\n            final = price - discount\n            result.append({'id': order['id'], 'final_price': final, 'type': 'premium'})\n        elif order['type'] == 'vip':\n            price = order['price']\n            if price > 100:\n                discount = price * 0.3\n            else:\n                discount = price * 0.15\n            final = price - discount\n            result.append({'id': order['id'], 'final_price': final, 'type': 'vip'})\n    return result",
+    "test_code": "import orders\n\ndef test_process_orders():\n    test_orders = [\n        {'id': 1, 'type': 'standard', 'price': 150},\n        {'id': 2, 'type': 'premium', 'price': 50},\n        {'id': 3, 'type': 'vip', 'price': 200},\n    ]\n    result = orders.process_orders(test_orders)\n    assert result[0]['final_price'] == 135.0  # 150 - 10%\n    assert result[1]['final_price'] == 47.5   # 50 - 5%\n    assert result[2]['final_price'] == 140.0  # 200 - 30%\n    print('All tests passed!')\n\ntest_process_orders()",
+    "metadata": {
+      "category": "refactoring",
+      "difficulty": "medium",
+      "expected_tools": ["file_read", "file_edit"]
+    }
+  },
+  {
+    "task_id": "agentic/implement_api",
+    "prompt": "Implement a simple REST API endpoint in 'api.py' that:\n1. Has a GET /health endpoint returning {'status': 'healthy'}\n2. Has a POST /echo endpoint that returns the JSON body it receives\n\nUse Flask and include error handling.",
+    "test_code": "import sys\ntry:\n    from api import app\n    client = app.test_client()\n    \n    # Test health endpoint\n    response = client.get('/health')\n    assert response.status_code == 200\n    assert response.get_json() == {'status': 'healthy'}\n    \n    # Test echo endpoint\n    response = client.post('/echo', json={'message': 'hello'})\n    assert response.status_code == 200\n    assert response.get_json() == {'message': 'hello'}\n    \n    print('All tests passed!')\nexcept ImportError as e:\n    print(f'Import error: {e}')\n    sys.exit(1)",
+    "metadata": {
+      "category": "implementation",
+      "difficulty": "medium",
+      "expected_tools": ["file_write"]
+    }
+  },
+  {
+    "task_id": "agentic/debug_recursion",
+    "prompt": "The 'tree.py' file has a bug causing infinite recursion when traversing certain tree structures. Find and fix the bug.",
+    "context_code": "# tree.py\nclass TreeNode:\n    def __init__(self, value, children=None):\n        self.value = value\n        self.children = children or []\n\ndef find_value(node, target):\n    '''Find a value in the tree, return the node or None.'''\n    if node.value == target:\n        return node\n    for child in node.children:\n        result = find_value(node, target)  # Bug: should be find_value(child, target)\n        if result:\n            return result\n    return None\n\ndef count_nodes(node, visited=set()):  # Bug: mutable default argument\n    '''Count total nodes in tree.'''\n    if node in visited:\n        return 0\n    visited.add(node)\n    count = 1\n    for child in node.children:\n        count += count_nodes(child, visited)\n    return count",
+    "test_code": "import tree\n\ndef test_tree():\n    # Create a simple tree\n    leaf1 = tree.TreeNode(1)\n    leaf2 = tree.TreeNode(2)\n    root = tree.TreeNode(0, [leaf1, leaf2])\n    \n    # Test find_value\n    assert tree.find_value(root, 0) == root\n    assert tree.find_value(root, 1) == leaf1\n    assert tree.find_value(root, 2) == leaf2\n    assert tree.find_value(root, 99) is None\n    \n    # Test count_nodes (need fresh visited set each time)\n    assert tree.count_nodes(root) == 3\n    \n    print('All tests passed!')\n\ntest_tree()",
+    "metadata": {
+      "category": "bug_fix",
+      "difficulty": "hard",
+      "expected_tools": ["file_read", "file_edit"]
+    }
+  }
+]

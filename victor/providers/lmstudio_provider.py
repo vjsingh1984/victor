@@ -27,7 +27,7 @@ References:
 
 import json
 import logging
-from typing import Any, AsyncIterator, Dict, List, Optional, Union
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
 
 import httpx
 
@@ -90,6 +90,7 @@ class LMStudioProvider(BaseProvider):
         super().__init__(base_url=chosen_base, timeout=timeout, **kwargs)
         self._raw_base_urls = base_url
         self._api_key = api_key
+        self._models_available: Optional[bool] = None  # Set during URL discovery
 
         # Use httpx directly (not AsyncOpenAI SDK) for consistent behavior with Ollama
         self.client = httpx.AsyncClient(
@@ -122,14 +123,16 @@ class LMStudioProvider(BaseProvider):
         Returns:
             Initialized LMStudioProvider with best available endpoint
         """
-        chosen_base = await cls._select_base_url_async(base_url, timeout)
-        return cls(
+        chosen_base, models_available = await cls._select_base_url_async(base_url, timeout)
+        instance = cls(
             base_url=chosen_base,
             timeout=timeout,
             api_key=api_key,
             _skip_discovery=True,
             **kwargs,
         )
+        instance._models_available = models_available
+        return instance
 
     @property
     def name(self) -> str:
@@ -195,13 +198,22 @@ class LMStudioProvider(BaseProvider):
                             f"LMStudio base URL selected: {url} "
                             f"(models: {', '.join(model_names)}{'...' if len(models) > 3 else ''})"
                         )
+                        self._models_available = True
                     else:
-                        logger.info(f"LMStudio base URL selected: {url} (no models loaded)")
+                        logger.warning(
+                            f"LMStudio server at {url} has NO MODELS LOADED. "
+                            "Please load a model in LMStudio before using this provider."
+                        )
+                        self._models_available = False
                     return url
             except Exception as exc:
                 logger.warning(f"LMStudio endpoint {url} not reachable ({exc}); trying next.")
 
-        fallback = base_url if isinstance(base_url, str) else str(base_url[0]) if base_url else "http://127.0.0.1:1234"
+        fallback = (
+            base_url
+            if isinstance(base_url, str)
+            else str(base_url[0]) if base_url else "http://127.0.0.1:1234"
+        )
         logger.error(
             f"No LMStudio endpoints reachable from: {candidates}. Falling back to {fallback}"
         )
@@ -210,13 +222,19 @@ class LMStudioProvider(BaseProvider):
     @classmethod
     async def _select_base_url_async(
         cls, base_url: Union[str, List[str], None], timeout: int
-    ) -> str:
+    ) -> Tuple[str, Optional[bool]]:
         """Async version of _select_base_url for non-blocking endpoint discovery.
 
         Priority:
         1) LMSTUDIO_ENDPOINTS env var (comma-separated) if set
         2) Explicitly provided list (comma-separated) or URL
         3) Default localhost:1234
+
+        Returns:
+            Tuple of (url, models_available) where models_available is:
+            - True if models are loaded
+            - False if no models loaded
+            - None if couldn't determine
         """
         import os
 
@@ -258,17 +276,25 @@ class LMStudioProvider(BaseProvider):
                             f"LMStudio base URL selected (async): {url} "
                             f"(models: {', '.join(model_names)}{'...' if len(models) > 3 else ''})"
                         )
+                        return url, True
                     else:
-                        logger.info(f"LMStudio base URL selected (async): {url} (no models loaded)")
-                    return url
+                        logger.warning(
+                            f"LMStudio server at {url} has NO MODELS LOADED. "
+                            "Please load a model in LMStudio before using this provider."
+                        )
+                        return url, False
             except Exception as exc:
                 logger.warning(f"LMStudio endpoint {url} not reachable ({exc}); trying next.")
 
-        fallback = base_url if isinstance(base_url, str) else str(base_url[0]) if base_url else "http://127.0.0.1:1234"
+        fallback = (
+            base_url
+            if isinstance(base_url, str)
+            else str(base_url[0]) if base_url else "http://127.0.0.1:1234"
+        )
         logger.error(
             f"No LMStudio endpoints reachable from: {candidates}. Falling back to {fallback}"
         )
-        return fallback
+        return fallback, None
 
     async def chat(
         self,
@@ -294,8 +320,16 @@ class LMStudioProvider(BaseProvider):
             CompletionResponse with generated content
 
         Raises:
-            ProviderError: If request fails
+            ProviderError: If request fails or no models loaded
         """
+        # Early check: fail fast if no models are loaded
+        if self._models_available is False:
+            raise ProviderError(
+                "LMStudio server has no models loaded. "
+                "Please load a model in LMStudio before using this provider. "
+                f"Server URL: {self.base_url}"
+            )
+
         try:
             payload = self._build_request_payload(
                 messages=messages,
@@ -365,8 +399,16 @@ class LMStudioProvider(BaseProvider):
             StreamChunk with incremental content
 
         Raises:
-            ProviderError: If request fails
+            ProviderError: If request fails or no models loaded
         """
+        # Early check: fail fast if no models are loaded
+        if self._models_available is False:
+            raise ProviderError(
+                "LMStudio server has no models loaded. "
+                "Please load a model in LMStudio before using this provider. "
+                f"Server URL: {self.base_url}"
+            )
+
         try:
             payload = self._build_request_payload(
                 messages=messages,
@@ -404,7 +446,9 @@ class LMStudioProvider(BaseProvider):
                             logger.debug(f"LMStudio stream complete after {line_count} lines")
                             yield StreamChunk(
                                 content="",
-                                tool_calls=accumulated_tool_calls if accumulated_tool_calls else None,
+                                tool_calls=(
+                                    accumulated_tool_calls if accumulated_tool_calls else None
+                                ),
                                 stop_reason="stop",
                                 is_final=True,
                             )
@@ -577,6 +621,7 @@ class LMStudioProvider(BaseProvider):
 
         # Try LMStudio's [TOOL_REQUEST] format first
         import re
+
         tool_request_pattern = r"\[TOOL_REQUEST\](.*?)\[END_TOOL_REQUEST\]"
         matches = re.findall(tool_request_pattern, content, re.DOTALL)
         if matches:
@@ -634,7 +679,9 @@ class LMStudioProvider(BaseProvider):
         if not tool_calls and content:
             parsed_tool_calls = self._parse_json_tool_call_from_content(content)
             if parsed_tool_calls:
-                logger.debug(f"LMStudio: Parsed tool call from content (fallback for model: {model})")
+                logger.debug(
+                    f"LMStudio: Parsed tool call from content (fallback for model: {model})"
+                )
                 tool_calls = parsed_tool_calls
                 content = ""  # Clear content since it was a tool call
 

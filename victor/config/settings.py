@@ -30,14 +30,52 @@ from victor.config.model_capabilities import _load_tool_capable_patterns_from_ya
 # All Victor paths are centralized here for consistency and easy configuration.
 # Project-local paths are stored in {project_root}/.victor/
 # Global paths are stored in ~/.victor/
+#
+# SECURITY: Uses secure_paths module to protect against:
+# - HOME environment variable manipulation (SEC-001)
+# - Path traversal attacks via VICTOR_DIR_NAME (SEC-002)
+# - Symlink attacks (SEC-003)
 # =============================================================================
 
-# Directory names (configurable via environment variables)
-VICTOR_DIR_NAME = os.getenv("VICTOR_DIR_NAME", ".victor")
+# Context file name (configurable)
 VICTOR_CONTEXT_FILE = os.getenv("VICTOR_CONTEXT_FILE", "init.md")
 
-# Global config directory (user home)
-GLOBAL_VICTOR_DIR = Path.home() / VICTOR_DIR_NAME
+
+def _get_secure_victor_dir_name() -> str:
+    """Get validated VICTOR_DIR_NAME with path traversal protection.
+
+    Security: Blocks path traversal attempts like '../../../etc' or '/tmp/evil'
+    """
+    try:
+        from victor.config.secure_paths import validate_victor_dir_name
+
+        raw_name = os.getenv("VICTOR_DIR_NAME", ".victor")
+        validated_name, is_valid = validate_victor_dir_name(raw_name)
+        return validated_name
+    except ImportError:
+        # Fallback if secure_paths not available yet (during initial import)
+        return os.getenv("VICTOR_DIR_NAME", ".victor")
+
+
+def _get_secure_global_victor_dir() -> Path:
+    """Get global Victor directory with secure home resolution.
+
+    Security: Validates HOME against passwd database to detect manipulation.
+    """
+    try:
+        from victor.config.secure_paths import get_victor_dir
+
+        return get_victor_dir()
+    except ImportError:
+        # Fallback if secure_paths not available yet
+        return Path.home() / _get_secure_victor_dir_name()
+
+
+# Directory name with validation (lazy property to avoid circular imports)
+VICTOR_DIR_NAME = _get_secure_victor_dir_name()
+
+# Global config directory with secure home resolution
+GLOBAL_VICTOR_DIR = _get_secure_global_victor_dir()
 
 
 class ProjectPaths:
@@ -334,7 +372,7 @@ class Settings(BaseSettings):
     """Main application settings."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=".env" if not os.getenv("VICTOR_SKIP_ENV_FILE") else None,
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="allow",
@@ -372,6 +410,13 @@ class Settings(BaseSettings):
     # Privacy and Security
     airgapped_mode: bool = False
 
+    # Write Approval Mode (safety for autonomous/task mode)
+    # Controls when user confirmation is required for file modifications:
+    #   - "off": Never require approval (dangerous, testing only)
+    #   - "risky_only": Only for HIGH/CRITICAL risk operations (default)
+    #   - "all_writes": Require for ALL write operations (recommended for task mode)
+    write_approval_mode: str = "risky_only"
+
     # Unified Embedding Model (Optimized for Memory + Cache Efficiency)
     # Using same model for tool selection AND codebase search provides:
     # - 40% memory reduction (130MB vs 200MB)
@@ -405,6 +450,11 @@ class Settings(BaseSettings):
     theme: str = "monokai"
     show_token_count: bool = True
     stream_responses: bool = True
+
+    # Interaction Mode
+    # When True (one-shot mode), auto-continue when model asks for user input
+    # When False (interactive mode), return to user for choice
+    one_shot_mode: bool = False
 
     # MCP
     use_mcp_tools: bool = False
@@ -531,6 +581,19 @@ class Settings(BaseSettings):
     # ==========================================================================
     streaming_metrics_enabled: bool = True  # Enable streaming performance metrics
     streaming_metrics_history_size: int = 1000  # Number of metrics samples to retain
+
+    # ==========================================================================
+    # Serialization (Token Optimization for Tool Output)
+    # ==========================================================================
+    # Controls how tool outputs are serialized for token efficiency.
+    # Formats: json, json_minified, toon, csv, markdown_table, reference_encoded
+    # TOON (Token-Oriented Object Notation) provides 30-60% savings for tabular data.
+    serialization_enabled: bool = True  # Enable token-optimized serialization
+    serialization_default_format: Optional[str] = None  # None = auto-select best format
+    serialization_min_savings_threshold: float = 0.15  # Min savings to use alternative format
+    serialization_include_format_hint: bool = True  # Include format description in output
+    serialization_min_rows_for_tabular: int = 3  # Min rows to consider tabular formats
+    serialization_debug_mode: bool = False  # Include data characteristics in output
 
     # Analytics
     analytics_enabled: bool = True
@@ -799,25 +862,27 @@ class Settings(BaseSettings):
         from victor.config.api_keys import get_api_key
 
         # Set provider-specific defaults and load API key
+        # Check Settings instance attributes first, then fallback to API key manager
         if provider == "anthropic":
-            api_key = get_api_key("anthropic")
+            api_key = self.anthropic_api_key or get_api_key("anthropic")
             if api_key:
                 settings["api_key"] = api_key
             settings.setdefault("base_url", "https://api.anthropic.com")
 
         elif provider == "openai":
-            api_key = get_api_key("openai")
+            api_key = self.openai_api_key or get_api_key("openai")
             if api_key:
                 settings["api_key"] = api_key
             settings.setdefault("base_url", "https://api.openai.com/v1")
 
         elif provider == "google":
-            api_key = get_api_key("google")
+            api_key = self.google_api_key or get_api_key("google")
             if api_key:
                 settings["api_key"] = api_key
 
         elif provider == "xai":
-            api_key = get_api_key("xai")
+            # xai_api_key might not exist in Settings, use getattr with default
+            api_key = getattr(self, "xai_api_key", None) or get_api_key("xai")
             if api_key:
                 settings["api_key"] = api_key
             settings.setdefault("base_url", "https://api.x.ai/v1")
@@ -867,6 +932,12 @@ class Settings(BaseSettings):
             if api_key:
                 settings["api_key"] = api_key
             settings.setdefault("base_url", "https://api.deepseek.com/v1")
+
+        elif provider == "groqcloud":
+            api_key = get_api_key("groqcloud")
+            if api_key:
+                settings["api_key"] = api_key
+            settings.setdefault("base_url", "https://api.groq.com/openai/v1")
 
         return settings
 

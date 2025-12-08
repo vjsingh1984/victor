@@ -26,7 +26,15 @@ from victor.merge import (
     MergeManager,
     ResolutionStrategy,
 )
-from victor.tools.base import BaseTool, CostTier, ToolMetadata, ToolResult
+from victor.tools.base import (
+    AccessMode,
+    BaseTool,
+    CostTier,
+    DangerLevel,
+    Priority,
+    ToolMetadata,
+    ToolResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,22 +43,10 @@ class MergeConflictTool(BaseTool):
     """Tool for detecting and resolving merge conflicts."""
 
     name = "merge_conflicts"
-    description = """Detect and resolve git merge conflicts intelligently.
+    description = """Detect and resolve git merge conflicts.
 
-Supports:
-- Automatic conflict detection from git status
-- Smart resolution strategies:
-  - Trivial: whitespace-only differences
-  - Import: combine and sort import statements
-  - Union: combine non-overlapping additions
-- Complexity analysis and resolution ordering
-
-Actions:
-- detect: Find all merge conflicts
-- analyze: Analyze conflict complexity and resolution effort
-- resolve: Attempt automatic resolution
-- apply: Apply a specific strategy (ours/theirs) to a file
-- abort: Abort the current merge/rebase"""
+    Actions: detect, analyze, resolve (auto), apply (ours/theirs), abort.
+    Smart strategies: trivial (whitespace), import (sort/combine), union."""
 
     parameters = {
         "type": "object",
@@ -82,13 +78,34 @@ Actions:
         return CostTier.FREE
 
     @property
+    def priority(self) -> Priority:
+        """Tool priority for selection availability."""
+        return Priority.MEDIUM  # Task-specific conflict resolution
+
+    @property
+    def access_mode(self) -> AccessMode:
+        """Tool access mode for approval tracking."""
+        return AccessMode.MIXED  # Reads repo state and can modify files
+
+    @property
+    def danger_level(self) -> DangerLevel:
+        """Danger level for warning/confirmation logic."""
+        return DangerLevel.MEDIUM  # Modifies conflicted files
+
+    @property
     def metadata(self) -> ToolMetadata:
         """Inline semantic metadata for dynamic tool selection."""
         return ToolMetadata(
             category="merge",
             keywords=[
-                "merge conflict", "conflict", "resolve conflict", "git conflict",
-                "rebase conflict", "merge resolution", "conflict markers", "git merge"
+                "merge conflict",
+                "conflict",
+                "resolve conflict",
+                "git conflict",
+                "rebase conflict",
+                "merge resolution",
+                "conflict markers",
+                "git merge",
             ],
             use_cases=[
                 "detecting merge conflicts",

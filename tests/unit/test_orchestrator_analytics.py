@@ -16,6 +16,9 @@ def orchestrator(mock_usage_logger: MagicMock) -> AgentOrchestrator:
     """Fixture to create an AgentOrchestrator with a mocked logger."""
     settings = Settings(analytics_enabled=True)
     mock_provider = MagicMock()
+    # Properly configure the mock provider to avoid format string issues
+    mock_provider.name = "test-provider"
+    mock_provider.get_context_window.return_value = 100000
 
     # Patch at the import location in orchestrator module
     with patch("victor.agent.orchestrator.UsageLogger", return_value=mock_usage_logger):
@@ -33,6 +36,9 @@ def test_orchestrator_initializes_logger(mock_usage_logger: MagicMock):
     """Tests that the orchestrator initializes and uses the UsageLogger."""
     settings = Settings(analytics_enabled=True)
     mock_provider = MagicMock()
+    # Properly configure the mock provider to avoid format string issues
+    mock_provider.name = "test-provider"
+    mock_provider.get_context_window.return_value = 100000
 
     with patch(
         "victor.agent.orchestrator.UsageLogger", return_value=mock_usage_logger
@@ -69,11 +75,11 @@ async def test_handle_tool_calls_logs_events(
     from victor.agent.tool_executor import ToolExecutionResult
 
     # Use an existing registered tool
-    tool_calls = [{"name": "read_file", "arguments": {"path": "/tmp/test.txt"}}]
+    tool_calls = [{"name": "read", "arguments": {"path": "/tmp/test.txt"}}]
 
     # Mock the tool_executor.execute to return a ToolExecutionResult
     mock_exec_result = ToolExecutionResult(
-        tool_name="read_file",
+        tool_name="read",
         success=True,
         result="File contents",
         error=None,
@@ -84,14 +90,14 @@ async def test_handle_tool_calls_logs_events(
 
     # Check for tool_call log
     mock_usage_logger.log_event.assert_any_call(
-        "tool_call", {"tool_name": "read_file", "tool_args": {"path": "/tmp/test.txt"}}
+        "tool_call", {"tool_name": "read", "tool_args": {"path": "/tmp/test.txt"}}
     )
 
     # Check for tool_result log
     mock_usage_logger.log_event.assert_any_call(
         "tool_result",
         {
-            "tool_name": "read_file",
+            "tool_name": "read",
             "success": True,
             "result": "File contents",
             "error": None,

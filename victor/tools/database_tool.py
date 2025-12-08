@@ -33,6 +33,7 @@ Features:
 import sqlite3
 from typing import Any, Dict, List, Optional
 
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 # Global state
@@ -405,7 +406,13 @@ async def _do_disconnect(connection_id: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Disconnect failed: {str(e)}"}
 
 
-@tool
+@tool(
+    category="database",
+    priority=Priority.MEDIUM,  # Task-specific database operations
+    access_mode=AccessMode.MIXED,  # Reads and can modify database
+    danger_level=DangerLevel.MEDIUM,  # Database modifications have impact
+    keywords=["database", "sql", "query", "connect", "tables", "sqlite", "postgres"],
+)
 async def database(
     action: str,
     database: Optional[str] = None,

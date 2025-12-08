@@ -14,12 +14,19 @@
 
 """Loop detection and budget enforcement for the orchestrator.
 
+.. deprecated::
+    This module is deprecated. Use `victor.agent.unified_task_tracker.UnifiedTaskTracker`
+    instead, which consolidates TaskMilestoneMonitor and LoopDetector into a single
+    unified system.
+
 This module provides loop detection and tool budget enforcement:
 - Tool call counting and budget enforcement
 - True loop detection (repeated signatures)
 - Progress tracking (unique files read)
 - Task-type aware thresholds (analysis vs action vs default)
 - Research loop detection
+- **Unified offset-aware file read tracking** - allows paginated reading
+  of large files while catching true loops (same region read repeatedly)
 
 The primary class is `LoopDetector`.
 
@@ -30,6 +37,8 @@ Design principles:
 - Clear, testable interface
 - Task-type aware configuration
 - Extensible for future needs
+- **Offset-aware detection** - reads to different parts of the same file
+  are NOT counted as loops; only overlapping reads trigger detection
 
 """
 
@@ -38,7 +47,10 @@ import logging
 from collections import Counter, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
+
+from victor.tools.tool_names import ToolNames, get_canonical_name
+from victor.tools.metadata_registry import get_progress_params as registry_get_progress_params
 
 if TYPE_CHECKING:
     from victor.agent.complexity_classifier import TaskClassification
@@ -58,17 +70,79 @@ class TaskType(Enum):
 # Tools that indicate research activity
 RESEARCH_TOOLS = frozenset({"web_search", "web_fetch", "tavily_search", "search_web", "fetch_url"})
 
-# Progressive tools - different params indicate progress, not loops
-# Format: tool_name -> list of params that indicate progress
-PROGRESSIVE_PARAMS = {
-    "read_file": ["path", "offset", "limit"],
-    "code_search": ["query", "directory"],
-    "semantic_code_search": ["query", "directory"],
-    "list_directory": ["path", "recursive"],
-    "execute_bash": ["command"],
-    "web_search": ["query"],
-    "web_fetch": ["url"],
-}
+def get_progress_params_for_tool(tool_name: str) -> List[str]:
+    """Get progress parameters for a tool from the decorator-driven registry.
+
+    Progress parameters indicate exploration progress (e.g., different query,
+    different file offset) rather than loops. Tools define these via
+    @tool(progress_params=["path", "offset"]) decorator.
+
+    Args:
+        tool_name: Name of the tool
+
+    Returns:
+        List of parameter names that indicate progress, or empty list
+    """
+    registry_params = registry_get_progress_params(tool_name)
+    return list(registry_params) if registry_params else []
+
+
+def is_progressive_tool(tool_name: str) -> bool:
+    """Check if a tool has progress parameters defined in the registry.
+
+    Args:
+        tool_name: Name of the tool
+
+    Returns:
+        True if tool has progress params defined via @tool decorator
+    """
+    return bool(registry_get_progress_params(tool_name))
+
+
+# Default limit for read_file when not specified (matches tool default)
+DEFAULT_READ_LIMIT = 500
+
+# Canonical tool name for file reading (from centralized registry)
+# The loop detector normalizes tool names using get_canonical_name() before checking
+CANONICAL_READ_TOOL = ToolNames.READ
+
+
+@dataclass
+class FileReadRange:
+    """Represents a range of lines read from a file.
+
+    Used for smart overlap detection in loop prevention.
+    Two reads are considered duplicates only if they access
+    overlapping line ranges.
+    """
+
+    offset: int
+    limit: int
+
+    @property
+    def end(self) -> int:
+        """End line (exclusive) of this range."""
+        return self.offset + self.limit
+
+    def overlaps(self, other: "FileReadRange") -> bool:
+        """Check if this range overlaps with another.
+
+        Args:
+            other: Another FileReadRange to compare against
+
+        Returns:
+            True if ranges overlap, False otherwise
+        """
+        # Ranges overlap if neither is completely before the other
+        return self.offset < other.end and other.offset < self.end
+
+    def __hash__(self) -> int:
+        return hash((self.offset, self.limit))
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, FileReadRange):
+            return False
+        return self.offset == other.offset and self.limit == other.limit
 
 
 @dataclass
@@ -90,17 +164,21 @@ class ProgressConfig:
     # Loop detection
     repeat_threshold_default: int = 3
     repeat_threshold_analysis: int = 5
+    repeat_threshold_action: int = 4  # Action tasks need more flexibility for file ops
     signature_history_size: int = 10
+    signature_lookback_for_warning: int = 3  # Check last N sigs when clearing warning
 
     # Progress detection
     min_content_threshold: int = 150
 
-    # Hard limits
-    max_total_iterations: int = 20
+    # Hard limits - increased to allow complex multi-step tasks
+    # Loop detection will catch actual loops; this is just a safety net
+    max_total_iterations: int = 50
 
-    # Same-resource access limits (Gap 2 fix)
-    # Tracks reads of the same file regardless of offset
-    max_reads_per_file: int = 3
+    # Same-resource access limits (unified offset-aware tracking)
+    # For file reads: only counts reads with overlapping offset ranges as duplicates
+    # This allows paginated reading of large files while catching true loops
+    max_overlapping_reads_per_file: int = 3
     max_searches_per_query_prefix: int = 2
 
 
@@ -112,11 +190,13 @@ class StopReason:
         should_stop: Whether execution should stop
         reason: Human-readable reason for stopping
         details: Dictionary with additional context for logging/debugging
+        is_warning: Whether this is a soft warning (not yet a hard stop)
     """
 
     should_stop: bool
     reason: str
     details: Dict[str, Any] = field(default_factory=dict)
+    is_warning: bool = False  # True for soft warnings before hard stop
 
 
 class LoopDetector:
@@ -166,13 +246,20 @@ class LoopDetector:
         # Resource tracking
         self._unique_resources: Set[str] = set()
 
-        # Base resource counting (tracks same file regardless of offset)
-        # Key: base resource (e.g., "file:orchestrator.py"), Value: count
+        # File read range tracking (unified offset-aware detection)
+        # Key: file path, Value: list of FileReadRange objects
+        # Counts overlapping reads as duplicates, allows non-overlapping pagination
+        self._file_read_ranges: Dict[str, List[FileReadRange]] = {}
+
+        # Base resource counting for non-file resources (searches, directories)
+        # Key: base resource (e.g., "search:.:query_prefix"), Value: count
         self._base_resource_counts: Counter[str] = Counter()
 
         # Loop detection
         self._signature_history: deque = deque(maxlen=self.config.signature_history_size)
         self._consecutive_research_calls = 0
+        self._loop_warning_given: bool = False  # Track if we've warned about impending loop
+        self._warned_signature: Optional[str] = None  # The signature we warned about
 
         # Manual stop
         self._forced_stop: Optional[str] = None
@@ -183,9 +270,12 @@ class LoopDetector:
         self._iterations = 0
         self._low_output_iterations = 0
         self._unique_resources.clear()
+        self._file_read_ranges.clear()
         self._base_resource_counts.clear()
         self._signature_history.clear()
         self._consecutive_research_calls = 0
+        self._loop_warning_given = False
+        self._warned_signature = None
         self._forced_stop = None
 
     @property
@@ -234,13 +324,31 @@ class LoopDetector:
         if resource_key:
             self._unique_resources.add(resource_key)
 
-        # Track base resources (ignores offset - for same-file loop detection)
-        base_key = self._get_base_resource_key(tool_name, arguments)
-        if base_key:
-            self._base_resource_counts[base_key] += 1
+        # Track file reads with offset-aware overlap detection
+        # Normalize tool name to canonical form (e.g., "read_file" → "read")
+        canonical_name = get_canonical_name(tool_name)
+        if canonical_name == CANONICAL_READ_TOOL:
+            self._track_file_read(arguments)
+        else:
+            # Track base resources for non-file operations (searches, etc.)
+            base_key = self._get_base_resource_key(tool_name, arguments)
+            if base_key:
+                self._base_resource_counts[base_key] += 1
 
         # Track signature for loop detection
         signature = self._get_signature(tool_name, arguments)
+
+        # Clear loop warning only if signature is TRULY different
+        # Check against last N signatures to prevent gaming by alternating (A, B, A, B...)
+        if self._loop_warning_given and self._signature_history:
+            lookback = self.config.signature_lookback_for_warning
+            recent_sigs = list(self._signature_history)[-lookback:]
+            if signature not in recent_sigs:
+                logger.debug(
+                    f"LoopDetector: Signature not in last {lookback} history, clearing loop warning"
+                )
+                self._loop_warning_given = False
+
         self._signature_history.append(signature)
 
         # Track research calls
@@ -251,9 +359,54 @@ class LoopDetector:
 
         logger.debug(
             f"LoopDetector: tool_call={tool_name}, "
-            f"total={self._tool_calls}, unique_resources={len(self._unique_resources)}, "
-            f"base_key={base_key}, base_count={self._base_resource_counts.get(base_key, 0) if base_key else 0}"
+            f"total={self._tool_calls}, unique_resources={len(self._unique_resources)}"
         )
+
+    def _track_file_read(self, arguments: Dict[str, Any]) -> None:
+        """Track a file read operation with offset-aware overlap detection.
+
+        Args:
+            arguments: Arguments from the read_file tool call
+        """
+        path = arguments.get("path", "")
+        if not path:
+            return
+
+        offset = arguments.get("offset", 0)
+        limit = arguments.get("limit", DEFAULT_READ_LIMIT)
+        new_range = FileReadRange(offset=offset, limit=limit)
+
+        if path not in self._file_read_ranges:
+            self._file_read_ranges[path] = []
+
+        self._file_read_ranges[path].append(new_range)
+
+        # Count overlapping reads
+        overlapping_count = self._count_overlapping_reads(path, new_range)
+
+        logger.debug(
+            f"LoopDetector: file_read path={path}, offset={offset}, limit={limit}, "
+            f"overlapping_reads={overlapping_count}, total_reads={len(self._file_read_ranges[path])}"
+        )
+
+    def _count_overlapping_reads(self, path: str, current_range: FileReadRange) -> int:
+        """Count how many previous reads to this file overlap with the current range.
+
+        Args:
+            path: File path being read
+            current_range: The current read range to check against
+
+        Returns:
+            Number of overlapping reads (including the current one)
+        """
+        if path not in self._file_read_ranges:
+            return 0
+
+        count = 0
+        for prev_range in self._file_read_ranges[path]:
+            if prev_range.overlaps(current_range):
+                count += 1
+        return count
 
     def record_iteration(self, content_length: int) -> None:
         """Record an iteration completion.
@@ -343,6 +496,8 @@ class LoopDetector:
             "iterations": self._iterations,
             "low_output_iterations": self._low_output_iterations,
             "unique_resources": len(self._unique_resources),
+            "files_read": len(self._file_read_ranges),
+            "total_file_reads": sum(len(ranges) for ranges in self._file_read_ranges.values()),
             "remaining_budget": self.remaining_budget,
             "progress_percentage": self.progress_percentage,
             "task_type": self.task_type.value,
@@ -361,11 +516,12 @@ class LoopDetector:
         Returns:
             String signature for the tool call
         """
-        if tool_name in PROGRESSIVE_PARAMS:
+        # Check for progress params (registry with static fallback)
+        progress_params = get_progress_params_for_tool(tool_name)
+        if progress_params:
             # Include progressive params in signature
-            params = PROGRESSIVE_PARAMS[tool_name]
             sig_parts = [tool_name]
-            for param in params:
+            for param in progress_params:
                 value = arguments.get(param, "")
                 # Truncate long values
                 if isinstance(value, str) and len(value) > 100:
@@ -389,26 +545,43 @@ class LoopDetector:
         Returns:
             Resource key string or None if not trackable
         """
-        if tool_name == "read_file":
+        # Normalize tool name to canonical form
+        canonical_name = get_canonical_name(tool_name)
+        if canonical_name == CANONICAL_READ_TOOL:
             path = arguments.get("path", "")
             offset = arguments.get("offset", 0)
             if path:
                 return f"file:{path}:{offset}"
-        elif tool_name == "list_directory":
+        elif canonical_name == ToolNames.LS:
             path = arguments.get("path", "")
             if path:
                 return f"dir:{path}"
-        elif tool_name in {"code_search", "semantic_code_search"}:
+        elif canonical_name in {ToolNames.GREP, ToolNames.SEARCH}:
             query = arguments.get("query", "")
             directory = arguments.get("directory", ".")
             if query:
                 return f"search:{directory}:{query[:50]}"
+        elif canonical_name == ToolNames.SHELL:
+            # Track bash commands as resources to show progress
+            command = arguments.get("command", "")
+            if command:
+                # Extract first 50 chars of command for unique identification
+                return f"bash:{command[:50]}"
+        elif canonical_name in {ToolNames.FETCH, ToolNames.WEB, ToolNames.SUMMARIZE}:
+            # Track web operations as resources (important for ACTION tasks)
+            url = arguments.get("url", "")
+            query = arguments.get("query", "")
+            if url:
+                return f"web:{canonical_name}:{url[:80]}"
+            elif query:
+                return f"web:{canonical_name}:{query[:50]}"
         return None
 
     def _get_base_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
         """Generate a base resource key for same-resource loop detection.
 
-        Ignores offset/limit to track repeated access to same file regardless of chunk.
+        Note: read_file is handled separately with offset-aware overlap detection
+        in _track_file_read() and _check_file_read_loops().
 
         Args:
             tool_name: Name of the tool
@@ -417,20 +590,29 @@ class LoopDetector:
         Returns:
             Base resource key string or None if not trackable
         """
-        if tool_name == "read_file":
-            path = arguments.get("path", "")
-            if path:
-                return f"file:{path}"
-        elif tool_name == "list_directory":
+        # Note: read is NOT tracked here - uses unified offset-aware detection
+        canonical_name = get_canonical_name(tool_name)
+        if canonical_name == ToolNames.LS:
             path = arguments.get("path", "")
             if path:
                 return f"dir:{path}"
-        elif tool_name in {"code_search", "semantic_code_search"}:
+        elif canonical_name in {ToolNames.GREP, ToolNames.SEARCH}:
             query = arguments.get("query", "")
             directory = arguments.get("directory", ".")
             if query:
                 # Use first 20 chars as prefix to detect similar queries
                 return f"search:{directory}:{query[:20]}"
+        elif canonical_name == ToolNames.SHELL:
+            # Track bash command base (first word/command) for loop detection
+            command = arguments.get("command", "")
+            if command:
+                # Extract the base command (first word or git subcommand)
+                parts = command.strip().split()
+                if parts:
+                    base_cmd = parts[0]
+                    if base_cmd == "git" and len(parts) > 1:
+                        base_cmd = f"git {parts[1]}"
+                    return f"bash:{base_cmd}"
         return None
 
     def _check_loop(self) -> Optional[str]:
@@ -439,10 +621,14 @@ class LoopDetector:
         Returns:
             Description of loop type if detected, None otherwise
         """
-        # Check for same-file overuse (Gap 2 fix)
+        # Check for overlapping file reads (unified offset-aware detection)
+        # Only counts reads to the SAME offset range as loops, allows pagination
+        file_loop = self._check_file_read_loops()
+        if file_loop:
+            return file_loop
+
+        # Check for similar search queries (non-file resources)
         for base_key, count in self._base_resource_counts.items():
-            if base_key.startswith("file:") and count > self.config.max_reads_per_file:
-                return f"same file read {count} times (max: {self.config.max_reads_per_file}): {base_key}"
             if base_key.startswith("search:") and count > self.config.max_searches_per_query_prefix:
                 return f"similar search repeated {count} times (max: {self.config.max_searches_per_query_prefix}): {base_key}"
 
@@ -450,19 +636,129 @@ class LoopDetector:
             return None
 
         # Get repeat threshold based on task type
-        threshold = (
-            self.config.repeat_threshold_analysis
-            if self.task_type == TaskType.ANALYSIS
-            else self.config.repeat_threshold_default
-        )
+        if self.task_type == TaskType.ANALYSIS:
+            threshold = self.config.repeat_threshold_analysis
+        elif self.task_type == TaskType.ACTION:
+            threshold = self.config.repeat_threshold_action
+        else:
+            threshold = self.config.repeat_threshold_default
 
-        # Check for exact repeated signatures
-        recent = list(self._signature_history)[-min(len(self._signature_history), 6) :]
+        # Check for repeated signatures (including alternating patterns like A,B,A,B)
+        # Look at ALL unique signatures in recent history, not just the last one
+        recent = list(self._signature_history)[-min(len(self._signature_history), 8) :]
         if recent:
-            last_sig = recent[-1]
-            repeat_count = sum(1 for s in recent if s == last_sig)
-            if repeat_count >= threshold:
-                return f"same signature repeated {repeat_count} times"
+            # Count occurrences of each signature
+            from collections import Counter
+
+            sig_counts = Counter(recent)
+            for sig, count in sig_counts.items():
+                if count >= threshold:
+                    return f"same signature repeated {count} times: {sig[:50]}"
+
+        return None
+
+    def check_loop_warning(self) -> Optional[str]:
+        """Check if we're approaching loop threshold (warning at threshold-1).
+
+        This is a soft warning to give the model a chance to correct behavior
+        before the hard stop at threshold.
+
+        Returns:
+            Warning message if at threshold-1, None otherwise.
+            Only returns once per loop pattern (tracked by _loop_warning_given).
+        """
+        if self._loop_warning_given:
+            return None  # Already warned
+
+        if len(self._signature_history) < 3:
+            return None
+
+        # Get repeat threshold based on task type
+        if self.task_type == TaskType.ANALYSIS:
+            threshold = self.config.repeat_threshold_analysis
+        elif self.task_type == TaskType.ACTION:
+            threshold = self.config.repeat_threshold_action
+        else:
+            threshold = self.config.repeat_threshold_default
+
+        # Check for approaching repeated signatures (threshold - 1)
+        # Look at ALL unique signatures (catches alternating patterns like A,B,A,B)
+        recent = list(self._signature_history)[-min(len(self._signature_history), 8) :]
+        if recent:
+            from collections import Counter
+
+            sig_counts = Counter(recent)
+            for sig, count in sig_counts.items():
+                if count == threshold - 1:
+                    self._loop_warning_given = True
+                    self._warned_signature = sig  # Track which signature we warned about
+                    logger.info(f"LoopDetector: Setting warned_signature to {sig[:50]}")
+                    return f"approaching loop threshold ({count}/{threshold}): {sig[:80]}"
+
+        return None
+
+    def is_blocked_after_warning(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
+        """Check if a proposed tool call is blocked because it matches the warned signature.
+
+        After giving a loop warning, if the model tries the SAME operation again,
+        block it immediately instead of waiting for the hard loop detection.
+
+        Args:
+            tool_name: Name of the tool being called
+            arguments: Tool arguments
+
+        Returns:
+            Block message if the call matches warned signature, None if allowed.
+        """
+        if not self._loop_warning_given or not self._warned_signature:
+            return None
+
+        # Check if proposed signature matches the warned signature
+        proposed_sig = self._get_signature(tool_name, arguments)
+        if proposed_sig == self._warned_signature:
+            logger.warning(
+                f"LoopDetector: Blocking repeated signature after warning: {proposed_sig[:50]}"
+            )
+            return (
+                f"blocked after warning: same operation attempted ({proposed_sig[:50]}). "
+                "Try a different approach."
+            )
+
+        return None
+
+    def clear_loop_warning(self) -> None:
+        """Clear the loop warning flag when model does something different."""
+        self._loop_warning_given = False
+        self._warned_signature = None
+
+    def _check_file_read_loops(self) -> Optional[str]:
+        """Check for file read loops using offset-aware overlap detection.
+
+        Only flags as a loop when the same file region is read multiple times.
+        Paginated reads (different offset ranges) are allowed.
+
+        Returns:
+            Description of loop if detected, None otherwise
+        """
+        for path, ranges in self._file_read_ranges.items():
+            if len(ranges) < 2:
+                continue
+
+            # For each range, count how many other ranges overlap with it
+            for i, current_range in enumerate(ranges):
+                overlap_count = 0
+                for j, other_range in enumerate(ranges):
+                    if i != j and current_range.overlaps(other_range):
+                        overlap_count += 1
+
+                # +1 to include the current range itself
+                total_overlapping = overlap_count + 1
+                if total_overlapping > self.config.max_overlapping_reads_per_file:
+                    return (
+                        f"same file region read {total_overlapping} times "
+                        f"(max: {self.config.max_overlapping_reads_per_file}): "
+                        f"file:{path} [offset={current_range.offset}, limit={current_range.limit}]"
+                    )
 
         return None
 

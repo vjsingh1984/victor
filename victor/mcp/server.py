@@ -252,7 +252,9 @@ class MCPServer:
             return self._create_error(msg_id, -32602, "Missing tool name")
 
         try:
-            result = await self.tool_registry.execute(tool_name, **tool_args)
+            # Create minimal context for tool execution
+            context: Dict[str, Any] = {}
+            result = await self.tool_registry.execute(tool_name, context, **tool_args)
 
             tool_result = MCPToolCallResult(
                 tool_name=tool_name,
@@ -474,32 +476,54 @@ async def run_mcp_server_stdio() -> None:
     This is the main entry point for running Victor as an MCP server.
     Can be invoked via: python -m victor.mcp.server
     """
+    import importlib
+    import inspect
+    import os
     import sys
 
     from victor.config.settings import Settings
-    from victor.tools.base import ToolRegistry
+    from victor.tools.base import BaseTool, ToolRegistry
 
-    # Import and register default tools
+    # Initialize settings
     Settings()
     registry = ToolRegistry()
 
-    # Create and register default tools
-    # Import each tool module to trigger registration
-    try:
-        from victor.tools import filesystem
+    # Dynamic tool discovery (same as orchestrator)
+    tools_dir = os.path.join(os.path.dirname(__file__), "..", "tools")
+    excluded_files = {
+        "__init__.py",
+        "base.py",
+        "decorators.py",
+        "semantic_selector.py",
+        "common.py",
+    }
+    registered_count = 0
 
-        # Register filesystem tools
-        if hasattr(filesystem, "read_file") and hasattr(filesystem.read_file, "Tool"):
-            registry.register(filesystem.read_file.Tool)
-        if hasattr(filesystem, "write_file") and hasattr(filesystem.write_file, "Tool"):
-            registry.register(filesystem.write_file.Tool)
-        if hasattr(filesystem, "list_directory") and hasattr(filesystem.list_directory, "Tool"):
-            registry.register(filesystem.list_directory.Tool)
-
-        # Add more tools as needed...
-
-    except Exception as e:
-        print(f"Warning: Could not load all tools: {e}", file=sys.stderr)
+    for filename in os.listdir(tools_dir):
+        if filename.endswith(".py") and filename not in excluded_files:
+            module_name = f"victor.tools.{filename[:-3]}"
+            try:
+                module = importlib.import_module(module_name)
+                for _name, obj in inspect.getmembers(module):
+                    # Register @tool decorated functions
+                    if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
+                        registry.register(obj)
+                        registered_count += 1
+                    # Register BaseTool class instances
+                    elif (
+                        inspect.isclass(obj)
+                        and issubclass(obj, BaseTool)
+                        and obj is not BaseTool
+                        and hasattr(obj, "name")
+                    ):
+                        try:
+                            tool_instance = obj()
+                            registry.register(tool_instance)
+                            registered_count += 1
+                        except Exception:
+                            pass  # Skip tools that need special initialization
+            except Exception as e:
+                print(f"Warning: Could not load {module_name}: {e}", file=sys.stderr)
 
     server = MCPServer(
         name="Victor MCP Server",
@@ -507,7 +531,7 @@ async def run_mcp_server_stdio() -> None:
         tool_registry=registry,
     )
 
-    print(f"Starting MCP server with {len(registry.list_tools())} tools", file=sys.stderr)
+    print(f"Starting MCP server with {registered_count} tools", file=sys.stderr)
     await server.start_stdio_server()
 
 

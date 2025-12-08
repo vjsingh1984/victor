@@ -22,20 +22,15 @@ import asyncio
 import logging
 import os
 import shutil
-import subprocess
 import tempfile
-import time
 from abc import ABC, abstractmethod
-from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncIterator, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 from victor.evaluation.protocol import (
-    BenchmarkMetadata,
     BenchmarkTask,
     BenchmarkType,
-    CodeQualityMetrics,
     EvaluationConfig,
     EvaluationResult,
     TaskResult,
@@ -156,10 +151,12 @@ class TaskEnvironment:
         """
         # Create temporary directory (sanitize task_id to be valid for directory names)
         safe_task_id = self.task.task_id.replace("/", "_").replace("\\", "_")
-        self._temp_dir = Path(tempfile.mkdtemp(
-            prefix=f"eval_{safe_task_id}_",
-            dir=self.workspace_dir,
-        ))
+        self._temp_dir = Path(
+            tempfile.mkdtemp(
+                prefix=f"eval_{safe_task_id}_",
+                dir=self.workspace_dir,
+            )
+        )
 
         # Clone repo if specified (for SWE-bench)
         if self.task.repo:
@@ -229,8 +226,14 @@ class TaskEnvironment:
 
         try:
             result = await asyncio.create_subprocess_exec(
-                "git", "apply", str(patch_file),
-                cwd=self._temp_dir / "repo" if (self._temp_dir / "repo").exists() else self._temp_dir,
+                "git",
+                "apply",
+                str(patch_file),
+                cwd=(
+                    self._temp_dir / "repo"
+                    if (self._temp_dir / "repo").exists()
+                    else self._temp_dir
+                ),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -308,12 +311,21 @@ class TaskEnvironment:
         """Run tests in Docker container."""
         try:
             cmd = [
-                "docker", "run", "--rm",
-                "-v", f"{test_dir}:/workspace",
-                "-w", "/workspace",
-                "--network", "none",
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                f"{test_dir}:/workspace",
+                "-w",
+                "/workspace",
+                "--network",
+                "none",
                 self.docker_image,
-                "python", "-m", "pytest", "-v", "--tb=short",
+                "python",
+                "-m",
+                "pytest",
+                "-v",
+                "--tb=short",
             ]
 
             result = await asyncio.create_subprocess_exec(
@@ -330,7 +342,9 @@ class TaskEnvironment:
             except asyncio.TimeoutError:
                 # Kill container
                 await asyncio.create_subprocess_exec(
-                    "docker", "kill", str(result.pid),
+                    "docker",
+                    "kill",
+                    str(result.pid),
                 )
                 return 0, 0, "", "Timeout"
 
@@ -362,9 +376,8 @@ class TaskEnvironment:
             total = int(unittest_match.group(1))
             failures = re.search(r"failures=(\d+)", output)
             errors = re.search(r"errors=(\d+)", output)
-            failed = (
-                (int(failures.group(1)) if failures else 0)
-                + (int(errors.group(1)) if errors else 0)
+            failed = (int(failures.group(1)) if failures else 0) + (
+                int(errors.group(1)) if errors else 0
             )
             return total - failed, total
 
@@ -392,7 +405,12 @@ class EvaluationHarness:
             runners: Dict mapping benchmark types to runners
         """
         self._runners = runners or {}
-        self._results_dir = Path.home() / ".victor" / "evaluations"
+        try:
+            from victor.config.secure_paths import get_victor_dir
+
+            self._results_dir = get_victor_dir() / "evaluations"
+        except ImportError:
+            self._results_dir = Path.home() / ".victor" / "evaluations"
         self._results_dir.mkdir(parents=True, exist_ok=True)
 
     def register_runner(self, runner: BaseBenchmarkRunner) -> None:
@@ -419,6 +437,7 @@ class EvaluationHarness:
         config: EvaluationConfig,
         agent_callback: Any,  # Callable that takes task and returns output
         progress_callback: Optional[Any] = None,  # Callable(task_idx, total, TaskResult)
+        retry_callback: Optional[Any] = None,  # Callable for self-correction retries
     ) -> EvaluationResult:
         """Run a complete evaluation.
 
@@ -427,6 +446,9 @@ class EvaluationHarness:
             agent_callback: Async function that runs the agent on a task
             progress_callback: Optional callback called after each task completes.
                               Signature: (task_index: int, total_tasks: int, result: TaskResult) -> None
+            retry_callback: Optional callback for self-correction retries.
+                           Signature: (task, previous_code, feedback_prompt) -> str
+                           Required if config.enable_self_correction is True.
 
         Returns:
             EvaluationResult with all task results
@@ -434,6 +456,20 @@ class EvaluationHarness:
         runner = self.get_runner(config.benchmark)
         if runner is None:
             raise ValueError(f"No runner for benchmark: {config.benchmark}")
+
+        # Warn if self-correction enabled but no retry_callback
+        if config.enable_self_correction and retry_callback is None:
+            logger.warning(
+                "Self-correction enabled but no retry_callback provided. "
+                "Auto-fix will work but LLM retries will be skipped."
+            )
+
+        # Create metrics collector for self-correction tracking
+        metrics_collector = None
+        if config.enable_self_correction:
+            from victor.evaluation.correction import CorrectionMetricsCollector
+
+            metrics_collector = CorrectionMetricsCollector()
 
         result = EvaluationResult(config=config)
         result.start_time = datetime.now()
@@ -445,15 +481,34 @@ class EvaluationHarness:
         # Run tasks
         if config.parallel_tasks > 1:
             results = await self._run_parallel(
-                tasks, runner, agent_callback, config, progress_callback
+                tasks,
+                runner,
+                agent_callback,
+                config,
+                progress_callback,
+                retry_callback,
+                metrics_collector,
             )
         else:
             results = await self._run_sequential(
-                tasks, runner, agent_callback, config, progress_callback
+                tasks,
+                runner,
+                agent_callback,
+                config,
+                progress_callback,
+                retry_callback,
+                metrics_collector,
             )
 
         result.task_results = results
         result.end_time = datetime.now()
+
+        # Add correction metrics to result
+        if metrics_collector:
+            result.correction_metrics = metrics_collector.metrics.to_dict()
+            logger.info(
+                f"Self-correction metrics: {metrics_collector.metrics.correction_success_rate:.1%} success rate"
+            )
 
         # Save results
         self._save_results(result)
@@ -467,6 +522,8 @@ class EvaluationHarness:
         agent_callback: Any,
         config: EvaluationConfig,
         progress_callback: Optional[Any] = None,
+        retry_callback: Optional[Any] = None,
+        metrics_collector: Optional[Any] = None,
     ) -> list[TaskResult]:
         """Run tasks sequentially."""
         results = []
@@ -476,7 +533,7 @@ class EvaluationHarness:
 
             try:
                 task_result = await self._run_single_task(
-                    task, runner, agent_callback, config
+                    task, runner, agent_callback, config, retry_callback, metrics_collector
                 )
                 results.append(task_result)
 
@@ -509,6 +566,8 @@ class EvaluationHarness:
         agent_callback: Any,
         config: EvaluationConfig,
         progress_callback: Optional[Any] = None,
+        retry_callback: Optional[Any] = None,
+        metrics_collector: Optional[Any] = None,
     ) -> list[TaskResult]:
         """Run tasks in parallel."""
         semaphore = asyncio.Semaphore(config.parallel_tasks)
@@ -520,7 +579,7 @@ class EvaluationHarness:
             async with semaphore:
                 try:
                     result = await self._run_single_task(
-                        task, runner, agent_callback, config
+                        task, runner, agent_callback, config, retry_callback, metrics_collector
                     )
                 except Exception as e:
                     result = TaskResult(
@@ -548,8 +607,20 @@ class EvaluationHarness:
         runner: BaseBenchmarkRunner,
         agent_callback: Any,
         config: EvaluationConfig,
+        retry_callback: Any = None,
+        metrics_collector: Any = None,
     ) -> TaskResult:
-        """Run a single task."""
+        """Run a single task with optional self-correction.
+
+        Args:
+            task: The benchmark task
+            runner: The benchmark runner
+            agent_callback: Callback to generate initial output
+            config: Evaluation configuration
+            retry_callback: Optional callback for self-correction retries.
+                           Signature: (task, previous_code, feedback_prompt) -> str
+            metrics_collector: Optional CorrectionMetricsCollector for tracking metrics
+        """
         start_time = datetime.now()
         task_result = TaskResult(
             task_id=task.task_id,
@@ -569,46 +640,212 @@ class EvaluationHarness:
                 task_result.error_message = "Agent timeout"
                 return task_result
 
-            task_result.generated_code = agent_output
-
-            # Analyze code quality
-            try:
-                from victor.evaluation.analyzers import get_code_quality_analyzer
-                analyzer = get_code_quality_analyzer()
-                code_quality = await analyzer.analyze(
-                    agent_output,
-                    language=task.language,
+            # Self-correction loop (if enabled)
+            if config.enable_self_correction:
+                agent_output, task_result = await self._run_with_self_correction(
+                    task=task,
+                    runner=runner,
+                    agent_output=agent_output,
+                    config=config,
+                    retry_callback=retry_callback,
+                    task_result=task_result,
+                    metrics_collector=metrics_collector,
                 )
-                task_result.code_quality = code_quality
-            except Exception as e:
-                logger.warning(f"Code quality analysis failed: {e}")
+            else:
+                # Standard flow without self-correction
+                task_result.generated_code = agent_output
 
-            # Evaluate result
-            eval_result = await runner.run_task(task, agent_output, config)
+                # Analyze code quality
+                try:
+                    from victor.evaluation.analyzers import get_code_quality_analyzer
 
-            # Merge results
-            task_result.status = eval_result.status
-            task_result.tests_passed = eval_result.tests_passed
-            task_result.tests_failed = eval_result.tests_failed
-            task_result.tests_total = eval_result.tests_total
-            task_result.stdout = eval_result.stdout
-            task_result.stderr = eval_result.stderr
+                    analyzer = get_code_quality_analyzer()
+                    code_quality = await analyzer.analyze(
+                        agent_output,
+                        language=task.language,
+                    )
+                    task_result.code_quality = code_quality
+                except Exception as e:
+                    logger.warning(f"Code quality analysis failed: {e}")
 
-            # Calculate completion score
-            task_result.completion_score = task_result.calculate_completion_score()
+                # Evaluate result
+                eval_result = await runner.run_task(task, agent_output, config)
+
+                # Merge results
+                task_result.status = eval_result.status
+                task_result.tests_passed = eval_result.tests_passed
+                task_result.tests_failed = eval_result.tests_failed
+                task_result.tests_total = eval_result.tests_total
+                task_result.stdout = eval_result.stdout
+                task_result.stderr = eval_result.stderr
+
+                # Calculate completion score
+                task_result.completion_score = task_result.calculate_completion_score()
 
         except Exception as e:
             task_result.status = TaskStatus.ERROR
             task_result.error_message = str(e)
             import traceback
+
             task_result.traceback = traceback.format_exc()
 
         task_result.end_time = datetime.now()
-        task_result.duration_seconds = (
-            task_result.end_time - start_time
-        ).total_seconds()
+        task_result.duration_seconds = (task_result.end_time - start_time).total_seconds()
 
         return task_result
+
+    async def _run_with_self_correction(
+        self,
+        task: BenchmarkTask,
+        runner: BaseBenchmarkRunner,
+        agent_output: str,
+        config: EvaluationConfig,
+        retry_callback: Any,
+        task_result: TaskResult,
+        metrics_collector: Any = None,
+    ) -> tuple[str, TaskResult]:
+        """Run task with self-correction loop.
+
+        This implements generic iterative refinement:
+        1. Validate code (syntax, imports)
+        2. Auto-fix common issues
+        3. Run tests
+        4. If failed, generate feedback and retry
+
+        This is NOT task-specific - it works for any code generation.
+
+        Args:
+            metrics_collector: Optional CorrectionMetricsCollector for tracking metrics
+        """
+        from victor.evaluation.correction import (
+            create_self_corrector,
+            detect_language,
+        )
+
+        corrector = create_self_corrector(
+            max_iterations=config.self_correction_max_iterations,
+            auto_fix=config.auto_fix_imports,
+        )
+
+        # Detect language for metrics
+        lang = detect_language(agent_output, filename=f"solution.{task.language}")
+
+        best_output = agent_output
+        best_result = None
+
+        for iteration in range(config.self_correction_max_iterations):
+            task_result.attempts = iteration + 1
+
+            # Step 1: Validate and auto-fix
+            fixed_code, validation = corrector.validate_and_fix(agent_output)
+            agent_output = fixed_code
+
+            # Record validation in metrics
+            if metrics_collector:
+                metrics_collector.record_validation(lang, validation)
+
+            # Step 2: Analyze code quality
+            code_quality = None
+            try:
+                from victor.evaluation.analyzers import get_code_quality_analyzer
+
+                analyzer = get_code_quality_analyzer()
+                code_quality = await analyzer.analyze(
+                    agent_output,
+                    language=task.language,
+                )
+            except Exception as e:
+                logger.warning(f"Code quality analysis failed: {e}")
+
+            # Step 3: Run tests
+            eval_result = await runner.run_task(task, agent_output, config)
+
+            # Track correction attempt in metrics
+            if metrics_collector:
+                with metrics_collector.track_correction(
+                    task_id=task.task_id,
+                    language=lang,
+                    iteration=iteration + 1,
+                    validation_before=validation,
+                    test_passed_before=eval_result.tests_passed,
+                    test_total=eval_result.tests_total,
+                ) as tracker:
+                    is_success = eval_result.status == TaskStatus.PASSED
+                    tracker.set_result(
+                        success=is_success,
+                        validation_after=validation,
+                        test_passed_after=eval_result.tests_passed,
+                        auto_fixed=fixed_code != agent_output,
+                    )
+
+            # Track best result
+            if best_result is None or eval_result.tests_passed > best_result.tests_passed:
+                best_output = agent_output
+                best_result = eval_result
+
+            # Check if passed
+            if eval_result.status == TaskStatus.PASSED:
+                task_result.generated_code = agent_output
+                task_result.code_quality = code_quality
+                task_result.status = eval_result.status
+                task_result.tests_passed = eval_result.tests_passed
+                task_result.tests_failed = eval_result.tests_failed
+                task_result.tests_total = eval_result.tests_total
+                task_result.stdout = eval_result.stdout
+                task_result.stderr = eval_result.stderr
+                task_result.successful_attempts = 1
+                task_result.completion_score = task_result.calculate_completion_score()
+                logger.info(f"  Self-correction: PASSED on iteration {iteration + 1}")
+                return agent_output, task_result
+
+            # Step 4: Generate feedback for retry
+            if iteration < config.self_correction_max_iterations - 1 and retry_callback:
+                feedback = corrector.generate_feedback(
+                    code=agent_output,
+                    validation=validation,
+                    test_stdout=eval_result.stdout,
+                    test_stderr=eval_result.stderr,
+                    test_passed=eval_result.tests_passed,
+                    test_total=eval_result.tests_total,
+                )
+
+                if feedback.has_issues:
+                    retry_prompt = corrector.build_retry_prompt(
+                        original_prompt=task.prompt,
+                        previous_code=agent_output,
+                        feedback=feedback,
+                        iteration=iteration + 1,
+                    )
+
+                    logger.info(
+                        f"  Self-correction: Retry {iteration + 2}/{config.self_correction_max_iterations}"
+                    )
+
+                    try:
+                        agent_output = await asyncio.wait_for(
+                            retry_callback(task, agent_output, retry_prompt),
+                            timeout=config.timeout_per_task,
+                        )
+                    except asyncio.TimeoutError:
+                        logger.warning("  Self-correction: Retry timeout")
+                        break
+                    except Exception as e:
+                        logger.warning(f"  Self-correction: Retry failed: {e}")
+                        break
+
+        # Use best result
+        task_result.generated_code = best_output
+        task_result.code_quality = code_quality
+        if best_result:
+            task_result.status = best_result.status
+            task_result.tests_passed = best_result.tests_passed
+            task_result.tests_failed = best_result.tests_failed
+            task_result.tests_total = best_result.tests_total
+            task_result.stdout = best_result.stdout
+            task_result.stderr = best_result.stderr
+        task_result.completion_score = task_result.calculate_completion_score()
+
+        return best_output, task_result
 
     def _save_results(self, result: EvaluationResult) -> Path:
         """Save evaluation results to disk."""
@@ -642,16 +879,20 @@ class EvaluationHarness:
                     "tool_calls": r.tool_calls,
                     "turns": r.turns,
                     "completion_score": r.completion_score,
-                    "code_quality": {
-                        "syntax_valid": r.code_quality.syntax_valid,
-                        "lint_errors": r.code_quality.lint_errors,
-                        "lint_warnings": r.code_quality.lint_warnings,
-                        "style_score": r.code_quality.style_score,
-                        "cyclomatic_complexity": r.code_quality.cyclomatic_complexity,
-                        "maintainability_index": r.code_quality.maintainability_index,
-                        "type_coverage": r.code_quality.type_coverage,
-                        "overall_score": r.code_quality.get_overall_score(),
-                    } if r.code_quality else None,
+                    "code_quality": (
+                        {
+                            "syntax_valid": r.code_quality.syntax_valid,
+                            "lint_errors": r.code_quality.lint_errors,
+                            "lint_warnings": r.code_quality.lint_warnings,
+                            "style_score": r.code_quality.style_score,
+                            "cyclomatic_complexity": r.code_quality.cyclomatic_complexity,
+                            "maintainability_index": r.code_quality.maintainability_index,
+                            "type_coverage": r.code_quality.type_coverage,
+                            "overall_score": r.code_quality.get_overall_score(),
+                        }
+                        if r.code_quality
+                        else None
+                    ),
                     "error_message": r.error_message,
                 }
                 for r in result.task_results
@@ -667,6 +908,7 @@ class EvaluationHarness:
     def load_results(self, path: Path) -> dict:
         """Load evaluation results from disk."""
         import json
+
         with open(path) as f:
             return json.load(f)
 
@@ -688,6 +930,7 @@ class EvaluationHarness:
             return self._generate_markdown_report(result)
         elif format == "json":
             import json
+
             return json.dumps(result.get_metrics(), indent=2)
         else:
             return self._generate_text_report(result)

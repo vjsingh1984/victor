@@ -325,7 +325,7 @@ class ModelSwitcher:
             return self._available_models[query]
 
         # Search by display name or model ID
-        for model_id, info in self._available_models.items():
+        for _model_id, info in self._available_models.items():
             if query_lower in info.display_name.lower() or query_lower in info.model_id.lower():
                 return info
 

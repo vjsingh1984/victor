@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
@@ -288,60 +289,60 @@ def _lines_match(lines: List[str], expected: List[str], start: int) -> bool:
     return True
 
 
-@tool
-async def apply_patch(
-    patch: str,
+@tool(
+    category="patch",
+    priority=Priority.HIGH,  # Important for applying code changes
+    access_mode=AccessMode.WRITE,  # Modifies files
+    danger_level=DangerLevel.LOW,  # Changes are undoable via backup
+    keywords=["patch", "apply", "diff", "unified diff", "create"],
+)
+async def patch(
+    operation: str = "apply",
+    patch_content: str = "",
     file_path: Optional[str] = None,
+    new_content: str = "",
     dry_run: bool = False,
     fuzz: int = 2,
     backup: bool = True,
+    context_lines: int = 3,
 ) -> Dict[str, Any]:
+    """Unified patch operations: create diffs or apply patches.
+
+    Operations:
+    - "apply": Apply a unified diff patch to files (default)
+    - "create": Create a unified diff from file and new content
+
+    Args:
+        operation: "apply" (default) or "create"
+        patch_content: Unified diff content (for "apply" operation)
+        file_path: Target file path
+        new_content: New content to diff against (for "create" operation)
+        dry_run: Preview changes without applying (for "apply" operation)
+        fuzz: Fuzzy matching factor (for "apply" operation)
+        backup: Create backup before modifying (for "apply" operation)
+        context_lines: Context lines to include (for "create" operation)
     """
-        Apply a unified diff patch to one or more files.
+    op = operation.lower().strip()
 
-        Parses and applies unified diff format patches to files. Supports
-        creating new files, deleting files, and modifying existing files.
-        Includes fuzzy matching for context lines to handle minor differences.
+    # Route to create diff operation
+    if op == "create":
+        if not file_path:
+            return {"success": False, "error": "file_path required for 'create' operation"}
+        if not new_content:
+            return {"success": False, "error": "new_content required for 'create' operation"}
+        return await _create_diff(file_path, new_content, context_lines)
 
-        Args:
-            patch: The unified diff patch content to apply.
-            file_path: Optional specific file path (overrides paths in diff).
-            dry_run: If True, show what would be changed without applying (default: False).
-            fuzz: Lines of context that can be different when matching (default: 2).
-            backup: If True, create backup of modified files (default: True).
+    # Apply patch operation (default)
+    if op != "apply":
+        return {"success": False, "error": f"Unknown operation '{operation}'. Use 'apply' or 'create'."}
 
-        Returns:
-            Dictionary containing:
-            - success: Whether all patches were applied successfully
-            - files_modified: List of files that were modified
-            - files_created: List of files that were created
-            - files_deleted: List of files that were deleted
-            - warnings: List of warning messages
-            - preview: Preview of changes (if dry_run=True)
-
-        Examples:
-            Apply a simple patch:
-                apply_patch(patch='''
-    --- a/hello.py
-    +++ b/hello.py
-    @@ -1,3 +1,4 @@
-     def hello():
-    -    print("Hello")
-    +    print("Hello, World!")
-    +    return True
-    ''')
-
-            Preview changes without applying:
-                apply_patch(patch="...", dry_run=True)
-
-            Apply to specific file:
-                apply_patch(patch="...", file_path="src/main.py")
-    """
+    if not patch_content:
+        return {"success": False, "error": "patch_content required for 'apply' operation"}
     from victor.agent.change_tracker import ChangeType, get_change_tracker
 
     # Parse the patch
     try:
-        patches = parse_unified_diff(patch)
+        patches = parse_unified_diff(patch_content)
     except Exception as e:
         return {"success": False, "error": f"Failed to parse patch: {e}"}
 
@@ -505,36 +506,12 @@ def _compute_simple_diff(old: str, new: str) -> str:
     return "\n".join(result)
 
 
-@tool
-async def create_patch(
+async def _create_diff(
     file_path: str,
     new_content: str,
     context_lines: int = 3,
 ) -> Dict[str, Any]:
-    """
-    Create a unified diff patch from a file and new content.
-
-    Generates a unified diff patch that can be applied later or reviewed.
-    Useful for showing changes before applying them.
-
-    Args:
-        file_path: Path to the original file.
-        new_content: The new content to generate a diff for.
-        context_lines: Number of context lines to include (default: 3).
-
-    Returns:
-        Dictionary containing:
-        - success: Whether patch was created successfully
-        - patch: The unified diff patch text
-        - stats: Statistics about the changes
-
-    Examples:
-        Generate a patch:
-            create_patch(
-                file_path="src/main.py",
-                new_content="# New content\\nprint('hello')"
-            )
-    """
+    """Internal: Create a unified diff patch from a file and new content."""
     import difflib
 
     try:
@@ -550,7 +527,7 @@ async def create_patch(
         new_lines = new_content.splitlines(keepends=True)
 
         # Generate unified diff
-        diff = difflib.unified_diff(
+        diff_result = difflib.unified_diff(
             original_lines,
             new_lines,
             fromfile=f"a/{file_path}",
@@ -558,7 +535,7 @@ async def create_patch(
             n=context_lines,
         )
 
-        patch_text = "".join(diff)
+        patch_text = "".join(diff_result)
 
         # Compute stats
         additions = sum(
@@ -574,6 +551,7 @@ async def create_patch(
 
         return {
             "success": True,
+            "operation": "create",
             "patch": patch_text,
             "stats": {
                 "additions": additions,
@@ -587,3 +565,5 @@ async def create_patch(
             "success": False,
             "error": f"Failed to create patch: {e}",
         }
+
+

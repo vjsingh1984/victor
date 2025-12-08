@@ -34,6 +34,7 @@ except ImportError:
     Container = None  # type: ignore
     DockerException = Exception  # Fallback
 
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 
@@ -188,25 +189,9 @@ class CodeSandbox:
 CodeExecutionManager = CodeSandbox
 
 
-@tool
-async def execute_python_in_sandbox(code: str, context: dict) -> str:
-    """
-    Executes a block of Python code in a stateful, sandboxed environment.
-    Files can be uploaded to the sandbox using `upload_files_to_sandbox`.
-
-    Args:
-        code: The Python code to execute.
-        context: The tool context, provided by the orchestrator.
-
-    Returns:
-        A string containing the exit code, stdout, and stderr.
-    """
-    sandbox: CodeSandbox = context.get("code_manager")
-    if not sandbox:
-        return "Error: CodeSandbox not found in context."
-
-    result = sandbox.execute(code)
-
+async def _execute_code(sandbox_instance: CodeSandbox, code: str) -> str:
+    """Internal: Execute Python code in sandbox."""
+    result = sandbox_instance.execute(code)
     output = f"Exit Code: {result['exit_code']}\n"
     if result["stdout"]:
         output += f"--- STDOUT ---\n{result['stdout']}\n"
@@ -215,25 +200,63 @@ async def execute_python_in_sandbox(code: str, context: dict) -> str:
     return output
 
 
-@tool
-async def upload_files_to_sandbox(file_paths: List[str], context: dict) -> str:
-    """
-    Uploads one or more local files to the code execution sandbox.
-    The files will be placed in the root of the execution environment.
-
-    Args:
-        file_paths: A list of local file paths to upload.
-        context: The tool context, provided by the orchestrator.
-
-    Returns:
-        A confirmation message.
-    """
-    sandbox: CodeSandbox = context.get("code_manager")
-    if not sandbox:
-        return "Error: CodeSandbox not found in context."
-
+async def _upload_files(sandbox_instance: CodeSandbox, file_paths: List[str]) -> str:
+    """Internal: Upload files to sandbox."""
     try:
-        sandbox.put_files(file_paths)
+        sandbox_instance.put_files(file_paths)
         return f"Successfully uploaded {len(file_paths)} files to the sandbox."
     except Exception as e:
         return f"Error uploading files: {e}"
+
+
+@tool(
+    category="execution",
+    priority=Priority.MEDIUM,  # Task-specific code execution
+    access_mode=AccessMode.EXECUTE,  # Runs code in container
+    danger_level=DangerLevel.HIGH,  # Arbitrary code execution
+    keywords=["sandbox", "execute", "python", "container", "docker", "upload", "code"],
+)
+async def sandbox(
+    operation: str,
+    code: str = "",
+    file_paths: List[str] = None,
+    context: dict = None,
+) -> str:
+    """Unified sandbox operations for code execution in isolated Docker container.
+
+    Operations:
+    - "execute": Run Python code in the sandbox
+    - "upload": Upload local files to the sandbox
+
+    Args:
+        operation: Operation to perform - "execute" or "upload"
+        code: Python code to execute (for "execute" operation)
+        file_paths: List of local file paths to upload (for "upload" operation)
+        context: Tool context provided by orchestrator
+
+    Returns:
+        Operation result string
+    """
+    if context is None:
+        return "Error: Context not provided."
+
+    sandbox_instance: CodeSandbox = context.get("code_manager")
+    if not sandbox_instance:
+        return "Error: CodeSandbox not found in context."
+
+    op = operation.lower().strip()
+
+    if op == "execute":
+        if not code:
+            return "Error: 'code' parameter required for execute operation."
+        return await _execute_code(sandbox_instance, code)
+
+    elif op == "upload":
+        if not file_paths:
+            return "Error: 'file_paths' parameter required for upload operation."
+        return await _upload_files(sandbox_instance, file_paths)
+
+    else:
+        return f"Error: Unknown operation '{operation}'. Use 'execute' or 'upload'."
+
+

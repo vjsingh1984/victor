@@ -1,0 +1,10 @@
+# Gemma3-Tools 27B with 128K context (native max is 131K)
+# Shares weights with gemma3-tools:27b (no storage duplication)
+# Target: localhost (M1 Max)
+
+FROM gemma3-tools:27b
+
+PARAMETER num_ctx 131072
+PARAMETER temperature 1
+PARAMETER top_k 64
+PARAMETER top_p 0.95

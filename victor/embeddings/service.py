@@ -22,13 +22,17 @@ This module provides a single embedding service instance that:
 """
 
 import asyncio
+import hashlib
 import logging
 import os
 import threading
 import time
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
+
+# Import TRACE level from debug_logger (initializes the level on import)
+from victor.agent.debug_logger import TRACE
 
 # Disable tokenizers parallelism BEFORE importing sentence_transformers
 # This prevents "bad value(s) in fds_to_keep" errors in async contexts
@@ -94,6 +98,16 @@ class EmbeddingService:
         self._model_lock = threading.Lock()
         self._dimension: Optional[int] = None
 
+        # In-memory embedding cache for repeated texts (e.g., tool descriptions)
+        # Key: hash of text, Value: embedding vector
+        self._embedding_cache: Dict[str, np.ndarray] = {}
+        self._cache_hits = 0
+        self._cache_misses = 0
+        self._max_cache_size = 1000  # Limit memory usage
+
+        # Shutdown flag to prevent new operations after shutdown initiated
+        self._shutdown = False
+
     @classmethod
     def get_instance(
         cls,
@@ -122,9 +136,20 @@ class EmbeddingService:
         """Reset the singleton instance (mainly for testing)."""
         with cls._lock:
             if cls._instance is not None:
+                cls._instance._shutdown = True
                 cls._instance._model = None
                 cls._instance = None
                 logger.info("Reset EmbeddingService singleton")
+
+    def shutdown(self) -> None:
+        """Signal shutdown to prevent new embedding operations.
+
+        After calling this, embed_text and embed_batch will return
+        zero vectors instead of computing new embeddings. This prevents
+        embedding operations from running after shutdown is initiated.
+        """
+        self._shutdown = True
+        logger.debug("[EmbeddingService] Shutdown signaled, new operations will be skipped")
 
     def _ensure_model_loaded(self) -> None:
         """Ensure the model is loaded (lazy loading)."""
@@ -187,15 +212,29 @@ class EmbeddingService:
         """Check if the model is loaded."""
         return self._model is not None
 
-    def embed_text_sync(self, text: str) -> np.ndarray:
+    def _get_cache_key(self, text: str) -> str:
+        """Generate cache key for text."""
+        return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+    def embed_text_sync(self, text: str, use_cache: bool = True) -> np.ndarray:
         """Generate embedding for a single text (sync version).
 
         Args:
             text: Text to embed
+            use_cache: Whether to use in-memory cache (default: True)
 
         Returns:
             Embedding vector as numpy array (float32)
         """
+        # Check cache first
+        if use_cache:
+            cache_key = self._get_cache_key(text)
+            if cache_key in self._embedding_cache:
+                self._cache_hits += 1
+                logger.log(TRACE, f"[EmbeddingService] cache hit: chars={len(text)}")
+                return self._embedding_cache[cache_key]
+            self._cache_misses += 1
+
         self._ensure_model_loaded()
 
         try:
@@ -208,13 +247,30 @@ class EmbeddingService:
             elapsed = time.perf_counter() - start_time
             chars_per_sec = len(text) / elapsed if elapsed > 0 else 0
 
-            logger.debug(
+            # Log at TRACE level (very verbose)
+            logger.log(
+                TRACE,
                 f"[EmbeddingService] embed_text: "
                 f"chars={len(text)}, "
                 f"time={elapsed*1000:.2f}ms, "
-                f"chars/sec={chars_per_sec:.0f}"
+                f"chars/sec={chars_per_sec:.0f}",
             )
-            return np.asarray(embedding, dtype=np.float32)
+
+            result = np.asarray(embedding, dtype=np.float32)
+
+            # Cache the result
+            if use_cache:
+                # Evict oldest entries if cache is full
+                if len(self._embedding_cache) >= self._max_cache_size:
+                    # Simple eviction: remove first 10% of entries
+                    keys_to_remove = list(self._embedding_cache.keys())[
+                        : self._max_cache_size // 10
+                    ]
+                    for key in keys_to_remove:
+                        del self._embedding_cache[key]
+                self._embedding_cache[cache_key] = result
+
+            return result
         except Exception as e:
             logger.warning(f"Failed to generate embedding: {e}")
             # Return zero vector as fallback (better than crashing)
@@ -305,17 +361,50 @@ class EmbeddingService:
             # Return zero vectors as fallback
             return np.zeros((len(texts), self.dimension), dtype=np.float32)
 
-    async def embed_text(self, text: str) -> np.ndarray:
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get embedding cache statistics.
+
+        Returns:
+            Dictionary with cache stats: hits, misses, size, hit_rate
+        """
+        total = self._cache_hits + self._cache_misses
+        hit_rate = self._cache_hits / total if total > 0 else 0.0
+        return {
+            "hits": self._cache_hits,
+            "misses": self._cache_misses,
+            "size": len(self._embedding_cache),
+            "hit_rate": f"{hit_rate:.1%}",
+            "max_size": self._max_cache_size,
+        }
+
+    def clear_cache(self) -> None:
+        """Clear the embedding cache."""
+        self._embedding_cache.clear()
+        self._cache_hits = 0
+        self._cache_misses = 0
+        logger.debug("[EmbeddingService] Cache cleared")
+
+    async def embed_text(self, text: str, use_cache: bool = True) -> np.ndarray:
         """Generate embedding for a single text (async version).
 
         Args:
             text: Text to embed
+            use_cache: Whether to use in-memory cache (default: True)
 
         Returns:
             Embedding vector as numpy array (float32)
         """
+        # Check shutdown flag before starting operation
+        if self._shutdown:
+            logger.log(
+                TRACE, f"[EmbeddingService] Skipping embed_text (shutdown): chars={len(text)}"
+            )
+            return np.zeros(self.dimension, dtype=np.float32)
+
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.embed_text_sync, text)
+        return await loop.run_in_executor(
+            None, lambda: self.embed_text_sync(text, use_cache=use_cache)
+        )
 
     async def embed_batch(self, texts: List[str]) -> np.ndarray:
         """Generate embeddings for multiple texts (async version).
@@ -326,6 +415,13 @@ class EmbeddingService:
         Returns:
             2D numpy array of embeddings (shape: [len(texts), dimension])
         """
+        # Check shutdown flag before starting operation
+        if self._shutdown:
+            logger.log(
+                TRACE, f"[EmbeddingService] Skipping embed_batch (shutdown): count={len(texts)}"
+            )
+            return np.zeros((len(texts), self.dimension), dtype=np.float32)
+
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.embed_batch_sync, texts)
 

@@ -1,0 +1,570 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Unified provider and model management.
+
+This module provides centralized management for:
+- Provider initialization and switching
+- Model switching and hot-swap
+- Provider health monitoring
+- Fallback chain management
+- Tool calling adapter coordination
+
+Design Pattern: Facade + Strategy
+=================================
+ProviderManager acts as a facade coordinating:
+- ModelSwitcher: Switch tracking and history
+- ProviderHealthChecker: Health monitoring
+- ToolCallingAdapterRegistry: Tool capability detection
+- ProviderRegistry: Provider instantiation
+
+Usage:
+    from victor.agent.provider_manager import ProviderManager
+
+    manager = ProviderManager(
+        settings=settings,
+        initial_provider=provider,
+        initial_model=model,
+    )
+
+    # Switch providers with health check
+    await manager.switch_provider("anthropic", "claude-sonnet-4-20250514")
+
+    # Get healthy providers
+    healthy = await manager.get_healthy_providers()
+"""
+
+import asyncio
+import logging
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional
+
+from victor.agent.model_switcher import ModelSwitcher, SwitchReason, ModelSwitchEvent
+from victor.agent.tool_calling import ToolCallingAdapterRegistry, ToolCallingCapabilities
+from victor.providers.base import BaseProvider
+from victor.providers.registry import ProviderRegistry
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ProviderManagerConfig:
+    """Configuration for ProviderManager.
+
+    Attributes:
+        enable_health_checks: Enable provider health monitoring
+        health_check_interval: Interval between health checks (seconds)
+        auto_fallback: Automatically fallback to healthy provider on failure
+        fallback_providers: Ordered list of fallback providers
+        max_fallback_attempts: Maximum fallback attempts before giving up
+    """
+
+    enable_health_checks: bool = True
+    health_check_interval: float = 60.0
+    auto_fallback: bool = True
+    fallback_providers: List[str] = field(default_factory=list)
+    max_fallback_attempts: int = 3
+
+
+@dataclass
+class ProviderState:
+    """Current state of a provider.
+
+    Attributes:
+        provider: Provider instance
+        provider_name: Provider name
+        model: Current model
+        tool_adapter: Tool calling adapter
+        capabilities: Tool calling capabilities
+        is_healthy: Whether provider is healthy
+        last_error: Last error message (if any)
+    """
+
+    provider: BaseProvider
+    provider_name: str
+    model: str
+    tool_adapter: Any = None
+    capabilities: Optional[ToolCallingCapabilities] = None
+    is_healthy: bool = True
+    last_error: Optional[str] = None
+
+
+class ProviderManager:
+    """Unified management of providers and models.
+
+    Coordinates provider switching, health monitoring, and fallback
+    handling for robust LLM interactions.
+
+    Features:
+    - Hot-swap providers without losing context
+    - Automatic health monitoring
+    - Fallback chain support
+    - Switch history tracking
+    - Tool capability detection
+    """
+
+    # Known provider context windows (in tokens)
+    PROVIDER_CONTEXT_WINDOWS = {
+        "anthropic": 200000,
+        "openai": 128000,
+        "google": 1000000,
+        "xai": 131072,
+        "deepseek": 131072,
+        "moonshot": 262144,
+        "ollama": 32768,
+        "lmstudio": 32768,
+        "vllm": 32768,
+    }
+
+    # Cloud providers with robust tool calling
+    CLOUD_PROVIDERS = {"anthropic", "openai", "google", "xai", "deepseek", "moonshot", "groq"}
+
+    # Local providers
+    LOCAL_PROVIDERS = {"ollama", "lmstudio", "vllm"}
+
+    def __init__(
+        self,
+        settings: Any,
+        initial_provider: Optional[BaseProvider] = None,
+        initial_model: Optional[str] = None,
+        provider_name: Optional[str] = None,
+        config: Optional[ProviderManagerConfig] = None,
+    ):
+        """Initialize the provider manager.
+
+        Args:
+            settings: Application settings
+            initial_provider: Initial provider instance
+            initial_model: Initial model name
+            provider_name: Provider name (e.g., 'anthropic', 'ollama')
+            config: Optional configuration
+        """
+        self.settings = settings
+        self.config = config or ProviderManagerConfig()
+
+        # Current state
+        self._current_state: Optional[ProviderState] = None
+
+        # Initialize with provided values
+        if initial_provider and initial_model:
+            name = provider_name or getattr(initial_provider, "name", "unknown")
+            self._current_state = ProviderState(
+                provider=initial_provider,
+                provider_name=name.lower(),
+                model=initial_model,
+            )
+
+        # Model switcher for tracking
+        self._model_switcher = ModelSwitcher()
+        if self._current_state:
+            self._model_switcher.set_current(
+                self._current_state.provider_name,
+                self._current_state.model,
+            )
+
+        # Health checker (lazy initialization)
+        self._health_checker: Optional[Any] = None
+        self._health_check_task: Optional[asyncio.Task] = None
+
+        # Callbacks for provider changes
+        self._on_switch_callbacks: List[Callable[[ProviderState], None]] = []
+
+        logger.debug(
+            f"ProviderManager initialized: {self._current_state.provider_name if self._current_state else 'none'}"
+        )
+
+    @property
+    def provider(self) -> Optional[BaseProvider]:
+        """Get current provider instance."""
+        return self._current_state.provider if self._current_state else None
+
+    @property
+    def provider_name(self) -> str:
+        """Get current provider name."""
+        return self._current_state.provider_name if self._current_state else ""
+
+    @property
+    def model(self) -> str:
+        """Get current model name."""
+        return self._current_state.model if self._current_state else ""
+
+    @property
+    def capabilities(self) -> Optional[ToolCallingCapabilities]:
+        """Get current tool calling capabilities."""
+        return self._current_state.capabilities if self._current_state else None
+
+    @property
+    def tool_adapter(self) -> Optional[Any]:
+        """Get current tool calling adapter."""
+        return self._current_state.tool_adapter if self._current_state else None
+
+    def is_cloud_provider(self) -> bool:
+        """Check if current provider is cloud-based."""
+        return self.provider_name in self.CLOUD_PROVIDERS
+
+    def is_local_provider(self) -> bool:
+        """Check if current provider is local."""
+        return self.provider_name in self.LOCAL_PROVIDERS
+
+    def get_context_window(self) -> int:
+        """Get context window size for current provider/model.
+
+        Returns:
+            Context window in tokens
+        """
+        # Try to get from provider
+        if self.provider and hasattr(self.provider, "get_context_window"):
+            try:
+                return self.provider.get_context_window(self.model)
+            except Exception:
+                pass
+
+        # Fall back to known values
+        return self.PROVIDER_CONTEXT_WINDOWS.get(self.provider_name, 32768)
+
+    def initialize_tool_adapter(self) -> ToolCallingCapabilities:
+        """Initialize tool calling adapter for current provider/model.
+
+        Returns:
+            Tool calling capabilities
+        """
+        if not self._current_state:
+            raise ValueError("No provider configured")
+
+        adapter = ToolCallingAdapterRegistry.get_adapter(
+            provider_name=self.provider_name,
+            model=self.model,
+            config={"settings": self.settings},
+        )
+
+        capabilities = adapter.get_capabilities()
+
+        self._current_state.tool_adapter = adapter
+        self._current_state.capabilities = capabilities
+
+        logger.info(
+            f"Tool adapter initialized: native={capabilities.native_tool_calls}, "
+            f"format={capabilities.tool_call_format.value}"
+        )
+
+        return capabilities
+
+    async def switch_provider(
+        self,
+        provider_name: str,
+        model: Optional[str] = None,
+        reason: SwitchReason = SwitchReason.USER_REQUEST,
+        **provider_kwargs: Any,
+    ) -> bool:
+        """Switch to a different provider.
+
+        Args:
+            provider_name: Name of the provider
+            model: Optional model name (uses current if not provided)
+            reason: Reason for the switch
+            **provider_kwargs: Additional provider arguments
+
+        Returns:
+            True if switch was successful
+        """
+        try:
+            # Get provider settings if not provided
+            if not provider_kwargs:
+                provider_kwargs = self.settings.get_provider_settings(provider_name)
+
+            # Create new provider
+            new_provider = ProviderRegistry.create(provider_name, **provider_kwargs)
+            new_model = model or self.model
+
+            # Check health if enabled
+            if self.config.enable_health_checks:
+                is_healthy = await self._check_provider_health(new_provider, provider_name)
+                if not is_healthy and self.config.auto_fallback:
+                    logger.warning(f"Provider {provider_name} unhealthy, attempting fallback")
+                    return await self._attempt_fallback(reason)
+
+            # Store old state for switch tracking
+            old_provider = self.provider_name
+            old_model = self.model
+
+            # Create new state
+            self._current_state = ProviderState(
+                provider=new_provider,
+                provider_name=provider_name.lower(),
+                model=new_model,
+            )
+
+            # Initialize tool adapter
+            self.initialize_tool_adapter()
+
+            # Record switch
+            self._model_switcher.switch(
+                provider=provider_name,
+                model=new_model,
+                reason=reason,
+                metadata={
+                    "from_provider": old_provider,
+                    "from_model": old_model,
+                },
+            )
+
+            # Notify callbacks
+            self._notify_switch(self._current_state)
+
+            logger.info(
+                f"Switched provider: {old_provider}:{old_model} -> "
+                f"{provider_name}:{new_model} ({reason.value})"
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to switch provider to {provider_name}: {e}")
+            if self._current_state:
+                self._current_state.last_error = str(e)
+            return False
+
+    async def switch_model(
+        self,
+        model: str,
+        reason: SwitchReason = SwitchReason.USER_REQUEST,
+    ) -> bool:
+        """Switch to a different model on the current provider.
+
+        Args:
+            model: New model name
+            reason: Reason for the switch
+
+        Returns:
+            True if switch was successful
+        """
+        if not self._current_state:
+            logger.error("No provider configured, cannot switch model")
+            return False
+
+        try:
+            old_model = self.model
+
+            # Update model
+            self._current_state.model = model
+
+            # Reinitialize tool adapter
+            self.initialize_tool_adapter()
+
+            # Record switch
+            self._model_switcher.switch(
+                provider=self.provider_name,
+                model=model,
+                reason=reason,
+                metadata={"from_model": old_model},
+            )
+
+            # Notify callbacks
+            self._notify_switch(self._current_state)
+
+            logger.info(
+                f"Switched model: {old_model} -> {model} "
+                f"(native_tools={self.capabilities.native_tool_calls if self.capabilities else 'unknown'})"
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to switch model to {model}: {e}")
+            if self._current_state:
+                self._current_state.last_error = str(e)
+            return False
+
+    def get_info(self) -> Dict[str, Any]:
+        """Get information about current provider and model.
+
+        Returns:
+            Dictionary with provider/model info and capabilities
+        """
+        if not self._current_state:
+            return {"provider": None, "model": None}
+
+        caps = self.capabilities
+        return {
+            "provider": self.provider_name,
+            "model": self.model,
+            "supports_tools": self.provider.supports_tools() if self.provider else False,
+            "native_tool_calls": caps.native_tool_calls if caps else False,
+            "streaming_tool_calls": caps.streaming_tool_calls if caps else False,
+            "parallel_tool_calls": caps.parallel_tool_calls if caps else False,
+            "thinking_mode": caps.thinking_mode if caps else False,
+            "context_window": self.get_context_window(),
+            "is_cloud": self.is_cloud_provider(),
+            "is_local": self.is_local_provider(),
+            "is_healthy": self._current_state.is_healthy,
+        }
+
+    def get_switch_history(self) -> List[ModelSwitchEvent]:
+        """Get history of provider/model switches.
+
+        Returns:
+            List of switch events
+        """
+        return self._model_switcher.get_switch_history()
+
+    def add_switch_callback(self, callback: Callable[[ProviderState], None]) -> None:
+        """Add callback for provider/model switches.
+
+        Args:
+            callback: Function called with new ProviderState after switch
+        """
+        self._on_switch_callbacks.append(callback)
+
+    async def _check_provider_health(self, provider: BaseProvider, provider_name: str) -> bool:
+        """Check health of a provider.
+
+        Args:
+            provider: Provider instance
+            provider_name: Provider name
+
+        Returns:
+            True if provider is healthy
+        """
+        try:
+            # Lazy initialize health checker
+            if not self._health_checker:
+                from victor.providers.health import ProviderHealthChecker
+
+                self._health_checker = ProviderHealthChecker()
+
+            # Register and check
+            self._health_checker.register_provider(provider_name, provider)
+            result = await self._health_checker.check_provider(provider_name)
+
+            from victor.providers.health import HealthStatus
+
+            return result.status in (HealthStatus.HEALTHY, HealthStatus.DEGRADED)
+
+        except ImportError:
+            logger.debug("Health checker not available, skipping health check")
+            return True
+        except Exception as e:
+            logger.warning(f"Health check failed for {provider_name}: {e}")
+            return True  # Assume healthy on error
+
+    async def _attempt_fallback(self, original_reason: SwitchReason) -> bool:
+        """Attempt to fallback to a healthy provider.
+
+        Args:
+            original_reason: Original reason for switch attempt
+
+        Returns:
+            True if fallback was successful
+        """
+        fallback_providers = self.config.fallback_providers
+
+        if not fallback_providers:
+            logger.warning("No fallback providers configured")
+            return False
+
+        for attempt, provider_name in enumerate(fallback_providers):
+            if attempt >= self.config.max_fallback_attempts:
+                break
+
+            logger.info(f"Attempting fallback to {provider_name} (attempt {attempt + 1})")
+
+            try:
+                # Disable auto_fallback to prevent infinite loop
+                old_auto_fallback = self.config.auto_fallback
+                self.config.auto_fallback = False
+
+                result = await self.switch_provider(
+                    provider_name,
+                    reason=SwitchReason.FALLBACK,
+                )
+
+                self.config.auto_fallback = old_auto_fallback
+
+                if result:
+                    logger.info(f"Fallback to {provider_name} successful")
+                    return True
+
+            except Exception as e:
+                logger.warning(f"Fallback to {provider_name} failed: {e}")
+
+        logger.error("All fallback attempts exhausted")
+        return False
+
+    def _notify_switch(self, new_state: ProviderState) -> None:
+        """Notify callbacks of provider switch."""
+        for callback in self._on_switch_callbacks:
+            try:
+                callback(new_state)
+            except Exception as e:
+                logger.warning(f"Switch callback error: {e}")
+
+    async def start_health_monitoring(self) -> None:
+        """Start background health monitoring."""
+        if not self.config.enable_health_checks:
+            return
+
+        if self._health_check_task and not self._health_check_task.done():
+            return
+
+        async def monitor_loop():
+            while True:
+                try:
+                    await asyncio.sleep(self.config.health_check_interval)
+                    if self.provider:
+                        is_healthy = await self._check_provider_health(
+                            self.provider, self.provider_name
+                        )
+                        if self._current_state:
+                            self._current_state.is_healthy = is_healthy
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    logger.debug(f"Health monitoring error: {e}")
+
+        self._health_check_task = asyncio.create_task(monitor_loop())
+        logger.info("Started provider health monitoring")
+
+    async def stop_health_monitoring(self) -> None:
+        """Stop background health monitoring."""
+        if self._health_check_task:
+            self._health_check_task.cancel()
+            try:
+                await self._health_check_task
+            except asyncio.CancelledError:
+                pass
+            self._health_check_task = None
+            logger.debug("Stopped provider health monitoring")
+
+    async def get_healthy_providers(self) -> List[str]:
+        """Get list of healthy providers.
+
+        Returns:
+            List of healthy provider names sorted by latency
+        """
+        if not self._health_checker:
+            return [self.provider_name] if self.provider_name else []
+
+        return self._health_checker.get_healthy_providers()
+
+    async def close(self) -> None:
+        """Close provider and cleanup."""
+        await self.stop_health_monitoring()
+
+        if self.provider:
+            try:
+                await self.provider.close()
+            except Exception as e:
+                logger.debug(f"Error closing provider: {e}")
+
+        logger.debug("ProviderManager closed")

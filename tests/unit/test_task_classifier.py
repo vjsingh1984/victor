@@ -143,7 +143,8 @@ class TestTaskClassifierGeneration:
         result = classifier.classify("Create a simple function that calculates factorial")
 
         assert result.complexity == TaskComplexity.GENERATION
-        assert result.tool_budget == 1
+        # GENERATION tasks have 0 tool budget - no exploration needed for code generation
+        assert result.tool_budget == 0
 
     def test_write_code_generation(self):
         """Test that 'write code' is classified as GENERATION."""

@@ -64,7 +64,8 @@ class ToolCallingCapabilities:
     xml_fallback_parsing: bool = False  # Can parse XML tool calls from content
 
     # Model-specific features
-    thinking_mode: bool = False  # Supports /think /no_think (Qwen3)
+    thinking_mode: bool = False  # Model has a thinking/reasoning mode
+    thinking_disable_prefix: Optional[str] = None  # Prefix to disable thinking (e.g., "/no_think")
     requires_strict_prompting: bool = False  # Needs strict system prompts
 
     # Format details
@@ -74,6 +75,11 @@ class ToolCallingCapabilities:
     # Recommended limits
     recommended_max_tools: int = 20  # Max tools to send
     recommended_tool_budget: int = 12  # Max tool calls per turn
+
+    # Model-specific exploration behavior
+    # Models that need more "thinking" turns get higher exploration_multiplier
+    exploration_multiplier: float = 1.0  # Multiplies max_exploration_iterations
+    continuation_patience: int = 3  # Empty turns to allow before forcing completion
 
 
 @dataclass
@@ -472,36 +478,71 @@ class BaseToolCallingAdapter(ABC):
             String to append to system prompt (empty if none needed)
         """
         capabilities = self.get_capabilities()
-
-        if capabilities.native_tool_calls and not capabilities.requires_strict_prompting:
-            return ""  # Native support, no hints needed
-
         hints = []
 
         if capabilities.requires_strict_prompting:
             hints.append("Call tools ONE AT A TIME. Wait for results.")
             hints.append("After 2-3 tool calls, provide your answer.")
             hints.append("Do NOT output JSON, XML, or tool syntax in responses.")
+        elif capabilities.native_tool_calls and capabilities.parallel_tool_calls:
+            # Encourage parallel tool calls for capable models
+            hints.append("Call MULTIPLE tools in parallel when operations are independent.")
 
         if capabilities.thinking_mode:
             hints.append("Use /no_think for simple questions.")
 
         return "\n".join(hints)
 
-    def normalize_arguments(self, arguments: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
-        """Normalize tool arguments.
+    # Default values for required parameters that providers may omit.
+    # These are sensible defaults that preserve expected tool behavior.
+    # Key: tool_name, Value: dict of parameter defaults
+    # NOTE: Includes both canonical short names and legacy names for backward compat
+    TOOL_ARGUMENT_DEFAULTS: Dict[str, Dict[str, Any]] = {
+        # Canonical short names
+        "ls": {"path": "."},
+        "read": {"path": ""},  # Empty string will fail gracefully
+        "shell": {"command": ""},
+        "grep": {"query": "", "path": "."},
+        "search": {"query": "", "path": "."},
+        # Legacy names (backward compatibility - LLMs may still use these)
+        "list_directory": {"path": "."},
+        "read_file": {"path": ""},
+        "execute_bash": {"command": ""},
+        "code_search": {"query": "", "path": "."},
+        "semantic_code_search": {"query": "", "path": "."},
+    }
 
-        Default implementation returns arguments unchanged.
-        Subclasses can override for provider-specific normalization.
+    def normalize_arguments(self, arguments: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
+        """Normalize tool arguments with sensible defaults.
+
+        Providers may omit required parameters (e.g., Gemini returning empty args
+        for list_directory when it means "current directory"). This method fills
+        in sensible defaults to prevent tool execution failures.
+
+        Design Principle:
+            Tools define their contracts (required params). Adapters bridge the gap
+            between what providers return and what tools expect. This keeps tools
+            provider-agnostic while handling provider quirks in one place.
 
         Args:
             arguments: Raw arguments from model
             tool_name: Name of the tool
 
         Returns:
-            Normalized arguments
+            Normalized arguments with defaults applied
         """
-        return arguments
+        # Get defaults for this tool
+        defaults = self.TOOL_ARGUMENT_DEFAULTS.get(tool_name, {})
+        if not defaults:
+            return arguments
+
+        # Apply defaults for missing required parameters
+        normalized = dict(arguments)  # Copy to avoid mutation
+        for param, default_value in defaults.items():
+            if param not in normalized or normalized[param] is None:
+                normalized[param] = default_value
+
+        return normalized
 
     def is_valid_tool_name(self, name: str) -> bool:
         """Check if a tool name is valid.

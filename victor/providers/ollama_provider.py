@@ -62,6 +62,8 @@ class OllamaProvider(BaseProvider):
             chosen_base = self._select_base_url(base_url, timeout)
         super().__init__(base_url=chosen_base, timeout=timeout, **kwargs)
         self._raw_base_urls = base_url
+        self._models_without_tools: set = set()  # Cache models that don't support tools
+        self._context_window_cache: Dict[str, int] = {}  # Cache model context windows
         self.client = httpx.AsyncClient(
             base_url=chosen_base,
             timeout=httpx.Timeout(timeout),
@@ -101,6 +103,73 @@ class OllamaProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         """Ollama supports streaming."""
         return True
+
+    def get_context_window(self, model: str) -> int:
+        """Get context window size for a model by querying Ollama API.
+
+        Queries /api/show to get the actual context length from model metadata.
+        Results are cached per endpoint+model to avoid repeated API calls.
+
+        Args:
+            model: Model name (e.g., 'qwen3-coder-tools:30b')
+
+        Returns:
+            Context window size in tokens (default 32768 if query fails)
+        """
+        # Cache key includes endpoint since same model can have different context on different servers
+        cache_key = f"{self.base_url}:{model}"
+
+        # Check cache first
+        if cache_key in self._context_window_cache:
+            return self._context_window_cache[cache_key]
+
+        default_context = 32768  # Conservative fallback
+
+        try:
+            # Synchronous request to /api/show
+            with httpx.Client(base_url=self.base_url, timeout=httpx.Timeout(5)) as client:
+                resp = client.post("/api/show", json={"name": model})
+                resp.raise_for_status()
+                data = resp.json()
+
+                # Look for context_length in model_info
+                # Keys are like "qwen3moe.context_length" or "llama.context_length"
+                model_info = data.get("model_info", {})
+                for key, value in model_info.items():
+                    if "context_length" in key.lower():
+                        context_window = int(value)
+                        self._context_window_cache[cache_key] = context_window
+                        logger.debug(f"Ollama model {model} context window: {context_window}")
+                        return context_window
+
+                # Fallback: check parameters for num_ctx
+                parameters = data.get("parameters", "")
+                if "num_ctx" in parameters:
+                    # Parse "num_ctx 262144" from parameters string
+                    for line in parameters.split("\n"):
+                        if "num_ctx" in line:
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                try:
+                                    context_window = int(parts[-1])
+                                    self._context_window_cache[cache_key] = context_window
+                                    logger.debug(
+                                        f"Ollama model {model} context window (from params): {context_window}"
+                                    )
+                                    return context_window
+                                except ValueError:
+                                    pass
+
+                logger.warning(
+                    f"Could not determine context window for {model}, using default {default_context}"
+                )
+                self._context_window_cache[cache_key] = default_context
+                return default_context
+
+        except Exception as e:
+            logger.warning(f"Failed to query Ollama for model info: {e}")
+            self._context_window_cache[cache_key] = default_context
+            return default_context
 
     def _select_base_url(self, base_url: Union[str, List[str], None], timeout: int) -> str:
         """Pick the first reachable Ollama endpoint from a tiered list.
@@ -257,6 +326,37 @@ class OllamaProvider(BaseProvider):
                 provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
+            # Check for "does not support tools" error (HTTP 400)
+            # Retry without tools if model doesn't support them
+            if e.response.status_code == 400 and tools:
+                try:
+                    error_text = e.response.text
+                    if "does not support tools" in error_text.lower():
+                        logger.warning(
+                            f"Model {model} doesn't support tools via Ollama API. "
+                            "Retrying without tools (will use fallback parsing)."
+                        )
+                        # Cache that this model doesn't support tools
+                        self._models_without_tools.add(model)
+                        # Retry without tools
+                        payload = self._build_request_payload(
+                            messages=messages,
+                            model=model,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            tools=None,  # No tools
+                            stream=False,
+                            **kwargs,
+                        )
+                        response = await self._execute_with_circuit_breaker(
+                            self.client.post, "/api/chat", json=payload
+                        )
+                        response.raise_for_status()
+                        result = response.json()
+                        return self._parse_response(result, model)
+                except Exception:
+                    pass  # Fall through to original error
+
             raise ProviderError(
                 message=f"HTTP error: {e.response.status_code}",
                 provider=self.name,

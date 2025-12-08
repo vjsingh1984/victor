@@ -25,13 +25,13 @@ from victor.tools.base import ToolRegistry
 logger = logging.getLogger(__name__)
 
 
-# Core tools that should generally remain enabled for basic functionality
-CORE_TOOLS: Set[str] = {
-    "read_file",
-    "write_file",
-    "list_directory",
-    "execute_bash",
-}
+def _get_critical_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
+    """Get critical tools using dynamic discovery from tool_selection module.
+
+    Critical tools are those with priority=Priority.CRITICAL in their @tool decorator.
+    """
+    from victor.agent.tool_selection import get_critical_tools
+    return get_critical_tools(registry)
 
 
 class ConfigLoader:
@@ -114,8 +114,9 @@ class ConfigLoader:
                 f"Available: {', '.join(sorted(registered))}"
             )
 
-        # Warn about missing core tools
-        missing_core = CORE_TOOLS - set(enabled_tools)
+        # Warn about missing core tools (dynamically discovered)
+        core_tools = _get_critical_tools(registry)
+        missing_core = core_tools - set(enabled_tools)
         if missing_core:
             logger.warning(
                 f"'enabled' list missing core tools: {', '.join(missing_core)}. "
@@ -147,8 +148,9 @@ class ConfigLoader:
                 f"Available: {', '.join(sorted(registered))}"
             )
 
-        # Warn about disabling core tools
-        disabled_core = CORE_TOOLS & set(disabled_tools)
+        # Warn about disabling core tools (dynamically discovered)
+        core_tools = _get_critical_tools(registry)
+        disabled_core = core_tools & set(disabled_tools)
         if disabled_core:
             logger.warning(
                 f"Disabling core tools: {', '.join(disabled_core)}. "
@@ -178,7 +180,9 @@ class ConfigLoader:
                 registry.enable_tool(tool_name)
             else:
                 registry.disable_tool(tool_name)
-                if tool_name in CORE_TOOLS:
+                # Check if this is a core tool (dynamically discovered)
+                core_tools = _get_critical_tools(registry)
+                if tool_name in core_tools:
                     logger.warning(
                         f"Disabling core tool '{tool_name}'. "
                         f"This may limit agent functionality."

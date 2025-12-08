@@ -29,11 +29,18 @@ logger = logging.getLogger(__name__)
 
 
 # Provider classifications
-CLOUD_PROVIDERS: Set[str] = {"anthropic", "openai", "google", "xai"}
+CLOUD_PROVIDERS: Set[str] = {"anthropic", "openai", "google", "xai", "moonshot", "kimi", "deepseek"}
 LOCAL_PROVIDERS: Set[str] = {"ollama", "lmstudio", "vllm"}
 
 # Critical grounding rules to prevent hallucination
+# Concise version for cloud providers - they handle context well
 GROUNDING_RULES = """
+GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
+Quote code exactly from tool output. If more info needed, call another tool.
+""".strip()
+
+# Extended grounding rules for local models that need more explicit guidance
+GROUNDING_RULES_EXTENDED = """
 CRITICAL - TOOL OUTPUT GROUNDING:
 When you receive tool output in <TOOL_OUTPUT> tags:
 1. The content between ═══ markers is ACTUAL file/command output - NEVER ignore it
@@ -48,36 +55,40 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
 
 # Task-type-specific prompt hints
 # These are appended to system prompts when task type is detected
+# Concise format for cloud providers - local models use extended hints from complexity_classifier
 TASK_TYPE_HINTS = {
-    "create_simple": """
-TASK TYPE: Simple Code Generation
-This is a standalone code generation task. Follow these rules:
-1. Generate the code DIRECTLY using write_file - do NOT explore the codebase first.
-2. Do NOT call list_directory or code_search unless the user asks about existing code.
-3. Create a new file with the requested functionality immediately.
-4. After writing the file, you're DONE. Do not make additional tool calls.
-""",
-    "create": """
-TASK TYPE: Code Creation with Context
-This task requires creating new code that integrates with existing code:
-1. Examine relevant existing files to understand patterns and context.
-2. After reading 1-2 files, create the new code with write_file.
-3. Ensure the new code follows existing patterns and conventions.
-""",
-    "edit": """
-TASK TYPE: Code Modification
-This task requires modifying existing code:
-1. First read the target file(s) to understand the current state.
-2. After reading, use edit_files or write_file to make changes.
-3. Make focused changes - only modify what's needed for the task.
-""",
-    "search": """
-TASK TYPE: Code Search/Discovery
-This task requires finding information in the codebase:
-1. Use code_search or semantic_code_search for content searches.
-2. Use list_directory for structure exploration.
-3. Summarize findings clearly after 2-4 tool calls.
-""",
+    "code_generation": """[GENERATE] Write code directly. No exploration needed. Complete implementation.""",
+    "create_simple": """[CREATE] Write file immediately. Skip codebase exploration. One tool call max.""",
+    "create": """[CREATE+CONTEXT] Read 1-2 relevant files, then create. Follow existing patterns.""",
+    "edit": """[EDIT] Read target file first, then modify. Focused changes only.""",
+    "search": """[SEARCH] Use code_search/list_directory. Summarize after 2-4 calls.""",
+    "action": """[ACTION] Execute git/test/build operations. Multiple tool calls allowed. Continue until complete.""",
+    "analysis_deep": """[ANALYSIS] Thorough codebase exploration. Read all relevant modules. Comprehensive output.""",
+    "analyze": """[ANALYZE] Examine code carefully. Read related files. Structured findings.""",
+    "design": """[ARCHITECTURE] For architecture/component questions:
+DOC-FIRST STRATEGY (mandatory order):
+1. FIRST: Read architecture docs if they exist:
+   - read_file CLAUDE.md, .victor/init.md, README.md, ARCHITECTURE.md
+   - These contain component lists, named implementations, and key relationships
+2. SECOND: Explore implementation directories systematically:
+   - list_directory on src/, lib/, engines/, impls/, modules/, core/, services/
+   - Directory names under impls/ or engines/ are often named implementations
+   - Look for ALL-CAPS directory/file names - these are typically named engines/components
+3. THIRD: Read key implementation files for each component found
+4. FOURTH: Look for benchmark/test files (benches/, *_bench*, *_test*) for performance insights
+
+DISCOVERY PATTERNS - Look for:
+- Named implementations: Directories with ALL-CAPS names (engines, stores, protocols)
+- Factories/registries: Files named *_factory.*, *_registry.*, mod.rs, index.ts
+- Core abstractions: base.py, interface.*, trait definitions
+- Configuration: *.yaml, *.toml in config/ directories
+
+Output requirements:
+- Use discovered component names (not generic descriptions like "storage module")
+- Include file:line references (e.g., "src/engines/impl.rs:42")
+- Verify improvements reference ACTUAL code patterns (grep first)
+Use 15-20 tool calls minimum. Prioritize by architectural importance.""",
+    "general": """[GENERAL] Moderate exploration. 3-6 tool calls. Answer concisely.""",
 }
 
 
@@ -180,7 +191,11 @@ class SystemPromptBuilder:
         Returns:
             System prompt string tailored to the provider/model
         """
-        base_prompt = "You are a code analyst for this repository."
+        base_prompt = (
+            "You are an expert coding assistant. You can analyze, explain, and generate code.\n"
+            "When asked to write or complete code, provide working implementations directly.\n"
+            "When asked to explore or analyze code, use the available tools."
+        )
 
         # Get adapter-specific hints
         hints = self.tool_adapter.get_system_prompt_hints() if self.tool_adapter else None
@@ -195,10 +210,11 @@ class SystemPromptBuilder:
         if caps and caps.native_tool_calls and not caps.requires_strict_prompting:
             return (
                 f"{base_prompt}\n\n"
-                "Use the available tools to explore and modify code effectively:\n"
-                "1. Use list_directory and read_file to examine code before conclusions.\n"
-                "2. If asked to modify code, use write_file or edit_files after understanding context.\n"
-                "3. Provide clear responses based on actual file contents.\n\n"
+                "Tool usage guidelines:\n"
+                "1. For code generation tasks: write the code directly in your response.\n"
+                "2. For exploration tasks: use list_directory and read_file to examine code.\n"
+                "3. For modification tasks: use write_file or edit_files after understanding context.\n"
+                "4. Provide clear, working solutions.\n\n"
                 f"{GROUNDING_RULES}"
             )
 
@@ -230,7 +246,13 @@ class SystemPromptBuilder:
         return self._build_default_prompt()
 
     def _build_cloud_prompt(self) -> str:
-        """Build prompt for cloud providers (Anthropic, OpenAI, Google, xAI)."""
+        """Build prompt for cloud providers (Anthropic, OpenAI, xAI).
+
+        Delegates to Google-specific prompt for Gemini models.
+        """
+        if self.provider_name == "google":
+            return self._build_google_prompt()
+
         return (
             "You are an expert code analyst with access to tools for exploring "
             "and modifying code. Use them effectively:\n\n"
@@ -239,6 +261,29 @@ class SystemPromptBuilder:
             "3. Provide clear, actionable responses based on actual file contents.\n"
             "4. Always cite specific file paths and line numbers when referencing code.\n"
             "5. You may call multiple tools in parallel when they are independent.\n\n"
+            f"{GROUNDING_RULES}"
+        )
+
+    def _build_google_prompt(self) -> str:
+        """Build optimized prompt for Google/Gemini models.
+
+        Gemini Flash/Pro have excellent native tool calling and work best with:
+        - Concise, action-oriented instructions
+        - Minimal redundancy (don't repeat what's in tool definitions)
+        - Focus on task completion over verbose guidance
+        """
+        return (
+            "Expert coding assistant with tool access.\n\n"
+            "CORE RULES:\n"
+            "• Read files before making claims about their contents\n"
+            "• Cite file:line when referencing code\n"
+            "• Parallel tool calls allowed for independent operations\n"
+            "• Ground all responses in actual tool output\n\n"
+            "TASK EXECUTION:\n"
+            "• Generation: Write code directly, minimal tool use\n"
+            "• Exploration: Use tools systematically, then summarize\n"
+            "• Modification: Read → understand → edit\n"
+            "• Actions: Execute fully, report results\n\n"
             f"{GROUNDING_RULES}"
         )
 
@@ -266,20 +311,21 @@ class SystemPromptBuilder:
         """Build prompt for LMStudio provider."""
         if self.has_native_tool_support():
             return (
-                "You are a code analyst with native tool calling support.\n\n"
+                "You are an expert coding assistant. You can analyze, explain, and generate code.\n\n"
+                "CAPABILITIES:\n"
+                "- Code generation: Write working implementations directly in your response.\n"
+                "- Code analysis: Use tools to explore and understand existing code.\n"
+                "- Code modification: Use tools to read files before making changes.\n\n"
                 "TOOL USAGE:\n"
-                "- Use tools via the OpenAI function calling format.\n"
+                "- For code generation tasks: write code directly, no tools needed.\n"
+                "- For exploration tasks: use tools via OpenAI function calling format.\n"
                 "- Call tools one at a time and wait for results.\n"
                 "- After 2-3 tool calls, provide your answer.\n"
                 "- Do NOT repeat identical tool calls.\n\n"
                 "RESPONSE FORMAT:\n"
                 "- Provide answers in plain, readable text.\n"
-                "- Do NOT include JSON, XML, or tool syntax in your response.\n"
-                "- Be direct and answer the user's question.\n\n"
-                "STOP CRITERIA:\n"
-                "- Stop when you have enough information to answer.\n"
-                "- After 3+ calls to any tool, stop and summarize.\n"
-                "- Always end with a clear, human-readable answer.\n\n"
+                "- For code generation, include the complete implementation.\n"
+                "- Do NOT include JSON, XML, or tool syntax in your response.\n\n"
                 f"{GROUNDING_RULES}"
             )
         else:

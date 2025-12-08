@@ -40,10 +40,15 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.tool_executor import ToolExecutor
+from victor.agent.parallel_executor import (
+    ParallelToolExecutor,
+    ParallelExecutionConfig,
+)
 
 if TYPE_CHECKING:
     from victor.tools.base import ToolRegistry
     from victor.cache.tool_cache import ToolCache
+    from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +62,16 @@ class ToolPipelineConfig:
     enable_analytics: bool = True
     enable_failed_signature_tracking: bool = True
     max_tool_name_length: int = 64
+
+    # Code correction settings
+    enable_code_correction: bool = False
+    code_correction_auto_fix: bool = True
+
+    # Parallel execution settings
+    enable_parallel_execution: bool = True
+    max_concurrent_tools: int = 5
+    parallel_batch_size: int = 10
+    parallel_timeout_per_tool: float = 60.0
 
 
 @dataclass
@@ -74,6 +89,10 @@ class ToolCallResult:
     skipped: bool = False
     skip_reason: Optional[str] = None
 
+    # Code correction tracking
+    code_corrected: bool = False
+    code_validation_errors: Optional[List[str]] = None
+
 
 @dataclass
 class PipelineExecutionResult:
@@ -86,6 +105,9 @@ class PipelineExecutionResult:
     skipped_calls: int = 0
     total_time_ms: float = 0.0
     budget_exhausted: bool = False
+    # Parallel execution metrics
+    parallel_execution_used: bool = False
+    parallel_speedup: float = 1.0
 
 
 class ToolPipeline:
@@ -121,6 +143,7 @@ class ToolPipeline:
         config: Optional[ToolPipelineConfig] = None,
         tool_cache: Optional["ToolCache"] = None,
         argument_normalizer: Optional[ArgumentNormalizer] = None,
+        code_correction_middleware: Optional["CodeCorrectionMiddleware"] = None,
         on_tool_start: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         on_tool_complete: Optional[Callable[[ToolCallResult], None]] = None,
     ):
@@ -132,6 +155,7 @@ class ToolPipeline:
             config: Pipeline configuration
             tool_cache: Optional cache for tool results
             argument_normalizer: Optional argument normalizer
+            code_correction_middleware: Optional middleware for code validation/fixing
             on_tool_start: Callback when tool execution starts
             on_tool_complete: Callback when tool execution completes
         """
@@ -140,6 +164,7 @@ class ToolPipeline:
         self.config = config or ToolPipelineConfig()
         self.tool_cache = tool_cache
         self.normalizer = argument_normalizer or ArgumentNormalizer()
+        self.code_correction_middleware = code_correction_middleware
 
         # Callbacks
         self.on_tool_start = on_tool_start
@@ -152,6 +177,9 @@ class ToolPipeline:
 
         # Analytics
         self._tool_stats: Dict[str, Dict[str, Any]] = {}
+
+        # Parallel executor (lazy initialized)
+        self._parallel_executor: Optional[ParallelToolExecutor] = None
 
     @property
     def calls_used(self) -> int:
@@ -167,6 +195,31 @@ class ToolPipeline:
     def executed_tools(self) -> List[str]:
         """List of executed tool names."""
         return list(self._executed_tools)
+
+    @property
+    def parallel_executor(self) -> ParallelToolExecutor:
+        """Get or create the parallel executor (lazy initialization)."""
+        if self._parallel_executor is None:
+            parallel_config = ParallelExecutionConfig(
+                max_concurrent=self.config.max_concurrent_tools,
+                enable_parallel=self.config.enable_parallel_execution,
+                batch_size=self.config.parallel_batch_size,
+                timeout_per_tool=self.config.parallel_timeout_per_tool,
+            )
+            self._parallel_executor = ParallelToolExecutor(
+                tool_executor=self.executor,
+                config=parallel_config,
+                progress_callback=self._parallel_progress_callback,
+            )
+        return self._parallel_executor
+
+    def _parallel_progress_callback(self, tool_name: str, status: str, success: bool) -> None:
+        """Progress callback for parallel execution."""
+        if status == "started" and self.on_tool_start:
+            try:
+                self.on_tool_start(tool_name, {})
+            except Exception as e:
+                logger.warning(f"on_tool_start callback failed: {e}")
 
     def reset(self) -> None:
         """Reset pipeline state for new conversation."""
@@ -270,6 +323,147 @@ class ToolPipeline:
         result.total_time_ms = (time.monotonic() - start_time) * 1000
         return result
 
+    async def execute_tool_calls_parallel(
+        self,
+        tool_calls: List[Dict[str, Any]],
+        context: Optional[Dict[str, Any]] = None,
+        force_parallel: bool = False,
+    ) -> PipelineExecutionResult:
+        """Execute tool calls with parallelization when beneficial.
+
+        Automatically decides whether to use parallel execution based on:
+        - Number of tool calls (>1 for parallel)
+        - Tool categories (read-only tools can parallelize)
+        - Configuration settings
+
+        Args:
+            tool_calls: List of tool call requests
+            context: Execution context passed to tools
+            force_parallel: Override automatic decision (for testing)
+
+        Returns:
+            PipelineExecutionResult with parallel metrics
+        """
+        context = context or {}
+        start_time = time.monotonic()
+
+        # Check if parallelization is worthwhile
+        should_parallelize = self.config.enable_parallel_execution and (
+            force_parallel or len(tool_calls) > 1
+        )
+
+        if not should_parallelize:
+            # Fall back to sequential execution
+            return await self.execute_tool_calls(tool_calls, context)
+
+        # Pre-validate and normalize tool calls
+        validated_calls = []
+        skipped_results = []
+
+        for tc in tool_calls:
+            tool_name = tc.get("name", "")
+
+            # Quick validation checks
+            if not tool_name or not self.is_valid_tool_name(tool_name):
+                skipped_results.append(
+                    ToolCallResult(
+                        tool_name=tool_name or "unknown",
+                        arguments={},
+                        success=False,
+                        skipped=True,
+                        skip_reason=f"Invalid tool name: {tool_name}",
+                    )
+                )
+                continue
+
+            if not self.tools.is_tool_enabled(tool_name):
+                skipped_results.append(
+                    ToolCallResult(
+                        tool_name=tool_name,
+                        arguments={},
+                        success=False,
+                        skipped=True,
+                        skip_reason=f"Unknown or disabled tool: {tool_name}",
+                    )
+                )
+                continue
+
+            # Normalize arguments
+            raw_args = tc.get("arguments", {})
+            normalized_args, _ = self._normalize_arguments(tool_name, raw_args)
+
+            # Check for repeated failures
+            if self.config.enable_failed_signature_tracking:
+                signature = self._get_call_signature(tool_name, normalized_args)
+                if signature in self._failed_signatures:
+                    skipped_results.append(
+                        ToolCallResult(
+                            tool_name=tool_name,
+                            arguments=normalized_args,
+                            success=False,
+                            skipped=True,
+                            skip_reason="Repeated failing call with same arguments",
+                        )
+                    )
+                    continue
+
+            validated_calls.append({"name": tool_name, "arguments": normalized_args})
+
+        # Execute validated calls in parallel
+        parallel_result = await self.parallel_executor.execute_parallel(validated_calls, context)
+
+        # Build pipeline result
+        result = PipelineExecutionResult(
+            total_calls=len(tool_calls),
+            parallel_execution_used=True,
+            parallel_speedup=parallel_result.parallel_speedup,
+        )
+
+        # Add skipped results first
+        for skipped in skipped_results:
+            result.results.append(skipped)
+            result.skipped_calls += 1
+
+        # Convert parallel results to pipeline results
+        for exec_result in parallel_result.results:
+            call_result = ToolCallResult(
+                tool_name=exec_result.tool_name,
+                arguments={},  # Arguments already logged
+                success=exec_result.success,
+                result=exec_result.result,
+                error=exec_result.error,
+                execution_time_ms=exec_result.execution_time * 1000,
+            )
+            result.results.append(call_result)
+
+            if exec_result.success:
+                result.successful_calls += 1
+                self._executed_tools.append(exec_result.tool_name)
+            else:
+                result.failed_calls += 1
+                # Track failed signature
+                if self.config.enable_failed_signature_tracking:
+                    # We need to get arguments back - use tool name + error as key
+                    self._failed_signatures.add((exec_result.tool_name, exec_result.error or ""))
+
+            # Update call count
+            self._calls_used += 1
+
+            # Check budget
+            if self._calls_used >= self.config.tool_budget:
+                result.budget_exhausted = True
+                break
+
+        result.total_time_ms = (time.monotonic() - start_time) * 1000
+
+        logger.info(
+            f"Parallel pipeline: {len(validated_calls)} tools, "
+            f"speedup={parallel_result.parallel_speedup:.2f}x, "
+            f"time={result.total_time_ms:.1f}ms"
+        )
+
+        return result
+
     async def _execute_single_call(
         self,
         tool_call: Dict[str, Any],
@@ -340,6 +534,41 @@ class ToolPipeline:
         normalized_args, strategy = self._normalize_arguments(tool_name, raw_args)
         normalization_applied = None if strategy == NormalizationStrategy.DIRECT else strategy.value
 
+        # Code correction middleware - validate and fix code arguments
+        code_corrected = False
+        code_validation_errors: Optional[List[str]] = None
+
+        if (
+            self.config.enable_code_correction
+            and self.code_correction_middleware is not None
+            and self.code_correction_middleware.should_validate(tool_name)
+        ):
+            try:
+                correction_result = self.code_correction_middleware.validate_and_fix(
+                    tool_name, normalized_args
+                )
+
+                if correction_result.was_corrected:
+                    # Apply the correction
+                    normalized_args = self.code_correction_middleware.apply_correction(
+                        normalized_args, correction_result
+                    )
+                    code_corrected = True
+                    logger.info(
+                        f"Code auto-corrected for tool '{tool_name}': "
+                        f"{len(correction_result.validation.errors)} issues fixed"
+                    )
+
+                if not correction_result.validation.valid:
+                    # Collect validation errors for feedback
+                    code_validation_errors = list(correction_result.validation.errors)
+                    logger.warning(
+                        f"Code validation errors for tool '{tool_name}': "
+                        f"{code_validation_errors}"
+                    )
+            except Exception as e:
+                logger.warning(f"Code correction middleware failed: {e}")
+
         # Check for repeated failures
         if self.config.enable_failed_signature_tracking:
             signature = self._get_call_signature(tool_name, normalized_args)
@@ -382,6 +611,8 @@ class ToolPipeline:
             error=exec_result.error,
             execution_time_ms=execution_time_ms,
             normalization_applied=normalization_applied,
+            code_corrected=code_corrected,
+            code_validation_errors=code_validation_errors,
         )
 
         # Track failed signatures

@@ -12,19 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for code_intelligence_tool module."""
+"""Tests for code_intelligence_tool module and consolidated rename from refactor_tool."""
 
 import pytest
 
 from victor.tools.code_intelligence_tool import (
-    find_symbol,
-    find_references,
-    rename_symbol,
+    symbol,
+    refs,
 )
+from victor.tools.refactor_tool import rename
 
 
-class TestFindSymbol:
-    """Tests for find_symbol function."""
+class TestSymbol:
+    """Tests for symbol function."""
 
     @pytest.mark.skip(reason="Tree-sitter query format issues - needs investigation")
     @pytest.mark.asyncio
@@ -42,7 +42,7 @@ def another_function():
 """
         )
 
-        result = await find_symbol(file_path=str(test_file), symbol_name="hello_world")
+        result = await symbol(file_path=str(test_file), symbol_name="hello_world")
 
         assert result is not None
         assert result["symbol_name"] == "hello_world"
@@ -66,7 +66,7 @@ class MyClass:
 """
         )
 
-        result = await find_symbol(file_path=str(test_file), symbol_name="MyClass")
+        result = await symbol(file_path=str(test_file), symbol_name="MyClass")
 
         assert result is not None
         assert result["symbol_name"] == "MyClass"
@@ -74,7 +74,7 @@ class MyClass:
         assert "class MyClass" in result["code"]
 
     @pytest.mark.asyncio
-    async def test_find_symbol_not_found(self, tmp_path):
+    async def test_symbol_not_found(self, tmp_path):
         """Test searching for non-existent symbol."""
         test_file = tmp_path / "test.py"
         test_file.write_text(
@@ -84,25 +84,25 @@ def existing_function():
 """
         )
 
-        result = await find_symbol(file_path=str(test_file), symbol_name="nonexistent")
+        result = await symbol(file_path=str(test_file), symbol_name="nonexistent")
 
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_find_symbol_file_not_found(self):
+    async def test_symbol_file_not_found(self):
         """Test with non-existent file."""
-        result = await find_symbol(file_path="/nonexistent/file.py", symbol_name="test")
+        result = await symbol(file_path="/nonexistent/file.py", symbol_name="test")
 
         assert result is not None
         assert "error" in result
 
     @pytest.mark.asyncio
-    async def test_find_symbol_empty_file(self, tmp_path):
+    async def test_symbol_empty_file(self, tmp_path):
         """Test with empty file."""
         test_file = tmp_path / "empty.py"
         test_file.write_text("")
 
-        result = await find_symbol(file_path=str(test_file), symbol_name="test")
+        result = await symbol(file_path=str(test_file), symbol_name="test")
 
         assert result is None
 
@@ -120,7 +120,7 @@ def outer_function():
 """
         )
 
-        result = await find_symbol(file_path=str(test_file), symbol_name="inner_function")
+        result = await symbol(file_path=str(test_file), symbol_name="inner_function")
 
         assert result is not None
         assert result["symbol_name"] == "inner_function"
@@ -139,15 +139,15 @@ class TestClass:
 """
         )
 
-        result = await find_symbol(file_path=str(test_file), symbol_name="test_method")
+        result = await symbol(file_path=str(test_file), symbol_name="test_method")
 
         assert result is not None
         assert result["symbol_name"] == "test_method"
         assert result["type"] == "function"
 
     @pytest.mark.asyncio
-    async def test_find_symbol_generic_exception(self, tmp_path):
-        """Test generic exception handling in find_symbol."""
+    async def test_symbol_generic_exception(self, tmp_path):
+        """Test generic exception handling in symbol."""
         from unittest.mock import patch
 
         test_file = tmp_path / "test.py"
@@ -158,18 +158,18 @@ class TestClass:
             "victor.tools.code_intelligence_tool.get_parser",
             side_effect=RuntimeError("Parse error"),
         ):
-            result = await find_symbol(file_path=str(test_file), symbol_name="test_func")
+            result = await symbol(file_path=str(test_file), symbol_name="test_func")
 
             assert result is not None
             assert "error" in result
             assert "unexpected error" in result["error"].lower()
 
 
-class TestFindReferences:
-    """Tests for find_references function."""
+class TestRefs:
+    """Tests for refs function."""
 
     @pytest.mark.asyncio
-    async def test_find_references_basic(self, tmp_path):
+    async def test_refs_basic(self, tmp_path):
         """Test finding references in directory."""
         # Create a directory with Python files
         test_file1 = tmp_path / "file1.py"
@@ -189,13 +189,13 @@ result = target_function()
 """
         )
 
-        result = await find_references(symbol_name="target_function", search_path=str(tmp_path))
+        result = await refs(symbol_name="target_function", search_path=str(tmp_path))
 
         assert isinstance(result, list)
         # May or may not find cross-file references depending on implementation
 
     @pytest.mark.asyncio
-    async def test_find_references_no_matches(self, tmp_path):
+    async def test_refs_no_matches(self, tmp_path):
         """Test finding references when none exist."""
         test_file = tmp_path / "test.py"
         test_file.write_text(
@@ -205,7 +205,7 @@ def some_function():
 """
         )
 
-        result = await find_references(
+        result = await refs(
             symbol_name="nonexistent_function", search_path=str(tmp_path)
         )
 
@@ -213,23 +213,23 @@ def some_function():
         # Empty list or minimal results expected
 
     @pytest.mark.asyncio
-    async def test_find_references_invalid_path(self):
+    async def test_refs_invalid_path(self):
         """Test with invalid search path."""
-        result = await find_references(symbol_name="test", search_path="/nonexistent/path")
+        result = await refs(symbol_name="test", search_path="/nonexistent/path")
 
         assert isinstance(result, list)
         # Should handle gracefully, return empty list
 
     @pytest.mark.asyncio
-    async def test_find_references_empty_directory(self, tmp_path):
+    async def test_refs_empty_directory(self, tmp_path):
         """Test with empty directory."""
-        result = await find_references(symbol_name="test", search_path=str(tmp_path))
+        result = await refs(symbol_name="test", search_path=str(tmp_path))
 
         assert isinstance(result, list)
         assert len(result) == 0
 
     @pytest.mark.asyncio
-    async def test_find_references_with_parse_errors(self, tmp_path):
+    async def test_refs_with_parse_errors(self, tmp_path):
         """Test that unparseable files are skipped gracefully."""
         # Create a file with invalid Python
         bad_file = tmp_path / "bad.py"
@@ -246,14 +246,14 @@ result = target_function()
 """
         )
 
-        result = await find_references(symbol_name="target_function", search_path=str(tmp_path))
+        result = await refs(symbol_name="target_function", search_path=str(tmp_path))
 
         # Should still return results from good file
         assert isinstance(result, list)
         # The bad file should be skipped (exception caught)
 
     @pytest.mark.asyncio
-    async def test_find_references_with_file_exception(self, tmp_path):
+    async def test_refs_with_file_exception(self, tmp_path):
         """Test that file exceptions are caught and processing continues."""
         from unittest.mock import patch
 
@@ -263,372 +263,281 @@ result = target_function()
 
         # Mock open to raise an exception for any file
         with patch("builtins.open", side_effect=OSError("File read error")):
-            result = await find_references(symbol_name="target", search_path=str(tmp_path))
+            result = await refs(symbol_name="target", search_path=str(tmp_path))
 
             # Should return empty list since all files failed to read
             assert isinstance(result, list)
             assert len(result) == 0
 
 
-class TestRenameSymbol:
-    """Tests for rename_symbol function."""
+class TestRename:
+    """Tests for consolidated rename function from refactor_tool."""
 
     @pytest.mark.asyncio
-    async def test_rename_missing_context(self, tmp_path):
-        """Test rename with missing context."""
+    async def test_rename_single_file(self, tmp_path):
+        """Test renaming symbol in a single file."""
         test_file = tmp_path / "test.py"
         test_file.write_text(
-            """
-def old_function():
+            """def old_func():
     return True
 
-def caller():
-    result = old_function()
-    return result
+result = old_func()
 """
         )
 
-        result = await rename_symbol(
-            symbol_name="old_function",
-            new_symbol_name="new_function",
-            context={},  # Empty context, no tool_registry
-            search_path=str(tmp_path),
+        result = await rename(
+            old_name="old_func",
+            new_name="new_func",
+            path=str(test_file),
+            scope="file",
+            preview=False,
         )
 
-        # Should handle missing tool_registry gracefully
-        assert result is not None
-        assert "Error" in result or "error" in result.lower()
+        assert result["success"] is True
+        assert result["files_count"] == 1
+        assert result["total_changes"] >= 2  # Definition + usage
+
+        # Verify file was modified
+        content = test_file.read_text()
+        assert "new_func" in content
+        assert "old_func" not in content
 
     @pytest.mark.asyncio
-    async def test_rename_with_no_references(self, tmp_path):
-        """Test rename when no references found."""
-        from unittest.mock import AsyncMock, MagicMock
-
-        # Create mock tool_registry
-        mock_registry = MagicMock()
-        mock_result = MagicMock()
-        mock_result.success = True
-        mock_result.output = []  # No references found
-        mock_registry.execute = AsyncMock(return_value=mock_result)
-
-        result = await rename_symbol(
-            symbol_name="nonexistent",
-            new_symbol_name="new_name",
-            context={"tool_registry": mock_registry},
-            search_path=str(tmp_path),
-        )
-
-        # Should indicate no references found
-        assert result is not None
-        assert "No references" in result or "no references" in result.lower()
-
-    @pytest.mark.asyncio
-    async def test_rename_execution_failure(self):
-        """Test rename when find_references fails."""
-        from unittest.mock import AsyncMock, MagicMock
-
-        # Create mock tool_registry that returns failure
-        mock_registry = MagicMock()
-        mock_result = MagicMock()
-        mock_result.success = False
-        mock_result.error = "Test error"
-        mock_registry.execute = AsyncMock(return_value=mock_result)
-
-        result = await rename_symbol(
-            symbol_name="test",
-            new_symbol_name="new_test",
-            context={"tool_registry": mock_registry},
-            search_path=".",
-        )
-
-        # Should handle error gracefully
-        assert result is not None
-        assert "Error" in result or "error" in result.lower()
-
-    @pytest.mark.asyncio
-    async def test_rename_basic_structure(self):
-        """Test basic structure of rename_symbol function."""
-        # Just test that it handles missing context properly
-        result = await rename_symbol(symbol_name="test", new_symbol_name="new_test", context={})
-
-        assert result is not None
-        assert isinstance(result, str)
-
-    @pytest.mark.asyncio
-    async def test_rename_with_successful_transaction(self, tmp_path):
-        """Test successful rename with transaction."""
-        from unittest.mock import AsyncMock, MagicMock
-
-        # Create test files
-        test_file1 = tmp_path / "file1.py"
-        test_file1.write_text(
-            """
-def old_name():
+    async def test_rename_single_file_preview(self, tmp_path):
+        """Test preview mode doesn't modify file."""
+        test_file = tmp_path / "test.py"
+        original_content = """def old_func():
     return True
+"""
+        test_file.write_text(original_content)
 
-result = old_name()
+        result = await rename(
+            old_name="old_func",
+            new_name="new_func",
+            path=str(test_file),
+            scope="file",
+            preview=True,
+        )
+
+        assert result["success"] is True
+        assert "PREVIEW" in result["formatted_report"]
+
+        # File should NOT be modified
+        assert test_file.read_text() == original_content
+
+    @pytest.mark.asyncio
+    async def test_rename_directory_scope(self, tmp_path):
+        """Test renaming symbol across directory."""
+        # Create files in directory
+        file1 = tmp_path / "module1.py"
+        file1.write_text("def helper(): pass\nhelper()")
+
+        file2 = tmp_path / "module2.py"
+        file2.write_text("from module1 import helper\nhelper()")
+
+        result = await rename(
+            old_name="helper",
+            new_name="util",
+            path=str(tmp_path),
+            scope="directory",
+            preview=False,
+        )
+
+        assert result["success"] is True
+        assert result["files_count"] == 2
+
+        # Both files should be modified
+        assert "util" in file1.read_text()
+        assert "util" in file2.read_text()
+
+    @pytest.mark.asyncio
+    async def test_rename_project_scope(self, tmp_path):
+        """Test renaming symbol across entire project."""
+        # Create nested directory structure
+        subdir = tmp_path / "subpackage"
+        subdir.mkdir()
+
+        file1 = tmp_path / "main.py"
+        file1.write_text("CONFIG = 'test'\nprint(CONFIG)")
+
+        file2 = subdir / "utils.py"
+        file2.write_text("from main import CONFIG\nval = CONFIG")
+
+        result = await rename(
+            old_name="CONFIG",
+            new_name="SETTINGS",
+            path=str(tmp_path),
+            scope="project",
+            preview=False,
+        )
+
+        assert result["success"] is True
+        assert result["files_count"] == 2
+
+        # Both files should be modified
+        assert "SETTINGS" in file1.read_text()
+        assert "SETTINGS" in file2.read_text()
+
+    @pytest.mark.asyncio
+    async def test_rename_with_depth_limit(self, tmp_path):
+        """Test depth limiting for project scope."""
+        # Create nested structure
+        deep_dir = tmp_path / "level1" / "level2" / "level3"
+        deep_dir.mkdir(parents=True)
+
+        file_root = tmp_path / "root.py"
+        file_root.write_text("target = 1")
+
+        file_deep = deep_dir / "deep.py"
+        file_deep.write_text("target = 2")
+
+        # Only rename at depth 0 (current dir only)
+        result = await rename(
+            old_name="target",
+            new_name="renamed",
+            path=str(tmp_path),
+            scope="project",
+            depth=0,
+            preview=False,
+        )
+
+        assert result["success"] is True
+        # Should only modify root file
+        assert "renamed" in file_root.read_text()
+        assert "target" in file_deep.read_text()  # Deep file unchanged
+
+    @pytest.mark.asyncio
+    async def test_rename_missing_params(self):
+        """Test error when required params missing."""
+        result = await rename(old_name="", new_name="new")
+        assert result["success"] is False
+        assert "Missing" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_rename_same_name(self, tmp_path):
+        """Test error when old and new names are the same."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def func(): pass")
+
+        result = await rename(
+            old_name="func",
+            new_name="func",
+            path=str(test_file),
+            scope="file",
+        )
+
+        assert result["success"] is False
+        assert "different" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_rename_invalid_scope(self, tmp_path):
+        """Test error with invalid scope."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def func(): pass")
+
+        result = await rename(
+            old_name="func",
+            new_name="new_func",
+            path=str(test_file),
+            scope="invalid",
+        )
+
+        assert result["success"] is False
+        assert "Invalid scope" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_rename_file_not_found(self):
+        """Test error when file doesn't exist."""
+        result = await rename(
+            old_name="func",
+            new_name="new_func",
+            path="/nonexistent/file.py",
+            scope="file",
+        )
+
+        assert result["success"] is False
+        assert "not found" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_rename_symbol_not_found(self, tmp_path):
+        """Test error when symbol not found in file."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def other_func(): pass")
+
+        result = await rename(
+            old_name="nonexistent",
+            new_name="new_name",
+            path=str(test_file),
+            scope="file",
+        )
+
+        assert result["success"] is False
+        assert "not found" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_rename_no_python_files(self, tmp_path):
+        """Test error when no Python files in directory."""
+        # Create empty directory
+        result = await rename(
+            old_name="func",
+            new_name="new_func",
+            path=str(tmp_path),
+            scope="project",
+        )
+
+        assert result["success"] is False
+        assert "No Python files" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_rename_skips_excluded_dirs(self, tmp_path):
+        """Test that __pycache__, .git etc are skipped."""
+        # Create file in __pycache__
+        cache_dir = tmp_path / "__pycache__"
+        cache_dir.mkdir()
+        cache_file = cache_dir / "cached.py"
+        cache_file.write_text("target = 1")
+
+        # Create normal file
+        normal_file = tmp_path / "main.py"
+        normal_file.write_text("target = 2")
+
+        result = await rename(
+            old_name="target",
+            new_name="renamed",
+            path=str(tmp_path),
+            scope="project",
+            preview=False,
+        )
+
+        assert result["success"] is True
+        # Cache file should be unchanged
+        assert "target" in cache_file.read_text()
+        # Normal file should be modified
+        assert "renamed" in normal_file.read_text()
+
+    @pytest.mark.asyncio
+    async def test_rename_word_boundary_safety(self, tmp_path):
+        """Test that rename uses word boundaries to avoid partial matches."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text(
+            """def get_user(): pass
+def get_username(): pass  # Should NOT be renamed
+user = get_user()
+username = get_username()  # Should NOT be renamed
 """
         )
 
-        test_file2 = tmp_path / "file2.py"
-        test_file2.write_text(
-            """
-from file1 import old_name
-
-value = old_name()
-"""
+        result = await rename(
+            old_name="get_user",
+            new_name="fetch_user",
+            path=str(test_file),
+            scope="file",
+            preview=False,
         )
 
-        # Create mock tool_registry with proper responses
-        mock_registry = MagicMock()
+        assert result["success"] is True
 
-        # Mock find_references to return references
-        references = [
-            {"file_path": str(test_file1), "line": 2, "column": 5, "preview": "def old_name():"},
-            {
-                "file_path": str(test_file1),
-                "line": 5,
-                "column": 10,
-                "preview": "result = old_name()",
-            },
-            {"file_path": str(test_file2), "line": 4, "column": 8, "preview": "value = old_name()"},
-        ]
-
-        find_refs_result = MagicMock()
-        find_refs_result.success = True
-        find_refs_result.output = references
-
-        # Mock transaction start
-        start_result = MagicMock()
-        start_result.success = True
-
-        # Mock file reads
-        read_result1 = MagicMock()
-        read_result1.success = True
-        read_result1.output = test_file1.read_text()
-
-        read_result2 = MagicMock()
-        read_result2.success = True
-        read_result2.output = test_file2.read_text()
-
-        # Mock add_modify
-        add_modify_result = MagicMock()
-        add_modify_result.success = True
-
-        # Setup execute mock to return appropriate results
-        async def mock_execute(tool_name, context, **kwargs):
-            if tool_name == "find_references":
-                return find_refs_result
-            elif kwargs.get("operation") == "start_transaction":
-                return start_result
-            elif tool_name == "read_file":
-                if kwargs.get("path") == str(test_file1):
-                    return read_result1
-                else:
-                    return read_result2
-            elif kwargs.get("operation") == "add_modify":
-                return add_modify_result
-            return MagicMock(success=True)
-
-        mock_registry.execute = AsyncMock(side_effect=mock_execute)
-
-        result = await rename_symbol(
-            symbol_name="old_name",
-            new_symbol_name="new_name",
-            context={"tool_registry": mock_registry},
-            search_path=str(tmp_path),
-        )
-
-        assert result is not None
-        assert "Queued rename" in result
-        assert "new_name" in result
-
-    @pytest.mark.asyncio
-    async def test_rename_transaction_start_failure(self):
-        """Test rename when transaction start fails."""
-        from unittest.mock import AsyncMock, MagicMock
-
-        mock_registry = MagicMock()
-
-        # find_references succeeds
-        find_refs_result = MagicMock()
-        find_refs_result.success = True
-        find_refs_result.output = [
-            {"file_path": "test.py", "line": 1, "column": 1, "preview": "test"}
-        ]
-
-        # transaction start fails
-        start_result = MagicMock()
-        start_result.success = False
-        start_result.error = "Transaction error"
-
-        async def mock_execute(tool_name, context, **kwargs):
-            if tool_name == "find_references":
-                return find_refs_result
-            elif kwargs.get("operation") == "start_transaction":
-                return start_result
-            return MagicMock(success=True)
-
-        mock_registry.execute = AsyncMock(side_effect=mock_execute)
-
-        result = await rename_symbol(
-            symbol_name="test",
-            new_symbol_name="new_test",
-            context={"tool_registry": mock_registry},
-            search_path=".",
-        )
-
-        assert "Error starting transaction" in result
-
-    @pytest.mark.asyncio
-    async def test_rename_file_read_failure(self, tmp_path):
-        """Test rename when file read fails."""
-        from unittest.mock import AsyncMock, MagicMock
-
-        test_file = tmp_path / "test.py"
-        test_file.write_text("def old(): pass")
-
-        mock_registry = MagicMock()
-
-        # find_references succeeds
-        find_refs_result = MagicMock()
-        find_refs_result.success = True
-        find_refs_result.output = [
-            {"file_path": str(test_file), "line": 1, "column": 5, "preview": "def old():"}
-        ]
-
-        # transaction start succeeds
-        start_result = MagicMock()
-        start_result.success = True
-
-        # read_file fails
-        read_result = MagicMock()
-        read_result.success = False
-
-        # abort succeeds
-        abort_result = MagicMock()
-        abort_result.success = True
-
-        async def mock_execute(tool_name, context, **kwargs):
-            if tool_name == "find_references":
-                return find_refs_result
-            elif kwargs.get("operation") == "start_transaction":
-                return start_result
-            elif tool_name == "read_file":
-                return read_result
-            elif kwargs.get("operation") == "abort":
-                return abort_result
-            return MagicMock(success=True)
-
-        mock_registry.execute = AsyncMock(side_effect=mock_execute)
-
-        result = await rename_symbol(
-            symbol_name="old",
-            new_symbol_name="new",
-            context={"tool_registry": mock_registry},
-            search_path=str(tmp_path),
-        )
-
-        assert "No files were modified" in result or "aborted" in result.lower()
-
-    @pytest.mark.asyncio
-    async def test_rename_add_modify_failure(self, tmp_path):
-        """Test rename when add_modify fails."""
-        from unittest.mock import AsyncMock, MagicMock
-
-        test_file = tmp_path / "test.py"
-        test_file.write_text("def old(): pass")
-
-        mock_registry = MagicMock()
-
-        # find_references succeeds
-        find_refs_result = MagicMock()
-        find_refs_result.success = True
-        find_refs_result.output = [
-            {"file_path": str(test_file), "line": 1, "column": 5, "preview": "def old():"}
-        ]
-
-        # transaction start succeeds
-        start_result = MagicMock()
-        start_result.success = True
-
-        # read_file succeeds
-        read_result = MagicMock()
-        read_result.success = True
-        read_result.output = "def old(): pass"
-
-        # add_modify fails
-        add_modify_result = MagicMock()
-        add_modify_result.success = False
-        add_modify_result.error = "Modify failed"
-
-        async def mock_execute(tool_name, context, **kwargs):
-            if tool_name == "find_references":
-                return find_refs_result
-            elif kwargs.get("operation") == "start_transaction":
-                return start_result
-            elif tool_name == "read_file":
-                return read_result
-            elif kwargs.get("operation") == "add_modify":
-                return add_modify_result
-            return MagicMock(success=True)
-
-        mock_registry.execute = AsyncMock(side_effect=mock_execute)
-
-        result = await rename_symbol(
-            symbol_name="old",
-            new_symbol_name="new",
-            context={"tool_registry": mock_registry},
-            search_path=str(tmp_path),
-        )
-
-        assert "Error queuing modification" in result
-
-    @pytest.mark.asyncio
-    async def test_rename_exception_during_processing(self, tmp_path):
-        """Test rename when exception occurs during file processing."""
-        from unittest.mock import AsyncMock, MagicMock
-
-        test_file = tmp_path / "test.py"
-        test_file.write_text("def old(): pass")
-
-        mock_registry = MagicMock()
-
-        # find_references succeeds
-        find_refs_result = MagicMock()
-        find_refs_result.success = True
-        find_refs_result.output = [
-            {"file_path": str(test_file), "line": 1, "column": 5, "preview": "def old():"}
-        ]
-
-        # transaction start succeeds
-        start_result = MagicMock()
-        start_result.success = True
-
-        # abort succeeds
-        abort_result = MagicMock()
-        abort_result.success = True
-
-        # read_file raises exception
-        async def mock_execute(tool_name, context, **kwargs):
-            if tool_name == "find_references":
-                return find_refs_result
-            elif kwargs.get("operation") == "start_transaction":
-                return start_result
-            elif tool_name == "read_file":
-                raise RuntimeError("File system error")
-            elif kwargs.get("operation") == "abort":
-                return abort_result
-            return MagicMock(success=True)
-
-        mock_registry.execute = AsyncMock(side_effect=mock_execute)
-
-        result = await rename_symbol(
-            symbol_name="old",
-            new_symbol_name="new",
-            context={"tool_registry": mock_registry},
-            search_path=str(tmp_path),
-        )
-
-        assert "Failed to process file" in result
-        assert "aborted" in result.lower()
+        content = test_file.read_text()
+        assert "fetch_user" in content
+        assert "get_username" in content  # Not renamed
+        assert "fetch_username" not in content  # Partial match prevented

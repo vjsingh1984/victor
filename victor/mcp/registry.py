@@ -624,8 +624,15 @@ class MCPRegistry:
         # Global user config
         search_paths.append(paths.global_victor_dir / "mcp.yaml")
         search_paths.append(paths.global_victor_dir / "mcp.yml")
-        search_paths.append(Path.home() / ".config" / "mcp" / "servers.yaml")
-        search_paths.append(Path.home() / ".config" / "mcp" / "servers.yml")
+        # Also search XDG config directory (with secure home resolution)
+        try:
+            from victor.config.secure_paths import get_secure_home
+
+            secure_home = get_secure_home()
+        except ImportError:
+            secure_home = Path.home()
+        search_paths.append(secure_home / ".config" / "mcp" / "servers.yaml")
+        search_paths.append(secure_home / ".config" / "mcp" / "servers.yml")
 
         # Load from first found config
         for config_path in search_paths:

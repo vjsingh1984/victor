@@ -18,33 +18,25 @@ Guide for maintainers on creating and publishing Victor releases.
 
 Victor uses a fully automated release pipeline triggered by Git tags:
 
-```
-Tag Push (v0.1.0)
-       │
-       ▼
-┌──────────────────┐
-│   GitHub Actions │
-│                  │
-│  ┌────────────┐  │
-│  │    Test    │  │
-│  └─────┬──────┘  │
-│        │         │
-│        ▼         │
-│  ┌────────────┐  │
-│  │   Build    │  │
-│  │  - Python  │  │
-│  │  - Binary  │  │
-│  │  - Docker  │  │
-│  └─────┬──────┘  │
-│        │         │
-│        ▼         │
-│  ┌────────────┐  │
-│  │  Publish   │  │
-│  │  - PyPI    │  │
-│  │  - GitHub  │  │
-│  │  - Docker  │  │
-│  └────────────┘  │
-└──────────────────┘
+```mermaid
+flowchart TB
+    TAG["🏷️ Tag Push<br/>(v0.1.0)"]
+
+    subgraph GHA["GitHub Actions"]
+        TEST["✅ Test"]
+        BUILD["📦 Build<br/>• Python<br/>• Binary<br/>• Docker"]
+        PUBLISH["🚀 Publish<br/>• PyPI<br/>• GitHub<br/>• Docker"]
+
+        TEST --> BUILD --> PUBLISH
+    end
+
+    TAG --> GHA
+
+    style TAG fill:#e0e7ff,stroke:#4f46e5
+    style GHA fill:#f0f9ff,stroke:#0284c7
+    style TEST fill:#d1fae5,stroke:#10b981
+    style BUILD fill:#fef3c7,stroke:#f59e0b
+    style PUBLISH fill:#dbeafe,stroke:#3b82f6
 ```
 
 ## Pre-Release Checklist

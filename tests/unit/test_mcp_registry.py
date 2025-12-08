@@ -138,7 +138,6 @@ class TestMCPRegistryConnect:
     @pytest.mark.asyncio
     async def test_connect_success(self):
         """Test successful connection."""
-        from unittest.mock import patch, AsyncMock, MagicMock
 
         registry = MCPRegistry()
         config = MCPServerConfig(name="test", command=["echo"])
@@ -157,7 +156,6 @@ class TestMCPRegistryConnect:
     @pytest.mark.asyncio
     async def test_connect_failure(self):
         """Test connection failure."""
-        from unittest.mock import patch, AsyncMock, MagicMock
 
         registry = MCPRegistry()
         config = MCPServerConfig(name="test", command=["echo"])
@@ -174,7 +172,6 @@ class TestMCPRegistryConnect:
     @pytest.mark.asyncio
     async def test_connect_exception(self):
         """Test connection exception handling."""
-        from unittest.mock import patch, AsyncMock, MagicMock
 
         registry = MCPRegistry()
         config = MCPServerConfig(name="test", command=["echo"])
@@ -192,7 +189,6 @@ class TestMCPRegistryConnect:
     @pytest.mark.asyncio
     async def test_disconnect(self):
         """Test disconnecting from a server."""
-        from unittest.mock import MagicMock
 
         registry = MCPRegistry()
         config = MCPServerConfig(name="test", command=["echo"])
@@ -222,7 +218,6 @@ class TestMCPRegistryConnect:
     @pytest.mark.asyncio
     async def test_connect_all(self):
         """Test connecting to all servers."""
-        from unittest.mock import patch, AsyncMock, MagicMock
 
         registry = MCPRegistry()
         registry.register_server(MCPServerConfig(name="s1", command=["echo"]))
@@ -244,7 +239,6 @@ class TestMCPRegistryConnect:
     @pytest.mark.asyncio
     async def test_disconnect_all(self):
         """Test disconnecting from all servers."""
-        from unittest.mock import MagicMock
 
         registry = MCPRegistry()
         registry.register_server(MCPServerConfig(name="s1", command=["echo"]))
@@ -282,7 +276,6 @@ class TestMCPRegistryHealthCheck:
     @pytest.mark.asyncio
     async def test_health_check_success(self):
         """Test successful health check."""
-        from unittest.mock import MagicMock, AsyncMock
 
         registry = MCPRegistry()
         config = MCPServerConfig(name="test", command=["echo"])
@@ -301,7 +294,6 @@ class TestMCPRegistryHealthCheck:
     @pytest.mark.asyncio
     async def test_health_check_failure(self):
         """Test failed health check."""
-        from unittest.mock import MagicMock, AsyncMock
 
         registry = MCPRegistry()
         config = MCPServerConfig(name="test", command=["echo"])
@@ -320,7 +312,6 @@ class TestMCPRegistryHealthCheck:
     @pytest.mark.asyncio
     async def test_health_check_exception(self):
         """Test health check with exception."""
-        from unittest.mock import MagicMock, AsyncMock
 
         registry = MCPRegistry()
         config = MCPServerConfig(name="test", command=["echo"])
@@ -367,7 +358,6 @@ class TestMCPRegistryStartStop:
     @pytest.mark.asyncio
     async def test_start(self):
         """Test starting the registry."""
-        from unittest.mock import patch, AsyncMock, MagicMock
 
         registry = MCPRegistry()
         registry.register_server(MCPServerConfig(name="test", command=["echo"]))
@@ -409,7 +399,6 @@ class TestMCPRegistryCallTool:
     @pytest.mark.asyncio
     async def test_call_tool_success(self):
         """Test successful tool call."""
-        from unittest.mock import MagicMock, AsyncMock
         from victor.mcp.protocol import MCPToolCallResult
 
         registry = MCPRegistry()

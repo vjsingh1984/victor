@@ -3,7 +3,7 @@
 **For Newbies: A Comprehensive Guide to Understanding Victor's Design**
 
 > Created: 2025-11-26
-> Updated: 2025-11-30
+> Updated: 2025-12-06
 > Author: Architecture Analysis
 > Audience: New developers, contributors, and system designers
 
@@ -36,7 +36,7 @@ Victor is an **enterprise-ready, terminal-based AI coding assistant** that acts 
 
 **Solution**: Victor provides a unified abstraction layer that:
 - Normalizes all provider differences into a single interface
-- Provides ~38 enterprise-grade tools (git, testing, security, docker, etc.)
+- Provides 46 enterprise-grade tools (git, testing, security, docker, etc.)
 - Enables air-gapped (offline) operation for compliance
 - Uses intelligent semantic tool selection instead of broadcasting all tools
 
@@ -46,36 +46,36 @@ Victor is an **enterprise-ready, terminal-based AI coding assistant** that acts 
 
 ### 2.1 High-Level Layered Design
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     USER INTERFACES                          │
-│   - CLI (victor/ui/cli.py)                                  │
-│   - MCP Server (exposes tools to Claude Desktop, VS Code)   │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│              AGENT ORCHESTRATOR (Brain)                      │
-│   victor/agent/orchestrator.py                              │
-│                                                              │
-│   Responsibilities:                                         │
-│   - Manage conversation history                            │
-│   - Select relevant tools intelligently                     │
-│   - Execute tool calls from LLM                             │
-│   - Handle streaming responses                              │
-│   - Enforce tool budget limits                              │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-         ┌─────────────┼─────────────┐
-         │             │             │
-         ▼             ▼             ▼
-┌────────────┐  ┌─────────────┐  ┌─────────────┐
-│  PROVIDER  │  │    TOOLS    │  │     MCP     │
-│  SYSTEM    │  │   SYSTEM    │  │  BRIDGE     │
-│            │  │             │  │             │
-│ Normalize  │  │ 43 tools    │  │ Client +    │
-│ different  │  │ registered  │  │ Server      │
-│ LLM APIs   │  │ in registry │  │             │
-└────────────┘  └─────────────┘  └─────────────┘
+```mermaid
+flowchart TB
+    subgraph UI["USER INTERFACES"]
+        CLI["CLI<br/>(victor/ui/cli.py)"]
+        MCP_UI["MCP Server<br/>(Claude Desktop, VS Code)"]
+    end
+
+    subgraph ORCH["AGENT ORCHESTRATOR (Brain)"]
+        direction TB
+        ORC["victor/agent/orchestrator.py"]
+        RESP["• Manage conversation history<br/>• Select relevant tools intelligently<br/>• Execute tool calls from LLM<br/>• Handle streaming responses<br/>• Enforce tool budget limits"]
+    end
+
+    subgraph SYSTEMS[""]
+        direction LR
+        PROV["PROVIDER SYSTEM<br/>━━━━━━━━━━━━<br/>Normalize different<br/>LLM APIs"]
+        TOOLS["TOOLS SYSTEM<br/>━━━━━━━━━━━━<br/>46 tools<br/>registered in registry"]
+        MCP_B["MCP BRIDGE<br/>━━━━━━━━━━━━<br/>Client +<br/>Server"]
+    end
+
+    UI --> ORCH
+    ORCH --> PROV
+    ORCH --> TOOLS
+    ORCH --> MCP_B
+
+    style UI fill:#e0e7ff,stroke:#4f46e5
+    style ORCH fill:#d1fae5,stroke:#10b981
+    style PROV fill:#fef3c7,stroke:#f59e0b
+    style TOOLS fill:#fef3c7,stroke:#f59e0b
+    style MCP_B fill:#fef3c7,stroke:#f59e0b
 ```
 
 ### 2.2 Key Components Explained
@@ -87,16 +87,161 @@ Victor is an **enterprise-ready, terminal-based AI coding assistant** that acts 
 
 **What it does**:
 1. **Manages Conversation**: Keeps track of all messages (user, assistant, tool results)
-2. **Selects Tools**: Intelligently chooses which tools to send to the LLM (not all 32!)
+2. **Selects Tools**: Intelligently chooses which tools to send to the LLM (not all 46!)
 3. **Executes Tools**: When LLM requests a tool, orchestrator runs it
 4. **Streams Responses**: Shows results in real-time
 5. **Enforces Budget**: Limits tool calls to prevent infinite loops
 
 **Key Data**:
 - `self.messages`: Full conversation history
-- `self.tools`: ToolRegistry with all 43 tools
+- `self.tools`: ToolRegistry with all 46 tools
 - `self.provider`: Current LLM provider (Claude, Ollama, etc.)
 - `self.semantic_selector`: Optional embedding-based tool selector
+
+**Decomposed Components** (as of December 2025):
+
+The orchestrator follows the **facade pattern**, delegating to specialized components:
+
+```mermaid
+flowchart TB
+    subgraph FACADE["AgentOrchestrator (Facade)"]
+        direction TB
+
+        subgraph ROW1[" "]
+            direction LR
+            CC["**ConversationController**<br/>• Message history<br/>• Context tracking<br/>• Stage management"]
+            TP["**ToolPipeline**<br/>• Tool validation<br/>• Execution coord<br/>• Budget enforcement"]
+            SC["**StreamingController**<br/>• Session lifecycle<br/>• Cancellation<br/>• Metrics"]
+        end
+
+        subgraph ROW2[" "]
+            direction LR
+            MC["**MetricsCollector**<br/>• Stream metrics<br/>• Tool selection<br/>• Cost tracking"]
+            TA["**TaskAnalyzer**<br/>• Complexity class.<br/>• Task/intent class.<br/>• Unified facade"]
+            MS["**ModelSwitcher**<br/>• Provider swap<br/>• Fallback chains<br/>• Hot-swap support"]
+        end
+
+        UTC["**UnifiedTaskClassifier**<br/>• Negation detection<br/>• Context boosting<br/>• LRU cache (TTL)"]
+
+        TA --> UTC
+    end
+
+    style FACADE fill:#f0f9ff,stroke:#0284c7
+    style CC fill:#d1fae5,stroke:#10b981
+    style TP fill:#d1fae5,stroke:#10b981
+    style SC fill:#d1fae5,stroke:#10b981
+    style MC fill:#fef3c7,stroke:#f59e0b
+    style TA fill:#fef3c7,stroke:#f59e0b
+    style MS fill:#fef3c7,stroke:#f59e0b
+    style UTC fill:#e0e7ff,stroke:#4f46e5
+```
+
+| Component | Location | Responsibility |
+|-----------|----------|----------------|
+| `ConversationController` | `victor/agent/conversation_controller.py` | Message history, context size tracking, conversation stage management |
+| `ToolPipeline` | `victor/agent/tool_pipeline.py` | Tool validation, execution coordination, budget enforcement |
+| `StreamingController` | `victor/agent/streaming_controller.py` | Session lifecycle, cancellation handling |
+| `MetricsCollector` | `victor/agent/metrics_collector.py` | Stream metrics (TTFT, throughput), tool selection stats, cost tracking |
+| `TaskAnalyzer` | `victor/agent/task_analyzer.py` | Unified facade for complexity/task/intent classification |
+| `UnifiedTaskClassifier` | `victor/agent/unified_classifier.py` | Keyword + semantic classification with negation detection |
+| `ToolRegistrar` | `victor/agent/tool_registrar.py` | Dynamic tool discovery, plugin loading, MCP integration, tool dependency graph |
+| `ProviderManager` | `victor/agent/provider_manager.py` | Unified provider/model management, switching, health monitoring, fallback chains |
+| `ToolSequenceTracker` | `victor/agent/tool_sequence_tracker.py` | Workflow pattern detection, transition probability tracking, 15-20% tool selection boost |
+| `UsageAnalytics` | `victor/agent/usage_analytics.py` | Tool/provider performance tracking, Prometheus/JSON export, optimization recommendations |
+| `ContextCompactor` | `victor/agent/context_compactor.py` | Proactive context compaction (70% threshold), smart tool result truncation |
+
+**Benefits of Decomposition**:
+1. **Testability**: Each component can be unit tested in isolation
+2. **Maintainability**: Changes are localized to specific modules
+3. **Clarity**: Single responsibility per component
+4. **Scalability**: New functionality via new components, not god-class expansion
+
+**UnifiedTaskClassifier Architecture** (as of December 2025):
+
+The `UnifiedTaskClassifier` provides robust task classification with negation detection:
+
+```mermaid
+flowchart TB
+    subgraph UTC["UnifiedTaskClassifier"]
+        INPUT["📥 **Input**<br/>\"Don't analyze this, just run the tests\""]
+
+        subgraph STEP1["1. Keyword Detection"]
+            KW1["\"analyze\" → ANALYSIS, weight: 1.0"]
+            KW2["\"run\" → ACTION, weight: 0.9"]
+        end
+
+        subgraph STEP2["2. Negation Detection"]
+            NEG1["\"Don't\" before \"analyze\" → ❌ NEGATED"]
+            NEG2["\", just\" before \"run\" → ✅ NOT NEGATED"]
+        end
+
+        subgraph STEP3["3. Score Calculation"]
+            SCORE1["ACTION score: 0.9 (run)"]
+            SCORE2["ANALYSIS score: -0.5 (negated)"]
+        end
+
+        OUTPUT["📤 **Output**<br/>ClassificationResult(<br/>  task_type=ACTION,<br/>  confidence=0.78,<br/>  negated_keywords=[\"analyze\"]<br/>)"]
+
+        INPUT --> STEP1
+        STEP1 --> STEP2
+        STEP2 --> STEP3
+        STEP3 --> OUTPUT
+    end
+
+    style UTC fill:#f0f9ff,stroke:#0284c7
+    style INPUT fill:#e0e7ff,stroke:#4f46e5
+    style OUTPUT fill:#d1fae5,stroke:#10b981
+    style STEP1 fill:#fef3c7,stroke:#f59e0b
+    style STEP2 fill:#fee2e2,stroke:#ef4444
+    style STEP3 fill:#dbeafe,stroke:#3b82f6
+```
+
+**Key Features**:
+
+| Feature | Description |
+|---------|-------------|
+| **Negation Patterns** | Detects "don't", "do not", "skip", "without", "avoid", "never" within 30-char window |
+| **Positive Overrides** | ", just", ", instead", "but do" cancel earlier negation for subsequent keywords |
+| **Weighted Keywords** | Keywords have weights (0.5-1.0) based on signal strength |
+| **LRU Cache with TTL** | 256-entry cache, 5-minute TTL, MD5-based keys |
+| **Context Boosting** | Conversation history boosts confidence for consistent task types |
+| **Ensemble Voting** | Combines keyword, semantic, and context signals |
+
+**Classification Types** (`TaskType` enum):
+- `ACTION`: Execute commands, deploy, build, install
+- `ANALYSIS`: Analyze, review, audit, explain
+- `GENERATION`: Create, generate, write, implement
+- `SEARCH`: Find, search, locate, grep
+- `EDIT`: Refactor, modify, update, rename
+- `DEFAULT`: Ambiguous or conversational messages
+
+**Integration with TaskAnalyzer**:
+```python
+# TaskAnalyzer uses UnifiedTaskClassifier for robust classification
+analyzer = TaskAnalyzer()
+result = analyzer.analyze("Don't analyze, just run tests")
+
+print(result.unified_task_type)      # TaskType.ACTION
+print(result.is_action_task)         # True
+print(result.is_analysis_task)       # False
+print(result.negated_keywords)       # ["analyze"]
+print(result.needs_execution)        # True
+```
+
+**Caching Behavior**:
+```python
+classifier = UnifiedTaskClassifier()
+
+# First call - cache miss (computed)
+result1 = classifier.classify("Analyze the code")
+
+# Second call - cache hit (instant)
+result2 = classifier.classify("Analyze the code")
+
+# Stats
+stats = classifier.get_cache_stats()
+# {"cache_size": 1, "cache_hits": 1, "cache_misses": 1, "hit_rate": 0.5}
+```
 
 #### B. Provider System
 **Location**: `victor/providers/`
@@ -176,7 +321,7 @@ result = await self.tools.execute(
 )
 ```
 
-**Tool Categories** (~38 total):
+**Tool Categories** (46 total):
 - **File Operations**: read_file, write_file, edit_files, list_directory
 - **Execution**: execute_bash, execute_python_in_sandbox
 - **Git**: git, git_suggest_commit, git_create_pr
@@ -205,7 +350,7 @@ result = await self.tools.execute(
 1. **MCP Server** (victor/mcp/server.py): Exposes Victor's tools to external clients
    - Claude Desktop can connect to Victor as an MCP server
    - VS Code can use Victor's tools via MCP
-   - Other MCP clients can discover and call Victor's 43 tools
+   - Other MCP clients can discover and call Victor's 46 tools
 
 2. **MCP Client** (victor/mcp/client.py): Connects to external MCP servers
    - Victor can connect to filesystem servers, database servers, etc.
@@ -220,7 +365,7 @@ result = await self.tools.execute(
 
 ### 3.1 The Current Design
 
-**Question**: Does Victor broadcast all 43 tools to the LLM every time?
+**Question**: Does Victor broadcast all 46 tools to the LLM every time?
 
 **Answer**: **No, but there's a fallback that does!**
 
@@ -248,7 +393,7 @@ if self.provider.supports_tools():
 
 **How it works**:
 1. Generate embedding for user message: "write a Python function to validate emails"
-2. Compare to pre-computed embeddings of all 43 tools
+2. Compare to pre-computed embeddings of all 46 tools
 3. Select top 8 most similar tools using cosine similarity
 4. Threshold: 0.10 (tools with similarity < 0.10 are filtered)
 
@@ -375,7 +520,7 @@ if not tools:
 ```
 
 **The Problem**:
-- If semantic selection returns 0 tools (low similarity), it sends ALL 43 tools
+- If semantic selection returns 0 tools (low similarity), it sends ALL 46 tools
 - This defeats the purpose of intelligent selection
 - Wastes context window on small models
 - Confuses smaller LLMs with too many choices
@@ -393,7 +538,7 @@ if not tools:
 
 **✅ What's Implemented**:
 1. **MCP Server** (victor/mcp/server.py): Fully functional
-   - Exposes Victor's 43 tools via MCP protocol
+   - Exposes Victor's 46 tools via MCP protocol
    - Supports tool calling
    - Supports resource access (file:// URIs)
    - Uses stdio transport
@@ -559,7 +704,7 @@ Based on deep analysis, here are critical missing features:
 
 ### 5.7 Dynamic Tool Loading
 
-**Current**: All 43 tools loaded at startup. Plugin system now implemented.
+**Current**: All 46 tools loaded at startup. Plugin system now implemented.
 
 **Implemented**:
 - **Plugin system**: `victor/tools/plugin.py` - ToolPlugin base class and FunctionToolPlugin
@@ -589,7 +734,7 @@ Based on deep analysis, here are critical missing features:
 
 ### 6.1 Tool Broadcasting Fallback
 
-**Issue**: When semantic selection returns 0 tools, ALL 43 tools are sent.
+**Issue**: When semantic selection returns 0 tools, ALL 46 tools are sent.
 
 **Why it's bad**:
 - Defeats the purpose of intelligent selection
@@ -1241,7 +1386,7 @@ The recommended roadmap is designed for incremental improvement with immediate v
 
 **Think of Victor as**:
 - A **universal translator** between different AI providers
-- A **toolbox** of 32 enterprise-grade coding tools
+- A **toolbox** of 46 enterprise-grade coding tools
 - A **smart assistant** that chooses the right tools for each task
 
 **Key Design Principles**:
@@ -1274,15 +1419,24 @@ Display to User
 **What Makes Victor Special**:
 - Works with BOTH expensive cloud models AND free local models
 - Air-gapped mode for compliance (100% offline)
-- Intelligent tool selection (not broadcasting all 43 tools)
+- Intelligent tool selection (not broadcasting all 46 tools)
 - Enterprise-grade tools (security scanning, CI/CD, testing, etc.)
 
-**Current Limitations** (as of 2025-11-30):
+**Current Limitations** (as of 2025-12-06):
 - Tool selection fallback improved but still needs refinement
 - MCP registry implemented (victor/mcp/registry.py) but auto-discovery pending
 - Tool result caching implemented (victor/cache/tool_cache.py)
 - Dependency graph implemented (victor/tools/dependency_graph.py)
 - Conversation state machine implemented (victor/agent/conversation_state.py)
+- Orchestrator decomposition complete (ConversationController, ToolPipeline, StreamingController, MetricsCollector, ToolRegistrar, ProviderManager, ToolSequenceTracker extracted)
+- UnifiedTaskClassifier with negation detection implemented (victor/agent/unified_classifier.py)
+- ToolSequenceTracker integrated into SemanticToolSelector for 15-20% tool selection boost
+- Classification caching with LRU + TTL implemented
+- Provider health check system implemented (victor/providers/health.py)
+- Resilience metrics export implemented (victor/providers/metrics_export.py)
+- Classification-aware tool selection implemented in SemanticToolSelector
+- UsageAnalytics implemented (victor/agent/usage_analytics.py) with Prometheus/JSON export and optimization recommendations
+- ContextCompactor implemented (victor/agent/context_compactor.py) with proactive compaction and smart truncation
 
 **Future Vision**:
 - Perfect tool selection (no wasted context)
@@ -1292,5 +1446,5 @@ Display to User
 
 ---
 
-**Last Updated**: 2025-11-30
-**Next Review**: After Phase 4 implementation
+**Last Updated**: 2025-12-06
+**Next Review**: After usage analytics implementation

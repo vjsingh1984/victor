@@ -12,15 +12,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Agent orchestrator for managing conversations and tool execution."""
+"""Agent orchestrator for managing conversations and tool execution.
+
+Architecture: Facade Pattern
+============================
+AgentOrchestrator acts as a facade coordinating several extracted components:
+
+Extracted Components (separate modules):
+- ConversationController: Message history, context tracking, stage management
+- ToolPipeline: Tool validation, execution coordination, budget enforcement
+- StreamingController: Session lifecycle, metrics collection, cancellation
+- TaskAnalyzer: Unified facade for complexity/task/intent classification
+- ToolSelector: Semantic and keyword-based tool selection
+- ToolRegistrar: Tool registration, plugins, MCP integration (NEW)
+
+Remaining Orchestrator Responsibilities:
+- High-level chat flow coordination
+- Configuration loading and validation
+- Post-switch hooks (prompt rebuilding, tracker updates)
+
+Recently Integrated:
+- ProviderManager: Provider initialization, switching, health checks (NEW)
+
+Note: Keep orchestrator as a thin facade. New logic should go into
+appropriate extracted components, not added here.
+
+Recent Refactoring (December 2025):
+- Extracted ToolRegistrar from _register_default_tools, _initialize_plugins,
+  _setup_mcp_integration, _plan_tools, and _goal_hints_for_message
+- Added ProviderHealthChecker for proactive health monitoring
+- Added ResilienceMetricsExporter for dashboard integration
+- Added classification-aware tool selection in SemanticToolSelector
+"""
 
 import ast
 import asyncio
-import importlib
-import inspect
 import json
 import logging
-import os
 import time
 from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional, Set
@@ -35,19 +63,27 @@ from victor.agent.conversation_memory import (
 )
 from victor.agent.conversation_embedding_store import (
     ConversationEmbeddingStore,
-    get_conversation_embedding_store,
 )
 from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
 from victor.agent.debug_logger import get_debug_logger
-from victor.agent.action_authorizer import ActionAuthorizer, ActionIntent
-from victor.agent.loop_detector import ProgressConfig, LoopDetector, TaskType
+from victor.agent.action_authorizer import (
+    ActionAuthorizer,
+    ActionIntent,
+    INTENT_BLOCKED_TOOLS,
+)
 from victor.agent.prompt_builder import SystemPromptBuilder, get_task_type_hint
 from victor.agent.response_sanitizer import ResponseSanitizer
-from victor.agent.search_router import SearchRouter
+from victor.agent.search_router import SearchRouter, SearchRoute, SearchType
 from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity, DEFAULT_BUDGETS
-from victor.agent.context_reminder import ContextReminderManager, create_reminder_manager
+from victor.agent.context_reminder import create_reminder_manager
 from victor.agent.stream_handler import StreamMetrics
-from victor.agent.milestone_monitor import TaskMilestoneMonitor
+from victor.agent.metrics_collector import (
+    MetricsCollector,
+    MetricsCollectorConfig,
+)
+from victor.agent.unified_task_tracker import (
+    UnifiedTaskTracker,
+)
 
 # New decomposed components (facades for orchestrator responsibilities)
 from victor.agent.conversation_controller import (
@@ -56,6 +92,22 @@ from victor.agent.conversation_controller import (
     ContextMetrics,
     CompactionStrategy,
 )
+from victor.agent.context_compactor import (
+    ContextCompactor,
+    TruncationStrategy,
+    create_context_compactor,
+)
+from victor.agent.usage_analytics import (
+    UsageAnalytics,
+    AnalyticsConfig,
+)
+from victor.agent.tool_sequence_tracker import (
+    ToolSequenceTracker,
+    create_sequence_tracker,
+)
+
+# CodeCorrectionMiddleware imported lazily to avoid circular import
+# (code_correction_middleware -> evaluation.correction -> evaluation.__init__ -> agent_adapter -> orchestrator)
 from victor.agent.tool_pipeline import (
     ToolPipeline,
     ToolPipelineConfig,
@@ -67,16 +119,19 @@ from victor.agent.streaming_controller import (
     StreamingSession,
 )
 from victor.agent.task_analyzer import TaskAnalyzer, get_task_analyzer
+from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
+from victor.agent.provider_manager import ProviderManager, ProviderManagerConfig, ProviderState
 
 from victor.agent.tool_selection import (
-    CORE_TOOLS,
+    get_critical_tools,
     ToolSelector,
 )
 from victor.agent.tool_calling import (
-    ToolCallingAdapterRegistry,
     ToolCallParseResult,
 )
 from victor.agent.tool_executor import ToolExecutor, ValidationMode
+from victor.agent.safety import SafetyChecker, get_safety_checker
+from victor.agent.auto_commit import AutoCommitter, get_auto_committer
 from victor.agent.parallel_executor import (
     create_parallel_executor,
 )
@@ -98,31 +153,45 @@ from victor.providers.base import (
     ToolDefinition,
 )
 from victor.providers.registry import ProviderRegistry
-from victor.tools.batch_processor_tool import set_batch_processor_config
 from victor.tools.base import CostTier, ToolRegistry
 from victor.tools.code_executor_tool import CodeExecutionManager
-from victor.tools.code_review_tool import set_code_review_config
 from victor.tools.dependency_graph import ToolDependencyGraph
-from victor.tools.git_tool import set_git_provider
 from victor.tools.mcp_bridge_tool import configure_mcp_client, get_mcp_tool_definitions
 from victor.tools.plugin_registry import ToolPluginRegistry
 from victor.tools.semantic_selector import SemanticToolSelector
-from victor.tools.web_search_tool import set_web_search_provider, set_web_tool_defaults
 from victor.embeddings.intent_classifier import IntentClassifier, IntentType
 from victor.workflows.base import WorkflowRegistry
 from victor.workflows.new_feature_workflow import NewFeatureWorkflow
+
+# Token-optimized serialization for tool outputs
+from victor.serialization import (
+    get_adaptive_serializer,
+    SerializationContext,
+)
 
 logger = logging.getLogger(__name__)
 
 # Tools with progressive parameters - different params = progress, not a loop
 # Format: tool_name -> list of param names that indicate progress
+# NOTE: Includes both canonical short names and legacy names for LLM compatibility
 PROGRESSIVE_TOOLS = {
+    # Canonical short names
+    "read": ["path", "offset", "limit"],
+    "grep": ["query", "directory"],
+    "search": ["query", "directory"],
+    "ls": ["path", "recursive"],
+    "shell": ["command"],
+    "git": ["operation", "files", "branch"],
+    "http": ["url", "method"],
+    "web": ["query"],
+    "summarize": ["query"],
+    "fetch": ["url"],
+    # Legacy names (backward compatibility - LLMs may still use these)
     "read_file": ["path", "offset", "limit"],
     "code_search": ["query", "directory"],
     "semantic_code_search": ["query", "directory"],
     "list_directory": ["path", "recursive"],
     "execute_bash": ["command"],
-    "git": ["operation", "files", "branch"],
     "http_request": ["url", "method"],
     "web_search": ["query"],
     "web_summarize": ["query"],
@@ -178,15 +247,11 @@ class AgentOrchestrator:
         # Fall back to provider defaults
         if context_tokens is None:
             provider_name = getattr(provider, "name", "").lower()
-            context_tokens = AgentOrchestrator.PROVIDER_CONTEXT_WINDOWS.get(
-                provider_name, 100000
-            )
+            context_tokens = AgentOrchestrator.PROVIDER_CONTEXT_WINDOWS.get(provider_name, 100000)
 
         # Convert tokens to chars: ~3.5 chars per token with 80% safety margin
         max_chars = int(context_tokens * 3.5 * 0.8)
-        logger.info(
-            f"Model context: {context_tokens:,} tokens -> {max_chars:,} chars limit"
-        )
+        logger.info(f"Model context: {context_tokens:,} tokens -> {max_chars:,} chars limit")
         return max_chars
 
     def __init__(
@@ -215,27 +280,42 @@ class AgentOrchestrator:
             provider_name: Optional provider label from profile (e.g., lmstudio, vllm) to disambiguate OpenAI-compatible providers
         """
         self.settings = settings
-        self.provider = provider
-        self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.console = console or Console()
         self.tool_selection = tool_selection or {}
         self.thinking = thinking
-        self.provider_name = (provider_name or getattr(provider, "name", "") or "").lower()
         self.tool_calling_models = getattr(settings, "tool_calling_models", {})
         self.tool_capabilities = ToolCallingMatrix(
             self.tool_calling_models,
             always_allow_providers=["openai", "anthropic", "google", "xai"],
         )
 
-        # Initialize tool calling adapter for unified provider handling
-        self.tool_adapter = ToolCallingAdapterRegistry.get_adapter(
-            provider_name=self.provider_name or getattr(provider, "name", "unknown"),
-            model=model,
-            config={"settings": settings},
+        # Initialize ProviderManager for unified provider/model management
+        # This encapsulates provider state, switching, and health monitoring
+        self._provider_manager = ProviderManager(
+            settings=settings,
+            initial_provider=provider,
+            initial_model=model,
+            provider_name=provider_name,
+            config=ProviderManagerConfig(
+                enable_health_checks=getattr(settings, "provider_health_checks", True),
+                auto_fallback=getattr(settings, "provider_auto_fallback", True),
+                fallback_providers=getattr(settings, "fallback_providers", []),
+            ),
         )
-        self.tool_calling_caps = self.tool_adapter.get_capabilities()
+
+        # Initialize tool adapter through ProviderManager
+        self._provider_manager.initialize_tool_adapter()
+
+        # Expose provider attributes for backward compatibility
+        # These delegate to ProviderManager
+        self.provider = self._provider_manager.provider
+        self.model = self._provider_manager.model
+        self.provider_name = self._provider_manager.provider_name
+        self.tool_adapter = self._provider_manager.tool_adapter
+        self.tool_calling_caps = self._provider_manager.capabilities
+
         logger.info(
             f"Tool calling adapter: {self.tool_adapter.provider_name}, "
             f"native={self.tool_calling_caps.native_tool_calls}, "
@@ -277,25 +357,6 @@ class AgentOrchestrator:
         default_budget = max(default_budget, 50)
         self.tool_budget = getattr(settings, "tool_call_budget", default_budget)
         self.tool_calls_used = 0
-
-        # Unified progress tracker for loop detection and progress monitoring
-        # Replaces scattered loop detection variables with a single source of truth
-        self.progress_tracker = LoopDetector(
-            config=ProgressConfig(
-                tool_budget=self.tool_budget,
-                max_iterations_default=getattr(settings, "max_exploration_iterations", 5),
-                max_iterations_analysis=getattr(
-                    settings, "max_exploration_iterations_analysis", 15
-                ),
-                max_iterations_action=getattr(settings, "max_exploration_iterations_action", 6),
-                max_iterations_research=getattr(settings, "max_research_iterations", 6),
-                repeat_threshold_default=3,
-                repeat_threshold_analysis=5,
-                min_content_threshold=getattr(settings, "min_content_threshold", 150),
-                max_total_iterations=getattr(settings, "max_total_loop_iterations", 20),
-            ),
-            task_type=TaskType.DEFAULT,
-        )
 
         # Gap implementations: Complexity classifier, action authorizer, search router
         self.task_classifier = ComplexityClassifier()
@@ -345,21 +406,20 @@ class AgentOrchestrator:
         # Background task tracking for graceful shutdown
         self._background_tasks: set[asyncio.Task] = set()
 
-        # Tool usage analytics
-        self._tool_usage_stats: Dict[str, Dict[str, Any]] = {}
-        self._tool_selection_stats: Dict[str, int] = {
-            "semantic_selections": 0,
-            "keyword_selections": 0,
-            "fallback_selections": 0,
-            "total_tools_selected": 0,
-            "total_tools_executed": 0,
-        }
-        # Cost tracking
-        self._cost_tracking: Dict[str, Any] = {
-            "total_cost_weight": 0.0,
-            "cost_by_tier": {tier.value: 0.0 for tier in CostTier},
-            "calls_by_tier": {tier.value: 0 for tier in CostTier},
-        }
+        # Metrics collection (extracted component)
+        self._metrics_collector = MetricsCollector(
+            config=MetricsCollectorConfig(
+                model=model,
+                provider=self.provider_name,
+                analytics_enabled=bool(self.streaming_metrics_collector),
+            ),
+            usage_logger=self.usage_logger,
+            debug_logger=self.debug_logger,
+            streaming_metrics_collector=self.streaming_metrics_collector,
+            tool_cost_lookup=lambda name: (
+                self.tools.get_tool_cost(name) if hasattr(self, "tools") else CostTier.FREE
+            ),
+        )
         # Result cache for pure/idempotent tools
         self.tool_cache = None
         if getattr(self.settings, "tool_cache_enabled", True):
@@ -450,11 +510,35 @@ class AgentOrchestrator:
 
         # Tool registry
         self.tools = ToolRegistry()
-        self._register_default_tools()
+
+        # Initialize ToolRegistrar (extracted component for tool registration)
+        # Encapsulates: dynamic tool discovery, plugins, MCP integration
+        self.tool_registrar = ToolRegistrar(
+            tools=self.tools,
+            settings=settings,
+            provider=provider,
+            model=model,
+            tool_graph=self.tool_graph,
+            config=ToolRegistrarConfig(
+                enable_plugins=getattr(settings, "plugin_enabled", True),
+                enable_mcp=getattr(settings, "use_mcp_tools", False),
+                enable_tool_graph=True,
+                airgapped_mode=getattr(settings, "airgapped_mode", False),
+                plugin_dirs=getattr(settings, "plugin_dirs", []),
+                disabled_plugins=set(getattr(settings, "disabled_plugins", [])),
+                plugin_packages=getattr(settings, "plugin_packages", []),
+                max_workers=4,
+                max_complexity=10,
+            ),
+        )
+        self.tool_registrar.set_background_task_callback(self._create_background_task)
+
+        # Synchronous registration (dynamic tools, configs)
+        self._register_default_tools()  # Delegates to ToolRegistrar
         self._load_tool_configurations()  # Load tool enable/disable states from config
         self.tools.register_before_hook(self._log_tool_call)
 
-        # Plugin system for extensible tools
+        # Plugin system for extensible tools (delegates to ToolRegistrar)
         self.plugin_manager: Optional[ToolPluginRegistry] = None
         if getattr(settings, "plugin_enabled", True):
             self._initialize_plugins()
@@ -473,6 +557,60 @@ class AgentOrchestrator:
         }
         validation_mode = validation_mode_map.get(validation_mode_str, ValidationMode.LENIENT)
 
+        # Initialize CodeCorrectionMiddleware for automatic code validation and fixing
+        # This reduces failed tool calls by ~15-20% by fixing common syntax issues
+        # Lazy import to avoid circular import chain
+        code_correction_enabled = getattr(settings, "code_correction_enabled", True)
+        code_correction_auto_fix = getattr(settings, "code_correction_auto_fix", True)
+        code_correction_max_iterations = getattr(settings, "code_correction_max_iterations", 1)
+
+        self._code_correction_middleware: Optional[Any] = None
+        if code_correction_enabled:
+            try:
+                from victor.agent.code_correction_middleware import (
+                    CodeCorrectionMiddleware,
+                    CodeCorrectionConfig,
+                )
+
+                self._code_correction_middleware = CodeCorrectionMiddleware(
+                    config=CodeCorrectionConfig(
+                        enabled=True,
+                        auto_fix=code_correction_auto_fix,
+                        max_iterations=code_correction_max_iterations,
+                    )
+                )
+                logger.debug(
+                    f"CodeCorrectionMiddleware enabled (auto_fix={code_correction_auto_fix}, "
+                    f"max_iterations={code_correction_max_iterations})"
+                )
+            except ImportError as e:
+                logger.warning(f"CodeCorrectionMiddleware unavailable: {e}")
+                code_correction_enabled = False
+
+        # Initialize SafetyChecker for dangerous operation detection
+        # Exposes via property for UI layer to set confirmation callback
+        self._safety_checker = get_safety_checker()
+
+        # Initialize AutoCommitter for AI-assisted code change commits
+        # Provides conventional commits with co-authorship attribution
+        auto_commit_enabled = getattr(settings, "auto_commit_enabled", False)
+        self._auto_committer: Optional[AutoCommitter] = None
+        if auto_commit_enabled:
+            workspace_root = (
+                Path(settings.workspace_root)
+                if hasattr(settings, "workspace_root") and settings.workspace_root
+                else None
+            )
+            self._auto_committer = AutoCommitter(
+                workspace_root=workspace_root,
+                auto_commit=True,
+                use_conventional_commits=getattr(settings, "use_conventional_commits", True),
+            )
+            logger.debug("AutoCommitter enabled for AI-assisted commits")
+        else:
+            # Still create instance for manual use, just not auto-commit
+            self._auto_committer = get_auto_committer()
+
         self.tool_executor = ToolExecutor(
             tool_registry=self.tools,
             argument_normalizer=self.argument_normalizer,
@@ -480,6 +618,9 @@ class AgentOrchestrator:
             max_retries=getattr(settings, "tool_retry_max_attempts", 3),
             retry_delay=getattr(settings, "tool_retry_base_delay", 1.0),
             validation_mode=validation_mode,
+            safety_checker=self._safety_checker,
+            code_correction_middleware=self._code_correction_middleware,
+            enable_code_correction=code_correction_enabled,
         )
 
         # Parallel tool executor for concurrent independent tool calls
@@ -519,15 +660,22 @@ class AgentOrchestrator:
         # Background embedding preload task (ToolSelector owns the _embeddings_initialized state)
         self._embedding_preload_task: Optional[asyncio.Task[None]] = None
 
-        # Initialize TaskMilestoneMonitor for goal-aware orchestration
-        self.task_tracker = TaskMilestoneMonitor()
+        # Initialize UnifiedTaskTracker (single source of truth for task tracking)
+        # This is the single source of truth for task progress, milestones, and loop detection
+        self.unified_tracker = UnifiedTaskTracker()
+        # Apply model-specific exploration settings
+        self.unified_tracker.set_model_exploration_settings(
+            exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
+            continuation_patience=self.tool_calling_caps.continuation_patience,
+        )
 
         # Initialize unified ToolSelector (handles semantic + keyword selection)
+        # Use unified_tracker as the single source of truth for task tracking
         self.tool_selector = ToolSelector(
             tools=self.tools,
             semantic_selector=self.semantic_selector,
             conversation_state=self.conversation_state,
-            task_tracker=self.task_tracker,
+            task_tracker=self.unified_tracker,
             model=self.model,
             provider_name=self.provider_name,
             tool_selection_config=self.tool_selection,
@@ -564,7 +712,9 @@ class AgentOrchestrator:
                 # Smart compaction settings from Settings
                 compaction_strategy=compaction_strategy,
                 min_messages_to_keep=getattr(settings, "context_min_messages_to_keep", 6),
-                tool_result_retention_weight=getattr(settings, "context_tool_retention_weight", 1.5),
+                tool_result_retention_weight=getattr(
+                    settings, "context_tool_retention_weight", 1.5
+                ),
                 recent_message_weight=getattr(settings, "context_recency_weight", 2.0),
                 semantic_relevance_threshold=getattr(settings, "context_semantic_threshold", 0.3),
             ),
@@ -605,9 +755,57 @@ class AgentOrchestrator:
         # TaskAnalyzer: Unified task analysis facade
         self._task_analyzer = get_task_analyzer()
 
+        # ContextCompactor: Proactive context management and tool result truncation
+        # This component provides:
+        # - Proactive compaction before context overflow (triggers at 70% utilization)
+        # - Smart tool result truncation with content-aware strategies
+        # - Token estimation with content-type-specific factors
+        truncation_strategy_str = getattr(settings, "tool_truncation_strategy", "smart").lower()
+        truncation_strategy_map = {
+            "head": TruncationStrategy.HEAD,
+            "tail": TruncationStrategy.TAIL,
+            "both": TruncationStrategy.BOTH,
+            "smart": TruncationStrategy.SMART,
+        }
+        truncation_strategy = truncation_strategy_map.get(
+            truncation_strategy_str, TruncationStrategy.SMART
+        )
+
+        self._context_compactor = create_context_compactor(
+            controller=self._conversation_controller,
+            proactive_threshold=getattr(settings, "context_proactive_threshold", 0.90),
+            min_messages_after_compact=getattr(settings, "context_min_messages_after_compact", 8),
+            tool_result_max_chars=getattr(settings, "max_tool_output_chars", 8000),
+            tool_result_max_lines=getattr(settings, "max_tool_output_lines", 200),
+            truncation_strategy=truncation_strategy,
+            preserve_code_blocks=True,
+            enable_proactive=getattr(settings, "context_proactive_compaction", True),
+            enable_tool_truncation=getattr(settings, "tool_result_truncation", True),
+        )
+
+        # Initialize UsageAnalytics singleton for data-driven optimization
+        analytics_cache_dir = (
+            Path(settings.cache_dir)
+            if hasattr(settings, "cache_dir") and settings.cache_dir
+            else None
+        )
+        self._usage_analytics = UsageAnalytics.get_instance(
+            AnalyticsConfig(
+                cache_dir=analytics_cache_dir,
+                enable_prometheus_export=getattr(settings, "enable_prometheus_export", True),
+            )
+        )
+
+        # Initialize ToolSequenceTracker for intelligent next-tool suggestions
+        self._sequence_tracker = create_sequence_tracker(
+            use_predefined=getattr(settings, "use_predefined_patterns", True),
+            learning_rate=getattr(settings, "sequence_learning_rate", 0.3),
+        )
+
         logger.info(
             "Orchestrator initialized with decomposed components: "
-            "ConversationController, ToolPipeline, StreamingController, TaskAnalyzer"
+            "ConversationController, ToolPipeline, StreamingController, TaskAnalyzer, "
+            "ContextCompactor, UsageAnalytics, ToolSequenceTracker"
         )
 
     # =====================================================================
@@ -616,40 +814,20 @@ class AgentOrchestrator:
 
     def _on_tool_start_callback(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Callback when tool execution starts (from ToolPipeline)."""
-        # Use the pipeline's calls_used as the iteration count
         iteration = self._tool_pipeline.calls_used if hasattr(self, "_tool_pipeline") else 0
-        self.debug_logger.log_tool_call(tool_name, arguments, iteration)
+        self._metrics_collector.on_tool_start(tool_name, arguments, iteration)
 
     def _on_tool_complete_callback(self, result: ToolCallResult) -> None:
         """Callback when tool execution completes (from ToolPipeline)."""
-        # Update tool usage stats
-        if result.tool_name not in self._tool_usage_stats:
-            self._tool_usage_stats[result.tool_name] = {
-                "calls": 0,
-                "successes": 0,
-                "failures": 0,
-                "total_time_ms": 0.0,
-            }
-        stats = self._tool_usage_stats[result.tool_name]
-        stats["calls"] += 1
-        if result.success:
-            stats["successes"] += 1
-        else:
-            stats["failures"] += 1
-        stats["total_time_ms"] += result.execution_time_ms
+        self._metrics_collector.on_tool_complete(result)
 
     def _on_streaming_session_complete(self, session: StreamingSession) -> None:
         """Callback when streaming session completes (from StreamingController)."""
-        self.usage_logger.log_event(
-            "stream_completed",
-            {
-                "session_id": session.session_id,
-                "model": session.model,
-                "provider": session.provider,
-                "duration": session.duration,
-                "cancelled": session.cancelled,
-            },
-        )
+        self._metrics_collector.on_streaming_session_complete(session)
+
+        # End UsageAnalytics session
+        if hasattr(self, "_usage_analytics") and self._usage_analytics:
+            self._usage_analytics.end_session()
 
     # =====================================================================
     # Component accessors for external use
@@ -674,6 +852,53 @@ class AgentOrchestrator:
     def task_analyzer(self) -> TaskAnalyzer:
         """Get the task analyzer component."""
         return self._task_analyzer
+
+    @property
+    def provider_manager(self) -> ProviderManager:
+        """Get the provider manager component."""
+        return self._provider_manager
+
+    @property
+    def context_compactor(self) -> ContextCompactor:
+        """Get the context compactor component."""
+        return self._context_compactor
+
+    @property
+    def usage_analytics(self) -> UsageAnalytics:
+        """Get the usage analytics singleton."""
+        return self._usage_analytics
+
+    @property
+    def sequence_tracker(self) -> ToolSequenceTracker:
+        """Get the tool sequence tracker for intelligent next-tool suggestions."""
+        return self._sequence_tracker
+
+    @property
+    def code_correction_middleware(self) -> Optional[Any]:
+        """Get the code correction middleware for automatic code validation/fixing."""
+        return self._code_correction_middleware
+
+    @property
+    def safety_checker(self) -> SafetyChecker:
+        """Get the safety checker for dangerous operation detection.
+
+        UI layers can use this to set confirmation callbacks:
+            orchestrator.safety_checker.confirmation_callback = my_callback
+        """
+        return self._safety_checker
+
+    @property
+    def auto_committer(self) -> Optional[AutoCommitter]:
+        """Get the auto-committer for AI-assisted code change commits.
+
+        Usage:
+            result = orchestrator.auto_committer.commit_changes(
+                files=["src/api.py"],
+                description="Add input validation",
+                change_type="feat"
+            )
+        """
+        return self._auto_committer
 
     @property
     def messages(self) -> List[Message]:
@@ -778,8 +1003,7 @@ class AgentOrchestrator:
 
     def _init_stream_metrics(self) -> StreamMetrics:
         """Initialize fresh stream metrics for a new streaming session."""
-        self._current_stream_metrics = StreamMetrics(start_time=time.time())
-        return self._current_stream_metrics
+        return self._metrics_collector.init_stream_metrics()
 
     def _init_conversation_embedding_store(self) -> None:
         """Initialize LanceDB embedding store for semantic conversation retrieval.
@@ -822,57 +1046,15 @@ class AgentOrchestrator:
 
     def _record_first_token(self) -> None:
         """Record the time of first token received."""
-        if hasattr(self, "_current_stream_metrics") and self._current_stream_metrics:
-            if self._current_stream_metrics.first_token_time is None:
-                self._current_stream_metrics.first_token_time = time.time()
+        self._metrics_collector.record_first_token()
 
     def _finalize_stream_metrics(self) -> Optional[StreamMetrics]:
         """Finalize stream metrics at end of streaming session."""
-        if hasattr(self, "_current_stream_metrics") and self._current_stream_metrics:
-            self._current_stream_metrics.end_time = time.time()
-            metrics = self._current_stream_metrics
-
-            # Log stream metrics
-            self.usage_logger.log_event(
-                "stream_completed",
-                {
-                    "ttft": metrics.time_to_first_token,
-                    "total_duration": metrics.total_duration,
-                    "tokens_per_second": metrics.tokens_per_second,
-                    "total_chunks": metrics.total_chunks,
-                },
-            )
-
-            # Record to streaming metrics collector if available
-            if self.streaming_metrics_collector:
-                try:
-                    from victor.analytics.streaming_metrics import StreamMetrics as AnalyticsMetrics
-                    import uuid
-
-                    # Estimate total tokens from content length (roughly 4 chars per token)
-                    estimated_tokens = metrics.total_content_length // 4
-
-                    # Convert to analytics format and record
-                    analytics_metrics = AnalyticsMetrics(
-                        request_id=str(uuid.uuid4()),
-                        start_time=metrics.start_time,
-                        first_token_time=metrics.first_token_time,
-                        last_token_time=metrics.end_time,
-                        total_chunks=metrics.total_chunks,
-                        total_tokens=estimated_tokens,
-                        model=self.model,
-                        provider=self.provider_name,
-                    )
-                    self.streaming_metrics_collector.record_metrics(analytics_metrics)
-                except Exception as e:
-                    logger.debug(f"Failed to record to metrics collector: {e}")
-
-            return metrics
-        return None
+        return self._metrics_collector.finalize_stream_metrics()
 
     def get_last_stream_metrics(self) -> Optional[StreamMetrics]:
         """Get metrics from the last streaming session."""
-        return getattr(self, "_current_stream_metrics", None)
+        return self._metrics_collector.get_last_stream_metrics()
 
     def get_streaming_metrics_summary(self) -> Optional[Dict[str, Any]]:
         """Get comprehensive streaming metrics summary.
@@ -880,14 +1062,7 @@ class AgentOrchestrator:
         Returns:
             Dictionary with aggregated metrics or None if metrics disabled.
         """
-        if not self.streaming_metrics_collector:
-            return None
-
-        summary = self.streaming_metrics_collector.get_summary()
-        # Convert MetricsSummary dataclass to dict if needed
-        if hasattr(summary, "__dict__"):
-            return vars(summary)
-        return summary  # type: ignore[return-value]
+        return self._metrics_collector.get_streaming_metrics_summary()
 
     def get_streaming_metrics_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent streaming metrics history.
@@ -898,12 +1073,7 @@ class AgentOrchestrator:
         Returns:
             List of recent metrics dictionaries
         """
-        if not self.streaming_metrics_collector:
-            return []
-
-        metrics_list = self.streaming_metrics_collector.get_recent_metrics(count=limit)
-        # Convert StreamMetrics to dictionaries
-        return [vars(m) if hasattr(m, "__dict__") else m for m in metrics_list]  # type: ignore[misc]
+        return self._metrics_collector.get_streaming_metrics_history(limit)
 
     async def _preload_embeddings(self) -> None:
         """Preload tool embeddings in background to avoid blocking first query.
@@ -981,70 +1151,102 @@ class AgentOrchestrator:
             method: Selection method used ('semantic', 'keyword', 'fallback')
             num_tools: Number of tools selected
         """
-        if method == "semantic":
-            self._tool_selection_stats["semantic_selections"] += 1
-        elif method == "keyword":
-            self._tool_selection_stats["keyword_selections"] += 1
-        elif method == "fallback":
-            self._tool_selection_stats["fallback_selections"] += 1
+        self._metrics_collector.record_tool_selection(method, num_tools)
 
-        self._tool_selection_stats["total_tools_selected"] += num_tools
-        self.usage_logger.log_event("tool_selection", {"method": method, "tool_count": num_tools})
+    def route_search_query(self, query: str) -> Dict[str, Any]:
+        """Route a search query to the optimal search tool using SearchRouter.
 
-        logger.debug(
-            f"Tool selection: method={method}, num_tools={num_tools}, "
-            f"stats={self._tool_selection_stats}"
-        )
+        Analyzes the query to determine whether keyword search (code_search)
+        or semantic search (semantic_code_search) would yield better results.
 
-    def _record_tool_execution(self, tool_name: str, success: bool, elapsed_ms: float) -> None:
+        Args:
+            query: The search query
+
+        Returns:
+            Dictionary with routing recommendation:
+                - recommended_tool: "code_search" or "semantic_code_search" or "both"
+                - confidence: Confidence in the recommendation (0.0-1.0)
+                - reason: Human-readable explanation
+                - search_type: SearchType enum value
+
+        Example:
+            route = orchestrator.route_search_query("class BaseTool")
+            # Returns: {"recommended_tool": "code_search", "confidence": 1.0, ...}
+
+            route = orchestrator.route_search_query("how does error handling work")
+            # Returns: {"recommended_tool": "semantic_code_search", "confidence": 0.9, ...}
+        """
+        route: SearchRoute = self.search_router.route(query)
+
+        # Map SearchType to tool name
+        tool_map = {
+            SearchType.KEYWORD: "code_search",
+            SearchType.SEMANTIC: "semantic_code_search",
+            SearchType.HYBRID: "both",
+        }
+
+        return {
+            "recommended_tool": tool_map.get(route.search_type, "code_search"),
+            "confidence": route.confidence,
+            "reason": route.reason,
+            "search_type": route.search_type.value,
+            "matched_patterns": route.matched_patterns,
+            "transformed_query": route.transformed_query,
+        }
+
+    def get_recommended_search_tool(self, query: str) -> str:
+        """Get the recommended search tool name for a query.
+
+        Convenience method that returns just the tool name.
+
+        Args:
+            query: The search query
+
+        Returns:
+            Tool name: "code_search", "semantic_code_search", or "both"
+        """
+        return self.route_search_query(query)["recommended_tool"]
+
+    def _record_tool_execution(
+        self,
+        tool_name: str,
+        success: bool,
+        elapsed_ms: float,
+        error_type: Optional[str] = None,
+    ) -> None:
         """Record tool execution statistics.
 
         Args:
             tool_name: Name of the tool executed
             success: Whether execution succeeded
             elapsed_ms: Execution time in milliseconds
+            error_type: Type of error if execution failed
         """
-        # Get tool cost tier
-        tool_cost = self.tools.get_tool_cost(tool_name)
-        cost_tier = tool_cost if tool_cost else CostTier.FREE
-        cost_weight = cost_tier.weight
+        self._metrics_collector.record_tool_execution(tool_name, success, elapsed_ms)
 
-        if tool_name not in self._tool_usage_stats:
-            self._tool_usage_stats[tool_name] = {
-                "total_calls": 0,
-                "successful_calls": 0,
-                "failed_calls": 0,
-                "total_time_ms": 0.0,
-                "avg_time_ms": 0.0,
-                "min_time_ms": float("inf"),
-                "max_time_ms": 0.0,
-                "cost_tier": cost_tier.value,
-                "total_cost_weight": 0.0,
-            }
+        # Also record to UsageAnalytics for data-driven optimization
+        if hasattr(self, "_usage_analytics") and self._usage_analytics:
+            context_metrics = self._conversation_controller.get_context_metrics()
+            self._usage_analytics.record_tool_execution(
+                tool_name=tool_name,
+                success=success,
+                execution_time_ms=elapsed_ms,
+                error_type=error_type,
+                context_tokens=context_metrics.estimated_tokens,
+            )
 
-        stats = self._tool_usage_stats[tool_name]
-        stats["total_calls"] += 1
-        stats["successful_calls"] += 1 if success else 0
-        stats["failed_calls"] += 0 if success else 1
-        stats["total_time_ms"] += elapsed_ms
-        stats["avg_time_ms"] = stats["total_time_ms"] / stats["total_calls"]
-        stats["min_time_ms"] = min(stats["min_time_ms"], elapsed_ms)
-        stats["max_time_ms"] = max(stats["max_time_ms"], elapsed_ms)
-        stats["total_cost_weight"] += cost_weight
+        # Record to ToolSequenceTracker for intelligent next-tool suggestions
+        if hasattr(self, "_sequence_tracker") and self._sequence_tracker:
+            self._sequence_tracker.record_execution(
+                tool_name=tool_name,
+                success=success,
+                execution_time=elapsed_ms / 1000.0,  # Convert to seconds
+            )
 
-        # Update global cost tracking
-        self._cost_tracking["total_cost_weight"] += cost_weight
-        self._cost_tracking["cost_by_tier"][cost_tier.value] += cost_weight
-        self._cost_tracking["calls_by_tier"][cost_tier.value] += 1
-
-        self._tool_selection_stats["total_tools_executed"] += 1
-
-        logger.debug(
-            f"Tool executed: {tool_name} "
-            f"(success={success}, time={elapsed_ms:.1f}ms, "
-            f"total_calls={stats['total_calls']}, "
-            f"success_rate={stats['successful_calls']/stats['total_calls']*100:.1f}%)"
-        )
+        # Also record to SemanticToolSelector's internal tracker for confidence boosting
+        # This enables the 15-20% accuracy improvement via workflow pattern detection
+        if hasattr(self, "tool_selector") and hasattr(self.tool_selector, "record_tool_execution"):
+            self.tool_selector.record_tool_execution(tool_name, success=success)
 
     def get_tool_usage_stats(self) -> Dict[str, Any]:
         """Get comprehensive tool usage statistics.
@@ -1056,30 +1258,9 @@ class AgentOrchestrator:
             - Cost tracking (by tier and total)
             - Overall metrics
         """
-        return {
-            "selection_stats": self._tool_selection_stats,
-            "tool_stats": self._tool_usage_stats,
-            "cost_tracking": self._cost_tracking,
-            "top_tools_by_usage": sorted(
-                [(name, stats["total_calls"]) for name, stats in self._tool_usage_stats.items()],
-                key=lambda x: x[1],
-                reverse=True,
-            )[:10],
-            "top_tools_by_time": sorted(
-                [(name, stats["total_time_ms"]) for name, stats in self._tool_usage_stats.items()],
-                key=lambda x: x[1],
-                reverse=True,
-            )[:10],
-            "top_tools_by_cost": sorted(
-                [
-                    (name, stats.get("total_cost_weight", 0.0))
-                    for name, stats in self._tool_usage_stats.items()
-                ],
-                key=lambda x: x[1],
-                reverse=True,
-            )[:10],
-            "conversation_state": self.conversation_state.get_state_summary(),
-        }
+        return self._metrics_collector.get_tool_usage_stats(
+            conversation_state_summary=self.conversation_state.get_state_summary()
+        )
 
     def get_conversation_stage(self) -> ConversationStage:
         """Get the current conversation stage.
@@ -1097,6 +1278,269 @@ class AgentOrchestrator:
         """
         return self.conversation_state.get_stage_tools()
 
+    def get_optimization_status(self) -> Dict[str, Any]:
+        """Get comprehensive status of all integrated optimization components.
+
+        Provides visibility into the health and statistics of all optimization
+        components for debugging, monitoring, and observability.
+
+        Returns:
+            Dictionary with component status and statistics:
+            - context_compactor: Compaction stats, utilization, threshold
+            - usage_analytics: Tool/provider metrics, session info
+            - sequence_tracker: Pattern learning stats, suggestions
+            - code_correction: Enabled status, correction stats
+            - safety_checker: Enabled status, pattern counts
+            - auto_committer: Enabled status, commit history
+            - search_router: Routing stats, pattern matches
+        """
+        status: Dict[str, Any] = {
+            "timestamp": time.time(),
+            "components": {},
+        }
+
+        # Context Compactor
+        if self._context_compactor:
+            status["components"]["context_compactor"] = self._context_compactor.get_statistics()
+
+        # Usage Analytics
+        if self._usage_analytics:
+            try:
+                status["components"]["usage_analytics"] = {
+                    "session_active": self._usage_analytics._current_session is not None,
+                    "tool_records_count": len(self._usage_analytics._tool_records),
+                    "provider_records_count": len(self._usage_analytics._provider_records),
+                }
+            except Exception:
+                status["components"]["usage_analytics"] = {"status": "error"}
+
+        # Sequence Tracker
+        if self._sequence_tracker:
+            try:
+                status["components"]["sequence_tracker"] = self._sequence_tracker.get_statistics()
+            except Exception:
+                status["components"]["sequence_tracker"] = {"status": "error"}
+
+        # Code Correction Middleware
+        status["components"]["code_correction"] = {
+            "enabled": self._code_correction_middleware is not None,
+        }
+        if self._code_correction_middleware:
+            status["components"]["code_correction"]["config"] = {
+                "auto_fix": self._code_correction_middleware.config.auto_fix,
+                "max_iterations": self._code_correction_middleware.config.max_iterations,
+            }
+
+        # Safety Checker
+        status["components"]["safety_checker"] = {
+            "enabled": self._safety_checker is not None,
+            "has_confirmation_callback": (
+                self._safety_checker.confirmation_callback is not None
+                if self._safety_checker
+                else False
+            ),
+        }
+
+        # Auto Committer
+        status["components"]["auto_committer"] = {
+            "enabled": self._auto_committer is not None,
+        }
+        if self._auto_committer:
+            status["components"]["auto_committer"]["auto_commit"] = self._auto_committer.auto_commit
+
+        # Search Router
+        status["components"]["search_router"] = {
+            "enabled": self.search_router is not None,
+        }
+
+        # Overall health
+        enabled_count = sum(
+            1
+            for c in status["components"].values()
+            if c.get("enabled", True) and c.get("status") != "error"
+        )
+        status["health"] = {
+            "enabled_components": enabled_count,
+            "total_components": len(status["components"]),
+            "status": "healthy" if enabled_count >= 4 else "degraded",
+        }
+
+        return status
+
+    def flush_analytics(self) -> Dict[str, bool]:
+        """Flush all analytics and cached data to persistent storage.
+
+        Call this method before shutdown or when you need to ensure
+        all analytics data is persisted to disk. Useful for graceful
+        shutdown scenarios.
+
+        Returns:
+            Dictionary indicating success/failure for each component:
+            - usage_analytics: Whether analytics were flushed
+            - sequence_tracker: Whether patterns were saved
+            - tool_cache: Whether cache was flushed
+        """
+        results: Dict[str, bool] = {}
+
+        # Flush usage analytics
+        if hasattr(self, "_usage_analytics") and self._usage_analytics:
+            try:
+                self._usage_analytics.flush()
+                results["usage_analytics"] = True
+                logger.debug("UsageAnalytics flushed to disk")
+            except Exception as e:
+                logger.warning(f"Failed to flush usage analytics: {e}")
+                results["usage_analytics"] = False
+        else:
+            results["usage_analytics"] = False
+
+        # Flush sequence tracker patterns
+        if hasattr(self, "_sequence_tracker") and self._sequence_tracker:
+            try:
+                # SequenceTracker learns patterns in memory; no explicit flush needed
+                # but we capture statistics for reporting
+                stats = self._sequence_tracker.get_statistics()
+                results["sequence_tracker"] = True
+                logger.debug(
+                    f"SequenceTracker has {stats.get('unique_transitions', 0)} learned patterns"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to get sequence tracker stats: {e}")
+                results["sequence_tracker"] = False
+        else:
+            results["sequence_tracker"] = False
+
+        # Flush tool cache
+        if hasattr(self, "tool_cache") and self.tool_cache:
+            try:
+                # Tool cache is already persistent; just report status
+                results["tool_cache"] = True
+            except Exception as e:
+                logger.warning(f"Failed to access tool cache: {e}")
+                results["tool_cache"] = False
+        else:
+            results["tool_cache"] = False
+
+        logger.info(f"Analytics flush complete: {results}")
+        return results
+
+    async def start_health_monitoring(self) -> bool:
+        """Start background provider health monitoring.
+
+        Enables automatic health checks at configured intervals and
+        auto-failover to healthy providers when enabled.
+
+        Returns:
+            True if monitoring started, False if already running or unavailable
+        """
+        if not hasattr(self, "_provider_manager") or not self._provider_manager:
+            logger.warning("Provider manager not available for health monitoring")
+            return False
+
+        try:
+            await self._provider_manager.start_health_monitoring()
+            logger.info("Provider health monitoring started")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to start health monitoring: {e}")
+            return False
+
+    async def stop_health_monitoring(self) -> bool:
+        """Stop background provider health monitoring.
+
+        Call this during graceful shutdown to clean up monitoring tasks.
+
+        Returns:
+            True if monitoring stopped, False if not running or error
+        """
+        if not hasattr(self, "_provider_manager") or not self._provider_manager:
+            return False
+
+        try:
+            await self._provider_manager.stop_health_monitoring()
+            logger.debug("Provider health monitoring stopped")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to stop health monitoring: {e}")
+            return False
+
+    async def get_provider_health(self) -> Dict[str, Any]:
+        """Get health status of all registered providers.
+
+        Returns:
+            Dictionary with provider health information:
+            - current_provider: Name of current provider
+            - is_healthy: Current provider health status
+            - healthy_providers: List of healthy provider names
+            - can_failover: Whether failover is possible
+        """
+        result: Dict[str, Any] = {
+            "current_provider": self.provider_name,
+            "is_healthy": True,
+            "healthy_providers": [self.provider_name] if self.provider_name else [],
+            "can_failover": False,
+        }
+
+        if hasattr(self, "_provider_manager") and self._provider_manager:
+            try:
+                # Get current state
+                state = self._provider_manager.get_current_state()
+                if state:
+                    result["is_healthy"] = state.is_healthy
+                    result["switch_count"] = state.switch_count
+
+                # Get healthy providers for failover
+                healthy = await self._provider_manager.get_healthy_providers()
+                result["healthy_providers"] = healthy
+                result["can_failover"] = len(healthy) > 1
+
+            except Exception as e:
+                logger.warning(f"Failed to get provider health: {e}")
+                result["error"] = str(e)
+
+        return result
+
+    async def graceful_shutdown(self) -> Dict[str, bool]:
+        """Perform graceful shutdown of all orchestrator components.
+
+        Flushes analytics, stops health monitoring, and cleans up resources.
+        Call this before application exit.
+
+        Returns:
+            Dictionary with shutdown status for each component
+        """
+        results: Dict[str, bool] = {}
+
+        # Flush analytics data
+        try:
+            flush_results = self.flush_analytics()
+            results["analytics_flushed"] = all(flush_results.values())
+        except Exception as e:
+            logger.warning(f"Failed to flush analytics during shutdown: {e}")
+            results["analytics_flushed"] = False
+
+        # Stop health monitoring
+        try:
+            results["health_monitoring_stopped"] = await self.stop_health_monitoring()
+        except Exception as e:
+            logger.warning(f"Failed to stop health monitoring: {e}")
+            results["health_monitoring_stopped"] = False
+
+        # End usage analytics session
+        if hasattr(self, "_usage_analytics") and self._usage_analytics:
+            try:
+                if self._usage_analytics._current_session is not None:
+                    self._usage_analytics.end_session()
+                results["session_ended"] = True
+            except Exception as e:
+                logger.warning(f"Failed to end analytics session: {e}")
+                results["session_ended"] = False
+        else:
+            results["session_ended"] = True
+
+        logger.info(f"Graceful shutdown complete: {results}")
+        return results
+
     # =========================================================================
     # Provider/Model Hot-Swap Methods
     # =========================================================================
@@ -1111,6 +1555,9 @@ class AgentOrchestrator:
 
         This method reinitializes the provider, tool calling adapter, and
         prompt builder while preserving the conversation history.
+
+        Delegates core switching to ProviderManager while handling
+        orchestrator-specific post-switch hooks.
 
         Args:
             provider_name: Name of the provider (ollama, lmstudio, anthropic, etc.)
@@ -1138,21 +1585,31 @@ class AgentOrchestrator:
             # Determine model to use
             new_model = model or self.model
 
-            # Update core attributes
+            # Store old state for analytics
             old_provider_name = self.provider_name
             old_model = self.model
 
-            self.provider = new_provider
-            self.model = new_model
-            self.provider_name = provider_name.lower()
-
-            # Reinitialize tool calling adapter for the new provider/model
-            self.tool_adapter = ToolCallingAdapterRegistry.get_adapter(
-                provider_name=self.provider_name,
+            # Update ProviderManager internal state directly
+            # (Using sync update instead of async switch_provider for backward compatibility)
+            self._provider_manager._current_state = ProviderState(
+                provider=new_provider,
+                provider_name=provider_name.lower(),
                 model=new_model,
-                config={"settings": self.settings},
             )
-            self.tool_calling_caps = self.tool_adapter.get_capabilities()
+            self._provider_manager.initialize_tool_adapter()
+
+            # Sync local attributes from ProviderManager
+            self.provider = self._provider_manager.provider
+            self.model = self._provider_manager.model
+            self.provider_name = self._provider_manager.provider_name
+            self.tool_adapter = self._provider_manager.tool_adapter
+            self.tool_calling_caps = self._provider_manager.capabilities
+
+            # Apply model-specific exploration settings to unified tracker
+            self.unified_tracker.set_model_exploration_settings(
+                exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
+                continuation_patience=self.tool_calling_caps.continuation_patience,
+            )
 
             # Reinitialize prompt builder
             self.prompt_builder = SystemPromptBuilder(
@@ -1194,6 +1651,9 @@ class AgentOrchestrator:
                 },
             )
 
+            # Update metrics collector with new model info
+            self._metrics_collector.update_model_info(new_model, self.provider_name)
+
             return True
 
         except Exception as e:
@@ -1206,6 +1666,9 @@ class AgentOrchestrator:
         This is a lighter-weight switch than switch_provider() - it only
         updates the model and reinitializes the tool adapter.
 
+        Delegates core switching to ProviderManager while handling
+        orchestrator-specific post-switch hooks.
+
         Args:
             model: New model name
 
@@ -1217,15 +1680,22 @@ class AgentOrchestrator:
         """
         try:
             old_model = self.model
-            self.model = model
 
-            # Reinitialize tool calling adapter for the new model
-            self.tool_adapter = ToolCallingAdapterRegistry.get_adapter(
-                provider_name=self.provider_name,
-                model=model,
-                config={"settings": self.settings},
+            # Update ProviderManager's model and reinitialize adapter
+            if self._provider_manager._current_state:
+                self._provider_manager._current_state.model = model
+                self._provider_manager.initialize_tool_adapter()
+
+            # Sync local attributes from ProviderManager
+            self.model = self._provider_manager.model
+            self.tool_adapter = self._provider_manager.tool_adapter
+            self.tool_calling_caps = self._provider_manager.capabilities
+
+            # Apply model-specific exploration settings to unified tracker
+            self.unified_tracker.set_model_exploration_settings(
+                exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
+                continuation_patience=self.tool_calling_caps.continuation_patience,
             )
-            self.tool_calling_caps = self.tool_adapter.get_capabilities()
 
             # Reinitialize prompt builder
             self.prompt_builder = SystemPromptBuilder(
@@ -1263,6 +1733,9 @@ class AgentOrchestrator:
                 },
             )
 
+            # Update metrics collector with new model info
+            self._metrics_collector.update_model_info(model, self.provider_name)
+
             return True
 
         except Exception as e:
@@ -1272,20 +1745,24 @@ class AgentOrchestrator:
     def get_current_provider_info(self) -> Dict[str, Any]:
         """Get information about the current provider and model.
 
+        Combines ProviderManager's provider info with orchestrator-specific
+        runtime state (tool budget, tool calls used).
+
         Returns:
             Dictionary with provider/model info and capabilities
         """
-        return {
-            "provider": self.provider_name,
-            "model": self.model,
-            "supports_tools": self.provider.supports_tools() if self.provider else False,
-            "native_tool_calls": self.tool_calling_caps.native_tool_calls,
-            "streaming_tool_calls": self.tool_calling_caps.streaming_tool_calls,
-            "parallel_tool_calls": self.tool_calling_caps.parallel_tool_calls,
-            "thinking_mode": self.tool_calling_caps.thinking_mode,
-            "tool_budget": self.tool_budget,
-            "tool_calls_used": self.tool_calls_used,
-        }
+        # Get base info from ProviderManager
+        info = self._provider_manager.get_info()
+
+        # Add orchestrator-specific runtime state
+        info.update(
+            {
+                "tool_budget": self.tool_budget,
+                "tool_calls_used": self.tool_calls_used,
+            }
+        )
+
+        return info
 
     def _parse_tool_calls_with_adapter(
         self, content: str, raw_tool_calls: Optional[List[Dict[str, Any]]] = None
@@ -1352,10 +1829,357 @@ class AgentOrchestrator:
         """Check if a tool name is valid and not a hallucination."""
         return self.sanitizer.is_valid_tool_name(name)
 
+    def _get_thinking_disabled_prompt(self, base_prompt: str) -> str:
+        """Prefix a prompt with the thinking disable prefix if supported.
+
+        IMPORTANT: This should ONLY be used in RECOVERY scenarios where:
+        - Model returned empty response (stuck in thinking)
+        - Context overflow forced completion
+        - Iteration limit forced completion
+
+        Normal model calls should NOT use this - thinking mode produces
+        better quality results. This is a last-resort recovery mechanism.
+
+        For models with thinking mode (e.g., Qwen3), prepends the configured
+        disable prefix (e.g., "/no_think") to get direct responses without
+        internal reasoning overhead.
+
+        Args:
+            base_prompt: The base prompt text
+
+        Returns:
+            Prompt with thinking disable prefix if available, otherwise base_prompt
+        """
+        prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
+        if prefix:
+            return f"{prefix}\n{base_prompt}"
+        return base_prompt
+
     def _log_tool_call(self, name: str, kwargs: dict) -> None:
         """A hook that logs information before a tool is called."""
         # Move verbose argument logging to debug level - not user-facing
         logger.debug(f"Tool call: {name} with args: {kwargs}")
+
+    def _filter_tools_by_intent(self, tools: List[Any]) -> List[Any]:
+        """Filter tools based on detected user intent.
+
+        This method enforces intent-based tool restrictions:
+        - DISPLAY_ONLY: Blocks write tools (write_file, edit_files, etc.)
+        - READ_ONLY: Blocks write tools AND generation tools
+        - WRITE_ALLOWED: No restrictions
+        - AMBIGUOUS: No restrictions (relies on prompt guard)
+
+        The blocked tools are defined in action_authorizer.INTENT_BLOCKED_TOOLS,
+        which is the single source of truth for tool filtering.
+
+        Args:
+            tools: List of tool definitions (ToolDefinition objects or dicts)
+
+        Returns:
+            Filtered list of tools, excluding blocked tools for current intent
+        """
+        if not hasattr(self, "_current_intent"):
+            return tools
+
+        blocked_tools = INTENT_BLOCKED_TOOLS.get(self._current_intent, frozenset())
+        if not blocked_tools:
+            return tools
+
+        def get_tool_name(tool: Any) -> str:
+            """Extract tool name from ToolDefinition object or dict."""
+            if hasattr(tool, "name"):
+                return tool.name
+            elif isinstance(tool, dict):
+                return tool.get("name", "")
+            return ""
+
+        original_count = len(tools)
+        filtered = [t for t in tools if get_tool_name(t) not in blocked_tools]
+        filtered_count = original_count - len(filtered)
+
+        if filtered_count > 0:
+            blocked_names = blocked_tools & {get_tool_name(t) for t in tools}
+            logger.info(
+                f"Intent {self._current_intent.value}: filtered {filtered_count} "
+                f"write/generation tools (blocked: {blocked_names})"
+            )
+
+        return filtered
+
+    def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
+        """Classify task type based on keywords in the user message.
+
+        Uses UnifiedTaskClassifier for robust classification with:
+        - Negation detection (handles "don't analyze", "skip the review")
+        - Confidence scoring for better decisions
+        - Weighted keyword matching
+
+        Args:
+            user_message: The user's input message
+
+        Returns:
+            Dictionary with:
+            - is_action_task: bool - True if task requires action (create/execute/run)
+            - is_analysis_task: bool - True if task requires analysis/exploration
+            - needs_execution: bool - True if task specifically requires execution
+            - coarse_task_type: str - "analysis", "action", or "default"
+            - confidence: float - Classification confidence (0.0-1.0)
+            - source: str - Classification source ("keyword", "context", "ensemble")
+            - task_type: str - Detailed task type
+        """
+        from victor.agent.unified_classifier import get_unified_classifier
+
+        classifier = get_unified_classifier()
+        result = classifier.classify(user_message)
+
+        # Log negated keywords for debugging
+        if result.negated_keywords:
+            negated_strs = [f"{m.keyword}" for m in result.negated_keywords]
+            logger.debug(f"Negated keywords detected: {negated_strs}")
+
+        return result.to_legacy_dict()
+
+    def _classify_task_with_context(
+        self, user_message: str, history: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
+        """Classify task with conversation context for improved accuracy.
+
+        Uses conversation history to boost classification confidence when
+        the current message is ambiguous but context suggests a task type.
+
+        Args:
+            user_message: The user's input message
+            history: Optional conversation history for context boosting
+
+        Returns:
+            Dictionary with classification results (same as _classify_task_keywords
+            but with potential context boosting applied)
+        """
+        from victor.agent.unified_classifier import get_unified_classifier
+
+        classifier = get_unified_classifier()
+
+        if history:
+            result = classifier.classify_with_context(user_message, history)
+        else:
+            result = classifier.classify(user_message)
+
+        if result.context_signals:
+            logger.debug(f"Context signals applied: {result.context_signals}")
+
+        return result.to_legacy_dict()
+
+    def _get_tool_status_message(self, tool_name: str, tool_args: Dict[str, Any]) -> str:
+        """Generate a user-friendly status message for a tool execution.
+
+        Provides context-aware status messages showing relevant details
+        (command, path, query, etc.) for different tool types.
+
+        Args:
+            tool_name: Name of the tool being executed
+            tool_args: Arguments passed to the tool
+
+        Returns:
+            Status message string with emoji prefix
+        """
+        if tool_name == "execute_bash" and "command" in tool_args:
+            cmd = tool_args["command"]
+            cmd_display = cmd[:80] + "..." if len(cmd) > 80 else cmd
+            return f"🔧 Running {tool_name}: `{cmd_display}`"
+
+        if tool_name == "list_directory":
+            path = tool_args.get("path", ".")
+            return f"🔧 Listing directory: {path}"
+
+        if tool_name == "read":
+            path = tool_args.get("path", "file")
+            return f"🔧 Reading file: {path}"
+
+        if tool_name == "edit_files":
+            files = tool_args.get("files", [])
+            if files and isinstance(files, list):
+                paths = [f.get("path", "?") for f in files[:3]]
+                path_display = ", ".join(paths)
+                if len(files) > 3:
+                    path_display += f" (+{len(files) - 3} more)"
+                return f"🔧 Editing: {path_display}"
+            return f"🔧 Running {tool_name}..."
+
+        if tool_name == "write":
+            path = tool_args.get("path", "file")
+            return f"🔧 Writing file: {path}"
+
+        if tool_name == "code_search":
+            query = tool_args.get("query", "")
+            query_display = query[:50] + "..." if len(query) > 50 else query
+            return f"🔧 Searching: {query_display}"
+
+        return f"🔧 Running {tool_name}..."
+
+    def _determine_continuation_action(
+        self,
+        intent_result: Any,  # IntentClassificationResult
+        is_analysis_task: bool,
+        is_action_task: bool,
+        content_length: int,
+        full_content: Optional[str],
+        continuation_prompts: int,
+        asking_input_prompts: int,
+        one_shot_mode: bool,
+    ) -> Dict[str, Any]:
+        """Determine what continuation action to take when model doesn't call tools.
+
+        Encapsulates the complex decision logic for handling responses without tool
+        calls, including intent classification, continuation prompting, and summary
+        requests.
+
+        Args:
+            intent_result: Result from intent classifier (has .intent, .confidence)
+            is_analysis_task: Whether task is analysis-oriented
+            is_action_task: Whether task is action-oriented
+            content_length: Length of model's response content
+            full_content: Full response content (for structure detection)
+            continuation_prompts: Current count of continuation prompts sent
+            asking_input_prompts: Current count of asking-input auto-responses
+            one_shot_mode: Whether running in non-interactive mode
+
+        Returns:
+            Dictionary with:
+            - action: str - One of: "continue_asking_input", "return_to_user",
+                          "prompt_tool_call", "request_summary",
+                          "request_completion", "finish"
+            - message: Optional[str] - System message to inject (if any)
+            - reason: str - Human-readable reason for the action
+            - updates: Dict - State updates (continuation_prompts, asking_input_prompts)
+        """
+
+        # Extract intent type
+        intends_to_continue = intent_result.intent == IntentType.CONTINUATION
+        is_completion = intent_result.intent == IntentType.COMPLETION
+        is_asking_input = intent_result.intent == IntentType.ASKING_INPUT
+
+        # Configuration
+        max_asking_input_prompts = 3
+        requires_continuation_support = is_analysis_task or is_action_task or intends_to_continue
+        max_continuation_prompts = 10 if is_analysis_task else (5 if is_action_task else 3)
+
+        # Budget/iteration thresholds
+        budget_threshold = (
+            self.tool_budget // 4 if requires_continuation_support else self.tool_budget // 2
+        )
+        max_iterations = self.unified_tracker.config.get("max_total_iterations", 50)
+        iteration_threshold = (
+            max_iterations * 3 // 4 if requires_continuation_support else max_iterations // 2
+        )
+
+        # State updates to apply
+        updates: Dict[str, int] = {}
+
+        # Handle model asking for user input
+        if is_asking_input:
+            if one_shot_mode and asking_input_prompts < max_asking_input_prompts:
+                updates["asking_input_prompts"] = asking_input_prompts + 1
+                return {
+                    "action": "continue_asking_input",
+                    "message": (
+                        "Yes, please continue with the implementation. "
+                        "Proceed with the most sensible approach based on what you've learned."
+                    ),
+                    "reason": f"Model asking input (one-shot) - auto-continuing ({asking_input_prompts + 1}/{max_asking_input_prompts})",
+                    "updates": updates,
+                }
+            elif not one_shot_mode:
+                return {
+                    "action": "return_to_user",
+                    "message": None,
+                    "reason": "Model asking input (interactive) - returning to user",
+                    "updates": updates,
+                }
+
+        # Check for structured content that indicates completion
+        has_substantial_structured_content = content_length > 200 and any(
+            marker in (full_content or "")
+            for marker in ["## ", "**Summary", "**Strengths", "**Weaknesses"]
+        )
+        content_looks_incomplete = content_length < 500 and not has_substantial_structured_content
+
+        # Determine if we should prompt for continuation
+        should_prompt_continuation = intends_to_continue or (
+            intent_result.intent == IntentType.NEUTRAL
+            and content_looks_incomplete
+            and not is_completion
+        )
+
+        # Prompt model to make tool call if appropriate
+        if (
+            requires_continuation_support
+            and should_prompt_continuation
+            and self.tool_calls_used < budget_threshold
+            and self.unified_tracker.iterations < iteration_threshold
+            and continuation_prompts < max_continuation_prompts
+        ):
+            updates["continuation_prompts"] = continuation_prompts + 1
+            return {
+                "action": "prompt_tool_call",
+                "message": (
+                    "You said you would examine more files but did not call any tool. "
+                    "Either:\n"
+                    "1. Call list_directory to explore a directory, OR\n"
+                    "2. Call read_file to read a specific file, OR\n"
+                    "3. Provide your analysis NOW if you have enough information.\n\n"
+                    "Make a tool call or provide your summary."
+                ),
+                "reason": f"Prompting for tool call ({continuation_prompts + 1}/{max_continuation_prompts})",
+                "updates": updates,
+            }
+
+        # Request summary if max continuation prompts reached
+        if (
+            requires_continuation_support
+            and continuation_prompts >= max_continuation_prompts
+            and self.tool_calls_used > 0
+        ):
+            updates["continuation_prompts"] = 99  # Prevent further prompting
+            return {
+                "action": "request_summary",
+                "message": (
+                    "Please complete the task NOW based on what you have done so far. "
+                    "Provide a summary of your progress and any remaining steps."
+                ),
+                "reason": f"Max continuation prompts ({max_continuation_prompts}) reached",
+                "updates": updates,
+            }
+
+        # Request completion for incomplete output
+        if (
+            requires_continuation_support
+            and self.tool_calls_used > 0
+            and content_looks_incomplete
+            and not is_completion
+            and not getattr(self, "_final_summary_requested", False)
+        ):
+            return {
+                "action": "request_completion",
+                "message": (
+                    "You have examined several files. Please provide a complete summary "
+                    "of your analysis including:\n"
+                    "1. **Strengths** - What the codebase does well\n"
+                    "2. **Weaknesses** - Areas that need improvement\n"
+                    "3. **Recommendations** - Specific suggestions for improvement\n\n"
+                    "Provide your analysis NOW."
+                ),
+                "reason": "Incomplete output - requesting final summary",
+                "updates": updates,
+                "set_final_summary_requested": True,
+            }
+
+        # No more tool calls needed - finish
+        return {
+            "action": "finish",
+            "message": None,
+            "reason": "No more tool calls requested",
+            "updates": updates,
+        }
 
     def _extract_file_structure(self, content: str, file_path: str) -> str:
         """Extract a structural summary for very large files.
@@ -1434,11 +2258,95 @@ class AgentOrchestrator:
 
         return "\n".join(summary_parts)
 
+    def _serialize_structured_output(
+        self,
+        tool_name: str,
+        output: Any,
+        tool_args: Optional[Dict[str, Any]] = None,
+    ) -> tuple[str, Optional[str]]:
+        """Serialize structured tool output for token efficiency.
+
+        Uses adaptive serialization to convert lists and dicts to compact formats
+        like TOON or CSV, achieving 30-60% token savings for tabular data.
+
+        Full context awareness includes:
+        - Provider and model capabilities
+        - Tool-specific serialization preferences
+        - Current context token pressure (remaining/max tokens)
+        - Tool operation (e.g., git log vs git diff)
+
+        Args:
+            tool_name: Name of the tool (for context)
+            output: Raw output from the tool
+            tool_args: Optional tool arguments (for extracting operation)
+
+        Returns:
+            Tuple of (serialized_string, format_hint_or_none)
+        """
+        # Only serialize structured data (lists, dicts)
+        # Strings, numbers, and other primitives are kept as-is
+        if not isinstance(output, (list, dict)):
+            return str(output) if output is not None else "", None
+
+        # Skip serialization if output is too small (overhead not worth it)
+        if isinstance(output, list) and len(output) < 3:
+            return str(output), None
+        if isinstance(output, dict) and len(output) < 3:
+            return str(output), None
+
+        try:
+            # Get provider name for context-aware serialization
+            provider_name = self.provider.name if self.provider else None
+
+            # Extract tool operation from arguments (e.g., "log" for git)
+            tool_operation = None
+            if tool_args:
+                tool_operation = tool_args.get("operation") or tool_args.get("subcommand")
+
+            # Get context metrics for token pressure awareness
+            context_metrics = self.get_context_metrics()
+            max_context_tokens = self._get_model_context_window()
+            remaining_tokens = max_context_tokens - context_metrics.estimated_tokens
+
+            # Create serialization context with full information
+            context = SerializationContext(
+                provider=provider_name,
+                model=self.model,
+                tool_name=tool_name,
+                tool_operation=tool_operation,
+                remaining_context_tokens=remaining_tokens,
+                max_context_tokens=max_context_tokens,
+                response_token_reserve=self.max_tokens,  # Reserve for response generation
+            )
+
+            # Serialize using adaptive serializer
+            serializer = get_adaptive_serializer()
+            result = serializer.serialize(output, context)
+
+            # Only use if we got meaningful savings
+            if result.estimated_savings_percent >= 0.15:  # 15% threshold
+                format_hint = result.format_hint
+                logger.debug(
+                    f"Serialized {tool_name} output: {result.format.value}, "
+                    f"saved {result.estimated_savings_percent*100:.1f}% tokens"
+                )
+                return result.content, format_hint
+
+            # Fall back to JSON for low savings
+            return str(output), None
+
+        except Exception as e:
+            logger.debug(f"Serialization failed for {tool_name}, using str(): {e}")
+            return str(output), None
+
     def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
         """Format tool output with clear boundaries to prevent model hallucination.
 
         Uses structured markers that models recognize as authoritative tool output.
         This prevents the model from ignoring or fabricating tool results.
+
+        For structured data (lists, dicts), uses token-optimized serialization
+        to achieve 30-60% savings on tabular data.
 
         Args:
             tool_name: Name of the tool that was executed
@@ -1448,16 +2356,31 @@ class AgentOrchestrator:
         Returns:
             Formatted string with clear TOOL_OUTPUT boundaries
         """
-        # Maximum output size to prevent context overflow (reduced from 50K to 15K)
-        max_output_chars = getattr(self.settings, "max_tool_output_chars", 15000)
-
-        output_str = str(output) if output is not None else ""
+        # Use adaptive serialization for structured outputs
+        # Pass args for tool operation detection (e.g., git log vs git diff)
+        output_str, format_hint = self._serialize_structured_output(tool_name, output, args)
         original_len = len(output_str)
         truncated = False
 
-        if original_len > max_output_chars:
-            truncated = True
-            output_str = output_str[:max_output_chars]
+        # Default max_output_chars for truncation messages
+        max_output_chars = getattr(self.settings, "max_tool_output_chars", 15000)
+
+        # Use ContextCompactor for smart truncation if available
+        if hasattr(self, "_context_compactor") and self._context_compactor:
+            truncation_result = self._context_compactor.truncate_tool_result(output_str)
+            if truncation_result.truncated:
+                truncated = True
+                output_str = truncation_result.content
+                logger.debug(
+                    f"Smart truncated tool output for {tool_name}: "
+                    f"{original_len:,} -> {len(output_str):,} chars "
+                    f"(removed {truncation_result.truncated_chars:,} chars)"
+                )
+        else:
+            # Fallback to simple truncation if compactor not available
+            if original_len > max_output_chars:
+                truncated = True
+                output_str = output_str[:max_output_chars]
 
         # Special formatting for file reading tools - make content unmistakably clear
         if tool_name == "read_file":
@@ -1521,9 +2444,10 @@ These are the actual search results. Reference only the files and matches shown 
 </TOOL_OUTPUT>"""
 
         else:
-            # Generic tool output format
+            # Generic tool output format with optional format hint
             truncation_note = " [OUTPUT TRUNCATED]" if truncated else ""
-            return f"""<TOOL_OUTPUT tool="{tool_name}">
+            format_note = f"\n{format_hint}" if format_hint else ""
+            return f"""<TOOL_OUTPUT tool="{tool_name}">{format_note}
 {output_str}{truncation_note}
 </TOOL_OUTPUT>"""
 
@@ -1532,72 +2456,24 @@ These are the actual search results. Reference only the files and matches shown 
         self.workflow_registry.register(NewFeatureWorkflow())
 
     def _register_default_tools(self) -> None:
-        """Dynamically discovers and registers all tools from the victor.tools directory."""
-        # --- Pre-registration setup ---
-        # Some tools have functions that need to be called before registration to set
-        # providers or configurations.
+        """Dynamically discovers and registers all tools.
 
-        # Set git provider
-        set_git_provider(self.provider, self.model)
+        Delegates to ToolRegistrar for:
+        - Pre-registration provider setup
+        - Dynamic tool discovery from victor/tools directory
+        - MCP integration (if enabled)
 
-        # Set batch processor config
-        set_batch_processor_config(max_workers=4)
+        Note: This is a thin wrapper that delegates to ToolRegistrar.
+        The method is kept for backwards compatibility.
+        """
+        # Delegate to ToolRegistrar for provider setup
+        self.tool_registrar._setup_providers()
 
-        # Set code review config
-        set_code_review_config(max_complexity=10)
+        # Delegate to ToolRegistrar for dynamic tool registration
+        registered_count = self.tool_registrar._register_dynamic_tools()
+        logger.debug(f"Dynamically registered {registered_count} tools via ToolRegistrar")
 
-        # Set web search provider and defaults (if not in air-gapped mode)
-        if not self.settings.airgapped_mode:
-            set_web_search_provider(self.provider, self.model)
-            try:
-                tool_config = self.settings.load_tool_config()
-                web_cfg = tool_config.get("web_tools", {}) or tool_config.get("web", {}) or {}
-                set_web_tool_defaults(
-                    fetch_top=web_cfg.get("summarize_fetch_top"),
-                    fetch_pool=web_cfg.get("summarize_fetch_pool"),
-                    max_content_length=web_cfg.get("summarize_max_content_length"),
-                )
-            except Exception as exc:
-                logger.warning(f"Failed to apply web tool defaults: {exc}")
-
-        # --- Dynamic Tool Discovery and Registration ---
-        tools_dir = os.path.join(os.path.dirname(__file__), "..", "tools")
-        excluded_files = {"__init__.py", "base.py", "decorators.py", "semantic_selector.py"}
-        registered_tools_count = 0
-
-        # Import BaseTool for isinstance checks
-        from victor.tools.base import BaseTool as BaseToolClass
-
-        for filename in os.listdir(tools_dir):
-            if filename.endswith(".py") and filename not in excluded_files:
-                module_name = f"victor.tools.{filename[:-3]}"
-                try:
-                    module = importlib.import_module(module_name)
-                    for _name, obj in inspect.getmembers(module):
-                        # Register @tool decorated functions
-                        if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
-                            self.tools.register(obj)
-                            registered_tools_count += 1
-                        # Register BaseTool class instances (class-based tools)
-                        elif (
-                            inspect.isclass(obj)
-                            and issubclass(obj, BaseToolClass)
-                            and obj is not BaseToolClass
-                            and hasattr(obj, "name")
-                        ):
-                            try:
-                                tool_instance = obj()
-                                self.tools.register(tool_instance)
-                                registered_tools_count += 1
-                            except Exception as e:
-                                logger.debug(f"Skipped registering {_name}: {e}")
-                except Exception as e:
-                    logger.warning(f"Failed to load tools from {module_name}: {e}")
-
-        logger.debug(f"Dynamically registered {registered_tools_count} tools from victor.tools/")
-
-        # --- Post-registration setup for special tools (like MCP) ---
-        # Register MCP tools if configured (supports both legacy and new registry approach)
+        # MCP integration (handled separately via registrar config)
         if getattr(self.settings, "use_mcp_tools", False):
             self._setup_mcp_integration()
 
@@ -1736,80 +2612,32 @@ These are the actual search results. Reference only the files and matches shown 
             logger.debug(f"Failed to register tool dependencies: {exc}")
 
     def _initialize_plugins(self) -> None:
-        """Initialize and load tool plugins from configured directories."""
-        try:
-            from victor.config.settings import get_project_paths
+        """Initialize and load tool plugins from configured directories.
 
-            # Use centralized path for plugins directory
-            plugin_dirs = [get_project_paths().global_plugins_dir]
-            plugin_config = getattr(self.settings, "plugin_config", {})
-            disabled_plugins = set(getattr(self.settings, "plugin_disabled", []))
-
-            self.plugin_manager = ToolPluginRegistry(
-                plugin_dirs=plugin_dirs,
-                config=plugin_config,
-            )
-
-            # Disable specified plugins
-            for plugin_name in disabled_plugins:
-                self.plugin_manager.disable_plugin(plugin_name)
-
-            # Discover and load plugins from directories
-            loaded_count = self.plugin_manager.discover_and_load()
-
-            # Load plugins from packages
-            for package_name in getattr(self.settings, "plugin_packages", []):
-                plugin = self.plugin_manager.load_plugin_from_package(package_name)
-                if plugin:
-                    self.plugin_manager.register_plugin(plugin)
-
-            # Register plugin tools with our tool registry
-            if loaded_count > 0 or self.plugin_manager.loaded_plugins:
-                tool_count = self.plugin_manager.register_tools(self.tools)
-                logger.info(
-                    f"Plugins loaded: {len(self.plugin_manager.loaded_plugins)} plugins, "
-                    f"{tool_count} tools"
-                )
-
-        except Exception as e:
-            logger.warning(f"Failed to initialize plugin system: {e}")
-            self.plugin_manager = None
+        Delegates to ToolRegistrar for plugin discovery and loading.
+        The method is kept for backwards compatibility.
+        """
+        tool_count = self.tool_registrar._initialize_plugins()
+        # Store reference to plugin_manager for backwards compatibility
+        self.plugin_manager = self.tool_registrar.plugin_manager
+        if tool_count > 0:
+            logger.info(f"Plugins initialized via ToolRegistrar: {tool_count} tools")
 
     def _plan_tools(
         self, goals: List[str], available_inputs: Optional[List[str]] = None
     ) -> List[ToolDefinition]:
-        """Plan a sequence of tools to satisfy goals using the dependency graph."""
-        if not goals or not self.tool_graph:
-            return []
+        """Plan a sequence of tools to satisfy goals using the dependency graph.
 
-        available = available_inputs or []
-        plan_names = self.tool_graph.plan(goals, available)
-        tool_defs: List[ToolDefinition] = []
-        for name in plan_names:
-            tool = self.tools.get(name)
-            if tool and self.tools.is_tool_enabled(name):
-                tool_defs.append(
-                    ToolDefinition(
-                        name=tool.name, description=tool.description, parameters=tool.parameters
-                    )
-                )
-        return tool_defs
+        Delegates to ToolRegistrar for tool planning.
+        """
+        return self.tool_registrar.plan_tools(goals, available_inputs)
 
     def _goal_hints_for_message(self, user_message: str) -> List[str]:
-        """Infer planning goals from the user request."""
-        text = user_message.lower()
-        goals: List[str] = []
-        if any(kw in text for kw in ["summarize", "summary", "analyze", "overview"]):
-            goals.append("summary")
-        if any(kw in text for kw in ["review", "code review", "audit"]):
-            goals.append("summary")
-        if any(kw in text for kw in ["doc", "documentation", "readme"]):
-            goals.append("documentation")
-        if any(kw in text for kw in ["security", "vulnerability", "secret", "scan"]):
-            goals.append("security_report")
-        if any(kw in text for kw in ["complexity", "metrics", "maintainability", "technical debt"]):
-            goals.append("metrics_report")
-        return goals
+        """Infer planning goals from the user request.
+
+        Delegates to ToolRegistrar for goal inference.
+        """
+        return self.tool_registrar.infer_goals_from_message(user_message)
 
     def _load_tool_configurations(self) -> None:
         """Load tool configurations from profiles.yaml.
@@ -1842,6 +2670,9 @@ These are the actual search results. Reference only the files and matches shown 
             # Get all registered tool names for validation
             registered_tools = {tool.name for tool in self.tools.list_tools(only_enabled=False)}
 
+            # Get critical tools dynamically from registry (priority=Priority.CRITICAL)
+            core_tools = get_critical_tools(self.tools)
+
             # Format 1: Lists of enabled/disabled tools
             if "enabled" in tool_config:
                 enabled_tools = tool_config.get("enabled", [])
@@ -1854,8 +2685,8 @@ These are the actual search results. Reference only the files and matches shown 
                         f"Available tools: {', '.join(sorted(registered_tools))}"
                     )
 
-                # Check if core tools are included (use centralized CORE_TOOLS from tool_selection)
-                missing_core = CORE_TOOLS - set(enabled_tools)
+                # Check if core tools are included (use dynamically discovered core tools)
+                missing_core = core_tools - set(enabled_tools)
                 if missing_core:
                     logger.warning(
                         f"'enabled' list is missing recommended core tools: {', '.join(missing_core)}. "
@@ -1882,7 +2713,7 @@ These are the actual search results. Reference only the files and matches shown 
                     )
 
                 # Warn if disabling core tools
-                disabled_core = CORE_TOOLS & set(disabled_tools)
+                disabled_core = core_tools & set(disabled_tools)
                 if disabled_core:
                     logger.warning(
                         f"Disabling core tools: {', '.join(disabled_core)}. "
@@ -1908,7 +2739,7 @@ These are the actual search results. Reference only the files and matches shown 
                     else:
                         self.tools.disable_tool(tool_name)
                         # Warn if disabling core tools
-                        if tool_name in CORE_TOOLS:
+                        if tool_name in core_tools:
                             logger.warning(
                                 f"Disabling core tool '{tool_name}'. This may limit agent functionality."
                             )
@@ -2141,57 +2972,77 @@ These are the actual search results. Reference only the files and matches shown 
         start_time = stream_metrics.start_time
         total_tokens: float = 0
 
+        # Cumulative token usage from provider (more accurate than estimates)
+        cumulative_usage: Dict[str, int] = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+        }
+
         self._ensure_system_message()
         self.tool_calls_used = 0
         self.observed_files = []
         self.executed_tools = []
         self.failed_tool_signatures = set()
 
-        # Reset progress tracker for new conversation turn
-        self.progress_tracker.reset()
+        # Reset unified tracker for new conversation (single source of truth)
+        self.unified_tracker.reset()
 
         # Reset context reminder manager for new conversation turn
         self.reminder_manager.reset()
 
-        # Local aliases for frequently-used progress tracker values
-        # These are derived from the progress tracker config for convenience in logs
-        max_total_iterations = self.progress_tracker.config.max_total_iterations
-        max_low_output_iterations = 3  # Legacy compat - now tracked by progress_tracker
-        unique_files_read: set = set()  # Legacy compat - progress_tracker tracks unique_resources
+        # Start UsageAnalytics session for this conversation
+        if hasattr(self, "_usage_analytics") and self._usage_analytics:
+            self._usage_analytics.start_session()
+
+        # Clear ToolSequenceTracker history for new conversation (keep learned patterns)
+        if hasattr(self, "_sequence_tracker") and self._sequence_tracker:
+            self._sequence_tracker.clear_history()
+
+        # Local aliases for frequently-used values
+        max_total_iterations = self.unified_tracker.config.get("max_total_iterations", 50)
         total_iterations = 0
         force_completion = False
 
         # Add user message to history
         self.add_message("user", user_message)
 
-        # Detect task type for goal-aware orchestration
-        self.task_tracker.reset()  # Reset for new conversation turn
-        task_type = self.task_tracker.detect_task_type(user_message)
-        logger.info(f"Task type detected: {task_type.value}")
+        # Record this turn in UsageAnalytics
+        if hasattr(self, "_usage_analytics") and self._usage_analytics:
+            self._usage_analytics.record_turn()
+
+        # Detect task type using unified tracker (single source of truth)
+        unified_task_type = self.unified_tracker.detect_task_type(user_message)
+        logger.info(f"Task type detected: {unified_task_type.value}")
+
+        # Get exploration iterations from unified tracker (replaces TASK_CONFIGS lookup)
+        max_exploration_iterations = self.unified_tracker.max_exploration_iterations
 
         # Inject task-specific prompt hint for better guidance
-        task_hint = get_task_type_hint(task_type.value)
+        task_hint = get_task_type_hint(unified_task_type.value)
         if task_hint:
             self.add_message("system", task_hint.strip())
-            logger.debug(f"Injected task hint for task type: {task_type.value}")
+            logger.debug(f"Injected task hint for task type: {unified_task_type.value}")
 
         # Gap 1: Classify task complexity and adjust tool budget
         task_classification = self.task_classifier.classify(user_message)
         complexity_tool_budget = DEFAULT_BUDGETS.get(task_classification.complexity, 15)
         if task_classification.complexity == TaskComplexity.SIMPLE:
             # Override with simpler budget for simple tasks
-            self.progress_tracker.config.max_total_iterations = min(
-                complexity_tool_budget, self.progress_tracker.config.max_total_iterations
-            )
+            current_max = self.unified_tracker.config.get("max_total_iterations", 50)
+            new_max = min(complexity_tool_budget, current_max)
+            self.unified_tracker.set_tool_budget(new_max)
             logger.info(
                 f"Task complexity: {task_classification.complexity.value}, "
                 f"adjusted max_iterations to {complexity_tool_budget}"
             )
         elif task_classification.complexity == TaskComplexity.GENERATION:
             # Generation tasks should complete in 1-2 tool calls
-            self.progress_tracker.config.max_total_iterations = min(
-                complexity_tool_budget + 1, self.progress_tracker.config.max_total_iterations
-            )
+            current_max = self.unified_tracker.config.get("max_total_iterations", 50)
+            new_max = min(complexity_tool_budget + 1, current_max)
+            self.unified_tracker.set_tool_budget(new_max)
             logger.info(
                 f"Generation task detected, limiting iterations to {complexity_tool_budget + 1}"
             )
@@ -2210,6 +3061,8 @@ These are the actual search results. Reference only the files and matches shown 
 
         # Gap 4: Detect intent and inject prompt guard for non-write tasks
         intent_result = self.intent_detector.detect(user_message)
+        # Store intent for tool filtering (accessible throughout session)
+        self._current_intent = intent_result.intent
         if intent_result.intent in (ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY):
             if intent_result.prompt_guard:
                 self.add_message("system", intent_result.prompt_guard.strip())
@@ -2221,40 +3074,24 @@ These are the actual search results. Reference only the files and matches shown 
         # Iteratively stream → run tools → stream follow-up until no tool calls or budget exhausted
         context_msg = user_message
 
-        # Detect action-oriented tasks (create, execute, run) - should allow more exploration before action
-        action_keywords = ["create", "generate", "write", "execute", "run", "make", "build"]
-        is_action_task = any(keyword in user_message.lower() for keyword in action_keywords)
+        # Classify task type based on keywords
+        task_keywords = self._classify_task_keywords(user_message)
+        is_action_task = task_keywords["is_action_task"]
+        is_analysis_task = task_keywords["is_analysis_task"]
+        needs_execution = task_keywords["needs_execution"]
+        coarse_task_type = task_keywords["coarse_task_type"]
 
-        # Detect analysis/exploration tasks that need extensive reading
-        analysis_keywords = [
-            "analyze",
-            "analysis",
-            "review",
-            "examine",
-            "understand",
-            "explore",
-            "audit",
-            "inspect",
-            "investigate",
-            "survey",
-            "comprehensive",
-            "thorough",
-            "entire codebase",
-            "all files",
-            "full analysis",
-            "deep dive",
-        ]
-        is_analysis_task = any(keyword in user_message.lower() for keyword in analysis_keywords)
+        # For compound analysis+edit tasks, unified_tracker handles exploration limits
+        if is_analysis_task and unified_task_type.value in ("edit", "create"):
+            logger.info(
+                f"Compound task detected (analysis+{unified_task_type.value}): "
+                f"unified_tracker will use appropriate exploration limits"
+            )
 
-        # Configure progress tracker task type based on detected task type
-        # This determines thresholds for loop detection and iteration limits
-        if is_analysis_task:
-            self.progress_tracker.task_type = TaskType.ANALYSIS
-        elif is_action_task:
-            self.progress_tracker.task_type = TaskType.ACTION
-        else:
-            self.progress_tracker.task_type = TaskType.DEFAULT
-        logger.info(f"LoopDetector task_type: {self.progress_tracker.task_type.value}")
+        logger.info(
+            f"Task type classification: coarse={coarse_task_type}, "
+            f"unified={unified_task_type.value}, is_analysis={is_analysis_task}, is_action={is_action_task}"
+        )
 
         # For analysis tasks: increase temperature to reduce repetition/getting stuck
         if is_analysis_task:
@@ -2299,13 +3136,10 @@ These are the actual search results. Reference only the files and matches shown 
         # Add guidance for action-oriented tasks
         if is_action_task:
             logger.info(
-                f"Detected action-oriented task - allowing up to {max_low_output_iterations} exploration iterations"
+                f"Detected action-oriented task - allowing up to {max_exploration_iterations} exploration iterations"
             )
 
-            # Detect if this is specifically about executing/running scripts
-            execution_keywords = ["execute", "run"]
-            needs_execution = any(keyword in user_message.lower() for keyword in execution_keywords)
-
+            # needs_execution is already computed by _classify_task_keywords
             if needs_execution:
                 self.add_message(
                     "system",
@@ -2331,7 +3165,7 @@ These are the actual search results. Reference only the files and matches shown 
             f"Stream chat limits: "
             f"tool_budget={self.tool_budget}, "
             f"max_total_iterations={max_total_iterations}, "
-            f"max_low_output_iterations={max_low_output_iterations}, "
+            f"max_exploration_iterations={max_exploration_iterations}, "
             f"is_analysis_task={is_analysis_task}, "
             f"is_action_task={is_action_task}"
         )
@@ -2350,12 +3184,34 @@ These are the actual search results. Reference only the files and matches shown 
                 )
                 return
 
+            # Proactive context compaction check (triggers before overflow)
+            # This prevents context overflow by compacting at 70% utilization
+            if hasattr(self, "_context_compactor") and self._context_compactor:
+                compaction_action = self._context_compactor.check_and_compact(
+                    current_query=user_message
+                )
+                if compaction_action.action_taken:
+                    logger.info(
+                        f"Proactive compaction: {compaction_action.trigger.value}, "
+                        f"removed {compaction_action.messages_removed} messages, "
+                        f"freed {compaction_action.chars_freed:,} chars"
+                    )
+                    if compaction_action.messages_removed > 0:
+                        yield StreamChunk(
+                            content=f"\n[context] Proactively compacted history "
+                            f"({compaction_action.messages_removed} messages, "
+                            f"{compaction_action.chars_freed:,} chars freed).\n"
+                        )
+                        # Inject context reminder about compacted content
+                        self._conversation_controller.inject_compaction_context()
+
             # Check hard iteration limit
             total_iterations += 1
+            unique_resources = self.unified_tracker.unique_resources
             logger.debug(
                 f"Iteration {total_iterations}/{max_total_iterations}: "
                 f"tool_calls_used={self.tool_calls_used}/{self.tool_budget}, "
-                f"unique_files_read={len(unique_files_read)}, "
+                f"unique_resources={len(unique_resources)}, "
                 f"force_completion={force_completion}"
             )
 
@@ -2363,7 +3219,7 @@ These are the actual search results. Reference only the files and matches shown 
             self.debug_logger.log_iteration_start(
                 total_iterations,
                 tool_calls=self.tool_calls_used,
-                files_read=len(unique_files_read),
+                files_read=len(unique_resources),
             )
             self.debug_logger.log_limits(
                 tool_budget=self.tool_budget,
@@ -2396,16 +3252,26 @@ These are the actual search results. Reference only the files and matches shown 
                         content="\n[tool] ⚠ Context size limit reached. Providing summary.\n"
                     )
                     # Force completion due to context overflow
-                    self.add_message(
-                        "system",
-                        "CRITICAL: Context size limit reached. Provide a concise summary of findings.",
+                    # Use temporary messages to avoid polluting conversation history
+                    # Use thinking disable prefix if model supports it (e.g., Qwen3 /no_think)
+                    completion_prompt = self._get_thinking_disabled_prompt(
+                        "Context limit reached. Summarize in 2-3 sentences."
                     )
+
+                    # Take only recent context (last 8 messages) for the completion request
+                    recent_messages = (
+                        self.messages[-8:] if len(self.messages) > 8 else self.messages[:]
+                    )
+                    completion_messages = recent_messages + [
+                        Message(role="user", content=completion_prompt)
+                    ]
+
                     try:
                         response = await self.provider.chat(
-                            messages=self.messages,
+                            messages=completion_messages,
                             model=self.model,
                             temperature=self.temperature,
-                            max_tokens=self.max_tokens,
+                            max_tokens=min(self.max_tokens, 1024),  # Limit output for overflow
                             tools=None,
                         )
                         if response and response.content:
@@ -2426,19 +3292,28 @@ These are the actual search results. Reference only the files and matches shown 
                     content=f"\n[tool] ⚠ Maximum iterations ({max_total_iterations}) reached. Providing summary.\n"
                 )
                 # Force a final response without tools
-                self.add_message(
-                    "system",
-                    "CRITICAL: You have reached the maximum number of iterations. "
-                    "STOP ALL TOOL CALLS immediately. Provide a brief summary of what you found "
-                    "based on the information gathered so far. Do NOT attempt any more tool calls.",
+                # Use temporary messages to avoid polluting conversation history
+                # Use thinking disable prefix if model supports it (e.g., Qwen3 /no_think)
+                iteration_prompt = self._get_thinking_disabled_prompt(
+                    "Max iterations reached. Summarize key findings in 3-4 sentences. "
+                    "Do NOT attempt any more tool calls."
                 )
+
+                # Take only recent context (last 10 messages) for the completion request
+                recent_messages = (
+                    self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
+                )
+                completion_messages = recent_messages + [
+                    Message(role="user", content=iteration_prompt)
+                ]
+
                 # Make one final call without tools
                 try:
                     response = await self.provider.chat(
-                        messages=self.messages,
+                        messages=completion_messages,
                         model=self.model,
                         temperature=self.temperature,
-                        max_tokens=self.max_tokens,
+                        max_tokens=min(self.max_tokens, 1024),  # Limit output for forced completion
                         tools=None,  # No tools - force text response
                     )
                     if response and response.content:
@@ -2481,6 +3356,9 @@ These are the actual search results. Reference only the files and matches shown 
                     planned_tools=planned_tools,
                 )
                 tools = self.tool_selector.prioritize_by_stage(context_msg, tools)
+
+                # Filter tools based on detected intent (display_only/read_only blocks writes)
+                tools = self._filter_tools_by_intent(tools)
 
             # Prepare optional thinking parameter for providers that support it (Anthropic)
             provider_kwargs = {}
@@ -2530,6 +3408,17 @@ These are the actual search results. Reference only the files and matches shown 
                     logger.debug(f"Received tool_calls in chunk: {chunk.tool_calls}")
                     tool_calls = chunk.tool_calls
                     stream_metrics.tool_calls_count += len(chunk.tool_calls)
+
+                # Capture usage from final chunks (provider-reported tokens)
+                if chunk.usage:
+                    for key in cumulative_usage:
+                        cumulative_usage[key] += chunk.usage.get(key, 0)
+                    logger.debug(
+                        f"Chunk usage: in={chunk.usage.get('prompt_tokens', 0)} "
+                        f"out={chunk.usage.get('completion_tokens', 0)} "
+                        f"cache_read={chunk.usage.get('cache_read_input_tokens', 0)}"
+                    )
+
                 yield chunk
 
             # If garbage was detected, force completion on next iteration
@@ -2596,36 +3485,71 @@ These are the actual search results. Reference only the files and matches shown 
                 # No content and no tool calls; attempt aggressive recovery
                 logger.warning("Model returned empty response - attempting aggressive recovery")
 
-                # Aggressive retry with progressively simpler prompts and higher temperature
-                recovery_prompts = [
-                    (
-                        "Summarize your findings so far. What files did you examine? "
-                        "What patterns or issues did you notice? Keep it brief.",
-                        min(self.temperature + 0.2, 1.0),
-                    ),
-                    (
-                        "Based on the code you've seen, list 3-5 observations or suggestions.",
-                        min(self.temperature + 0.3, 1.0),
-                    ),
-                    (
-                        "What did you learn from the files? One paragraph summary.",
-                        min(self.temperature + 0.4, 1.0),
-                    ),
-                ]
+                # Check if model has thinking disable prefix (e.g., Qwen3 /no_think)
+                thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
+                if thinking_prefix:
+                    logger.debug(f"Using thinking disable prefix '{thinking_prefix}' for recovery")
+
+                # Build recovery prompts - _get_thinking_disabled_prompt adds prefix if available
+                # Use simpler prompts and lower temps for models with thinking mode
+                has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
+                if has_thinking_mode:
+                    # Simpler prompts and lower temps for thinking models
+                    recovery_prompts = [
+                        (
+                            self._get_thinking_disabled_prompt(
+                                "Respond in 2-3 sentences: What files did you read and what did you find?"
+                            ),
+                            min(self.temperature + 0.1, 0.7),
+                        ),
+                        (
+                            self._get_thinking_disabled_prompt(
+                                "List 3 bullet points about the code you examined."
+                            ),
+                            min(self.temperature + 0.2, 0.8),
+                        ),
+                        (
+                            self._get_thinking_disabled_prompt(
+                                "One sentence answer: What is the main thing you learned?"
+                            ),
+                            min(self.temperature + 0.3, 0.9),
+                        ),
+                    ]
+                else:
+                    # Standard recovery prompts
+                    recovery_prompts = [
+                        (
+                            "Summarize your findings so far. What files did you examine? "
+                            "What patterns or issues did you notice? Keep it brief.",
+                            min(self.temperature + 0.2, 1.0),
+                        ),
+                        (
+                            "Based on the code you've seen, list 3-5 observations or suggestions.",
+                            min(self.temperature + 0.3, 1.0),
+                        ),
+                        (
+                            "What did you learn from the files? One paragraph summary.",
+                            min(self.temperature + 0.4, 1.0),
+                        ),
+                    ]
 
                 recovery_success = False
                 for attempt, (prompt, temp) in enumerate(recovery_prompts, 1):
                     logger.info(f"Recovery attempt {attempt}/3 with temp={temp:.1f}")
 
-                    # Add simplified prompt
-                    self.add_message("system", prompt)
+                    # Create temporary message list to avoid polluting conversation history
+                    # Include only recent context (last 5 exchanges) to reduce token load
+                    recent_messages = (
+                        self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
+                    )
+                    recovery_messages = recent_messages + [Message(role="user", content=prompt)]
 
                     try:
                         response = await self.provider.chat(
-                            messages=self.messages,
+                            messages=recovery_messages,
                             model=self.model,
-                            temperature=temp,  # Higher temperature
-                            max_tokens=self.max_tokens,
+                            temperature=temp,
+                            max_tokens=min(self.max_tokens, 1024),  # Limit output for recovery
                             tools=None,  # Force text response
                         )
                         if response and response.content:
@@ -2640,13 +3564,37 @@ These are the actual search results. Reference only the files and matches shown 
                                 break
                             elif response.content and len(response.content) > 20:
                                 # Use raw if sanitization failed but content exists
+                                self.add_message("assistant", response.content)
                                 yield StreamChunk(content=response.content, is_final=True)
                                 recovery_success = True
                                 break
                         else:
                             logger.debug(f"Recovery attempt {attempt}: empty response")
                     except Exception as exc:
+                        exc_str = str(exc)
                         logger.warning(f"Recovery attempt {attempt} failed: {exc}")
+
+                        # Check for rate limit errors and extract wait time
+                        if "rate_limit" in exc_str.lower() or "429" in exc_str:
+                            import re
+
+                            # Try to extract "try again in X.XXs" or similar patterns
+                            wait_match = re.search(
+                                r"try again in (\d+(?:\.\d+)?)\s*s", exc_str, re.I
+                            )
+                            if wait_match:
+                                wait_time = float(wait_match.group(1))
+                                logger.info(
+                                    f"Rate limited. Waiting {wait_time:.1f}s before retry..."
+                                )
+                                await asyncio.sleep(
+                                    min(wait_time + 0.5, 30.0)
+                                )  # Add 0.5s buffer, cap at 30s
+                            else:
+                                # Default exponential backoff for rate limits
+                                backoff = min(2**attempt, 15)  # 2, 4, 8 seconds
+                                logger.info(f"Rate limited. Waiting {backoff}s before retry...")
+                                await asyncio.sleep(backoff)
 
                 if recovery_success:
                     return
@@ -2654,7 +3602,7 @@ These are the actual search results. Reference only the files and matches shown 
                 # All recovery attempts failed - provide helpful error
                 if is_analysis_task and self.tool_calls_used > 0:
                     # Generate a minimal summary from what we know
-                    unique_resources = self.progress_tracker.unique_resources
+                    unique_resources = self.unified_tracker.unique_resources
                     files_examined = list(unique_resources)[:10]
                     fallback_msg = (
                         f"\n\n**Analysis Summary** (auto-generated)\n\n"
@@ -2674,145 +3622,173 @@ These are the actual search results. Reference only the files and matches shown 
                 tool_name = tc.get("name", "")
                 tool_args = tc.get("arguments", {})
 
-                # Record tool call in unified progress tracker
-                # This consolidates loop detection and resource tracking
-                self.progress_tracker.record_tool_call(tool_name, tool_args)
+                # Record tool call in unified tracker (single source of truth)
+                self.unified_tracker.record_tool_call(tool_name, tool_args)
 
             content_length = len(full_content.strip())
 
-            # Record iteration in unified progress tracker
-            self.progress_tracker.record_iteration(content_length)
+            # Record iteration in unified tracker (single source of truth)
+            self.unified_tracker.record_iteration(content_length)
 
-            # Check if progress tracker recommends stopping
-            stop_reason = self.progress_tracker.should_stop()
-            if stop_reason.should_stop and not force_completion:
-                force_completion = True
-                logger.info(f"LoopDetector: {stop_reason.reason}")
+            # Check for loop warning using UnifiedTaskTracker (primary)
+            # This gives the model a chance to correct behavior before we force stop
+            unified_loop_warning = self.unified_tracker.check_loop_warning()
+            if unified_loop_warning and not force_completion:
+                logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
+                yield StreamChunk(
+                    content=f"\n[loop] ⚠ Warning: Approaching loop limit - {unified_loop_warning}\n"
+                )
+                # Inject system message to warn the model
+                self.add_message(
+                    "system",
+                    "WARNING: You are about to hit loop detection. You have been performing "
+                    "the same operation repeatedly (e.g., writing the same file, making the same call). "
+                    "Please do something DIFFERENT now:\n"
+                    "- If you're writing a file repeatedly, STOP and move to a different task\n"
+                    "- If you're stuck, provide your current progress and ask for clarification\n"
+                    "- If you've completed the task, provide a summary and finish\n\n"
+                    "Continuing the same operation will force the conversation to end.",
+                )
+                # Continue to give the model one more chance
+                continue
 
-            # Check task-aware force action (goal-oriented completion)
-            should_force, force_hint = self.task_tracker.should_force_action()
-            if should_force and not force_completion:
+            # PRIMARY: Check UnifiedTaskTracker for stop decision (single source of truth)
+            unified_should_force, unified_hint = self.unified_tracker.should_force_action()
+            if unified_should_force and not force_completion:
                 force_completion = True
-                logger.info(f"Task tracker forcing action: {force_hint}")
+                logger.info(
+                    f"UnifiedTaskTracker forcing action: {unified_hint}, "
+                    f"metrics={self.unified_tracker.get_metrics()}"
+                )
 
             logger.debug(f"After streaming pass, tool_calls = {tool_calls}")
 
             if not tool_calls:
                 # Check if model intended to continue but didn't make a tool call
-                # (common with local models that sometimes forget to actually call the tool)
-                # Use semantic intent classification instead of hardcoded phrase matching
-                intent_result = self.intent_classifier.classify_intent_sync(full_content or "")
-
-                # Only consider continuation if semantically matches continuation intent
-                # and does NOT match completion intent
-                intends_to_continue = intent_result.intent == IntentType.CONTINUATION
-                is_completion = intent_result.intent == IntentType.COMPLETION
+                # Use semantic intent classification to determine continuation action
+                # NOTE: Use the LAST portion of the response for intent classification
+                # because asking_input patterns like "Would you like me to..." typically
+                # appear at the END of a long response
+                intent_text = full_content or ""
+                if len(intent_text) > 500:
+                    intent_text = intent_text[-500:]
+                intent_result = self.intent_classifier.classify_intent_sync(intent_text)
 
                 logger.debug(
                     f"Intent classification: {intent_result.intent.name} "
                     f"(confidence={intent_result.confidence:.3f}, "
-                    f"top_matches={intent_result.top_matches[:2]})"
+                    f"text_len={len(intent_text)}, "
+                    f"top_matches={intent_result.top_matches[:3]})"
                 )
 
-                # Track continuation prompts to avoid infinite loops
+                # Initialize tracking variables
                 if not hasattr(self, "_continuation_prompts"):
                     self._continuation_prompts = 0
+                if not hasattr(self, "_asking_input_prompts"):
+                    self._asking_input_prompts = 0
 
-                # For analysis tasks, if the model seems to want to continue, prompt it
-                # Allow more continuation prompts for analysis tasks
-                max_continuation_prompts = 10 if is_analysis_task else 2
-                budget_threshold = (
-                    self.tool_budget // 4 if is_analysis_task else self.tool_budget // 2
-                )
-                max_iterations = self.progress_tracker.config.max_total_iterations
-                iteration_threshold = (
-                    max_iterations * 3 // 4 if is_analysis_task else max_iterations // 2
-                )
+                # Check for response loop using UnifiedTaskTracker
+                # (detects when model keeps responding with similar text without tool calls)
+                is_repeated_response = self.unified_tracker.check_response_loop(full_content or "")
 
-                # For analysis tasks, also continue if intent is NEUTRAL and response looks
-                # incomplete (short content without structured output)
-                content_looks_incomplete = content_length < 500 and not any(
-                    marker in (full_content or "")
-                    for marker in ["## ", "**Summary", "**Strengths", "**Weaknesses", "1. ", "2. "]
-                )
-                should_prompt_continuation = intends_to_continue or (
-                    intent_result.intent == IntentType.NEUTRAL
-                    and content_looks_incomplete
-                    and not is_completion
+                # Use helper to determine what action to take
+                one_shot_mode = getattr(self.settings, "one_shot_mode", False)
+                action_result = self._determine_continuation_action(
+                    intent_result=intent_result,
+                    is_analysis_task=is_analysis_task,
+                    is_action_task=is_action_task,
+                    content_length=content_length,
+                    full_content=full_content,
+                    continuation_prompts=self._continuation_prompts,
+                    asking_input_prompts=self._asking_input_prompts,
+                    one_shot_mode=one_shot_mode,
                 )
 
-                if (
-                    is_analysis_task
-                    and should_prompt_continuation
-                    and self.tool_calls_used < budget_threshold
-                    and self.progress_tracker.iterations < iteration_threshold
-                    and self._continuation_prompts < max_continuation_prompts
-                ):
-                    self._continuation_prompts += 1
-                    logger.info(
-                        f"Model indicated continuation intent without tool call - prompting to continue "
-                        f"(attempt {self._continuation_prompts}/{max_continuation_prompts})"
-                    )
-                    self.add_message(
-                        "system",
-                        "You said you would examine more files but did not call any tool. "
-                        "Either:\n"
-                        "1. Call list_directory to explore a directory, OR\n"
-                        "2. Call read_file to read a specific file, OR\n"
-                        "3. Provide your analysis NOW if you have enough information.\n\n"
-                        "Make a tool call or provide your summary.",
-                    )
-                    # Continue the loop to give the model another chance
-                    continue
-
-                # If we hit the continuation limit, ask for a summary instead
-                if (
-                    is_analysis_task
-                    and self._continuation_prompts >= max_continuation_prompts
-                    and self.tool_calls_used > 0
-                ):
-                    logger.info(
-                        f"Max continuation prompts ({max_continuation_prompts}) reached, requesting summary"
-                    )
-                    self.add_message(
-                        "system",
-                        "Please provide your analysis NOW based on what you have examined so far. "
-                        "Summarize the strengths, weaknesses, and improvement areas you've identified.",
-                    )
-                    # One more iteration to get the summary
-                    self._continuation_prompts = 99  # Prevent further prompting
-                    continue
-
-                # For analysis tasks with tool calls but incomplete output, request a summary
-                if (
-                    is_analysis_task
-                    and self.tool_calls_used > 0
-                    and content_looks_incomplete
-                    and not is_completion
-                    and not hasattr(self, "_final_summary_requested")
-                ):
+                # Apply state updates from action result
+                if "continuation_prompts" in action_result.get("updates", {}):
+                    self._continuation_prompts = action_result["updates"]["continuation_prompts"]
+                if "asking_input_prompts" in action_result.get("updates", {}):
+                    self._asking_input_prompts = action_result["updates"]["asking_input_prompts"]
+                if action_result.get("set_final_summary_requested"):
                     self._final_summary_requested = True
+
+                action = action_result["action"]
+
+                # Override: If repeated response detected, force completion to prevent loop
+                if is_repeated_response and action in ("prompt_tool_call", "request_summary"):
+                    action = "finish"
                     logger.info(
-                        "Analysis task exiting with incomplete output - requesting final summary"
+                        f"Continuation action: {action} - "
+                        "Overriding to finish due to repeated response"
                     )
-                    self.add_message(
-                        "system",
-                        "You have examined several files. Please provide a complete summary "
-                        "of your analysis including:\n"
-                        "1. **Strengths** - What the codebase does well\n"
-                        "2. **Weaknesses** - Areas that need improvement\n"
-                        "3. **Recommendations** - Specific suggestions for improvement\n\n"
-                        "Provide your analysis NOW.",
-                    )
+                else:
+                    logger.info(f"Continuation action: {action} - {action_result['reason']}")
+
+                # Handle action: continue_asking_input
+                if action == "continue_asking_input":
+                    self.add_message("user", action_result["message"])
                     continue
 
-                # No more tool calls requested; finish
+                # Handle action: return_to_user
+                if action == "return_to_user":
+                    break
+
+                # Handle action: prompt_tool_call
+                if action == "prompt_tool_call":
+                    self.add_message("system", action_result["message"])
+                    self.unified_tracker.increment_turn()
+                    continue
+
+                # Handle action: request_summary
+                if action == "request_summary":
+                    self.add_message("system", action_result["message"])
+                    continue
+
+                # Handle action: request_completion
+                if action == "request_completion":
+                    self.add_message("system", action_result["message"])
+                    continue
+
+                # Handle action: finish - No more tool calls requested
                 # Display performance metrics
                 elapsed_time = time.time() - start_time
-                tokens_per_second = total_tokens / elapsed_time if elapsed_time > 0 else 0
-                yield StreamChunk(
-                    content=f"\n\n📊 {total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s\n"
-                )
+
+                # Build token usage summary
+                # Use actual provider-reported usage if available, else use estimate
+                if cumulative_usage["total_tokens"] > 0:
+                    # Provider-reported tokens (accurate)
+                    input_tokens = cumulative_usage["prompt_tokens"]
+                    output_tokens = cumulative_usage["completion_tokens"]
+                    _display_tokens = cumulative_usage["total_tokens"]
+                    cache_read = cumulative_usage.get("cache_read_input_tokens", 0)
+                    cache_create = cumulative_usage.get("cache_creation_input_tokens", 0)
+
+                    # Build metrics line
+                    tokens_per_second = output_tokens / elapsed_time if elapsed_time > 0 else 0
+                    metrics_parts = [
+                        f"📊 in={input_tokens:,}",
+                        f"out={output_tokens:,}",
+                    ]
+                    if cache_read > 0:
+                        metrics_parts.append(f"cached={cache_read:,}")
+                    if cache_create > 0:
+                        metrics_parts.append(f"cache_new={cache_create:,}")
+                    metrics_parts.extend(
+                        [
+                            f"| {elapsed_time:.1f}s",
+                            f"| {tokens_per_second:.1f} tok/s",
+                        ]
+                    )
+                    metrics_line = " ".join(metrics_parts)
+                else:
+                    # Fallback to estimate
+                    tokens_per_second = total_tokens / elapsed_time if elapsed_time > 0 else 0
+                    metrics_line = (
+                        f"📊 ~{total_tokens:.0f} tokens (est.) | "
+                        f"{elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s"
+                    )
+
+                yield StreamChunk(content=f"\n\n{metrics_line}\n")
                 yield StreamChunk(content="", is_final=True)
                 break
 
@@ -2869,32 +3845,41 @@ These are the actual search results. Reference only the files and matches shown 
 
             # Force final response after too many consecutive tool calls without output
             # This prevents endless tool call loops
-            # For analysis tasks, allow significantly more tool calls
+            # For analysis/action tasks, allow significantly more tool calls
             base_max_consecutive = 8
             if is_analysis_task:
                 base_max_consecutive = 50  # Analysis needs many tool calls to explore codebase
+            elif is_action_task:
+                base_max_consecutive = 30  # Action tasks (web search, multi-step) need flexibility
             max_consecutive_tool_calls = getattr(
                 self.settings, "max_consecutive_tool_calls", base_max_consecutive
             )
             if self.tool_calls_used >= max_consecutive_tool_calls and not force_completion:
                 # Check if we've been making progress (reading new files)
-                # For analysis tasks, use a more lenient progress threshold
+                # For analysis/action tasks, use a more lenient progress threshold
+                # Action tasks may do web searches, directory listings, bash commands - not just file reads
+                requires_lenient_progress = is_analysis_task or is_action_task
                 progress_threshold = (
-                    self.tool_calls_used // 4 if is_analysis_task else self.tool_calls_used // 2
+                    self.tool_calls_used // 4
+                    if requires_lenient_progress
+                    else self.tool_calls_used // 2
                 )
-                if len(unique_files_read) < progress_threshold:
+                if len(unique_resources) < progress_threshold:
                     # Not making good progress - force completion
                     logger.warning(
                         f"Forcing completion: {self.tool_calls_used} tool calls but only "
-                        f"{len(unique_files_read)} unique files read (threshold: {progress_threshold})"
+                        f"{len(unique_resources)} unique resources (threshold: {progress_threshold})"
                     )
                     force_completion = True
 
             # Force completion if too many low-output iterations or research calls
             if force_completion:
-                # Check stop reason from progress tracker to determine message type
-                stop_reason = self.progress_tracker.should_stop()
-                is_research_loop = "research" in stop_reason.reason.lower()
+                # Check stop reason from unified tracker to determine message type
+                stop_decision = self.unified_tracker.should_stop()
+                is_research_loop = (
+                    stop_decision.reason.value == "loop_detected"
+                    and "research" in stop_decision.hint.lower()
+                )
 
                 if is_research_loop:
                     yield StreamChunk(
@@ -2940,65 +3925,39 @@ These are the actual search results. Reference only the files and matches shown 
                 break  # Exit the loop after forcing final response
 
             tool_calls = tool_calls[:remaining]
+
+            # Filter out tool calls that are blocked after loop warning
+            # After warning, the same signature cannot be attempted again
+            filtered_tool_calls = []
+            for tc in tool_calls:
+                tc_name = tc.get("name", "")
+                tc_args = tc.get("arguments", {})
+                block_reason = self.unified_tracker.is_blocked_after_warning(tc_name, tc_args)
+                if block_reason:
+                    yield StreamChunk(content=f"\n[loop] ⛔ {block_reason}\n")
+                    # Inject message to guide model to different approach
+                    self.add_message(
+                        "system",
+                        f"BLOCKED: {block_reason}\n"
+                        "You MUST try a different approach. Do NOT repeat the same operation.\n"
+                        "Either: 1) Use a different tool, 2) Use different parameters, or "
+                        "3) Provide your final response without further tool calls.",
+                    )
+                else:
+                    filtered_tool_calls.append(tc)
+
+            if not filtered_tool_calls and tool_calls:
+                # All tool calls were blocked - continue loop for model to respond
+                continue
+
+            tool_calls = filtered_tool_calls
+
             for tool_call in tool_calls:
                 tool_name = tool_call.get("name", "tool")
                 tool_args = tool_call.get("arguments", {})
-                # Clean user-friendly message without internal [tool] prefix
-                # Show relevant context for observability (command, path, file, etc.)
-                if tool_name == "execute_bash" and "command" in tool_args:
-                    cmd = tool_args["command"]
-                    # Truncate long commands for readability
-                    cmd_display = cmd[:80] + "..." if len(cmd) > 80 else cmd
-                    yield StreamChunk(
-                        content="",
-                        metadata={"status": f"🔧 Running {tool_name}: `{cmd_display}`"},
-                    )
-                elif tool_name == "list_directory":
-                    path = tool_args.get("path", ".")
-                    yield StreamChunk(
-                        content="",
-                        metadata={"status": f"🔧 Listing directory: {path}"},
-                    )
-                elif tool_name == "read_file":
-                    path = tool_args.get("path", "file")
-                    yield StreamChunk(
-                        content="",
-                        metadata={"status": f"🔧 Reading file: {path}"},
-                    )
-                elif tool_name == "edit_files":
-                    files = tool_args.get("files", [])
-                    if files and isinstance(files, list):
-                        paths = [f.get("path", "?") for f in files[:3]]
-                        path_display = ", ".join(paths)
-                        if len(files) > 3:
-                            path_display += f" (+{len(files) - 3} more)"
-                        yield StreamChunk(
-                            content="",
-                            metadata={"status": f"🔧 Editing: {path_display}"},
-                        )
-                    else:
-                        yield StreamChunk(
-                            content="",
-                            metadata={"status": f"🔧 Running {tool_name}..."},
-                        )
-                elif tool_name == "write_file":
-                    path = tool_args.get("path", "file")
-                    yield StreamChunk(
-                        content="",
-                        metadata={"status": f"🔧 Writing file: {path}"},
-                    )
-                elif tool_name == "code_search":
-                    query = tool_args.get("query", "")
-                    query_display = query[:50] + "..." if len(query) > 50 else query
-                    yield StreamChunk(
-                        content="",
-                        metadata={"status": f"🔧 Searching: {query_display}"},
-                    )
-                else:
-                    yield StreamChunk(
-                        content="",
-                        metadata={"status": f"🔧 Running {tool_name}..."},
-                    )
+                # Generate user-friendly status message with relevant context
+                status_msg = self._get_tool_status_message(tool_name, tool_args)
+                yield StreamChunk(content="", metadata={"status": status_msg})
 
             tool_results = await self._handle_tool_calls(tool_calls)
             for result in tool_results:
@@ -3009,6 +3968,39 @@ These are the actual search results. Reference only the files and matches shown 
                         content="",
                         metadata={"status": f"✓ {tool_name} ({elapsed:.1f}s)"},
                     )
+                    # Show content preview for write/edit operations (like Claude Code)
+                    tool_args = result.get("args", {})
+                    if tool_name == "write_file" and tool_args.get("content"):
+                        content = tool_args["content"]
+                        lines = content.split("\n")
+                        preview_lines = 8  # Show first N lines
+                        if len(lines) > preview_lines:
+                            preview = "\n".join(lines[:preview_lines])
+                            preview += f"\n... ({len(lines) - preview_lines} more lines)"
+                        else:
+                            preview = content
+                        # Format as a code block preview
+                        yield StreamChunk(
+                            content="",
+                            metadata={"file_preview": preview, "path": tool_args.get("path", "")},
+                        )
+                    elif tool_name == "edit_files" and tool_args.get("files"):
+                        # Show edit operations summary
+                        files = tool_args.get("files", [])
+                        for file_edit in files[:3]:  # Show first 3 files
+                            path = file_edit.get("path", "")
+                            edits = file_edit.get("edits", [])
+                            for edit in edits[:2]:  # Show first 2 edits per file
+                                old_str = edit.get("old_string", "")[:50]
+                                new_str = edit.get("new_string", "")[:50]
+                                if old_str and new_str:
+                                    yield StreamChunk(
+                                        content="",
+                                        metadata={
+                                            "edit_preview": f"- {old_str}...\n+ {new_str}...",
+                                            "path": path,
+                                        },
+                                    )
                 else:
                     yield StreamChunk(
                         content="",
@@ -3198,6 +4190,10 @@ These are the actual search results. Reference only the files and matches shown 
                 tool_args, tool_name
             )
 
+            # Apply adapter-based normalization for missing required parameters
+            # This handles provider-specific quirks like Gemini omitting 'path' for list_directory
+            normalized_args = self.tool_adapter.normalize_arguments(normalized_args, tool_name)
+
             # Skip repeated failing calls with identical signature to avoid tight loops
             try:
                 signature = (tool_name, json.dumps(normalized_args, sort_keys=True, default=str))
@@ -3237,10 +4233,12 @@ These are the actual search results. Reference only the files and matches shown 
             }
 
             # Execute tool via centralized ToolExecutor (handles retry, caching, metrics)
+            # Note: skip_normalization=True since we already normalized above
             exec_result = await self.tool_executor.execute(
                 tool_name=tool_name,
                 arguments=normalized_args,
                 context=context,
+                skip_normalization=True,
             )
             success = exec_result.success
             error_msg = exec_result.error
@@ -3248,24 +4246,41 @@ These are the actual search results. Reference only the files and matches shown 
             # Update counters and tracking
             self.tool_calls_used += 1
             self.executed_tools.append(tool_name)
-            if tool_name == "read_file" and "path" in normalized_args:
+            if tool_name == "read" and "path" in normalized_args:
                 self.observed_files.append(str(normalized_args.get("path")))
+
+            # Reset continuation prompts counter on successful tool call
+            # This allows the model to get fresh continuation prompts if it pauses again
+            if hasattr(self, "_continuation_prompts") and self._continuation_prompts > 0:
+                logger.debug(
+                    f"Resetting continuation prompts counter (was {self._continuation_prompts}) after successful tool call"
+                )
+                self._continuation_prompts = 0
+
+            # Reset asking input prompts counter on successful tool call
+            if hasattr(self, "_asking_input_prompts") and self._asking_input_prompts > 0:
+                logger.debug(
+                    f"Resetting asking input prompts counter (was {self._asking_input_prompts}) after successful tool call"
+                )
+                self._asking_input_prompts = 0
 
             # Calculate execution time
             elapsed_ms = (time.monotonic() - start) * 1000  # Convert to milliseconds
 
-            # Record tool execution analytics
-            self._record_tool_execution(tool_name, success, elapsed_ms)
+            # Record tool execution analytics (including error type for UsageAnalytics)
+            error_type = (
+                type(exec_result.error).__name__ if exec_result.error and not success else None
+            )
+            self._record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
 
             # Update conversation state machine for stage detection
             self.conversation_state.record_tool_execution(tool_name, normalized_args)
 
-            # Update task progress tracker for milestone tracking
+            # Update unified tracker for milestone tracking (single source of truth)
             result_dict = {"success": success}
             if hasattr(exec_result, "result") and exec_result.result:
                 result_dict["result"] = exec_result.result
-            self.task_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
-            self.task_tracker.increment_iteration()
+            self.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
 
             # ToolExecutionResult stores actual output in .result field
             output = exec_result.result if success else None
@@ -3315,6 +4330,7 @@ These are the actual search results. Reference only the files and matches shown 
                         "name": tool_name,
                         "success": True,
                         "elapsed": time.monotonic() - start,
+                        "args": normalized_args,  # Include args for diff display
                     }
                 )
             else:
@@ -3354,6 +4370,11 @@ These are the actual search results. Reference only the files and matches shown 
         - Observed files list
         - Executed tools list
         - Conversation state machine
+        - Context reminder manager
+        - Metrics collector stats
+        - Context compactor statistics
+        - Sequence tracker history (preserves learned patterns)
+        - Usage analytics session (ends current, starts fresh)
         """
         self.conversation.clear()
         self._system_added = False
@@ -3372,7 +4393,24 @@ These are the actual search results. Reference only the files and matches shown 
         if hasattr(self, "reminder_manager"):
             self.reminder_manager.reset()
 
-        logger.debug("Conversation and session state reset")
+        # Reset metrics collector
+        if hasattr(self, "_metrics_collector"):
+            self._metrics_collector.reset_stats()
+
+        # Reset optimization components for clean session
+        if hasattr(self, "_context_compactor") and self._context_compactor:
+            self._context_compactor.reset_statistics()
+
+        if hasattr(self, "_sequence_tracker") and self._sequence_tracker:
+            self._sequence_tracker.clear_history()
+
+        if hasattr(self, "_usage_analytics") and self._usage_analytics:
+            # End current session if active, start fresh
+            if self._usage_analytics._current_session is not None:
+                self._usage_analytics.end_session()
+            self._usage_analytics.start_session()
+
+        logger.debug("Conversation and session state reset (including optimization components)")
 
     def request_cancellation(self) -> None:
         """Request cancellation of the current streaming operation.
@@ -3607,6 +4645,17 @@ These are the actual search results. Reference only the files and matches shown 
             except Exception as e:
                 logger.warning(f"Error closing semantic selector: {e}")
 
+        # Signal shutdown to EmbeddingService singleton
+        # This prevents post-shutdown embedding operations
+        try:
+            from victor.embeddings.service import EmbeddingService
+
+            if EmbeddingService._instance is not None:
+                EmbeddingService._instance.shutdown()
+                logger.debug("EmbeddingService shutdown signaled")
+        except Exception as e:
+            logger.debug(f"Error signaling EmbeddingService shutdown: {e}")
+
         logger.info("AgentOrchestrator shutdown complete")
 
     async def __aenter__(self) -> "AgentOrchestrator":
@@ -3633,6 +4682,10 @@ These are the actual search results. Reference only the files and matches shown 
 
         Returns:
             Configured AgentOrchestrator instance
+
+        Note:
+            The orchestrator reads settings.one_shot_mode to determine whether to
+            auto-continue on ASKING_INPUT (one-shot) or return to user (interactive).
         """
         # Load profile
         profiles = settings.load_profiles()

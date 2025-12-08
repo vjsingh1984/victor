@@ -67,6 +67,17 @@ DEFAULT_CODE_EXTENSIONS: Set[str] = {
     ".bash",
     ".zsh",
     ".fish",
+    # .NET / C# extensions
+    ".cs",
+    ".csx",
+    ".vb",
+    ".fs",
+    ".fsx",
+    ".csproj",
+    ".vbproj",
+    ".fsproj",
+    ".sln",
+    ".xaml",
 }
 
 
@@ -125,6 +136,58 @@ def gather_code_files(
     """
     exts = extensions if extensions is not None else DEFAULT_CODE_EXTENSIONS
     return safe_walk(root, exclude_dirs=exclude_dirs, extensions=exts)
+
+
+def gather_files_by_pattern(
+    root: Path,
+    pattern: str = "*",
+    exclude_dirs: Optional[Set[str]] = None,
+) -> List[Path]:
+    """Gather files matching a glob pattern, excluding common non-code directories.
+
+    This is the canonical function for file gathering. All tools should use this
+    instead of raw rglob to ensure consistent exclusion of venv, node_modules, etc.
+
+    Args:
+        root: Root directory to search
+        pattern: Glob pattern for files (e.g., "*.py", "*.json")
+        exclude_dirs: Directories to exclude (defaults to EXCLUDE_DIRS)
+
+    Returns:
+        List of Path objects matching pattern, excluding unwanted directories
+
+    Example:
+        # Get all Python files, excluding venv/node_modules
+        files = gather_files_by_pattern(Path("."), "*.py")
+
+        # Get all JSON files with custom exclusions
+        files = gather_files_by_pattern(Path("src"), "*.json", {"tests"})
+    """
+    exclude = exclude_dirs if exclude_dirs is not None else EXCLUDE_DIRS
+    files: List[Path] = []
+
+    for path in root.rglob(pattern):
+        if not path.is_file():
+            continue
+
+        # Check if any parent directory is in exclusion list
+        try:
+            parts = path.relative_to(root).parts
+        except ValueError:
+            # Path is not relative to root
+            parts = path.parts
+
+        # Skip if any part is in excluded directories
+        if any(part in exclude for part in parts):
+            continue
+
+        # Skip hidden directories (but not hidden files like .env)
+        if any(part.startswith(".") for part in parts[:-1]):
+            continue
+
+        files.append(path)
+
+    return files
 
 
 def latest_mtime(root: Path, exclude_dirs: Optional[Set[str]] = None) -> float:

@@ -37,6 +37,8 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Set
 
+from victor.tools.metadata_registry import get_tools_by_stage as registry_get_tools_by_stage
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,7 +54,9 @@ class ConversationStage(Enum):
     COMPLETION = auto()  # Summarizing, done
 
 
-# Tools associated with each stage
+# Default tools associated with each stage (fallback when registry has no stage data).
+# Prefer using @tool(stages=["reading", "execution"]) decorator to define tool stages.
+# The registry-based lookup is the primary source; this is the static fallback.
 STAGE_TOOL_MAPPING: Dict[ConversationStage, Set[str]] = {
     ConversationStage.INITIAL: {
         "code_search",
@@ -211,11 +215,18 @@ class ConversationStateMachine:
     - Tool execution patterns
     - Message content analysis
     - Conversation progression
+
+    Includes cooldown mechanism to prevent rapid stage thrashing.
     """
+
+    # Minimum seconds between stage transitions (prevents thrashing)
+    TRANSITION_COOLDOWN_SECONDS: float = 3.0
 
     def __init__(self) -> None:
         """Initialize the state machine."""
         self.state = ConversationState()
+        self._last_transition_time: float = 0.0
+        self._transition_count: int = 0
 
     def reset(self) -> None:
         """Reset state for a new conversation."""
@@ -257,10 +268,34 @@ class ConversationStateMachine:
     def get_stage_tools(self) -> Set[str]:
         """Get tools relevant to the current stage.
 
+        First tries the registry (tools with @tool(stages=[...]) decorator),
+        then falls back to static STAGE_TOOL_MAPPING for backward compatibility.
+        Returns union of both sources for comprehensive coverage.
+
         Returns:
             Set of tool names relevant to current stage
         """
-        return STAGE_TOOL_MAPPING.get(self.state.stage, set())
+        return self._get_tools_for_stage(self.state.stage)
+
+    def _get_tools_for_stage(self, stage: ConversationStage) -> Set[str]:
+        """Get tools for a specific stage from registry and static fallback.
+
+        Args:
+            stage: The conversation stage to get tools for
+
+        Returns:
+            Set of tool names (union of registry and static mapping)
+        """
+        stage_name = stage.name.lower()
+
+        # Try registry first (decorator-driven)
+        registry_tools = registry_get_tools_by_stage(stage_name)
+
+        # Get static fallback
+        static_tools = STAGE_TOOL_MAPPING.get(stage, set())
+
+        # Return union for comprehensive coverage during migration
+        return registry_tools | static_tools
 
     def get_state_summary(self) -> Dict[str, Any]:
         """Get a summary of the current conversation state.
@@ -315,10 +350,11 @@ class ConversationStateMachine:
         if not self.state.last_tools:
             return None
 
-        # Score stages based on tool overlap
+        # Score stages based on tool overlap (uses registry + static fallback)
         scores: Dict[ConversationStage, int] = {}
 
-        for stage, stage_tools in STAGE_TOOL_MAPPING.items():
+        for stage in ConversationStage:
+            stage_tools = self._get_tools_for_stage(stage)
             overlap = len(set(self.state.last_tools) & stage_tools)
             if overlap > 0:
                 scores[stage] = overlap
@@ -332,8 +368,8 @@ class ConversationStateMachine:
         """Check if we should transition to a new stage."""
         detected = self._detect_stage_from_tools()
         if detected and detected != self.state.stage:
-            # Only transition if we have strong evidence
-            stage_tools = STAGE_TOOL_MAPPING.get(detected, set())
+            # Only transition if we have strong evidence (uses registry + static fallback)
+            stage_tools = self._get_tools_for_stage(detected)
             recent_overlap = len(set(self.state.last_tools) & stage_tools)
 
             if recent_overlap >= 2:  # At least 2 matching tools
@@ -345,7 +381,12 @@ class ConversationStateMachine:
         Args:
             new_stage: Stage to transition to
             confidence: Confidence in this transition
+
+        Note: Transitions are rate-limited by TRANSITION_COOLDOWN_SECONDS to
+        prevent rapid stage thrashing observed in analysis tasks.
         """
+        import time
+
         old_stage = self.state.stage
 
         # Don't transition backwards unless confidence is high
@@ -353,18 +394,31 @@ class ConversationStateMachine:
             return
 
         if new_stage != old_stage:
+            # Enforce cooldown to prevent stage thrashing
+            current_time = time.time()
+            time_since_last = current_time - self._last_transition_time
+
+            if time_since_last < self.TRANSITION_COOLDOWN_SECONDS:
+                logger.debug(
+                    f"Stage transition blocked by cooldown: {old_stage.name} -> {new_stage.name} "
+                    f"(waited {time_since_last:.1f}s, need {self.TRANSITION_COOLDOWN_SECONDS}s)"
+                )
+                return
+
             logger.info(
                 f"Stage transition: {old_stage.name} -> {new_stage.name} "
                 f"(confidence: {confidence:.2f})"
             )
             self.state.stage = new_stage
             self.state._stage_confidence = confidence
+            self._last_transition_time = current_time
+            self._transition_count += 1
 
     def should_include_tool(self, tool_name: str) -> bool:
         """Check if a tool should be included based on current stage.
 
         This provides a soft recommendation - tools outside the current
-        stage are not excluded, just deprioritized.
+        stage are not excluded, just deprioritized. Uses registry + static fallback.
 
         Args:
             tool_name: Name of the tool
@@ -378,17 +432,19 @@ class ConversationStateMachine:
         if tool_name in stage_tools:
             return True
 
-        # Also include if in adjacent stages (flexible)
+        # Also include if in adjacent stages (flexible, uses registry + static fallback)
         current_idx = self.state.stage.value
         for stage in ConversationStage:
             if abs(stage.value - current_idx) <= 1:
-                if tool_name in STAGE_TOOL_MAPPING.get(stage, set()):
+                if tool_name in self._get_tools_for_stage(stage):
                     return True
 
         return False
 
     def get_tool_priority_boost(self, tool_name: str) -> float:
         """Get priority boost for a tool based on current stage.
+
+        Uses registry + static fallback for stage tool lookups.
 
         Args:
             tool_name: Name of the tool
@@ -399,11 +455,11 @@ class ConversationStateMachine:
         if tool_name in self.get_stage_tools():
             return 0.15  # High boost for stage-relevant tools
 
-        # Check adjacent stages
+        # Check adjacent stages (uses registry + static fallback)
         current_idx = self.state.stage.value
         for stage in ConversationStage:
             if abs(stage.value - current_idx) == 1:
-                if tool_name in STAGE_TOOL_MAPPING.get(stage, set()):
+                if tool_name in self._get_tools_for_stage(stage):
                     return 0.08  # Medium boost for adjacent stage tools
 
         return 0.0  # No boost

@@ -105,6 +105,14 @@ def _register_default_providers() -> None:
     from victor.providers.google_provider import GoogleProvider
     from victor.providers.xai_provider import XAIProvider
     from victor.providers.lmstudio_provider import LMStudioProvider
+    from victor.providers.moonshot_provider import MoonshotProvider
+    from victor.providers.deepseek_provider import DeepSeekProvider
+    from victor.providers.groq_provider import GroqProvider
+    from victor.providers.mistral_provider import MistralProvider
+    from victor.providers.together_provider import TogetherProvider
+    from victor.providers.openrouter_provider import OpenRouterProvider
+    from victor.providers.fireworks_provider import FireworksProvider
+    from victor.providers.cerebras_provider import CerebrasProvider
 
     ProviderRegistry.register("ollama", OllamaProvider)
     ProviderRegistry.register("anthropic", AnthropicProvider)
@@ -117,6 +125,47 @@ def _register_default_providers() -> None:
     ProviderRegistry.register("google", GoogleProvider)
     ProviderRegistry.register("xai", XAIProvider)
     ProviderRegistry.register("grok", XAIProvider)  # Alias for xai
+    # Moonshot AI for Kimi K2 models (OpenAI-compatible with reasoning traces)
+    ProviderRegistry.register("moonshot", MoonshotProvider)
+    ProviderRegistry.register("kimi", MoonshotProvider)  # Alias for moonshot
+    # DeepSeek for DeepSeek-V3 models (chat and reasoner)
+    ProviderRegistry.register("deepseek", DeepSeekProvider)
+    # Groq Cloud for ultra-fast LLM inference (free tier available)
+    ProviderRegistry.register("groqcloud", GroqProvider)
+
+    # New free-tier providers (2025)
+    # Mistral AI - 500K tokens/min free tier
+    ProviderRegistry.register("mistral", MistralProvider)
+    # Together AI - $25 free credits
+    ProviderRegistry.register("together", TogetherProvider)
+    # OpenRouter - unified gateway, free tier with daily limits
+    ProviderRegistry.register("openrouter", OpenRouterProvider)
+    # Fireworks AI - $1 free credits, fast inference
+    ProviderRegistry.register("fireworks", FireworksProvider)
+    # Cerebras - ultra-fast inference, free tier
+    ProviderRegistry.register("cerebras", CerebrasProvider)
+
+    # Enterprise cloud providers
+    from victor.providers.vertex_provider import VertexAIProvider
+    from victor.providers.azure_openai_provider import AzureOpenAIProvider
+    from victor.providers.bedrock_provider import BedrockProvider
+    from victor.providers.huggingface_provider import HuggingFaceProvider
+    from victor.providers.replicate_provider import ReplicateProvider
+
+    # Google Cloud Vertex AI - Enterprise Gemini access
+    ProviderRegistry.register("vertex", VertexAIProvider)
+    ProviderRegistry.register("vertexai", VertexAIProvider)  # Alias
+    # Azure OpenAI - Enterprise OpenAI + Phi models
+    ProviderRegistry.register("azure", AzureOpenAIProvider)
+    ProviderRegistry.register("azure-openai", AzureOpenAIProvider)  # Alias
+    # AWS Bedrock - Claude, Llama, Mistral, Titan
+    ProviderRegistry.register("bedrock", BedrockProvider)
+    ProviderRegistry.register("aws", BedrockProvider)  # Alias
+    # Hugging Face Inference API - 1000s of open models
+    ProviderRegistry.register("huggingface", HuggingFaceProvider)
+    ProviderRegistry.register("hf", HuggingFaceProvider)  # Alias
+    # Replicate - Neocloud for open models
+    ProviderRegistry.register("replicate", ReplicateProvider)
 
 
 # Register providers on module import

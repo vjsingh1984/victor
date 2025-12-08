@@ -274,6 +274,32 @@ class CodebaseIndex:
     - Dependency graph analysis
     """
 
+    # All source file patterns to watch (multi-language support)
+    WATCHED_PATTERNS = [
+        "*.py",
+        "*.pyw",  # Python
+        "*.js",
+        "*.jsx",
+        "*.mjs",  # JavaScript
+        "*.ts",
+        "*.tsx",  # TypeScript
+        "*.go",  # Go
+        "*.rs",  # Rust
+        "*.java",
+        "*.kt",
+        "*.scala",  # JVM
+        "*.rb",  # Ruby
+        "*.php",  # PHP
+        "*.cs",  # C#
+        "*.cpp",
+        "*.cc",
+        "*.c",
+        "*.h",
+        "*.hpp",  # C/C++
+        "*.swift",  # Swift
+        "*.dart",  # Dart
+    ]
+
     def __init__(
         self,
         root_path: str,
@@ -322,6 +348,9 @@ class CodebaseIndex:
         self._watcher_enabled = enable_watcher and WATCHDOG_AVAILABLE
         self._observer: Optional[Observer] = None
         self._file_handler: Optional[CodebaseFileHandler] = None
+
+        # Callbacks for change notifications (e.g., SymbolStore)
+        self._change_callbacks: List[Callable[[str], None]] = []
 
         # Embedding support (optional)
         self.use_embeddings = use_embeddings
@@ -493,9 +522,7 @@ class CodebaseIndex:
                 lance_tables = [d for d in contents if d.is_dir() and d.suffix == ".lance"]
                 if not lance_tables:
                     # Also check for any subdirectories with data (table directories)
-                    has_data = any(
-                        d.is_dir() and list(d.iterdir()) for d in contents if d.is_dir()
-                    )
+                    has_data = any(d.is_dir() and list(d.iterdir()) for d in contents if d.is_dir())
                     if not has_data:
                         logger.warning(f"LanceDB has no tables: {embeddings_dir}")
                         return False
@@ -613,6 +640,16 @@ class CodebaseIndex:
             "files_deleted": deleted,
         }
 
+    def register_change_callback(self, callback: Callable[[str], None]) -> None:
+        """Register a callback to be notified when files change.
+
+        This allows other systems (like SymbolStore) to stay synchronized.
+
+        Args:
+            callback: Function to call with the changed file path
+        """
+        self._change_callbacks.append(callback)
+
     def _on_file_changed(self, file_path: str) -> None:
         """Callback when a file changes.
 
@@ -625,12 +662,22 @@ class CodebaseIndex:
                 rel_path = str(Path(file_path).relative_to(self.root))
                 self._changed_files.add(rel_path)
                 logger.debug(f"File changed, index marked stale: {rel_path}")
+
+                # Notify registered callbacks
+                for callback in self._change_callbacks:
+                    try:
+                        callback(file_path)
+                    except Exception as e:
+                        logger.warning(f"Change callback failed: {e}")
+
             except ValueError:
                 # File outside root, ignore
                 pass
 
     def start_watcher(self) -> bool:
         """Start file watcher for automatic staleness detection.
+
+        Watches all supported source file types (Python, JS, TS, Go, Rust, etc.)
 
         Returns:
             True if watcher started successfully, False otherwise
@@ -646,7 +693,7 @@ class CodebaseIndex:
         try:
             self._file_handler = CodebaseFileHandler(
                 on_change=self._on_file_changed,
-                file_patterns=["*.py"],
+                file_patterns=self.WATCHED_PATTERNS,
                 ignore_patterns=self.ignore_patterns,
             )
 
@@ -654,7 +701,7 @@ class CodebaseIndex:
             self._observer.schedule(self._file_handler, str(self.root), recursive=True)
             self._observer.start()
 
-            logger.info(f"Started file watcher for {self.root}")
+            logger.info(f"Started file watcher for {self.root} (all languages)")
             return True
 
         except Exception as e:

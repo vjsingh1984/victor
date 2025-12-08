@@ -19,6 +19,13 @@ Provides clean, scannable debug output that focuses on meaningful events:
 - Tool calls and results (one-line format)
 - Context size tracking
 - Progress indicators
+
+Logging Levels (Victor convention):
+- TRACE (5): Very verbose per-operation logs (embedding calls, cache lookups)
+- DEBUG (10): Detailed internal state (argument normalization, selection steps)
+- INFO (20): Key events (iteration start, tool execution, model response)
+- WARNING (30): Recoverable issues (empty response, cache miss)
+- ERROR (40): Operation failures
 """
 
 import logging
@@ -27,6 +34,20 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from victor.providers.base import Message
+
+# Custom TRACE level for very verbose logging (below DEBUG)
+TRACE = 5
+logging.addLevelName(TRACE, "TRACE")
+
+
+def trace(self: logging.Logger, message: str, *args: Any, **kwargs: Any) -> None:
+    """Log at TRACE level (5) - for very verbose per-operation logs."""
+    if self.isEnabledFor(TRACE):
+        self._log(TRACE, message, args, **kwargs)
+
+
+# Add trace method to Logger class
+logging.Logger.trace = trace  # type: ignore[attr-defined]
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +61,13 @@ NOISY_LOGGERS = [
     "asyncio",
     "transformers",
     "huggingface_hub",
+    # Markdown parsing libraries
+    "markdown_it",
+    "markdown_it.rules_block",
+    "markdown_it.rules_inline",
+    "markdown_it.rules_core",
+    # Data loading
+    "datasets",
 ]
 
 
@@ -47,9 +75,15 @@ def configure_logging_levels(log_level: str = "INFO") -> None:
     """Configure logging levels, silencing noisy third-party loggers.
 
     Args:
-        log_level: Desired log level for Victor loggers
+        log_level: Desired log level for Victor loggers.
+            Supported: TRACE (5), DEBUG, INFO, WARNING, ERROR, CRITICAL
     """
-    level = getattr(logging, log_level.upper(), logging.INFO)
+    # Handle custom TRACE level
+    level_upper = log_level.upper()
+    if level_upper == "TRACE":
+        level = TRACE
+    else:
+        level = getattr(logging, level_upper, logging.INFO)
 
     # Set Victor loggers to desired level
     logging.getLogger("victor").setLevel(level)

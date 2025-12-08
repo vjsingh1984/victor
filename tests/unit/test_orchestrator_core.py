@@ -18,7 +18,6 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.agent.orchestrator import AgentOrchestrator
-from victor.agent.stream_handler import StreamMetrics
 from victor.config.settings import Settings
 
 
@@ -28,6 +27,7 @@ def mock_provider():
     provider = MagicMock()
     provider.name = "mock_provider"
     provider.supports_tools.return_value = True
+    provider.get_context_window.return_value = 100000  # Return integer for context window
     provider.chat = AsyncMock(return_value=MagicMock(content="Response", tool_calls=[]))
     return provider
 
@@ -58,29 +58,28 @@ class TestStreamMetrics:
 
     def test_record_first_token_time(self, orchestrator):
         """Test _record_first_token records time correctly."""
-        import time
-
-        orchestrator._current_stream_metrics = StreamMetrics()
-        orchestrator._current_stream_metrics.start_time = time.time()
-        assert orchestrator._current_stream_metrics.first_token_time is None
+        # Initialize stream metrics through the public API
+        stream_metrics = orchestrator._init_stream_metrics()
+        assert stream_metrics.first_token_time is None
 
         orchestrator._record_first_token()
 
-        assert orchestrator._current_stream_metrics.first_token_time is not None
+        # Access through the metrics collector's internal state
+        assert orchestrator._metrics_collector._current_stream_metrics.first_token_time is not None
 
     def test_record_first_token_no_metrics(self, orchestrator):
         """Test _record_first_token does nothing when no metrics."""
-        # Should not raise
+        # Should not raise even without initialized metrics
         orchestrator._record_first_token()
 
     def test_finalize_stream_metrics(self, orchestrator):
         """Test _finalize_stream_metrics returns metrics (covers lines 306-321)."""
         import time
 
-        orchestrator._current_stream_metrics = StreamMetrics()
-        orchestrator._current_stream_metrics.start_time = time.time()
-        orchestrator._current_stream_metrics.first_token_time = time.time()
-        orchestrator._current_stream_metrics.total_chunks = 10
+        # Initialize metrics through the API
+        stream_metrics = orchestrator._init_stream_metrics()
+        stream_metrics.first_token_time = time.time()
+        stream_metrics.total_chunks = 10
 
         result = orchestrator._finalize_stream_metrics()
 
@@ -95,7 +94,8 @@ class TestStreamMetrics:
 
     def test_get_last_stream_metrics(self, orchestrator):
         """Test get_last_stream_metrics returns stored metrics (covers line 325)."""
-        orchestrator._current_stream_metrics = StreamMetrics()
+        # Initialize metrics first
+        orchestrator._init_stream_metrics()
         result = orchestrator.get_last_stream_metrics()
         assert result is not None
 
@@ -221,22 +221,22 @@ class TestToolSelection:
 
     def test_record_tool_selection_semantic(self, orchestrator):
         """Test _record_tool_selection records semantic stats (covers lines 381-388)."""
-        initial = orchestrator._tool_selection_stats["semantic_selections"]
+        initial = orchestrator._metrics_collector._selection_stats.semantic_selections
         orchestrator._record_tool_selection("semantic", 5)
-        assert orchestrator._tool_selection_stats["semantic_selections"] == initial + 1
-        assert orchestrator._tool_selection_stats["total_tools_selected"] >= 5
+        assert orchestrator._metrics_collector._selection_stats.semantic_selections == initial + 1
+        assert orchestrator._metrics_collector._selection_stats.total_tools_selected >= 5
 
     def test_record_tool_selection_keyword(self, orchestrator):
         """Test _record_tool_selection records keyword stats."""
-        initial = orchestrator._tool_selection_stats["keyword_selections"]
+        initial = orchestrator._metrics_collector._selection_stats.keyword_selections
         orchestrator._record_tool_selection("keyword", 3)
-        assert orchestrator._tool_selection_stats["keyword_selections"] == initial + 1
+        assert orchestrator._metrics_collector._selection_stats.keyword_selections == initial + 1
 
     def test_record_tool_selection_fallback(self, orchestrator):
         """Test _record_tool_selection records fallback stats."""
-        initial = orchestrator._tool_selection_stats["fallback_selections"]
+        initial = orchestrator._metrics_collector._selection_stats.fallback_selections
         orchestrator._record_tool_selection("fallback", 2)
-        assert orchestrator._tool_selection_stats["fallback_selections"] == initial + 1
+        assert orchestrator._metrics_collector._selection_stats.fallback_selections == initial + 1
 
     def test_get_tool_usage_stats(self, orchestrator):
         """Test get_tool_usage_stats returns stats (covers lines 446-457+)."""
@@ -338,7 +338,7 @@ class TestToolExecution:
         """Test _record_tool_execution with success (covers lines 400-444)."""
         orchestrator._record_tool_execution("test_tool", success=True, elapsed_ms=100.0)
 
-        stats = orchestrator._tool_usage_stats.get("test_tool")
+        stats = orchestrator._metrics_collector._tool_usage_stats.get("test_tool")
         assert stats is not None
         assert stats["total_calls"] == 1
         assert stats["successful_calls"] == 1
@@ -348,7 +348,7 @@ class TestToolExecution:
         """Test _record_tool_execution with failure."""
         orchestrator._record_tool_execution("failing_tool", success=False, elapsed_ms=50.0)
 
-        stats = orchestrator._tool_usage_stats.get("failing_tool")
+        stats = orchestrator._metrics_collector._tool_usage_stats.get("failing_tool")
         assert stats is not None
         assert stats["total_calls"] == 1
         assert stats["successful_calls"] == 0
@@ -359,7 +359,7 @@ class TestToolExecution:
         orchestrator._record_tool_execution("timed_tool", success=True, elapsed_ms=100.0)
         orchestrator._record_tool_execution("timed_tool", success=True, elapsed_ms=200.0)
 
-        stats = orchestrator._tool_usage_stats.get("timed_tool")
+        stats = orchestrator._metrics_collector._tool_usage_stats.get("timed_tool")
         assert stats["total_calls"] == 2
         assert stats["total_time_ms"] == 300.0
         assert stats["avg_time_ms"] == 150.0
@@ -378,7 +378,7 @@ class TestToolCallParsing:
 
     def test_parse_tool_calls_with_adapter_native(self, orchestrator):
         """Test _parse_tool_calls_with_adapter with native tool calls."""
-        raw_calls = [{"name": "read_file", "arguments": {"path": "/test.py"}}]
+        raw_calls = [{"name": "read", "arguments": {"path": "/test.py"}}]
         result = orchestrator._parse_tool_calls_with_adapter("", raw_calls)
         assert result is not None
 
@@ -679,7 +679,7 @@ class TestChatMethod:
                 thinking=True,
             )
 
-            response = await orch.chat("Think about this")
+            await orch.chat("Think about this")
 
             # Verify thinking parameter was passed
             call_kwargs = mock_provider.chat.call_args[1]
@@ -745,6 +745,7 @@ class TestFromSettings:
         mock_provider = MagicMock()
         mock_provider.name = "mock_provider"
         mock_provider.supports_tools.return_value = True
+        mock_provider.get_context_window.return_value = 100000
 
         with patch("victor.agent.orchestrator.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider
@@ -881,7 +882,7 @@ class TestHandleToolCalls:
         orchestrator.sanitizer.is_valid_tool_name = MagicMock(return_value=True)
         orchestrator.tools.is_tool_enabled = MagicMock(return_value=True)
 
-        result = await orchestrator._handle_tool_calls([{"name": "read_file", "arguments": {}}])
+        result = await orchestrator._handle_tool_calls([{"name": "read", "arguments": {}}])
         # Should skip because budget reached
         assert result == []
 
@@ -904,7 +905,7 @@ class TestHandleToolCalls:
 
             # Use string JSON arguments
             result = await orch._handle_tool_calls(
-                [{"name": "read_file", "arguments": '{"path": "/test.py"}'}]
+                [{"name": "read", "arguments": '{"path": "/test.py"}'}]
             )
 
             assert len(result) == 1
@@ -925,7 +926,7 @@ class TestHandleToolCalls:
                 return_value=MagicMock(success=True, result="done", error=None)
             )
 
-            result = await orch._handle_tool_calls([{"name": "read_file", "arguments": None}])
+            result = await orch._handle_tool_calls([{"name": "read", "arguments": None}])
 
             assert len(result) == 1
             assert result[0]["success"] is True
@@ -946,11 +947,11 @@ class TestHandleToolCalls:
             import json
 
             args = {"path": "/test.py"}
-            signature = ("read_file", json.dumps(args, sort_keys=True, default=str))
+            signature = ("read", json.dumps(args, sort_keys=True, default=str))
             orch.failed_tool_signatures.add(signature)
 
             # Try same call again
-            result = await orch._handle_tool_calls([{"name": "read_file", "arguments": args}])
+            result = await orch._handle_tool_calls([{"name": "read", "arguments": args}])
 
             # Should be skipped
             assert result == []
@@ -971,14 +972,14 @@ class TestHandleToolCalls:
             )
 
             result = await orch._handle_tool_calls(
-                [{"name": "read_file", "arguments": {"path": "/test.py"}}]
+                [{"name": "read", "arguments": {"path": "/test.py"}}]
             )
 
             assert len(result) == 1
             assert result[0]["success"] is True
-            assert result[0]["name"] == "read_file"
+            assert result[0]["name"] == "read"
             assert orch.tool_calls_used == 1
-            assert "read_file" in orch.executed_tools
+            assert "read" in orch.executed_tools
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_failure(self, mock_provider, orchestrator_settings):
@@ -996,7 +997,7 @@ class TestHandleToolCalls:
             )
 
             result = await orch._handle_tool_calls(
-                [{"name": "read_file", "arguments": {"path": "/nonexistent.py"}}]
+                [{"name": "read", "arguments": {"path": "/nonexistent.py"}}]
             )
 
             assert len(result) == 1
@@ -1021,7 +1022,513 @@ class TestHandleToolCalls:
             )
 
             await orch._handle_tool_calls(
-                [{"name": "read_file", "arguments": {"path": "/test.py"}}]
+                [{"name": "read", "arguments": {"path": "/test.py"}}]
             )
 
             assert "/test.py" in orch.observed_files
+
+
+class TestGetToolStatusMessage:
+    """Tests for _get_tool_status_message helper method."""
+
+    def test_execute_bash_with_command(self, mock_provider, orchestrator_settings):
+        """Test status message for execute_bash tool."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message("execute_bash", {"command": "ls -la"})
+            assert result == "🔧 Running execute_bash: `ls -la`"
+
+    def test_execute_bash_long_command_truncation(self, mock_provider, orchestrator_settings):
+        """Test long command truncation for execute_bash."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            long_cmd = "a" * 100
+            result = orch._get_tool_status_message("execute_bash", {"command": long_cmd})
+            assert result == f"🔧 Running execute_bash: `{'a' * 80}...`"
+
+    def test_list_directory(self, mock_provider, orchestrator_settings):
+        """Test status message for list_directory tool."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message("list_directory", {"path": "/src"})
+            assert result == "🔧 Listing directory: /src"
+
+    def test_list_directory_default_path(self, mock_provider, orchestrator_settings):
+        """Test list_directory with default path."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message("list_directory", {})
+            assert result == "🔧 Listing directory: ."
+
+    def test_read_file(self, mock_provider, orchestrator_settings):
+        """Test status message for read_file tool."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message("read", {"path": "/src/main.py"})
+            assert result == "🔧 Reading file: /src/main.py"
+
+    def test_edit_files_single(self, mock_provider, orchestrator_settings):
+        """Test status message for edit_files with single file."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message(
+                "edit_files", {"files": [{"path": "/src/main.py"}]}
+            )
+            assert result == "🔧 Editing: /src/main.py"
+
+    def test_edit_files_multiple(self, mock_provider, orchestrator_settings):
+        """Test status message for edit_files with multiple files."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message(
+                "edit_files",
+                {
+                    "files": [
+                        {"path": "/a.py"},
+                        {"path": "/b.py"},
+                        {"path": "/c.py"},
+                        {"path": "/d.py"},
+                    ]
+                },
+            )
+            assert result == "🔧 Editing: /a.py, /b.py, /c.py (+1 more)"
+
+    def test_edit_files_empty(self, mock_provider, orchestrator_settings):
+        """Test status message for edit_files with empty files list."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message("edit_files", {"files": []})
+            assert result == "🔧 Running edit_files..."
+
+    def test_write_file(self, mock_provider, orchestrator_settings):
+        """Test status message for write tool."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message("write", {"path": "/new_file.py"})
+            assert result == "🔧 Writing file: /new_file.py"
+
+    def test_code_search(self, mock_provider, orchestrator_settings):
+        """Test status message for code_search tool."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message("code_search", {"query": "def main"})
+            assert result == "🔧 Searching: def main"
+
+    def test_code_search_long_query_truncation(self, mock_provider, orchestrator_settings):
+        """Test long query truncation for code_search."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            long_query = "a" * 60
+            result = orch._get_tool_status_message("code_search", {"query": long_query})
+            assert result == f"🔧 Searching: {'a' * 50}..."
+
+    def test_unknown_tool(self, mock_provider, orchestrator_settings):
+        """Test status message for unknown tools."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._get_tool_status_message("some_custom_tool", {"arg": "value"})
+            assert result == "🔧 Running some_custom_tool..."
+
+
+class TestClassifyTaskKeywords:
+    """Tests for _classify_task_keywords helper method."""
+
+    def test_action_task_create(self, mock_provider, orchestrator_settings):
+        """Test detection of action task with 'create' keyword."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("Create a Python function")
+            assert result["is_action_task"] is True
+            assert result["coarse_task_type"] == "action"
+            assert result["needs_execution"] is False
+
+    def test_action_task_execute(self, mock_provider, orchestrator_settings):
+        """Test detection of action task with execution keywords."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("Execute the script")
+            assert result["is_action_task"] is True
+            assert result["needs_execution"] is True
+            assert result["coarse_task_type"] == "action"
+
+    def test_action_task_run(self, mock_provider, orchestrator_settings):
+        """Test detection of action task with 'run' keyword."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("Run the tests")
+            assert result["is_action_task"] is True
+            assert result["needs_execution"] is True
+
+    def test_analysis_task_analyze(self, mock_provider, orchestrator_settings):
+        """Test detection of analysis task with 'analyze' keyword."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("Analyze the codebase")
+            assert result["is_analysis_task"] is True
+            assert result["coarse_task_type"] == "analysis"
+
+    def test_analysis_task_review(self, mock_provider, orchestrator_settings):
+        """Test detection of analysis task with 'review' keyword."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("Review the code for bugs")
+            assert result["is_analysis_task"] is True
+
+    def test_analysis_task_question_pattern(self, mock_provider, orchestrator_settings):
+        """Test detection of analysis task with question patterns."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("How does the authentication work?")
+            assert result["is_analysis_task"] is True
+            assert result["coarse_task_type"] == "analysis"
+
+    def test_default_task(self, mock_provider, orchestrator_settings):
+        """Test default classification for generic messages."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("Hello there")
+            assert result["is_action_task"] is False
+            assert result["is_analysis_task"] is False
+            assert result["coarse_task_type"] == "default"
+
+    def test_analysis_takes_precedence(self, mock_provider, orchestrator_settings):
+        """Test that analysis classification takes precedence over action."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            # Message with both action and analysis keywords
+            result = orch._classify_task_keywords("Analyze and create a report")
+            # Both should be true but coarse type should be analysis
+            assert result["is_action_task"] is True
+            assert result["is_analysis_task"] is True
+            assert result["coarse_task_type"] == "analysis"
+
+    def test_case_insensitive(self, mock_provider, orchestrator_settings):
+        """Test that keyword detection is case insensitive."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = orch._classify_task_keywords("ANALYZE THE CODE")
+            assert result["is_analysis_task"] is True
+            result = orch._classify_task_keywords("CREATE a file")
+            assert result["is_action_task"] is True
+
+
+class TestDetermineContinuationAction:
+    """Tests for _determine_continuation_action helper method."""
+
+    @pytest.fixture
+    def mock_intent_result(self):
+        """Create a mock intent classification result."""
+
+        class MockIntentResult:
+            def __init__(self, intent_type):
+                self.intent = intent_type
+                self.confidence = 0.9
+                self.top_matches = []
+
+        return MockIntentResult
+
+    def test_asking_input_one_shot_auto_continue(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that asking_input in one_shot mode returns continue_asking_input action."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            intent = mock_intent_result(IntentType.ASKING_INPUT)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=True,
+                is_action_task=False,
+                content_length=100,
+                full_content="Would you like me to continue?",
+                continuation_prompts=0,
+                asking_input_prompts=0,
+                one_shot_mode=True,
+            )
+            assert result["action"] == "continue_asking_input"
+            assert "Yes, please continue" in result["message"]
+            assert result["updates"]["asking_input_prompts"] == 1
+
+    def test_asking_input_interactive_returns_to_user(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that asking_input in interactive mode returns return_to_user action."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            intent = mock_intent_result(IntentType.ASKING_INPUT)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=True,
+                is_action_task=False,
+                content_length=100,
+                full_content="Would you like me to continue?",
+                continuation_prompts=0,
+                asking_input_prompts=0,
+                one_shot_mode=False,
+            )
+            assert result["action"] == "return_to_user"
+            assert result["message"] is None
+
+    def test_continuation_intent_prompts_tool_call(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that continuation intent prompts for tool call."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            # Ensure budget thresholds are met
+            orch.tool_budget = 100
+            orch.tool_calls_used = 5
+            intent = mock_intent_result(IntentType.CONTINUATION)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=True,
+                is_action_task=False,
+                content_length=100,
+                full_content="Let me check more files...",
+                continuation_prompts=0,
+                asking_input_prompts=0,
+                one_shot_mode=True,
+            )
+            assert result["action"] == "prompt_tool_call"
+            assert "list_directory" in result["message"]
+            assert result["updates"]["continuation_prompts"] == 1
+
+    def test_max_continuation_prompts_requests_summary(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that max continuation prompts triggers summary request."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            orch.tool_calls_used = 5
+            intent = mock_intent_result(IntentType.CONTINUATION)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=True,
+                is_action_task=False,
+                content_length=100,
+                full_content="Let me check more...",
+                continuation_prompts=10,  # At max for analysis
+                asking_input_prompts=0,
+                one_shot_mode=True,
+            )
+            assert result["action"] == "request_summary"
+            assert "complete the task NOW" in result["message"]
+            assert result["updates"]["continuation_prompts"] == 99
+
+    def test_incomplete_output_requests_completion(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that incomplete output with tool calls requests completion."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            # Set tool_calls_used >= budget_threshold to skip prompt_tool_call
+            # Default tool_budget=20, so budget_threshold=5 for analysis
+            orch.tool_budget = 20
+            orch.tool_calls_used = 6  # >= 5, skips prompt_tool_call
+            # Make sure _final_summary_requested is not set
+            if hasattr(orch, "_final_summary_requested"):
+                delattr(orch, "_final_summary_requested")
+            intent = mock_intent_result(IntentType.NEUTRAL)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=True,
+                is_action_task=False,
+                content_length=100,  # Short - looks incomplete
+                full_content="Brief text",
+                continuation_prompts=8,  # Below max (10 for analysis), skips request_summary
+                asking_input_prompts=0,
+                one_shot_mode=True,
+            )
+            assert result["action"] == "request_completion"
+            assert "Strengths" in result["message"]
+            assert result.get("set_final_summary_requested") is True
+
+    def test_completion_intent_finishes(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that completion intent returns finish action."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            intent = mock_intent_result(IntentType.COMPLETION)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=False,
+                is_action_task=False,
+                content_length=1000,  # Long content
+                full_content="Here is the complete analysis...",
+                continuation_prompts=0,
+                asking_input_prompts=0,
+                one_shot_mode=False,
+            )
+            assert result["action"] == "finish"
+            assert result["message"] is None
+
+    def test_substantial_structured_content_finishes(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that substantial structured content returns finish action."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            intent = mock_intent_result(IntentType.NEUTRAL)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=True,
+                is_action_task=False,
+                content_length=300,  # >200
+                full_content="## Summary\n\n**Strengths**\n\nThe code is well organized.",
+                continuation_prompts=0,
+                asking_input_prompts=0,
+                one_shot_mode=False,
+            )
+            assert result["action"] == "finish"
+
+    def test_asking_input_max_prompts_exceeded(
+        self, mock_provider, orchestrator_settings, mock_intent_result
+    ):
+        """Test that asking_input respects max prompts limit."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            intent = mock_intent_result(IntentType.ASKING_INPUT)
+            result = orch._determine_continuation_action(
+                intent_result=intent,
+                is_analysis_task=True,
+                is_action_task=False,
+                content_length=100,
+                full_content="Would you like me to continue?",
+                continuation_prompts=0,
+                asking_input_prompts=3,  # At max
+                one_shot_mode=True,
+            )
+            # Should fall through to other logic, not continue_asking_input
+            assert result["action"] != "continue_asking_input"

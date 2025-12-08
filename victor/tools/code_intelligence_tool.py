@@ -13,15 +13,13 @@
 # limitations under the License.
 
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from pathlib import Path
 
 from tree_sitter import QueryCursor
 from victor.codebase.tree_sitter_manager import get_parser
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
-
-if TYPE_CHECKING:
-    from victor.tools.base import ToolRegistry
 
 
 # Tree-sitter queries to find function and class definitions in Python
@@ -40,18 +38,36 @@ PYTHON_QUERIES = {
 }
 
 
-@tool
-async def find_symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
-    """
-    Finds the definition of a class or function in a Python file using AST parsing.
+@tool(
+    category="code_intelligence",
+    priority=Priority.HIGH,  # Important for code navigation
+    access_mode=AccessMode.READONLY,  # Only reads files for analysis
+    danger_level=DangerLevel.SAFE,  # No side effects
+    keywords=["symbol", "find", "definition", "function", "class", "locate", "ast"],
+)
+async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
+    """[AST-AWARE] Find function/class definition using tree-sitter parsing.
+
+    Uses AST analysis for accurate symbol lookup. For Python code analysis only.
+    Use this instead of grep/text search when you need precise symbol definitions.
 
     Args:
-        file_path: The path to the Python file to search in.
-        symbol_name: The name of the class or function to find.
+        file_path: Path to Python file (.py).
+        symbol_name: Name of function or class to find.
 
     Returns:
-        A dictionary containing the symbol's name, type, start line, end line,
-        and the block of code defining it. Returns None if not found.
+        Dict with symbol_name, type, file_path, start_line, end_line, code.
+        None if not found. {"error": ...} on file/parse errors.
+
+    When to use:
+        - Finding where a function/class is defined
+        - Getting the full code block of a symbol
+        - Navigating to symbol definitions
+
+    When NOT to use:
+        - Non-Python files (use grep/search instead)
+        - Finding usages/references (use refs() instead)
+        - Text patterns that aren't symbol names
     """
     try:
         parser = get_parser("python")
@@ -94,17 +110,36 @@ async def find_symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, An
         return {"error": f"An unexpected error occurred: {e}"}
 
 
-@tool
-async def find_references(symbol_name: str, search_path: str = ".") -> List[Dict[str, Any]]:
-    """
-    Finds all references to a symbol in a directory using AST parsing.
+@tool(
+    category="code_intelligence",
+    priority=Priority.HIGH,  # Important for code navigation
+    access_mode=AccessMode.READONLY,  # Only reads files for analysis
+    danger_level=DangerLevel.SAFE,  # No side effects
+    keywords=["refs", "references", "find", "usage", "occurrences", "symbol", "ast"],
+)
+async def refs(symbol_name: str, search_path: str = ".") -> List[Dict[str, Any]]:
+    """[AST-AWARE] Find all references to a symbol using tree-sitter parsing.
+
+    Scans Python files and identifies exact identifier matches using AST analysis.
+    More accurate than grep for finding symbol usages (won't match substrings).
 
     Args:
-        symbol_name: The name of the symbol (variable, function, class, etc.) to find.
-        search_path: The directory path to search in. Defaults to the current directory.
+        symbol_name: Symbol name (variable, function, class) to find.
+        search_path: Directory to search recursively. Default: current directory.
 
     Returns:
-        A list of dictionaries, each representing a reference found.
+        List of dicts: [{file_path, line, column, preview}, ...]
+        Empty list if no references found.
+
+    When to use:
+        - Finding all usages of a function/variable/class
+        - Understanding symbol usage patterns
+        - Preparing for refactoring (see rename() for actual changes)
+
+    When NOT to use:
+        - Non-Python files (use grep instead)
+        - Finding text patterns (use grep instead)
+        - Modifying code (use rename() for symbol renames)
     """
     references = []
     parser = get_parser("python")
@@ -147,112 +182,7 @@ async def find_references(symbol_name: str, search_path: str = ".") -> List[Dict
     return references
 
 
-@tool
-async def rename_symbol(
-    symbol_name: str, new_symbol_name: str, context: dict, search_path: str = "."
-) -> str:
-    """
-    Safely renames a symbol across all Python files in the specified search path.
 
-    This tool finds all references to `symbol_name` and replaces them with `new_symbol_name`
-    within a transactional file editing process. Users should review and commit the changes
-    using the `file_editor` tool.
-
-    Args:
-        symbol_name: The current name of the symbol (function, class, variable, etc.) to rename.
-        new_symbol_name: The new name for the symbol.
-        context: The tool context, provided by the orchestrator.
-        search_path: The directory path to search in. Defaults to the current directory.
-
-    Returns:
-        A message indicating the status of the rename operation and instructions for review.
-    """
-    tool_registry: ToolRegistry = context.get("tool_registry")
-    if not tool_registry:
-        return "Error: ToolRegistry not found in context."
-
-    # 1. Find all references to the symbol
-    references_result = await tool_registry.execute(
-        "find_references", context, symbol_name=symbol_name, search_path=search_path
-    )
-
-    if not references_result.success:
-        return f"Error finding references: {references_result.error}"
-
-    references = references_result.output
-    if not references:
-        return f"No references found for symbol '{symbol_name}'."
-
-    # Group references by file
-    files_to_modify: Dict[str, List[Dict[str, Any]]] = {}
-    for ref in references:
-        file_path = ref["file_path"]
-        if file_path not in files_to_modify:
-            files_to_modify[file_path] = []
-        files_to_modify[file_path].append(ref)
-
-    # 2. Start a file editing transaction
-    transaction_description = f"Rename symbol '{symbol_name}' to '{new_symbol_name}'."
-    start_transaction_result = await tool_registry.execute(
-        "file_editor", context, operation="start_transaction", description=transaction_description
-    )
-    if not start_transaction_result.success:
-        return f"Error starting transaction: {start_transaction_result.error}"
-
-    # 3. Queue modifications for each file
-    modified_files_count = 0
-    for file_path, _refs in files_to_modify.items():
-        try:
-            # Read current content
-            read_result = await tool_registry.execute("read_file", context, path=file_path)
-            if not read_result.success:
-                print(f"Warning: Could not read {file_path}. Skipping.")
-                continue
-
-            original_content = read_result.output
-            lines = original_content.splitlines()
-
-            # Perform replacements. Iterate through lines and replace
-            # This is a basic text replacement; for true AST safety,
-            # an AST transformer would be needed here.
-            # However, `find_references` gives us line/col, which helps
-            # in targeted replacement within a line.
-            new_lines = []
-            for _i, line in enumerate(lines):
-                # Check if this line contains a reference for the current symbol
-                # This is a simplified check. A more robust solution would
-                # use the column information from `refs` to ensure exact match.
-                if symbol_name in line:
-                    new_lines.append(line.replace(symbol_name, new_symbol_name))
-                else:
-                    new_lines.append(line)
-
-            new_content = "\n".join(new_lines)
-
-            # Add modification to the transaction
-            add_modify_result = await tool_registry.execute(
-                "file_editor",
-                context,
-                operation="add_modify",
-                path=file_path,
-                new_content=new_content,
-            )
-            if not add_modify_result.success:
-                return f"Error queuing modification for {file_path}: " f"{add_modify_result.error}"
-            modified_files_count += 1
-
-        except Exception as e:
-            # Abort the transaction if any file processing fails
-            await tool_registry.execute("file_editor", context, operation="abort")
-            return f"Failed to process file {file_path} for renaming: {e}. Transaction aborted."
-
-    if modified_files_count == 0:
-        await tool_registry.execute("file_editor", context, operation="abort")
-        return "No files were modified. Transaction aborted."
-
-    return (
-        f"Queued rename of '{symbol_name}' to '{new_symbol_name}' across "
-        f"{modified_files_count} files. Please use the `file_editor(operation='preview')` "
-        f"tool to review changes, then `file_editor(operation='commit')` or "
-        f"`file_editor(operation='rollback')`."
-    )
+# Note: For project-wide symbol renaming, use the consolidated `rename` tool
+# from refactor_tool.py with scope="project". Example:
+#   rename(old_name="foo", new_name="bar", scope="project")

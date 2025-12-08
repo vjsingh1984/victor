@@ -1,0 +1,368 @@
+# Copyright 2025 Vijaykumar Singh
+# SPDX-License-Identifier: Apache-2.0
+"""Code Correction Middleware for Tool Pipeline.
+
+This middleware integrates the self-correction system into Victor's
+tool execution pipeline, providing automatic code validation and
+fixing for tools that accept code as input.
+
+Design Pattern: Middleware/Interceptor Pattern
+- Intercepts tool calls before execution
+- Validates and auto-fixes code arguments
+- Provides feedback for failed validations
+
+Integration Points:
+- ToolPipeline: Called during argument processing
+- code_executor: Validates Python code before execution
+- file_editor: Validates code in file content
+- write_file: Validates code in file content
+
+Usage:
+    from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
+
+    middleware = CodeCorrectionMiddleware(enabled=True)
+
+    # In tool pipeline, before execution:
+    if middleware.should_validate(tool_name):
+        validated_args, validation = middleware.validate_and_fix(
+            tool_name, arguments
+        )
+        if not validation.valid and not middleware.auto_fix:
+            # Return feedback to LLM for retry
+            feedback = middleware.get_feedback(validation)
+
+Enterprise Integration Pattern: Intercepting Filter
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional, Set, Tuple
+
+from victor.evaluation.correction import (
+    SelfCorrector,
+    ValidationResult,
+    CorrectionFeedback,
+    Language,
+    detect_language,
+    create_self_corrector,
+    CorrectionMetricsCollector,
+)
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CodeCorrectionConfig:
+    """Configuration for code correction middleware."""
+
+    # Enable/disable the middleware
+    enabled: bool = True
+
+    # Auto-fix common issues (imports, markdown cleanup)
+    auto_fix: bool = True
+
+    # Tools to validate code arguments for
+    code_tools: Set[str] = field(
+        default_factory=lambda: {
+            "code_executor",
+            "execute_code",
+            "run_code",
+            "write_file",
+            "file_editor",
+            "edit_file",
+            "create_file",
+        }
+    )
+
+    # Argument names that contain code
+    code_argument_names: Set[str] = field(
+        default_factory=lambda: {
+            "code",
+            "python_code",
+            "content",
+            "source",
+            "script",
+            "new_content",
+            "file_content",
+        }
+    )
+
+    # Maximum correction iterations per call
+    max_iterations: int = 1
+
+    # Collect metrics
+    collect_metrics: bool = True
+
+
+@dataclass
+class CorrectionResult:
+    """Result of code correction attempt."""
+
+    original_code: str
+    corrected_code: str
+    validation: ValidationResult
+    was_corrected: bool
+    feedback: Optional[CorrectionFeedback] = None
+
+
+class CodeCorrectionMiddleware:
+    """Middleware for validating and correcting code in tool arguments.
+
+    This middleware integrates with the tool pipeline to provide
+    automatic code validation and fixing before tool execution.
+
+    Example:
+        middleware = CodeCorrectionMiddleware()
+
+        # Check if tool needs code validation
+        if middleware.should_validate("code_executor"):
+            # Validate and optionally fix the code
+            result = middleware.validate_and_fix(
+                tool_name="code_executor",
+                arguments={"code": "print('hello')"},
+            )
+
+            if result.was_corrected:
+                arguments["code"] = result.corrected_code
+
+            if not result.validation.valid:
+                # Generate feedback for LLM retry
+                feedback = middleware.generate_feedback(result)
+    """
+
+    def __init__(
+        self,
+        config: Optional[CodeCorrectionConfig] = None,
+        metrics_collector: Optional[CorrectionMetricsCollector] = None,
+    ):
+        """Initialize the middleware.
+
+        Args:
+            config: Configuration options
+            metrics_collector: Optional collector for correction metrics
+        """
+        self.config = config or CodeCorrectionConfig()
+        self.metrics_collector = metrics_collector
+        self._corrector: Optional[SelfCorrector] = None
+
+    @property
+    def corrector(self) -> SelfCorrector:
+        """Lazy-load the self-corrector."""
+        if self._corrector is None:
+            self._corrector = create_self_corrector(
+                max_iterations=self.config.max_iterations,
+                auto_fix=self.config.auto_fix,
+            )
+        return self._corrector
+
+    def should_validate(self, tool_name: str) -> bool:
+        """Check if this tool should have its code validated.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            True if code validation should be applied
+        """
+        if not self.config.enabled:
+            return False
+        return tool_name in self.config.code_tools
+
+    def find_code_argument(
+        self,
+        arguments: Dict[str, Any],
+    ) -> Optional[Tuple[str, str]]:
+        """Find the code argument in tool arguments.
+
+        Args:
+            arguments: Tool arguments dictionary
+
+        Returns:
+            Tuple of (argument_name, code_value) or None
+        """
+        for arg_name in self.config.code_argument_names:
+            if arg_name in arguments:
+                value = arguments[arg_name]
+                if isinstance(value, str) and value.strip():
+                    return (arg_name, value)
+        return None
+
+    def validate_and_fix(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        language_hint: Optional[str] = None,
+    ) -> CorrectionResult:
+        """Validate and optionally fix code in tool arguments.
+
+        Args:
+            tool_name: Name of the tool being called
+            arguments: Tool arguments (may be modified if auto_fix enabled)
+            language_hint: Optional language hint (e.g., "python", "javascript")
+
+        Returns:
+            CorrectionResult with validation status and corrected code
+        """
+        # Find the code argument
+        code_arg = self.find_code_argument(arguments)
+
+        if code_arg is None:
+            # No code to validate
+            return CorrectionResult(
+                original_code="",
+                corrected_code="",
+                validation=ValidationResult(
+                    valid=True,
+                    language=Language.UNKNOWN,
+                    syntax_valid=True,
+                    imports_valid=True,
+                    errors=(),
+                    warnings=(),
+                ),
+                was_corrected=False,
+            )
+
+        arg_name, code = code_arg
+
+        # Detect language
+        if language_hint:
+            # Use hint to create filename for detection
+            lang = detect_language(code, filename=f"code.{language_hint}")
+        else:
+            # Infer from tool name
+            if tool_name in {"code_executor", "execute_code", "run_code"}:
+                lang = Language.PYTHON
+            else:
+                lang = detect_language(code)
+
+        # Validate and fix
+        fixed_code, validation = self.corrector.validate_and_fix(code, language=lang)
+
+        # Track metrics
+        if self.metrics_collector:
+            self.metrics_collector.record_validation(lang, validation)
+
+        was_corrected = fixed_code != code
+
+        # Generate feedback if not valid
+        feedback = None
+        if not validation.valid:
+            feedback = self.corrector.generate_feedback(
+                code=code,
+                validation=validation,
+            )
+
+        return CorrectionResult(
+            original_code=code,
+            corrected_code=fixed_code,
+            validation=validation,
+            was_corrected=was_corrected,
+            feedback=feedback,
+        )
+
+    def apply_correction(
+        self,
+        arguments: Dict[str, Any],
+        result: CorrectionResult,
+    ) -> Dict[str, Any]:
+        """Apply correction to tool arguments.
+
+        Args:
+            arguments: Original tool arguments
+            result: Correction result
+
+        Returns:
+            Updated arguments with corrected code
+        """
+        if not result.was_corrected:
+            return arguments
+
+        # Find and update the code argument
+        code_arg = self.find_code_argument(arguments)
+        if code_arg:
+            arg_name, _ = code_arg
+            arguments = dict(arguments)  # Don't mutate original
+            arguments[arg_name] = result.corrected_code
+
+        return arguments
+
+    def format_validation_error(self, result: CorrectionResult) -> str:
+        """Format validation errors for display.
+
+        Args:
+            result: Correction result
+
+        Returns:
+            Formatted error message
+        """
+        if result.validation.valid:
+            return ""
+
+        lines = ["Code validation failed:"]
+
+        if not result.validation.syntax_valid:
+            lines.append("  - Syntax errors detected")
+
+        if not result.validation.imports_valid:
+            lines.append("  - Import issues detected")
+            if result.validation.missing_imports:
+                for imp in result.validation.missing_imports[:5]:
+                    lines.append(f"    - Missing: {imp}")
+
+        for error in result.validation.errors[:5]:
+            lines.append(f"  - {error}")
+
+        if result.feedback and result.feedback.suggestions:
+            lines.append("\nSuggestions:")
+            for suggestion in result.feedback.suggestions[:3]:
+                lines.append(f"  - {suggestion}")
+
+        return "\n".join(lines)
+
+    def get_retry_prompt(
+        self,
+        result: CorrectionResult,
+        original_prompt: Optional[str] = None,
+    ) -> str:
+        """Generate a retry prompt for the LLM.
+
+        Args:
+            result: Correction result with validation info
+            original_prompt: Optional original user prompt
+
+        Returns:
+            Prompt for LLM to retry code generation
+        """
+        if result.feedback is None:
+            return self.format_validation_error(result)
+
+        return self.corrector.build_retry_prompt(
+            original_prompt=original_prompt or "",
+            previous_code=result.original_code,
+            feedback=result.feedback,
+            iteration=1,
+        )
+
+
+# Singleton instance for shared use
+_middleware_instance: Optional[CodeCorrectionMiddleware] = None
+
+
+def get_code_correction_middleware() -> CodeCorrectionMiddleware:
+    """Get the global code correction middleware instance.
+
+    Returns:
+        Shared middleware instance
+    """
+    global _middleware_instance
+    if _middleware_instance is None:
+        _middleware_instance = CodeCorrectionMiddleware()
+    return _middleware_instance
+
+
+def reset_middleware() -> None:
+    """Reset the global middleware instance."""
+    global _middleware_instance
+    _middleware_instance = None

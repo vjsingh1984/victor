@@ -30,14 +30,13 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional
 
-logger = logging.getLogger(__name__)
-
-# Import settings for configurable paths
 from victor.config.settings import (
     VICTOR_DIR_NAME,
     VICTOR_CONTEXT_FILE,
     get_project_paths,
 )
+
+logger = logging.getLogger(__name__)
 
 # Context file location: .victor/init.md (configurable via settings.py)
 # No legacy locations - clean integration for future code

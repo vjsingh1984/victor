@@ -18,7 +18,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from victor.tools.file_editor_tool import edit_files
+from victor.tools.file_editor_tool import edit
 
 
 @pytest.mark.asyncio
@@ -28,15 +28,15 @@ async def test_file_editor_tool():
         test_file = Path(tmpdir) / "test.py"
 
         # Test 1: Create file
-        result = await edit_files(
-            operations=[
+        result = await edit(
+            ops=[
                 {
                     "type": "create",
                     "path": str(test_file),
                     "content": "def hello():\n    print('Hello, World!')\n",
                 }
             ],
-            description="Create test file",
+            desc="Create test file",
         )
         assert result["success"], f"Create failed: {result.get('error')}"
 
@@ -47,15 +47,15 @@ async def test_file_editor_tool():
 
         # Test 2: Modify file
         new_content = "def hello():\n    print('Hello, Victor!')\n"
-        result = await edit_files(
-            operations=[
+        result = await edit(
+            ops=[
                 {
                     "type": "modify",
                     "path": str(test_file),
                     "new_content": new_content,
                 }
             ],
-            description="Modify test file",
+            desc="Modify test file",
         )
         assert result["success"], f"Modify failed: {result.get('error')}"
 
@@ -63,9 +63,9 @@ async def test_file_editor_tool():
         content = test_file.read_text()
         assert "Victor" in content, "File modification failed"
 
-        # Test 3: Preview mode (dry run) - must pass auto_commit=False to not apply
-        result = await edit_files(
-            operations=[
+        # Test 3: Preview mode (dry run) - must pass commit=False to not apply
+        result = await edit(
+            ops=[
                 {
                     "type": "modify",
                     "path": str(test_file),
@@ -73,8 +73,8 @@ async def test_file_editor_tool():
                 }
             ],
             preview=True,
-            auto_commit=False,  # Required for true dry run
-            description="Preview test",
+            commit=False,  # Required for true dry run
+            desc="Preview test",
         )
         assert result["success"], f"Preview failed: {result.get('error')}"
 
@@ -83,14 +83,14 @@ async def test_file_editor_tool():
         assert "Victor" in content, "Preview mode modified file!"
 
         # Test 4: Delete file
-        result = await edit_files(
-            operations=[
+        result = await edit(
+            ops=[
                 {
                     "type": "delete",
                     "path": str(test_file),
                 }
             ],
-            description="Delete test file",
+            desc="Delete test file",
         )
         assert result["success"], f"Delete failed: {result.get('error')}"
 
@@ -106,8 +106,8 @@ async def test_file_editor_multiple_operations():
         file2 = Path(tmpdir) / "file2.py"
 
         # Create multiple files
-        result = await edit_files(
-            operations=[
+        result = await edit(
+            ops=[
                 {
                     "type": "create",
                     "path": str(file1),
@@ -119,7 +119,7 @@ async def test_file_editor_multiple_operations():
                     "content": "# File 2\n",
                 },
             ],
-            description="Create multiple files",
+            desc="Create multiple files",
         )
         assert result["success"], f"Multiple create failed: {result.get('error')}"
 
@@ -131,14 +131,14 @@ async def test_file_editor_multiple_operations():
 @pytest.mark.asyncio
 async def test_file_editor_invalid_operation():
     """Test handling of invalid operations."""
-    result = await edit_files(
-        operations=[
+    result = await edit(
+        ops=[
             {
                 "type": "invalid_op",
                 "path": "/nonexistent/file.py",
             }
         ],
-        description="Invalid operation test",
+        desc="Invalid operation test",
     )
     # Should handle gracefully
     assert isinstance(result, dict)

@@ -3,14 +3,107 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.common import EXCLUDE_DIRS, DEFAULT_CODE_EXTENSIONS, latest_mtime
 from victor.tools.decorators import tool
 
-# Alias for backward compatibility
-DEFAULT_EXTS = DEFAULT_CODE_EXTENSIONS
 
 # Cache for semantic indexes to avoid re-embedding on every call
 _INDEX_CACHE: Dict[str, Dict[str, Any]] = {}
+
+# Directories that indicate non-core code (lower importance)
+NON_CORE_DIRS = {
+    "test",
+    "tests",
+    "testing",
+    "spec",
+    "specs",
+    "demo",
+    "demos",
+    "example",
+    "examples",
+    "sample",
+    "samples",
+    "client",
+    "clients",
+    "sdk",
+    "benchmark",
+    "benchmarks",
+    "bench",
+    "doc",
+    "docs",
+    "documentation",
+    "script",
+    "scripts",
+    "tool",
+    "tools",
+    "util",
+    "utils",
+    "mock",
+    "mocks",
+    "fixture",
+    "fixtures",
+    "stub",
+    "stubs",
+}
+
+# Directories that indicate core code (higher importance)
+CORE_DIRS = {
+    "src",
+    "lib",
+    "core",
+    "pkg",
+    "internal",
+    "main",
+    "engine",
+    "engines",
+    "service",
+    "services",
+    "storage",
+    "index",
+    "compute",
+    "network",
+    "api",
+}
+
+
+def _calculate_importance_score(file_path: str, symbol_type: Optional[str] = None) -> float:
+    """Calculate importance score for a search result.
+
+    Higher scores = more architecturally important.
+
+    Scoring factors:
+    - Core directories: +0.3
+    - Non-core directories: -0.4
+    - Class/struct definitions: +0.2
+    - Test files: -0.3
+    """
+    score = 1.0
+    path_lower = file_path.lower()
+    parts = set(path_lower.replace("\\", "/").split("/"))
+
+    # Check for core directories
+    if parts & CORE_DIRS:
+        score += 0.3
+
+    # Check for non-core directories
+    if parts & NON_CORE_DIRS:
+        score -= 0.4
+
+    # Explicit test file patterns
+    if any(p in path_lower for p in ["test_", "_test.", ".test.", "/test/", "/tests/"]):
+        score -= 0.3
+
+    # Symbol type bonus
+    if symbol_type in ("class", "struct", "trait", "interface", "impl"):
+        score += 0.2
+
+    # Depth penalty - deeper nesting = less core
+    depth = len([p for p in parts if p and p not in {".", ".."}])
+    if depth > 5:
+        score -= 0.1
+
+    return max(0.1, score)  # Floor at 0.1
 
 
 def _latest_mtime(root: Path) -> float:
@@ -22,13 +115,13 @@ def _normalize_extensions(exts: Optional[List[str]]) -> Set[str]:
     """Normalize extensions to ensure they have leading dots.
 
     Handles:
-    - None -> returns DEFAULT_EXTS
+    - None -> returns DEFAULT_CODE_EXTENSIONS
     - String 'py' -> {'.py'}
     - List ['py', 'js'] -> {'.py', '.js'}
     - Already dotted ['.py'] -> {'.py'}
     """
     if exts is None:
-        return DEFAULT_EXTS
+        return DEFAULT_CODE_EXTENSIONS
 
     # Handle string input (convert to list)
     if isinstance(exts, str):
@@ -140,106 +233,92 @@ async def _get_or_build_index(
     return index, rebuilt
 
 
-@tool
-async def code_search(
+async def _literal_search(
     query: str,
-    root: str = ".",
+    path: str = ".",
     k: int = 5,
-    max_files: int = 200,
-    max_chars: int = 50000,
     exts: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """
-    Simple keyword-based code search for exact text matches.
+    """Internal literal/keyword search implementation.
 
-    Use this ONLY for simple, literal keyword searches (e.g., "def foo", "import xyz").
-    For conceptual queries like "find classes that inherit", "find error handling",
-    or "find all implementations of X", use semantic_code_search instead.
-
-    Scans files and scores by keyword match frequency. Fast but misses semantic meaning.
+    Args:
+        query: Search terms
+        path: Directory to search
+        k: Max results
+        exts: File extensions ([".py", ".js"])
     """
     try:
-        files = _gather_files(root, exts, max_files)
+        files = _gather_files(path, exts, 200)
         scores: List[Dict[str, Any]] = []
-        for path in files:
+        for file_path in files:
             try:
-                with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                    text = f.read(max_chars)
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    text = f.read(50000)
                 score = _keyword_score(text, query)
                 if score > 0:
-                    scores.append({"path": path, "score": score, "snippet": text[:800]})
+                    scores.append({"path": file_path, "score": score, "snippet": text[:800]})
             except Exception:
                 continue
 
         scores.sort(key=lambda x: x["score"], reverse=True)
         top = scores[: max(1, min(k, len(scores)))]
-        return {"success": True, "results": top, "count": len(top)}
+        return {"success": True, "results": top, "count": len(top), "mode": "literal"}
     except Exception as exc:
         return {"success": False, "error": str(exc)}
 
 
-@tool
-async def semantic_code_search(
+@tool(
+    category="search",
+    priority=Priority.CRITICAL,  # Always available for code exploration
+    access_mode=AccessMode.READONLY,  # Only reads files for search
+    danger_level=DangerLevel.SAFE,  # No side effects
+    # Registry-driven metadata for tool selection and loop detection
+    progress_params=["query", "path", "mode"],  # Different queries/paths = exploration not loop
+    stages=["initial", "reading", "analysis"],  # Relevant for exploration stages
+    task_types=["search", "analysis"],  # Classification-aware selection
+    execution_category="read_only",  # Safe for parallel execution
+    keywords=["search", "semantic", "embedding", "concept", "pattern", "similar", "find", "grep", "literal"],
+    mandatory_keywords=["search code", "find in code", "search for"],  # Force inclusion
+)
+async def search(
     query: str,
-    root: str = ".",
+    path: str = ".",
     k: int = 10,
-    force_reindex: bool = False,
-    filter_file_path: Optional[str] = None,
-    filter_symbol_type: Optional[str] = None,
-    filter_visibility: Optional[str] = None,
-    filter_language: Optional[str] = None,
-    filter_is_test_file: Optional[bool] = None,
-    filter_has_docstring: Optional[bool] = None,
+    mode: str = "semantic",
+    reindex: bool = False,
+    file: Optional[str] = None,
+    symbol: Optional[str] = None,
+    lang: Optional[str] = None,
+    test: Optional[bool] = None,
+    exts: Optional[List[str]] = None,
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
+    """Unified code search with multiple modes.
+
+    Modes:
+    - "semantic": Embedding-based search. Best for concepts, patterns, inheritance.
+    - "literal": Keyword matching (like grep). Best for exact text/identifiers.
+
+    Args:
+        query: Search query (semantic concepts or literal text)
+        path: Directory to search
+        k: Max results
+        mode: Search mode - "semantic" (default) or "literal"
+        reindex: Force re-index (semantic mode only)
+        file: Filter by file path (semantic mode only)
+        symbol: Filter by type (class/function/method) (semantic mode only)
+        lang: Filter by language (python/rust/js) (semantic mode only)
+        test: Filter test files (true/false) (semantic mode only)
+        exts: File extensions for literal mode (e.g., [".py", ".js"])
     """
-    PREFERRED: AI-powered semantic search using embeddings for conceptual code queries.
-
-    Use this for:
-    - "Find all classes that inherit from X" or "classes implementing Y"
-    - "Find error handling patterns" or "find logging implementations"
-    - "Where is authentication/validation/caching done?"
-    - "Find similar code to X" or "find related functionality"
-    - Any conceptual or structural query about the codebase
-
-    Returns semantically relevant matches even when exact keywords don't appear.
-    Uses pre-built LanceDB vector index for fast, accurate results with line numbers.
-
-    ## Chunking Strategy (BODY_AWARE)
-
-    The codebase is indexed using intelligent chunking that respects code boundaries:
-    - FILE_SUMMARY: High-level file description with symbol counts
-    - CLASS_SUMMARY: Class overview with method list and inheritance
-    - METHOD_HEADER: Function signature + docstring
-    - METHOD_BODY: Large function bodies (>30 lines) split with overlap for context
-
-    ## Available Metadata Filters
-
-    Use these optional parameters to narrow search results:
-
-    - filter_file_path: Filter by file path pattern (e.g., "src/auth" or "tests/")
-    - filter_symbol_type: "class", "function", "method", or "function_body"
-    - filter_visibility: "public", "private", or "dunder"
-    - filter_language: "python", "javascript", "typescript", "go", "rust", etc.
-    - filter_is_test_file: True to search only tests, False to exclude tests
-    - filter_has_docstring: True to find documented code, False for undocumented
-
-    ## Metadata Available in Results
-
-    Each result includes rich metadata for context:
-    - file_path, line_start, line_end: Location
-    - symbol_name, symbol_type: Symbol info
-    - chunk_type: file_summary, class_summary, method_header, method_body
-    - visibility: public, private, dunder
-    - has_docstring, line_count, param_count: Code metrics
-    - is_async, decorator_count: Function attributes
-    - method_count, base_count: Class attributes
-    - content_hash: For deduplication
-    """
+    # Route to literal search if mode is "literal"
+    if mode == "literal":
+        return await _literal_search(query, path, k, exts)
+    search_root = path
     try:
-        root_path = Path(root).resolve()
+        root_path = Path(search_root).resolve()
         if not root_path.exists():
-            return {"success": False, "error": f"Root not found: {root}"}
+            return {"success": False, "error": f"Root not found: {search_root}"}
 
         settings = context.get("settings") if context else None
         if settings is None:
@@ -249,53 +328,70 @@ async def semantic_code_search(
         filter_metadata: Optional[Dict[str, Any]] = None
         filters_applied = []
 
-        if any(
-            [
-                filter_file_path,
-                filter_symbol_type,
-                filter_visibility,
-                filter_language,
-                filter_is_test_file is not None,
-                filter_has_docstring is not None,
-            ]
-        ):
+        if any([file, symbol, lang, test is not None]):
             filter_metadata = {}
-            if filter_file_path:
-                filter_metadata["file_path"] = filter_file_path
-                filters_applied.append(f"file_path={filter_file_path}")
-            if filter_symbol_type:
-                filter_metadata["symbol_type"] = filter_symbol_type
-                filters_applied.append(f"symbol_type={filter_symbol_type}")
-            if filter_visibility:
-                filter_metadata["visibility"] = filter_visibility
-                filters_applied.append(f"visibility={filter_visibility}")
-            if filter_language:
-                filter_metadata["language"] = filter_language
-                filters_applied.append(f"language={filter_language}")
-            if filter_is_test_file is not None:
-                filter_metadata["is_test_file"] = filter_is_test_file
-                filters_applied.append(f"is_test_file={filter_is_test_file}")
-            if filter_has_docstring is not None:
-                filter_metadata["has_docstring"] = filter_has_docstring
-                filters_applied.append(f"has_docstring={filter_has_docstring}")
+            if file:
+                filter_metadata["file_path"] = file
+                filters_applied.append(f"file={file}")
+            if symbol:
+                filter_metadata["symbol_type"] = symbol
+                filters_applied.append(f"symbol={symbol}")
+            if lang:
+                filter_metadata["language"] = lang
+                filters_applied.append(f"lang={lang}")
+            if test is not None:
+                filter_metadata["is_test_file"] = test
+                filters_applied.append(f"test={test}")
 
-        index, rebuilt = await _get_or_build_index(root_path, settings, force_reindex=force_reindex)
+        index, rebuilt = await _get_or_build_index(root_path, settings, force_reindex=reindex)
         results = await index.semantic_search(
             query=query,
             max_results=k,
             filter_metadata=filter_metadata,
         )
 
+        # Truncate content in results to prevent context overflow
+        # Keep enough for context but not entire function bodies
+        MAX_CONTENT_CHARS = 500
+        truncated_results = []
+        for result in results:
+            # Convert to dict for serialization
+            result_dict = result.model_dump() if hasattr(result, "model_dump") else dict(result)
+            content = result_dict.get("content", "")
+            if len(content) > MAX_CONTENT_CHARS:
+                result_dict["content"] = (
+                    content[:MAX_CONTENT_CHARS] + f"... [truncated, {len(content)} chars total]"
+                )
+                result_dict["content_truncated"] = True
+
+            # Calculate importance score for ranking
+            file_path = result_dict.get("file_path", "")
+            symbol_type = result_dict.get("symbol_type")
+            importance = _calculate_importance_score(file_path, symbol_type)
+            result_dict["importance_score"] = round(importance, 2)
+
+            # Combine semantic similarity with importance for final ranking
+            semantic_score = result_dict.get("score", result_dict.get("similarity", 0.5))
+            result_dict["combined_score"] = round(semantic_score * importance, 3)
+
+            truncated_results.append(result_dict)
+
+        # Re-sort by combined score (importance-weighted semantic relevance)
+        truncated_results.sort(key=lambda x: x.get("combined_score", 0), reverse=True)
+
         return {
             "success": True,
-            "results": results,
-            "count": len(results),
+            "results": truncated_results,
+            "count": len(truncated_results),
+            "hint": "Use read_file with line_start/line_end to see full content of specific results.",
+            "ranking_note": "Results ranked by combined_score (semantic_similarity × importance). Core src/ code ranked higher than test/demo files.",
             "metadata": {
                 "rebuilt": rebuilt,
                 "root": str(root_path),
                 "indexed_at": _INDEX_CACHE[str(root_path)]["indexed_at"],
                 "filters_applied": filters_applied if filters_applied else None,
                 "chunking_strategy": "BODY_AWARE",
+                "importance_weighted": True,
                 "available_filters": [
                     "file_path",
                     "symbol_type",
@@ -313,3 +409,5 @@ async def semantic_code_search(
         }
     except Exception as exc:
         return {"success": False, "error": str(exc)}
+
+

@@ -176,3 +176,25 @@ vscode-victor/node_modules/
 vscode-victor/out/
 vscode-victor/.vscode-test/
 vscode-victor/*.vsix
+
+# Audit logs (contain sensitive metadata - never commit)
+audit/
+docs/security/audit/
+victor/audit/
+*.jsonl
+
+# HumanEval benchmark test outputs (orphaned in root)
+/example_function.py
+/has_close_elements.py
+/is_prime.py
+/parse_nested_parens.py
+/separate_paren_groups.py
+/truncate_number.py
+
+# Shell script error files (accidental file creation)
+/---
+/-e
+/echo
+
+# Embeddings cache (generated, contains binary data)
+victor/agent/.embeddings/

@@ -170,6 +170,8 @@ class OpenAIProvider(BaseProvider):
                 "temperature": temperature,
                 "max_tokens": max_tokens,
                 "stream": True,
+                # Request usage info in final chunk
+                "stream_options": {"include_usage": True},
                 **kwargs,
             }
 
@@ -258,7 +260,19 @@ class OpenAIProvider(BaseProvider):
         Returns:
             StreamChunk or None
         """
+        # Parse usage from final chunk (sent when stream_options.include_usage=True)
+        usage: Optional[Dict[str, int]] = None
+        if hasattr(chunk, "usage") and chunk.usage:
+            usage = {
+                "prompt_tokens": chunk.usage.prompt_tokens or 0,
+                "completion_tokens": chunk.usage.completion_tokens or 0,
+                "total_tokens": chunk.usage.total_tokens or 0,
+            }
+
         if not chunk.choices:
+            # Usage-only chunk (no content)
+            if usage:
+                return StreamChunk(content="", is_final=True, usage=usage)
             return None
 
         choice = chunk.choices[0]
@@ -318,6 +332,7 @@ class OpenAIProvider(BaseProvider):
             tool_calls=tool_calls,
             stop_reason=finish_reason,
             is_final=is_final,
+            usage=usage,
         )
 
     def _handle_error(self, error: Exception) -> ProviderError:

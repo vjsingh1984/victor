@@ -3,9 +3,6 @@
 
 """Tests for subprocess_executor module."""
 
-import asyncio
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 

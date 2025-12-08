@@ -129,7 +129,9 @@ class TestSystemPromptBuilder:
         """Test LMStudio prompt for models with native support."""
         builder = SystemPromptBuilder(provider_name="lmstudio", model="qwen2.5-coder:7b")
         result = builder._build_lmstudio_prompt()
-        assert "native" in result.lower()
+        # Native support models get the expanded capabilities prompt
+        assert "CAPABILITIES:" in result
+        assert "Code generation" in result
 
     def test_build_vllm_prompt(self):
         """Test vLLM prompt."""
@@ -235,5 +237,5 @@ class TestSystemPromptBuilderEdgeCases:
         )
         result = builder._build_with_adapter()
         # Should include base prompt and grounding rules
-        assert "You are a code analyst for this repository." in result
-        assert "CRITICAL - TOOL OUTPUT GROUNDING:" in result
+        assert "expert coding assistant" in result.lower()
+        assert "GROUNDING" in result

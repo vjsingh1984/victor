@@ -520,3 +520,452 @@ def sql_injection(user_input):
         result = await code_review(path=str(test_file), aspects=["security"])
 
         assert result["success"] is True
+
+
+class TestHelperFunctions:
+    """Tests for helper functions in code_review_tool."""
+
+    def test_issue_to_dict(self):
+        """Test _issue_to_dict conversion."""
+        from victor.tools.code_review_tool import _issue_to_dict
+        from victor.tools.language_analyzer import AnalysisIssue
+
+        issue = AnalysisIssue(
+            type="security",
+            severity="high",
+            issue="Hardcoded password",
+            file="test.py",
+            line=10,
+            code='password = "secret"',
+            recommendation="Use env vars",
+            metric=None,
+        )
+        result = _issue_to_dict(issue)
+
+        assert result["type"] == "security"
+        assert result["severity"] == "high"
+        assert result["issue"] == "Hardcoded password"
+        assert result["file"] == "test.py"
+        assert result["line"] == 10
+
+    def test_issue_to_dict_with_metric(self):
+        """Test _issue_to_dict with metric value."""
+        from victor.tools.code_review_tool import _issue_to_dict
+        from victor.tools.language_analyzer import AnalysisIssue
+
+        issue = AnalysisIssue(
+            type="complexity",
+            severity="medium",
+            issue="High complexity",
+            file="test.py",
+            line=5,
+            code="def complex():",
+            recommendation="Refactor",
+            metric=25,
+        )
+        result = _issue_to_dict(issue)
+        assert result["metric"] == 25
+
+    def test_get_glob_patterns_for_languages_all(self):
+        """Test getting glob patterns for all languages."""
+        from victor.tools.code_review_tool import _get_glob_patterns_for_languages
+
+        patterns = _get_glob_patterns_for_languages(None)
+        assert len(patterns) > 0
+        assert any(".py" in p for p in patterns)
+
+    def test_get_glob_patterns_for_python(self):
+        """Test getting glob patterns for Python."""
+        from victor.tools.code_review_tool import _get_glob_patterns_for_languages
+
+        patterns = _get_glob_patterns_for_languages(["python"])
+        assert "*.py" in patterns
+
+    def test_get_glob_patterns_for_javascript(self):
+        """Test getting glob patterns for JavaScript."""
+        from victor.tools.code_review_tool import _get_glob_patterns_for_languages
+
+        patterns = _get_glob_patterns_for_languages(["javascript"])
+        assert len(patterns) > 0
+
+    def test_get_glob_patterns_unknown_language(self):
+        """Test glob patterns default to Python for unknown language."""
+        from victor.tools.code_review_tool import _get_glob_patterns_for_languages
+
+        patterns = _get_glob_patterns_for_languages(["unknown_xyz"])
+        assert patterns == ["*.py"]
+
+    def test_get_glob_patterns_multiple_languages(self):
+        """Test glob patterns for multiple languages."""
+        from victor.tools.code_review_tool import _get_glob_patterns_for_languages
+
+        patterns = _get_glob_patterns_for_languages(["python", "javascript"])
+        assert len(patterns) >= 2
+
+    def test_analyze_file_python(self, tmp_path):
+        """Test _analyze_file for Python."""
+        from victor.tools.code_review_tool import _analyze_file
+
+        test_file = tmp_path / "test.py"
+        test_file.write_text('password = "secret"\nprint("debug")')
+
+        issues = _analyze_file(test_file, ["security", "best_practices"], 10)
+        assert isinstance(issues, list)
+        assert any(i.get("type") in ("security", "smell") for i in issues)
+
+    def test_analyze_file_unsupported(self, tmp_path):
+        """Test _analyze_file for unsupported file type."""
+        from victor.tools.code_review_tool import _analyze_file
+
+        test_file = tmp_path / "test.xyz"
+        test_file.write_text("content")
+
+        issues = _analyze_file(test_file, ["all"], 10)
+        assert issues == []
+
+    def test_analyze_file_read_error(self):
+        """Test _analyze_file handles read errors."""
+        from pathlib import Path
+        from victor.tools.code_review_tool import _analyze_file
+
+        issues = _analyze_file(Path("/nonexistent/test.py"), ["all"], 10)
+        assert issues == []
+
+    def test_build_report_no_issues(self):
+        """Test _build_report with no issues."""
+        from pathlib import Path
+        from victor.tools.code_review_tool import _build_report
+
+        report = _build_report(
+            path=Path("/test"),
+            files_reviewed=5,
+            aspects=["security", "complexity"],
+            results={
+                "security": {"issues": [], "count": 0},
+                "complexity": {"issues": [], "count": 0},
+            },
+            filtered_issues=[],
+            issues_by_severity={"critical": 0, "high": 0, "medium": 0, "low": 0},
+            languages_found={"python"},
+        )
+
+        assert "Code Review Report" in report
+        assert "Files reviewed: 5" in report
+        assert "No issues found" in report
+
+    def test_build_report_with_issues(self):
+        """Test _build_report with issues."""
+        from pathlib import Path
+        from victor.tools.code_review_tool import _build_report
+
+        security_issue = {
+            "type": "security",
+            "severity": "high",
+            "issue": "Hardcoded password",
+            "file": "test.py",
+            "line": 10,
+            "recommendation": "Use env vars",
+        }
+
+        report = _build_report(
+            path=Path("/test"),
+            files_reviewed=3,
+            aspects=["security"],
+            results={"security": {"issues": [security_issue], "count": 1}},
+            filtered_issues=[security_issue],
+            issues_by_severity={"critical": 0, "high": 1, "medium": 0, "low": 0},
+            languages_found={"python"},
+        )
+
+        assert "Total issues: 1" in report
+        assert "High: 1" in report
+
+    def test_build_report_with_many_issues(self):
+        """Test _build_report truncation for many issues."""
+        from pathlib import Path
+        from victor.tools.code_review_tool import _build_report
+
+        issues = [
+            {
+                "type": "security",
+                "severity": "high",
+                "issue": f"Issue {i}",
+                "file": f"test{i}.py",
+                "line": i,
+                "recommendation": "fix",
+            }
+            for i in range(10)
+        ]
+
+        report = _build_report(
+            path=Path("/test"),
+            files_reviewed=10,
+            aspects=["security"],
+            results={"security": {"issues": issues, "count": 10}},
+            filtered_issues=issues,
+            issues_by_severity={"critical": 0, "high": 10, "medium": 0, "low": 0},
+            languages_found={"python"},
+        )
+
+        assert "... and 5 more" in report
+
+    def test_build_report_all_aspects(self):
+        """Test _build_report with all aspects."""
+        from pathlib import Path
+        from victor.tools.code_review_tool import _build_report
+
+        complexity_issue = {
+            "type": "complexity",
+            "severity": "medium",
+            "issue": "High complexity",
+            "file": "test.py",
+            "code": "def complex():",
+            "metric": 15,
+        }
+        bp_issue = {
+            "type": "best_practices",
+            "severity": "low",
+            "issue": "Debug print",
+            "file": "test.py",
+            "line": 5,
+            "recommendation": "Remove",
+        }
+        doc_issue = {
+            "type": "documentation",
+            "severity": "low",
+            "issue": "Missing docstring",
+            "file": "test.py",
+            "code": "def foo():",
+            "recommendation": "Add docstring",
+        }
+
+        report = _build_report(
+            path=Path("/test"),
+            files_reviewed=1,
+            aspects=["security", "complexity", "best_practices", "documentation"],
+            results={
+                "security": {"issues": [], "count": 0},
+                "complexity": {"issues": [complexity_issue], "count": 1},
+                "best_practices": {"issues": [bp_issue], "count": 1},
+                "documentation": {"issues": [doc_issue], "count": 1},
+            },
+            filtered_issues=[complexity_issue, bp_issue, doc_issue],
+            issues_by_severity={"critical": 0, "high": 0, "medium": 1, "low": 2},
+            languages_found={"python"},
+        )
+
+        assert "Security Issues:" in report
+        assert "Complexity Issues:" in report
+        assert "Best Practice Issues:" in report
+        assert "Documentation Issues:" in report
+
+
+class TestCodeReviewMultiLanguage:
+    """Tests for multi-language code review."""
+
+    @pytest.mark.asyncio
+    async def test_review_javascript_file(self, tmp_path):
+        """Test review of JavaScript file."""
+        test_file = tmp_path / "test.js"
+        test_file.write_text('eval(userInput);\nconsole.log("debug");')
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "javascript" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_typescript_file(self, tmp_path):
+        """Test review of TypeScript file."""
+        test_file = tmp_path / "test.ts"
+        test_file.write_text('function hello(): void {\n    console.log("debug");\n}')
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "typescript" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_java_file(self, tmp_path):
+        """Test review of Java file."""
+        test_file = tmp_path / "Test.java"
+        test_file.write_text("""
+public class Test {
+    public void test() {
+        System.out.println("debug");
+    }
+}
+""")
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "java" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_go_file(self, tmp_path):
+        """Test review of Go file."""
+        test_file = tmp_path / "main.go"
+        test_file.write_text("""
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("hello")
+}
+""")
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "go" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_rust_file(self, tmp_path):
+        """Test review of Rust file."""
+        test_file = tmp_path / "main.rs"
+        test_file.write_text('fn main() {\n    println!("Hello");\n}')
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "rust" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_c_file(self, tmp_path):
+        """Test review of C file."""
+        test_file = tmp_path / "main.c"
+        test_file.write_text('strcpy(dest, src);\nprintf("debug");')
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "c" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_cpp_file(self, tmp_path):
+        """Test review of C++ file."""
+        test_file = tmp_path / "main.cpp"
+        test_file.write_text('using namespace std;\nstrcpy(dest, src);')
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "cpp" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_ruby_file(self, tmp_path):
+        """Test review of Ruby file."""
+        test_file = tmp_path / "script.rb"
+        test_file.write_text('eval(user_input)\nputs "debug"')
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "ruby" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_php_file(self, tmp_path):
+        """Test review of PHP file."""
+        test_file = tmp_path / "index.php"
+        test_file.write_text('<?php\nvar_dump($x);\n?>')
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "php" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_csharp_file(self, tmp_path):
+        """Test review of C# file."""
+        test_file = tmp_path / "Program.cs"
+        test_file.write_text('Console.WriteLine("debug");')
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "c_sharp" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_kotlin_file(self, tmp_path):
+        """Test review of Kotlin file."""
+        test_file = tmp_path / "Main.kt"
+        test_file.write_text('fun main() {\n    println("Hello")\n}')
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "kotlin" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_swift_file(self, tmp_path):
+        """Test review of Swift file."""
+        test_file = tmp_path / "App.swift"
+        test_file.write_text('let value = optional!\nprint("debug")')
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "swift" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_scala_file(self, tmp_path):
+        """Test review of Scala file."""
+        test_file = tmp_path / "Main.scala"
+        test_file.write_text('object Main {\n  def main(args: Array[String]): Unit = println("Hi")\n}')
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "scala" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_bash_file(self, tmp_path):
+        """Test review of Bash file."""
+        test_file = tmp_path / "script.sh"
+        test_file.write_text('#!/bin/bash\neval "$user_input"\necho "Hello"')
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "bash" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_sql_file(self, tmp_path):
+        """Test review of SQL file."""
+        test_file = tmp_path / "query.sql"
+        test_file.write_text('SELECT * FROM users;\nGRANT ALL PRIVILEGES ON database.* TO user;')
+
+        result = await code_review(path=str(test_file), aspects=["all"])
+        assert result["success"] is True
+        assert "sql" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_mixed_languages_directory(self, tmp_path):
+        """Test review of directory with mixed languages."""
+        (tmp_path / "app.py").write_text('print("debug")')
+        (tmp_path / "app.js").write_text('console.log("debug");')
+        (tmp_path / "App.java").write_text('class App { void m() { System.out.println("x"); } }')
+
+        result = await code_review(path=str(tmp_path), aspects=["best_practices"])
+        assert result["success"] is True
+        assert result.get("files_reviewed", 0) >= 3
+        languages = set(result.get("languages_found", []))
+        assert "python" in languages
+        assert "javascript" in languages
+        assert "java" in languages
+
+    @pytest.mark.asyncio
+    async def test_review_with_language_filter(self, tmp_path):
+        """Test review with languages filter."""
+        (tmp_path / "test.py").write_text('print("debug")')
+        (tmp_path / "test.js").write_text('console.log("debug");')
+
+        result = await code_review(path=str(tmp_path), aspects=["all"], languages=["python"])
+        assert result["success"] is True
+        # Should only review Python files
+        if result.get("files_reviewed", 0) > 0:
+            assert "python" in result.get("languages_found", [])
+
+    @pytest.mark.asyncio
+    async def test_review_with_languages_json_string(self, tmp_path):
+        """Test review with languages as JSON string."""
+        (tmp_path / "test.py").write_text('x = 1')
+
+        result = await code_review(path=str(tmp_path), aspects=["all"], languages='["python"]')
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_review_with_languages_single_string(self, tmp_path):
+        """Test review with single language as string."""
+        (tmp_path / "test.py").write_text('x = 1')
+
+        result = await code_review(path=str(tmp_path), aspects=["all"], languages="python")
+        assert result["success"] is True

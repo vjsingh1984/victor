@@ -187,12 +187,34 @@ class AnthropicProvider(BaseProvider):
 
             tool_calls: Dict[str, Dict[str, Any]] = {}
             block_index_to_id: Dict[int, str] = {}
+            usage: Optional[Dict[str, int]] = None
 
             async with self.client.messages.stream(**request_params) as stream:
                 async for event in stream:
                     event_type = getattr(event, "type", "")
 
-                    if event_type == "content_block_start":
+                    if event_type == "message_start":
+                        # Capture initial usage from message_start (input tokens)
+                        message = getattr(event, "message", None)
+                        if message:
+                            msg_usage = getattr(message, "usage", None)
+                            if msg_usage:
+                                usage = {
+                                    "prompt_tokens": getattr(msg_usage, "input_tokens", 0),
+                                    "completion_tokens": 0,
+                                    "total_tokens": getattr(msg_usage, "input_tokens", 0),
+                                }
+                                # Capture cache tokens if present
+                                cache_creation = getattr(
+                                    msg_usage, "cache_creation_input_tokens", None
+                                )
+                                cache_read = getattr(msg_usage, "cache_read_input_tokens", None)
+                                if cache_creation is not None:
+                                    usage["cache_creation_input_tokens"] = cache_creation
+                                if cache_read is not None:
+                                    usage["cache_read_input_tokens"] = cache_read
+
+                    elif event_type == "content_block_start":
                         block = getattr(event, "content_block", None)
                         if block and getattr(block, "type", "") == "tool_use":
                             tc_id = getattr(block, "id", None) or f"tool_{len(tool_calls) + 1}"
@@ -242,6 +264,23 @@ class AnthropicProvider(BaseProvider):
                                 tool_calls[tc_id].get("arguments")
                             )
 
+                    elif event_type == "message_delta":
+                        # Capture output tokens from message_delta
+                        msg_usage = getattr(event, "usage", None)
+                        if msg_usage:
+                            output_tokens = getattr(msg_usage, "output_tokens", 0)
+                            if usage:
+                                usage["completion_tokens"] = output_tokens
+                                usage["total_tokens"] = (
+                                    usage.get("prompt_tokens", 0) + output_tokens
+                                )
+                            else:
+                                usage = {
+                                    "prompt_tokens": 0,
+                                    "completion_tokens": output_tokens,
+                                    "total_tokens": output_tokens,
+                                }
+
                     elif event_type == "message_stop":
                         for tc in tool_calls.values():
                             tc["arguments"] = self._parse_json_arguments(tc.get("arguments"))
@@ -251,6 +290,7 @@ class AnthropicProvider(BaseProvider):
                             tool_calls=list(tool_calls.values()) or None,
                             stop_reason="stop",
                             is_final=True,
+                            usage=usage,
                         )
 
         except Exception as e:

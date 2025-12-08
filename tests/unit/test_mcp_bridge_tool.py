@@ -20,7 +20,7 @@ from unittest.mock import patch, MagicMock, AsyncMock
 from victor.tools.mcp_bridge_tool import (
     configure_mcp_client,
     get_mcp_tool_definitions,
-    mcp_call,
+    mcp,
     _prefixed,
 )
 
@@ -97,7 +97,7 @@ class TestMCPCall:
     async def test_mcp_call_no_client(self):
         """Test mcp_call when no client is configured."""
         with patch("victor.tools.mcp_bridge_tool._mcp_client", None):
-            result = await mcp_call(name="test_tool")
+            result = await mcp(name="test_tool")
             assert result["success"] is False
             assert "not configured" in result["error"]
 
@@ -107,7 +107,7 @@ class TestMCPCall:
         mock_client = MagicMock()
         mock_client.initialized = False
         with patch("victor.tools.mcp_bridge_tool._mcp_client", mock_client):
-            result = await mcp_call(name="test_tool")
+            result = await mcp(name="test_tool")
             assert result["success"] is False
             assert "not initialized" in result["error"]
 
@@ -124,7 +124,7 @@ class TestMCPCall:
 
         with patch("victor.tools.mcp_bridge_tool._mcp_client", mock_client):
             with patch("victor.tools.mcp_bridge_tool._mcp_prefix", "mcp"):
-                result = await mcp_call(name="mcp_test_tool", arguments={"arg": "value"})
+                result = await mcp(name="mcp_test_tool", arguments={"arg": "value"})
                 assert result["success"] is True
 
     @pytest.mark.asyncio
@@ -135,6 +135,6 @@ class TestMCPCall:
         mock_client.call_tool = AsyncMock(side_effect=Exception("Test error"))
 
         with patch("victor.tools.mcp_bridge_tool._mcp_client", mock_client):
-            result = await mcp_call(name="test_tool")
+            result = await mcp(name="test_tool")
             assert result["success"] is False
             assert "Test error" in result["error"]

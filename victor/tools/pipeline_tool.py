@@ -28,7 +28,15 @@ from victor.pipeline import (
     PipelineManager,
     PipelinePlatform,
 )
-from victor.tools.base import BaseTool, CostTier, ToolMetadata, ToolResult
+from victor.tools.base import (
+    AccessMode,
+    BaseTool,
+    CostTier,
+    DangerLevel,
+    Priority,
+    ToolMetadata,
+    ToolResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,23 +45,10 @@ class PipelineAnalyzerTool(BaseTool):
     """Tool for analyzing CI/CD pipelines and coverage."""
 
     name = "pipeline_analyzer"
-    description = """Analyze CI/CD pipelines and code coverage.
+    description = """Analyze CI/CD pipelines (GitHub Actions, GitLab) and coverage.
 
-Supports multiple CI/CD platforms:
-- GitHub Actions (.github/workflows/)
-- GitLab CI (.gitlab-ci.yml)
-
-Supports multiple coverage formats:
-- Cobertura XML
-- LCOV
-- JaCoCo XML
-
-Actions:
-- analyze: Full pipeline analysis with issues and recommendations
-- coverage: Get current coverage metrics
-- compare_coverage: Compare coverage against baseline
-- summary: Get high-level pipeline health summary
-- detect: Detect which CI/CD platforms are configured"""
+    Actions: analyze, coverage, compare_coverage, summary, detect.
+    Coverage formats: Cobertura, LCOV, JaCoCo."""
 
     parameters = {
         "type": "object",
@@ -90,14 +85,39 @@ Actions:
         return CostTier.LOW
 
     @property
+    def priority(self) -> Priority:
+        """Tool priority for selection availability."""
+        return Priority.MEDIUM  # Task-specific pipeline analysis
+
+    @property
+    def access_mode(self) -> AccessMode:
+        """Tool access mode for approval tracking."""
+        return AccessMode.READONLY  # Only reads pipeline configs and coverage
+
+    @property
+    def danger_level(self) -> DangerLevel:
+        """Danger level for warning/confirmation logic."""
+        return DangerLevel.SAFE  # No side effects
+
+    @property
     def metadata(self) -> ToolMetadata:
         """Inline semantic metadata for dynamic tool selection."""
         return ToolMetadata(
             category="pipeline",
             keywords=[
-                "pipeline", "ci/cd", "coverage", "github actions", "gitlab ci",
-                "cobertura", "lcov", "jacoco", "test coverage", "pipeline health",
-                "build analysis", "workflow analysis", "coverage trend"
+                "pipeline",
+                "ci/cd",
+                "coverage",
+                "github actions",
+                "gitlab ci",
+                "cobertura",
+                "lcov",
+                "jacoco",
+                "test coverage",
+                "pipeline health",
+                "build analysis",
+                "workflow analysis",
+                "coverage trend",
             ],
             use_cases=[
                 "analyzing CI/CD pipelines",

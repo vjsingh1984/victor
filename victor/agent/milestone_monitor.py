@@ -14,6 +14,11 @@
 
 """Goal-aware milestone tracking for intelligent orchestration.
 
+.. deprecated::
+    This module is deprecated. Use `victor.agent.unified_task_tracker.UnifiedTaskTracker`
+    instead, which consolidates TaskMilestoneMonitor and LoopDetector into a single
+    unified system.
+
 This module provides task type detection and milestone tracking to enable
 the orchestrator to make smarter decisions about when to force action,
 when exploration is complete, and what tools are needed.
@@ -38,6 +43,9 @@ from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
 import yaml
 
+# Import canonical TaskType from task_classifier (single source of truth)
+from victor.embeddings.task_classifier import TaskType
+
 logger = logging.getLogger(__name__)
 
 
@@ -58,7 +66,7 @@ class TaskToolConfigLoader:
     DEFAULT_CONFIG: Dict[str, Any] = {
         "task_types": {
             "edit": {
-                "max_exploration_iterations": 3,
+                "max_exploration_iterations": 8,  # Increased from 3 - edits often need context
                 "force_action_after_target_read": True,
                 "required_tools": ["edit_files", "read_file"],
                 "stage_tools": {
@@ -87,7 +95,7 @@ class TaskToolConfigLoader:
                 },
             },
             "create": {
-                "max_exploration_iterations": 3,
+                "max_exploration_iterations": 8,  # Increased from 3 - creates often need context
                 "force_action_after_target_read": False,
                 "required_tools": ["write_file"],
                 "stage_tools": {
@@ -117,7 +125,7 @@ class TaskToolConfigLoader:
                 },
             },
             "analyze": {
-                "max_exploration_iterations": 10,
+                "max_exploration_iterations": 20,
                 "force_action_after_target_read": False,
                 "required_tools": ["read_file", "execute_bash"],
                 "stage_tools": {
@@ -131,22 +139,29 @@ class TaskToolConfigLoader:
                 },
             },
             "design": {
-                "max_exploration_iterations": 2,
+                # Architecture/design questions require thorough codebase exploration
+                # Increased from 2 to 20 to allow proper analysis
+                "max_exploration_iterations": 20,
                 "force_action_after_target_read": False,
-                "needs_tools": False,
-                "required_tools": [],
+                "needs_tools": True,  # Design tasks NEED tools to explore the codebase
+                "required_tools": ["list_directory", "read_file", "code_search"],
                 "stage_tools": {
-                    "initial": [],
-                    "reading": [],
+                    "initial": [
+                        "list_directory",
+                        "code_search",
+                        "read_file",
+                        "get_project_overview",
+                    ],
+                    "reading": ["read_file", "code_search", "list_directory"],
                     "executing": [],
-                    "verifying": [],
+                    "verifying": ["read_file"],
                 },
                 "force_action_hints": {
-                    "max_iterations": "Please provide your recommendations.",
+                    "max_iterations": "Please summarize the architecture and provide your recommendations.",
                 },
             },
             "general": {
-                "max_exploration_iterations": 8,
+                "max_exploration_iterations": 15,
                 "force_action_after_target_read": False,
                 "required_tools": ["read_file", "list_directory"],
                 "stage_tools": {
@@ -240,18 +255,6 @@ class TaskToolConfigLoader:
         return cast(Dict[str, Any], result) if isinstance(result, dict) else {}
 
 
-class TaskType(Enum):
-    """Types of tasks that can be detected from prompts."""
-
-    EDIT = "edit"  # Modify existing code/files
-    SEARCH = "search"  # Find/locate code or files
-    CREATE = "create"  # Write new files (with context/location specified)
-    CREATE_SIMPLE = "create_simple"  # Generate standalone code (no exploration needed)
-    ANALYZE = "analyze"  # Count, measure, analyze code
-    DESIGN = "design"  # Conceptual/planning tasks (no tools needed)
-    GENERAL = "general"  # Ambiguous or general help
-
-
 class Milestone(Enum):
     """Milestones that can be achieved during task execution."""
 
@@ -304,8 +307,8 @@ TASK_CONFIGS: Dict[TaskType, TaskConfig] = {
         needs_tools=True,
     ),
     TaskType.ANALYZE: TaskConfig(
-        max_exploration_iterations=10,
-        required_tools={"read_file", "execute_bash", "list_directory", "code_search"},
+        max_exploration_iterations=20,
+        required_tools={"read", "shell", "ls", "grep"},  # Canonical short names
         completion_milestones={Milestone.SEARCH_COMPLETE},
         force_action_after_target_read=False,
         needs_tools=True,
@@ -318,9 +321,23 @@ TASK_CONFIGS: Dict[TaskType, TaskConfig] = {
         needs_tools=False,  # Conceptual tasks don't need tools
     ),
     TaskType.GENERAL: TaskConfig(
-        max_exploration_iterations=8,
-        required_tools={"read_file", "list_directory"},
+        max_exploration_iterations=15,
+        required_tools={"read", "ls"},  # Canonical short names
         completion_milestones=set(),
+        force_action_after_target_read=False,
+        needs_tools=True,
+    ),
+    TaskType.ACTION: TaskConfig(
+        max_exploration_iterations=25,  # Allow extensive iteration for multi-step actions (web search, git ops)
+        required_tools={"shell", "web", "fetch", "write"},  # Canonical short names
+        completion_milestones={Milestone.CHANGE_MADE},
+        force_action_after_target_read=False,
+        needs_tools=True,
+    ),
+    TaskType.ANALYSIS_DEEP: TaskConfig(
+        max_exploration_iterations=30,  # Allow extensive exploration for deep analysis
+        required_tools={"read", "grep", "search", "ls"},  # Canonical short names
+        completion_milestones={Milestone.SEARCH_COMPLETE},
         force_action_after_target_read=False,
         needs_tools=True,
     ),
@@ -337,7 +354,8 @@ class TaskProgress:
     target_entities: Set[str] = field(default_factory=set)  # Classes, functions, etc.
     files_read: Set[str] = field(default_factory=set)
     files_modified: Set[str] = field(default_factory=set)
-    iteration_count: int = 0
+    iteration_count: int = 0  # Productive iterations (tool calls made)
+    total_turns: int = 0  # Total turns including empty continuation prompts
 
 
 class TaskMilestoneMonitor:
@@ -420,15 +438,37 @@ class TaskMilestoneMonitor:
         self._use_semantic = use_semantic_classification
         self._task_classifier = None
 
-        # Lazy initialization of classifier
+        # Model-specific exploration settings (can be overridden by orchestrator)
+        self._exploration_multiplier: float = 1.0
+        self._continuation_patience: int = 3
+
+        # Lazy initialization of classifier (use singleton to avoid duplicate loading)
         if self._use_semantic:
             try:
                 from victor.embeddings.task_classifier import TaskTypeClassifier
 
-                self._task_classifier = TaskTypeClassifier()
+                self._task_classifier = TaskTypeClassifier.get_instance()
             except ImportError:
                 logger.warning("TaskTypeClassifier not available, falling back to regex patterns")
                 self._use_semantic = False
+
+    def set_model_exploration_settings(
+        self, exploration_multiplier: float = 1.0, continuation_patience: int = 3
+    ) -> None:
+        """Set model-specific exploration settings.
+
+        Called by the orchestrator after loading model capabilities.
+
+        Args:
+            exploration_multiplier: Multiplier for max_exploration_iterations
+            continuation_patience: Number of empty turns allowed before forcing
+        """
+        self._exploration_multiplier = exploration_multiplier
+        self._continuation_patience = continuation_patience
+        logger.debug(
+            f"Model exploration settings: multiplier={exploration_multiplier}, "
+            f"patience={continuation_patience}"
+        )
 
     def reset(self) -> None:
         """Reset the tracker for a new conversation."""
@@ -458,29 +498,19 @@ class TaskMilestoneMonitor:
             try:
                 result = self._task_classifier.classify_sync(prompt)
                 if result.confidence >= 0.35:  # Minimum confidence threshold
-                    # Convert from classifier TaskType to local TaskType
-                    from victor.embeddings.task_classifier import TaskType as ClassifierTaskType
-
-                    type_mapping = {
-                        ClassifierTaskType.CREATE_SIMPLE: TaskType.CREATE_SIMPLE,
-                        ClassifierTaskType.CREATE: TaskType.CREATE,
-                        ClassifierTaskType.EDIT: TaskType.EDIT,
-                        ClassifierTaskType.SEARCH: TaskType.SEARCH,
-                        ClassifierTaskType.ANALYZE: TaskType.ANALYZE,
-                        ClassifierTaskType.DESIGN: TaskType.DESIGN,
-                        ClassifierTaskType.GENERAL: TaskType.GENERAL,
-                    }
-                    detected_type = type_mapping.get(result.task_type, TaskType.GENERAL)
-                    self.progress.task_type = detected_type
-                    logger.debug(
-                        f"Detected task type: {detected_type.value} via semantic classification "
-                        f"(confidence: {result.confidence:.2f})"
+                    # TaskType is now imported from task_classifier - no mapping needed
+                    self.progress.task_type = result.task_type
+                    task_config = TASK_CONFIGS.get(result.task_type)
+                    max_exp = task_config.max_exploration_iterations if task_config else "N/A"
+                    logger.info(
+                        f"Task type detected: {result.task_type.value} "
+                        f"(semantic, confidence={result.confidence:.2f}, max_exploration={max_exp})"
                     )
-                    return detected_type
+                    return result.task_type
                 else:
-                    logger.debug(
-                        f"Semantic classification confidence too low ({result.confidence:.2f}), "
-                        "falling back to regex"
+                    logger.info(
+                        f"Semantic classification: {result.task_type.value} "
+                        f"(confidence={result.confidence:.2f} < 0.35 threshold), falling back to regex"
                     )
             except Exception as e:
                 logger.warning(f"Semantic classification failed, using regex fallback: {e}")
@@ -676,9 +706,23 @@ class TaskMilestoneMonitor:
         return False
 
     def increment_iteration(self) -> None:
-        """Increment the iteration counter."""
+        """Increment the productive iteration counter (called on successful tool call)."""
         self.iteration_count += 1
         self.progress.iteration_count = self.iteration_count
+        # Also increment total turns when a tool call happens
+        self.progress.total_turns += 1
+
+    def increment_turn(self) -> None:
+        """Increment total turns without incrementing productive iterations.
+
+        Called when a turn happens without a tool call (e.g., continuation prompts).
+        This helps track models that need more "thinking" turns.
+        """
+        self.progress.total_turns += 1
+        logger.debug(
+            f"Turn without tool call: total_turns={self.progress.total_turns}, "
+            f"productive_iterations={self.iteration_count}"
+        )
 
     def should_force_action(self) -> Tuple[bool, Optional[str]]:
         """Determine if the LLM should be forced to take action.
@@ -696,12 +740,39 @@ class TaskMilestoneMonitor:
         if self.iteration_count < 2:
             return False, None
 
+        # Calculate effective iteration count that accounts for model "thinking" overhead
+        # Models that need more turns per tool call get a higher effective limit
+        total_turns = self.progress.total_turns
+        productive = self.iteration_count
+
+        # Start with base max, apply model-specific multiplier
+        base_max = config.max_exploration_iterations
+        model_adjusted_max = int(base_max * self._exploration_multiplier)
+
+        # Productivity ratio: what fraction of turns resulted in tool calls?
+        # Lower ratio = model needs more thinking, we should be more patient
+        if total_turns > 0 and productive > 0:
+            productivity_ratio = productive / total_turns
+            # If model only makes tool calls 50% of turns, give it additional buffer
+            # Clamp multiplier between 1.0 and 2.0 to avoid extreme values
+            productivity_multiplier = (
+                min(2.0, max(1.0, 1.0 / productivity_ratio)) if productivity_ratio > 0 else 1.5
+            )
+            effective_max = int(model_adjusted_max * productivity_multiplier)
+            logger.debug(
+                f"Exploration limits: base={base_max}, model_adjusted={model_adjusted_max}, "
+                f"effective={effective_max} (productivity={productivity_ratio:.2f}, "
+                f"multiplier={self._exploration_multiplier})"
+            )
+        else:
+            effective_max = model_adjusted_max
+
         # Force action for EDIT tasks after target is read
         if (
             config.force_action_after_target_read
             and Milestone.TARGET_READ in self.progress.milestones
             and Milestone.CHANGE_MADE not in self.progress.milestones
-            and self.iteration_count >= config.max_exploration_iterations
+            and self.iteration_count >= effective_max
         ):
             hint = (
                 "You have gathered enough information about the target file. "
@@ -710,8 +781,8 @@ class TaskMilestoneMonitor:
             logger.info(f"Forcing action for EDIT task after {self.iteration_count} iterations")
             return True, hint
 
-        # Force completion if we've exceeded exploration limit
-        if self.iteration_count > config.max_exploration_iterations:
+        # Force completion if we've exceeded exploration limit (using effective max)
+        if self.iteration_count > effective_max:
             if self.progress.task_type == TaskType.SEARCH:
                 hint = (
                     "You have done extensive exploration. "
@@ -722,7 +793,14 @@ class TaskMilestoneMonitor:
                     "You have gathered sufficient context. "
                     "Please complete the task or explain what's blocking you."
                 )
-            logger.info(f"Forcing completion after {self.iteration_count} iterations")
+            logger.info(
+                f"Forcing completion after {self.iteration_count} iterations "
+                f"(task_type={self.progress.task_type.value}, "
+                f"base_max={config.max_exploration_iterations}, effective_max={effective_max}, "
+                f"total_turns={total_turns}, "
+                f"milestones={[m.value for m in self.progress.milestones]}, "
+                f"files_read={len(self.progress.files_read)})"
+            )
             return True, hint
 
         return False, None
@@ -768,6 +846,11 @@ class TaskMilestoneMonitor:
         Returns:
             Dictionary with progress information
         """
+        config = self.get_task_config()
+        total_turns = self.progress.total_turns
+        productive = self.iteration_count
+        productivity_ratio = productive / total_turns if total_turns > 0 else 1.0
+
         return {
             "task_type": self.progress.task_type.value,
             "milestones": [m.value for m in self.progress.milestones],
@@ -776,5 +859,8 @@ class TaskMilestoneMonitor:
             "files_read": list(self.progress.files_read),
             "files_modified": list(self.progress.files_modified),
             "iteration_count": self.iteration_count,
+            "total_turns": total_turns,
+            "productivity_ratio": round(productivity_ratio, 2),
+            "max_exploration": config.max_exploration_iterations,
             "goal_satisfied": self.is_goal_satisfied(),
         }

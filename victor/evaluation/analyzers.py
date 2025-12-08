@@ -101,6 +101,7 @@ class AnalyzerRegistry:
         """
         if "code_quality" not in cls._instances:
             from victor.evaluation.code_quality import CodeQualityAnalyzer
+
             cls._instances["code_quality"] = CodeQualityAnalyzer()
         return cls._instances["code_quality"]
 
@@ -116,6 +117,7 @@ class AnalyzerRegistry:
         """
         if "pass_at_k" not in cls._instances:
             from victor.evaluation.pass_at_k import PassAtKEvaluator
+
             cls._instances["pass_at_k"] = PassAtKEvaluator(**kwargs)
         return cls._instances["pass_at_k"]
 
@@ -143,6 +145,7 @@ class AnalyzerRegistry:
             style_guide: Style guide to follow
         """
         from victor.evaluation.code_quality import CodeQualityAnalyzer
+
         analyzer = CodeQualityAnalyzer(
             use_ruff=use_ruff,
             use_radon=use_radon,
@@ -165,6 +168,7 @@ class AnalyzerRegistry:
             temperature: Sampling temperature for diversity
         """
         from victor.evaluation.pass_at_k import PassAtKEvaluator
+
         evaluator = PassAtKEvaluator(
             k_values=k_values,
             default_n_samples=default_n_samples,

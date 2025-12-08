@@ -22,105 +22,111 @@ from typing import Any, Dict, List
 from pathlib import Path
 
 from victor.editing import FileEditor
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 
-@tool
-async def edit_files(
-    operations: List[Dict[str, Any]],
+@tool(
+    category="filesystem",
+    priority=Priority.CRITICAL,  # Always available for selection
+    access_mode=AccessMode.WRITE,  # Creates/modifies/deletes files
+    danger_level=DangerLevel.LOW,  # Changes are undoable via transaction system
+    # Registry-driven metadata for tool selection and loop detection
+    progress_params=["ops"],  # Different operations indicate progress, not loops
+    stages=["executing"],  # Conversation stages where relevant
+    task_types=["edit", "action"],  # Task types for classification-aware selection
+    execution_category="write",  # Cannot run in parallel with conflicting ops
+    keywords=["edit", "modify", "replace", "create", "delete", "rename", "file", "text"],
+)
+async def edit(
+    ops: List[Dict[str, Any]],
     preview: bool = False,
-    auto_commit: bool = True,
-    description: str = "",
-    context_lines: int = 3,
+    commit: bool = True,
+    desc: str = "",
+    ctx: int = 3,
 ) -> Dict[str, Any]:
-    """
-    Unified file editing with transaction support.
+    """[TEXT-BASED] Edit files atomically with undo. NOT code-aware.
 
-    Perform multiple file operations in a single transaction with built-in
-    preview and rollback capability.
+    Performs literal string replacement. Does NOT understand code structure.
+    WARNING: May cause false positives in code (e.g., 'foo' matches 'foobar').
+    For Python symbol renaming, use rename() from refactor_tool instead.
 
-    OPERATION TYPES:
-        - "replace" (RECOMMENDED for edits): Surgical string replacement. Only
-          changes the exact matched text, preserving the rest of the file.
-          Use this for fixing bugs, refactoring, or adding code to existing files.
-          Requires: old_str (exact text to find), new_str (replacement text).
-          FAILS if old_str not found or matches multiple times (ambiguous).
-
-        - "create": Create a new file. Use for new files only.
-          Requires: path, content.
-
-        - "modify": Replace ENTIRE file content. Use only when you need to
-          completely rewrite a file. For surgical edits, use "replace" instead.
-          Requires: path, content (or new_content).
-
-        - "delete": Remove a file.
-          Requires: path.
-
-        - "rename": Move/rename a file.
-          Requires: path, new_path.
+    Ops: replace/create/modify/delete/rename.
 
     Args:
-        operations: List of file operations. Each operation is a dict with:
-            - type: "replace", "create", "modify", "delete", or "rename" (required)
-            - path: File path (required)
-            - old_str: Text to find and replace (required for "replace")
-            - new_str: Replacement text (required for "replace")
-            - content: File content (for create/modify)
-            - new_path: New file path (required for rename)
-        preview: If True, show diff preview without applying changes (default: False).
-        auto_commit: If True, automatically commit changes after queuing (default: True).
-        description: Optional description of this edit operation.
-        context_lines: Number of context lines to show in diffs (default: 3).
+        ops: [{type, path, ...}] - replace needs old_str/new_str
+        preview: Show diff without applying
+        commit: Auto-apply changes
+        desc: Change description
+        ctx: Diff context lines
 
-    Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - operations_queued: Number of operations queued
-        - operations_applied: Number of operations applied (if auto_commit=True)
-        - by_type: Breakdown of operations by type
-        - message: Status message
-        - preview_output: Diff preview text (if preview=True)
-        - error: Error message if failed
+    When to use:
+        - Config files (JSON, YAML, TOML, etc.)
+        - Documentation (Markdown, text files)
+        - Any non-code text changes
+        - Creating/deleting/renaming files
 
-    Examples:
-        # RECOMMENDED: Surgical edit with replace (most token-efficient)
-        edit_files(operations=[{
-            "type": "replace",
-            "path": "foo.py",
-            "old_str": "def calculate():\\n    return 1",
-            "new_str": "def calculate():\\n    return 42"
-        }])
-
-        # Create a new file
-        edit_files(operations=[
-            {"type": "create", "path": "new_file.py", "content": "print('hello')"}
-        ])
-
-        # Delete and rename files
-        edit_files(operations=[
-            {"type": "delete", "path": "old.py"},
-            {"type": "rename", "path": "temp.py", "new_path": "final.py"}
-        ])
-
-        # Full file rewrite (use sparingly - prefer "replace" for edits)
-        edit_files(operations=[
-            {"type": "modify", "path": "config.py", "content": "# Complete new content"}
-        ])
+    When NOT to use:
+        - Renaming Python symbols (use rename() instead - AST-aware)
+        - Code refactoring where false positives matter
     """
-    # Allow callers (models) to pass operations as a JSON string; normalize to list[dict]
-    if isinstance(operations, str):
+    # Allow callers (models) to pass ops as a JSON string; normalize to list[dict]
+    if isinstance(ops, str):
         import json
+        import re
 
+        # Try to parse the JSON, with recovery for common issues
         try:
-            operations = json.loads(operations)
+            ops = json.loads(ops)
         except json.JSONDecodeError as exc:
-            return {"success": False, "error": f"Invalid JSON for operations: {exc}"}
+            # Try to provide helpful error message and recovery hints
+            error_context = ""
 
-    if not operations:
+            # Detect control character issues (common with embedded newlines)
+            if "control character" in str(exc).lower():
+                error_context = (
+                    "\n\nHINT: JSON strings cannot contain raw newlines or tabs. "
+                    "Use \\n for newlines and \\t for tabs within string values."
+                )
+                # Try to fix by escaping control characters in strings
+                try:
+                    fixed = re.sub(
+                        r'(?<!\\)\n(?=(?:[^"]*"[^"]*")*[^"]*"[^"]*$)', r"\\n", ops
+                    )
+                    fixed = re.sub(r'(?<!\\)\t(?=(?:[^"]*"[^"]*")*[^"]*"[^"]*$)', r"\\t", fixed)
+                    ops = json.loads(fixed)
+                    # If fixed, log and continue
+                    import logging
+
+                    logging.getLogger(__name__).info("Auto-fixed JSON control characters")
+                except json.JSONDecodeError:
+                    pass  # Recovery failed, use original error
+
+            if isinstance(ops, str):  # Still a string = parsing failed
+                # Detect delimiter issues
+                if "delimiter" in str(exc).lower():
+                    error_context = "\n\nHINT: Check for missing commas between array elements or object properties."
+                # Detect structure issues
+                elif "Expecting" in str(exc):
+                    error_context = (
+                        "\n\nHINT: Check JSON structure - ensure arrays use [], objects use {}, "
+                        "and strings are quoted."
+                    )
+
+                example = (
+                    "\n\nCorrect format example:\n"
+                    '[{"type": "replace", "path": "file.py", "old_str": "x=1", "new_str": "x=2"}]'
+                )
+                return {
+                    "success": False,
+                    "error": f"Invalid JSON for operations: {exc}{error_context}{example}",
+                }
+
+    if not ops:
         return {"success": False, "error": "No operations provided"}
 
     # Validate operations
-    for i, op in enumerate(operations):
+    for i, op in enumerate(ops):
         if not isinstance(op, dict):
             return {
                 "success": False,
@@ -153,18 +159,18 @@ async def edit_files(
     # Initialize editor
     backup_dir = get_project_paths().backups_dir
     editor = FileEditor(backup_dir=str(backup_dir))
-    transaction_id = editor.start_transaction(description)
+    transaction_id = editor.start_transaction(desc)
 
     # Initialize change tracker for undo/redo
     tracker = get_change_tracker()
-    tracker.begin_change_group("edit_files", description or f"Edit {len(operations)} files")
+    tracker.begin_change_group("edit_files", desc or f"Edit {len(ops)} files")
 
     # Count operations by type
     by_type = {"create": 0, "modify": 0, "delete": 0, "rename": 0}
 
     # Queue all operations
     try:
-        for op in operations:
+        for op in ops:
             op_type = op["type"]
             path = op["path"]
             file_path = Path(path).expanduser().resolve()
@@ -322,7 +328,7 @@ async def edit_files(
         tracker.commit_change_group()  # Empty commit to reset state
         return {"success": False, "error": f"Failed to queue operations: {str(e)}"}
 
-    operations_queued = len(operations)
+    operations_queued = len(ops)
 
     # Handle preview mode
     if preview:
@@ -334,12 +340,12 @@ async def edit_files(
         sys.stdout = captured_output = io.StringIO()
 
         try:
-            editor.preview_diff(context_lines=context_lines)
+            editor.preview_diff(context_lines=ctx)
             preview_text = captured_output.getvalue()
         finally:
             sys.stdout = old_stdout
 
-        if not auto_commit:
+        if not commit:
             editor.abort()
             return {
                 "success": True,
@@ -367,8 +373,8 @@ async def edit_files(
                     "error": "Failed to commit changes. Transaction rolled back.",
                 }
 
-    # Handle auto_commit
-    if auto_commit:
+    # Handle commit
+    if commit:
         success = editor.commit(dry_run=False)
         if success:
             # Commit the change group for undo/redo
@@ -394,5 +400,7 @@ async def edit_files(
             "operations_queued": operations_queued,
             "operations_applied": 0,
             "by_type": by_type,
-            "message": f"Queued {operations_queued} operations (not applied, auto_commit=False)",
+            "message": f"Queued {operations_queued} operations (not applied, commit=False)",
         }
+
+

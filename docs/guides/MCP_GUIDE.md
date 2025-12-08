@@ -12,21 +12,28 @@ MCP (Model Context Protocol) is an open protocol by Anthropic that standardizes 
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Victor Agent                              │
-│                                                              │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
-│  │ MCP Server   │    │ Tool         │    │ MCP Client   │  │
-│  │ (Expose      │◄──►│ Registry     │◄──►│ (Use ext.    │  │
-│  │  tools)      │    │ (32+ tools)  │    │  tools)      │  │
-│  └──────────────┘    └──────────────┘    └──────────────┘  │
-│         │                                       │           │
-└─────────┼───────────────────────────────────────┼───────────┘
-          │                                       │
-          ▼                                       ▼
-   Claude Desktop                          External MCP
-   VS Code                                 Servers
+```mermaid
+flowchart TB
+    subgraph VICTOR["🤖 Victor Agent"]
+        SERVER["MCP Server<br/>(Expose tools)"]
+        REGISTRY["Tool Registry<br/>(47+ tools)"]
+        CLIENT["MCP Client<br/>(Use ext. tools)"]
+
+        SERVER <--> REGISTRY <--> CLIENT
+    end
+
+    CLAUDE["Claude Desktop<br/>VS Code"]
+    EXTERNAL["External MCP<br/>Servers"]
+
+    SERVER --> CLAUDE
+    CLIENT --> EXTERNAL
+
+    style VICTOR fill:#f0f9ff,stroke:#0284c7
+    style SERVER fill:#d1fae5,stroke:#10b981
+    style REGISTRY fill:#fef3c7,stroke:#f59e0b
+    style CLIENT fill:#e0e7ff,stroke:#4f46e5
+    style CLAUDE fill:#dbeafe,stroke:#3b82f6
+    style EXTERNAL fill:#fee2e2,stroke:#ef4444
 ```
 
 ## Using Victor as an MCP Server

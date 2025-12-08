@@ -12,11 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for project_context module."""
+"""Tests for project_context module.
+
+The project context module now uses settings-driven paths:
+- Default location: .victor/init.md (from VICTOR_DIR_NAME, VICTOR_CONTEXT_FILE)
+"""
 
 import tempfile
 from pathlib import Path
-from victor.context.project_context import ProjectContext, CONTEXT_FILE_NAMES
+from victor.context.project_context import (
+    ProjectContext,
+    CONTEXT_FILE_PATH,
+)
+from victor.config.settings import VICTOR_DIR_NAME, VICTOR_CONTEXT_FILE
 
 
 class TestProjectContext:
@@ -41,42 +49,20 @@ class TestProjectContext:
             result = pc.find_context_file()
             assert result is None
 
-    def test_find_context_file_victor_md(self):
-        """Test finding .victor.md file."""
+    def test_find_context_file_victor_init_md(self):
+        """Test finding .victor/init.md file (settings-based path)."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create .victor.md file
-            context_file = Path(tmpdir) / ".victor.md"
+            # Create .victor/init.md file using settings
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            context_file = victor_dir / VICTOR_CONTEXT_FILE
             context_file.write_text("# Project Context\n\nThis is a test.")
 
             pc = ProjectContext(tmpdir)
             result = pc.find_context_file()
             assert result is not None
-            assert result.name == ".victor.md"
-
-    def test_find_context_file_victor_md_uppercase(self):
-        """Test finding VICTOR.md file."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Create VICTOR.md file
-            context_file = Path(tmpdir) / "VICTOR.md"
-            context_file.write_text("# Project Context\n\nThis is a test.")
-
-            pc = ProjectContext(tmpdir)
-            result = pc.find_context_file()
-            assert result is not None
-            assert result.name == "VICTOR.md"
-
-    def test_find_context_file_priority(self):
-        """Test that .victor.md takes priority over VICTOR.md."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Create both files
-            (Path(tmpdir) / ".victor.md").write_text("# Lower case")
-            (Path(tmpdir) / "VICTOR.md").write_text("# Upper case")
-
-            pc = ProjectContext(tmpdir)
-            result = pc.find_context_file()
-            assert result is not None
-            # .victor.md should take priority
-            assert result.name == ".victor.md"
+            assert result.name == VICTOR_CONTEXT_FILE
+            assert result.parent.name == VICTOR_DIR_NAME
 
     def test_load_no_context_file(self):
         """Test loading when no context file exists."""
@@ -89,8 +75,10 @@ class TestProjectContext:
     def test_load_with_context_file(self):
         """Test loading a context file."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create context file
-            context_file = Path(tmpdir) / ".victor.md"
+            # Create .victor/init.md file
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            context_file = victor_dir / VICTOR_CONTEXT_FILE
             context_file.write_text("# Test Project\n\nProject instructions here.")
 
             pc = ProjectContext(tmpdir)
@@ -102,12 +90,13 @@ class TestProjectContext:
     def test_content_after_load(self):
         """Test content is accessible after loading."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            context_file = Path(tmpdir) / ".victor.md"
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            context_file = victor_dir / VICTOR_CONTEXT_FILE
             context_file.write_text("# Content Test\n\nSome content.")
 
             pc = ProjectContext(tmpdir)
             pc.load()
-            # Access _content directly as no getter method
             assert pc._content is not None
             assert "Content Test" in pc._content
             assert "Some content" in pc._content
@@ -118,17 +107,20 @@ class TestProjectContext:
             pc = ProjectContext(tmpdir)
             assert pc._content is None
 
-    def test_context_file_names_constant(self):
-        """Test that CONTEXT_FILE_NAMES has expected values."""
-        assert ".victor.md" in CONTEXT_FILE_NAMES
-        assert "VICTOR.md" in CONTEXT_FILE_NAMES
+    def test_context_file_path_constant(self):
+        """Test that CONTEXT_FILE_PATH has expected value from settings."""
+        expected_path = f"{VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}"
+        assert CONTEXT_FILE_PATH == expected_path
 
     def test_find_context_file_in_parent_dir(self):
         """Test finding context file in parent directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create .victor.md in parent
+            # Create .victor/init.md in parent
             parent = Path(tmpdir)
-            (parent / ".victor.md").write_text("# Parent context")
+            victor_dir = parent / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            context_file = victor_dir / VICTOR_CONTEXT_FILE
+            context_file.write_text("# Parent context")
 
             # Create subdirectory
             subdir = parent / "subdir"
@@ -137,23 +129,9 @@ class TestProjectContext:
             pc = ProjectContext(str(subdir))
             result = pc.find_context_file()
             assert result is not None
-            assert result.name == ".victor.md"
-            assert result.parent == parent
-
-    def test_find_context_file_in_victor_subdir(self):
-        """Test finding .victor/context.md file."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Create .victor/context.md
-            victor_dir = Path(tmpdir) / ".victor"
-            victor_dir.mkdir()
-            context_file = victor_dir / "context.md"
-            context_file.write_text("# Context in .victor dir")
-
-            pc = ProjectContext(tmpdir)
-            result = pc.find_context_file()
-            assert result is not None
-            assert result.name == "context.md"
-            assert ".victor" in str(result)
+            assert result.name == VICTOR_CONTEXT_FILE
+            assert result.parent.name == VICTOR_DIR_NAME
+            assert result.parent.parent == parent
 
     def test_find_context_file_stops_at_git_root(self):
         """Test that search stops at git root."""
@@ -162,7 +140,7 @@ class TestProjectContext:
             # Create git marker in parent
             (parent / ".git").mkdir()
 
-            # Create subdir without .victor.md
+            # Create subdir without .victor/
             subdir = parent / "subdir"
             subdir.mkdir()
 
@@ -179,7 +157,9 @@ class TestProjectContext:
     def test_content_property_after_load(self):
         """Test content property returns content after load."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            (Path(tmpdir) / ".victor.md").write_text("# Test Content")
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            (victor_dir / VICTOR_CONTEXT_FILE).write_text("# Test Content")
             pc = ProjectContext(tmpdir)
             pc.load()
             assert pc.content == "# Test Content"
@@ -187,7 +167,9 @@ class TestProjectContext:
     def test_context_file_property(self):
         """Test context_file property."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            context_path = Path(tmpdir) / ".victor.md"
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            context_path = victor_dir / VICTOR_CONTEXT_FILE
             context_path.write_text("# Test")
             pc = ProjectContext(tmpdir)
             pc.load()
@@ -214,7 +196,9 @@ Run pytest.
 ## Architecture
 The architecture is simple.
 """
-            (Path(tmpdir) / ".victor.md").write_text(content)
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            (victor_dir / VICTOR_CONTEXT_FILE).write_text(content)
             pc = ProjectContext(tmpdir)
             pc.load()
 
@@ -238,7 +222,9 @@ Overview content here.
 ## Commands
 Run pytest.
 """
-            (Path(tmpdir) / ".victor.md").write_text(content)
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            (victor_dir / VICTOR_CONTEXT_FILE).write_text(content)
             pc = ProjectContext(tmpdir)
             pc.load()
 
@@ -251,7 +237,9 @@ Run pytest.
             content = """## Commands
 Run pytest.
 """
-            (Path(tmpdir) / ".victor.md").write_text(content)
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            (victor_dir / VICTOR_CONTEXT_FILE).write_text(content)
             pc = ProjectContext(tmpdir)
             pc.load()
 
@@ -264,7 +252,9 @@ Run pytest.
             content = """## Package Layout
 Layout info here.
 """
-            (Path(tmpdir) / ".victor.md").write_text(content)
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            (victor_dir / VICTOR_CONTEXT_FILE).write_text(content)
             pc = ProjectContext(tmpdir)
             pc.load()
 
@@ -283,7 +273,9 @@ class TestGetSystemPromptAddition:
     def test_system_prompt_addition_with_content(self):
         """Test system prompt addition with content."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            (Path(tmpdir) / ".victor.md").write_text("# My Project\nSome instructions.")
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            (victor_dir / VICTOR_CONTEXT_FILE).write_text("# My Project\nSome instructions.")
             pc = ProjectContext(tmpdir)
             pc.load()
 
@@ -291,7 +283,8 @@ class TestGetSystemPromptAddition:
             assert "<project-context>" in result
             assert "</project-context>" in result
             assert "My Project" in result
-            assert ".victor.md" in result
+            # The filename in the system prompt should be VICTOR_CONTEXT_FILE
+            assert VICTOR_CONTEXT_FILE in result
 
 
 class TestGetPackageLayoutHint:
@@ -300,7 +293,9 @@ class TestGetPackageLayoutHint:
     def test_package_layout_hint_not_found(self):
         """Test when no layout hint is found."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            (Path(tmpdir) / ".victor.md").write_text("# Project\nNo layout info.")
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            (victor_dir / VICTOR_CONTEXT_FILE).write_text("# Project\nNo layout info.")
             pc = ProjectContext(tmpdir)
             pc.load()
             assert pc.get_package_layout_hint() == ""
@@ -313,7 +308,9 @@ class TestGetPackageLayoutHint:
 - victor/
 - tests/
 """
-            (Path(tmpdir) / ".victor.md").write_text(content)
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            (victor_dir / VICTOR_CONTEXT_FILE).write_text(content)
             pc = ProjectContext(tmpdir)
             pc.load()
             result = pc.get_package_layout_hint()
@@ -325,7 +322,9 @@ class TestGetPackageLayoutHint:
             content = """## Directory Structure
 src/ contains source code.
 """
-            (Path(tmpdir) / ".victor.md").write_text(content)
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            (victor_dir / VICTOR_CONTEXT_FILE).write_text(content)
             pc = ProjectContext(tmpdir)
             pc.load()
             result = pc.get_package_layout_hint()
@@ -337,7 +336,9 @@ src/ contains source code.
             content = """## Architecture
 MVC pattern.
 """
-            (Path(tmpdir) / ".victor.md").write_text(content)
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            (victor_dir / VICTOR_CONTEXT_FILE).write_text(content)
             pc = ProjectContext(tmpdir)
             pc.load()
             result = pc.get_package_layout_hint()
@@ -353,7 +354,8 @@ class TestGenerateVictorMd:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             result = generate_victor_md(tmpdir)
-            assert "# .victor.md" in result
+            # Should generate with the context file name from settings
+            assert f"# {VICTOR_CONTEXT_FILE}" in result
             assert "## Project Overview" in result
             assert "## Package Layout" in result
             assert "## Common Commands" in result
@@ -471,7 +473,7 @@ This is my awesome project that does cool things.
         from victor.context.project_context import generate_victor_md
 
         result = generate_victor_md()
-        assert "# .victor.md" in result
+        assert f"# {VICTOR_CONTEXT_FILE}" in result
 
     def test_generate_no_readme_content(self):
         """Test generation when README exists but has no usable content."""
@@ -488,21 +490,24 @@ class TestInitVictorMd:
     """Tests for init_victor_md function."""
 
     def test_init_creates_file(self):
-        """Test that init creates .victor.md file."""
+        """Test that init creates .victor/init.md file."""
         from victor.context.project_context import init_victor_md
 
         with tempfile.TemporaryDirectory() as tmpdir:
             result = init_victor_md(tmpdir)
             assert result is not None
             assert result.exists()
-            assert result.name == ".victor.md"
+            assert result.name == VICTOR_CONTEXT_FILE
+            assert result.parent.name == VICTOR_DIR_NAME
 
     def test_init_does_not_overwrite(self):
         """Test that init doesn't overwrite existing file."""
         from victor.context.project_context import init_victor_md
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            existing = Path(tmpdir) / ".victor.md"
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            existing = victor_dir / VICTOR_CONTEXT_FILE
             existing.write_text("Existing content")
 
             result = init_victor_md(tmpdir)
@@ -515,13 +520,15 @@ class TestInitVictorMd:
         from victor.context.project_context import init_victor_md
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            existing = Path(tmpdir) / ".victor.md"
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            existing = victor_dir / VICTOR_CONTEXT_FILE
             existing.write_text("Existing content")
 
             result = init_victor_md(tmpdir, force=True)
             assert result is not None
             # Content should be replaced
-            assert "# .victor.md" in result.read_text()
+            assert f"# {VICTOR_CONTEXT_FILE}" in result.read_text()
 
     def test_init_default_cwd(self):
         """Test init with default cwd."""
@@ -557,7 +564,9 @@ class TestLoadError:
         from unittest.mock import patch
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            context_file = Path(tmpdir) / ".victor.md"
+            victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
+            victor_dir.mkdir()
+            context_file = victor_dir / VICTOR_CONTEXT_FILE
             context_file.write_text("content")
 
             pc = ProjectContext(tmpdir)

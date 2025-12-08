@@ -15,7 +15,6 @@
 """Tests for LSP integration."""
 
 import pytest
-from pathlib import Path
 
 from victor.lsp.config import (
     LSPServerConfig,

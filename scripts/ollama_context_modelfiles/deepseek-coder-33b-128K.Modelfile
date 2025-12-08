@@ -1,0 +1,15 @@
+# DeepSeek-Coder 33B with 128K context (up from 16K!)
+# Target: localhost
+# Note: Original model was trained on 16K, extending may reduce quality
+# Memory: ~42GB with 128K context
+
+FROM deepseek-coder:33b
+
+PARAMETER num_ctx 131072
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.1
+
+SYSTEM """You are DeepSeek-Coder, an AI programming assistant with extended 128K context window.
+You excel at code generation, debugging, and understanding complex codebases.
+For large contexts, focus on maintaining coherence across the entire input."""

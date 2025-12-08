@@ -40,6 +40,8 @@ async def test_embedding_preloading_reduces_latency():
         settings = Settings(use_semantic_tool_selection=True, embedding_model="test-model")
         mock_provider = MagicMock()
         mock_provider.supports_tools.return_value = True
+        mock_provider.name = "test_provider"
+        mock_provider.get_context_window.return_value = 100000
 
         # --- Test 1: Without preloading ---
         orchestrator_no_preload = AgentOrchestrator(

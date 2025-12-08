@@ -17,7 +17,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from victor.tools.workflow_tool import run_workflow
+from victor.tools.workflow_tool import workflow
 
 
 class TestRunWorkflow:
@@ -36,7 +36,7 @@ class TestRunWorkflow:
         context = {"workflow_registry": mock_registry}
         workflow_args = {"arg1": "value1", "arg2": "value2"}
 
-        result = await run_workflow(
+        result = await workflow(
             workflow_name="test_workflow", context=context, workflow_args=workflow_args
         )
 
@@ -48,7 +48,7 @@ class TestRunWorkflow:
     async def test_run_workflow_no_registry(self):
         """Test handling of missing workflow registry."""
         context = {}
-        result = await run_workflow(
+        result = await workflow(
             workflow_name="test_workflow", context=context, workflow_args={}
         )
 
@@ -62,7 +62,7 @@ class TestRunWorkflow:
         mock_registry.get.return_value = None
 
         context = {"workflow_registry": mock_registry}
-        result = await run_workflow(
+        result = await workflow(
             workflow_name="nonexistent_workflow", context=context, workflow_args={}
         )
 
@@ -80,7 +80,7 @@ class TestRunWorkflow:
         mock_registry.get.return_value = mock_workflow
 
         context = {"workflow_registry": mock_registry}
-        result = await run_workflow(
+        result = await workflow(
             workflow_name="failing_workflow", context=context, workflow_args={}
         )
 
@@ -107,7 +107,7 @@ class TestRunWorkflow:
             "options": {"strict_mode": True},
         }
 
-        result = await run_workflow(
+        result = await workflow(
             workflow_name="new_feature", context=context, workflow_args=workflow_args
         )
 

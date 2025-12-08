@@ -20,20 +20,21 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from victor.tools.code_executor_tool import (
-    CodeExecutionManager,
-    execute_python_in_sandbox,
-    upload_files_to_sandbox,
+    CodeSandbox,
+    sandbox,
+    _execute_code,
+    _upload_files,
 )
 
 
-class TestCodeExecutionManager:
-    """Tests for CodeExecutionManager class."""
+class TestCodeSandbox:
+    """Tests for CodeSandbox class."""
 
     def test_init_success(self):
         """Test successful initialization with Docker available."""
         with patch("docker.from_env") as mock_docker:
             mock_docker.return_value = MagicMock()
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
 
             assert manager.docker_image == "python:3.11-slim"
             assert manager.container is None
@@ -46,7 +47,7 @@ class TestCodeExecutionManager:
 
         with patch("docker.from_env", side_effect=DockerException("Docker not found")):
             with pytest.raises(RuntimeError, match="Docker is not running"):
-                CodeExecutionManager(require_docker=True)
+                CodeSandbox(require_docker=True)
 
     def test_start_container(self):
         """Test starting a new container."""
@@ -56,7 +57,7 @@ class TestCodeExecutionManager:
             mock_container = MagicMock()
             mock_client.containers.run.return_value = mock_container
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
             manager.start()
 
             mock_client.images.pull.assert_called_once_with("python:3.11-slim")
@@ -70,7 +71,7 @@ class TestCodeExecutionManager:
             mock_docker.return_value = mock_client
             mock_container = MagicMock()
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
             manager.container = mock_container
             manager.start()
 
@@ -84,7 +85,7 @@ class TestCodeExecutionManager:
             mock_docker.return_value = mock_client
             mock_client.containers.run.side_effect = Exception("Container start failed")
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
             # Should NOT raise - instead logs warning and continues
             manager.start()
 
@@ -99,7 +100,7 @@ class TestCodeExecutionManager:
             mock_docker.return_value = mock_client
             mock_container = MagicMock()
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
             manager.container = mock_container
             manager.stop()
 
@@ -112,7 +113,7 @@ class TestCodeExecutionManager:
             mock_client = MagicMock()
             mock_docker.return_value = mock_client
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
             manager.stop()  # Should not raise
 
             assert manager.container is None
@@ -127,7 +128,7 @@ class TestCodeExecutionManager:
             mock_container = MagicMock()
             mock_container.remove.side_effect = docker.errors.NotFound("Container not found")
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
             manager.container = mock_container
             manager.stop()  # Should handle gracefully
 
@@ -146,7 +147,7 @@ class TestCodeExecutionManager:
             mock_exec_result.output = (b"Hello, World!\n", b"")
             mock_container.exec_run.return_value = mock_exec_result
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
             manager.container = mock_container
 
             result = manager.execute("print('Hello, World!')")
@@ -168,7 +169,7 @@ class TestCodeExecutionManager:
             mock_exec_result.output = (b"", b"NameError: name 'x' is not defined\n")
             mock_container.exec_run.return_value = mock_exec_result
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
             manager.container = mock_container
 
             result = manager.execute("print(x)")
@@ -183,7 +184,7 @@ class TestCodeExecutionManager:
             mock_client = MagicMock()
             mock_docker.return_value = mock_client
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
 
             with pytest.raises(RuntimeError, match="Execution session not started"):
                 manager.execute("print('hello')")
@@ -199,7 +200,7 @@ class TestCodeExecutionManager:
             mock_docker.return_value = mock_client
             mock_container = MagicMock()
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
             manager.container = mock_container
 
             manager.put_files([str(test_file)])
@@ -213,7 +214,7 @@ class TestCodeExecutionManager:
             mock_docker.return_value = mock_client
             mock_container = MagicMock()
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
             manager.container = mock_container
 
             with pytest.raises(FileNotFoundError, match="Local file not found"):
@@ -225,7 +226,7 @@ class TestCodeExecutionManager:
             mock_client = MagicMock()
             mock_docker.return_value = mock_client
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
 
             with pytest.raises(RuntimeError, match="Execution session not started"):
                 manager.put_files(["test.txt"])
@@ -248,7 +249,7 @@ class TestCodeExecutionManager:
             tar_stream.seek(0)
             mock_container.get_archive.return_value = ([tar_stream.read()], {})
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
             manager.container = mock_container
 
             result = manager.get_file("/app/test.txt")
@@ -262,7 +263,7 @@ class TestCodeExecutionManager:
             mock_client = MagicMock()
             mock_docker.return_value = mock_client
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
 
             with pytest.raises(RuntimeError, match="Execution session not started"):
                 manager.get_file("/app/test.txt")
@@ -284,45 +285,45 @@ class TestCodeExecutionManager:
             tar_stream.seek(0)
             mock_container.get_archive.return_value = ([tar_stream.read()], {})
 
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
             manager.container = mock_container
 
             with pytest.raises(FileNotFoundError, match="File not found in container"):
                 manager.get_file("/app/testdir")
 
 
-class TestExecutePythonInSandbox:
-    """Tests for execute_python_in_sandbox tool function."""
+class TestSandboxTool:
+    """Tests for the unified sandbox tool function."""
 
     @pytest.mark.asyncio
     async def test_execute_success(self):
-        """Test successful code execution through tool."""
-        mock_manager = MagicMock()
-        mock_manager.execute.return_value = {
+        """Test successful code execution through unified tool."""
+        mock_sandbox = MagicMock()
+        mock_sandbox.execute.return_value = {
             "exit_code": 0,
             "stdout": "Hello\n",
             "stderr": "",
         }
 
-        context = {"code_manager": mock_manager}
-        result = await execute_python_in_sandbox(code="print('Hello')", context=context)
+        context = {"code_manager": mock_sandbox}
+        result = await sandbox(operation="execute", code="print('Hello')", context=context)
 
         assert "Exit Code: 0" in result
         assert "Hello" in result
-        mock_manager.execute.assert_called_once_with("print('Hello')")
+        mock_sandbox.execute.assert_called_once_with("print('Hello')")
 
     @pytest.mark.asyncio
     async def test_execute_with_stderr(self):
         """Test code execution with error output."""
-        mock_manager = MagicMock()
-        mock_manager.execute.return_value = {
+        mock_sandbox = MagicMock()
+        mock_sandbox.execute.return_value = {
             "exit_code": 1,
             "stdout": "",
             "stderr": "Error: something went wrong\n",
         }
 
-        context = {"code_manager": mock_manager}
-        result = await execute_python_in_sandbox(code="raise Exception('test')", context=context)
+        context = {"code_manager": mock_sandbox}
+        result = await sandbox(operation="execute", code="raise Exception('test')", context=context)
 
         assert "Exit Code: 1" in result
         assert "STDERR" in result
@@ -332,37 +333,33 @@ class TestExecutePythonInSandbox:
     async def test_execute_no_manager(self):
         """Test execution without code manager in context."""
         context = {}
-        result = await execute_python_in_sandbox(code="print('test')", context=context)
+        result = await sandbox(operation="execute", code="print('test')", context=context)
 
         assert "Error" in result
         assert "CodeSandbox not found" in result
 
-
-class TestUploadFilesToSandbox:
-    """Tests for upload_files_to_sandbox tool function."""
-
     @pytest.mark.asyncio
     async def test_upload_success(self):
-        """Test successful file upload."""
-        mock_manager = MagicMock()
-        mock_manager.put_files = MagicMock()
+        """Test successful file upload through unified tool."""
+        mock_sandbox = MagicMock()
+        mock_sandbox.put_files = MagicMock()
 
-        context = {"code_manager": mock_manager}
-        result = await upload_files_to_sandbox(
-            file_paths=["file1.txt", "file2.txt"], context=context
+        context = {"code_manager": mock_sandbox}
+        result = await sandbox(
+            operation="upload", file_paths=["file1.txt", "file2.txt"], context=context
         )
 
         assert "Successfully uploaded 2 files" in result
-        mock_manager.put_files.assert_called_once_with(["file1.txt", "file2.txt"])
+        mock_sandbox.put_files.assert_called_once_with(["file1.txt", "file2.txt"])
 
     @pytest.mark.asyncio
     async def test_upload_failure(self):
         """Test file upload failure."""
-        mock_manager = MagicMock()
-        mock_manager.put_files.side_effect = Exception("Upload failed")
+        mock_sandbox = MagicMock()
+        mock_sandbox.put_files.side_effect = Exception("Upload failed")
 
-        context = {"code_manager": mock_manager}
-        result = await upload_files_to_sandbox(file_paths=["file.txt"], context=context)
+        context = {"code_manager": mock_sandbox}
+        result = await sandbox(operation="upload", file_paths=["file.txt"], context=context)
 
         assert "Error uploading files" in result
         assert "Upload failed" in result
@@ -371,7 +368,16 @@ class TestUploadFilesToSandbox:
     async def test_upload_no_manager(self):
         """Test upload without code manager in context."""
         context = {}
-        result = await upload_files_to_sandbox(file_paths=["file.txt"], context=context)
+        result = await sandbox(operation="upload", file_paths=["file.txt"], context=context)
 
         assert "Error" in result
         assert "CodeSandbox not found" in result
+
+    @pytest.mark.asyncio
+    async def test_invalid_operation(self):
+        """Test with invalid operation."""
+        mock_sandbox = MagicMock()
+        context = {"code_manager": mock_sandbox}
+        result = await sandbox(operation="invalid", context=context)
+
+        assert "Unknown operation" in result or "invalid" in result.lower()

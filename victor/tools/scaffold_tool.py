@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 import logging
 
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
@@ -339,7 +340,13 @@ API_V1_STR=/api/v1
 }
 
 
-@tool
+@tool(
+    category="scaffolding",
+    priority=Priority.LOW,  # Specialized project setup tool
+    access_mode=AccessMode.WRITE,  # Creates files and directories
+    danger_level=DangerLevel.LOW,  # Creates new files only
+    keywords=["scaffold", "template", "project", "boilerplate", "generate"],
+)
 async def scaffold(
     operation: str,
     template: Optional[str] = None,

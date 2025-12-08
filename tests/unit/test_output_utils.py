@@ -14,7 +14,6 @@
 
 """Tests for output_utils module."""
 
-import pytest
 
 from victor.tools.output_utils import (
     grep_lines,
@@ -23,8 +22,6 @@ from victor.tools.output_utils import (
     format_diff,
     summarize_changes,
     compact_file_list,
-    GrepResult,
-    OutputMode,
 )
 
 
