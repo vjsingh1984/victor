@@ -95,11 +95,13 @@ class ConversationEmbeddingStore:
     - Pre-computing and storing message embeddings
     - Using LanceDB's fast ANN search
     - Supporting session-scoped queries
+    - Automatic pruning of old messages beyond MAX_MESSAGES
 
     Key benefits over on-the-fly embedding:
     - O(1) embedding lookup instead of O(n) computation
     - Sub-millisecond vector search via LanceDB indices
     - Persistent storage survives process restarts
+    - Bounded storage via automatic pruning
 
     Schema:
         - id: str (message ID)
@@ -115,6 +117,13 @@ class ConversationEmbeddingStore:
 
     # Maximum content length to store (for preview)
     MAX_CONTENT_PREVIEW = 500
+
+    # Maximum messages to keep in the store (prunes oldest when exceeded)
+    # 10,000 messages ≈ 15MB storage (384-dim embeddings)
+    MAX_MESSAGES = 10_000
+
+    # Prune when this many messages over limit (batch pruning for efficiency)
+    PRUNE_BATCH_SIZE = 500
 
     def __init__(
         self,
@@ -305,6 +314,9 @@ class ConversationEmbeddingStore:
             f"[ConversationEmbeddingStore] Batch added {len(records)} messages "
             f"in {elapsed*1000:.2f}ms ({elapsed*1000/len(records):.2f}ms/msg)"
         )
+
+        # Prune old messages if over limit
+        await self._prune_old_messages()
 
         return len(records)
 
@@ -528,6 +540,79 @@ class ConversationEmbeddingStore:
             )
             return 0
 
+    async def _prune_old_messages(self) -> int:
+        """Prune oldest messages if over MAX_MESSAGES limit.
+
+        Uses batch pruning for efficiency - only prunes when PRUNE_BATCH_SIZE
+        over the limit to avoid frequent small deletions.
+
+        Returns:
+            Number of messages pruned
+        """
+        if self._table is None:
+            return 0
+
+        try:
+            count = self._table.count_rows()
+
+            # Only prune if we're significantly over limit
+            if count <= self.MAX_MESSAGES + self.PRUNE_BATCH_SIZE:
+                return 0
+
+            # Calculate how many to delete
+            delete_count = count - self.MAX_MESSAGES
+
+            # Get oldest message IDs by timestamp
+            # LanceDB doesn't have direct "ORDER BY ... LIMIT" so we query all and sort
+            df = self._table.to_pandas()
+            if len(df) == 0:
+                return 0
+
+            # Sort by timestamp ascending and take oldest
+            df = df.sort_values("timestamp", ascending=True)
+            oldest_ids = df.head(delete_count)["id"].tolist()
+
+            if not oldest_ids:
+                return 0
+
+            # Delete in batches to avoid huge SQL strings
+            deleted = 0
+            batch_size = 100
+            for i in range(0, len(oldest_ids), batch_size):
+                batch_ids = oldest_ids[i : i + batch_size]
+                # Build delete condition
+                id_list = ", ".join(f"'{id}'" for id in batch_ids)
+                self._table.delete(f"id IN ({id_list})")
+                deleted += len(batch_ids)
+
+            logger.info(
+                f"[ConversationEmbeddingStore] Pruned {deleted} old messages "
+                f"(was {count}, now {count - deleted}, limit {self.MAX_MESSAGES})"
+            )
+            return deleted
+
+        except Exception as e:
+            logger.warning(f"[ConversationEmbeddingStore] Pruning failed: {e}")
+            return 0
+
+    async def compact(self) -> bool:
+        """Compact the LanceDB table to reclaim space after deletions.
+
+        Returns:
+            True if compaction succeeded
+        """
+        if self._table is None:
+            return False
+
+        try:
+            self._table.compact_files()
+            self._table.cleanup_old_versions(older_than=None, delete_unverified=True)
+            logger.info("[ConversationEmbeddingStore] Compaction complete")
+            return True
+        except Exception as e:
+            logger.warning(f"[ConversationEmbeddingStore] Compaction failed: {e}")
+            return False
+
     async def get_stats(self) -> Dict[str, Any]:
         """Get store statistics.
 
@@ -548,6 +633,8 @@ class ConversationEmbeddingStore:
             "store": "conversation_embedding_store",
             "backend": "lancedb",
             "total_messages": count,
+            "max_messages": self.MAX_MESSAGES,
+            "usage_pct": (count / self.MAX_MESSAGES * 100) if self.MAX_MESSAGES > 0 else 0,
             "embedding_dimension": self.dimension,
             "embedding_model": self._embedding_service.model_name,
             "db_path": str(self._db_path),

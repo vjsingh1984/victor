@@ -976,8 +976,7 @@ class TaskTypeClassifier:
         self.embedding_service = embedding_service or EmbeddingService.get_instance()
         self.threshold = threshold
 
-        # Create collections for each task type
-        self._collections: Dict[TaskType, StaticEmbeddingCollection] = {}
+        # Phrase lists by task type
         self._phrase_lists: Dict[TaskType, List[str]] = {
             TaskType.CREATE_SIMPLE: CREATE_SIMPLE_PHRASES,
             TaskType.CREATE: CREATE_PHRASES,
@@ -990,12 +989,12 @@ class TaskTypeClassifier:
             TaskType.ANALYSIS_DEEP: ANALYSIS_DEEP_PHRASES,
         }
 
-        for task_type in self._phrase_lists.keys():
-            self._collections[task_type] = StaticEmbeddingCollection(
-                name=f"task_{task_type.value}",
-                cache_dir=self.cache_dir,
-                embedding_service=self.embedding_service,
-            )
+        # Single unified collection for all task phrases (1 file instead of 9)
+        self._collection = StaticEmbeddingCollection(
+            name="task_classifier",
+            cache_dir=self.cache_dir,
+            embedding_service=self.embedding_service,
+        )
 
         self._initialized = False
 
@@ -1150,44 +1149,50 @@ class TaskTypeClassifier:
         return embedding_result, embedding_score, None
 
     def initialize_sync(self) -> None:
-        """Initialize task type collections with canonical phrases."""
+        """Initialize unified task classifier collection with all phrases."""
         if self._initialized:
             return
 
+        # Build all items with task_type in metadata
+        all_items: List[CollectionItem] = []
         for task_type, phrases in self._phrase_lists.items():
-            items = [
-                CollectionItem(
-                    id=f"{task_type.value}_{i}",
-                    text=phrase,
-                    metadata={"task_type": task_type.value},
+            for i, phrase in enumerate(phrases):
+                all_items.append(
+                    CollectionItem(
+                        id=f"{task_type.value}_{i}",
+                        text=phrase,
+                        metadata={"task_type": task_type.value},
+                    )
                 )
-                for i, phrase in enumerate(phrases)
-            ]
-            self._collections[task_type].initialize_sync(items)
+
+        # Initialize single unified collection
+        self._collection.initialize_sync(all_items)
 
         self._initialized = True
-        total_phrases = sum(len(p) for p in self._phrase_lists.values())
-        logger.info(f"TaskTypeClassifier initialized with {total_phrases} canonical phrases")
+        logger.info(f"TaskTypeClassifier initialized with {len(all_items)} canonical phrases")
 
     async def initialize(self) -> None:
-        """Initialize task type collections (async version)."""
+        """Initialize unified task classifier collection (async version)."""
         if self._initialized:
             return
 
+        # Build all items with task_type in metadata
+        all_items: List[CollectionItem] = []
         for task_type, phrases in self._phrase_lists.items():
-            items = [
-                CollectionItem(
-                    id=f"{task_type.value}_{i}",
-                    text=phrase,
-                    metadata={"task_type": task_type.value},
+            for i, phrase in enumerate(phrases):
+                all_items.append(
+                    CollectionItem(
+                        id=f"{task_type.value}_{i}",
+                        text=phrase,
+                        metadata={"task_type": task_type.value},
+                    )
                 )
-                for i, phrase in enumerate(phrases)
-            ]
-            await self._collections[task_type].initialize(items)
+
+        # Initialize single unified collection
+        await self._collection.initialize(all_items)
 
         self._initialized = True
-        total_phrases = sum(len(p) for p in self._phrase_lists.values())
-        logger.info(f"TaskTypeClassifier initialized with {total_phrases} canonical phrases")
+        logger.info(f"TaskTypeClassifier initialized with {len(all_items)} canonical phrases")
 
     def _detect_file_context(self, prompt: str) -> bool:
         """Detect if prompt mentions specific file paths.
@@ -1234,16 +1239,25 @@ class TaskTypeClassifier:
         # Step 1: Preprocess prompt for embedding comparison
         preprocessed = self._preprocess_prompt(prompt)
 
-        # Step 2: Search all collections with PREPROCESSED prompt
+        # Step 2: Search unified collection and aggregate by task_type
+        # Get top 20 results to ensure we see all task types
+        results = self._collection.search_sync(preprocessed, top_k=20)
+
         all_scores: Dict[TaskType, float] = {}
         all_matches: List[Tuple[str, float]] = []
 
-        for task_type, collection in self._collections.items():
-            results = collection.search_sync(preprocessed, top_k=3)
-            if results:
-                best_score = results[0][1]
-                all_scores[task_type] = best_score
-                all_matches.append((f"{task_type.value}:{results[0][0].text[:40]}", best_score))
+        for item, score in results:
+            task_type_str = item.metadata.get("task_type", "general")
+            try:
+                task_type = TaskType(task_type_str)
+            except ValueError:
+                task_type = TaskType.GENERAL
+
+            # Keep best score per task type
+            if task_type not in all_scores or score > all_scores[task_type]:
+                all_scores[task_type] = score
+
+            all_matches.append((f"{task_type.value}:{item.text[:40]}", score))
 
         # Sort matches by score
         all_matches.sort(key=lambda x: x[1], reverse=True)
@@ -1310,7 +1324,6 @@ class TaskTypeClassifier:
 
     def clear_cache(self) -> None:
         """Clear cached collections."""
-        for collection in self._collections.values():
-            collection.clear_cache()
+        self._collection.clear_cache()
         self._initialized = False
         logger.info("TaskTypeClassifier cache cleared")

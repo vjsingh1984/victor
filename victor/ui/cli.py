@@ -1296,6 +1296,7 @@ providers:
                     use_llm=deep,
                     include_conversations=learn,
                     on_progress=on_progress,
+                    force=force,
                 )
             )
         elif index:
@@ -1303,7 +1304,7 @@ providers:
             from victor.context.codebase_analyzer import generate_victor_md_from_index
 
             console.print("[dim]  Building symbol index...[/]")
-            new_content = asyncio.run(generate_victor_md_from_index())
+            new_content = asyncio.run(generate_victor_md_from_index(force=force))
         else:
             # Quick regex-based analysis
             from victor.context.codebase_analyzer import generate_smart_victor_md
@@ -2290,6 +2291,208 @@ async def test_provider_async(provider: str) -> None:
 
     except Exception as e:
         console.print(f"[red]✗[/] Error: {e}")
+
+
+@app.command()
+def embeddings(
+    stat: bool = typer.Option(False, "--stat", "-s", help="Show detailed statistics with timestamps"),
+    clear: bool = typer.Option(False, "--clear", "-c", help="Clear embeddings (shows preview first)"),
+    rebuild: bool = typer.Option(False, "--rebuild", "-r", help="Clear and trigger rebuild immediately"),
+    tool: bool = typer.Option(False, "--tool", help="Target: tool embeddings (semantic tool selection)"),
+    intent: bool = typer.Option(False, "--intent", help="Target: task/intent classifier embeddings"),
+    conversation: bool = typer.Option(False, "--conversation", help="Target: conversation embeddings"),
+    all_embeddings: bool = typer.Option(False, "--all", "-a", help="Target: all embeddings"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+) -> None:
+    """Manage Victor embeddings for troubleshooting.
+
+    Embeddings are vector representations used for semantic matching.
+    Use this command when things aren't working:
+    - Tool selection seems broken
+    - Task detection is wrong
+    - Embeddings appear stale or corrupted
+
+    COMMANDS:
+        victor embeddings                Show status (default)
+        victor embeddings --stat         Detailed stats with timestamps
+        victor embeddings --clear        Clear embeddings (with confirmation)
+        victor embeddings --rebuild      Clear and rebuild immediately
+
+    TARGETS (combine with --clear or --rebuild):
+        --tool          Tool embeddings (semantic tool selection)
+        --intent        Task/intent classifier embeddings
+        --conversation  Conversation embeddings (semantic search)
+        --all           All embeddings (default if no target specified)
+
+    EXAMPLES:
+        victor embeddings                # Quick status
+        victor embeddings --stat         # Detailed stats with timestamps
+        victor embeddings --clear        # Clear all with confirmation
+        victor embeddings --clear --yes  # Clear without confirmation
+        victor embeddings --clear --tool # Clear only tool embeddings
+        victor embeddings --rebuild -y   # Full reset and rebuild
+
+    EMBEDDING TYPES:
+        Tool Embeddings (~65KB)
+          Location: ~/.victor/embeddings/tool_embeddings_*.pkl
+          Purpose:  Semantic tool selection (match query to tools)
+          Rebuild:  ~2s on next chat
+
+        Intent/Task Classifiers (~800KB)
+          Location: ~/.victor/embeddings/task_*_collection.pkl
+          Purpose:  Task type detection (create/edit/search/analyze)
+          Rebuild:  ~4s on next chat
+
+        Conversation Embeddings (~variable)
+          Location: .victor/embeddings/conversations/
+          Purpose:  Semantic conversation search
+          Source:   Derived from .victor/conversation.db (never deleted)
+          Rebuild:  Repopulated as you chat
+
+    PRESERVED (never cleared by this command):
+        .victor/conversation.db   # Actual conversation history (SQLite)
+        .victor/symbol_store.db   # Codebase index (use 'victor init --force')
+        ~/.victor/cache/          # Tool result cache (TTL-managed)
+        ~/.victor/profiles.yaml   # Your configuration
+    """
+    from victor.cache.embedding_cache_manager import CacheType, EmbeddingCacheManager
+
+    # Get cache manager instance
+    manager = EmbeddingCacheManager.get_instance()
+
+    # Determine targets based on flags (only embedding types, not tiered cache)
+    targets: list[CacheType] = []
+    if tool:
+        targets.append(CacheType.TOOL)
+    if intent:
+        targets.append(CacheType.INTENT)
+    if conversation:
+        targets.append(CacheType.CONVERSATION)
+    if all_embeddings or (not targets and (clear or rebuild)):
+        # All embedding types (TOOL, INTENT, CONVERSATION) - excludes TIERED which is tool results
+        targets = [CacheType.TOOL, CacheType.INTENT, CacheType.CONVERSATION]
+
+    # Get status
+    status = manager.get_status()
+
+    # Calculate totals for targets
+    target_files = sum(status.get_cache(t).file_count for t in targets) if targets else 0
+    target_size = sum(status.get_cache(t).total_size for t in targets) if targets else 0
+
+    # Show header
+    console.print("\n[bold]Victor Embedding Status[/]")
+    console.print("─" * 70)
+
+    # Display cache info
+    if stat:
+        # Detailed stats mode
+        for cache_info in status.caches:
+            will_clear = cache_info.cache_type in targets and (clear or rebuild)
+            marker = "[red]✗[/]" if will_clear and not cache_info.is_empty else (
+                "[green]●[/]" if not cache_info.is_empty else "[dim]○[/]"
+            )
+            suffix = " [red]← will clear[/]" if will_clear and not cache_info.is_empty else ""
+
+            console.print(f"\n  {marker} [bold]{cache_info.name}[/]{suffix}")
+            console.print(f"      [dim]Purpose:[/] {cache_info.description}")
+            console.print(f"      [dim]Location:[/] {cache_info.path}")
+            console.print(f"      [dim]Files:[/] {cache_info.file_count} ({cache_info.size_str})")
+            console.print(f"      [dim]Updated:[/] {cache_info.age_str}")
+
+            # Show individual files
+            if cache_info.file_count > 0 and cache_info.file_count <= 5:
+                for f in cache_info.files:
+                    console.print(f"        [dim]• {f.name} ({f.size_str}, {f.age_str})[/]")
+            elif cache_info.file_count > 5:
+                for f in cache_info.files[:3]:
+                    console.print(f"        [dim]• {f.name} ({f.size_str}, {f.age_str})[/]")
+                console.print(f"        [dim]... and {cache_info.file_count - 3} more[/]")
+    else:
+        # Simple status view
+        for cache_info in status.caches:
+            will_clear = cache_info.cache_type in targets and (clear or rebuild)
+            marker = "[red]✗[/]" if will_clear and not cache_info.is_empty else (
+                "[green]●[/]" if not cache_info.is_empty else "[dim]○[/]"
+            )
+            suffix = " [red]← will clear[/]" if will_clear and not cache_info.is_empty else ""
+            age = f" ({cache_info.age_str})" if cache_info.newest else ""
+            console.print(f"  {marker} {cache_info.name}: {cache_info.file_count} files ({cache_info.size_str}){age}{suffix}")
+
+    console.print("─" * 70)
+    console.print(f"  Total: {status.total_files} files ({status.total_size_str})")
+
+    # Show help only when no flags provided (just `victor embeddings`)
+    no_flags = not stat and not clear and not rebuild and not tool and not intent and not conversation and not all_embeddings
+    if no_flags:
+        console.print("\n[bold]Commands:[/]")
+        console.print("  [cyan]victor embeddings --stat[/]          Detailed stats with timestamps")
+        console.print("  [cyan]victor embeddings --clear[/]         Clear embeddings")
+        console.print("  [cyan]victor embeddings --rebuild[/]       Clear and rebuild immediately")
+        console.print("\n[bold]Targets:[/]")
+        console.print("  [cyan]--tool[/]         Tool embeddings (semantic tool selection)")
+        console.print("  [cyan]--intent[/]       Task/intent classifiers")
+        console.print("  [cyan]--conversation[/] Project conversation embeddings")
+        console.print("  [cyan]--all[/]          All embeddings (default)")
+        console.print("\n[dim]Combine: victor embeddings --rebuild --tool --yes[/]")
+        return
+
+    # Just showing stats, no action needed
+    if stat and not clear and not rebuild:
+        return
+
+    # Nothing to clear
+    if target_files == 0:
+        console.print("\n[dim]Nothing to clear - selected embeddings are already empty.[/]")
+        return
+
+    # Show what will be cleared and ask for confirmation
+    target_names = [status.get_cache(t).name for t in targets]
+    size_str = f"{target_size / 1024:.1f} KB" if target_size >= 1024 else f"{target_size} B"
+    console.print(f"\n[bold yellow]Will clear: {', '.join(target_names)}[/]")
+    console.print(f"[bold yellow]{target_files} files ({size_str})[/]")
+
+    if not yes:
+        console.print("")
+        if not Confirm.ask("[yellow]Proceed?[/]", default=False):
+            console.print("[dim]Cancelled.[/]")
+            return
+
+    # Perform clearing using the manager
+    console.print("\n[bold]Clearing...[/]")
+
+    def progress_callback(msg: str) -> None:
+        if msg.startswith("  "):
+            # Already formatted
+            if "ERROR" in msg:
+                console.print(msg.replace("ERROR", "[red]ERROR[/]"))
+            elif ": empty" in msg:
+                console.print(f"  [dim]○[/]{msg[1:]}")
+            else:
+                console.print(f"  [green]✓[/]{msg[1:]}")
+        else:
+            console.print(f"  [dim]{msg}[/]")
+
+    result = manager.clear(targets, progress_callback)
+
+    size_str = f"{result.cleared_size / 1024:.1f} KB" if result.cleared_size >= 1024 else f"{result.cleared_size} B"
+    console.print(f"\n[green]✓ Cleared {result.cleared_files} files ({size_str})[/]")
+
+    # Rebuild if requested
+    if rebuild:
+        console.print("\n[bold]Rebuilding...[/]")
+        try:
+            phrase_count = manager.rebuild_task_classifiers_sync(progress_callback)
+            console.print(f"  [green]✓[/] Task classifiers rebuilt ({phrase_count} phrases)")
+
+            if CacheType.TOOL in targets:
+                console.print("  [dim]Tool embeddings will rebuild on next chat (~2s)[/]")
+
+            console.print("\n[green]✓ Rebuild complete![/]")
+        except Exception as e:
+            console.print(f"\n[yellow]Rebuild skipped: {e}[/]")
+            console.print("[dim]Caches will auto-rebuild on next 'victor chat'.[/]")
+    else:
+        console.print("[dim]Embeddings will auto-rebuild on next 'victor chat'.[/]")
 
 
 if __name__ == "__main__":
