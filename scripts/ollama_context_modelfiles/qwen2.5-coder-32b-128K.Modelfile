@@ -1,0 +1,13 @@
+# Qwen2.5-Coder 32B with 128K context
+# Target: Both localhost and 192.168.1.20
+# Memory: ~40GB with 128K context
+
+FROM qwen2.5-coder:32b
+
+PARAMETER num_ctx 131072
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.05
+
+SYSTEM """You are Qwen2.5-Coder, a powerful coding assistant with 128K context window.
+You excel at understanding large codebases, multi-file analysis, and complex programming tasks."""

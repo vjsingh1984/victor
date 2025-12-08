@@ -1,0 +1,15 @@
+# DeepSeek-R1 32B with 262K context (extended from 131K)
+# Target: 192.168.1.20 (RTX 4000 Ada + 128GB RAM)
+# Memory: ~80GB with 262K context
+# Note: Native 131K, extending with RoPE scaling
+
+FROM deepseek-r1:32b
+
+PARAMETER num_ctx 262144
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.0
+PARAMETER rope_frequency_base 1000000
+
+SYSTEM """You are DeepSeek-R1 with 262K extended context for complex reasoning tasks.
+Use chain-of-thought for step-by-step analysis of large documents and codebases."""
