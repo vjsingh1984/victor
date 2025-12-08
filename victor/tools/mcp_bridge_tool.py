@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 from victor.mcp.client import MCPClient
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 
@@ -37,8 +38,14 @@ def get_mcp_tool_definitions() -> List[Dict[str, Any]]:
     return defs
 
 
-@tool
-async def mcp_call(name: str, arguments: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+@tool(
+    category="mcp",
+    priority=Priority.MEDIUM,  # Task-specific MCP bridge
+    access_mode=AccessMode.MIXED,  # Depends on MCP tool being called
+    danger_level=DangerLevel.MEDIUM,  # External tool execution
+    keywords=["mcp", "model context protocol", "external tool"],
+)
+async def mcp(name: str, arguments: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Call an MCP tool by name (prefixed with the MCP namespace).
     """
@@ -59,3 +66,5 @@ async def mcp_call(name: str, arguments: Optional[Dict[str, Any]] = None) -> Dic
         }
     except Exception as exc:
         return {"success": False, "error": str(exc)}
+
+

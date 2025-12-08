@@ -21,6 +21,7 @@ Supports: stats, clear, info.
 from typing import Dict, Any, Optional
 import logging
 
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.cache.tiered_cache import TieredCache
 
@@ -155,7 +156,13 @@ async def _do_info() -> Dict[str, Any]:
     }
 
 
-@tool
+@tool(
+    category="cache",
+    priority=Priority.LOW,  # Administrative tool
+    access_mode=AccessMode.MIXED,  # Reads stats and can clear cache
+    danger_level=DangerLevel.LOW,  # Cache clearing is safe
+    keywords=["cache", "clear", "stats", "memory", "disk"],
+)
 async def cache(
     action: str,
     namespace: Optional[str] = None,

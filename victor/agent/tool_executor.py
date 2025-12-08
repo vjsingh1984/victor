@@ -50,6 +50,10 @@ from victor.core.retry import (
     tool_retry_strategy,
 )
 from victor.tools.base import BaseTool, Hook, HookError, ToolRegistry, ToolResult, ValidationResult
+from victor.tools.metadata_registry import (
+    get_idempotent_tools as registry_get_idempotent_tools,
+    get_cache_invalidating_tools as registry_get_cache_invalidating_tools,
+)
 
 
 class ValidationMode(Enum):
@@ -154,27 +158,33 @@ class ToolExecutor:
     - Track execution metrics
     """
 
-    # Tools that are safe to cache (idempotent, read-only operations)
-    DEFAULT_CACHEABLE_TOOLS = frozenset(
-        [
-            "code_search",
-            "semantic_code_search",
-            "list_directory",
-            "read_file",
-            "plan_files",
-        ]
-    )
+    @classmethod
+    def is_cacheable_tool(cls, tool_name: str) -> bool:
+        """Check if a tool is safe to cache (idempotent, read-only).
 
-    # Tools that modify state and should invalidate cache
-    CACHE_INVALIDATING_TOOLS = frozenset(
-        [
-            "write_file",
-            "edit_files",
-            "execute_bash",
-            "git",
-            "docker",
-        ]
-    )
+        Tools declare cacheability via @tool(access_mode=AccessMode.READONLY).
+
+        Args:
+            tool_name: Name of the tool to check
+
+        Returns:
+            True if tool results can be cached
+        """
+        return tool_name in registry_get_idempotent_tools()
+
+    @classmethod
+    def is_cache_invalidating_tool(cls, tool_name: str) -> bool:
+        """Check if a tool modifies state and should invalidate cache.
+
+        Tools declare state modification via @tool(access_mode=AccessMode.WRITE/EXECUTE/MIXED).
+
+        Args:
+            tool_name: Name of the tool to check
+
+        Returns:
+            True if tool modifies state
+        """
+        return tool_name in registry_get_cache_invalidating_tools()
 
     def __init__(
         self,
@@ -444,12 +454,12 @@ class ToolExecutor:
         if success:
             self._stats[tool_name]["successes"] += 1
 
-            # Cache successful results for cacheable tools
-            if self.cache and tool_name in self.DEFAULT_CACHEABLE_TOOLS:
+            # Cache successful results for cacheable tools (registry + fallback)
+            if self.cache and self.is_cacheable_tool(tool_name):
                 self.cache.set(tool_name, normalized_args, result)
 
-            # Invalidate cache for tools that modify state
-            if self.cache and tool_name in self.CACHE_INVALIDATING_TOOLS:
+            # Invalidate cache for tools that modify state (registry + fallback)
+            if self.cache and self.is_cache_invalidating_tool(tool_name):
                 self._invalidate_cache_for_write_tool(tool_name, normalized_args)
         else:
             self._stats[tool_name]["failures"] += 1

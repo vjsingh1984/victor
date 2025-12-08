@@ -22,73 +22,62 @@ from typing import Any, Dict, List
 from pathlib import Path
 
 from victor.editing import FileEditor
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 
 @tool(
     category="filesystem",
-    keywords=[
-        "edit",
-        "modify",
-        "change",
-        "update",
-        "replace",
-        "fix",
-        "refactor",
-        "create",
-        "delete",
-        "rename",
-        "file",
-        "code",
-    ],
-    use_cases=[
-        "editing existing files",
-        "modifying source code",
-        "fixing bugs in code",
-        "creating new files",
-        "deleting files",
-        "renaming files",
-        "refactoring code",
-        "applying code changes",
-    ],
-    examples=[
-        "edit the file to fix the bug",
-        "change the function to return 42",
-        "replace 'old_value' with 'new_value' in config.py",
-        "create a new file called utils.py",
-        "delete the old_module.py file",
-        "rename temp.py to final.py",
-    ],
-    priority_hints=[
-        "PREFERRED tool for making code changes",
-        "Use 'replace' operation for surgical edits (most reliable)",
-        "Use 'create' for new files, 'modify' only for complete rewrites",
-        "Supports undo via /undo command",
-        "Can perform multiple operations atomically",
-    ],
+    priority=Priority.CRITICAL,  # Always available for selection
+    access_mode=AccessMode.WRITE,  # Creates/modifies/deletes files
+    danger_level=DangerLevel.LOW,  # Changes are undoable via transaction system
+    # Registry-driven metadata for tool selection and loop detection
+    progress_params=["ops"],  # Different operations indicate progress, not loops
+    stages=["executing"],  # Conversation stages where relevant
+    task_types=["edit", "action"],  # Task types for classification-aware selection
+    execution_category="write",  # Cannot run in parallel with conflicting ops
+    keywords=["edit", "modify", "replace", "create", "delete", "rename", "file", "text"],
 )
-async def edit_files(
-    operations: List[Dict[str, Any]],
+async def edit(
+    ops: List[Dict[str, Any]],
     preview: bool = False,
-    auto_commit: bool = True,
-    description: str = "",
-    context_lines: int = 3,
+    commit: bool = True,
+    desc: str = "",
+    ctx: int = 3,
 ) -> Dict[str, Any]:
-    """PRIMARY tool for code changes with transaction support and undo.
+    """[TEXT-BASED] Edit files atomically with undo. NOT code-aware.
 
-    Operations: replace (old_str→new_str), create, modify, delete, rename.
-    Use preview=True to see changes before applying. Supports /undo command.
+    Performs literal string replacement. Does NOT understand code structure.
+    WARNING: May cause false positives in code (e.g., 'foo' matches 'foobar').
+    For Python symbol renaming, use rename() from refactor_tool instead.
 
-    Example: [{"type": "replace", "path": "main.py", "old_str": "x=1", "new_str": "x=42"}]
+    Ops: replace/create/modify/delete/rename.
+
+    Args:
+        ops: [{type, path, ...}] - replace needs old_str/new_str
+        preview: Show diff without applying
+        commit: Auto-apply changes
+        desc: Change description
+        ctx: Diff context lines
+
+    When to use:
+        - Config files (JSON, YAML, TOML, etc.)
+        - Documentation (Markdown, text files)
+        - Any non-code text changes
+        - Creating/deleting/renaming files
+
+    When NOT to use:
+        - Renaming Python symbols (use rename() instead - AST-aware)
+        - Code refactoring where false positives matter
     """
-    # Allow callers (models) to pass operations as a JSON string; normalize to list[dict]
-    if isinstance(operations, str):
+    # Allow callers (models) to pass ops as a JSON string; normalize to list[dict]
+    if isinstance(ops, str):
         import json
         import re
 
         # Try to parse the JSON, with recovery for common issues
         try:
-            operations = json.loads(operations)
+            ops = json.loads(ops)
         except json.JSONDecodeError as exc:
             # Try to provide helpful error message and recovery hints
             error_context = ""
@@ -102,10 +91,10 @@ async def edit_files(
                 # Try to fix by escaping control characters in strings
                 try:
                     fixed = re.sub(
-                        r'(?<!\\)\n(?=(?:[^"]*"[^"]*")*[^"]*"[^"]*$)', r"\\n", operations
+                        r'(?<!\\)\n(?=(?:[^"]*"[^"]*")*[^"]*"[^"]*$)', r"\\n", ops
                     )
                     fixed = re.sub(r'(?<!\\)\t(?=(?:[^"]*"[^"]*")*[^"]*"[^"]*$)', r"\\t", fixed)
-                    operations = json.loads(fixed)
+                    ops = json.loads(fixed)
                     # If fixed, log and continue
                     import logging
 
@@ -113,7 +102,7 @@ async def edit_files(
                 except json.JSONDecodeError:
                     pass  # Recovery failed, use original error
 
-            if isinstance(operations, str):  # Still a string = parsing failed
+            if isinstance(ops, str):  # Still a string = parsing failed
                 # Detect delimiter issues
                 if "delimiter" in str(exc).lower():
                     error_context = "\n\nHINT: Check for missing commas between array elements or object properties."
@@ -133,11 +122,11 @@ async def edit_files(
                     "error": f"Invalid JSON for operations: {exc}{error_context}{example}",
                 }
 
-    if not operations:
+    if not ops:
         return {"success": False, "error": "No operations provided"}
 
     # Validate operations
-    for i, op in enumerate(operations):
+    for i, op in enumerate(ops):
         if not isinstance(op, dict):
             return {
                 "success": False,
@@ -170,18 +159,18 @@ async def edit_files(
     # Initialize editor
     backup_dir = get_project_paths().backups_dir
     editor = FileEditor(backup_dir=str(backup_dir))
-    transaction_id = editor.start_transaction(description)
+    transaction_id = editor.start_transaction(desc)
 
     # Initialize change tracker for undo/redo
     tracker = get_change_tracker()
-    tracker.begin_change_group("edit_files", description or f"Edit {len(operations)} files")
+    tracker.begin_change_group("edit_files", desc or f"Edit {len(ops)} files")
 
     # Count operations by type
     by_type = {"create": 0, "modify": 0, "delete": 0, "rename": 0}
 
     # Queue all operations
     try:
-        for op in operations:
+        for op in ops:
             op_type = op["type"]
             path = op["path"]
             file_path = Path(path).expanduser().resolve()
@@ -339,7 +328,7 @@ async def edit_files(
         tracker.commit_change_group()  # Empty commit to reset state
         return {"success": False, "error": f"Failed to queue operations: {str(e)}"}
 
-    operations_queued = len(operations)
+    operations_queued = len(ops)
 
     # Handle preview mode
     if preview:
@@ -351,12 +340,12 @@ async def edit_files(
         sys.stdout = captured_output = io.StringIO()
 
         try:
-            editor.preview_diff(context_lines=context_lines)
+            editor.preview_diff(context_lines=ctx)
             preview_text = captured_output.getvalue()
         finally:
             sys.stdout = old_stdout
 
-        if not auto_commit:
+        if not commit:
             editor.abort()
             return {
                 "success": True,
@@ -384,8 +373,8 @@ async def edit_files(
                     "error": "Failed to commit changes. Transaction rolled back.",
                 }
 
-    # Handle auto_commit
-    if auto_commit:
+    # Handle commit
+    if commit:
         success = editor.commit(dry_run=False)
         if success:
             # Commit the change group for undo/redo
@@ -411,5 +400,7 @@ async def edit_files(
             "operations_queued": operations_queued,
             "operations_applied": 0,
             "by_type": by_type,
-            "message": f"Queued {operations_queued} operations (not applied, auto_commit=False)",
+            "message": f"Queued {operations_queued} operations (not applied, commit=False)",
         }
+
+

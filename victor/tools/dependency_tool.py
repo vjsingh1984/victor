@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import logging
 
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
@@ -381,7 +382,13 @@ async def _do_check(requirements_file: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Failed to check requirements: {str(e)}"}
 
 
-@tool
+@tool(
+    category="deps",
+    priority=Priority.MEDIUM,  # Task-specific dependency management
+    access_mode=AccessMode.MIXED,  # Can read and update packages
+    danger_level=DangerLevel.MEDIUM,  # Package updates can affect system
+    keywords=["dependency", "package", "requirements", "version", "npm", "pip"],
+)
 async def dependency(
     action: str,
     packages: Optional[List[str]] = None,

@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import logging
 
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.common import gather_files_by_pattern
 
@@ -360,8 +361,17 @@ For complete API documentation, see [API Docs](docs/api.md).
 # Consolidated tools
 
 
-@tool
-async def generate_docs(
+@tool(
+    category="docs",
+    priority=Priority.MEDIUM,  # Task-specific documentation generation
+    access_mode=AccessMode.WRITE,  # Writes documentation files
+    danger_level=DangerLevel.LOW,  # File changes are additive and undoable
+    keywords=["docs", "documentation", "docstring", "api", "readme", "type hints", "generate"],
+    mandatory_keywords=["generate docs", "add documentation", "document code"],  # Force inclusion
+    task_types=["documentation", "generation"],  # Classification-aware selection
+    stages=["documentation"],  # Conversation stages where relevant
+)
+async def docs(
     path: str,
     doc_types: List[str] = None,
     format: str = "google",
@@ -581,8 +591,14 @@ async def generate_docs(
     }
 
 
-@tool
-async def analyze_docs(
+@tool(
+    category="docs",
+    priority=Priority.MEDIUM,  # Task-specific analysis
+    access_mode=AccessMode.READONLY,  # Only reads files for analysis
+    danger_level=DangerLevel.SAFE,  # No side effects
+    keywords=["documentation", "coverage", "analyze", "quality", "docstring"],
+)
+async def docs_coverage(
     path: str,
     check_coverage: bool = True,
     check_quality: bool = False,
@@ -782,3 +798,5 @@ async def analyze_docs(
         "recommendations": recommendations,
         "formatted_report": "\n".join(report),
     }
+
+

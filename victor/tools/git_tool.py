@@ -26,7 +26,7 @@ import subprocess
 from typing import Any, Dict, List, Optional, Tuple
 
 from victor.config.timeouts import ProcessTimeouts
-from victor.tools.base import ToolConfig
+from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority, ToolConfig
 from victor.tools.decorators import tool
 
 # Global state for AI provider (DEPRECATED: use ToolConfig via context instead)
@@ -101,6 +101,14 @@ def _run_git(*args: str, env_overrides: Optional[Dict[str, str]] = None) -> Tupl
 
 @tool(
     category="git",
+    priority=Priority.HIGH,  # Frequently used for version control
+    access_mode=AccessMode.MIXED,  # Reads repo state and writes commits
+    danger_level=DangerLevel.MEDIUM,  # Repository modifications
+    # Registry-driven metadata for tool selection and cache management
+    stages=["executing", "verification"],  # Conversation stages where relevant
+    task_types=["action", "analysis"],  # Task types for classification-aware selection
+    execution_category=ExecutionCategory.MIXED,  # Can both read and write
+    progress_params=["operation", "files", "branch"],  # Params indicating different operations
     keywords=[
         "git",
         "commit",
@@ -297,11 +305,16 @@ async def git(
 
 @tool(
     category="git",
+    priority=Priority.MEDIUM,  # Task-specific AI operation
+    access_mode=AccessMode.READONLY,  # Only reads diff, doesn't commit
+    danger_level=DangerLevel.SAFE,  # No side effects
     keywords=["commit message", "ai", "generate", "suggest", "conventional commit"],
+    mandatory_keywords=["generate commit message", "suggest commit"],  # Force inclusion
+    task_types=["generation", "git"],  # Classification-aware selection
     use_cases=["generating commit messages", "creating conventional commits"],
     examples=["suggest a commit message", "generate commit message for staged changes"],
 )
-async def git_suggest_commit(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def commit_msg(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Generate an AI-powered commit message from staged changes.
 
     Analyzes the staged diff and generates a conventional commit message
@@ -386,7 +399,12 @@ Generate ONLY the commit message, nothing else."""
 
 @tool(
     category="git",
+    priority=Priority.MEDIUM,  # Task-specific GitHub operation
+    access_mode=AccessMode.NETWORK,  # Pushes to remote, creates PR via API
+    danger_level=DangerLevel.LOW,  # PRs can be closed/reverted
     keywords=["pull request", "pr", "github", "merge request", "create pr"],
+    mandatory_keywords=["create pr", "pull request", "open pr"],  # Force inclusion
+    task_types=["action", "git"],  # Classification-aware selection
     use_cases=["creating pull requests", "opening PRs on GitHub"],
     examples=[
         "create a pull request",
@@ -394,7 +412,7 @@ Generate ONLY the commit message, nothing else."""
         "create pr with title 'Add feature'",
     ],
 )
-async def git_create_pr(
+async def pr(
     pr_title: Optional[str] = None,
     pr_description: Optional[str] = None,
     base_branch: str = "main",
@@ -555,11 +573,14 @@ DESCRIPTION:
 
 @tool(
     category="git",
+    priority=Priority.MEDIUM,  # Context-specific conflict resolution
+    access_mode=AccessMode.READONLY,  # Only analyzes, doesn't modify
+    danger_level=DangerLevel.SAFE,  # No side effects
     keywords=["merge conflict", "conflict", "resolve", "rebase", "merge"],
     use_cases=["analyzing merge conflicts", "resolving git conflicts", "conflict resolution help"],
     examples=["analyze conflicts", "show merge conflicts", "help resolve conflicts"],
 )
-async def git_analyze_conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Analyze merge conflicts and provide resolution guidance.
 
     Detects files with merge conflicts (marked as UU in git status) and provides
@@ -634,3 +655,5 @@ async def git_analyze_conflicts(context: Optional[Dict[str, Any]] = None) -> Dic
     analysis.append("4. Continue: git merge --continue or git rebase --continue")
 
     return {"success": True, "output": "\n".join(analysis), "error": ""}
+
+

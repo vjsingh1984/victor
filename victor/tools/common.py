@@ -67,6 +67,17 @@ DEFAULT_CODE_EXTENSIONS: Set[str] = {
     ".bash",
     ".zsh",
     ".fish",
+    # .NET / C# extensions
+    ".cs",
+    ".csx",
+    ".vb",
+    ".fs",
+    ".fsx",
+    ".csproj",
+    ".vbproj",
+    ".fsproj",
+    ".sln",
+    ".xaml",
 }
 
 

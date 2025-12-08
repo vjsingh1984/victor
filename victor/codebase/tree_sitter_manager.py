@@ -19,13 +19,37 @@ from tree_sitter import Language, Parser
 
 # Language package mapping for tree-sitter 0.25+
 # These use pre-compiled language packages instead of runtime compilation
+# Install with: pip install tree-sitter-<language>
 LANGUAGE_MODULES = {
+    # Core languages (commonly used)
     "python": "tree_sitter_python",
     "javascript": "tree_sitter_javascript",
     "typescript": "tree_sitter_typescript",
     "java": "tree_sitter_java",
     "go": "tree_sitter_go",
     "rust": "tree_sitter_rust",
+    # Additional languages
+    "c": "tree_sitter_c",
+    "cpp": "tree_sitter_cpp",
+    "c_sharp": "tree_sitter_c_sharp",
+    "ruby": "tree_sitter_ruby",
+    "php": "tree_sitter_php",
+    "kotlin": "tree_sitter_kotlin",
+    "swift": "tree_sitter_swift",
+    "scala": "tree_sitter_scala",
+    "bash": "tree_sitter_bash",
+    "sql": "tree_sitter_sql",
+    # Web languages
+    "html": "tree_sitter_html",
+    "css": "tree_sitter_css",
+    "json": "tree_sitter_json",
+    "yaml": "tree_sitter_yaml",
+    "toml": "tree_sitter_toml",
+    # Other
+    "lua": "tree_sitter_lua",
+    "elixir": "tree_sitter_elixir",
+    "haskell": "tree_sitter_haskell",
+    "r": "tree_sitter_r",
 }
 
 _language_cache: Dict[str, Language] = {}

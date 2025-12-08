@@ -24,9 +24,11 @@ This module provides:
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Awaitable
+from typing import Any, Callable, Dict, List, Optional, Awaitable, Set
 import re
 import logging
+
+from victor.tools.metadata_registry import get_write_tools as registry_get_write_tools
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +54,12 @@ class ApprovalMode(Enum):
     ALL_WRITES = "all_writes"  # Require approval for ALL write operations
 
 
-# Tools that perform write/modify operations and should be gated
-# This is the single source of truth for write tool identification
+# Static fallback for tools that perform write/modify operations.
+# PRIMARY source is decorator-driven via @tool(access_mode=AccessMode.WRITE/EXECUTE/MIXED)
+# in victor/tools/metadata_registry.py. This fallback ensures backward compatibility
+# and covers tools that may not yet have decorator metadata.
 # IMPORTANT: Only include actual @tool decorated functions from victor/tools/
-WRITE_TOOL_NAMES: frozenset[str] = frozenset(
+_STATIC_WRITE_TOOL_NAMES: frozenset[str] = frozenset(
     {
         # Direct file modifications
         "write_file",  # filesystem.py - writes/overwrites files
@@ -78,6 +82,23 @@ WRITE_TOOL_NAMES: frozenset[str] = frozenset(
         "batch",  # batch_processor_tool.py
     }
 )
+
+
+def get_write_tool_names() -> Set[str]:
+    """Get all write tool names from registry + static fallback.
+
+    This is the preferred way to get the full set of write tools.
+    Returns union of decorator-driven registry and static fallback.
+
+    Returns:
+        Set of tool names that perform write/modify operations.
+    """
+    registry_tools = registry_get_write_tools()
+    return registry_tools | set(_STATIC_WRITE_TOOL_NAMES)
+
+
+# Backward compatibility alias - prefer get_write_tool_names() for dynamic lookup
+WRITE_TOOL_NAMES = _STATIC_WRITE_TOOL_NAMES
 
 
 # Numeric ordering for risk level comparisons
@@ -319,13 +340,21 @@ class SafetyChecker:
     def is_write_tool(self, tool_name: str) -> bool:
         """Check if a tool is a write/modify operation.
 
+        Uses decorator-driven registry as primary source, with static fallback
+        for backward compatibility during migration.
+
         Args:
             tool_name: Name of the tool
 
         Returns:
-            True if the tool can modify files
+            True if the tool can modify files/state
         """
-        return tool_name in WRITE_TOOL_NAMES
+        # Primary: check decorator-driven registry
+        registry_write_tools = registry_get_write_tools()
+        if tool_name in registry_write_tools:
+            return True
+        # Fallback: check static list for tools without decorator metadata
+        return tool_name in _STATIC_WRITE_TOOL_NAMES
 
     async def check_and_confirm(
         self,

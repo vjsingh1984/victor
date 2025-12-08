@@ -130,21 +130,33 @@ task_types:
       max_iterations: "You have done extensive analysis. Please summarize your findings."
 
   design:
-    description: "Conceptual/planning tasks (no tools needed)"
-    max_exploration_iterations: 2
+    description: "Architecture/design questions - requires codebase exploration"
+    max_exploration_iterations: 20  # Design tasks need thorough exploration
     force_action_after_target_read: false
-    needs_tools: false
+    needs_tools: true  # Design tasks NEED tools to explore the codebase
 
-    required_tools: []
+    required_tools:
+      - list_directory
+      - read_file
+      - code_search
 
     stage_tools:
-      initial: []
-      reading: []
+      initial:
+        - list_directory
+        - code_search
+        - semantic_code_search
+        - read_file
+        - get_project_overview
+      reading:
+        - read_file
+        - code_search
+        - list_directory
       executing: []
-      verifying: []
+      verifying:
+        - read_file
 
     force_action_hints:
-      max_iterations: "Please provide your design recommendations."
+      max_iterations: "Please summarize the architecture and provide your recommendations."
 
   general:
     description: "Ambiguous or general help"

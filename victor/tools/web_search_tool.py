@@ -29,7 +29,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 from bs4 import BeautifulSoup
 
-from victor.tools.base import CostTier
+from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 # Global provider and model for AI summarization (set by orchestrator)
@@ -167,16 +167,36 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
     return ""
 
 
-@tool(cost_tier=CostTier.MEDIUM)
-async def web_search(
-    query: str, max_results: int = 5, region: str = "wt-wt", safe_search: str = "moderate"
+@tool(
+    cost_tier=CostTier.MEDIUM,
+    category="web",
+    priority=Priority.CONTEXTUAL,  # Only used when web search is requested
+    access_mode=AccessMode.NETWORK,  # Makes external HTTP requests
+    danger_level=DangerLevel.SAFE,  # No local side effects
+    # Registry-driven metadata for tool selection and loop detection
+    progress_params=["query"],  # Different queries indicate progress, not loops
+    stages=["research"],  # Conversation stages where relevant
+    task_types=["research", "analysis"],  # Task types for classification-aware selection
+    execution_category="network",  # Can run in parallel with read-only ops
+    keywords=["search", "web", "internet", "lookup", "find online", "google", "duckduckgo", "summarize"],
+    mandatory_keywords=["search web", "search online", "look up online"],  # Force inclusion
+)
+async def web(
+    query: str,
+    max_results: int = 5,
+    region: str = "wt-wt",
+    safe_search: str = "moderate",
+    ai_summarize: bool = False,
+    fetch_top: Optional[int] = None,
+    fetch_pool: Optional[int] = None,
+    max_content_length: int = 5000,
 ) -> Dict[str, Any]:
-    """
-    Web search / online lookup using DuckDuckGo (internet search, find online, lookup docs).
+    """Search the web using DuckDuckGo. Optionally summarize with AI.
 
     Purpose:
     - Find links, docs, references on the public web.
     - Return titles, URLs, and snippets for relevance checking.
+    - Optionally use AI to summarize search results.
     - Ideal when the user says "search the web", "find online", "lookup", "docs", "articles".
 
     Args:
@@ -184,14 +204,24 @@ async def web_search(
         max_results: Maximum number of results to return (default: 5).
         region: Region for search results, e.g., 'us-en', 'uk-en', 'wt-wt' for worldwide (default: 'wt-wt').
         safe_search: Safe search level - 'on', 'moderate', 'off' (default: 'moderate').
+        ai_summarize: If True, use AI to summarize results (default: False).
+        fetch_top: Number of URLs to fetch for deeper summary (only with ai_summarize=True).
+        fetch_pool: Pool of URLs to try fetching from (only with ai_summarize=True).
+        max_content_length: Max content length to extract per URL (only with ai_summarize=True).
 
     Returns:
         Dictionary containing:
         - success: Whether search succeeded
         - results: Formatted search results text
         - result_count: Number of results found
+        - summary: AI summary (only if ai_summarize=True)
         - error: Error message if failed
     """
+    # Route to summarize implementation if ai_summarize is True
+    if ai_summarize:
+        return await _summarize_search(
+            query, max_results, region, safe_search, fetch_top, fetch_pool, max_content_length
+        )
     if not query:
         return {"success": False, "error": "Missing required parameter: query"}
 
@@ -241,23 +271,24 @@ async def web_search(
         return {"success": False, "error": f"Search failed: {str(e)}"}
 
 
-@tool(cost_tier=CostTier.MEDIUM)
-async def web_fetch(url: str) -> Dict[str, Any]:
-    """
-    Fetch and extract content from a URL.
-
-    Downloads a web page and extracts the main text content,
-    removing scripts, styles, navigation, and other non-content elements.
+@tool(
+    cost_tier=CostTier.MEDIUM,
+    category="web",
+    priority=Priority.MEDIUM,  # Used when fetching specific URLs
+    access_mode=AccessMode.NETWORK,  # Makes external HTTP requests
+    danger_level=DangerLevel.SAFE,  # No local side effects
+    # Registry-driven metadata for tool selection and loop detection
+    progress_params=["url"],  # Different URLs indicate progress, not loops
+    stages=["research"],  # Conversation stages where relevant
+    task_types=["research", "analysis"],  # Task types for classification-aware selection
+    execution_category="network",  # Can run in parallel with read-only ops
+    keywords=["fetch", "url", "webpage", "download", "http", "content"],
+)
+async def fetch(url: str) -> Dict[str, Any]:
+    """Fetch and extract main text content from a URL.
 
     Args:
-        url: URL to fetch and extract content from.
-
-    Returns:
-        Dictionary containing:
-        - success: Whether fetch succeeded
-        - content: Extracted text content
-        - url: URL that was fetched
-        - error: Error message if failed
+        url: URL to fetch content from
     """
     if not url:
         return {"success": False, "error": "Missing required parameter: url"}
@@ -288,8 +319,7 @@ async def web_fetch(url: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Failed to fetch URL: {str(e)}"}
 
 
-@tool(cost_tier=CostTier.MEDIUM)
-async def web_summarize(
+async def _summarize_search(
     query: str,
     max_results: int = 5,
     region: str = "wt-wt",
@@ -298,27 +328,7 @@ async def web_summarize(
     fetch_pool: Optional[int] = None,
     max_content_length: int = 5000,
 ) -> Dict[str, Any]:
-    """
-    Search the web AND summarize results with AI (web search + summarization).
-
-    Purpose:
-    - Perform a web search, then produce a concise summary with key findings and cited links.
-    - Use when the user asks to "summarize from the web", "give me top X with pros/cons", or needs synthesized web info.
-    - Returns original results plus AI-written summary.
-
-    Args:
-        query: Search query string.
-        max_results: Maximum number of results to include in summary (default: 5).
-        region: Region for search results, e.g., 'us-en', 'uk-en', 'wt-wt' for worldwide (default: 'wt-wt').
-        safe_search: Safe search level - 'on', 'moderate', 'off' (default: 'moderate').
-
-    Returns:
-        Dictionary containing:
-        - success: Whether summarization succeeded
-        - summary: AI-generated summary of search results
-        - original_results: Raw search results
-        - error: Error message if failed
-    """
+    """Internal implementation for web search with AI summarization."""
     if not _provider:
         return {"success": False, "error": "No LLM provider available for summarization"}
 
@@ -395,7 +405,7 @@ async def web_summarize(
             url = result.get("url")
             if not url:
                 continue
-            fetch_res = await web_fetch(url=url)
+            fetch_res = await fetch(url=url)
             if fetch_res.get("success") and fetch_res.get("content"):
                 content = fetch_res["content"][:max_content_length]
                 fetched_contents.append({"url": url, "content": content})

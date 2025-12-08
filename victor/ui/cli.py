@@ -1168,13 +1168,16 @@ def init(
         False, "--force", "-f", help="Overwrite existing init.md completely"
     ),
     learn: bool = typer.Option(
-        False, "--learn", "-L", help="Enhance with conversation history insights"
+        True, "--learn/--no-learn", "-L", help="Include conversation history insights (default: on)"
     ),
     index: bool = typer.Option(
-        False, "--index", "-i", help="Use SQLite symbol store for multi-language analysis"
+        False, "--index", "-i", help="Use SQLite symbol store only (no LLM)"
     ),
     deep: bool = typer.Option(
-        False, "--deep", "-d", help="Use LLM for deep analysis (any language)"
+        True, "--deep/--no-deep", "-d", help="Use LLM for deep analysis (default: on)"
+    ),
+    quick: bool = typer.Option(
+        False, "--quick", "-q", help="Fast regex-only analysis (no LLM, no indexing)"
     ),
     symlinks: bool = typer.Option(
         False, "--symlinks", "-l", help="Create CLAUDE.md and other tool aliases"
@@ -1189,13 +1192,16 @@ def init(
     1. Creates global config files (~/.victor/profiles.yaml) if missing
     2. Analyzes your codebase and creates .victor/init.md (like CLAUDE.md)
 
+    By default, uses LLM + conversation insights for comprehensive analysis.
+    Falls back to --learn (no LLM) if LLM calls fail.
+
     Examples:
-        victor init              # Full initialization (config + project analysis)
+        victor init              # Comprehensive: LLM + conversation insights (default)
+        victor init --quick      # Fast regex-only analysis (no LLM)
+        victor init --no-deep    # Symbol index + conversation insights (no LLM)
+        victor init --index      # Symbol index only (no LLM, no conversation)
         victor init --update     # Update analysis, preserve user edits
         victor init --force      # Regenerate init.md completely
-        victor init --learn      # Include conversation history insights
-        victor init --index      # Multi-language symbol indexing
-        victor init --deep       # Use LLM for comprehensive analysis
         victor init --symlinks   # Also create CLAUDE.md symlink
         victor init --config     # Only setup global config
     """
@@ -1256,32 +1262,47 @@ providers:
             console.print("  [cyan]victor init --deep[/]     LLM-powered deep analysis")
             return
 
-    if deep:
-        console.print(
-            "[yellow]--deep requires an interactive session. Use 'victor' then '/init --deep'[/]"
-        )
-        console.print("[dim]Running quick analysis instead...[/]")
+    # Handle --quick flag (overrides everything)
+    if quick:
+        deep = False
+        learn = False
+        index = False
 
-    # Determine analysis mode
-    if learn:
-        console.print("[dim]Analyzing codebase + learning from conversation history...[/]")
+    # Determine analysis mode and print status
+    if deep and learn:
+        console.print("[dim]Comprehensive analysis: Index → Learn → LLM (default)...[/]")
+    elif deep:
+        console.print("[dim]Analysis: Index → LLM (no conversation insights)...[/]")
+    elif learn:
+        console.print("[dim]Analysis: Index → Learn (no LLM)...[/]")
     elif index:
-        console.print("[dim]Indexing codebase (multi-language symbol analysis)...[/]")
+        console.print("[dim]Analysis: Index only (no LLM, no conversation)...[/]")
     else:
-        console.print("[dim]Analyzing codebase (quick mode)...[/]")
+        console.print("[dim]Quick regex analysis (no indexing)...[/]")
 
     try:
         import asyncio
 
-        if learn:
-            # Use SymbolStore + conversation history insights
+        # Progress callback for user feedback
+        def on_progress(stage: str, msg: str):
+            console.print(f"[dim]  {msg}[/]")
+
+        # Use the unified pipeline for deep/learn modes
+        if deep or learn:
             from victor.context.codebase_analyzer import generate_enhanced_init_md
 
-            new_content = asyncio.run(generate_enhanced_init_md())
+            new_content = asyncio.run(
+                generate_enhanced_init_md(
+                    use_llm=deep,
+                    include_conversations=learn,
+                    on_progress=on_progress,
+                )
+            )
         elif index:
-            # Use SymbolStore for accurate multi-language symbol extraction
+            # Use SymbolStore only
             from victor.context.codebase_analyzer import generate_victor_md_from_index
 
+            console.print("[dim]  Building symbol index...[/]")
             new_content = asyncio.run(generate_victor_md_from_index())
         else:
             # Quick regex-based analysis

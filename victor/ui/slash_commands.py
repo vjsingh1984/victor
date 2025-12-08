@@ -630,38 +630,24 @@ class SlashCommandHandler:
             self.console.print("[dim]Analyzing codebase (quick mode)...[/]")
 
         try:
-            if use_learn:
-                # Use SymbolStore + conversation history insights
-                from victor.context.codebase_analyzer import generate_enhanced_init_md
+            from victor.context.codebase_analyzer import (
+                generate_enhanced_init_md,
+                generate_victor_md_from_index,
+                generate_smart_victor_md,
+            )
 
-                new_content = await generate_enhanced_init_md()
-            elif use_index:
-                # Use SymbolStore for accurate multi-language symbol extraction
-                from victor.context.codebase_analyzer import generate_victor_md_from_index
-
-                new_content = await generate_victor_md_from_index()
-            elif deep:
-                # Use LLM-powered generator (works with any project type)
-                if not self.agent or not self.agent.provider:
-                    self.console.print("[yellow]No active provider configured.[/]")
-                    self.console.print(
-                        "Use [bold]/init[/] without --deep, or configure a provider first."
-                    )
-                    return
-
-                from victor.context.codebase_analyzer import generate_victor_md_with_llm
-
-                provider_name = getattr(self.agent.provider, "name", "unknown")
-                model_name = getattr(self.agent, "model", "unknown")
-                self.console.print(f"[dim]Using provider: {provider_name}, model: {model_name}[/]")
-
-                new_content = await generate_victor_md_with_llm(
-                    self.agent.provider, model=model_name
+            # Unified pipeline: Index → Learn → LLM
+            if deep or use_learn:
+                new_content = await generate_enhanced_init_md(
+                    use_llm=deep,
+                    include_conversations=use_learn
+                    or deep,  # Include conversations by default with deep
                 )
+            elif use_index:
+                # Symbol index only (no conversation insights, no LLM)
+                new_content = await generate_victor_md_from_index()
             else:
-                # Use smart analyzer (regex-based, no LLM) - quick mode
-                from victor.context.codebase_analyzer import generate_smart_victor_md
-
+                # Quick regex-based analysis
                 new_content = generate_smart_victor_md()
 
             # Handle update mode - merge with existing content
@@ -2156,13 +2142,14 @@ Provide a 2-3 sentence summary:"""
                 return
 
             # Get tool-specific stats by querying common tools
+            # NOTE: Uses canonical short names for token efficiency
             common_tools = [
-                "list_directory",
-                "read_file",
-                "code_search",
+                "ls",
+                "read",
+                "grep",
                 "git",
-                "semantic_code_search",
-                "database",
+                "search",
+                "db",
                 "docker",
             ]
 

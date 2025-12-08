@@ -49,6 +49,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
+from victor.tools.tool_names import ToolNames, get_canonical_name
+from victor.tools.metadata_registry import get_progress_params as registry_get_progress_params
+
 if TYPE_CHECKING:
     from victor.agent.complexity_classifier import TaskClassification
 
@@ -67,23 +70,41 @@ class TaskType(Enum):
 # Tools that indicate research activity
 RESEARCH_TOOLS = frozenset({"web_search", "web_fetch", "tavily_search", "search_web", "fetch_url"})
 
-# Progressive tools - different params indicate progress, not loops
-# Format: tool_name -> list of params that indicate progress
-# For write/edit tools, only path matters - writing same file repeatedly is a loop
-PROGRESSIVE_PARAMS = {
-    "read_file": ["path", "offset", "limit"],
-    "code_search": ["query", "directory"],
-    "semantic_code_search": ["query", "directory"],
-    "list_directory": ["path", "recursive"],
-    "execute_bash": ["command"],
-    "web_search": ["query"],
-    "web_fetch": ["url"],
-    "write_file": ["path"],  # Same file = loop, regardless of content
-    "edit_files": ["files"],  # Same files = loop, regardless of edits
-}
+def get_progress_params_for_tool(tool_name: str) -> List[str]:
+    """Get progress parameters for a tool from the decorator-driven registry.
+
+    Progress parameters indicate exploration progress (e.g., different query,
+    different file offset) rather than loops. Tools define these via
+    @tool(progress_params=["path", "offset"]) decorator.
+
+    Args:
+        tool_name: Name of the tool
+
+    Returns:
+        List of parameter names that indicate progress, or empty list
+    """
+    registry_params = registry_get_progress_params(tool_name)
+    return list(registry_params) if registry_params else []
+
+
+def is_progressive_tool(tool_name: str) -> bool:
+    """Check if a tool has progress parameters defined in the registry.
+
+    Args:
+        tool_name: Name of the tool
+
+    Returns:
+        True if tool has progress params defined via @tool decorator
+    """
+    return bool(registry_get_progress_params(tool_name))
+
 
 # Default limit for read_file when not specified (matches tool default)
 DEFAULT_READ_LIMIT = 500
+
+# Canonical tool name for file reading (from centralized registry)
+# The loop detector normalizes tool names using get_canonical_name() before checking
+CANONICAL_READ_TOOL = ToolNames.READ
 
 
 @dataclass
@@ -304,7 +325,9 @@ class LoopDetector:
             self._unique_resources.add(resource_key)
 
         # Track file reads with offset-aware overlap detection
-        if tool_name == "read_file":
+        # Normalize tool name to canonical form (e.g., "read_file" → "read")
+        canonical_name = get_canonical_name(tool_name)
+        if canonical_name == CANONICAL_READ_TOOL:
             self._track_file_read(arguments)
         else:
             # Track base resources for non-file operations (searches, etc.)
@@ -493,11 +516,12 @@ class LoopDetector:
         Returns:
             String signature for the tool call
         """
-        if tool_name in PROGRESSIVE_PARAMS:
+        # Check for progress params (registry with static fallback)
+        progress_params = get_progress_params_for_tool(tool_name)
+        if progress_params:
             # Include progressive params in signature
-            params = PROGRESSIVE_PARAMS[tool_name]
             sig_parts = [tool_name]
-            for param in params:
+            for param in progress_params:
                 value = arguments.get(param, "")
                 # Truncate long values
                 if isinstance(value, str) and len(value) > 100:
@@ -521,34 +545,36 @@ class LoopDetector:
         Returns:
             Resource key string or None if not trackable
         """
-        if tool_name == "read_file":
+        # Normalize tool name to canonical form
+        canonical_name = get_canonical_name(tool_name)
+        if canonical_name == CANONICAL_READ_TOOL:
             path = arguments.get("path", "")
             offset = arguments.get("offset", 0)
             if path:
                 return f"file:{path}:{offset}"
-        elif tool_name == "list_directory":
+        elif canonical_name == ToolNames.LS:
             path = arguments.get("path", "")
             if path:
                 return f"dir:{path}"
-        elif tool_name in {"code_search", "semantic_code_search"}:
+        elif canonical_name in {ToolNames.GREP, ToolNames.SEARCH}:
             query = arguments.get("query", "")
             directory = arguments.get("directory", ".")
             if query:
                 return f"search:{directory}:{query[:50]}"
-        elif tool_name == "execute_bash":
+        elif canonical_name == ToolNames.SHELL:
             # Track bash commands as resources to show progress
             command = arguments.get("command", "")
             if command:
                 # Extract first 50 chars of command for unique identification
                 return f"bash:{command[:50]}"
-        elif tool_name in {"web_fetch", "web_search", "web_summarize"}:
+        elif canonical_name in {ToolNames.FETCH, ToolNames.WEB, ToolNames.SUMMARIZE}:
             # Track web operations as resources (important for ACTION tasks)
             url = arguments.get("url", "")
             query = arguments.get("query", "")
             if url:
-                return f"web:{tool_name}:{url[:80]}"
+                return f"web:{canonical_name}:{url[:80]}"
             elif query:
-                return f"web:{tool_name}:{query[:50]}"
+                return f"web:{canonical_name}:{query[:50]}"
         return None
 
     def _get_base_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
@@ -564,18 +590,19 @@ class LoopDetector:
         Returns:
             Base resource key string or None if not trackable
         """
-        # Note: read_file is NOT tracked here - uses unified offset-aware detection
-        if tool_name == "list_directory":
+        # Note: read is NOT tracked here - uses unified offset-aware detection
+        canonical_name = get_canonical_name(tool_name)
+        if canonical_name == ToolNames.LS:
             path = arguments.get("path", "")
             if path:
                 return f"dir:{path}"
-        elif tool_name in {"code_search", "semantic_code_search"}:
+        elif canonical_name in {ToolNames.GREP, ToolNames.SEARCH}:
             query = arguments.get("query", "")
             directory = arguments.get("directory", ".")
             if query:
                 # Use first 20 chars as prefix to detect similar queries
                 return f"search:{directory}:{query[:20]}"
-        elif tool_name == "execute_bash":
+        elif canonical_name == ToolNames.SHELL:
             # Track bash command base (first word/command) for loop detection
             command = arguments.get("command", "")
             if command:

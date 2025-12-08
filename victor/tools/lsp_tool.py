@@ -21,6 +21,7 @@ diagnostics, open, close.
 
 from typing import Any, Dict, Optional
 
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 # Completion kind mapping
@@ -298,7 +299,13 @@ async def _do_close(file_path: str) -> Dict[str, Any]:
     return {"success": True, "message": f"Closed {file_path}"}
 
 
-@tool
+@tool(
+    category="lsp",
+    priority=Priority.MEDIUM,  # Task-specific code intelligence
+    access_mode=AccessMode.MIXED,  # Manages LSP processes, reads files
+    danger_level=DangerLevel.SAFE,  # No file modifications
+    keywords=["lsp", "language server", "hover", "definition", "references", "diagnostics"],
+)
 async def lsp(
     action: str,
     language: Optional[str] = None,

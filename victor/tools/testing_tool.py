@@ -17,11 +17,21 @@ import json
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 
-@tool
-async def run_tests(
+@tool(
+    category="testing",
+    priority=Priority.MEDIUM,  # Task-specific testing tool
+    access_mode=AccessMode.EXECUTE,  # Runs pytest subprocess
+    danger_level=DangerLevel.SAFE,  # No file modifications
+    keywords=["test", "pytest", "unittest", "tests", "testing", "check", "validate"],
+    mandatory_keywords=["run tests", "run test", "execute tests"],  # Force inclusion
+    task_types=["testing", "verification"],  # Classification-aware selection
+    stages=["verification", "testing"],  # Conversation stages where relevant
+)
+async def test(
     path: Optional[str] = None, pytest_args: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
@@ -119,3 +129,5 @@ def _summarize_report(report: Dict[str, Any]) -> Dict[str, Any]:
         },
         "failures": failures,
     }
+
+

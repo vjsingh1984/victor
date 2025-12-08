@@ -1,0 +1,1089 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""SQLite-based symbol store for queryable code structure.
+
+Stores extracted symbols (classes, functions, interfaces, etc.) in SQLite
+for efficient querying. This complements the embedding store by providing
+structured access to code metadata.
+
+Features:
+- Multi-language support (Python, TypeScript, Go, Rust, Java, etc.)
+- Queryable by name, type, category, file path
+- Supports both OOP and procedural paradigms
+- Stores method signatures, docstrings, line numbers
+- Architecture pattern detection
+
+Usage:
+    store = SymbolStore("/path/to/project")
+    await store.index_codebase()
+
+    # Query by category
+    providers = store.find_by_category("provider")
+
+    # Query by type
+    classes = store.find_by_type("class")
+
+    # Query by pattern
+    handlers = store.find_by_name_pattern("%Handler")
+"""
+
+import ast
+import hashlib
+import logging
+import re
+import sqlite3
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+logger = logging.getLogger(__name__)
+
+
+# Pattern categories for architecture detection (universal across languages)
+ARCHITECTURE_PATTERNS = {
+    "provider": ["Provider", "Backend", "Client", "Connector", "Adapter", "Gateway"],
+    "service": ["Service", "UseCase", "Interactor", "Manager", "Facade"],
+    "repository": ["Repository", "Store", "Cache", "DAO", "Registry"],
+    "controller": ["Controller", "Handler", "Endpoint", "Router", "Route"],
+    "model": ["Model", "Entity", "Schema", "DTO", "Record", "Domain"],
+    "factory": ["Factory", "Builder", "Creator", "Producer"],
+    "middleware": ["Middleware", "Interceptor", "Filter", "Guard", "Pipe"],
+    "observer": ["Observer", "Listener", "Subscriber", "Watcher", "Hook"],
+    "strategy": ["Strategy", "Policy", "Algorithm"],
+    "component": ["Component", "Widget", "View", "Screen", "Page"],
+    "config": ["Config", "Settings", "Options", "Preferences", "Environment"],
+    "util": ["Util", "Utils", "Helper", "Helpers", "Common"],
+    "test": ["Test", "Spec", "Mock", "Stub", "Fake"],
+}
+
+
+@dataclass
+class SymbolInfo:
+    """Information about a code symbol."""
+
+    name: str
+    symbol_type: str  # class, function, interface, struct, enum, method, etc.
+    file_path: str
+    line_number: int
+    language: str
+    category: Optional[str] = None  # Architecture category (provider, service, etc.)
+    docstring: Optional[str] = None
+    signature: Optional[str] = None
+    parent_symbol: Optional[str] = None  # For methods: parent class name
+    modifiers: List[str] = field(default_factory=list)  # public, private, async, static
+    is_exported: bool = False
+    content_hash: Optional[str] = None
+
+
+@dataclass
+class FileInfo:
+    """Information about a source file."""
+
+    path: str
+    language: str
+    size: int
+    lines: int
+    last_modified: float
+    indexed_at: float
+    content_hash: str
+    symbol_count: int = 0
+    import_count: int = 0
+
+
+class SymbolStore:
+    """SQLite-based storage for code symbols with multi-language support."""
+
+    # Language extensions
+    LANGUAGE_EXTENSIONS = {
+        ".py": "python",
+        ".pyw": "python",
+        ".js": "javascript",
+        ".jsx": "javascript",
+        ".mjs": "javascript",
+        ".ts": "typescript",
+        ".tsx": "typescript",
+        ".go": "go",
+        ".rs": "rust",
+        ".java": "java",
+        ".kt": "kotlin",
+        ".scala": "scala",
+        ".rb": "ruby",
+        ".php": "php",
+        ".cs": "csharp",
+        ".cpp": "cpp",
+        ".cc": "cpp",
+        ".c": "c",
+        ".h": "c",
+        ".hpp": "cpp",
+        ".swift": "swift",
+        ".dart": "dart",
+        ".ex": "elixir",
+        ".exs": "elixir",
+        ".vue": "vue",
+        ".svelte": "svelte",
+    }
+
+    # Directories to skip
+    SKIP_DIRS = {
+        "__pycache__",
+        ".git",
+        ".pytest_cache",
+        "venv",
+        ".venv",
+        "env",
+        "node_modules",
+        ".tox",
+        "build",
+        "dist",
+        "target",
+        ".next",
+        ".nuxt",
+        "coverage",
+        ".cache",
+        "out",
+        "vendor",
+    }
+
+    def __init__(self, root_path: str):
+        """Initialize symbol store.
+
+        Args:
+            root_path: Root directory of the codebase
+        """
+        self.root = Path(root_path).resolve()
+        self._init_db()
+
+    @property
+    def _db_path(self) -> Path:
+        """Path to SQLite database (shared with conversation.db)."""
+        from victor.config.settings import get_project_paths
+
+        # Use the same database as conversation history for consolidation
+        return get_project_paths(self.root).conversation_db
+
+    def _init_db(self) -> None:
+        """Initialize SQLite database schema."""
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with sqlite3.connect(str(self._db_path)) as conn:
+            conn.executescript(
+                """
+                -- Files table
+                CREATE TABLE IF NOT EXISTS files (
+                    path TEXT PRIMARY KEY,
+                    language TEXT NOT NULL,
+                    size INTEGER,
+                    lines INTEGER,
+                    last_modified REAL,
+                    indexed_at REAL,
+                    content_hash TEXT,
+                    symbol_count INTEGER DEFAULT 0,
+                    import_count INTEGER DEFAULT 0
+                );
+
+                -- Symbols table
+                CREATE TABLE IF NOT EXISTS symbols (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    symbol_type TEXT NOT NULL,
+                    file_path TEXT NOT NULL,
+                    line_number INTEGER,
+                    language TEXT NOT NULL,
+                    category TEXT,
+                    docstring TEXT,
+                    signature TEXT,
+                    parent_symbol TEXT,
+                    modifiers TEXT,
+                    is_exported INTEGER DEFAULT 0,
+                    content_hash TEXT,
+                    FOREIGN KEY (file_path) REFERENCES files(path)
+                );
+
+                -- Imports/dependencies table
+                CREATE TABLE IF NOT EXISTS imports (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    file_path TEXT NOT NULL,
+                    import_name TEXT NOT NULL,
+                    import_type TEXT DEFAULT 'module',
+                    FOREIGN KEY (file_path) REFERENCES files(path)
+                );
+
+                -- Architecture patterns detected
+                CREATE TABLE IF NOT EXISTS patterns (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pattern_name TEXT NOT NULL,
+                    pattern_type TEXT NOT NULL,
+                    file_path TEXT NOT NULL,
+                    symbol_name TEXT,
+                    line_number INTEGER,
+                    description TEXT
+                );
+
+                -- Indexes for fast queries
+                CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
+                CREATE INDEX IF NOT EXISTS idx_symbols_type ON symbols(symbol_type);
+                CREATE INDEX IF NOT EXISTS idx_symbols_category ON symbols(category);
+                CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols(file_path);
+                CREATE INDEX IF NOT EXISTS idx_symbols_parent ON symbols(parent_symbol);
+                CREATE INDEX IF NOT EXISTS idx_imports_file ON imports(file_path);
+                CREATE INDEX IF NOT EXISTS idx_patterns_type ON patterns(pattern_type);
+
+                -- Metadata table
+                CREATE TABLE IF NOT EXISTS metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                );
+            """
+            )
+
+    def should_ignore(self, path: Path) -> bool:
+        """Check if path should be ignored."""
+        return any(skip in path.parts for skip in self.SKIP_DIRS)
+
+    def detect_language(self, path: Path) -> Optional[str]:
+        """Detect language from file extension."""
+        return self.LANGUAGE_EXTENSIONS.get(path.suffix.lower())
+
+    def categorize_symbol(self, name: str) -> Optional[str]:
+        """Determine architecture category from symbol name."""
+        for category, patterns in ARCHITECTURE_PATTERNS.items():
+            for pattern in patterns:
+                if pattern in name:
+                    return category
+        return None
+
+    async def index_codebase(self, force: bool = False) -> Dict[str, Any]:
+        """Index the entire codebase with incremental update support.
+
+        Handles:
+        - New files: Index and add symbols
+        - Modified files: Delete old symbols, re-index
+        - Deleted files: Remove symbols from database
+        - Unchanged files: Skip (unless force=True)
+
+        Args:
+            force: Force full reindex even if files haven't changed
+
+        Returns:
+            Statistics about the indexing operation
+        """
+        start_time = time.time()
+        stats = {
+            "files_indexed": 0,
+            "files_skipped": 0,
+            "files_deleted": 0,
+            "symbols_found": 0,
+            "patterns_detected": 0,
+            "languages": {},
+        }
+
+        print(f"🔍 Indexing symbols in {self.root}")
+
+        # Collect all current source files
+        current_files: Set[str] = set()
+        source_files = []
+        for ext in self.LANGUAGE_EXTENSIONS:
+            for file_path in self.root.rglob(f"*{ext}"):
+                if not self.should_ignore(file_path) and file_path.is_file():
+                    source_files.append(file_path)
+                    current_files.add(str(file_path.relative_to(self.root)))
+
+        print(f"Found {len(source_files)} source files")
+
+        with sqlite3.connect(str(self._db_path)) as conn:
+            # Step 1: Handle deleted files - remove symbols for files that no longer exist
+            cursor = conn.execute("SELECT path FROM files")
+            indexed_files = {row[0] for row in cursor}
+            deleted_files = indexed_files - current_files
+
+            for deleted_path in deleted_files:
+                self._delete_file_data(conn, deleted_path)
+                stats["files_deleted"] += 1
+
+            if deleted_files:
+                print(f"🗑️  Removed {len(deleted_files)} deleted files from index")
+
+            # Step 2: Index new and modified files
+            for file_path in source_files:
+                language = self.detect_language(file_path)
+                if not language:
+                    continue
+
+                rel_path = str(file_path.relative_to(self.root))
+
+                # Check if file needs reindexing
+                if not force and not self._needs_reindex(conn, file_path):
+                    stats["files_skipped"] += 1
+                    continue
+
+                # Delete old data for modified files before re-indexing
+                if rel_path in indexed_files:
+                    self._delete_file_data(conn, rel_path)
+
+                # Extract symbols based on language
+                try:
+                    symbols, imports = self._extract_symbols(file_path, language)
+
+                    # Store file info
+                    self._store_file(conn, file_path, language, len(symbols), len(imports))
+
+                    # Store symbols
+                    for symbol in symbols:
+                        self._store_symbol(conn, symbol)
+                        stats["symbols_found"] += 1
+
+                    # Store imports
+                    for imp in imports:
+                        conn.execute(
+                            "INSERT INTO imports (file_path, import_name) VALUES (?, ?)",
+                            (rel_path, imp),
+                        )
+
+                    stats["files_indexed"] += 1
+                    stats["languages"][language] = stats["languages"].get(language, 0) + 1
+
+                except Exception as e:
+                    logger.debug(f"Failed to index {file_path}: {e}")
+
+            # Step 3: Refresh architecture patterns (only if we indexed something)
+            if stats["files_indexed"] > 0 or stats["files_deleted"] > 0 or force:
+                # Clear old patterns and regenerate
+                conn.execute("DELETE FROM patterns")
+                patterns = self._detect_patterns(conn)
+                for pattern in patterns:
+                    conn.execute(
+                        """INSERT INTO patterns (pattern_name, pattern_type, file_path, symbol_name, line_number, description)
+                           VALUES (?, ?, ?, ?, ?, ?)""",
+                        pattern,
+                    )
+                    stats["patterns_detected"] += 1
+
+            # Update metadata
+            conn.execute(
+                "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+                ("last_indexed", str(time.time())),
+            )
+            conn.commit()
+
+        elapsed = time.time() - start_time
+        stats["elapsed_seconds"] = round(elapsed, 2)
+
+        if stats["files_indexed"] > 0 or stats["files_deleted"] > 0:
+            print(
+                f"✅ Indexed {stats['files_indexed']} files, {stats['symbols_found']} symbols in {elapsed:.2f}s"
+            )
+        else:
+            print(f"✅ Index up to date ({stats['files_skipped']} files unchanged)")
+
+        return stats
+
+    def _delete_file_data(self, conn: sqlite3.Connection, rel_path: str) -> None:
+        """Delete all data associated with a file.
+
+        Args:
+            conn: Database connection
+            rel_path: Relative path of file to delete
+        """
+        conn.execute("DELETE FROM symbols WHERE file_path = ?", (rel_path,))
+        conn.execute("DELETE FROM imports WHERE file_path = ?", (rel_path,))
+        conn.execute("DELETE FROM files WHERE path = ?", (rel_path,))
+
+    def _needs_reindex(self, conn: sqlite3.Connection, file_path: Path) -> bool:
+        """Check if file needs reindexing based on modification time."""
+        rel_path = str(file_path.relative_to(self.root))
+        cursor = conn.execute(
+            "SELECT last_modified, content_hash FROM files WHERE path = ?", (rel_path,)
+        )
+        row = cursor.fetchone()
+
+        if not row:
+            return True
+
+        current_mtime = file_path.stat().st_mtime
+        return current_mtime > row[0]
+
+    def _store_file(
+        self,
+        conn: sqlite3.Connection,
+        file_path: Path,
+        language: str,
+        symbol_count: int,
+        import_count: int,
+    ) -> None:
+        """Store file metadata."""
+        stat = file_path.stat()
+        content = file_path.read_bytes()
+        content_hash = hashlib.sha256(content).hexdigest()[:16]
+        lines = content.count(b"\n") + 1
+        rel_path = str(file_path.relative_to(self.root))
+
+        conn.execute(
+            """INSERT OR REPLACE INTO files
+               (path, language, size, lines, last_modified, indexed_at, content_hash, symbol_count, import_count)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                rel_path,
+                language,
+                stat.st_size,
+                lines,
+                stat.st_mtime,
+                time.time(),
+                content_hash,
+                symbol_count,
+                import_count,
+            ),
+        )
+
+    def _store_symbol(self, conn: sqlite3.Connection, symbol: SymbolInfo) -> None:
+        """Store a symbol in the database."""
+        modifiers_str = ",".join(symbol.modifiers) if symbol.modifiers else None
+
+        conn.execute(
+            """INSERT INTO symbols
+               (name, symbol_type, file_path, line_number, language, category,
+                docstring, signature, parent_symbol, modifiers, is_exported, content_hash)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                symbol.name,
+                symbol.symbol_type,
+                symbol.file_path,
+                symbol.line_number,
+                symbol.language,
+                symbol.category,
+                symbol.docstring,
+                symbol.signature,
+                symbol.parent_symbol,
+                modifiers_str,
+                1 if symbol.is_exported else 0,
+                symbol.content_hash,
+            ),
+        )
+
+    def _extract_symbols(
+        self, file_path: Path, language: str
+    ) -> Tuple[List[SymbolInfo], List[str]]:
+        """Extract symbols from a source file.
+
+        Uses AST for Python, regex patterns for other languages.
+
+        Returns:
+            Tuple of (symbols, imports)
+        """
+        content = file_path.read_text(encoding="utf-8", errors="ignore")
+        rel_path = str(file_path.relative_to(self.root))
+
+        if language == "python":
+            return self._extract_python_symbols(content, rel_path)
+        else:
+            return self._extract_generic_symbols(content, rel_path, language)
+
+    def _extract_python_symbols(
+        self, content: str, rel_path: str
+    ) -> Tuple[List[SymbolInfo], List[str]]:
+        """Extract symbols from Python code using AST."""
+        symbols = []
+        imports = []
+
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            return symbols, imports
+
+        _current_class = None
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                category = self.categorize_symbol(node.name)
+                is_abstract = (
+                    any(isinstance(b, ast.Name) and b.id == "ABC" for b in node.bases)
+                    or "Abstract" in node.name
+                )
+
+                symbols.append(
+                    SymbolInfo(
+                        name=node.name,
+                        symbol_type="class",
+                        file_path=rel_path,
+                        line_number=node.lineno,
+                        language="python",
+                        category=category,
+                        docstring=ast.get_docstring(node),
+                        modifiers=["abstract"] if is_abstract else [],
+                    )
+                )
+
+            elif isinstance(node, ast.FunctionDef) or isinstance(node, ast.AsyncFunctionDef):
+                # Build signature
+                args = [arg.arg for arg in node.args.args]
+                signature = f"{node.name}({', '.join(args)})"
+
+                modifiers = []
+                if isinstance(node, ast.AsyncFunctionDef):
+                    modifiers.append("async")
+                if node.name.startswith("_"):
+                    modifiers.append("private")
+
+                # Check for decorators
+                for dec in node.decorator_list:
+                    if isinstance(dec, ast.Name):
+                        if dec.id == "staticmethod":
+                            modifiers.append("static")
+                        elif dec.id == "classmethod":
+                            modifiers.append("classmethod")
+                        elif dec.id == "property":
+                            modifiers.append("property")
+
+                symbols.append(
+                    SymbolInfo(
+                        name=node.name,
+                        symbol_type="function",
+                        file_path=rel_path,
+                        line_number=node.lineno,
+                        language="python",
+                        category=self.categorize_symbol(node.name),
+                        docstring=ast.get_docstring(node),
+                        signature=signature,
+                        modifiers=modifiers,
+                    )
+                )
+
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    imports.append(alias.name)
+
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    imports.append(node.module)
+
+        return symbols, imports
+
+    def _extract_generic_symbols(
+        self, content: str, rel_path: str, language: str
+    ) -> Tuple[List[SymbolInfo], List[str]]:
+        """Extract symbols from any language using regex patterns.
+
+        This is language-agnostic and works for:
+        - OOP languages (Java, C#, TypeScript, etc.)
+        - Functional languages (Go, Rust, Elixir)
+        - Procedural code
+        """
+        symbols = []
+        imports = []
+
+        # Universal patterns for symbol detection
+        patterns = [
+            # Classes (JS/TS/Java/C#/PHP/Ruby)
+            (
+                r"(?:export\s+)?(?:public\s+|private\s+|protected\s+)?(?:abstract\s+)?class\s+([A-Z][a-zA-Z0-9_]*)",
+                "class",
+            ),
+            # Interfaces (TS/Java/C#/Go)
+            (r"(?:export\s+)?interface\s+([A-Z][a-zA-Z0-9_]*)", "interface"),
+            # Structs (Go/Rust/C)
+            (r"(?:pub\s+)?struct\s+([A-Z][a-zA-Z0-9_]*)", "struct"),
+            # Type aliases (TS/Go/Rust)
+            (r"(?:export\s+)?type\s+([A-Z][a-zA-Z0-9_]*)\s*[=<]", "type"),
+            # Enums (TS/Rust/Java/C#)
+            (r"(?:export\s+)?(?:pub\s+)?enum\s+([A-Z][a-zA-Z0-9_]*)", "enum"),
+            # Traits (Rust)
+            (r"(?:pub\s+)?trait\s+([A-Z][a-zA-Z0-9_]*)", "trait"),
+            # Modules (Ruby/Elixir)
+            (r"(?:defmodule|module)\s+([A-Z][a-zA-Z0-9_:]*)", "module"),
+            # Functions (Go/Rust - top-level)
+            (r"^(?:pub\s+)?fn\s+([a-z_][a-zA-Z0-9_]*)", "function"),
+            (r"^func\s+(?:\([^)]+\)\s+)?([a-zA-Z_][a-zA-Z0-9_]*)", "function"),
+            # React/Vue components
+            (
+                r"(?:export\s+)?(?:default\s+)?(?:const|function)\s+([A-Z][a-zA-Z0-9_]*)\s*[=\(]",
+                "component",
+            ),
+        ]
+
+        # Import patterns
+        import_patterns = [
+            r"import\s+.*?from\s+['\"]([^'\"]+)['\"]",  # ES modules
+            r"import\s+['\"]([^'\"]+)['\"]",  # Go imports
+            r"require\s*\(['\"]([^'\"]+)['\"]\)",  # CommonJS
+            r"use\s+([a-zA-Z_][a-zA-Z0-9_:]*)",  # Rust use
+        ]
+
+        lines = content.split("\n")
+
+        for line_no, line in enumerate(lines, 1):
+            # Check for symbols
+            for pattern, symbol_type in patterns:
+                match = re.search(pattern, line, re.MULTILINE)
+                if match:
+                    name = match.group(1)
+
+                    # Extract modifiers
+                    modifiers = []
+                    if "export" in line.lower():
+                        modifiers.append("export")
+                    if "public" in line.lower():
+                        modifiers.append("public")
+                    if "private" in line.lower():
+                        modifiers.append("private")
+                    if "async" in line.lower():
+                        modifiers.append("async")
+                    if "static" in line.lower():
+                        modifiers.append("static")
+                    if "abstract" in line.lower():
+                        modifiers.append("abstract")
+
+                    # Get docstring from previous lines
+                    docstring = self._extract_docstring_before(lines, line_no - 1)
+
+                    symbols.append(
+                        SymbolInfo(
+                            name=name,
+                            symbol_type=symbol_type,
+                            file_path=rel_path,
+                            line_number=line_no,
+                            language=language,
+                            category=self.categorize_symbol(name),
+                            docstring=docstring,
+                            modifiers=modifiers,
+                            is_exported="export" in line.lower() or "pub " in line.lower(),
+                        )
+                    )
+                    break  # One match per line
+
+            # Check for imports
+            for pattern in import_patterns:
+                for match in re.finditer(pattern, line):
+                    imports.append(match.group(1))
+
+        return symbols, imports
+
+    def _extract_docstring_before(self, lines: List[str], line_idx: int) -> Optional[str]:
+        """Extract docstring/comment from lines before the symbol."""
+        if line_idx <= 0:
+            return None
+
+        prev_line = lines[line_idx - 1].strip()
+
+        # Check for various comment styles
+        comment_markers = ["///", "/**", "/*", "//", "#", '"""', "'''"]
+        for marker in comment_markers:
+            if prev_line.startswith(marker):
+                # Clean up the comment
+                doc = prev_line.lstrip(marker).rstrip("*/").strip()
+                return doc[:200] if doc else None
+
+        return None
+
+    def _detect_patterns(self, conn: sqlite3.Connection) -> List[Tuple]:
+        """Detect architecture patterns from indexed symbols."""
+        patterns = []
+
+        # Check for Provider pattern
+        cursor = conn.execute(
+            """SELECT DISTINCT category, COUNT(*) as cnt
+               FROM symbols WHERE category IS NOT NULL
+               GROUP BY category HAVING cnt >= 2"""
+        )
+        for row in cursor:
+            category, count = row
+            patterns.append(
+                (
+                    f"{category.title()} Pattern",
+                    category,
+                    "",  # file_path
+                    None,  # symbol_name
+                    None,  # line_number
+                    f"Found {count} {category} components",
+                )
+            )
+
+        # Check for base classes (inheritance pattern)
+        cursor = conn.execute(
+            """SELECT name, file_path, line_number FROM symbols
+               WHERE symbol_type = 'class' AND
+               (name LIKE 'Base%' OR name LIKE 'Abstract%' OR name LIKE 'I%')"""
+        )
+        for row in cursor:
+            name, file_path, line_no = row
+            patterns.append(
+                (
+                    f"Base Class: {name}",
+                    "inheritance",
+                    file_path,
+                    name,
+                    line_no,
+                    "Abstract base class for inheritance",
+                )
+            )
+
+        return patterns
+
+    # Query methods
+
+    def find_by_category(self, category: str, limit: int = 50) -> List[SymbolInfo]:
+        """Find symbols by architecture category."""
+        with sqlite3.connect(str(self._db_path)) as conn:
+            cursor = conn.execute(
+                """SELECT name, symbol_type, file_path, line_number, language,
+                          category, docstring, signature, parent_symbol
+                   FROM symbols WHERE category = ? LIMIT ?""",
+                (category, limit),
+            )
+            return [self._row_to_symbol(row) for row in cursor]
+
+    def find_by_type(self, symbol_type: str, limit: int = 100) -> List[SymbolInfo]:
+        """Find symbols by type (class, function, interface, etc.)."""
+        with sqlite3.connect(str(self._db_path)) as conn:
+            cursor = conn.execute(
+                """SELECT name, symbol_type, file_path, line_number, language,
+                          category, docstring, signature, parent_symbol
+                   FROM symbols WHERE symbol_type = ? LIMIT ?""",
+                (symbol_type, limit),
+            )
+            return [self._row_to_symbol(row) for row in cursor]
+
+    def find_by_name_pattern(self, pattern: str, limit: int = 50) -> List[SymbolInfo]:
+        """Find symbols matching a name pattern (use % as wildcard)."""
+        with sqlite3.connect(str(self._db_path)) as conn:
+            cursor = conn.execute(
+                """SELECT name, symbol_type, file_path, line_number, language,
+                          category, docstring, signature, parent_symbol
+                   FROM symbols WHERE name LIKE ? LIMIT ?""",
+                (pattern, limit),
+            )
+            return [self._row_to_symbol(row) for row in cursor]
+
+    def find_key_components(self, limit: int = 20) -> List[SymbolInfo]:
+        """Find key architectural components (prioritized by category importance)."""
+        with sqlite3.connect(str(self._db_path)) as conn:
+            cursor = conn.execute(
+                """SELECT name, symbol_type, file_path, line_number, language,
+                          category, docstring, signature, parent_symbol
+                   FROM symbols
+                   WHERE category IS NOT NULL
+                   AND symbol_type IN ('class', 'interface', 'struct', 'trait')
+                   ORDER BY
+                     CASE category
+                       WHEN 'service' THEN 1
+                       WHEN 'controller' THEN 2
+                       WHEN 'repository' THEN 3
+                       WHEN 'provider' THEN 4
+                       WHEN 'factory' THEN 5
+                       WHEN 'model' THEN 6
+                       ELSE 7
+                     END,
+                     name
+                   LIMIT ?""",
+                (limit,),
+            )
+            return [self._row_to_symbol(row) for row in cursor]
+
+    def find_named_implementations(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Find named implementations grouped by domain.
+
+        Detects patterns like:
+        - src/storage/engines/impls/sst/ -> Storage Engines: SST
+        - src/graph/engines/orion/ -> Graph Engines: ORION
+        - src/providers/anthropic/ -> Providers: Anthropic
+
+        Returns:
+            Dict mapping domain names to lists of implementations with metadata.
+        """
+        # Skip these generic file/directory names (language-agnostic)
+        # Entry points, modules, and utility directories that shouldn't be impl names
+        SKIP_NAMES = {
+            "mod",
+            "lib",
+            "main",
+            "index",
+            "init",
+            "__init__",
+            "core",
+            "utils",
+            "common",
+            "factory",
+            "helpers",
+            "shared",
+            "generic",
+            "base",
+            "impls",
+            "tests",
+            "test",
+            "spec",
+            "specs",
+        }
+
+        # Note: We detect files vs directories structurally - paths from the symbol
+        # index always have the file as the last component, so we check position
+        # rather than extensions. This is inherently language-agnostic.
+
+        # Domain inference from path prefixes
+        DOMAIN_PREFIXES = {
+            "storage": ["storage", "db", "persistence", "cache"],
+            "graph": ["graph", "network", "relation"],
+            "index": ["index", "search", "query"],
+            "compute": ["compute", "processing", "ml", "ai"],
+            "network": ["network", "http", "rpc", "grpc"],
+            "auth": ["auth", "security", "identity"],
+        }
+
+        results: Dict[str, List[Dict[str, Any]]] = {}
+
+        with sqlite3.connect(str(self._db_path)) as conn:
+            # Get all struct/class symbols with their paths
+            cursor = conn.execute(
+                """SELECT DISTINCT file_path, name, symbol_type, docstring
+                   FROM symbols
+                   WHERE symbol_type IN ('struct', 'class', 'trait', 'interface')
+                   ORDER BY file_path"""
+            )
+
+            for row in cursor:
+                file_path, name, sym_type, docstring = row
+                path_lower = file_path.lower()
+                parts = file_path.split("/")
+
+                # Strategy 1: Look for engines/impls/NAME pattern (most specific)
+                impl_name = None
+                impl_type = None
+
+                # Detect sub-component types from path context (generic patterns)
+                # e.g., codecs/, encoding/, serialization/, compression/
+                SUBCOMPONENT_DIRS = {
+                    "codec",
+                    "codecs",
+                    "encoding",
+                    "serialization",
+                    "compression",
+                    "format",
+                    "protocol",
+                    "ops",
+                }
+
+                for i, part in enumerate(parts):
+                    # Check if path contains a subcomponent directory - classify accordingly
+                    # e.g., engines/core/ops/codec/impls/baseline/ -> Codecs: BASELINE
+                    part_lower = part.lower()
+                    if part_lower in SUBCOMPONENT_DIRS:
+                        # Look for impls/ after this subcomponent dir
+                        for j in range(i + 1, len(parts)):
+                            # j+1 < len(parts)-1 ensures next_part is a directory, not the file
+                            if parts[j] == "impls" and j + 1 < len(parts) - 1:
+                                next_part = parts[j + 1].lower()
+                                if next_part not in SKIP_NAMES:
+                                    impl_name = parts[j + 1].upper()
+                                    impl_type = (
+                                        part_lower + "s"
+                                        if not part_lower.endswith("s")
+                                        else part_lower
+                                    )
+                                    break
+                        if impl_name:
+                            break
+                        continue
+
+                    # engines/impls/sst/... -> SST (true storage engine)
+                    # i+1 < len(parts)-1 ensures next_part is a directory, not the file
+                    if part == "impls" and i + 1 < len(parts) - 1:
+                        next_part = parts[i + 1].lower()
+                        if next_part not in SKIP_NAMES:
+                            impl_name = parts[i + 1].upper()
+                            impl_type = "engines"
+                            break
+                    # engines/orion/... -> ORION (when no impls dir)
+                    elif part == "engines" and i + 1 < len(parts) - 1:
+                        next_part = parts[i + 1].lower()
+                        if next_part not in SKIP_NAMES:
+                            impl_name = parts[i + 1].upper()
+                            impl_type = "engines"
+                            break
+                    # providers/anthropic/... -> ANTHROPIC
+                    elif part == "providers" and i + 1 < len(parts) - 1:
+                        next_part = parts[i + 1].lower()
+                        if next_part not in SKIP_NAMES:
+                            impl_name = parts[i + 1].upper()
+                            impl_type = "providers"
+                            break
+                    # backends/local_rocksdb/... -> LOCAL_ROCKSDB
+                    elif part == "backends" and i + 1 < len(parts) - 1:
+                        next_part = parts[i + 1].lower()
+                        if next_part not in SKIP_NAMES:
+                            impl_name = parts[i + 1].upper()
+                            impl_type = "backends"
+                            break
+                    # adapters/some_adapter/... -> SOME_ADAPTER
+                    elif part == "adapters" and i + 1 < len(parts) - 1:
+                        next_part = parts[i + 1].lower()
+                        if next_part not in SKIP_NAMES:
+                            impl_name = parts[i + 1].upper()
+                            impl_type = "adapters"
+                            break
+
+                if not impl_name or not impl_type:
+                    continue
+
+                # Infer domain from path
+                domain = "other"
+                for d, prefixes in DOMAIN_PREFIXES.items():
+                    if any(p in path_lower for p in prefixes):
+                        domain = d
+                        break
+
+                # Build domain key
+                domain_key = f"{domain.title()} {impl_type.title()}"
+
+                if domain_key not in results:
+                    results[domain_key] = []
+
+                # Check if we already have this implementation
+                existing = [r for r in results[domain_key] if r["name"] == impl_name]
+                if not existing:
+                    results[domain_key].append(
+                        {
+                            "name": impl_name,
+                            "path": file_path,
+                            "description": (docstring or "")[:60] if docstring else "",
+                            "primary_symbol": name,
+                        }
+                    )
+
+        return results
+
+    def find_performance_hints(self) -> Dict[str, List[Dict[str, str]]]:
+        """Extract performance hints from docstrings and comments.
+
+        Looks for patterns like:
+        - "~5ms", "5ms latency", "< 10ms"
+        - "1M+ ops/sec", "10K vectors"
+        - "O(n log n)", "O(1)"
+
+        Returns:
+            Dict mapping file paths to lists of performance hints.
+        """
+        import re
+
+        # Patterns to detect performance metrics
+        METRIC_PATTERNS = [
+            (r"[~<>≈]?\s*\d+(?:\.\d+)?\s*(?:ms|μs|ns|s)\b", "latency"),
+            (r"\d+[KMB]?\+?\s*(?:ops?/sec|vectors?|items?|entries)", "throughput"),
+            (r"O\([^)]+\)", "complexity"),
+            (r"(?:latency|throughput|performance)[:\s]+[^.]{10,50}", "description"),
+        ]
+
+        results: Dict[str, List[Dict[str, str]]] = {}
+
+        with sqlite3.connect(str(self._db_path)) as conn:
+            cursor = conn.execute(
+                """SELECT file_path, docstring FROM symbols
+                   WHERE docstring IS NOT NULL AND docstring != ''"""
+            )
+
+            for file_path, docstring in cursor:
+                if not docstring:
+                    continue
+
+                hints = []
+                for pattern, hint_type in METRIC_PATTERNS:
+                    matches = re.findall(pattern, docstring, re.IGNORECASE)
+                    for match in matches:
+                        hints.append({"type": hint_type, "value": match.strip()})
+
+                if hints:
+                    if file_path not in results:
+                        results[file_path] = []
+                    results[file_path].extend(hints)
+
+        return results
+
+    def get_detected_patterns(self) -> List[Dict[str, Any]]:
+        """Get all detected architecture patterns."""
+        with sqlite3.connect(str(self._db_path)) as conn:
+            cursor = conn.execute(
+                "SELECT pattern_name, pattern_type, file_path, symbol_name, line_number, description FROM patterns"
+            )
+            return [
+                {
+                    "name": row[0],
+                    "type": row[1],
+                    "file_path": row[2],
+                    "symbol_name": row[3],
+                    "line_number": row[4],
+                    "description": row[5],
+                }
+                for row in cursor
+            ]
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get statistics about the symbol store."""
+        with sqlite3.connect(str(self._db_path)) as conn:
+            stats = {}
+
+            # File count by language
+            cursor = conn.execute("SELECT language, COUNT(*) FROM files GROUP BY language")
+            stats["files_by_language"] = dict(cursor.fetchall())
+
+            # Symbol count by type
+            cursor = conn.execute("SELECT symbol_type, COUNT(*) FROM symbols GROUP BY symbol_type")
+            stats["symbols_by_type"] = dict(cursor.fetchall())
+
+            # Symbol count by category
+            cursor = conn.execute(
+                "SELECT category, COUNT(*) FROM symbols WHERE category IS NOT NULL GROUP BY category"
+            )
+            stats["symbols_by_category"] = dict(cursor.fetchall())
+
+            # Total counts
+            cursor = conn.execute("SELECT COUNT(*) FROM files")
+            stats["total_files"] = cursor.fetchone()[0]
+
+            cursor = conn.execute("SELECT COUNT(*) FROM symbols")
+            stats["total_symbols"] = cursor.fetchone()[0]
+
+            cursor = conn.execute("SELECT COUNT(*) FROM patterns")
+            stats["total_patterns"] = cursor.fetchone()[0]
+
+            # Last indexed
+            cursor = conn.execute("SELECT value FROM metadata WHERE key = 'last_indexed'")
+            row = cursor.fetchone()
+            stats["last_indexed"] = float(row[0]) if row else None
+
+            return stats
+
+    def _row_to_symbol(self, row: tuple) -> SymbolInfo:
+        """Convert a database row to SymbolInfo."""
+        return SymbolInfo(
+            name=row[0],
+            symbol_type=row[1],
+            file_path=row[2],
+            line_number=row[3],
+            language=row[4],
+            category=row[5],
+            docstring=row[6],
+            signature=row[7],
+            parent_symbol=row[8],
+        )
+
+    def clear(self) -> None:
+        """Clear all data from the store."""
+        with sqlite3.connect(str(self._db_path)) as conn:
+            conn.executescript(
+                """
+                DELETE FROM symbols;
+                DELETE FROM files;
+                DELETE FROM imports;
+                DELETE FROM patterns;
+                DELETE FROM metadata;
+            """
+            )

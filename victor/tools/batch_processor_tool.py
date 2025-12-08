@@ -31,7 +31,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
 
-from victor.tools.base import CostTier
+from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
@@ -212,7 +212,14 @@ async def _parallel_analyze(files: List[Path]) -> List[Dict[str, Any]]:
     return results
 
 
-@tool(cost_tier=CostTier.HIGH)
+@tool(
+    cost_tier=CostTier.HIGH,
+    category="batch",
+    priority=Priority.LOW,  # Specialized bulk operations
+    access_mode=AccessMode.MIXED,  # Reads and can modify files
+    danger_level=DangerLevel.MEDIUM,  # Bulk file modifications
+    keywords=["batch", "bulk", "search", "replace", "transform"],
+)
 async def batch(
     operation: str,
     path: str,

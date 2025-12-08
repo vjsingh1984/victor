@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 import logging
 
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.common import gather_files_by_pattern
 
@@ -102,8 +103,17 @@ def _scan_file_for_config_issues(file_path: Path) -> List[Dict[str, Any]]:
     return findings
 
 
-@tool
-async def security_scan(
+@tool(
+    category="security",
+    priority=Priority.MEDIUM,  # Task-specific security analysis
+    access_mode=AccessMode.READONLY,  # Only reads files for scanning
+    danger_level=DangerLevel.SAFE,  # No side effects
+    keywords=["security", "scan", "vulnerability", "secret", "audit"],
+    mandatory_keywords=["security scan", "scan for vulnerabilities", "check security"],  # Force inclusion
+    task_types=["security", "analysis"],  # Classification-aware selection
+    stages=["analysis", "security"],  # Conversation stages where relevant
+)
+async def scan(
     path: str,
     scan_types: List[str] = None,
     file_pattern: str = "*.py",
@@ -386,3 +396,5 @@ async def security_scan(
         "findings": filtered_findings,
         "formatted_report": "\n".join(report),
     }
+
+

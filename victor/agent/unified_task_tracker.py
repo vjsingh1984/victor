@@ -47,6 +47,12 @@ from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 import yaml
 
+from victor.tools.tool_names import ToolNames, get_canonical_name
+from victor.agent.loop_detector import (
+    get_progress_params_for_tool,
+    is_progressive_tool,
+)
+
 if TYPE_CHECKING:
     from victor.agent.unified_classifier import ClassificationResult
 
@@ -109,21 +115,12 @@ class StopReason(Enum):
 # Tools that indicate research activity
 RESEARCH_TOOLS = frozenset({"web_search", "web_fetch", "tavily_search", "search_web", "fetch_url"})
 
-# Progressive tools - different params indicate progress, not loops
-PROGRESSIVE_PARAMS = {
-    "read_file": ["path", "offset", "limit"],
-    "code_search": ["query", "directory"],
-    "semantic_code_search": ["query", "directory"],
-    "list_directory": ["path", "recursive"],
-    "execute_bash": ["command"],
-    "web_search": ["query"],
-    "web_fetch": ["url"],
-    "write_file": ["path"],
-    "edit_files": ["files"],
-}
 
 # Default limit for read_file when not specified
 DEFAULT_READ_LIMIT = 500
+
+# Canonical tool name for file reading (from centralized registry)
+CANONICAL_READ_TOOL = ToolNames.READ
 
 
 # =============================================================================
@@ -238,9 +235,9 @@ class UnifiedTaskConfigLoader:
     DEFAULT_CONFIG: Dict[str, Any] = {
         "task_types": {
             "edit": {
-                "max_exploration_iterations": 8,
+                "max_exploration_iterations": 10,
                 "force_action_after_target_read": True,
-                "tool_budget": 20,
+                "tool_budget": 25,
                 "loop_repeat_threshold": 4,
                 "required_tools": ["edit_files", "read_file"],
                 "stage_tools": {
@@ -255,9 +252,9 @@ class UnifiedTaskConfigLoader:
                 },
             },
             "create": {
-                "max_exploration_iterations": 8,
+                "max_exploration_iterations": 10,
                 "force_action_after_target_read": False,
-                "tool_budget": 20,
+                "tool_budget": 25,
                 "loop_repeat_threshold": 4,
                 "required_tools": ["write_file"],
                 "stage_tools": {
@@ -271,10 +268,10 @@ class UnifiedTaskConfigLoader:
                 },
             },
             "create_simple": {
-                "max_exploration_iterations": 2,
+                "max_exploration_iterations": 10,
                 "force_action_after_target_read": False,
-                "tool_budget": 5,
-                "loop_repeat_threshold": 2,
+                "tool_budget": 20,
+                "loop_repeat_threshold": 3,
                 "required_tools": ["write_file"],
                 "stage_tools": {
                     "initial": ["write_file"],
@@ -319,9 +316,9 @@ class UnifiedTaskConfigLoader:
                 },
             },
             "research": {
-                "max_exploration_iterations": 8,
+                "max_exploration_iterations": 10,
                 "force_action_after_target_read": False,
-                "tool_budget": 15,
+                "tool_budget": 20,
                 "loop_repeat_threshold": 3,
                 "required_tools": ["web_search", "web_fetch"],
                 "stage_tools": {
@@ -335,20 +332,23 @@ class UnifiedTaskConfigLoader:
                 },
             },
             "design": {
-                "max_exploration_iterations": 3,
+                # Architecture/design questions require codebase exploration
+                # to understand key components, structure, and patterns.
+                # Increased limits from 3/5 to match "analyze" task type.
+                "max_exploration_iterations": 20,
                 "force_action_after_target_read": False,
-                "tool_budget": 5,
-                "loop_repeat_threshold": 2,
-                "needs_tools": False,
-                "required_tools": [],
+                "tool_budget": 40,
+                "loop_repeat_threshold": 5,
+                "needs_tools": True,
+                "required_tools": ["read_file", "list_directory", "code_search"],
                 "stage_tools": {
-                    "initial": [],
-                    "reading": [],
+                    "initial": ["list_directory", "code_search", "read_file"],
+                    "reading": ["read_file", "code_search", "list_directory"],
                     "executing": [],
-                    "verifying": [],
+                    "verifying": ["read_file"],
                 },
                 "force_action_hints": {
-                    "max_iterations": "Please provide your recommendations.",
+                    "max_iterations": "Please summarize the architecture and provide your recommendations.",
                 },
             },
             "general": {
@@ -820,7 +820,7 @@ class UnifiedTaskTracker:
         if tool_name in {"list_directory", "code_search", "semantic_code_search"}:
             self._progress.milestones.add(Milestone.TARGET_IDENTIFIED)
 
-        elif tool_name == "read_file":
+        elif get_canonical_name(tool_name) == CANONICAL_READ_TOOL:
             path = arguments.get("path", "")
             if path:
                 self._progress.files_read.add(path)
@@ -847,7 +847,7 @@ class UnifiedTaskTracker:
     def _update_loop_state(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Update loop detection state."""
         # Track file reads with offset-aware detection
-        if tool_name == "read_file":
+        if get_canonical_name(tool_name) == CANONICAL_READ_TOOL:
             self._track_file_read(arguments)
         else:
             # Track base resources for non-file operations
@@ -896,7 +896,8 @@ class UnifiedTaskTracker:
 
     def _update_stage(self, tool_name: str) -> None:
         """Update conversation stage based on tool usage."""
-        if tool_name in {"read_file", "code_search"}:
+        canonical = get_canonical_name(tool_name)
+        if canonical in {CANONICAL_READ_TOOL, ToolNames.GREP, ToolNames.SEARCH}:
             if self._progress.stage == ConversationStage.INITIAL:
                 self._progress.stage = ConversationStage.READING
 
@@ -1070,9 +1071,14 @@ class UnifiedTaskTracker:
             return "Please complete the task or explain what's blocking you."
 
     def _get_signature(self, tool_name: str, arguments: Dict[str, Any]) -> str:
-        """Generate signature for loop detection."""
-        if tool_name in PROGRESSIVE_PARAMS:
-            params = PROGRESSIVE_PARAMS[tool_name]
+        """Generate signature for loop detection.
+
+        For progressive tools (with progress_params defined via @tool decorator),
+        only the specified parameters are used in the signature - this allows
+        different queries/paths to be treated as exploration, not loops.
+        """
+        params = get_progress_params_for_tool(tool_name)
+        if params:
             sig_parts = [tool_name]
             for param in params:
                 value = arguments.get(param, "")
@@ -1086,18 +1092,19 @@ class UnifiedTaskTracker:
 
     def _get_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
         """Generate resource key for tracking unique resources."""
-        if tool_name == "read_file":
+        canonical = get_canonical_name(tool_name)
+        if canonical == CANONICAL_READ_TOOL:
             path = arguments.get("path", "")
             offset = arguments.get("offset", 0)
             return f"file:{path}:{offset}" if path else None
-        elif tool_name == "list_directory":
+        elif canonical == ToolNames.LS:
             path = arguments.get("path", "")
             return f"dir:{path}" if path else None
-        elif tool_name in {"code_search", "semantic_code_search"}:
+        elif canonical in {ToolNames.GREP, ToolNames.SEARCH}:
             query = arguments.get("query", "")
             directory = arguments.get("directory", ".")
             return f"search:{directory}:{query[:50]}" if query else None
-        elif tool_name == "execute_bash":
+        elif canonical == ToolNames.SHELL:
             command = arguments.get("command", "")
             return f"bash:{command[:50]}" if command else None
         return None

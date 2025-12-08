@@ -20,7 +20,7 @@ import os
 import pickle
 import re
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional, Tuple
+from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple
 
 # Disable tokenizers parallelism BEFORE importing sentence_transformers
 # This prevents "bad value(s) in fds_to_keep" errors in async contexts
@@ -34,6 +34,10 @@ from victor.tools.base import CostTier, ToolMetadataRegistry, ToolRegistry
 from victor.embeddings.service import EmbeddingService
 from victor.agent.tool_sequence_tracker import ToolSequenceTracker, create_sequence_tracker
 from victor.agent.debug_logger import TRACE  # Import TRACE level
+from victor.tools.metadata_registry import (
+    get_tools_matching_mandatory_keywords,
+    get_tools_by_task_type,
+)
 
 # Import for type checking only (avoid circular imports)
 from typing import TYPE_CHECKING
@@ -375,16 +379,17 @@ class SemanticToolSelector:
 
     # Fallback tools for each logical category (used when registry has no matches)
     # These are deprecated and will be removed once all tools have proper metadata
+    # NOTE: Uses canonical short names for token efficiency
     FALLBACK_CATEGORY_TOOLS = {
-        "file_ops": ["read_file", "write_file", "edit_files", "list_directory"],
-        "git_ops": ["execute_bash", "git_suggest_commit", "git_create_pr"],
-        "analysis": ["analyze_docs", "analyze_metrics"],
-        "refactoring": ["refactor_extract_function", "refactor_inline_variable", "rename_symbol"],
-        "generation": ["generate_docs", "semantic_code_search", "code_search"],
-        "execution": ["execute_bash", "execute_python_in_sandbox", "run_tests"],
-        "code_intel": ["find_symbol", "find_references", "semantic_code_search", "code_search"],
-        "web": ["web_search", "web_fetch", "web_summarize"],
-        "workflows": ["run_workflow", "batch", "cicd"],
+        "file_ops": ["read", "write", "edit", "ls"],
+        "git_ops": ["shell", "commit_msg", "pr"],
+        "analysis": ["docs_coverage", "metrics"],
+        "refactoring": ["extract", "inline", "rename"],
+        "generation": ["docs", "search", "grep"],
+        "execution": ["shell", "sandbox", "test"],
+        "code_intel": ["symbol", "refs", "search", "grep"],
+        "web": ["web", "fetch", "summarize"],
+        "workflows": ["workflow", "batch", "cicd"],
     }
 
     def get_tools_for_logical_category(self, logical_category: str) -> List[str]:
@@ -417,35 +422,36 @@ class SemanticToolSelector:
         return self.FALLBACK_CATEGORY_TOOLS.get(logical_category, [])
 
     # Mandatory tools for specific keywords (Phase 1)
+    # NOTE: Uses canonical short names for token efficiency
     MANDATORY_TOOL_KEYWORDS = {
-        "diff": ["execute_bash"],
-        "show changes": ["execute_bash"],
-        "git diff": ["execute_bash"],
-        "show diff": ["execute_bash"],
-        "compare": ["execute_bash"],
-        "commit": ["git_suggest_commit", "execute_bash"],
-        "pull request": ["git_create_pr"],
-        "pr": ["git_create_pr"],
-        "test": ["execute_bash", "run_tests"],
-        "run": ["execute_bash"],
-        "execute": ["execute_bash"],
-        "install": ["execute_bash"],
+        "diff": ["shell"],
+        "show changes": ["shell"],
+        "git diff": ["shell"],
+        "show diff": ["shell"],
+        "compare": ["shell"],
+        "commit": ["commit_msg", "shell"],
+        "pull request": ["pr"],
+        "pr": ["pr"],
+        "test": ["shell", "test"],
+        "run": ["shell"],
+        "execute": ["shell"],
+        "install": ["shell"],
         # Prefer semantic search, but keep keyword search available as a fallback
-        "search": ["web_search", "semantic_code_search", "code_search"],
-        "find": ["find_symbol", "find_references"],
-        "refactor": ["refactor_extract_function", "refactor_inline_variable", "rename_symbol"],
-        "security": ["security_scan"],
-        "scan": ["security_scan"],
-        "review": ["code_review"],
-        "document": ["generate_docs"],
-        "docs": ["generate_docs", "analyze_docs"],
+        "search": ["web", "search", "grep"],
+        "find": ["symbol", "refs"],
+        "refactor": ["extract", "inline", "rename"],
+        "security": ["scan"],
+        "scan": ["scan"],
+        "review": ["review"],
+        "document": ["docs"],
+        "docs": ["docs", "docs_coverage"],
         # File explanation requires reading the file first - prevents hallucination
-        "explain": ["read_file"],
-        "describe": ["read_file"],
-        "what does": ["read_file"],
-        # Count operations are more efficient with bash
-        "count": ["execute_bash", "list_directory"],
-        "how many": ["execute_bash", "list_directory"],
+        "explain": ["read"],
+        "describe": ["read"],
+        "what does": ["read"],
+        # Count operations are more efficient with shell
+        "count": ["shell", "ls"],
+        "how many": ["shell", "ls"],
     }
 
     # Conceptual query patterns that strongly prefer semantic_code_search over code_search
@@ -478,23 +484,25 @@ class SemanticToolSelector:
         "related to",  # conceptual search
     ]
 
-    # Tools for conceptual queries - forces semantic_code_search as primary
-    # Excludes list_directory to prevent LLM from exploring instead of searching
+    # Tools for conceptual queries - forces semantic search as primary
+    # Excludes ls to prevent LLM from exploring instead of searching
+    # NOTE: Uses canonical short names for token efficiency
     CONCEPTUAL_FALLBACK_TOOLS: List[str] = [
-        "semantic_code_search",  # MUST be first - primary tool for conceptual queries
-        "read_file",  # To examine results after search
+        "search",  # MUST be first - primary tool for conceptual queries
+        "read",  # To examine results after search
     ]
 
     # Common fallback tools - used when semantic selection returns too few results
     # These are the most universally useful tools
+    # NOTE: Uses canonical short names for token efficiency
     COMMON_FALLBACK_TOOLS: List[str] = [
-        "read_file",
-        "code_search",
-        "semantic_code_search",
-        "list_directory",
-        "execute_bash",
-        "write_file",
-        "edit_file",
+        "read",
+        "grep",
+        "search",
+        "ls",
+        "shell",
+        "write",
+        "edit",
     ]
 
     def _get_fallback_tools(
@@ -557,34 +565,49 @@ class SemanticToolSelector:
     def _get_mandatory_tools(self, query: str) -> List[str]:
         """Get tools that MUST be included based on keywords.
 
+        Uses registry-based lookup with static fallback for backward compatibility.
+        Tools can declare mandatory keywords via @tool(mandatory_keywords=["show diff"]).
+
         Args:
             query: User query
 
         Returns:
             List of tool names that are mandatory for this query
         """
-        mandatory = []
+        mandatory: Set[str] = set()
         query_lower = query.lower()
 
         # Check if this is a conceptual query that should strongly prefer semantic search
         is_conceptual = self._is_conceptual_query(query)
 
+        # PRIMARY: Use registry-based mandatory keyword lookup (decorator-driven)
+        # This enables tools to declare their own mandatory phrases via @tool decorator
+        registry_mandatory = get_tools_matching_mandatory_keywords(query)
+        if registry_mandatory:
+            logger.log(
+                TRACE,
+                f"Registry mandatory tools: {registry_mandatory}",
+            )
+            mandatory.update(registry_mandatory)
+
+        # FALLBACK: Use static MANDATORY_TOOL_KEYWORDS for backward compatibility
+        # This ensures tools not yet migrated to decorator syntax still work
         for keyword, tools in self.MANDATORY_TOOL_KEYWORDS.items():
             if self._keyword_in_text(query_lower, keyword):
                 # For conceptual queries, exclude code_search from search-related tools
                 # to force the LLM to use semantic_code_search instead
                 if is_conceptual and keyword in ["search", "find"]:
                     filtered_tools = [t for t in tools if t != "code_search"]
-                    mandatory.extend(filtered_tools)
+                    mandatory.update(filtered_tools)
                     logger.log(
                         TRACE,
-                        f"Mandatory tools for '{keyword}' (conceptual, excluding code_search): {filtered_tools}",
+                        f"Static mandatory tools for '{keyword}' (conceptual, excluding code_search): {filtered_tools}",
                     )
                 else:
-                    mandatory.extend(tools)
-                    logger.log(TRACE, f"Mandatory tools for '{keyword}': {tools}")
+                    mandatory.update(tools)
+                    logger.log(TRACE, f"Static mandatory tools for '{keyword}': {tools}")
 
-        return list(set(mandatory))
+        return list(mandatory)
 
     def _get_relevant_categories(self, query: str) -> List[str]:
         """Determine which tool categories are relevant for this query.
@@ -1141,12 +1164,13 @@ class SemanticToolSelector:
         mandatory_tool_names = self._get_mandatory_tools(enhanced_query)
 
         # Add mandatory tools for pending actions
+        # NOTE: Uses canonical short names for token efficiency
         pending_action_tools = {
-            "show_diff": ["execute_bash"],
-            "edit": ["edit_files", "read_file"],
-            "commit": ["git_suggest_commit", "execute_bash"],
-            "pr": ["git_create_pr"],
-            "test": ["execute_bash", "run_tests"],
+            "show_diff": ["shell"],
+            "edit": ["edit", "read"],
+            "commit": ["commit_msg", "shell"],
+            "pr": ["pr"],
+            "test": ["shell", "test"],
         }
 
         for action in pending_actions:
@@ -1560,24 +1584,28 @@ class SemanticToolSelector:
     }
 
     # Tools to exclude based on negated keywords
+    # NOTE: Uses canonical short names for token efficiency
     KEYWORD_TOOL_MAPPING = {
-        "analyze": ["analyze_docs", "analyze_metrics", "code_review"],
-        "review": ["code_review", "analyze_docs"],
-        "test": ["run_tests", "execute_bash"],
-        "run": ["execute_bash", "run_tests"],
-        "execute": ["execute_bash", "execute_python_in_sandbox"],
-        "search": ["code_search", "semantic_code_search", "web_search"],
-        "find": ["find_symbol", "find_references", "code_search"],
-        "create": ["write_file", "generate_docs"],
-        "generate": ["generate_docs", "write_file"],
-        "refactor": ["refactor_extract_function", "refactor_inline_variable", "rename_symbol"],
-        "edit": ["edit_files", "edit_file", "write_file"],
-        "commit": ["git_suggest_commit", "execute_bash"],
-        "deploy": ["execute_bash"],
+        "analyze": ["docs_coverage", "metrics", "review"],
+        "review": ["review", "docs_coverage"],
+        "test": ["test", "shell"],
+        "run": ["shell", "test"],
+        "execute": ["shell", "sandbox"],
+        "search": ["grep", "search", "web"],
+        "find": ["symbol", "refs", "grep"],
+        "create": ["write", "docs"],
+        "generate": ["docs", "write"],
+        "refactor": ["extract", "inline", "rename"],
+        "edit": ["edit", "write"],
+        "commit": ["commit_msg", "shell"],
+        "deploy": ["shell"],
     }
 
     def _get_tools_for_task_type(self, task_type_str: str) -> List[str]:
         """Get relevant tools based on task type.
+
+        Uses registry-based lookup with static fallback for backward compatibility.
+        Tools can declare their task types via @tool(task_types=["analysis", "edit"]).
 
         Args:
             task_type_str: Task type as string (e.g., "analysis", "action")
@@ -1585,17 +1613,39 @@ class SemanticToolSelector:
         Returns:
             List of tool names relevant to this task type
         """
+        tools: Set[str] = set()
+
+        # PRIMARY: Use registry-based task type lookup (decorator-driven)
+        # This enables tools to declare their own task types via @tool decorator
+        registry_tools = get_tools_by_task_type(task_type_str)
+        if registry_tools:
+            logger.log(
+                TRACE,
+                f"Registry task-type tools for '{task_type_str}': {registry_tools}",
+            )
+            tools.update(registry_tools)
+
+        # FALLBACK: Use static TASK_TYPE_CATEGORIES for backward compatibility
+        # This ensures tools not yet migrated to decorator syntax still work
         categories = self.TASK_TYPE_CATEGORIES.get(task_type_str, ["file_ops", "execution"])
-        tools = []
         for category in categories:
-            tools.extend(self.get_tools_for_logical_category(category))
-        return list(set(tools))
+            category_tools = self.get_tools_for_logical_category(category)
+            tools.update(category_tools)
+            logger.log(
+                TRACE,
+                f"Static category '{category}' tools: {category_tools}",
+            )
+
+        return list(tools)
 
     def _get_excluded_tools_from_negations(
         self,
         negated_keywords: List[Any],
-    ) -> set:
+    ) -> Set[str]:
         """Get tools that should be excluded based on negated keywords.
+
+        Uses registry-based lookup with static fallback for backward compatibility.
+        When user says "don't analyze", this excludes tools with task_type="analyze".
 
         Args:
             negated_keywords: List of KeywordMatch objects with negated keywords
@@ -1603,15 +1653,30 @@ class SemanticToolSelector:
         Returns:
             Set of tool names to exclude from selection
         """
-        excluded = set()
+        excluded: Set[str] = set()
+
         for match in negated_keywords:
             keyword = match.keyword if hasattr(match, "keyword") else str(match)
-            if keyword in self.KEYWORD_TOOL_MAPPING:
-                excluded.update(self.KEYWORD_TOOL_MAPPING[keyword])
+
+            # PRIMARY: Use registry-based task type lookup (decorator-driven)
+            # If keyword matches a task type, exclude tools declared for that type
+            registry_excluded = get_tools_by_task_type(keyword)
+            if registry_excluded:
+                excluded.update(registry_excluded)
                 logger.log(
                     TRACE,
-                    f"Excluding tools for negated '{keyword}': {self.KEYWORD_TOOL_MAPPING[keyword]}",
+                    f"Registry excluding tools for negated task_type '{keyword}': {registry_excluded}",
                 )
+
+            # FALLBACK: Use static KEYWORD_TOOL_MAPPING for backward compatibility
+            if keyword in self.KEYWORD_TOOL_MAPPING:
+                static_excluded = self.KEYWORD_TOOL_MAPPING[keyword]
+                excluded.update(static_excluded)
+                logger.log(
+                    TRACE,
+                    f"Static excluding tools for negated '{keyword}': {static_excluded}",
+                )
+
         return excluded
 
     def _adjust_threshold_by_confidence(

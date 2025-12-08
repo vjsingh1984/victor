@@ -311,7 +311,7 @@ class ComplexityClassifier:
         "create": TaskComplexity.COMPLEX,
         "create_simple": TaskComplexity.GENERATION,
         "analyze": TaskComplexity.MEDIUM,
-        "design": TaskComplexity.MEDIUM,  # Design/conceptual questions need exploration
+        "design": TaskComplexity.ANALYSIS,  # Architecture questions require thorough exploration
         "general": TaskComplexity.MEDIUM,
         "action": TaskComplexity.ACTION,
         "analysis_deep": TaskComplexity.COMPLEX,  # Map deep analysis to COMPLEX for backward compat

@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import logging
 
-from victor.tools.base import CostTier
+from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
@@ -151,57 +151,98 @@ def _is_stdlib(module_name: str) -> bool:
 # Tool functions
 
 
-@tool(cost_tier=CostTier.LOW)
-async def refactor_rename_symbol(
-    file: str,
-    old_name: str,
-    new_name: str,
-    scope: str = "file",
-    preview: bool = False,
-) -> Dict[str, Any]:
-    """
-    Rename a symbol (variable, function, class).
-
-    Safely renames symbols across a file using AST-based analysis
-    to avoid false matches.
+def _collect_python_files(
+    path: Path,
+    scope: str,
+    depth: int,
+    current_depth: int = 0,
+) -> List[Path]:
+    """Collect Python files based on scope and depth settings.
 
     Args:
-        file: File path to refactor.
-        old_name: Current symbol name.
-        new_name: New symbol name.
-        scope: Scope of rename (file or project) (default: file).
-        preview: Preview changes without applying (default: False).
+        path: Starting path (file or directory)
+        scope: "file", "directory", or "project"
+        depth: Max depth (-1=unlimited, 0=current only, N=N levels)
+        current_depth: Current recursion depth (internal)
 
     Returns:
-        Dictionary containing:
-        - success: Whether operation succeeded
-        - changes_count: Number of occurrences changed
-        - changes: List of changes made
-        - preview_text: Preview of changes
-        - formatted_report: Human-readable refactoring report
-        - error: Error message if failed
+        List of Python file paths to process
     """
-    if not file or not old_name or not new_name:
-        return {"success": False, "error": "Missing required parameters: file, old_name, new_name"}
+    files = []
 
-    file_obj = Path(file)
-    if not file_obj.exists():
-        return {"success": False, "error": f"File not found: {file}"}
+    if path.is_file():
+        if path.suffix == ".py":
+            files.append(path)
+        return files
 
-    # Read file
-    content = file_obj.read_text()
+    if not path.is_dir():
+        return files
 
-    # Parse AST to find symbol type and usage
+    # Check depth limit
+    if depth >= 0 and current_depth > depth:
+        return files
+
+    # Directories to skip
+    skip_dirs = {".git", ".venv", "venv", "__pycache__", "node_modules", ".tox", "build", "dist"}
+
+    for item in path.iterdir():
+        if item.name in skip_dirs:
+            continue
+
+        if item.is_file() and item.suffix == ".py":
+            files.append(item)
+        elif item.is_dir() and scope in ("directory", "project"):
+            # Recurse into subdirectories based on scope
+            if scope == "directory" and current_depth == 0:
+                # For "directory" scope, only go one level deep
+                sub_files = _collect_python_files(item, "file", depth, current_depth + 1)
+            else:
+                sub_files = _collect_python_files(item, scope, depth, current_depth + 1)
+            files.extend(sub_files)
+
+    return files
+
+
+def _rename_in_file(
+    file_path: Path,
+    old_name: str,
+    new_name: str,
+    require_definition: bool = False,
+) -> Optional[Dict[str, Any]]:
+    """Perform rename in a single file.
+
+    Args:
+        file_path: Path to Python file
+        old_name: Current symbol name
+        new_name: New symbol name
+        require_definition: If True, only rename if symbol is defined in file
+
+    Returns:
+        Dict with changes info, or None if no changes/file couldn't be processed
+    """
+    try:
+        content = file_path.read_text()
+    except (IOError, OSError) as e:
+        logger.warning(f"Could not read {file_path}: {e}")
+        return None
+
+    # Parse AST
     try:
         tree = ast.parse(content)
-    except SyntaxError as e:
-        return {"success": False, "error": f"Syntax error in file: {e}"}
+    except SyntaxError:
+        logger.warning(f"Syntax error in {file_path}, skipping")
+        return None
 
-    # Find symbol definition
-    symbol_info = _find_symbol(tree, old_name)
+    # Check if symbol exists in this file
+    pattern = r"\b" + re.escape(old_name) + r"\b"
+    if not re.search(pattern, content):
+        return None
 
-    if not symbol_info:
-        return {"success": False, "error": f"Symbol '{old_name}' not found in {file}"}
+    # If requiring definition, verify symbol is defined here
+    if require_definition:
+        symbol_info = _find_symbol(tree, old_name)
+        if not symbol_info:
+            return None
 
     # Perform rename
     lines = content.split("\n")
@@ -209,74 +250,221 @@ async def refactor_rename_symbol(
     changes = []
 
     for line_num, line in enumerate(lines, 1):
-        modified_line = line
-
-        # Use word boundaries for safe replacement
-        pattern = r"\b" + re.escape(old_name) + r"\b"
-
         if re.search(pattern, line):
             modified_line = re.sub(pattern, new_name, line)
-            changes.append(
-                {
-                    "line": line_num,
-                    "old": line,
-                    "new": modified_line,
-                }
-            )
+            changes.append({
+                "line": line_num,
+                "old": line.strip(),
+                "new": modified_line.strip(),
+            })
+            modified_lines.append(modified_line)
+        else:
+            modified_lines.append(line)
 
-        modified_lines.append(modified_line)
+    if not changes:
+        return None
 
-    new_content = "\n".join(modified_lines)
+    return {
+        "file_path": str(file_path),
+        "changes": changes,
+        "original_content": content,
+        "new_content": "\n".join(modified_lines),
+    }
+
+
+@tool(
+    cost_tier=CostTier.LOW,
+    category="refactor",
+    priority=Priority.MEDIUM,  # Task-specific refactoring
+    access_mode=AccessMode.WRITE,  # Modifies source files
+    danger_level=DangerLevel.LOW,  # Changes are undoable
+    keywords=["rename", "refactor", "symbol", "variable", "function", "class", "project", "multi-file", "ast"],
+    mandatory_keywords=["rename variable", "rename function", "refactor code"],  # Force inclusion
+    task_types=["refactor", "edit"],  # Classification-aware selection
+    stages=["executing", "refactoring"],  # Conversation stages where relevant
+)
+async def rename(
+    old_name: str,
+    new_name: str,
+    path: str = ".",
+    scope: str = "file",
+    depth: int = -1,
+    preview: bool = False,
+) -> Dict[str, Any]:
+    """[AST-AWARE] Rename symbols safely using word-boundary matching.
+
+    Uses AST parsing + word boundaries to rename symbols without false positives.
+    SAFE: Won't rename 'get_user' to 'fetch_user' inside 'get_username'.
+    Use this for Python symbol refactoring. Use edit() for non-code text changes.
+
+    Args:
+        old_name: Current symbol name to rename.
+        new_name: New symbol name.
+        path: File or directory path. For "file" scope, must be a file.
+              For "directory"/"project" scope, specifies starting directory.
+        scope: Rename scope:
+               - "file": Single file only (path must be a file)
+               - "directory": All .py files in the directory (non-recursive)
+               - "project": All .py files recursively (respects depth)
+        depth: Directory traversal depth for "project" scope:
+               - -1: Unlimited (default)
+               - 0: Current directory only
+               - N: Up to N levels deep
+        preview: If True, show what would change without applying.
+
+    Returns:
+        Dictionary containing:
+        - success: Whether operation succeeded
+        - files_count: Number of files modified
+        - total_changes: Total occurrences changed across all files
+        - file_changes: List of {file, changes} for each modified file
+        - formatted_report: Human-readable refactoring report
+        - error: Error message if failed
+
+    Examples:
+        # Single file rename
+        rename("get_user", "fetch_user", path="utils.py", scope="file")
+
+        # Directory rename (non-recursive)
+        rename("Config", "Settings", path="src/", scope="directory")
+
+        # Project-wide rename
+        rename("old_func", "new_func", scope="project")
+
+        # Limited depth rename
+        rename("helper", "util", path="lib/", scope="project", depth=2)
+    """
+    if not old_name or not new_name:
+        return {"success": False, "error": "Missing required parameters: old_name, new_name"}
+
+    if old_name == new_name:
+        return {"success": False, "error": "old_name and new_name must be different"}
+
+    # Validate scope
+    valid_scopes = ("file", "directory", "project")
+    if scope not in valid_scopes:
+        return {"success": False, "error": f"Invalid scope '{scope}'. Must be one of: {valid_scopes}"}
+
+    path_obj = Path(path).resolve()
+
+    # Validate path based on scope
+    if scope == "file":
+        if not path_obj.exists():
+            return {"success": False, "error": f"File not found: {path}"}
+        if not path_obj.is_file():
+            return {"success": False, "error": f"Path must be a file for scope='file': {path}"}
+        if path_obj.suffix != ".py":
+            return {"success": False, "error": f"File must be a Python file (.py): {path}"}
+    else:
+        if not path_obj.exists():
+            return {"success": False, "error": f"Directory not found: {path}"}
+        if not path_obj.is_dir():
+            return {"success": False, "error": f"Path must be a directory for scope='{scope}': {path}"}
+
+    # Collect files to process
+    files = _collect_python_files(path_obj, scope, depth)
+
+    if not files:
+        return {
+            "success": False,
+            "error": f"No Python files found in {path} with scope='{scope}'",
+        }
+
+    # Process each file
+    all_file_changes: List[Dict[str, Any]] = []
+    total_changes = 0
+
+    # For single-file scope, require symbol definition
+    require_def = scope == "file"
+
+    for file_path in files:
+        result = _rename_in_file(file_path, old_name, new_name, require_definition=require_def)
+        if result:
+            all_file_changes.append(result)
+            total_changes += len(result["changes"])
+
+    if not all_file_changes:
+        if scope == "file":
+            return {"success": False, "error": f"Symbol '{old_name}' not found in {path}"}
+        else:
+            return {"success": False, "error": f"No occurrences of '{old_name}' found in {len(files)} files"}
 
     # Build report
     report = []
     report.append(f"Rename Refactoring: '{old_name}' → '{new_name}'")
     report.append("=" * 70)
     report.append("")
-    report.append(f"File: {file}")
-    report.append(f"Symbol Type: {symbol_info['type']}")
-    report.append(f"Changes: {len(changes)} occurrences")
+    report.append(f"Scope: {scope}")
+    report.append(f"Path: {path}")
+    if scope == "project" and depth >= 0:
+        report.append(f"Depth: {depth}")
+    report.append(f"Files analyzed: {len(files)}")
+    report.append(f"Files modified: {len(all_file_changes)}")
+    report.append(f"Total changes: {total_changes} occurrences")
     report.append("")
 
-    if changes:
-        report.append("Preview of changes:")
-        for change in changes[:10]:  # Show first 10
-            report.append(f"\nLine {change['line']}:")
-            report.append(f"  - {change['old']}")
-            report.append(f"  + {change['new']}")
+    # Show changes per file
+    report.append("Changes by file:")
+    for fc in all_file_changes[:15]:  # Show first 15 files
+        rel_path = Path(fc["file_path"]).relative_to(Path.cwd()) if Path(fc["file_path"]).is_relative_to(Path.cwd()) else fc["file_path"]
+        report.append(f"\n  {rel_path} ({len(fc['changes'])} changes):")
+        for change in fc["changes"][:5]:  # Show first 5 changes per file
+            report.append(f"    Line {change['line']}: {change['old'][:50]}...")
 
-        if len(changes) > 10:
-            report.append(f"\n... and {len(changes) - 10} more changes")
+        if len(fc["changes"]) > 5:
+            report.append(f"    ... and {len(fc['changes']) - 5} more")
+
+    if len(all_file_changes) > 15:
+        report.append(f"\n... and {len(all_file_changes) - 15} more files")
 
     # Apply changes if not preview
     if not preview:
-        file_obj.write_text(new_content)
+        applied_count = 0
+        for fc in all_file_changes:
+            try:
+                Path(fc["file_path"]).write_text(fc["new_content"])
+                applied_count += 1
+            except (IOError, OSError) as e:
+                logger.error(f"Failed to write {fc['file_path']}: {e}")
+
         report.append("")
-        report.append("✅ Changes applied successfully")
+        if applied_count == len(all_file_changes):
+            report.append(f"✅ All {applied_count} files updated successfully")
+        else:
+            report.append(f"⚠️  {applied_count}/{len(all_file_changes)} files updated (some failed)")
     else:
         report.append("")
-        report.append("⚠️  This is a PREVIEW - no changes were made")
+        report.append("⚠️  PREVIEW MODE - no changes were made")
         report.append("   Run with preview=False to apply changes")
 
     return {
         "success": True,
-        "changes_count": len(changes),
-        "changes": changes,
-        "preview_text": new_content if preview else None,
+        "files_count": len(all_file_changes),
+        "total_changes": total_changes,
+        "file_changes": [
+            {"file": fc["file_path"], "changes_count": len(fc["changes"]), "changes": fc["changes"]}
+            for fc in all_file_changes
+        ],
         "formatted_report": "\n".join(report),
     }
 
 
-@tool(cost_tier=CostTier.LOW)
-async def refactor_extract_function(
+@tool(
+    cost_tier=CostTier.LOW,
+    category="refactor",
+    priority=Priority.MEDIUM,  # Task-specific refactoring
+    access_mode=AccessMode.WRITE,  # Modifies source files
+    danger_level=DangerLevel.LOW,  # Changes are undoable
+    keywords=["extract", "refactor", "function", "method", "code block"],
+)
+async def extract(
     file: str,
     start_line: int,
     end_line: int,
     function_name: str,
     preview: bool = False,
 ) -> Dict[str, Any]:
-    """
-    Extract code block into a new function.
+    """Extract code block into a new function.
 
     Extracts selected lines of code into a new function,
     analyzing variables to determine parameters and return values.
@@ -408,22 +596,25 @@ async def refactor_extract_function(
     }
 
 
-@tool(cost_tier=CostTier.LOW)
-async def refactor_inline_variable(
+@tool(
+    cost_tier=CostTier.LOW,
+    category="refactor",
+    priority=Priority.MEDIUM,  # Task-specific refactoring
+    access_mode=AccessMode.WRITE,  # Modifies source files
+    danger_level=DangerLevel.LOW,  # Changes are undoable
+    keywords=["inline", "refactor", "variable", "replace", "expand"],
+)
+async def inline(
     file: str,
     variable_name: str,
     preview: bool = False,
 ) -> Dict[str, Any]:
-    """
-    Inline a simple variable assignment.
-
-    Replaces all usages of a variable with its assigned value
-    and removes the assignment statement.
+    """Inline a variable by replacing usages with its assigned value.
 
     Args:
-        file: File path to refactor.
-        variable_name: Name of variable to inline.
-        preview: Preview changes without applying (default: False).
+        file: File path to refactor
+        variable_name: Variable to inline
+        preview: Preview without applying
 
     Returns:
         Dictionary containing:
@@ -537,20 +728,23 @@ async def refactor_inline_variable(
     }
 
 
-@tool(cost_tier=CostTier.LOW)
-async def refactor_organize_imports(
+@tool(
+    cost_tier=CostTier.LOW,
+    category="refactor",
+    priority=Priority.MEDIUM,  # Task-specific refactoring
+    access_mode=AccessMode.WRITE,  # Modifies source files
+    danger_level=DangerLevel.LOW,  # Changes are undoable
+    keywords=["organize", "imports", "sort", "refactor", "cleanup"],
+)
+async def organize_imports(
     file: str,
     preview: bool = False,
 ) -> Dict[str, Any]:
-    """
-    Organize and optimize import statements.
-
-    Sorts imports into groups (stdlib, third-party, local),
-    removes duplicates, and follows PEP 8 conventions.
+    """Organize imports: sort into groups (stdlib/third-party/local), remove duplicates.
 
     Args:
-        file: File path to refactor.
-        preview: Preview changes without applying (default: False).
+        file: File path to refactor
+        preview: Preview without applying
 
     Returns:
         Dictionary containing:
@@ -713,3 +907,5 @@ async def refactor_organize_imports(
         "local_count": len(local_imports),
         "formatted_report": "\n".join(report),
     }
+
+

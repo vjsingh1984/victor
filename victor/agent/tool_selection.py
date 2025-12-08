@@ -39,254 +39,296 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# Core tools that are almost always useful (filesystem, bash, editor)
-CORE_TOOLS: Set[str] = {
-    "read_file",
-    "write_file",
-    "list_directory",
-    "execute_bash",
-    "edit_files",
+# Fallback critical tools for cases where registry is unavailable.
+# Critical tools are detected via priority=Priority.CRITICAL in @tool decorator.
+_FALLBACK_CRITICAL_TOOLS: Set[str] = {
+    "read",      # read_file → read
+    "write",     # write_file → write
+    "ls",        # list_directory → ls
+    "shell",     # execute_bash → shell
+    "edit",      # edit_files → edit
+    "search",    # code_search → search (always needed for code exploration)
 }
 
-# Tool categories by use case
-# DEPRECATED: This hardcoded mapping is being replaced by dynamic discovery via
-# ToolMetadataRegistry. Tools should declare their category via @tool(category="...")
-# decorator. This fallback will be removed in a future version.
-# See get_tools_for_categories() for the migration path.
-TOOL_CATEGORIES: Dict[str, List[str]] = {
-    "git": ["git", "git_suggest_commit", "git_create_pr", "git_analyze_conflicts"],
-    "testing": ["run_tests", "testing_generate", "testing_coverage"],
-    "refactor": [
-        "refactor_extract_function",
-        "refactor_inline_variable",
-        "refactor_organize_imports",
-        "rename_symbol",  # AST-based rename
-    ],
-    "security": ["security_scan"],
-    "docs": ["generate_docs", "analyze_docs"],
-    "review": ["code_review"],
-    # Web/HTTP merged: includes search, fetch, and API operations
-    "web": ["web_search", "web_fetch", "web_summarize", "http_request", "http_test"],
-    "docker": ["docker"],
-    "metrics": ["analyze_metrics"],
-    "cicd": ["cicd"],
-    "scaffold": ["scaffold"],
-    # Search: includes keyword, semantic, and AST-based code intelligence
-    "search": [
-        "code_search",
-        "semantic_code_search",
-        "find_symbol",  # AST-based symbol lookup
-        "find_references",  # AST-based reference finding
-    ],
-    "database": ["database"],
-    # LSP: unified tool for language server operations
-    "lsp": ["lsp"],
-    # Dependencies: unified package management tool
-    "dependencies": ["dependency"],
-    "patch": ["apply_patch", "create_patch"],
-    # Cache: unified cache management tool
-    "cache": ["cache"],
-    "workflow": ["run_workflow"],
-    "sandbox": ["execute_python_in_sandbox"],
-    # Enterprise: Pipeline analytics and CI/CD
-    "pipeline": ["pipeline_analyzer"],
-    # Enterprise: Infrastructure as Code security
-    "iac": ["iac_scanner"],
-    # Enterprise: Merge conflict resolution
-    "merge": ["merge_conflicts"],
-    # Enterprise: Audit and compliance
-    "audit": ["audit"],
+
+def get_critical_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
+    """Dynamically discover critical tools from registry using priority-based detection.
+
+    Critical tools are those with priority=Priority.CRITICAL in their @tool decorator.
+    These tools are always available for selection regardless of task type.
+    Falls back to hardcoded list if registry is unavailable.
+
+    Args:
+        registry: Optional tool registry to query
+
+    Returns:
+        Set of canonical tool names that are critical priority tools
+    """
+    if registry is None:
+        return _FALLBACK_CRITICAL_TOOLS.copy()
+
+    critical_tools: Set[str] = set()
+    for tool in registry.list_tools(only_enabled=True):
+        # Use is_critical property which checks priority=Priority.CRITICAL
+        if hasattr(tool, "is_critical") and tool.is_critical:
+            critical_tools.add(tool.name)
+
+    # Fallback if no critical tools found (shouldn't happen with proper setup)
+    if not critical_tools:
+        logger.warning(
+            "No tools with priority=Priority.CRITICAL found in registry. "
+            "Using fallback critical tools. Check tool decorator definitions."
+        )
+        return _FALLBACK_CRITICAL_TOOLS.copy()
+
+    return critical_tools
+
+
+
+
+def get_tools_by_category(
+    registry: Optional["ToolRegistry"] = None, category: str = ""
+) -> Set[str]:
+    """Dynamically discover tools in a specific category from registry.
+
+    Tools declare their category via @tool(category="...") decorator.
+
+    Args:
+        registry: Tool registry to query
+        category: Category name to filter by (e.g., "git", "web", "testing")
+
+    Returns:
+        Set of tool names in the specified category
+    """
+    if registry is None or not category:
+        return set()
+
+    tools: Set[str] = set()
+    for tool in registry.list_tools(only_enabled=True):
+        if hasattr(tool, "category") and tool.category == category:
+            tools.add(tool.name)
+
+    return tools
+
+
+def get_all_categories(registry: Optional["ToolRegistry"] = None) -> Set[str]:
+    """Get all unique categories from tools in registry.
+
+    Args:
+        registry: Tool registry to query
+
+    Returns:
+        Set of unique category names
+    """
+    if registry is None:
+        return set()
+
+    categories: Set[str] = set()
+    for tool in registry.list_tools(only_enabled=True):
+        if hasattr(tool, "category") and tool.category:
+            categories.add(tool.category)
+
+    return categories
+
+
+def get_category_to_tools_map(
+    registry: Optional["ToolRegistry"] = None,
+) -> Dict[str, Set[str]]:
+    """Build a mapping from categories to tool names.
+
+    Dynamically discovers categories from tool metadata. Tools must declare
+    their category via @tool(category="...") decorator.
+
+    Args:
+        registry: Tool registry to query (required for proper operation)
+
+    Returns:
+        Dict mapping category name to set of tool names.
+        Empty dict if registry is None.
+
+    Raises:
+        ValueError: If registry is provided but no tools have categories
+    """
+    if registry is None:
+        logger.warning(
+            "get_category_to_tools_map called without registry. "
+            "Pass a ToolRegistry for proper category discovery."
+        )
+        return {}
+
+    category_map: Dict[str, Set[str]] = {}
+    for tool in registry.list_tools(only_enabled=True):
+        if hasattr(tool, "category") and tool.category:
+            category = tool.category
+            if category not in category_map:
+                category_map[category] = set()
+            category_map[category].add(tool.name)
+
+    if not category_map:
+        logger.warning(
+            "No tools with categories found in registry. "
+            "Add category metadata to @tool decorators."
+        )
+
+    return category_map
+
+
+# Fallback category keywords for goal inference.
+# DEPRECATED: Use registry.detect_categories_from_text() which builds this
+# dynamically from @tool(keywords=[...]) decorators.
+_FALLBACK_CATEGORY_KEYWORDS: Dict[str, Set[str]] = {
+    "security": {"security", "vulnerability", "scan", "audit", "cve", "exploit", "owasp"},
+    "metrics": {"metrics", "complexity", "coverage", "analyze", "statistics", "cyclomatic"},
+    "testing": {"test", "unittest", "pytest", "spec", "coverage", "mock"},
+    "git": {"git", "commit", "branch", "merge", "push", "pull", "rebase"},
+    "docker": {"docker", "container", "dockerfile", "compose", "image"},
+    "web": {"web", "http", "api", "fetch", "url", "search"},
 }
 
-# Web-related tools that should be included when web search is detected
-WEB_TOOLS: Set[str] = {"web_search", "web_summarize", "web_fetch"}
+# Alias for backward compatibility
+CATEGORY_KEYWORDS = _FALLBACK_CATEGORY_KEYWORDS
 
-# Keyword mappings to categories
-CATEGORY_KEYWORDS: Dict[str, List[str]] = {
-    "git": ["git", "commit", "branch", "merge", "repository", "conflict", "rebase"],
-    "testing": ["test", "pytest", "unittest", "coverage", "run tests"],
-    "refactor": ["refactor", "rename", "extract", "reorganize", "rename symbol"],
-    "security": ["security", "vulnerability", "secret", "scan"],
-    "docs": ["document", "docstring", "readme", "api doc"],
-    "review": ["review", "analyze code", "check code", "code quality"],
-    # Web/HTTP merged keywords
-    "web": [
-        "search web",
-        "search the web",
-        "look up",
-        "find online",
-        "search for",
-        "web search",
-        "online search",
-        "http request",
-        "api call",
-        "rest api",
-        "curl",
-        "fetch url",
-        "get request",
-        "post request",
-    ],
-    "docker": ["docker", "container", "image"],
-    "metrics": ["complexity", "metrics", "maintainability", "technical debt"],
-    "cicd": [
-        "ci/cd",
-        "cicd",
-        "pipeline",
-        "github actions",
-        "gitlab ci",
-        "circleci",
-    ],
-    "scaffold": ["scaffold", "template", "boilerplate", "new project", "create project"],
-    # Search: includes code search + symbol lookup keywords
-    "search": [
-        "search code",
-        "code search",
-        "find file",
-        "locate code",
-        "locate",  # Single word for "locate the error handling code"
-        "where is",
-        "find symbol",
-        "find definition",
-        "find references",
-        "references",  # Single word for flexible matching
-        "where is defined",
-        "symbol lookup",
-        "defined",  # Single word for "find where this class is defined"
-        "find where",  # Common pattern
-        "find all",  # For "find all references"
-        "class is",  # For "where this class is defined"
-    ],
-    "database": [
-        "database",
-        "sql",
-        "query",
-        "postgresql",
-        "mysql",
-        "sqlite",
-        "table",
-        "connect to",
-        "schema",
-        "rows",
-        "columns",
-        "select from",
-        "db",
-    ],
-    # LSP: unified tool keywords
-    "lsp": [
-        "lsp",
-        "language server",
-        "autocomplete",
-        "completions",
-        "hover",
-        "go to definition",
-        "diagnostics",
-        "intellisense",
-        "code intelligence",
-        "find references",
-        "references",
-        "find all references",
-        "symbol info",
-        "type info",
-    ],
-    "dependencies": [
-        "dependencies",
-        "packages",
-        "package",  # Single word for flexible matching
-        "requirements",
-        "pip",
-        "npm",
-        "outdated",
-        "upgrade packages",
-        "dependency tree",
-        "requirements.txt",
-        "package.json",
-        "update package",
-        "install package",
-        "upgrade package",
-        "package update",
-        "pip install",
-        "npm install",
-    ],
-    "patch": [
-        "patch",
-        "diff",
-        "apply patch",
-        "create patch",
-        "unified diff",
-        ".patch file",
-    ],
-    "cache": [
-        "cache",
-        "clear cache",
-        "cache stats",
-        "cache info",
-        "memory cache",
-    ],
-    "workflow": [
-        "workflow",
-        "run workflow",
-        "automation",
-        "multi-step",
-    ],
-    "sandbox": [
-        "sandbox",
-        "safe execution",
-        "isolated",
-        "execute python",
-        "run python safely",
-    ],
-    # Enterprise: Pipeline analytics
-    "pipeline": [
-        "pipeline",
-        "coverage",
-        "github actions",
-        "gitlab ci",
-        "cobertura",
-        "lcov",
-        "jacoco",
-        "test coverage",
-        "pipeline health",
-        "build analysis",
-        "workflow analysis",
-    ],
-    # Enterprise: IaC security
-    "iac": [
-        "iac",
-        "infrastructure as code",
-        "terraform",
-        "kubernetes",
-        "k8s",
-        "dockerfile",
-        "docker-compose",
-        "helm",
-        "security scan",
-        "infrastructure security",
-        "misconfiguration",
-    ],
-    # Enterprise: Merge conflicts
-    "merge": [
-        "merge conflict",
-        "conflict",
-        "resolve conflict",
-        "git conflict",
-        "rebase conflict",
-        "merge resolution",
-        "conflict markers",
-    ],
-    # Enterprise: Audit and compliance
-    "audit": [
-        "audit",
-        "compliance",
-        "soc2",
-        "gdpr",
-        "hipaa",
-        "pci dss",
-        "audit log",
-        "security audit",
-        "compliance report",
-        "pii detection",
-    ],
-}
+
+def detect_categories_from_message(message: str) -> Set[str]:
+    """Detect relevant tool categories from keywords in a message.
+
+    Uses registry-based detection with decorator-driven keywords when available,
+    falling back to static CATEGORY_KEYWORDS if registry is empty.
+
+    Args:
+        message: User message text to analyze
+
+    Returns:
+        Set of category names that match keywords in the message
+
+    Example:
+        >>> detect_categories_from_message("run a security scan")
+        {'security'}
+        >>> detect_categories_from_message("analyze code complexity and metrics")
+        {'metrics'}
+    """
+    # Try registry-based detection first (decorator-driven)
+    try:
+        from victor.tools.metadata_registry import detect_categories_from_text
+
+        registry_detected = detect_categories_from_text(message)
+        if registry_detected:
+            logger.debug(f"Registry detected categories: {registry_detected}")
+            return registry_detected
+    except Exception as e:
+        logger.debug(f"Registry category detection failed: {e}")
+
+    # Fallback to static keywords
+    message_lower = message.lower()
+    detected: Set[str] = set()
+
+    for category, keywords in _FALLBACK_CATEGORY_KEYWORDS.items():
+        if any(kw in message_lower for kw in keywords):
+            detected.add(category)
+
+    if detected:
+        logger.debug(f"Fallback detected categories: {detected}")
+
+    return detected
+
+
+def get_tools_for_categories(
+    categories: Set[str], registry: Optional["ToolRegistry"] = None
+) -> Set[str]:
+    """Get tool names for a set of categories.
+
+    Aggregates tools from multiple categories into a single set.
+    Uses the ToolMetadataRegistry for lookup if registry is not provided.
+
+    Args:
+        categories: Set of category names (e.g., {"security", "metrics"})
+        registry: Optional tool registry to query
+
+    Returns:
+        Set of tool names belonging to any of the specified categories
+    """
+    tools: Set[str] = set()
+
+    # Try registry-based lookup first
+    if registry is not None:
+        for category in categories:
+            category_tools = get_tools_by_category(registry, category)
+            tools.update(category_tools)
+    else:
+        # Fall back to metadata registry
+        try:
+            from victor.tools.metadata_registry import get_global_registry
+
+            meta_registry = get_global_registry()
+            for category in categories:
+                category_tools = meta_registry.get_tools_by_category(category)
+                tools.update(category_tools)
+        except Exception as e:
+            logger.debug(f"Failed to get tools for categories via registry: {e}")
+
+    return tools
+
+
+def get_web_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
+    """Get web-related tools from registry.
+
+    Web tools are those with category='web'. Tools must declare their category
+    via @tool(category="web") decorator.
+
+    Args:
+        registry: Tool registry to query (required for proper operation)
+
+    Returns:
+        Set of web-related tool names. Empty set if registry is None.
+    """
+    if registry is None:
+        logger.warning(
+            "get_web_tools called without registry. "
+            "Pass a ToolRegistry for proper tool discovery."
+        )
+        return set()
+
+    # Get tools with category="web"
+    return get_tools_by_category(registry, "web")
+
+
+def get_tools_with_keywords(
+    registry: Optional["ToolRegistry"] = None,
+    match_keywords: Optional[Set[str]] = None,
+) -> Set[str]:
+    """Find tools that have any of the specified keywords in their metadata.
+
+    Args:
+        registry: Tool registry to query
+        match_keywords: Set of keywords to match against tool metadata
+
+    Returns:
+        Set of tool names that match any of the keywords
+    """
+    if registry is None or not match_keywords:
+        return set()
+
+    matching_tools: Set[str] = set()
+    match_keywords_lower = {k.lower() for k in match_keywords}
+
+    for tool in registry.list_tools(only_enabled=True):
+        # Check tool metadata for keywords
+        metadata = getattr(tool, "metadata", None)
+        if metadata and hasattr(metadata, "keywords"):
+            tool_keywords = {k.lower() for k in (metadata.keywords or [])}
+            if tool_keywords & match_keywords_lower:
+                matching_tools.add(tool.name)
+
+        # Also check description for keyword matches
+        description = getattr(tool, "description", "").lower()
+        for kw in match_keywords_lower:
+            if kw in description:
+                matching_tools.add(tool.name)
+                break
+
+    return matching_tools
+
+
 
 # Web-related keywords for explicit web tool inclusion
 WEB_KEYWORDS: List[str] = ["search", "web", "online", "lookup", "http", "https"]
@@ -344,76 +386,88 @@ class ToolSelectionStats:
         }
 
 
-def detect_categories_from_message(message: str) -> Set[str]:
-    """Detect relevant tool categories from user message.
+def get_tools_from_message(message: str) -> Set[str]:
+    """Get tool names that match keywords in the user message.
+
+    Uses ToolMetadataRegistry to find tools whose @tool(keywords=[...])
+    match the user's message. This is the preferred method for keyword-based
+    tool selection as it uses the single source of truth from tool decorators.
 
     Args:
         message: User message text
 
     Returns:
-        Set of detected category names
+        Set of tool names whose keywords match the message
     """
-    message_lower = message.lower()
-    selected_categories: Set[str] = set()
+    try:
+        from victor.tools.metadata_registry import get_global_registry
 
-    for category, keywords in CATEGORY_KEYWORDS.items():
-        if any(kw in message_lower for kw in keywords):
-            selected_categories.add(category)
+        registry = get_global_registry()
+        tools = registry.get_tools_matching_text(message)
+        if tools:
+            logger.debug(f"Registry keyword match found tools: {tools}")
+        return tools
+    except Exception as e:
+        logger.debug(f"Registry unavailable for keyword matching: {e}")
+        return set()
 
-    return selected_categories
 
+def get_tools_from_message_scored(
+    message: str,
+    min_score: float = 0.0,
+    max_results: Optional[int] = None,
+) -> List[Tuple[str, float]]:
+    """Get tool names with relevance scores from the user message.
 
-def get_tools_for_categories(categories: Set[str]) -> Set[str]:
-    """Get tool names for the given categories.
-
-    Tries to use ToolMetadataRegistry for dynamic category lookup first,
-    falls back to hardcoded TOOL_CATEGORIES if registry is not initialized
-    or has no matches for a category.
+    Enhanced version of get_tools_from_message() that returns scored results.
+    Uses ToolMetadataRegistry.get_tools_matching_text_scored() for intelligent
+    ranking based on:
+    - Number of matching keywords
+    - Keyword specificity (longer = more specific)
+    - Tool priority (CRITICAL tools get boost)
 
     Args:
-        categories: Set of category names
+        message: User message text
+        min_score: Minimum score threshold (0.0 to 1.0)
+        max_results: Maximum number of results to return
 
     Returns:
-        Set of tool names from all categories
+        List of (tool_name, score) tuples sorted by score descending
     """
-    tools: Set[str] = set()
-    used_fallback = False
-
-    # Try registry first for dynamic categories
     try:
-        from victor.tools.base import ToolMetadataRegistry
+        from victor.tools.metadata_registry import get_global_registry
 
-        registry = ToolMetadataRegistry.get_instance()
-        for category in categories:
-            # Get tools from registry (dynamic)
-            registry_tools = registry.get_tools_by_category(category)
-            if registry_tools:
-                tools.update(registry_tools)
-                logger.debug(f"Category '{category}' resolved dynamically: {registry_tools}")
-            elif category in TOOL_CATEGORIES:
-                # Fallback to hardcoded (deprecated - log for migration tracking)
-                fallback_tools = TOOL_CATEGORIES[category]
-                tools.update(fallback_tools)
-                used_fallback = True
-                logger.debug(
-                    f"Category '{category}' using hardcoded fallback: {fallback_tools}. "
-                    "Consider adding category metadata to tools via @tool(category=...)"
-                )
-    except Exception as e:
-        # Fallback to hardcoded categories if registry not available
-        logger.debug(f"ToolMetadataRegistry unavailable ({e}), using hardcoded categories")
-        used_fallback = True
-        for category in categories:
-            if category in TOOL_CATEGORIES:
-                tools.update(TOOL_CATEGORIES[category])
-
-    if used_fallback and tools:
-        logger.debug(
-            "Some categories used hardcoded fallback. "
-            "Run 'victor tools --show-metadata' to see category coverage."
+        registry = get_global_registry()
+        results = registry.get_tools_matching_text_scored(
+            text=message,
+            min_score=min_score,
+            max_results=max_results,
+            use_fallback=True,
         )
+        scored_tools = [(r.tool_name, r.total_score) for r in results]
+        if scored_tools:
+            logger.debug(
+                f"Scored keyword match: {[(t, f'{s:.2f}') for t, s in scored_tools[:5]]}"
+            )
+        return scored_tools
+    except Exception as e:
+        logger.debug(f"Registry unavailable for scored matching: {e}")
+        return []
 
-    return tools
+
+def get_keyword_matching_metrics() -> Optional[Dict[str, Any]]:
+    """Get keyword matching metrics for observability.
+
+    Returns:
+        Dictionary with matching statistics, or None if unavailable
+    """
+    try:
+        from victor.tools.metadata_registry import get_global_registry
+
+        registry = get_global_registry()
+        return registry.metrics.to_dict()
+    except Exception:
+        return None
 
 
 def is_small_model(model_name: str, provider_name: str = "") -> bool:
@@ -508,7 +562,10 @@ def select_tools_by_keywords(
     is_small: bool = False,
     max_tools_for_small: int = 10,
 ) -> Set[str]:
-    """Select tools using keyword matching.
+    """Select tools using keyword matching via ToolMetadataRegistry.
+
+    Uses keywords defined in @tool decorators for tool selection.
+    This is the recommended approach - tools define their own keywords.
 
     Args:
         message: User message
@@ -519,13 +576,13 @@ def select_tools_by_keywords(
     Returns:
         Set of selected tool names
     """
-    # Start with core tools
-    selected = CORE_TOOLS.copy()
+    # Start with critical tools (dynamic discovery)
+    core_tools = get_critical_tools()
+    selected = core_tools.copy()
 
-    # Add category-based tools
-    categories = detect_categories_from_message(message)
-    category_tools = get_tools_for_categories(categories)
-    selected.update(category_tools)
+    # Add tools matching keywords from @tool decorators
+    keyword_matches = get_tools_from_message(message)
+    selected.update(keyword_matches)
 
     # Filter to only available tools
     selected = selected.intersection(all_tool_names)
@@ -533,8 +590,8 @@ def select_tools_by_keywords(
     # Limit for small models
     if is_small and len(selected) > max_tools_for_small:
         # Keep core tools, limit others
-        core_in_selected = selected.intersection(CORE_TOOLS)
-        others = list(selected - CORE_TOOLS)
+        core_in_selected = selected.intersection(core_tools)
+        others = list(selected - core_tools)
         max_others = max(0, max_tools_for_small - len(core_in_selected))
         selected = core_in_selected.union(set(others[:max_others]))
 
@@ -608,6 +665,76 @@ class ToolSelector:
 
         # Cache last selection to avoid redundant logging
         self._last_selection: Optional[Set[str]] = None
+
+        # Cached core and web tools (lazy loaded for dynamic discovery)
+        self._cached_core_tools: Optional[Set[str]] = None
+        self._cached_web_tools: Optional[Set[str]] = None
+
+        # Populate global metadata registry for keyword-based tool selection
+        self._populate_metadata_registry()
+
+    def _populate_metadata_registry(self) -> None:
+        """Populate the global metadata registry with tools from this selector.
+
+        This enables keyword-based tool lookup via get_tools_for_categories().
+        Only runs once per ToolSelector instance.
+        """
+        try:
+            from victor.tools.metadata_registry import get_global_registry
+
+            registry = get_global_registry()
+
+            # Register all tools from our tool registry
+            for tool in self.tools.list_tools(only_enabled=True):
+                registry.register(tool)
+
+            logger.debug(
+                f"Populated metadata registry with {len(registry)} tools "
+                f"({len(registry.get_all_keywords())} keywords)"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to populate metadata registry: {e}")
+
+    def _get_core_tools_cached(self) -> Set[str]:
+        """Get core tools with caching for performance.
+
+        Uses dynamic discovery via get_critical_tools() on first call,
+        then caches the result for subsequent calls.
+
+        Returns:
+            Set of canonical core tool names
+        """
+        if self._cached_core_tools is None:
+            self._cached_core_tools = get_critical_tools(self.tools)
+        return self._cached_core_tools
+
+    def _get_web_tools_cached(self) -> Set[str]:
+        """Get web tools with caching for performance.
+
+        Uses dynamic discovery via get_web_tools() on first call,
+        then caches the result for subsequent calls.
+
+        Returns:
+            Set of canonical web tool names
+        """
+        if self._cached_web_tools is None:
+            self._cached_web_tools = get_web_tools(self.tools)
+        return self._cached_web_tools
+
+    def invalidate_tool_cache(self) -> None:
+        """Invalidate cached tool sets to force re-discovery.
+
+        Call this method when:
+        - Tools are dynamically added/removed at runtime
+        - Plugin tools are loaded/unloaded
+        - Tool categories are modified
+
+        This enables hot-reload of tool configurations without
+        recreating the ToolSelector instance.
+        """
+        self._cached_core_tools = None
+        self._cached_web_tools = None
+        logger.debug("Tool selection cache invalidated - will re-discover on next access")
 
     def _record_selection(self, method: str, num_tools: int) -> None:
         """Record a selection event.
@@ -782,10 +909,10 @@ class ToolSelector:
             existing = {t.name for t in tools}
             tools.extend([t for t in keyword_tools if t.name not in existing])
 
-        # Ensure web tools if explicitly mentioned
+        # Ensure web tools if explicitly mentioned (dynamic discovery)
         message_lower = user_message.lower()
         if any(kw in message_lower for kw in WEB_KEYWORDS):
-            must_have = WEB_TOOLS
+            must_have = self._get_web_tools_cached()
             existing = {t.name for t in tools}
             for tool in self.tools.list_tools():
                 if tool.name in must_have and tool.name not in existing:
@@ -843,12 +970,13 @@ class ToolSelector:
         selected_tools: List[ToolDefinition] = list(planned_tools) if planned_tools else []
         existing_names = {t.name for t in selected_tools}
 
-        # Detect categories from message
-        selected_categories = detect_categories_from_message(user_message)
+        # Build selected tool names: core tools + registry keyword matches
+        # Uses keywords from @tool decorators as single source of truth
+        selected_tool_names = self._get_core_tools_cached().copy()
 
-        # Build selected tool names: core tools + category-specific tools
-        selected_tool_names = CORE_TOOLS.copy()
-        selected_tool_names.update(get_tools_for_categories(selected_categories))
+        # Use registry-based keyword matching (from @tool decorators)
+        registry_matches = get_tools_from_message(user_message)
+        selected_tool_names.update(registry_matches)
 
         # Check if this is a small model
         small_model = is_small_model(self.model, self.provider_name)
@@ -867,8 +995,9 @@ class ToolSelector:
 
         # For small models, limit to max 10 tools
         if small_model and len(selected_tools) > 10:
-            core_tools = [t for t in selected_tools if t.name in CORE_TOOLS]
-            other_tools = [t for t in selected_tools if t.name not in CORE_TOOLS]
+            core_tools_set = self._get_core_tools_cached()
+            core_tools = [t for t in selected_tools if t.name in core_tools_set]
+            other_tools = [t for t in selected_tools if t.name not in core_tools_set]
             selected_tools = core_tools + other_tools[: max(0, 10 - len(core_tools))]
 
         tool_names = [t.name for t in selected_tools]
@@ -918,11 +1047,11 @@ class ToolSelector:
 
         logger.debug(f"Stage detection: {current_stage.name}, " f"recommended tools: {stage_tools}")
 
-        # Core tools always included
-        core = CORE_TOOLS
+        # Core tools always included (dynamic discovery)
+        core = self._get_core_tools_cached()
 
-        # Web tools check
-        web_tools = WEB_TOOLS if needs_web_tools(user_message) else set()
+        # Web tools check (dynamic discovery)
+        web_tools = self._get_web_tools_cached() if needs_web_tools(user_message) else set()
 
         # Combine stage-specific tools with core and web tools
         keep = stage_tools | core | web_tools
@@ -950,8 +1079,8 @@ class ToolSelector:
             )
             return pruned
 
-        # Fallback to core tools
-        core_fallback = CORE_TOOLS
+        # Fallback to core tools (dynamic discovery)
+        core_fallback = self._get_core_tools_cached()
         fallback_tools = [t for t in tools if t.name in core_fallback]
 
         if fallback_tools:
@@ -978,7 +1107,7 @@ class ToolSelector:
             Set of tool names appropriate for the task and stage
         """
         if not self.task_tracker:
-            return CORE_TOOLS.copy()
+            return self._get_core_tools_cached().copy()
 
         # Lazy load the config loader
         if self._task_config_loader is None:
@@ -1037,17 +1166,17 @@ class ToolSelector:
         # Get task-aware tools
         task_tools = self.get_task_aware_tools(stage)
 
-        # Always include core tools
-        allowed = task_tools | CORE_TOOLS
+        # Always include core tools (dynamic discovery)
+        allowed = task_tools | self._get_core_tools_cached()
 
         # Check if we need to force action tools
         if self.task_tracker.progress.task_type.value == "edit":
-            # For EDIT tasks after target read, ensure edit_files is included
+            # For EDIT tasks after target read, ensure edit is included
             from victor.agent.milestone_monitor import Milestone
 
             if Milestone.TARGET_READ in self.task_tracker.progress.milestones:
-                allowed.add("edit_files")
-                logger.debug("Added edit_files for EDIT task after TARGET_READ")
+                allowed.add("edit")  # edit_files → edit (canonical name)
+                logger.debug("Added edit for EDIT task after TARGET_READ")
 
         # Filter tools to only those allowed
         filtered = [t for t in tools if t.name in allowed]
@@ -1077,8 +1206,8 @@ class ToolSelector:
         all_tools_map = {tool.name: tool for tool in self.tools.list_tools()}
         tools: List[ToolDefinition] = []
 
-        # Add core tools first
-        for tool_name in CORE_TOOLS:
+        # Add core tools first (dynamic discovery)
+        for tool_name in self._get_core_tools_cached():
             if tool_name in all_tools_map:
                 tool = all_tools_map[tool_name]
                 tools.append(

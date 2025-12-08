@@ -29,7 +29,15 @@ from victor.iac import (
     ScanResult,
     Severity,
 )
-from victor.tools.base import BaseTool, CostTier, ToolMetadata, ToolResult
+from victor.tools.base import (
+    AccessMode,
+    BaseTool,
+    CostTier,
+    DangerLevel,
+    Priority,
+    ToolMetadata,
+    ToolResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +80,21 @@ class IaCScannerTool(BaseTool):
     @property
     def cost_tier(self) -> CostTier:
         return CostTier.LOW
+
+    @property
+    def priority(self) -> Priority:
+        """Tool priority for selection availability."""
+        return Priority.MEDIUM  # Task-specific security scanning
+
+    @property
+    def access_mode(self) -> AccessMode:
+        """Tool access mode for approval tracking."""
+        return AccessMode.READONLY  # Only reads IaC files for analysis
+
+    @property
+    def danger_level(self) -> DangerLevel:
+        """Danger level for warning/confirmation logic."""
+        return DangerLevel.SAFE  # No side effects
 
     @property
     def metadata(self) -> ToolMetadata:

@@ -496,9 +496,17 @@ class BaseToolCallingAdapter(ABC):
     # Default values for required parameters that providers may omit.
     # These are sensible defaults that preserve expected tool behavior.
     # Key: tool_name, Value: dict of parameter defaults
+    # NOTE: Includes both canonical short names and legacy names for backward compat
     TOOL_ARGUMENT_DEFAULTS: Dict[str, Dict[str, Any]] = {
+        # Canonical short names
+        "ls": {"path": "."},
+        "read": {"path": ""},  # Empty string will fail gracefully
+        "shell": {"command": ""},
+        "grep": {"query": "", "path": "."},
+        "search": {"query": "", "path": "."},
+        # Legacy names (backward compatibility - LLMs may still use these)
         "list_directory": {"path": "."},
-        "read_file": {"path": ""},  # Empty string will fail gracefully
+        "read_file": {"path": ""},
         "execute_bash": {"command": ""},
         "code_search": {"query": "", "path": "."},
         "semantic_code_search": {"query": "", "path": "."},

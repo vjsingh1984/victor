@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 import logging
 
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
@@ -67,10 +68,16 @@ def _calculate_maintainability_index(code: str) -> float:
         return 0.0
 
 
-@tool
-async def analyze_metrics(
+@tool(
+    category="metrics",
+    priority=Priority.MEDIUM,  # Task-specific analysis tool
+    access_mode=AccessMode.READONLY,  # Only reads files for analysis
+    danger_level=DangerLevel.SAFE,  # No side effects
+    keywords=["metrics", "analyze", "code", "complexity", "quality"],
+)
+async def metrics(
     path: str,
-    metrics: List[str] = None,
+    metrics_list: List[str] = None,
     file_pattern: str = "*.py",
     complexity_threshold: int = 10,
     format: str = "summary",
@@ -116,12 +123,12 @@ async def analyze_metrics(
     if not path:
         return {"success": False, "error": "Missing required parameter: path"}
 
-    if metrics is None:
-        metrics = ["all"]
+    if metrics_list is None:
+        metrics_list = ["all"]
 
     # Expand "all" to all metric types
-    if "all" in metrics:
-        metrics = ["complexity", "maintainability", "debt", "profile"]
+    if "all" in metrics_list:
+        metrics_list = ["complexity", "maintainability", "debt", "profile"]
 
     path_obj = Path(path)
     if not path_obj.exists():
@@ -145,7 +152,7 @@ async def analyze_metrics(
         }
 
     # Initialize results
-    results = {metric: [] for metric in metrics}
+    results = {metric: [] for metric in metrics_list}
     total_complexity = 0
     total_maintainability = 0
     total_debt_hours = 0
@@ -160,7 +167,7 @@ async def analyze_metrics(
             code = file_path.read_text()
 
             # Complexity analysis
-            if "complexity" in metrics:
+            if "complexity" in metrics_list:
                 complexity = _calculate_complexity_score(code)
                 status = "ok" if complexity <= complexity_threshold else "warning"
                 results["complexity"].append(
@@ -174,7 +181,7 @@ async def analyze_metrics(
                 total_complexity += complexity
 
             # Maintainability analysis
-            if "maintainability" in metrics:
+            if "maintainability" in metrics_list:
                 mi = _calculate_maintainability_index(code)
                 if mi >= 80:
                     rating = "excellent"
@@ -195,7 +202,7 @@ async def analyze_metrics(
                 total_maintainability += mi
 
             # Technical debt estimation
-            if "debt" in metrics:
+            if "debt" in metrics_list:
                 complexity_score = _calculate_complexity_score(code)
                 mi_score = _calculate_maintainability_index(code)
 
@@ -229,7 +236,7 @@ async def analyze_metrics(
                 total_debt_hours += debt_hours
 
             # Code profile
-            if "profile" in metrics:
+            if "profile" in metrics_list:
                 tree = ast.parse(code)
                 functions = sum(1 for node in ast.walk(tree) if isinstance(node, ast.FunctionDef))
                 classes = sum(1 for node in ast.walk(tree) if isinstance(node, ast.ClassDef))
@@ -256,25 +263,25 @@ async def analyze_metrics(
     avg_complexity = total_complexity / files_analyzed if files_analyzed > 0 else 0
     avg_maintainability = (
         total_maintainability / files_analyzed
-        if files_analyzed > 0 and "maintainability" in metrics
+        if files_analyzed > 0 and "maintainability" in metrics_list
         else 0
     )
 
     # Generate recommendations
     recommendations = []
-    if "complexity" in metrics and avg_complexity > complexity_threshold:
+    if "complexity" in metrics_list and avg_complexity > complexity_threshold:
         recommendations.append(
             f"Average complexity ({avg_complexity:.1f}) exceeds threshold ({complexity_threshold}) - consider refactoring"
         )
-    if "maintainability" in metrics and avg_maintainability < 60:
+    if "maintainability" in metrics_list and avg_maintainability < 60:
         recommendations.append(
             f"Average maintainability ({avg_maintainability:.1f}/100) is below good - improve code quality"
         )
-    if "debt" in metrics and total_debt_hours > 20:
+    if "debt" in metrics_list and total_debt_hours > 20:
         recommendations.append(
             f"Total technical debt ({total_debt_hours} hours) is significant - prioritize refactoring"
         )
-    if "profile" in metrics and total_lines > 10000:
+    if "profile" in metrics_list and total_lines > 10000:
         recommendations.append(f"Large codebase ({total_lines} lines) - consider modularization")
 
     if not recommendations:
@@ -287,11 +294,11 @@ async def analyze_metrics(
     report.append("")
     report.append(f"Path: {path}")
     report.append(f"Files analyzed: {files_analyzed}")
-    report.append(f"Metrics: {', '.join(metrics)}")
+    report.append(f"Metrics: {', '.join(metrics_list)}")
     report.append("")
 
     # Complexity section
-    if "complexity" in metrics:
+    if "complexity" in metrics_list:
         report.append("Complexity Analysis:")
         report.append(f"  Average complexity: {avg_complexity:.2f}")
         report.append(f"  Threshold: {complexity_threshold}")
@@ -305,7 +312,7 @@ async def analyze_metrics(
         report.append("")
 
     # Maintainability section
-    if "maintainability" in metrics:
+    if "maintainability" in metrics_list:
         report.append("Maintainability Analysis:")
         report.append(f"  Average maintainability: {avg_maintainability:.2f}/100")
         poor_files = [r for r in results["maintainability"] if r["rating"] in ["poor", "fair"]]
@@ -320,7 +327,7 @@ async def analyze_metrics(
         report.append("")
 
     # Technical debt section
-    if "debt" in metrics:
+    if "debt" in metrics_list:
         report.append("Technical Debt:")
         report.append(f"  Total debt: {total_debt_hours} hours")
         high_debt_files = [r for r in results["debt"] if r["debt_level"] in ["medium", "high"]]
@@ -335,7 +342,7 @@ async def analyze_metrics(
         report.append("")
 
     # Profile section
-    if "profile" in metrics:
+    if "profile" in metrics_list:
         report.append("Code Profile:")
         report.append(f"  Total lines: {total_lines}")
         report.append(f"  Total functions: {total_functions}")
@@ -359,13 +366,15 @@ async def analyze_metrics(
         "results": results,
         "files_analyzed": files_analyzed,
         "summary": {
-            "avg_complexity": round(avg_complexity, 2) if "complexity" in metrics else None,
+            "avg_complexity": round(avg_complexity, 2) if "complexity" in metrics_list else None,
             "avg_maintainability": (
-                round(avg_maintainability, 2) if "maintainability" in metrics else None
+                round(avg_maintainability, 2) if "maintainability" in metrics_list else None
             ),
-            "total_debt_hours": total_debt_hours if "debt" in metrics else None,
-            "total_lines": total_lines if "profile" in metrics else None,
+            "total_debt_hours": total_debt_hours if "debt" in metrics_list else None,
+            "total_lines": total_lines if "profile" in metrics_list else None,
         },
         "recommendations": recommendations,
         "formatted_report": "\n".join(report),
     }
+
+

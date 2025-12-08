@@ -1286,6 +1286,8 @@ async def generate_victor_md_from_index(root_path: Optional[str] = None) -> str:
     stats = store.get_stats()
     key_components = store.find_key_components(limit=15)
     patterns = store.get_detected_patterns()
+    named_impls = store.find_named_implementations()
+    perf_hints = store.find_performance_hints()
 
     sections = []
 
@@ -1347,6 +1349,33 @@ async def generate_victor_md_from_index(root_path: Optional[str] = None) -> str:
                 f"| {comp.name} | {comp.symbol_type} | {path_with_line} | {desc[:50]} |"
             )
 
+        sections.append("")
+
+    # Named Implementations (grouped by domain)
+    if named_impls:
+        sections.append("## Named Implementations\n")
+        for domain, impls in sorted(named_impls.items()):
+            if impls:
+                sections.append(f"### {domain}\n")
+                sections.append("| Name | Path | Description |")
+                sections.append("|------|------|-------------|")
+                for impl in sorted(impls, key=lambda x: x["name"]):
+                    desc = impl.get("description", "") or impl.get("primary_symbol", "")
+                    sections.append(f"| **{impl['name']}** | `{impl['path']}` | {desc} |")
+                sections.append("")
+
+    # Performance Hints (extracted from docstrings)
+    if perf_hints:
+        sections.append("## Performance Hints\n")
+        sections.append("*Extracted from docstrings and comments*\n")
+        hint_count = 0
+        for file_path, hints in sorted(perf_hints.items())[:10]:
+            unique_hints = list({h["value"] for h in hints})[:3]
+            if unique_hints:
+                sections.append(f"- `{file_path}`: {', '.join(unique_hints)}")
+                hint_count += 1
+                if hint_count >= 8:
+                    break
         sections.append("")
 
     # Architecture Patterns (from detected patterns)
@@ -1554,60 +1583,157 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
     return insights
 
 
-async def generate_enhanced_init_md(root_path: Optional[str] = None) -> str:
-    """Generate init.md enhanced with conversation history insights.
+async def generate_enhanced_init_md(
+    root_path: Optional[str] = None,
+    use_llm: bool = False,
+    include_conversations: bool = True,
+    on_progress: Optional[callable] = None,
+) -> str:
+    """Generate init.md using symbol index, conversation insights, and optional LLM.
 
-    Combines static codebase analysis with dynamic insights from
-    conversation history to create a more useful project context.
+    Pipeline: Index → Learn (optional) → LLM enhance (optional)
 
     Args:
-        root_path: Root directory to analyze
+        root_path: Root directory to analyze. Defaults to current directory.
+        use_llm: Whether to use LLM for enhancement (default: False)
+        include_conversations: Whether to include conversation insights (default: True)
+        on_progress: Optional callback: fn(stage: str, message: str)
 
     Returns:
-        Enhanced init.md content
+        Enhanced init.md content. Falls back gracefully if LLM fails.
     """
-    # Get base init.md from symbol store
+    import time
+
+    from victor.providers.base import Message
+
+    step_times: dict = {}
+    step_start: float = 0
+
+    def progress(stage: str, msg: str, complete: bool = False):
+        nonlocal step_start
+        if complete and step_start > 0:
+            elapsed = time.time() - step_start
+            step_times[stage] = elapsed
+            if on_progress:
+                on_progress(stage, f"✓ {msg} ({elapsed:.1f}s)")
+        else:
+            step_start = time.time()
+            if on_progress:
+                on_progress(stage, msg)
+
+    # Step 1: Index - Use SymbolStore for base content
+    progress("index", "Building symbol index...")
     base_content = await generate_victor_md_from_index(root_path)
+    progress("index", "Symbol index built", complete=True)
 
-    # Extract conversation insights
-    insights = await extract_conversation_insights(root_path)
+    # Step 2: Learn - Add conversation insights
+    if include_conversations:
+        progress("learn", "Extracting conversation insights...")
+        insights = await extract_conversation_insights(root_path)
+        sessions = insights.get("session_count", 0)
+        progress("learn", f"Insights extracted ({sessions} sessions)", complete=True)
 
-    if "error" in insights or insights["session_count"] == 0:
+        if sessions > 0:
+            enhancements = ["\n## Learned from Conversations\n"]
+            enhancements.append(
+                f"*Based on {insights['session_count']} sessions, {insights['message_count']} messages*\n"
+            )
+
+            if insights.get("hot_files"):
+                enhancements.append("### Frequently Referenced Files\n")
+                for file_path, count in insights["hot_files"][:8]:
+                    enhancements.append(f"- `{file_path}` ({count} references)")
+                enhancements.append("")
+
+            if insights.get("common_topics"):
+                topics = [t[0] for t in insights["common_topics"][:6]]
+                enhancements.append("### Common Topics\n")
+                enhancements.append(f"Keywords: {', '.join(topics)}\n")
+
+            if insights.get("faq"):
+                enhancements.append("### Frequently Asked Questions\n")
+                for faq in insights["faq"][:3]:
+                    q = (
+                        faq["question"][:100] + "..."
+                        if len(faq["question"]) > 100
+                        else faq["question"]
+                    )
+                    enhancements.append(f"- {q}")
+                enhancements.append("")
+
+            # Insert before Important Notes
+            if "## Important Notes" in base_content:
+                parts = base_content.split("## Important Notes")
+                base_content = (
+                    parts[0] + "\n".join(enhancements) + "\n## Important Notes" + parts[1]
+                )
+            else:
+                base_content += "\n" + "\n".join(enhancements)
+
+    # Step 3: Deep - Use LLM to enhance content
+    if not use_llm:
         return base_content
 
-    # Build enhancement sections
-    enhancements = []
+    progress("deep", "Enhancing with LLM analysis...")
 
-    # Add conversation-derived insights section
-    enhancements.append("\n## Learned from Conversations\n")
-    enhancements.append(
-        f"*Based on {insights['session_count']} sessions, {insights['message_count']} messages*\n"
-    )
+    try:
+        from victor.config.settings import Settings
+        from victor.providers.registry import ProviderRegistry
 
-    # Hot files (frequently discussed)
-    if insights.get("hot_files"):
-        enhancements.append("### Frequently Referenced Files\n")
-        for file_path, count in insights["hot_files"][:8]:
-            enhancements.append(f"- `{file_path}` ({count} references)")
-        enhancements.append("")
+        settings = Settings()
+        provider_name = settings.default_provider
+        model_name = settings.default_model
+        provider_settings = settings.get_provider_settings(provider_name)
+        provider = ProviderRegistry.create(provider_name, **provider_settings)
 
-    # Common topics
-    if insights.get("common_topics"):
-        topics = [t[0] for t in insights["common_topics"][:6]]
-        enhancements.append("### Common Topics\n")
-        enhancements.append(f"Keywords: {', '.join(topics)}\n")
+        if not provider:
+            logger.warning(f"Could not get provider {provider_name}, skipping LLM")
+            return base_content
 
-    # FAQ section
-    if insights.get("faq"):
-        enhancements.append("### Frequently Asked Questions\n")
-        for faq in insights["faq"][:3]:
-            q = faq["question"][:100] + "..." if len(faq["question"]) > 100 else faq["question"]
-            enhancements.append(f"- {q}")
-        enhancements.append("")
+        enhance_prompt = f"""You are an expert software architect reviewing a project documentation file.
 
-    # Insert enhancements before "Important Notes" section
-    if "## Important Notes" in base_content:
-        parts = base_content.split("## Important Notes")
-        return parts[0] + "\n".join(enhancements) + "\n## Important Notes" + parts[1]
-    else:
-        return base_content + "\n" + "\n".join(enhancements)
+Below is an auto-generated init.md file for a codebase. Your task is to:
+1. Improve the descriptions to be more specific and actionable
+2. Identify any key architectural patterns that were missed
+3. Add meaningful relationships between components
+4. Ensure the most important components are highlighted
+5. Keep the same markdown structure but enhance the content quality
+
+IMPORTANT RULES:
+- Keep all existing sections and their structure
+- Do NOT add generic advice - only project-specific insights
+- Do NOT remove any existing content, only enhance it
+- Keep the file concise - quality over quantity
+- Focus on what makes this project unique
+
+Here is the current init.md content:
+
+```markdown
+{base_content}
+```
+
+Return ONLY the enhanced markdown content, no explanations."""
+
+        messages = [Message(role="user", content=enhance_prompt)]
+        response = await provider.chat(messages, model=model_name)
+        enhanced = response.content.strip()
+        progress("deep", "LLM enhancement complete", complete=True)
+
+        # Validate and clean response
+        if enhanced.startswith("#") or enhanced.startswith("```"):
+            if enhanced.startswith("```"):
+                lines = enhanced.split("\n")
+                lines = lines[1:] if lines[0].startswith("```") else lines
+                lines = lines[:-1] if lines and lines[-1].strip() == "```" else lines
+                enhanced = "\n".join(lines)
+            await provider.close()
+            return enhanced
+
+        logger.warning("LLM response doesn't look like valid markdown")
+        await provider.close()
+        return base_content
+
+    except Exception as e:
+        progress("deep", f"LLM failed: {e}", complete=True)
+        logger.warning(f"LLM enhancement failed: {e}, using base content")
+        return base_content

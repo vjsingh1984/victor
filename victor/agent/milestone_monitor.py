@@ -139,18 +139,25 @@ class TaskToolConfigLoader:
                 },
             },
             "design": {
-                "max_exploration_iterations": 2,
+                # Architecture/design questions require thorough codebase exploration
+                # Increased from 2 to 20 to allow proper analysis
+                "max_exploration_iterations": 20,
                 "force_action_after_target_read": False,
-                "needs_tools": False,
-                "required_tools": [],
+                "needs_tools": True,  # Design tasks NEED tools to explore the codebase
+                "required_tools": ["list_directory", "read_file", "code_search"],
                 "stage_tools": {
-                    "initial": [],
-                    "reading": [],
+                    "initial": [
+                        "list_directory",
+                        "code_search",
+                        "read_file",
+                        "get_project_overview",
+                    ],
+                    "reading": ["read_file", "code_search", "list_directory"],
                     "executing": [],
-                    "verifying": [],
+                    "verifying": ["read_file"],
                 },
                 "force_action_hints": {
-                    "max_iterations": "Please provide your recommendations.",
+                    "max_iterations": "Please summarize the architecture and provide your recommendations.",
                 },
             },
             "general": {
@@ -301,7 +308,7 @@ TASK_CONFIGS: Dict[TaskType, TaskConfig] = {
     ),
     TaskType.ANALYZE: TaskConfig(
         max_exploration_iterations=20,
-        required_tools={"read_file", "execute_bash", "list_directory", "code_search"},
+        required_tools={"read", "shell", "ls", "grep"},  # Canonical short names
         completion_milestones={Milestone.SEARCH_COMPLETE},
         force_action_after_target_read=False,
         needs_tools=True,
@@ -315,21 +322,21 @@ TASK_CONFIGS: Dict[TaskType, TaskConfig] = {
     ),
     TaskType.GENERAL: TaskConfig(
         max_exploration_iterations=15,
-        required_tools={"read_file", "list_directory"},
+        required_tools={"read", "ls"},  # Canonical short names
         completion_milestones=set(),
         force_action_after_target_read=False,
         needs_tools=True,
     ),
     TaskType.ACTION: TaskConfig(
         max_exploration_iterations=25,  # Allow extensive iteration for multi-step actions (web search, git ops)
-        required_tools={"execute_bash", "web_search", "web_fetch", "write_file"},
+        required_tools={"shell", "web", "fetch", "write"},  # Canonical short names
         completion_milestones={Milestone.CHANGE_MADE},
         force_action_after_target_read=False,
         needs_tools=True,
     ),
     TaskType.ANALYSIS_DEEP: TaskConfig(
         max_exploration_iterations=30,  # Allow extensive exploration for deep analysis
-        required_tools={"read_file", "code_search", "semantic_code_search", "list_directory"},
+        required_tools={"read", "grep", "search", "ls"},  # Canonical short names
         completion_milestones={Milestone.SEARCH_COMPLETE},
         force_action_after_target_read=False,
         needs_tools=True,

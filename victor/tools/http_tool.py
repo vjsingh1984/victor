@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""HTTP/API testing tool for making HTTP requests and testing APIs.
+"""HTTP/API tool for making HTTP requests and testing APIs.
 
 Features:
 - All HTTP methods (GET, POST, PUT, PATCH, DELETE)
 - Headers and authentication
 - Request/response inspection
 - JSON, form data, file uploads
-- Response validation
+- Response validation (test mode)
 - Performance metrics
 """
 
@@ -28,54 +28,23 @@ from typing import Any, Dict, Optional
 
 import httpx
 
-from victor.tools.base import CostTier
+from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 
-@tool(cost_tier=CostTier.MEDIUM)
-async def http_request(
+async def _make_request(
     method: str,
     url: str,
-    headers: Optional[Dict[str, Any]] = None,
-    params: Optional[Dict[str, Any]] = None,
-    json: Optional[Dict[str, Any]] = None,
-    data: Optional[Dict[str, Any]] = None,
-    auth: Optional[str] = None,
-    follow_redirects: bool = True,
-    timeout: int = 30,
+    headers: Optional[Dict[str, Any]],
+    params: Optional[Dict[str, Any]],
+    json_body: Optional[Dict[str, Any]],
+    data: Optional[Dict[str, Any]],
+    auth: Optional[str],
+    follow_redirects: bool,
+    timeout: int,
 ) -> Dict[str, Any]:
-    """
-    Make an HTTP request to a URL.
-
-    Supports all HTTP methods with headers, authentication, query parameters,
-    JSON body, form data, and performance metrics.
-
-    Args:
-        method: HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS).
-        url: Request URL.
-        headers: Request headers (optional).
-        params: Query parameters (optional).
-        json: JSON body as dictionary (optional).
-        data: Form data as dictionary (optional).
-        auth: Authentication - 'Bearer TOKEN' or 'Basic USER:PASS' (optional).
-        follow_redirects: Follow redirects (default: true).
-        timeout: Request timeout in seconds (default: 30).
-
-    Returns:
-        Dictionary containing:
-        - success: Whether request succeeded
-        - status_code: HTTP status code
-        - status: Status reason phrase
-        - headers: Response headers
-        - body: Parsed JSON or text response
-        - duration_ms: Request duration in milliseconds
-        - url: Final URL (after redirects)
-        - error: Error message if failed
-    """
-    if not url:
-        return {"success": False, "error": "Missing required parameter: url"}
-
-    method = method.upper()
+    """Internal: Make HTTP request and return response data."""
+    method_upper = method.upper()
     request_headers = headers or {}
 
     # Handle authentication
@@ -83,50 +52,119 @@ async def http_request(
         if auth.startswith("Bearer ") or auth.startswith("Basic "):
             request_headers["Authorization"] = auth
 
+    start_time = time.time()
+
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=follow_redirects) as client:
+        response = await client.request(
+            method=method_upper,
+            url=url,
+            headers=request_headers,
+            params=params,
+            json=json_body,
+            data=data,
+        )
+
+    duration = time.time() - start_time
+
+    # Parse response
     try:
-        # Make request
-        start_time = time.time()
+        response_json = response.json()
+    except (ValueError, TypeError, AttributeError):
+        response_json = None
 
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=follow_redirects) as client:
-            response = await client.request(
-                method=method,
-                url=url,
-                headers=request_headers,
-                params=params,
-                json=json,
-                data=data,
-            )
-
-        duration = time.time() - start_time
-
-        # Parse response
-        try:
-            response_json = response.json()
-        except (ValueError, TypeError, AttributeError):
-            response_json = None
-
-        # Build result
-        return {
-            "success": True,
-            "status_code": response.status_code,
-            "status": response.reason_phrase,
-            "headers": dict(response.headers),
-            "body": response_json if response_json else response.text[:1000],  # Limit text
-            "duration_ms": int(duration * 1000),
-            "url": str(response.url),
-        }
-
-    except httpx.TimeoutException:
-        return {"success": False, "error": f"Request timed out after {timeout} seconds"}
-    except Exception as e:
-        return {"success": False, "error": f"Request failed: {str(e)}"}
+    return {
+        "response": response,
+        "response_json": response_json,
+        "duration": duration,
+        "method": method_upper,
+    }
 
 
-@tool
-async def http_test(
+async def _http_request(
     method: str,
     url: str,
-    expected_status: Optional[int] = None,
+    headers: Optional[Dict[str, Any]],
+    params: Optional[Dict[str, Any]],
+    json_body: Optional[Dict[str, Any]],
+    data: Optional[Dict[str, Any]],
+    auth: Optional[str],
+    follow_redirects: bool,
+    timeout: int,
+) -> Dict[str, Any]:
+    """Internal: Standard HTTP request mode."""
+    result = await _make_request(
+        method, url, headers, params, json_body, data, auth, follow_redirects, timeout
+    )
+    response = result["response"]
+
+    return {
+        "success": True,
+        "status_code": response.status_code,
+        "status": response.reason_phrase,
+        "headers": dict(response.headers),
+        "body": result["response_json"] if result["response_json"] else response.text[:1000],
+        "duration_ms": int(result["duration"] * 1000),
+        "url": str(response.url),
+    }
+
+
+async def _http_test(
+    method: str,
+    url: str,
+    headers: Optional[Dict[str, Any]],
+    params: Optional[Dict[str, Any]],
+    json_body: Optional[Dict[str, Any]],
+    data: Optional[Dict[str, Any]],
+    auth: Optional[str],
+    follow_redirects: bool,
+    timeout: int,
+    expected_status: Optional[int],
+) -> Dict[str, Any]:
+    """Internal: API test mode with validation."""
+    result = await _make_request(
+        method, url, headers, params, json_body, data, auth, follow_redirects, timeout
+    )
+    response = result["response"]
+
+    # Validate
+    validations = []
+    all_passed = True
+
+    # Check status code
+    if expected_status is not None:
+        passed = response.status_code == expected_status
+        all_passed = all_passed and passed
+        validations.append({
+            "test": "Status code",
+            "expected": expected_status,
+            "actual": response.status_code,
+            "passed": passed,
+        })
+
+    return {
+        "success": all_passed,
+        "url": str(response.url),
+        "method": result["method"],
+        "status_code": response.status_code,
+        "duration_ms": int(result["duration"] * 1000),
+        "validations": validations,
+        "all_passed": all_passed,
+        "error": "" if all_passed else "Some validations failed",
+    }
+
+
+@tool(
+    cost_tier=CostTier.MEDIUM,
+    category="web",
+    priority=Priority.MEDIUM,  # Task-specific API testing
+    access_mode=AccessMode.NETWORK,  # Makes external HTTP requests
+    danger_level=DangerLevel.SAFE,  # No local side effects
+    keywords=["http", "request", "api", "rest", "test", "endpoint", "health"],
+)
+async def http(
+    method: str,
+    url: str,
+    mode: str = "request",
     headers: Optional[Dict[str, Any]] = None,
     params: Optional[Dict[str, Any]] = None,
     json: Optional[Dict[str, Any]] = None,
@@ -134,17 +172,18 @@ async def http_test(
     auth: Optional[str] = None,
     follow_redirects: bool = True,
     timeout: int = 30,
+    expected_status: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """
-    Test an API endpoint with validation.
+    """Unified HTTP operations for requests and API testing.
 
-    Makes an HTTP request and validates the response against expected values.
-    Currently validates status code, can be extended for more validations.
+    Modes:
+    - "request": Standard HTTP request (default)
+    - "test": API testing with validation
 
     Args:
         method: HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS).
         url: Request URL.
-        expected_status: Expected HTTP status code (optional).
+        mode: Operation mode - "request" (default) or "test".
         headers: Request headers (optional).
         params: Query parameters (optional).
         json: JSON body as dictionary (optional).
@@ -152,9 +191,19 @@ async def http_test(
         auth: Authentication - 'Bearer TOKEN' or 'Basic USER:PASS' (optional).
         follow_redirects: Follow redirects (default: true).
         timeout: Request timeout in seconds (default: 30).
+        expected_status: Expected HTTP status code (for "test" mode).
 
     Returns:
-        Dictionary containing:
+        For "request" mode:
+        - success: Whether request succeeded
+        - status_code: HTTP status code
+        - status: Status reason phrase
+        - headers: Response headers
+        - body: Parsed JSON or text response
+        - duration_ms: Request duration in milliseconds
+        - url: Final URL (after redirects)
+
+        For "test" mode:
         - success: Whether all validations passed
         - url: Final URL tested
         - method: HTTP method used
@@ -164,63 +213,23 @@ async def http_test(
         - all_passed: Whether all validations passed
         - error: Error message if request failed
     """
-    # Make request first using http_request
-    # We need to call the underlying logic directly to avoid double decoration
     if not url:
         return {"success": False, "error": "Missing required parameter: url"}
 
-    method_upper = method.upper()
-    request_headers = headers or {}
-
-    # Handle authentication
-    if auth:
-        if auth.startswith("Bearer ") or auth.startswith("Basic "):
-            request_headers["Authorization"] = auth
+    mode_lower = mode.lower().strip()
 
     try:
-        # Make request
-        start_time = time.time()
-
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=follow_redirects) as client:
-            response = await client.request(
-                method=method_upper,
-                url=url,
-                headers=request_headers,
-                params=params,
-                json=json,
-                data=data,
+        if mode_lower == "request":
+            return await _http_request(
+                method, url, headers, params, json, data, auth, follow_redirects, timeout
             )
-
-        duration = time.time() - start_time
-
-        # Validate
-        validations = []
-        all_passed = True
-
-        # Check status code
-        if expected_status is not None:
-            passed = response.status_code == expected_status
-            all_passed = all_passed and passed
-            validations.append(
-                {
-                    "test": "Status code",
-                    "expected": expected_status,
-                    "actual": response.status_code,
-                    "passed": passed,
-                }
+        elif mode_lower == "test":
+            return await _http_test(
+                method, url, headers, params, json, data, auth, follow_redirects, timeout,
+                expected_status
             )
-
-        # Build test result
-        return {
-            "success": all_passed,
-            "url": str(response.url),
-            "method": method_upper,
-            "status_code": response.status_code,
-            "duration_ms": int(duration * 1000),
-            "validations": validations,
-            "all_passed": all_passed,
-            "error": "" if all_passed else "Some validations failed",
-        }
+        else:
+            return {"success": False, "error": f"Unknown mode '{mode}'. Use 'request' or 'test'."}
 
     except httpx.TimeoutException:
         return {"success": False, "error": f"Request timed out after {timeout} seconds"}

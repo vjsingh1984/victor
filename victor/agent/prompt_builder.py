@@ -66,12 +66,28 @@ TASK_TYPE_HINTS = {
     "analysis_deep": """[ANALYSIS] Thorough codebase exploration. Read all relevant modules. Comprehensive output.""",
     "analyze": """[ANALYZE] Examine code carefully. Read related files. Structured findings.""",
     "design": """[ARCHITECTURE] For architecture/component questions:
-1. FIRST: Read README.md, CLAUDE.md, or project docs to understand high-level structure
-2. THEN: List main src/ directories to identify actual modules
-3. Filter out test/, demo/, examples/, clients/ when listing "key" components
-4. Rank by: file size, import frequency, centrality - NOT alphabetically
-5. Improvements must reference ACTUAL code patterns (e.g., "line 150 uses X, could be Y")
-Do NOT list components alphabetically. Prioritize by architectural importance.""",
+DOC-FIRST STRATEGY (mandatory order):
+1. FIRST: Read architecture docs if they exist:
+   - read_file CLAUDE.md, .victor/init.md, README.md, ARCHITECTURE.md
+   - These contain component lists, named implementations, and key relationships
+2. SECOND: Explore implementation directories systematically:
+   - list_directory on src/, lib/, engines/, impls/, modules/, core/, services/
+   - Directory names under impls/ or engines/ are often named implementations
+   - Look for ALL-CAPS directory/file names - these are typically named engines/components
+3. THIRD: Read key implementation files for each component found
+4. FOURTH: Look for benchmark/test files (benches/, *_bench*, *_test*) for performance insights
+
+DISCOVERY PATTERNS - Look for:
+- Named implementations: Directories with ALL-CAPS names (engines, stores, protocols)
+- Factories/registries: Files named *_factory.*, *_registry.*, mod.rs, index.ts
+- Core abstractions: base.py, interface.*, trait definitions
+- Configuration: *.yaml, *.toml in config/ directories
+
+Output requirements:
+- Use discovered component names (not generic descriptions like "storage module")
+- Include file:line references (e.g., "src/engines/impl.rs:42")
+- Verify improvements reference ACTUAL code patterns (grep first)
+Use 15-20 tool calls minimum. Prioritize by architectural importance.""",
     "general": """[GENERAL] Moderate exploration. 3-6 tool calls. Answer concisely.""",
 }
 

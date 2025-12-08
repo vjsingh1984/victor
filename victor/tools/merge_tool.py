@@ -26,7 +26,15 @@ from victor.merge import (
     MergeManager,
     ResolutionStrategy,
 )
-from victor.tools.base import BaseTool, CostTier, ToolMetadata, ToolResult
+from victor.tools.base import (
+    AccessMode,
+    BaseTool,
+    CostTier,
+    DangerLevel,
+    Priority,
+    ToolMetadata,
+    ToolResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +76,21 @@ class MergeConflictTool(BaseTool):
     @property
     def cost_tier(self) -> CostTier:
         return CostTier.FREE
+
+    @property
+    def priority(self) -> Priority:
+        """Tool priority for selection availability."""
+        return Priority.MEDIUM  # Task-specific conflict resolution
+
+    @property
+    def access_mode(self) -> AccessMode:
+        """Tool access mode for approval tracking."""
+        return AccessMode.MIXED  # Reads repo state and can modify files
+
+    @property
+    def danger_level(self) -> DangerLevel:
+        """Danger level for warning/confirmation logic."""
+        return DangerLevel.MEDIUM  # Modifies conflicted files
 
     @property
     def metadata(self) -> ToolMetadata:

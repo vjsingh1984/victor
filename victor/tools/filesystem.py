@@ -14,13 +14,492 @@
 
 """Filesystem tools for reading, writing, and listing contents."""
 
+import logging
+from dataclasses import dataclass
+from enum import Enum, auto
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Callable, Tuple
 
 import aiofiles
 
+from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
 from victor.tools.decorators import tool
 
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# FILE TYPE DETECTION SYSTEM
+# ============================================================================
+# Extensible architecture for detecting file types via magic bytes and extensions.
+# Future: Add handlers for PDF, images, archives, etc. via the handler registry.
+
+
+class FileCategory(Enum):
+    """High-level file category for routing to appropriate handlers."""
+
+    TEXT = auto()  # Plain text, code, config files
+    DOCUMENT = auto()  # PDF, DOCX, ODT, etc.
+    IMAGE = auto()  # PNG, JPEG, GIF, WebP, etc.
+    ARCHIVE = auto()  # ZIP, TAR, RAR, 7Z, etc.
+    DATABASE = auto()  # SQLite, etc.
+    MEDIA = auto()  # Audio/video files
+    COMPILED = auto()  # Executables, bytecode, shared libraries
+    DATA = auto()  # Generic binary data
+
+
+@dataclass
+class FileTypeInfo:
+    """Information about a detected file type."""
+
+    category: FileCategory
+    mime_type: str
+    description: str
+    extensions: Tuple[str, ...]  # Expected extensions for this type
+    magic_bytes: Optional[bytes] = None  # Magic signature if detected
+    magic_offset: int = 0  # Offset where magic bytes are found
+    suggestion: str = ""  # Help message for unsupported types
+
+
+# Magic bytes signatures for common file types
+# Format: (magic_bytes, offset, FileTypeInfo)
+# Order matters: more specific signatures should come first
+MAGIC_SIGNATURES: List[Tuple[bytes, int, FileTypeInfo]] = [
+    # Documents
+    (
+        b"%PDF",
+        0,
+        FileTypeInfo(
+            category=FileCategory.DOCUMENT,
+            mime_type="application/pdf",
+            description="PDF document",
+            extensions=(".pdf",),
+            suggestion="PDF reading support coming soon. For now, use `pdftotext` externally.",
+        ),
+    ),
+    (
+        b"PK\x03\x04",
+        0,
+        FileTypeInfo(
+            category=FileCategory.ARCHIVE,
+            mime_type="application/zip",
+            description="ZIP archive (or DOCX/XLSX/PPTX)",
+            extensions=(
+                ".zip",
+                ".docx",
+                ".xlsx",
+                ".pptx",
+                ".odt",
+                ".ods",
+                ".odp",
+                ".jar",
+                ".whl",
+                ".apk",
+            ),
+            suggestion="Use `unzip -l` to list contents, or extract and read individual files.",
+        ),
+    ),
+    (
+        b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",
+        0,
+        FileTypeInfo(
+            category=FileCategory.DOCUMENT,
+            mime_type="application/msword",
+            description="Microsoft Office legacy format (DOC/XLS/PPT)",
+            extensions=(".doc", ".xls", ".ppt"),
+            suggestion="Convert to .docx/.xlsx/.pptx or use external tools to extract text.",
+        ),
+    ),
+    # Images
+    (
+        b"\x89PNG\r\n\x1a\n",
+        0,
+        FileTypeInfo(
+            category=FileCategory.IMAGE,
+            mime_type="image/png",
+            description="PNG image",
+            extensions=(".png",),
+            suggestion="Image viewing support coming soon. Check for related text/alt-text files.",
+        ),
+    ),
+    (
+        b"\xff\xd8\xff",
+        0,
+        FileTypeInfo(
+            category=FileCategory.IMAGE,
+            mime_type="image/jpeg",
+            description="JPEG image",
+            extensions=(".jpg", ".jpeg"),
+            suggestion="Image viewing support coming soon. Check for related text/alt-text files.",
+        ),
+    ),
+    (
+        b"GIF87a",
+        0,
+        FileTypeInfo(
+            category=FileCategory.IMAGE,
+            mime_type="image/gif",
+            description="GIF image (GIF87a)",
+            extensions=(".gif",),
+            suggestion="Image viewing support coming soon.",
+        ),
+    ),
+    (
+        b"GIF89a",
+        0,
+        FileTypeInfo(
+            category=FileCategory.IMAGE,
+            mime_type="image/gif",
+            description="GIF image (GIF89a)",
+            extensions=(".gif",),
+            suggestion="Image viewing support coming soon.",
+        ),
+    ),
+    (
+        b"RIFF",
+        0,
+        FileTypeInfo(
+            category=FileCategory.IMAGE,
+            mime_type="image/webp",
+            description="WebP image (RIFF container)",
+            extensions=(".webp",),
+            suggestion="Image viewing support coming soon.",
+        ),
+    ),
+    (
+        b"BM",
+        0,
+        FileTypeInfo(
+            category=FileCategory.IMAGE,
+            mime_type="image/bmp",
+            description="BMP image",
+            extensions=(".bmp",),
+            suggestion="Image viewing support coming soon.",
+        ),
+    ),
+    (
+        b"II*\x00",
+        0,
+        FileTypeInfo(
+            category=FileCategory.IMAGE,
+            mime_type="image/tiff",
+            description="TIFF image (little-endian)",
+            extensions=(".tiff", ".tif"),
+            suggestion="Image viewing support coming soon.",
+        ),
+    ),
+    (
+        b"MM\x00*",
+        0,
+        FileTypeInfo(
+            category=FileCategory.IMAGE,
+            mime_type="image/tiff",
+            description="TIFF image (big-endian)",
+            extensions=(".tiff", ".tif"),
+            suggestion="Image viewing support coming soon.",
+        ),
+    ),
+    (
+        b"\x00\x00\x01\x00",
+        0,
+        FileTypeInfo(
+            category=FileCategory.IMAGE,
+            mime_type="image/x-icon",
+            description="ICO icon file",
+            extensions=(".ico",),
+            suggestion="Icon files are binary images. Check for SVG alternatives.",
+        ),
+    ),
+    # Archives
+    (
+        b"Rar!\x1a\x07",
+        0,
+        FileTypeInfo(
+            category=FileCategory.ARCHIVE,
+            mime_type="application/x-rar-compressed",
+            description="RAR archive",
+            extensions=(".rar",),
+            suggestion="Use `unrar l` to list contents.",
+        ),
+    ),
+    (
+        b"7z\xbc\xaf\x27\x1c",
+        0,
+        FileTypeInfo(
+            category=FileCategory.ARCHIVE,
+            mime_type="application/x-7z-compressed",
+            description="7-Zip archive",
+            extensions=(".7z",),
+            suggestion="Use `7z l` to list contents.",
+        ),
+    ),
+    (
+        b"\x1f\x8b",
+        0,
+        FileTypeInfo(
+            category=FileCategory.ARCHIVE,
+            mime_type="application/gzip",
+            description="Gzip compressed file",
+            extensions=(".gz", ".tgz"),
+            suggestion="Use `zcat` to view contents, or `tar -tzf` for tarballs.",
+        ),
+    ),
+    (
+        b"BZh",
+        0,
+        FileTypeInfo(
+            category=FileCategory.ARCHIVE,
+            mime_type="application/x-bzip2",
+            description="Bzip2 compressed file",
+            extensions=(".bz2",),
+            suggestion="Use `bzcat` to view contents.",
+        ),
+    ),
+    (
+        b"\xfd7zXZ\x00",
+        0,
+        FileTypeInfo(
+            category=FileCategory.ARCHIVE,
+            mime_type="application/x-xz",
+            description="XZ compressed file",
+            extensions=(".xz",),
+            suggestion="Use `xzcat` to view contents.",
+        ),
+    ),
+    # Database
+    (
+        b"SQLite format 3",
+        0,
+        FileTypeInfo(
+            category=FileCategory.DATABASE,
+            mime_type="application/x-sqlite3",
+            description="SQLite database",
+            extensions=(".db", ".sqlite", ".sqlite3"),
+            suggestion="Use `sqlite3 file.db '.tables'` to explore the database.",
+        ),
+    ),
+    # Media
+    (
+        b"ID3",
+        0,
+        FileTypeInfo(
+            category=FileCategory.MEDIA,
+            mime_type="audio/mpeg",
+            description="MP3 audio (ID3 tag)",
+            extensions=(".mp3",),
+            suggestion="Media files cannot be read as text.",
+        ),
+    ),
+    (
+        b"\xff\xfb",
+        0,
+        FileTypeInfo(
+            category=FileCategory.MEDIA,
+            mime_type="audio/mpeg",
+            description="MP3 audio (frame sync)",
+            extensions=(".mp3",),
+            suggestion="Media files cannot be read as text.",
+        ),
+    ),
+    (
+        b"fLaC",
+        0,
+        FileTypeInfo(
+            category=FileCategory.MEDIA,
+            mime_type="audio/flac",
+            description="FLAC audio",
+            extensions=(".flac",),
+            suggestion="Media files cannot be read as text.",
+        ),
+    ),
+    (
+        b"OggS",
+        0,
+        FileTypeInfo(
+            category=FileCategory.MEDIA,
+            mime_type="audio/ogg",
+            description="Ogg container (audio/video)",
+            extensions=(".ogg", ".ogv", ".oga"),
+            suggestion="Media files cannot be read as text.",
+        ),
+    ),
+    # Compiled/executables
+    (
+        b"\x7fELF",
+        0,
+        FileTypeInfo(
+            category=FileCategory.COMPILED,
+            mime_type="application/x-elf",
+            description="ELF executable/shared library",
+            extensions=(".so", ".o", ""),
+            suggestion="This is a compiled binary. Check for source files instead.",
+        ),
+    ),
+    (
+        b"MZ",
+        0,
+        FileTypeInfo(
+            category=FileCategory.COMPILED,
+            mime_type="application/x-msdownload",
+            description="Windows executable (PE/MZ)",
+            extensions=(".exe", ".dll"),
+            suggestion="This is a compiled binary. Check for source files instead.",
+        ),
+    ),
+    (
+        b"\xca\xfe\xba\xbe",
+        0,
+        FileTypeInfo(
+            category=FileCategory.COMPILED,
+            mime_type="application/java-archive",
+            description="Java class file / Mach-O fat binary",
+            extensions=(".class",),
+            suggestion="This is compiled Java bytecode. Check for .java source files.",
+        ),
+    ),
+    (
+        b"\xcf\xfa\xed\xfe",
+        0,
+        FileTypeInfo(
+            category=FileCategory.COMPILED,
+            mime_type="application/x-mach-binary",
+            description="Mach-O binary (64-bit)",
+            extensions=("", ".dylib"),
+            suggestion="This is a compiled macOS binary. Check for source files instead.",
+        ),
+    ),
+    (
+        b"\xce\xfa\xed\xfe",
+        0,
+        FileTypeInfo(
+            category=FileCategory.COMPILED,
+            mime_type="application/x-mach-binary",
+            description="Mach-O binary (32-bit)",
+            extensions=("", ".dylib"),
+            suggestion="This is a compiled macOS binary. Check for source files instead.",
+        ),
+    ),
+    # Python bytecode
+    # Note: Python bytecode magic changes with versions, so we check extension primarily
+]
+
+# Maximum bytes to read for magic detection
+MAGIC_BYTES_READ_SIZE = 32
+
+
+def detect_file_type_by_magic(file_path: Path) -> Optional[FileTypeInfo]:
+    """Detect file type by reading magic bytes from file header.
+
+    Args:
+        file_path: Path to the file to inspect
+
+    Returns:
+        FileTypeInfo if a known signature is found, None otherwise
+    """
+    try:
+        with open(file_path, "rb") as f:
+            header = f.read(MAGIC_BYTES_READ_SIZE)
+    except (IOError, PermissionError):
+        return None
+
+    if not header:
+        return None
+
+    for magic_bytes, offset, type_info in MAGIC_SIGNATURES:
+        if len(header) >= offset + len(magic_bytes):
+            if header[offset : offset + len(magic_bytes)] == magic_bytes:
+                # Return a copy with the detected magic bytes
+                return FileTypeInfo(
+                    category=type_info.category,
+                    mime_type=type_info.mime_type,
+                    description=type_info.description,
+                    extensions=type_info.extensions,
+                    magic_bytes=magic_bytes,
+                    magic_offset=offset,
+                    suggestion=type_info.suggestion,
+                )
+
+    return None
+
+
+def check_extension_magic_mismatch(
+    file_path: Path, magic_type: Optional[FileTypeInfo]
+) -> Optional[str]:
+    """Check if file extension matches detected magic bytes.
+
+    Returns a warning message if there's a mismatch, None otherwise.
+    """
+    if magic_type is None:
+        return None
+
+    ext = file_path.suffix.lower()
+
+    # If extension matches expected extensions, no warning
+    if ext in magic_type.extensions:
+        return None
+
+    # Extension doesn't match magic bytes - potential mismatch
+    expected_exts = ", ".join(magic_type.extensions) if magic_type.extensions else "(none)"
+    return (
+        f"Warning: File extension '{ext}' doesn't match detected content type.\n"
+        f"Detected: {magic_type.description} (mime: {magic_type.mime_type})\n"
+        f"Expected extensions: {expected_exts}\n"
+        f"The file may have been renamed or misidentified."
+    )
+
+
+# ============================================================================
+# BINARY FILE HANDLER REGISTRY (Extensible Architecture)
+# ============================================================================
+# Future handlers for different binary types can be registered here.
+# Each handler takes a Path and returns extracted text content.
+
+BinaryFileHandler = Callable[[Path], str]
+
+# Registry for binary file handlers by category
+# Future: Add handlers like:
+#   FileCategory.DOCUMENT: pdf_handler, docx_handler
+#   FileCategory.IMAGE: image_description_handler
+#   FileCategory.ARCHIVE: archive_list_handler
+_BINARY_HANDLERS: Dict[FileCategory, BinaryFileHandler] = {}
+
+
+def register_binary_handler(category: FileCategory, handler: BinaryFileHandler) -> None:
+    """Register a handler for a binary file category.
+
+    Args:
+        category: The file category this handler supports
+        handler: Function that takes a Path and returns extracted text content
+
+    Example:
+        def pdf_handler(path: Path) -> str:
+            # Extract text from PDF
+            return extracted_text
+
+        register_binary_handler(FileCategory.DOCUMENT, pdf_handler)
+    """
+    _BINARY_HANDLERS[category] = handler
+
+
+def unregister_binary_handler(category: FileCategory) -> None:
+    """Unregister a handler for a binary file category.
+
+    Useful for test cleanup to avoid test pollution.
+
+    Args:
+        category: The file category to unregister
+    """
+    _BINARY_HANDLERS.pop(category, None)
+
+
+def get_binary_handler(category: FileCategory) -> Optional[BinaryFileHandler]:
+    """Get the handler for a binary file category, if one is registered."""
+    return _BINARY_HANDLERS.get(category)
+
+
+# ============================================================================
+# FILE TYPE CONSTANTS
+# ============================================================================
 
 # Supported text/code file extensions
 TEXT_EXTENSIONS = {
@@ -146,6 +625,14 @@ TEXT_EXTENSIONS = {
 
 @tool(
     category="filesystem",
+    priority=Priority.CRITICAL,  # Always available for selection
+    access_mode=AccessMode.READONLY,  # Only reads files
+    danger_level=DangerLevel.SAFE,  # No side effects
+    # Registry-driven metadata for tool selection and loop detection
+    progress_params=["path", "offset", "limit"],  # Params indicating exploration progress
+    stages=["reading", "initial", "analysis"],  # Conversation stages where relevant
+    task_types=["analysis", "search"],  # Task types for classification-aware selection
+    execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
         "read",
         "file",
@@ -175,31 +662,34 @@ TEXT_EXTENSIONS = {
         "search for 'def calculate' in utils.py",
         "show first 50 lines of main.py",
     ],
+    mandatory_keywords=["read file", "show file", "explain this code", "what does this"],  # Force inclusion
     priority_hints=[
         "Use for TEXT and CODE files only (.py, .js, .json, .yaml, .md, etc.)",
         "NOT for binary files (.pdf, .docx, .db, .pyc, images, archives)",
         "Use search parameter for efficient grep-like targeted lookups",
-        "Use list_directory first if unsure what files exist",
+        "Use ls first if unsure what files exist",
     ],
 )
-async def read_file(
+async def read(
     path: str,
     offset: int = 0,
     limit: int = 0,
     search: str = "",
-    context_lines: int = 2,
+    ctx: int = 2,
     regex: bool = False,
 ) -> str:
-    """Read TEXT/CODE file contents with optional search and line range.
+    """Read text/code file. Binary files rejected.
 
-    SUPPORTED: .py, .js, .ts, .java, .go, .rs, .c, .cpp, .json, .yaml, .toml,
-               .xml, .html, .css, .md, .txt, .sh, .sql, .env, config files, etc.
+    Args:
+        path: File path
+        offset: Start line (0=beginning)
+        limit: Max lines (0=all)
+        search: Grep pattern
+        ctx: Context lines around matches
+        regex: Pattern is regex
 
-    NOT SUPPORTED: Binary files (.pdf, .docx, .xlsx, .db, .sqlite, .pyc, .pkl,
-                   images, videos, archives). These will return an error.
-
-    Use search param for efficient grep-like lookup (returns matches + context_lines).
-    Use offset/limit for line ranges. Default: returns full file.
+    Returns:
+        File content or matching lines.
     """
     file_path = Path(path).expanduser().resolve()
 
@@ -338,6 +828,42 @@ async def read_file(
     for info in BINARY_CATEGORIES.values():
         ALL_BINARY_EXTENSIONS.update(info["extensions"])
 
+    # =========================================================================
+    # MAGIC BYTES DETECTION (Primary check - cannot be spoofed by extension)
+    # =========================================================================
+    # Detect actual file type via magic bytes first
+    magic_type = detect_file_type_by_magic(file_path)
+
+    if magic_type is not None:
+        # Check for extension/magic mismatch (potential spoofing or misnamed file)
+        mismatch_warning = check_extension_magic_mismatch(file_path, magic_type)
+        if mismatch_warning:
+            logger.warning(mismatch_warning)
+
+        # If magic bytes indicate binary content, check if we have a handler
+        if magic_type.category != FileCategory.TEXT:
+            handler = get_binary_handler(magic_type.category)
+            if handler is not None:
+                # Future: Use registered handler to extract text
+                try:
+                    return handler(file_path)
+                except Exception as e:
+                    logger.error(f"Binary handler failed for {path}: {e}")
+                    # Fall through to error
+
+            # No handler available - provide helpful error with magic-based info
+            raise ValueError(
+                f"Cannot read binary file: {path}\n"
+                f"Detected type: {magic_type.description}\n"
+                f"MIME type: {magic_type.mime_type}\n"
+                f"Category: {magic_type.category.name}\n"
+                + (f"Suggestion: {magic_type.suggestion}" if magic_type.suggestion else "")
+                + (f"\n\n{mismatch_warning}" if mismatch_warning else "")
+            )
+
+    # =========================================================================
+    # EXTENSION-BASED CHECK (Fallback for files without recognized magic bytes)
+    # =========================================================================
     # Check by extension
     if file_path.suffix.lower() in ALL_BINARY_EXTENSIONS:
         raise ValueError(_get_binary_error(file_path.suffix, path))
@@ -351,6 +877,9 @@ async def read_file(
             f"or use 'coverage report' to see formatted coverage data."
         )
 
+    # =========================================================================
+    # TEXT FILE READING
+    # =========================================================================
     # Try to read the file, handling encoding errors gracefully
     try:
         async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
@@ -376,7 +905,7 @@ async def read_file(
 
     offset = _to_int(offset, 0)
     limit = _to_int(limit, 0)
-    context_lines = _to_int(context_lines, 2)
+    ctx = _to_int(ctx, 2)
 
     # TOKEN-EFFICIENT MODE: Search/grep
     if search:
@@ -385,8 +914,8 @@ async def read_file(
         result = grep_lines(
             content=content,
             pattern=search,
-            context_before=context_lines,
-            context_after=context_lines,
+            context_before=ctx,
+            context_after=ctx,
             case_sensitive=True,
             is_regex=regex,
             max_matches=50,
@@ -420,6 +949,14 @@ async def read_file(
 
 @tool(
     category="filesystem",
+    priority=Priority.CRITICAL,  # Always available for selection
+    access_mode=AccessMode.WRITE,  # Creates/overwrites files
+    danger_level=DangerLevel.LOW,  # Minor risk, easily undoable
+    # Registry-driven metadata for tool selection and cache invalidation
+    progress_params=["path"],  # Same file = loop, regardless of content
+    stages=["executing"],  # Conversation stages where relevant
+    task_types=["edit", "generation", "action"],  # Task types for classification-aware selection
+    execution_category=ExecutionCategory.WRITE,  # Cannot run in parallel with conflicting ops
     keywords=[
         "write",
         "file",
@@ -447,15 +984,19 @@ async def read_file(
     ],
     priority_hints=[
         "Use for creating new files or completely replacing file content",
-        "For surgical edits to existing files, use edit_files with 'replace' operation instead",
+        "For surgical edits to existing files, use edit with 'replace' operation instead",
         "Supports undo via /undo command",
     ],
 )
-async def write_file(path: str, content: str) -> str:
-    """Write/overwrite file with content. Creates parent dirs if needed.
+async def write(path: str, content: str) -> str:
+    """Write file. Creates parent dirs. Use edit_files for partial edits.
 
-    For surgical edits (replace specific text), use edit_files instead.
-    Supports /undo to revert.
+    Args:
+        path: File path (creates dirs)
+        content: Full content (overwrites)
+
+    Returns:
+        Success message.
     """
     from victor.agent.change_tracker import ChangeType, get_change_tracker
 
@@ -499,6 +1040,14 @@ async def write_file(path: str, content: str) -> str:
 
 @tool(
     category="filesystem",
+    priority=Priority.CRITICAL,  # Always available for selection
+    access_mode=AccessMode.READONLY,  # Only reads directory contents
+    danger_level=DangerLevel.SAFE,  # No side effects
+    # Registry-driven metadata for tool selection and loop detection
+    progress_params=["path", "depth", "pattern"],  # Params indicating exploration progress
+    stages=["initial", "reading"],  # Conversation stages where relevant
+    task_types=["search", "analysis"],  # Task types for classification-aware selection
+    execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
         "list",
         "directory",
@@ -525,25 +1074,30 @@ async def write_file(path: str, content: str) -> str:
         "find all test files",
         "list directories only",
     ],
+    mandatory_keywords=["list files", "show files", "how many files", "count files"],  # Force inclusion
     priority_hints=[
         "Use for browsing directory contents",
-        "Use pattern parameter for efficient filtering",
-        "Use extensions parameter to filter by file type",
+        "Use pattern parameter for filtering (e.g., '*.py', 'test_*')",
     ],
 )
-async def list_directory(
+async def ls(
     path: str,
     recursive: bool = False,
+    depth: int = 1,
     pattern: str = "",
-    extensions: str = "",
-    dirs_only: bool = False,
-    files_only: bool = False,
-    max_items: int = 500,
+    limit: int = 1000,
 ) -> List[Dict[str, Any]]:
-    """List directory contents with filtering.
+    """List directory contents.
 
-    Filters: pattern (glob), extensions (comma-separated), dirs_only, files_only.
-    Use recursive=True to traverse subdirectories. Max 500 items by default.
+    Args:
+        path: Directory path
+        recursive: All levels (ignores depth)
+        depth: Levels to explore (1=children)
+        pattern: Glob filter (*.py, test_*)
+        limit: Max entries
+
+    Returns:
+        List of {name/path, type, depth}.
     """
     import fnmatch
 
@@ -555,67 +1109,88 @@ async def list_directory(
         if not dir_path.is_dir():
             raise NotADirectoryError(f"Path is not a directory: {path}")
 
-        # Parse extensions if provided
-        ext_set = None
-        if extensions:
-            ext_set = {ext if ext.startswith(".") else f".{ext}" for ext in extensions.split(",")}
-
-        # Normalize max_items (handle non-int input from model)
-        if not isinstance(max_items, int):
-            max_items = (
-                int(max_items) if isinstance(max_items, str) and max_items.isdigit() else 500
-            )
+        # Normalize limit (handle non-int input from model)
+        if not isinstance(limit, int):
+            limit = int(limit) if isinstance(limit, str) and limit.isdigit() else 1000
 
         items = []
         count = 0
 
-        if recursive:
-            iterator = dir_path.rglob("*")
-        else:
-            iterator = sorted(dir_path.iterdir())
+        # Normalize depth (handle non-int input from model)
+        if not isinstance(depth, int):
+            depth = int(depth) if isinstance(depth, str) and depth.isdigit() else 1
 
-        for p in iterator:
-            if count >= max_items:
+        # Determine max depth for traversal
+        max_depth = float("inf") if recursive else depth
+
+        def walk_breadth_first(base: Path):
+            """Walk directory breadth-first (level by level)."""
+            from collections import deque
+
+            queue = deque([(base, 0)])  # (path, current_depth)
+
+            while queue:
+                current, current_depth = queue.popleft()
+                if current_depth > 0:  # Don't yield the root
+                    yield current, current_depth
+
+                if current.is_dir() and current_depth < max_depth:
+                    try:
+                        children = sorted(current.iterdir())
+                        for child in children:
+                            queue.append((child, current_depth + 1))
+                    except PermissionError:
+                        pass
+
+        def walk_depth_first(base: Path, current_depth: int):
+            """Walk directory depth-first (recursive)."""
+            if current_depth > max_depth:
+                return
+            try:
+                for p in sorted(base.iterdir()):
+                    yield p, current_depth
+                    if p.is_dir():
+                        yield from walk_depth_first(p, current_depth + 1)
+            except PermissionError:
+                pass
+
+        if depth == 1 and not recursive:
+            # Only immediate children (optimized path)
+            iterator = ((p, 1) for p in sorted(dir_path.iterdir()))
+        else:
+            # Breadth-first: see all children at each level first (better coverage when truncated)
+            iterator = walk_breadth_first(dir_path)
+
+        # Use relative paths when exploring beyond depth 1
+        use_relative_paths = recursive or depth > 1
+
+        for p, entry_depth in iterator:
+            if count >= limit:
                 break
 
             is_dir = p.is_dir()
-            name = str(p.relative_to(dir_path)) if recursive else p.name
-
-            # Apply filters
-            if dirs_only and not is_dir:
-                continue
-            if files_only and is_dir:
-                continue
+            name = str(p.relative_to(dir_path)) if use_relative_paths else p.name
 
             # Pattern filter (glob)
             if pattern and not fnmatch.fnmatch(name, pattern):
                 continue
 
-            # Extension filter
-            if ext_set and not is_dir and p.suffix not in ext_set:
-                continue
-
             items.append(
                 {
-                    "path" if recursive else "name": name,
+                    "path" if use_relative_paths else "name": name,
                     "type": "directory" if is_dir else "file",
+                    "depth": entry_depth,
                 }
             )
             count += 1
 
-        # Add metadata if filtered
-        if pattern or extensions or dirs_only or files_only:
-            # Return with metadata header
+        # Add metadata if filtered or truncated
+        if pattern or count >= limit:
             return {
                 "items": items,
                 "count": len(items),
-                "truncated": count >= max_items,
-                "filters": {
-                    "pattern": pattern or None,
-                    "extensions": extensions or None,
-                    "dirs_only": dirs_only,
-                    "files_only": files_only,
-                },
+                "truncated": count >= limit,
+                "filter": pattern or None,
             }
 
         return items
@@ -623,3 +1198,216 @@ async def list_directory(
     except Exception as e:
         # Let the decorator handle the exception and format it
         raise e
+
+
+# Important documentation file patterns (case-insensitive)
+IMPORTANT_DOC_PATTERNS = [
+    "readme*",
+    "architecture*",
+    "index*",
+    "claude*",
+    "contributing*",
+    "changelog*",
+    "license*",
+    "design*",
+    "overview*",
+    "getting*started*",
+    "setup*",
+    "install*",
+]
+
+
+@tool(
+    category="filesystem",
+    priority=Priority.HIGH,  # Useful for initial exploration
+    access_mode=AccessMode.READONLY,  # Only reads directory structure
+    danger_level=DangerLevel.SAFE,  # No side effects
+    # Registry-driven metadata for tool selection and loop detection
+    progress_params=["path", "max_depth"],  # Params indicating exploration progress
+    stages=["initial"],  # Best used at start of conversation
+    task_types=["analysis", "search"],  # Task types for classification-aware selection
+    execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
+    keywords=[
+        "overview",
+        "project",
+        "structure",
+        "explore",
+        "summary",
+        "codebase",
+        "architecture",
+    ],
+    use_cases=[
+        "getting a project overview",
+        "understanding codebase structure",
+        "finding important files",
+        "initial exploration",
+    ],
+    examples=[
+        "show me the project overview",
+        "what's in this codebase",
+        "explore the project structure",
+    ],
+)
+async def overview(
+    path: str = ".",
+    max_depth: int = 2,
+    top_files_by_size: int = 100,
+    top_doc_files: int = 15,
+) -> Dict[str, Any]:
+    """Get a curated project overview for initial exploration.
+
+    Provides:
+    1. Directory structure at max_depth (default: 2 levels)
+    2. Top documentation files (README*, ARCHITECTURE*, INDEX*, etc.)
+    3. Largest source files by size (helps identify core modules)
+
+    Args:
+        path: Root directory to explore (default: current directory)
+        max_depth: Directory exploration depth (default: 2)
+        top_files_by_size: Number of largest files to include (default: 100)
+        top_doc_files: Number of documentation files to include (default: 15)
+
+    Returns:
+        Dict with directories, important_docs, and largest_files sections
+    """
+    import fnmatch
+
+    try:
+        root = Path(path).expanduser().resolve()
+        if not root.exists():
+            raise FileNotFoundError(f"Directory not found: {path}")
+        if not root.is_dir():
+            raise NotADirectoryError(f"Path is not a directory: {path}")
+
+        # Excluded directories
+        exclude_dirs = {
+            ".git",
+            "node_modules",
+            "venv",
+            ".venv",
+            "__pycache__",
+            ".tox",
+            ".pytest_cache",
+            ".mypy_cache",
+            "dist",
+            "build",
+            ".eggs",
+            "htmlcov",
+            ".cache",
+            ".ruff_cache",
+        }
+
+        # Documentation extensions
+        doc_extensions = {".md", ".rst", ".txt", ".adoc"}
+
+        # Collect all files with metadata
+        all_files: List[Dict[str, Any]] = []
+        directories: List[Dict[str, Any]] = []
+        important_docs: List[Dict[str, Any]] = []
+
+        def walk_tree(base: Path, current_depth: int):
+            """Walk tree collecting files and directories."""
+            if current_depth > max_depth:
+                return
+            try:
+                for p in sorted(base.iterdir()):
+                    rel_path = str(p.relative_to(root))
+
+                    # Skip excluded directories
+                    if p.is_dir() and p.name in exclude_dirs:
+                        continue
+                    # Skip hidden files/dirs
+                    if p.name.startswith("."):
+                        continue
+
+                    if p.is_dir():
+                        directories.append(
+                            {
+                                "path": rel_path,
+                                "depth": current_depth,
+                            }
+                        )
+                        walk_tree(p, current_depth + 1)
+                    else:
+                        try:
+                            size = p.stat().st_size
+                        except OSError:
+                            size = 0
+
+                        file_info = {
+                            "path": rel_path,
+                            "name": p.name,
+                            "size": size,
+                            "extension": p.suffix.lower(),
+                            "depth": current_depth,
+                        }
+                        all_files.append(file_info)
+
+                        # Check if it's an important doc file
+                        name_lower = p.name.lower()
+                        is_doc = p.suffix.lower() in doc_extensions
+
+                        # Check against important doc patterns (case-insensitive)
+                        for pattern in IMPORTANT_DOC_PATTERNS:
+                            if fnmatch.fnmatch(name_lower, pattern):
+                                file_info["importance"] = "high"
+                                important_docs.append(file_info)
+                                break
+                        else:
+                            # Also include .md files at root level as potentially important
+                            if is_doc and current_depth == 1:
+                                file_info["importance"] = "medium"
+                                important_docs.append(file_info)
+
+            except PermissionError:
+                pass
+
+        walk_tree(root, 1)
+
+        # Sort important docs by importance then size
+        importance_order = {"high": 0, "medium": 1}
+        important_docs.sort(
+            key=lambda x: (
+                importance_order.get(x.get("importance", "medium"), 1),
+                -x.get("size", 0),
+            )
+        )
+        important_docs = important_docs[:top_doc_files]
+
+        # Get largest files (excluding docs already included)
+        doc_paths = {d["path"] for d in important_docs}
+        source_files = [f for f in all_files if f["path"] not in doc_paths]
+        source_files.sort(key=lambda x: -x.get("size", 0))
+        largest_files = source_files[:top_files_by_size]
+
+        # Format sizes for readability
+        def format_size(size: int) -> str:
+            if size < 1024:
+                return f"{size}B"
+            elif size < 1024 * 1024:
+                return f"{size // 1024}KB"
+            else:
+                return f"{size // (1024 * 1024)}MB"
+
+        for f in important_docs + largest_files:
+            f["size_formatted"] = format_size(f.get("size", 0))
+
+        return {
+            "success": True,
+            "root": str(root),
+            "directories": directories,
+            "directory_count": len(directories),
+            "important_docs": important_docs,
+            "largest_files": largest_files,
+            "total_files_scanned": len(all_files),
+            "hints": [
+                "Use read_file to examine important documentation first",
+                "Large files often indicate core modules",
+                "Check README.md and CLAUDE.md for project-specific guidance",
+            ],
+        }
+
+    except Exception as e:
+        raise e
+
+

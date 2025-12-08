@@ -123,7 +123,7 @@ from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
 from victor.agent.provider_manager import ProviderManager, ProviderManagerConfig, ProviderState
 
 from victor.agent.tool_selection import (
-    CORE_TOOLS,
+    get_critical_tools,
     ToolSelector,
 )
 from victor.agent.tool_calling import (
@@ -173,13 +173,25 @@ logger = logging.getLogger(__name__)
 
 # Tools with progressive parameters - different params = progress, not a loop
 # Format: tool_name -> list of param names that indicate progress
+# NOTE: Includes both canonical short names and legacy names for LLM compatibility
 PROGRESSIVE_TOOLS = {
+    # Canonical short names
+    "read": ["path", "offset", "limit"],
+    "grep": ["query", "directory"],
+    "search": ["query", "directory"],
+    "ls": ["path", "recursive"],
+    "shell": ["command"],
+    "git": ["operation", "files", "branch"],
+    "http": ["url", "method"],
+    "web": ["query"],
+    "summarize": ["query"],
+    "fetch": ["url"],
+    # Legacy names (backward compatibility - LLMs may still use these)
     "read_file": ["path", "offset", "limit"],
     "code_search": ["query", "directory"],
     "semantic_code_search": ["query", "directory"],
     "list_directory": ["path", "recursive"],
     "execute_bash": ["command"],
-    "git": ["operation", "files", "branch"],
     "http_request": ["url", "method"],
     "web_search": ["query"],
     "web_summarize": ["query"],
@@ -1979,7 +1991,7 @@ class AgentOrchestrator:
             path = tool_args.get("path", ".")
             return f"🔧 Listing directory: {path}"
 
-        if tool_name == "read_file":
+        if tool_name == "read":
             path = tool_args.get("path", "file")
             return f"🔧 Reading file: {path}"
 
@@ -1993,7 +2005,7 @@ class AgentOrchestrator:
                 return f"🔧 Editing: {path_display}"
             return f"🔧 Running {tool_name}..."
 
-        if tool_name == "write_file":
+        if tool_name == "write":
             path = tool_args.get("path", "file")
             return f"🔧 Writing file: {path}"
 
@@ -2658,6 +2670,9 @@ These are the actual search results. Reference only the files and matches shown 
             # Get all registered tool names for validation
             registered_tools = {tool.name for tool in self.tools.list_tools(only_enabled=False)}
 
+            # Get critical tools dynamically from registry (priority=Priority.CRITICAL)
+            core_tools = get_critical_tools(self.tools)
+
             # Format 1: Lists of enabled/disabled tools
             if "enabled" in tool_config:
                 enabled_tools = tool_config.get("enabled", [])
@@ -2670,8 +2685,8 @@ These are the actual search results. Reference only the files and matches shown 
                         f"Available tools: {', '.join(sorted(registered_tools))}"
                     )
 
-                # Check if core tools are included (use centralized CORE_TOOLS from tool_selection)
-                missing_core = CORE_TOOLS - set(enabled_tools)
+                # Check if core tools are included (use dynamically discovered core tools)
+                missing_core = core_tools - set(enabled_tools)
                 if missing_core:
                     logger.warning(
                         f"'enabled' list is missing recommended core tools: {', '.join(missing_core)}. "
@@ -2698,7 +2713,7 @@ These are the actual search results. Reference only the files and matches shown 
                     )
 
                 # Warn if disabling core tools
-                disabled_core = CORE_TOOLS & set(disabled_tools)
+                disabled_core = core_tools & set(disabled_tools)
                 if disabled_core:
                     logger.warning(
                         f"Disabling core tools: {', '.join(disabled_core)}. "
@@ -2724,7 +2739,7 @@ These are the actual search results. Reference only the files and matches shown 
                     else:
                         self.tools.disable_tool(tool_name)
                         # Warn if disabling core tools
-                        if tool_name in CORE_TOOLS:
+                        if tool_name in core_tools:
                             logger.warning(
                                 f"Disabling core tool '{tool_name}'. This may limit agent functionality."
                             )
@@ -4231,7 +4246,7 @@ These are the actual search results. Reference only the files and matches shown 
             # Update counters and tracking
             self.tool_calls_used += 1
             self.executed_tools.append(tool_name)
-            if tool_name == "read_file" and "path" in normalized_args:
+            if tool_name == "read" and "path" in normalized_args:
                 self.observed_files.append(str(normalized_args.get("path")))
 
             # Reset continuation prompts counter on successful tool call
