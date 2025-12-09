@@ -388,8 +388,7 @@ def _get_rl_profile_suggestion(
 
         # Find profiles that use the recommended provider
         matching_profiles = [
-            name for name, cfg in profiles.items()
-            if cfg.provider.lower() == rec.provider.lower()
+            name for name, cfg in profiles.items() if cfg.provider.lower() == rec.provider.lower()
         ]
 
         if matching_profiles:
@@ -2377,12 +2376,24 @@ async def test_provider_async(provider: str) -> None:
 
 @app.command()
 def embeddings(
-    stat: bool = typer.Option(False, "--stat", "-s", help="Show detailed statistics with timestamps"),
-    clear: bool = typer.Option(False, "--clear", "-c", help="Clear embeddings (shows preview first)"),
-    rebuild: bool = typer.Option(False, "--rebuild", "-r", help="Clear and trigger rebuild immediately"),
-    tool: bool = typer.Option(False, "--tool", help="Target: tool embeddings (semantic tool selection)"),
-    intent: bool = typer.Option(False, "--intent", help="Target: task/intent classifier embeddings"),
-    conversation: bool = typer.Option(False, "--conversation", help="Target: conversation embeddings"),
+    stat: bool = typer.Option(
+        False, "--stat", "-s", help="Show detailed statistics with timestamps"
+    ),
+    clear: bool = typer.Option(
+        False, "--clear", "-c", help="Clear embeddings (shows preview first)"
+    ),
+    rebuild: bool = typer.Option(
+        False, "--rebuild", "-r", help="Clear and trigger rebuild immediately"
+    ),
+    tool: bool = typer.Option(
+        False, "--tool", help="Target: tool embeddings (semantic tool selection)"
+    ),
+    intent: bool = typer.Option(
+        False, "--intent", help="Target: task/intent classifier embeddings"
+    ),
+    conversation: bool = typer.Option(
+        False, "--conversation", help="Target: conversation embeddings"
+    ),
     all_embeddings: bool = typer.Option(False, "--all", "-a", help="Target: all embeddings"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ) -> None:
@@ -2470,8 +2481,10 @@ def embeddings(
         # Detailed stats mode
         for cache_info in status.caches:
             will_clear = cache_info.cache_type in targets and (clear or rebuild)
-            marker = "[red]✗[/]" if will_clear and not cache_info.is_empty else (
-                "[green]●[/]" if not cache_info.is_empty else "[dim]○[/]"
+            marker = (
+                "[red]✗[/]"
+                if will_clear and not cache_info.is_empty
+                else ("[green]●[/]" if not cache_info.is_empty else "[dim]○[/]")
             )
             suffix = " [red]← will clear[/]" if will_clear and not cache_info.is_empty else ""
 
@@ -2493,18 +2506,30 @@ def embeddings(
         # Simple status view
         for cache_info in status.caches:
             will_clear = cache_info.cache_type in targets and (clear or rebuild)
-            marker = "[red]✗[/]" if will_clear and not cache_info.is_empty else (
-                "[green]●[/]" if not cache_info.is_empty else "[dim]○[/]"
+            marker = (
+                "[red]✗[/]"
+                if will_clear and not cache_info.is_empty
+                else ("[green]●[/]" if not cache_info.is_empty else "[dim]○[/]")
             )
             suffix = " [red]← will clear[/]" if will_clear and not cache_info.is_empty else ""
             age = f" ({cache_info.age_str})" if cache_info.newest else ""
-            console.print(f"  {marker} {cache_info.name}: {cache_info.file_count} files ({cache_info.size_str}){age}{suffix}")
+            console.print(
+                f"  {marker} {cache_info.name}: {cache_info.file_count} files ({cache_info.size_str}){age}{suffix}"
+            )
 
     console.print("─" * 70)
     console.print(f"  Total: {status.total_files} files ({status.total_size_str})")
 
     # Show help only when no flags provided (just `victor embeddings`)
-    no_flags = not stat and not clear and not rebuild and not tool and not intent and not conversation and not all_embeddings
+    no_flags = (
+        not stat
+        and not clear
+        and not rebuild
+        and not tool
+        and not intent
+        and not conversation
+        and not all_embeddings
+    )
     if no_flags:
         console.print("\n[bold]Commands:[/]")
         console.print("  [cyan]victor embeddings --stat[/]          Detailed stats with timestamps")
@@ -2556,7 +2581,11 @@ def embeddings(
 
     result = manager.clear(targets, progress_callback)
 
-    size_str = f"{result.cleared_size / 1024:.1f} KB" if result.cleared_size >= 1024 else f"{result.cleared_size} B"
+    size_str = (
+        f"{result.cleared_size / 1024:.1f} KB"
+        if result.cleared_size >= 1024
+        else f"{result.cleared_size} B"
+    )
     console.print(f"\n[green]✓ Cleared {result.cleared_files} files ({size_str})[/]")
 
     # Rebuild if requested
@@ -2582,7 +2611,12 @@ def embeddings(
                     # Create tool registry (same pattern as MCP server)
                     registry = ToolRegistry()
                     tools_dir = tool_os.path.join(tool_os.path.dirname(__file__), "..", "tools")
-                    excluded_files = {"__init__.py", "base.py", "decorators.py", "semantic_selector.py"}
+                    excluded_files = {
+                        "__init__.py",
+                        "base.py",
+                        "decorators.py",
+                        "semantic_selector.py",
+                    }
 
                     for filename in tool_os.listdir(tools_dir):
                         if filename.endswith(".py") and filename not in excluded_files:
@@ -2626,7 +2660,9 @@ def embeddings(
                         return count
 
                     msg_count = asyncio.run(rebuild_conversations())
-                    console.print(f"  [green]✓[/] Conversation embeddings rebuilt ({msg_count} messages)")
+                    console.print(
+                        f"  [green]✓[/] Conversation embeddings rebuilt ({msg_count} messages)"
+                    )
                 except Exception as e:
                     console.print(f"  [yellow]⚠[/] Conversation embeddings: {e}")
 

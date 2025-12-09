@@ -304,7 +304,7 @@ def create_auth_middleware(
             return web.json_response(
                 {"error": "Unauthorized", "message": "Valid API key required"},
                 status=401,
-                headers={"WWW-Authenticate": f"API-Key realm=\"Victor API\""},
+                headers={"WWW-Authenticate": 'API-Key realm="Victor API"'},
             )
 
         # Attach client_id to request for downstream use
@@ -356,6 +356,7 @@ def create_request_logging_middleware() -> Callable:
     Returns:
         aiohttp middleware
     """
+
     @web.middleware
     async def logging_middleware(request: Request, handler: Callable) -> Response:
         """Log requests and responses."""
@@ -366,17 +367,14 @@ def create_request_logging_middleware() -> Callable:
             elapsed = (time.monotonic() - start_time) * 1000
 
             logger.info(
-                f"{request.method} {request.path} -> {response.status} "
-                f"({elapsed:.1f}ms)"
+                f"{request.method} {request.path} -> {response.status} " f"({elapsed:.1f}ms)"
             )
 
             return response
 
         except Exception as e:
             elapsed = (time.monotonic() - start_time) * 1000
-            logger.error(
-                f"{request.method} {request.path} -> ERROR ({elapsed:.1f}ms): {e}"
-            )
+            logger.error(f"{request.method} {request.path} -> ERROR ({elapsed:.1f}ms): {e}")
             raise
 
     return logging_middleware
@@ -415,6 +413,7 @@ class APIMiddlewareStack:
         Returns:
             Self for chaining
         """
+
         @web.middleware
         async def cors_middleware(request: Request, handler: Callable) -> Response:
             if request.method == "OPTIONS":

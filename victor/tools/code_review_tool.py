@@ -157,7 +157,9 @@ def _build_report(
     report.append("")
     report.append(f"Path: {path}")
     report.append(f"Files reviewed: {files_reviewed}")
-    report.append(f"Languages found: {', '.join(sorted(languages_found)) if languages_found else 'None'}")
+    report.append(
+        f"Languages found: {', '.join(sorted(languages_found)) if languages_found else 'None'}"
+    )
     report.append(f"Aspects checked: {', '.join(aspects)}")
     report.append("")
     report.append(f"Total issues: {len(filtered_issues)}")
@@ -239,7 +241,15 @@ def _build_report(
 @tool(
     cost_tier=CostTier.LOW,
     category="analysis",
-    keywords=["review", "code", "quality", "security", "complexity", "best practices", "documentation"],
+    keywords=[
+        "review",
+        "code",
+        "quality",
+        "security",
+        "complexity",
+        "best practices",
+        "documentation",
+    ],
     mandatory_keywords=["review code", "code review", "analyze code"],  # Force inclusion
     task_types=["analysis", "review"],  # Classification-aware selection
     stages=["analysis", "verification"],  # Conversation stages where relevant

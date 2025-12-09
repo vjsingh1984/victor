@@ -185,7 +185,11 @@ class ExecutionCategory(Enum):
     @property
     def can_parallelize(self) -> bool:
         """Check if this category is safe to run in parallel with itself."""
-        return self in {ExecutionCategory.READ_ONLY, ExecutionCategory.COMPUTE, ExecutionCategory.NETWORK}
+        return self in {
+            ExecutionCategory.READ_ONLY,
+            ExecutionCategory.COMPUTE,
+            ExecutionCategory.NETWORK,
+        }
 
     @property
     def conflicts_with(self) -> set:
@@ -195,8 +199,16 @@ class ExecutionCategory(Enum):
             ExecutionCategory.WRITE: {ExecutionCategory.WRITE, ExecutionCategory.MIXED},
             ExecutionCategory.COMPUTE: set(),  # Safe with everything
             ExecutionCategory.NETWORK: set(),  # Safe with everything (rate limiting handled separately)
-            ExecutionCategory.EXECUTE: {ExecutionCategory.EXECUTE, ExecutionCategory.WRITE, ExecutionCategory.MIXED},
-            ExecutionCategory.MIXED: {ExecutionCategory.WRITE, ExecutionCategory.EXECUTE, ExecutionCategory.MIXED},
+            ExecutionCategory.EXECUTE: {
+                ExecutionCategory.EXECUTE,
+                ExecutionCategory.WRITE,
+                ExecutionCategory.MIXED,
+            },
+            ExecutionCategory.MIXED: {
+                ExecutionCategory.WRITE,
+                ExecutionCategory.EXECUTE,
+                ExecutionCategory.MIXED,
+            },
         }
         return conflict_map.get(self, set())
 
@@ -507,7 +519,9 @@ class ToolMetadata:
             "mandatory_keywords": self.mandatory_keywords,
             "task_types": self.task_types,
             "progress_params": self.progress_params,
-            "execution_category": self.execution_category.value if self.execution_category else "read_only",
+            "execution_category": (
+                self.execution_category.value if self.execution_category else "read_only"
+            ),
         }
 
     @classmethod

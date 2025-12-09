@@ -41,6 +41,7 @@ from typing import Any, Dict, List, Optional
 
 try:
     import httpx
+
     HTTPX_AVAILABLE = True
 except ImportError:
     httpx = None  # type: ignore
@@ -178,15 +179,12 @@ async def teams(
         A dictionary with the result of the operation.
     """
     if not HTTPX_AVAILABLE:
-        return {
-            "success": False,
-            "error": "httpx not installed. Install with: pip install httpx"
-        }
+        return {"success": False, "error": "httpx not installed. Install with: pip install httpx"}
 
     if not _config["access_token"]:
         return {
             "success": False,
-            "error": "Teams client is not configured. Call set_teams_config() first."
+            "error": "Teams client is not configured. Call set_teams_config() first.",
         }
 
     try:
@@ -204,16 +202,14 @@ async def teams(
                 return await _list_channels(client, team_id)
 
             elif operation == "create_channel":
-                return await _create_channel(
-                    client, team_id, channel_name, channel_description
-                )
+                return await _create_channel(client, team_id, channel_name, channel_description)
 
             else:
                 return {
                     "success": False,
                     "error": f"Unsupported operation: {operation}. "
-                             f"Valid operations: send_message, search_messages, "
-                             f"list_teams, list_channels, create_channel"
+                    f"Valid operations: send_message, search_messages, "
+                    f"list_teams, list_channels, create_channel",
                 }
 
     except httpx.HTTPStatusError as e:
@@ -279,9 +275,7 @@ async def _search_messages(
             "requests": [
                 {
                     "entityTypes": ["chatMessage"],
-                    "query": {
-                        "queryString": query
-                    },
+                    "query": {"queryString": query},
                     "from": 0,
                     "size": 10,
                 }
@@ -299,12 +293,16 @@ async def _search_messages(
         for hit_container in hits:
             for hit in hit_container.get("hits", []):
                 resource = hit.get("resource", {})
-                results.append({
-                    "id": resource.get("id"),
-                    "summary": hit.get("summary", "")[:200],
-                    "created_datetime": resource.get("createdDateTime"),
-                    "from": resource.get("from", {}).get("user", {}).get("displayName", "Unknown"),
-                })
+                results.append(
+                    {
+                        "id": resource.get("id"),
+                        "summary": hit.get("summary", "")[:200],
+                        "created_datetime": resource.get("createdDateTime"),
+                        "from": resource.get("from", {})
+                        .get("user", {})
+                        .get("displayName", "Unknown"),
+                    }
+                )
 
     return {"success": True, "results": results, "count": len(results)}
 

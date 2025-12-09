@@ -130,9 +130,11 @@ class PIIScrubber:
                 result[key] = self.scrub_dict(value)
             elif isinstance(value, list):
                 result[key] = [
-                    self.scrub_dict(v) if isinstance(v, dict)
-                    else self.scrub(v) if isinstance(v, str)
-                    else v
+                    (
+                        self.scrub_dict(v)
+                        if isinstance(v, dict)
+                        else self.scrub(v) if isinstance(v, str) else v
+                    )
                     for v in value
                 ]
             else:
@@ -493,4 +495,5 @@ def create_usage_logger(
 
     # Fall back to basic logger
     from victor.analytics.logger import UsageLogger
+
     return UsageLogger(log_file=log_file, enabled=enabled)

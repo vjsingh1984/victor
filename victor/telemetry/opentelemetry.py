@@ -59,6 +59,7 @@ try:
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
     from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
+
     _otel_available = True
 except ImportError:
     logger.debug(
@@ -123,11 +124,13 @@ def setup_opentelemetry(
 
     try:
         # Create resource with service information
-        resource = Resource.create({
-            SERVICE_NAME: service_name,
-            SERVICE_VERSION: service_version,
-            "deployment.environment": os.environ.get("VICTOR_ENV", "development"),
-        })
+        resource = Resource.create(
+            {
+                SERVICE_NAME: service_name,
+                SERVICE_VERSION: service_version,
+                "deployment.environment": os.environ.get("VICTOR_ENV", "development"),
+            }
+        )
 
         # Set up tracing
         if enable_tracing:
@@ -151,10 +154,7 @@ def setup_opentelemetry(
                     metric_exporter,
                     export_interval_millis=60000,  # Export every 60 seconds
                 )
-                meter_provider = MeterProvider(
-                    resource=resource,
-                    metric_readers=[metric_reader]
-                )
+                meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
                 metrics.set_meter_provider(meter_provider)
                 logger.info(f"OpenTelemetry metrics enabled, exporting to {endpoint}")
             else:
@@ -222,6 +222,7 @@ def trace_tool_execution(tool_name: str):
         async def my_tool(**kwargs):
             ...
     """
+
     def decorator(func):
         if not _otel_available:
             return func
@@ -244,4 +245,5 @@ def trace_tool_execution(tool_name: str):
                     raise
 
         return wrapper
+
     return decorator

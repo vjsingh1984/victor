@@ -228,9 +228,7 @@ class GroqProvider(BaseProvider):
 
             # Truncate if payload exceeds Groq's limit
             if not ok:
-                truncation_result = self._payload_limiter.truncate_if_needed(
-                    messages, tools
-                )
+                truncation_result = self._payload_limiter.truncate_if_needed(messages, tools)
                 messages = truncation_result.messages
                 tools = truncation_result.tools
                 if truncation_result.warning:
@@ -317,9 +315,7 @@ class GroqProvider(BaseProvider):
 
             # Truncate if payload exceeds Groq's limit
             if not ok:
-                truncation_result = self._payload_limiter.truncate_if_needed(
-                    messages, tools
-                )
+                truncation_result = self._payload_limiter.truncate_if_needed(messages, tools)
                 messages = truncation_result.messages
                 tools = truncation_result.tools
                 if truncation_result.warning:

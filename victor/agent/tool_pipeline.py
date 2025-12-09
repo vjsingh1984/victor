@@ -320,9 +320,7 @@ class ToolPipeline:
         signature = self._get_call_signature(tool_name, args)
         return signature in self._failed_signatures
 
-    def record_failure(
-        self, tool_name: str, args: Dict[str, Any], error_message: str
-    ) -> None:
+    def record_failure(self, tool_name: str, args: Dict[str, Any], error_message: str) -> None:
         """Record a failed tool call.
 
         Uses persistent SignatureStore when available for cross-session learning,

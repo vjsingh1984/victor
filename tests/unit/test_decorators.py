@@ -444,7 +444,10 @@ class TestToolNameResolution:
                 result = resolve_tool_name("execute_bash")
 
             assert result == "shell"
-            assert any("Legacy tool name 'execute_bash' used" in record.message for record in caplog.records)
+            assert any(
+                "Legacy tool name 'execute_bash' used" in record.message
+                for record in caplog.records
+            )
             assert any("'shell'" in record.message for record in caplog.records)
         finally:
             decorators_module._WARN_ON_LEGACY_NAMES = original_value
@@ -464,7 +467,9 @@ class TestToolNameResolution:
                 result = resolve_tool_name("read_file", warn_on_legacy=True)
 
             assert result == "read"
-            assert any("Legacy tool name 'read_file' used" in record.message for record in caplog.records)
+            assert any(
+                "Legacy tool name 'read_file' used" in record.message for record in caplog.records
+            )
         finally:
             decorators_module._WARN_ON_LEGACY_NAMES = original_value
 

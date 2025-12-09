@@ -31,6 +31,7 @@ def _get_critical_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
     Critical tools are those with priority=Priority.CRITICAL in their @tool decorator.
     """
     from victor.agent.tool_selection import get_critical_tools
+
     return get_critical_tools(registry)
 
 

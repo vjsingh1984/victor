@@ -66,11 +66,13 @@ def _auto_register_tool(tool_instance: BaseTool) -> None:
 
     try:
         from victor.tools.metadata_registry import register_tool_metadata
+
         register_tool_metadata(tool_instance)
         logger.debug(f"Auto-registered tool '{tool_instance.name}' with metadata registry")
     except ImportError:
         # metadata_registry not available (e.g., during early import stages)
         logger.debug(f"Could not auto-register tool '{tool_instance.name}': registry not available")
+
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +112,7 @@ def resolve_tool_name(name: str, warn_on_legacy: bool = False) -> str:
     """
     try:
         from victor.tools.tool_names import get_canonical_name, TOOL_ALIASES
+
         canonical = get_canonical_name(name)
 
         # Check if this was a legacy name
@@ -371,6 +374,7 @@ def _resolve_tool_name(func_name: str, explicit_name: Optional[str] = None) -> s
     # Try to auto-resolve from registry
     try:
         from victor.tools.tool_names import get_canonical_name
+
         return get_canonical_name(func_name)
     except ImportError:
         # Registry not available, use function name
@@ -679,9 +683,7 @@ def _create_tool_class(
             try:
                 return self._availability_check()
             except Exception as e:
-                logger.warning(
-                    f"Availability check for tool '{self._name}' raised exception: {e}"
-                )
+                logger.warning(f"Availability check for tool '{self._name}' raised exception: {e}")
                 return False
 
         def get_warning_message(self) -> str:

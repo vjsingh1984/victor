@@ -254,9 +254,9 @@ class CircuitBreaker:
             "total_successes": stats.total_successes,
             "last_failure_time": stats.last_failure_time,
             "last_state_change": stats.last_state_change,
-            "time_since_failure": time.time() - stats.last_failure_time
-            if stats.last_failure_time
-            else None,
+            "time_since_failure": (
+                time.time() - stats.last_failure_time if stats.last_failure_time else None
+            ),
         }
 
     def get_all_stats(self) -> Dict[str, Dict[str, Any]]:

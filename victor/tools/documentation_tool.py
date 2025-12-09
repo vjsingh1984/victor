@@ -798,5 +798,3 @@ async def docs_coverage(
         "recommendations": recommendations,
         "formatted_report": "\n".join(report),
     }
-
-

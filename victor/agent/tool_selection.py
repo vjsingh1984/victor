@@ -42,12 +42,12 @@ logger = logging.getLogger(__name__)
 # Fallback critical tools for cases where registry is unavailable.
 # Critical tools are detected via priority=Priority.CRITICAL in @tool decorator.
 _FALLBACK_CRITICAL_TOOLS: Set[str] = {
-    "read",      # read_file → read
-    "write",     # write_file → write
-    "ls",        # list_directory → ls
-    "shell",     # execute_bash → shell
-    "edit",      # edit_files → edit
-    "search",    # code_search → search (always needed for code exploration)
+    "read",  # read_file → read
+    "write",  # write_file → write
+    "ls",  # list_directory → ls
+    "shell",  # execute_bash → shell
+    "edit",  # edit_files → edit
+    "search",  # code_search → search (always needed for code exploration)
 }
 
 
@@ -82,8 +82,6 @@ def get_critical_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
         return _FALLBACK_CRITICAL_TOOLS.copy()
 
     return critical_tools
-
-
 
 
 def get_tools_by_category(
@@ -329,7 +327,6 @@ def get_tools_with_keywords(
     return matching_tools
 
 
-
 # Web-related keywords for explicit web tool inclusion
 WEB_KEYWORDS: List[str] = ["search", "web", "online", "lookup", "http", "https"]
 
@@ -446,9 +443,7 @@ def get_tools_from_message_scored(
         )
         scored_tools = [(r.tool_name, r.total_score) for r in results]
         if scored_tools:
-            logger.debug(
-                f"Scored keyword match: {[(t, f'{s:.2f}') for t, s in scored_tools[:5]]}"
-            )
+            logger.debug(f"Scored keyword match: {[(t, f'{s:.2f}') for t, s in scored_tools[:5]]}")
         return scored_tools
     except Exception as e:
         logger.debug(f"Registry unavailable for scored matching: {e}")

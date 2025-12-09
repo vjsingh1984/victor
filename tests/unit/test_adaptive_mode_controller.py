@@ -227,9 +227,9 @@ class TestAdaptiveModeController:
 
         # Should either complete or have low confidence for continuing
         assert (
-            action.target_mode == AgentMode.COMPLETE or
-            not action.should_continue or
-            action.confidence < 0.7
+            action.target_mode == AgentMode.COMPLETE
+            or not action.should_continue
+            or action.confidence < 0.7
         )
 
     def test_get_recommended_action_suggests_completion_on_high_quality(self, controller):

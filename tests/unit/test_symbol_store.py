@@ -113,12 +113,12 @@ class AnotherClass:
 
     def test_python_import_detection(self, tmp_path):
         """Test Python import detection."""
-        code = '''
+        code = """
 import os
 import sys
 from pathlib import Path
 from typing import Dict, List
-'''
+"""
         (tmp_path / "imports.py").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -133,7 +133,7 @@ class TestTypeScriptExtraction:
 
     def test_extract_typescript_class(self, tmp_path):
         """Test extracting TypeScript class definitions."""
-        code = '''
+        code = """
 export class UserService {
     private db: Database;
 
@@ -141,7 +141,7 @@ export class UserService {
         return this.db.find(id);
     }
 }
-'''
+"""
         (tmp_path / "service.ts").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -153,7 +153,7 @@ export class UserService {
 
     def test_extract_typescript_interface(self, tmp_path):
         """Test extracting TypeScript interface definitions."""
-        code = '''
+        code = """
 interface Config {
     apiUrl: string;
     timeout: number;
@@ -163,7 +163,7 @@ interface User {
     id: string;
     name: string;
 }
-'''
+"""
         (tmp_path / "types.ts").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -177,13 +177,13 @@ interface User {
 
     def test_extract_typescript_enum(self, tmp_path):
         """Test extracting TypeScript enum definitions."""
-        code = '''
+        code = """
 enum Status {
     Active = 'active',
     Inactive = 'inactive',
     Pending = 'pending'
 }
-'''
+"""
         (tmp_path / "enums.ts").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -199,7 +199,7 @@ class TestJavaScriptExtraction:
 
     def test_extract_javascript_class(self, tmp_path):
         """Test extracting JavaScript class definitions."""
-        code = '''
+        code = """
 class Component {
     constructor(props) {
         this.props = props;
@@ -209,7 +209,7 @@ class Component {
         return null;
     }
 }
-'''
+"""
         (tmp_path / "component.js").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -225,7 +225,7 @@ class TestGoExtraction:
 
     def test_extract_go_struct(self, tmp_path):
         """Test extracting Go struct definitions."""
-        code = '''
+        code = """
 package main
 
 type User struct {
@@ -237,7 +237,7 @@ type Config struct {
     Port int
     Host string
 }
-'''
+"""
         (tmp_path / "types.go").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -252,7 +252,7 @@ type Config struct {
 
     def test_extract_go_function(self, tmp_path):
         """Test extracting Go function definitions."""
-        code = '''
+        code = """
 package main
 
 func main() {
@@ -262,7 +262,7 @@ func main() {
 func processData(data []byte) error {
     return nil
 }
-'''
+"""
         (tmp_path / "main.go").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -278,7 +278,7 @@ class TestRustExtraction:
 
     def test_extract_rust_struct(self, tmp_path):
         """Test extracting Rust struct definitions."""
-        code = '''
+        code = """
 pub struct User {
     pub id: String,
     pub name: String,
@@ -288,7 +288,7 @@ struct Config {
     port: u16,
     host: String,
 }
-'''
+"""
         (tmp_path / "types.rs").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -302,13 +302,13 @@ struct Config {
 
     def test_extract_rust_enum(self, tmp_path):
         """Test extracting Rust enum definitions."""
-        code = '''
+        code = """
 pub enum Status {
     Active,
     Inactive,
     Pending,
 }
-'''
+"""
         (tmp_path / "enums.rs").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -320,11 +320,11 @@ pub enum Status {
 
     def test_extract_rust_trait(self, tmp_path):
         """Test extracting Rust trait definitions."""
-        code = '''
+        code = """
 pub trait Handler {
     fn handle(&self, request: Request) -> Response;
 }
-'''
+"""
         (tmp_path / "traits.rs").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -340,7 +340,7 @@ class TestJavaExtraction:
 
     def test_extract_java_class(self, tmp_path):
         """Test extracting Java class definitions."""
-        code = '''
+        code = """
 public class UserService {
     private Database db;
 
@@ -348,7 +348,7 @@ public class UserService {
         return db.find(id);
     }
 }
-'''
+"""
         (tmp_path / "UserService.java").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -360,12 +360,12 @@ public class UserService {
 
     def test_extract_java_interface(self, tmp_path):
         """Test extracting Java interface definitions."""
-        code = '''
+        code = """
 public interface Repository {
     Object find(String id);
     void save(Object entity);
 }
-'''
+"""
         (tmp_path / "Repository.java").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -381,7 +381,7 @@ class TestArchitecturePatternDetection:
 
     def test_detect_provider_pattern(self, tmp_path):
         """Test detecting provider pattern in class names."""
-        code = '''
+        code = """
 class DatabaseProvider:
     pass
 
@@ -390,7 +390,7 @@ class CacheProvider:
 
 class AuthProvider:
     pass
-'''
+"""
         (tmp_path / "providers.py").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -401,13 +401,13 @@ class AuthProvider:
 
     def test_detect_service_pattern(self, tmp_path):
         """Test detecting service pattern in class names."""
-        code = '''
+        code = """
 class UserService:
     pass
 
 class PaymentService:
     pass
-'''
+"""
         (tmp_path / "services.py").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -418,13 +418,13 @@ class PaymentService:
 
     def test_detect_repository_pattern(self, tmp_path):
         """Test detecting repository pattern in class names."""
-        code = '''
+        code = """
 class UserRepository:
     pass
 
 class ProductRepository:
     pass
-'''
+"""
         (tmp_path / "repositories.py").write_text(code)
         store = SymbolStore(str(tmp_path))
 
@@ -460,7 +460,7 @@ class TestRobustIndexing:
         (tmp_path / "encoding.py").write_bytes(b"class Test:\n    \xff\xfe pass")
 
         store = SymbolStore(str(tmp_path))
-        stats = asyncio.run(store.index_codebase())
+        asyncio.run(store.index_codebase())
 
         # Should handle encoding error gracefully
         # File may or may not be indexed depending on encoding handling
@@ -506,11 +506,11 @@ class TestQueryMethods:
 
     def test_find_by_name_pattern(self, tmp_path):
         """Test finding symbols by name pattern."""
-        code = '''
+        code = """
 class UserService: pass
 class UserRepository: pass
 class ProductService: pass
-'''
+"""
         (tmp_path / "classes.py").write_text(code)
         store = SymbolStore(str(tmp_path))
         asyncio.run(store.index_codebase())
@@ -525,12 +525,12 @@ class ProductService: pass
 
     def test_find_key_components(self, tmp_path):
         """Test finding key architectural components."""
-        code = '''
+        code = """
 class UserService: pass
 class DatabaseProvider: pass
 class UserRepository: pass
 class Config: pass
-'''
+"""
         (tmp_path / "app.py").write_text(code)
         store = SymbolStore(str(tmp_path))
         asyncio.run(store.index_codebase())

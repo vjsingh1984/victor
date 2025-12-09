@@ -207,7 +207,9 @@ class StaticEmbeddingCollection:
 
             expected_dim = self.embedding_service.dimension
             if len(embeddings.shape) != 2:
-                logger.warning(f"Collection '{self.name}': embeddings have wrong shape: {embeddings.shape}")
+                logger.warning(
+                    f"Collection '{self.name}': embeddings have wrong shape: {embeddings.shape}"
+                )
                 self._delete_cache("invalid shape")
                 return False
 
@@ -266,7 +268,9 @@ class StaticEmbeddingCollection:
                 "cache_version": self.CACHE_VERSION,
                 "items_hash": items_hash,
                 "model_name": self.embedding_service.model_name,
-                "embedding_dimension": self._embeddings.shape[1] if self._embeddings is not None else 0,
+                "embedding_dimension": (
+                    self._embeddings.shape[1] if self._embeddings is not None else 0
+                ),
                 "item_count": len(self._items),
                 "items": self._items,
                 "embeddings": self._embeddings,

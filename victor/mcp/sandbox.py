@@ -306,9 +306,7 @@ class SandboxedProcess:
         if os.path.exists(sandbox_exec) and self.config.allowed_paths:
             # Create sandbox profile
             profile = self._create_macos_sandbox_profile()
-            profile_file = tempfile.NamedTemporaryFile(
-                mode="w", suffix=".sb", delete=False
-            )
+            profile_file = tempfile.NamedTemporaryFile(mode="w", suffix=".sb", delete=False)
             profile_file.write(profile)
             profile_file.close()
 
@@ -507,7 +505,7 @@ class SandboxedProcess:
 # Factory function for creating sandboxed MCP client
 def create_sandboxed_mcp_client(
     config: Optional[SandboxConfig] = None,
-) -> "SandboxedMCPClient":
+) -> "Any":  # Returns MCPClient subclass (locally defined)
     """Create an MCP client with sandboxing.
 
     Args:

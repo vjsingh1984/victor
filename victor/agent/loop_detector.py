@@ -70,6 +70,7 @@ class TaskType(Enum):
 # Tools that indicate research activity
 RESEARCH_TOOLS = frozenset({"web_search", "web_fetch", "tavily_search", "search_web", "fetch_url"})
 
+
 def get_progress_params_for_tool(tool_name: str) -> List[str]:
     """Get progress parameters for a tool from the decorator-driven registry.
 
@@ -825,7 +826,7 @@ class LoopDetector:
 
         # Trim buffer if too large (keep last CONTENT_BUFFER_SIZE chars)
         if len(self._content_buffer) > self.CONTENT_BUFFER_SIZE:
-            self._content_buffer = self._content_buffer[-self.CONTENT_BUFFER_SIZE:]
+            self._content_buffer = self._content_buffer[-self.CONTENT_BUFFER_SIZE :]
 
     def check_content_loop(self) -> Optional[str]:
         """Check if content shows a repetitive loop pattern.
@@ -836,7 +837,10 @@ class LoopDetector:
         if self._content_loop_detected:
             return f"Content loop already detected: {self._content_loop_phrase}"
 
-        if len(self._content_buffer) < self.CONTENT_PHRASE_MIN_LENGTH * self.CONTENT_REPEAT_THRESHOLD:
+        if (
+            len(self._content_buffer)
+            < self.CONTENT_PHRASE_MIN_LENGTH * self.CONTENT_REPEAT_THRESHOLD
+        ):
             return None
 
         # Look for repeated phrases in the content buffer
@@ -865,7 +869,7 @@ class LoopDetector:
         for phrase_len in range(
             self.CONTENT_PHRASE_MAX_LENGTH,
             self.CONTENT_PHRASE_MIN_LENGTH - 1,
-            -5  # Step down by 5 chars
+            -5,  # Step down by 5 chars
         ):
             if len(text) < phrase_len * self.CONTENT_REPEAT_THRESHOLD:
                 continue
@@ -876,7 +880,7 @@ class LoopDetector:
             phrase_counts: Counter[str] = Counter()
 
             for i in range(0, len(text) - phrase_len, step):
-                phrase = text[i:i + phrase_len]
+                phrase = text[i : i + phrase_len]
                 # Skip phrases that are mostly whitespace or punctuation
                 if not self._is_meaningful_phrase(phrase):
                     continue

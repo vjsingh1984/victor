@@ -126,6 +126,7 @@ class TestPipelineAnalyzerToolProperties:
     def test_tool_name(self, tool):
         """Test tool name uses canonical name from ToolNames."""
         from victor.tools.tool_names import ToolNames
+
         assert tool.name == ToolNames.PIPELINE
         assert tool.name == "pipeline"  # Canonical short name
 

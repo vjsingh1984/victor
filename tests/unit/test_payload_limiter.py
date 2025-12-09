@@ -222,7 +222,9 @@ class TestProviderPayloadLimiter:
 
         # Check that tools exceed the limit
         estimate = limiter.estimate_size(messages, tools)
-        assert estimate.exceeds_limit, f"Test setup issue: payload should exceed limit ({estimate.total_bytes} vs {estimate.limit_bytes})"
+        assert (
+            estimate.exceeds_limit
+        ), f"Test setup issue: payload should exceed limit ({estimate.total_bytes} vs {estimate.limit_bytes})"
 
         result = limiter.truncate_if_needed(
             messages, tools, strategy=TruncationStrategy.REDUCE_TOOLS
@@ -239,9 +241,7 @@ class TestProviderPayloadLimiter:
         limiter = ProviderPayloadLimiter(provider_name="test", max_payload_bytes=100)
         messages = [MockMessage(role="user", content="x" * 500)]
 
-        result = limiter.truncate_if_needed(
-            messages, None, strategy=TruncationStrategy.FAIL
-        )
+        result = limiter.truncate_if_needed(messages, None, strategy=TruncationStrategy.FAIL)
 
         assert result.truncated is False
         assert result.warning is not None

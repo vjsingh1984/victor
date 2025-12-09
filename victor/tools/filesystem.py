@@ -662,7 +662,12 @@ TEXT_EXTENSIONS = {
         "search for 'def calculate' in utils.py",
         "show first 50 lines of main.py",
     ],
-    mandatory_keywords=["read file", "show file", "explain this code", "what does this"],  # Force inclusion
+    mandatory_keywords=[
+        "read file",
+        "show file",
+        "explain this code",
+        "what does this",
+    ],  # Force inclusion
     priority_hints=[
         "Use for TEXT and CODE files only (.py, .js, .json, .yaml, .md, etc.)",
         "NOT for binary files (.pdf, .docx, .db, .pyc, images, archives)",
@@ -1088,7 +1093,12 @@ async def write(path: str, content: str) -> str:
         "find all test files",
         "list directories only",
     ],
-    mandatory_keywords=["list files", "show files", "how many files", "count files"],  # Force inclusion
+    mandatory_keywords=[
+        "list files",
+        "show files",
+        "how many files",
+        "count files",
+    ],  # Force inclusion
     priority_hints=[
         "Use for browsing directory contents",
         "Use pattern parameter for filtering (e.g., '*.py', 'test_*')",
@@ -1423,5 +1433,3 @@ async def overview(
 
     except Exception as e:
         raise e
-
-

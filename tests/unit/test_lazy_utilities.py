@@ -68,6 +68,7 @@ class TestLazyProperty:
 
     def test_lazy_property_per_instance(self):
         """Each instance should have its own cached value."""
+
         class TestClass:
             def __init__(self, value: int):
                 self._value = value
@@ -84,6 +85,7 @@ class TestLazyProperty:
 
     def test_lazy_property_with_complex_type(self):
         """Property should work with complex return types."""
+
         class HeavyDependency:
             def __init__(self):
                 self.data = {"initialized": True}
@@ -101,6 +103,7 @@ class TestLazyProperty:
 
     def test_lazy_property_class_access_returns_descriptor(self):
         """Accessing on class should return the descriptor."""
+
         class TestClass:
             @LazyProperty
             def expensive(self) -> int:
@@ -117,6 +120,7 @@ class TestDeferredImport:
         result = deferred_import("json", "JSONEncoder")
         assert result is not None
         import json
+
         assert isinstance(result, json.JSONEncoder)
 
     def test_deferred_import_with_call_method(self):
@@ -129,6 +133,7 @@ class TestDeferredImport:
         )
         assert result is not None
         from pathlib import Path
+
         assert result == Path.cwd()
 
     def test_deferred_import_nonexistent_module_returns_fallback(self):
@@ -175,6 +180,7 @@ class TestSingletonFactory:
 
     def test_get_or_create_creates_instance(self):
         """Should create instance on first call."""
+
         class TestService:
             pass
 
@@ -183,6 +189,7 @@ class TestSingletonFactory:
 
     def test_get_or_create_returns_same_instance(self):
         """Should return same instance on subsequent calls."""
+
         class TestService:
             pass
 
@@ -193,6 +200,7 @@ class TestSingletonFactory:
 
     def test_get_or_create_with_factory(self):
         """Should use custom factory function."""
+
         class TestService:
             def __init__(self, value: int):
                 self.value = value
@@ -206,6 +214,7 @@ class TestSingletonFactory:
 
     def test_has_instance(self):
         """Should correctly report instance existence."""
+
         class TestService:
             pass
 
@@ -217,6 +226,7 @@ class TestSingletonFactory:
 
     def test_clear_specific_type(self):
         """Should clear specific type."""
+
         class Service1:
             pass
 
@@ -233,6 +243,7 @@ class TestSingletonFactory:
 
     def test_clear_all(self):
         """Should clear all instances."""
+
         class Service1:
             pass
 
@@ -249,6 +260,7 @@ class TestSingletonFactory:
 
     def test_set_instance(self):
         """Should allow setting instance directly."""
+
         class TestService:
             def __init__(self, value: str):
                 self.value = value
@@ -323,6 +335,7 @@ class TestIntegration:
 
     def test_lazy_property_with_deferred_import(self):
         """LazyProperty should work with deferred imports."""
+
         class TestClass:
             @LazyProperty
             def encoder(self):
@@ -333,10 +346,12 @@ class TestIntegration:
 
         assert encoder is not None
         import json
+
         assert isinstance(encoder, json.JSONEncoder)
 
     def test_singleton_factory_with_lazy_initialization(self):
         """SingletonFactory should work with complex initialization."""
+
         class ComplexService:
             def __init__(self):
                 self.dependencies = []

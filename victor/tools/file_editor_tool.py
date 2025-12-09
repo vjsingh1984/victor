@@ -90,9 +90,7 @@ async def edit(
                 )
                 # Try to fix by escaping control characters in strings
                 try:
-                    fixed = re.sub(
-                        r'(?<!\\)\n(?=(?:[^"]*"[^"]*")*[^"]*"[^"]*$)', r"\\n", ops
-                    )
+                    fixed = re.sub(r'(?<!\\)\n(?=(?:[^"]*"[^"]*")*[^"]*"[^"]*$)', r"\\n", ops)
                     fixed = re.sub(r'(?<!\\)\t(?=(?:[^"]*"[^"]*")*[^"]*"[^"]*$)', r"\\t", fixed)
                     ops = json.loads(fixed)
                     # If fixed, log and continue
@@ -402,5 +400,3 @@ async def edit(
             "by_type": by_type,
             "message": f"Queued {operations_queued} operations (not applied, commit=False)",
         }
-
-

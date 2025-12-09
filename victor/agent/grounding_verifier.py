@@ -213,7 +213,9 @@ class GroundingVerifier:
                 for root, dirs, files in os.walk(self.project_root):
                     # Filter out ignored directories
                     dirs[:] = [
-                        d for d in dirs if d not in self.config.ignore_patterns and not d.startswith(".")
+                        d
+                        for d in dirs
+                        if d not in self.config.ignore_patterns and not d.startswith(".")
                     ]
 
                     for file in files:
@@ -305,9 +307,7 @@ class GroundingVerifier:
         matches = self.SYMBOL_PATTERN.findall(response)
         return list(set(matches))
 
-    async def verify_file_paths(
-        self, paths: List[str], result: VerificationResult
-    ) -> None:
+    async def verify_file_paths(self, paths: List[str], result: VerificationResult) -> None:
         """Verify file path references exist.
 
         Args:

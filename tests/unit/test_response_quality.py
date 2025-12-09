@@ -53,12 +53,8 @@ class TestQualityResult:
         result = QualityResult(
             overall_score=0.75,
             dimension_scores=[
-                DimensionScore(
-                    dimension=QualityDimension.RELEVANCE, score=0.8, weight=1.0
-                ),
-                DimensionScore(
-                    dimension=QualityDimension.COMPLETENESS, score=0.7, weight=1.0
-                ),
+                DimensionScore(dimension=QualityDimension.RELEVANCE, score=0.8, weight=1.0),
+                DimensionScore(dimension=QualityDimension.COMPLETENESS, score=0.7, weight=1.0),
             ],
             passes_threshold=True,
         )
@@ -72,15 +68,9 @@ class TestQualityResult:
         result = QualityResult(
             overall_score=0.7,
             dimension_scores=[
-                DimensionScore(
-                    dimension=QualityDimension.RELEVANCE, score=0.9, weight=1.0
-                ),
-                DimensionScore(
-                    dimension=QualityDimension.COMPLETENESS, score=0.5, weight=1.0
-                ),
-                DimensionScore(
-                    dimension=QualityDimension.ACCURACY, score=0.6, weight=1.0
-                ),
+                DimensionScore(dimension=QualityDimension.RELEVANCE, score=0.9, weight=1.0),
+                DimensionScore(dimension=QualityDimension.COMPLETENESS, score=0.5, weight=1.0),
+                DimensionScore(dimension=QualityDimension.ACCURACY, score=0.6, weight=1.0),
             ],
             passes_threshold=True,
         )
@@ -178,9 +168,7 @@ class TestResponseQualityScorer:
         with_code_result = await scorer.score(query, with_code)
         without_code_result = await scorer.score(query, without_code)
 
-        with_code_completeness = with_code_result.get_dimension_score(
-            QualityDimension.COMPLETENESS
-        )
+        with_code_completeness = with_code_result.get_dimension_score(QualityDimension.COMPLETENESS)
         without_code_completeness = without_code_result.get_dimension_score(
             QualityDimension.COMPLETENESS
         )
@@ -243,9 +231,7 @@ class TestResponseQualityScorer:
         actionable_result = await scorer.score(query, actionable)
         not_actionable_result = await scorer.score(query, not_actionable)
 
-        actionable_score = actionable_result.get_dimension_score(
-            QualityDimension.ACTIONABILITY
-        )
+        actionable_score = actionable_result.get_dimension_score(QualityDimension.ACTIONABILITY)
         not_actionable_score = not_actionable_result.get_dimension_score(
             QualityDimension.ACTIONABILITY
         )
@@ -273,9 +259,7 @@ class TestResponseQualityScorer:
         incoherent_result = await scorer.score(query, incoherent)
 
         coherent_score = coherent_result.get_dimension_score(QualityDimension.COHERENCE)
-        incoherent_score = incoherent_result.get_dimension_score(
-            QualityDimension.COHERENCE
-        )
+        incoherent_score = incoherent_result.get_dimension_score(QualityDimension.COHERENCE)
 
         # Both should be valid scores
         assert coherent_score is not None
@@ -330,9 +314,7 @@ class TestResponseQualityScorer:
     @pytest.mark.asyncio
     async def test_custom_dimension_weights(self):
         """Should apply custom dimension weights."""
-        config = ScorerConfig(
-            dimension_weights={QualityDimension.RELEVANCE: 2.0}
-        )
+        config = ScorerConfig(dimension_weights={QualityDimension.RELEVANCE: 2.0})
         scorer = ResponseQualityScorer(config=config)
 
         query = "Test query"

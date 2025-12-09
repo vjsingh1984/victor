@@ -246,9 +246,7 @@ class LiveDisplayRenderer:
         """Format arguments for compact display."""
         if not arguments:
             return ""
-        args_str = ", ".join(
-            f"{k}={repr(v)[:30]}" for k, v in arguments.items()
-        )
+        args_str = ", ".join(f"{k}={repr(v)[:30]}" for k, v in arguments.items())
         return f"({args_str})"
 
     def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
@@ -437,9 +435,7 @@ async def stream_response(
 
                 # Check if we should abort due to excessive thinking
                 if content_filter.should_abort():
-                    renderer.on_status(
-                        f"⚠️ {content_filter.abort_reason}"
-                    )
+                    renderer.on_status(f"⚠️ {content_filter.abort_reason}")
                     break
 
         # Flush any remaining buffered content
@@ -459,7 +455,7 @@ async def stream_response(
     finally:
         renderer.cleanup()
         # Graceful cleanup of async generator to prevent RuntimeError on abort
-        if hasattr(stream_gen, 'aclose'):
+        if hasattr(stream_gen, "aclose"):
             try:
                 await stream_gen.aclose()
             except RuntimeError:

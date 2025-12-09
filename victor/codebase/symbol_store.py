@@ -414,11 +414,13 @@ class SymbolStore:
             # Show summary of failed files if any (helps users fix their code)
             if stats["files_failed"] > 0 and stats["files_failed"] <= 10:
                 print("  ⚠️  Failed files:")
-                for path, error_type, error_msg in stats["errors"]:
+                for path, error_type, _error_msg in stats["errors"]:
                     if error_type != "parse_error":
                         print(f"     {path}: {error_type}")
             elif stats["files_failed"] > 10:
-                print(f"  ⚠️  {stats['files_failed']} files failed to index (run with --verbose for details)")
+                print(
+                    f"  ⚠️  {stats['files_failed']} files failed to index (run with --verbose for details)"
+                )
         else:
             print(f"✅ Index up to date ({stats['files_skipped']} files unchanged)")
 
@@ -535,7 +537,6 @@ class SymbolStore:
             symbols, imports = self._extract_generic_symbols(content, rel_path, language)
 
         return symbols, imports, parse_error
-
 
     def _extract_python_symbols_robust(
         self, content: str, rel_path: str
@@ -709,9 +710,7 @@ class SymbolStore:
         """
         # Try tree-sitter first for better accuracy
         try:
-            symbols, imports = self._extract_generic_symbols_treesitter(
-                content, rel_path, language
-            )
+            symbols, imports = self._extract_generic_symbols_treesitter(content, rel_path, language)
             if symbols:  # Got results, use them
                 return symbols, imports
         except Exception as e:

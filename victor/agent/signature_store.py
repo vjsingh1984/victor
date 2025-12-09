@@ -204,9 +204,7 @@ class SignatureStore:
                     (now,),
                 )
                 self._cache = {
-                    self._make_signature_key(row["tool_name"], row["args_hash"]): row[
-                        "expires_at"
-                    ]
+                    self._make_signature_key(row["tool_name"], row["args_hash"]): row["expires_at"]
                     for row in cursor
                 }
                 self._cache_time = now
@@ -483,19 +481,14 @@ class SignatureStore:
                 "SELECT tool_name, COUNT(*), SUM(failure_count) "
                 "FROM failed_signatures GROUP BY tool_name"
             )
-            by_tool = {
-                row[0]: {"signatures": row[1], "total_failures": row[2]}
-                for row in cursor
-            }
+            by_tool = {row[0]: {"signatures": row[1], "total_failures": row[2]} for row in cursor}
 
             # Most failing
             cursor = conn.execute(
                 "SELECT tool_name, args_hash, failure_count "
                 "FROM failed_signatures ORDER BY failure_count DESC LIMIT 5"
             )
-            most_failing = [
-                {"tool": row[0], "hash": row[1], "count": row[2]} for row in cursor
-            ]
+            most_failing = [{"tool": row[0], "hash": row[1], "count": row[2]} for row in cursor]
 
         return {
             "total_signatures": total,

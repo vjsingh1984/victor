@@ -122,6 +122,7 @@ class CerebrasProvider(BaseProvider):
         if not self._api_key:
             try:
                 from victor.config.api_keys import get_api_key
+
                 self._api_key = get_api_key("cerebras") or ""
             except ImportError:
                 pass

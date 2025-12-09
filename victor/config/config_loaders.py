@@ -257,6 +257,7 @@ def _get_default_stage_keywords() -> Dict[str, StageConfig]:
 # =============================================================================
 # These are kept for backwards compatibility during migration
 
+
 @lru_cache(maxsize=1)
 def _get_legacy_provider_context_windows() -> Dict[str, int]:
     """Legacy function - use get_provider_limits() instead."""
@@ -264,6 +265,4 @@ def _get_legacy_provider_context_windows() -> Dict[str, int]:
     return {name: cfg.context_window for name, cfg in limits.items()}
 
 
-PROVIDER_CONTEXT_WINDOWS = property(
-    lambda self: _get_legacy_provider_context_windows()
-)
+PROVIDER_CONTEXT_WINDOWS = property(lambda self: _get_legacy_provider_context_windows())

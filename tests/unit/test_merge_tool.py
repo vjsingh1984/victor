@@ -127,6 +127,7 @@ class TestMergeConflictToolProperties:
     def test_tool_name(self, tool):
         """Test tool name uses canonical name from ToolNames."""
         from victor.tools.tool_names import ToolNames
+
         assert tool.name == ToolNames.MERGE
         assert tool.name == "merge"  # Canonical short name
 

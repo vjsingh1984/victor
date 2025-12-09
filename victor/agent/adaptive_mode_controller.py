@@ -78,27 +78,30 @@ logger = logging.getLogger(__name__)
 
 class AgentMode(Enum):
     """Agent operation modes."""
-    EXPLORE = "explore"      # Understanding codebase
-    PLAN = "plan"           # Creating implementation plan
-    BUILD = "build"         # Writing/modifying code
-    REVIEW = "review"       # Reviewing changes
-    COMPLETE = "complete"   # Task finished
+
+    EXPLORE = "explore"  # Understanding codebase
+    PLAN = "plan"  # Creating implementation plan
+    BUILD = "build"  # Writing/modifying code
+    REVIEW = "review"  # Reviewing changes
+    COMPLETE = "complete"  # Task finished
 
 
 class TransitionTrigger(Enum):
     """Triggers for mode transitions."""
-    USER_REQUEST = "user_request"         # User explicitly requested
-    TASK_COMPLETE = "task_complete"       # Task objective achieved
-    BUDGET_LOW = "budget_low"             # Tool/iteration budget low
+
+    USER_REQUEST = "user_request"  # User explicitly requested
+    TASK_COMPLETE = "task_complete"  # Task objective achieved
+    BUDGET_LOW = "budget_low"  # Tool/iteration budget low
     QUALITY_THRESHOLD = "quality_threshold"  # Quality score threshold met
-    PATTERN_DETECTED = "pattern_detected"    # Learned pattern suggests transition
-    LOOP_DETECTED = "loop_detected"       # Repetitive behavior detected
-    ERROR_RECOVERY = "error_recovery"     # Recovering from error
+    PATTERN_DETECTED = "pattern_detected"  # Learned pattern suggests transition
+    LOOP_DETECTED = "loop_detected"  # Repetitive behavior detected
+    ERROR_RECOVERY = "error_recovery"  # Recovering from error
 
 
 @dataclass
 class ModeState:
     """Current state for mode decision making."""
+
     mode: AgentMode
     task_type: str
     tool_calls_made: int
@@ -146,8 +149,9 @@ class ModeState:
 @dataclass
 class ModeAction:
     """Action to take in the current state."""
+
     target_mode: AgentMode
-    adjust_tool_budget: int = 0   # +/- adjustment
+    adjust_tool_budget: int = 0  # +/- adjustment
     should_continue: bool = True
     reason: str = ""
     confidence: float = 0.5
@@ -163,6 +167,7 @@ class ModeAction:
 @dataclass
 class TransitionEvent:
     """Record of a mode transition."""
+
     from_mode: AgentMode
     to_mode: AgentMode
     trigger: TransitionTrigger
@@ -186,6 +191,7 @@ class QLearningStore:
         """Initialize the Q-learning store."""
         if db_path is None:
             from victor.config.settings import get_project_paths
+
             paths = get_project_paths()
             db_path = paths.victor_dir / "mode_learning.db"
 
@@ -206,7 +212,8 @@ class QLearningStore:
 
         with sqlite3.connect(self.db_path) as conn:
             # Q-values table
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS q_values (
                     state_key TEXT NOT NULL,
                     action_key TEXT NOT NULL,
@@ -215,10 +222,12 @@ class QLearningStore:
                     last_updated TEXT NOT NULL,
                     PRIMARY KEY (state_key, action_key)
                 )
-            """)
+            """
+            )
 
             # Transition history for analysis
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS transition_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     profile_name TEXT NOT NULL,
@@ -230,10 +239,12 @@ class QLearningStore:
                     reward REAL,
                     timestamp TEXT NOT NULL
                 )
-            """)
+            """
+            )
 
             # Task-type specific statistics
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS task_stats (
                     task_type TEXT PRIMARY KEY,
                     optimal_tool_budget INTEGER DEFAULT 10,
@@ -242,16 +253,21 @@ class QLearningStore:
                     sample_count INTEGER DEFAULT 0,
                     last_updated TEXT NOT NULL
                 )
-            """)
+            """
+            )
 
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_q_state ON q_values(state_key)
-            """)
+            """
+            )
 
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_history_profile
                 ON transition_history(profile_name, timestamp)
-            """)
+            """
+            )
 
         self._initialized = True
 
@@ -262,7 +278,7 @@ class QLearningStore:
         with sqlite3.connect(self.db_path) as conn:
             row = conn.execute(
                 "SELECT q_value FROM q_values WHERE state_key = ? AND action_key = ?",
-                (state_key, action_key)
+                (state_key, action_key),
             ).fetchone()
 
             return row[0] if row else 0.0
@@ -274,8 +290,7 @@ class QLearningStore:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
-                "SELECT action_key, q_value FROM q_values WHERE state_key = ?",
-                (state_key,)
+                "SELECT action_key, q_value FROM q_values WHERE state_key = ?", (state_key,)
             ).fetchall()
 
             return {row["action_key"]: row["q_value"] for row in rows}
@@ -313,17 +328,24 @@ class QLearningStore:
 
         # Store updated Q-value
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO q_values (state_key, action_key, q_value, visit_count, last_updated)
                 VALUES (?, ?, ?, 1, ?)
                 ON CONFLICT(state_key, action_key) DO UPDATE SET
                     q_value = ?,
                     visit_count = visit_count + 1,
                     last_updated = ?
-            """, (
-                state_key, action_key, new_q, datetime.now().isoformat(),
-                new_q, datetime.now().isoformat()
-            ))
+            """,
+                (
+                    state_key,
+                    action_key,
+                    new_q,
+                    datetime.now().isoformat(),
+                    new_q,
+                    datetime.now().isoformat(),
+                ),
+            )
 
         return new_q
 
@@ -341,20 +363,23 @@ class QLearningStore:
         self._ensure_initialized()
 
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO transition_history
                 (profile_name, from_mode, to_mode, trigger, state_key, action_key, reward, timestamp)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                profile_name,
-                from_mode.value,
-                to_mode.value,
-                trigger.value,
-                state_key,
-                action_key,
-                reward,
-                datetime.now().isoformat(),
-            ))
+            """,
+                (
+                    profile_name,
+                    from_mode.value,
+                    to_mode.value,
+                    trigger.value,
+                    state_key,
+                    action_key,
+                    reward,
+                    datetime.now().isoformat(),
+                ),
+            )
 
     def update_task_stats(
         self,
@@ -369,8 +394,7 @@ class QLearningStore:
         with sqlite3.connect(self.db_path) as conn:
             # Get current stats
             row = conn.execute(
-                "SELECT * FROM task_stats WHERE task_type = ?",
-                (task_type,)
+                "SELECT * FROM task_stats WHERE task_type = ?", (task_type,)
             ).fetchone()
 
             if row:
@@ -386,7 +410,8 @@ class QLearningStore:
                 new_quality = quality_score
                 completion_rate = 1.0 if completed else 0.0
 
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO task_stats
                 (task_type, optimal_tool_budget, avg_quality_score, avg_completion_rate, sample_count, last_updated)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -396,12 +421,21 @@ class QLearningStore:
                     avg_completion_rate = ?,
                     sample_count = ?,
                     last_updated = ?
-            """, (
-                task_type, new_budget, new_quality, completion_rate, count,
-                datetime.now().isoformat(),
-                new_budget, new_quality, completion_rate, count,
-                datetime.now().isoformat(),
-            ))
+            """,
+                (
+                    task_type,
+                    new_budget,
+                    new_quality,
+                    completion_rate,
+                    count,
+                    datetime.now().isoformat(),
+                    new_budget,
+                    new_quality,
+                    completion_rate,
+                    count,
+                    datetime.now().isoformat(),
+                ),
+            )
 
     def get_task_stats(self, task_type: str) -> Dict[str, Any]:
         """Get statistics for a task type."""
@@ -410,8 +444,7 @@ class QLearningStore:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
-                "SELECT * FROM task_stats WHERE task_type = ?",
-                (task_type,)
+                "SELECT * FROM task_stats WHERE task_type = ?", (task_type,)
             ).fetchone()
 
             if row:
@@ -579,10 +612,7 @@ class AdaptiveModeController:
                 action_taken=action,
             )
 
-        logger.debug(
-            f"[AdaptiveModeController] State: {state_key}, "
-            f"Recommended: {action}"
-        )
+        logger.debug(f"[AdaptiveModeController] State: {state_key}, " f"Recommended: {action}")
 
         return action
 
@@ -593,38 +623,46 @@ class AdaptiveModeController:
 
         # Stay in current mode (with budget adjustments)
         for budget_adj in [-2, 0, 2, 5]:
-            actions.append(ModeAction(
-                target_mode=current_mode,
-                adjust_tool_budget=budget_adj,
-                should_continue=True,
-                confidence=0.5,
-            ))
+            actions.append(
+                ModeAction(
+                    target_mode=current_mode,
+                    adjust_tool_budget=budget_adj,
+                    should_continue=True,
+                    confidence=0.5,
+                )
+            )
 
         # Transitions to valid modes
         for target_mode in self.VALID_TRANSITIONS.get(current_mode, []):
-            actions.append(ModeAction(
-                target_mode=target_mode,
-                adjust_tool_budget=0,
-                should_continue=target_mode != AgentMode.COMPLETE,
-                confidence=0.5,
-            ))
+            actions.append(
+                ModeAction(
+                    target_mode=target_mode,
+                    adjust_tool_budget=0,
+                    should_continue=target_mode != AgentMode.COMPLETE,
+                    confidence=0.5,
+                )
+            )
 
         # Check for termination conditions
         if state.quality_score > 0.8 and state.tool_calls_made > 2:
-            actions.append(ModeAction(
-                target_mode=AgentMode.COMPLETE,
-                should_continue=False,
-                reason="High quality achieved",
-                confidence=0.8,
-            ))
+            actions.append(
+                ModeAction(
+                    target_mode=AgentMode.COMPLETE,
+                    should_continue=False,
+                    reason="High quality achieved",
+                    confidence=0.8,
+                )
+            )
 
         if state.tool_calls_made >= state.tool_budget:
-            actions.append(ModeAction(
-                target_mode=AgentMode.COMPLETE,
-                should_continue=False,
-                reason="Tool budget exhausted",
-                confidence=0.9,
-            ))
+            actions.append(
+                ModeAction(
+                    target_mode=AgentMode.COMPLETE,
+                    should_continue=False,
+                    reason="Tool budget exhausted",
+                    confidence=0.9,
+                )
+            )
 
         return actions
 
@@ -748,10 +786,12 @@ class AdaptiveModeController:
                 reward=reward,
             )
 
-            self._mode_history.append((
-                self._pending_transition.to_mode,
-                datetime.now(),
-            ))
+            self._mode_history.append(
+                (
+                    self._pending_transition.to_mode,
+                    datetime.now(),
+                )
+            )
 
             self._pending_transition = None
 

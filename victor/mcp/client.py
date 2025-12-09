@@ -200,9 +200,7 @@ class MCPClient:
         # Clean up sandboxed process if used
         if self._sandboxed_process is not None:
             try:
-                asyncio.get_event_loop().run_until_complete(
-                    self._sandboxed_process.terminate()
-                )
+                asyncio.get_event_loop().run_until_complete(self._sandboxed_process.terminate())
             except Exception as e:
                 logger.debug(f"Error terminating sandboxed process: {e}")
             self._sandboxed_process = None

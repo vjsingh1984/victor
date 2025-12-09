@@ -2386,9 +2386,7 @@ Provide a 2-3 sentence summary:"""
 
                 if mode_controller:
                     mode_controller.adjust_exploration_rate(rate)
-                    self.console.print(
-                        f"[green]Exploration rate set to:[/] {rate:.2f}"
-                    )
+                    self.console.print(f"[green]Exploration rate set to:[/] {rate:.2f}")
                 else:
                     self.console.print("[yellow]Mode controller not available[/]")
             except ValueError:
@@ -2425,7 +2423,9 @@ Provide a 2-3 sentence summary:"""
             content += f"  Profile: {session_stats.get('profile_name', 'unknown')}\n"
             content += f"  Total Reward: {session_stats.get('total_reward', 0):.2f}\n"
             content += f"  Mode Transitions: {session_stats.get('mode_transitions', 0)}\n"
-            content += f"  Exploration Rate (epsilon): {session_stats.get('exploration_rate', 0):.2f}\n"
+            content += (
+                f"  Exploration Rate (epsilon): {session_stats.get('exploration_rate', 0):.2f}\n"
+            )
 
             modes_visited = session_stats.get("modes_visited", [])
             if modes_visited:
@@ -3249,7 +3249,9 @@ Please think through this carefully and provide a detailed plan:"""
             try:
                 provider_stats = store.get_provider_stats()
                 family_stats = store.get_model_family_stats()
-                total_sessions = sum(s["session_count"] for s in provider_stats) if provider_stats else 0
+                total_sessions = (
+                    sum(s["session_count"] for s in provider_stats) if provider_stats else 0
+                )
                 total_providers = len(provider_stats) if provider_stats else 0
                 total_families = len(family_stats) if family_stats else 0
 
@@ -3357,12 +3359,12 @@ Please think through this carefully and provide a detailed plan:"""
                     f"[bold]Confidence:[/] {recommendation.confidence:.1%}\n"
                     f"[bold]Reason:[/] {recommendation.reason}\n\n"
                     f"[bold]Alternatives:[/]\n"
-                    + "\n".join(
-                        f"  - {p}: {q:.3f}"
-                        for p, q in recommendation.alternatives
-                    )
-                    + ("\n\n[dim]Task types: simple, complex, action, generation, analysis[/]"
-                       if not task_type else ""),
+                    + "\n".join(f"  - {p}: {q:.3f}" for p, q in recommendation.alternatives)
+                    + (
+                        "\n\n[dim]Task types: simple, complex, action, generation, analysis[/]"
+                        if not task_type
+                        else ""
+                    ),
                     title="Model Recommendation",
                     border_style="green",
                 )
@@ -3377,9 +3379,7 @@ Please think through this carefully and provide a detailed plan:"""
             # Set selection strategy
             if len(args) < 2:
                 self.console.print(f"[bold]Current strategy:[/] {selector.strategy.value}")
-                self.console.print(
-                    "[dim]Available: epsilon_greedy, ucb, exploit, thompson[/]"
-                )
+                self.console.print("[dim]Available: epsilon_greedy, ucb, exploit, thompson[/]")
                 return
 
             strategy_name = args[1].lower()

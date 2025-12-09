@@ -787,13 +787,15 @@ class TestCodeReviewMultiLanguage:
     async def test_review_java_file(self, tmp_path):
         """Test review of Java file."""
         test_file = tmp_path / "Test.java"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 public class Test {
     public void test() {
         System.out.println("debug");
     }
 }
-""")
+"""
+        )
 
         result = await code_review(path=str(test_file), aspects=["all"])
         assert result["success"] is True
@@ -803,7 +805,8 @@ public class Test {
     async def test_review_go_file(self, tmp_path):
         """Test review of Go file."""
         test_file = tmp_path / "main.go"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 package main
 
 import "fmt"
@@ -811,7 +814,8 @@ import "fmt"
 func main() {
     fmt.Println("hello")
 }
-""")
+"""
+        )
 
         result = await code_review(path=str(test_file), aspects=["all"])
         assert result["success"] is True
@@ -841,7 +845,7 @@ func main() {
     async def test_review_cpp_file(self, tmp_path):
         """Test review of C++ file."""
         test_file = tmp_path / "main.cpp"
-        test_file.write_text('using namespace std;\nstrcpy(dest, src);')
+        test_file.write_text("using namespace std;\nstrcpy(dest, src);")
 
         result = await code_review(path=str(test_file), aspects=["all"])
         assert result["success"] is True
@@ -861,7 +865,7 @@ func main() {
     async def test_review_php_file(self, tmp_path):
         """Test review of PHP file."""
         test_file = tmp_path / "index.php"
-        test_file.write_text('<?php\nvar_dump($x);\n?>')
+        test_file.write_text("<?php\nvar_dump($x);\n?>")
 
         result = await code_review(path=str(test_file), aspects=["all"])
         assert result["success"] is True
@@ -901,7 +905,9 @@ func main() {
     async def test_review_scala_file(self, tmp_path):
         """Test review of Scala file."""
         test_file = tmp_path / "Main.scala"
-        test_file.write_text('object Main {\n  def main(args: Array[String]): Unit = println("Hi")\n}')
+        test_file.write_text(
+            'object Main {\n  def main(args: Array[String]): Unit = println("Hi")\n}'
+        )
 
         result = await code_review(path=str(test_file), aspects=["all"])
         assert result["success"] is True
@@ -921,7 +927,7 @@ func main() {
     async def test_review_sql_file(self, tmp_path):
         """Test review of SQL file."""
         test_file = tmp_path / "query.sql"
-        test_file.write_text('SELECT * FROM users;\nGRANT ALL PRIVILEGES ON database.* TO user;')
+        test_file.write_text("SELECT * FROM users;\nGRANT ALL PRIVILEGES ON database.* TO user;")
 
         result = await code_review(path=str(test_file), aspects=["all"])
         assert result["success"] is True
@@ -957,7 +963,7 @@ func main() {
     @pytest.mark.asyncio
     async def test_review_with_languages_json_string(self, tmp_path):
         """Test review with languages as JSON string."""
-        (tmp_path / "test.py").write_text('x = 1')
+        (tmp_path / "test.py").write_text("x = 1")
 
         result = await code_review(path=str(tmp_path), aspects=["all"], languages='["python"]')
         assert result["success"] is True
@@ -965,7 +971,7 @@ func main() {
     @pytest.mark.asyncio
     async def test_review_with_languages_single_string(self, tmp_path):
         """Test review with single language as string."""
-        (tmp_path / "test.py").write_text('x = 1')
+        (tmp_path / "test.py").write_text("x = 1")
 
         result = await code_review(path=str(tmp_path), aspects=["all"], languages="python")
         assert result["success"] is True

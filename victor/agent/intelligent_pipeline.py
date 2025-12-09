@@ -83,6 +83,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RequestContext:
     """Context prepared for a request."""
+
     system_prompt: str
     recommended_tool_budget: int
     recommended_mode: str
@@ -95,6 +96,7 @@ class RequestContext:
 @dataclass
 class ResponseResult:
     """Result of processing a response."""
+
     is_valid: bool
     quality_score: float
     grounding_score: float
@@ -108,6 +110,7 @@ class ResponseResult:
 @dataclass
 class PipelineStats:
     """Statistics for the intelligent pipeline."""
+
     total_requests: int = 0
     successful_requests: int = 0
     avg_quality_score: float = 0.0
@@ -198,6 +201,7 @@ class IntelligentAgentPipeline:
         # Import here to avoid circular dependencies
         try:
             from victor.agent.intelligent_prompt_builder import IntelligentPromptBuilder
+
             self._prompt_builder = await IntelligentPromptBuilder.create(
                 provider_name=self.provider_name,
                 model=self.model,
@@ -209,6 +213,7 @@ class IntelligentAgentPipeline:
 
         try:
             from victor.agent.adaptive_mode_controller import AdaptiveModeController
+
             self._mode_controller = AdaptiveModeController(
                 profile_name=self.profile_name,
             )
@@ -218,6 +223,7 @@ class IntelligentAgentPipeline:
 
         try:
             from victor.agent.response_quality import ResponseQualityScorer
+
             self._quality_scorer = ResponseQualityScorer()
             logger.debug("[IntelligentPipeline] Quality scorer initialized")
         except Exception as e:
@@ -225,6 +231,7 @@ class IntelligentAgentPipeline:
 
         try:
             from victor.agent.grounding_verifier import GroundingVerifier
+
             if self.project_root:
                 self._grounding_verifier = GroundingVerifier(
                     project_root=self.project_root,
@@ -235,6 +242,7 @@ class IntelligentAgentPipeline:
 
         try:
             from victor.agent.resilience import ResilientExecutor
+
             self._resilient_executor = ResilientExecutor()
             logger.debug("[IntelligentPipeline] Resilient executor initialized")
         except Exception as e:
@@ -386,8 +394,7 @@ class IntelligentAgentPipeline:
             )
             quality_score = quality_result.overall_score
             quality_details = {
-                dim.dimension.value: dim.score
-                for dim in quality_result.dimension_scores
+                dim.dimension.value: dim.score for dim in quality_result.dimension_scores
             }
             improvement_suggestions = quality_result.improvement_suggestions
 
@@ -434,9 +441,7 @@ class IntelligentAgentPipeline:
         # Update stats
         if success:
             self._stats.successful_requests += 1
-        self._stats.avg_quality_score = (
-            0.9 * self._stats.avg_quality_score + 0.1 * quality_score
-        )
+        self._stats.avg_quality_score = 0.9 * self._stats.avg_quality_score + 0.1 * quality_score
         self._stats.avg_grounding_score = (
             0.9 * self._stats.avg_grounding_score + 0.1 * grounding_score
         )
@@ -513,7 +518,7 @@ class IntelligentAgentPipeline:
                 fallback=fallback_func if fallback else None,
             )
             return result
-        except Exception as e:
+        except Exception:
             self._stats.circuit_breaker_trips += 1
             raise
 
@@ -592,9 +597,7 @@ class IntelligentAgentPipeline:
         summary = {
             "profile_name": self.profile_name,
             "total_requests": self._stats.total_requests,
-            "success_rate": (
-                self._stats.successful_requests / max(self._stats.total_requests, 1)
-            ),
+            "success_rate": (self._stats.successful_requests / max(self._stats.total_requests, 1)),
         }
 
         if self._prompt_builder:

@@ -115,7 +115,7 @@ class TestFormatterRenderer:
         mock_console.print.assert_called_once()
         # Check Panel was printed
         call_args = mock_console.print.call_args[0][0]
-        assert hasattr(call_args, 'title')  # Panel has title attribute
+        assert hasattr(call_args, "title")  # Panel has title attribute
         mock_formatter.start_streaming.assert_called_once()
 
     def test_on_file_preview_no_extension(self, renderer, mock_formatter, mock_console):
@@ -278,9 +278,7 @@ class TestLiveDisplayRenderer:
         assert "read" in call_str
 
     @patch("victor.ui.stream_renderer.Live")
-    def test_on_tool_result_success_prints_checkmark(
-        self, mock_live_class, renderer, mock_console
-    ):
+    def test_on_tool_result_success_prints_checkmark(self, mock_live_class, renderer, mock_console):
         """Test on_tool_result() prints green checkmark for success."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -299,9 +297,7 @@ class TestLiveDisplayRenderer:
         assert "✓" in call_str
 
     @patch("victor.ui.stream_renderer.Live")
-    def test_on_tool_result_failure_prints_x(
-        self, mock_live_class, renderer, mock_console
-    ):
+    def test_on_tool_result_failure_prints_x(self, mock_live_class, renderer, mock_console):
         """Test on_tool_result() prints red X for failure."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -348,9 +344,7 @@ class TestLiveDisplayRenderer:
         assert renderer._content_buffer == "Hello World"
 
     @patch("victor.ui.stream_renderer.Live")
-    def test_finalize_returns_content_and_cleans_up(
-        self, mock_live_class, renderer, mock_console
-    ):
+    def test_finalize_returns_content_and_cleans_up(self, mock_live_class, renderer, mock_console):
         """Test finalize() returns content and stops Live display."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -654,7 +648,12 @@ class TestStreamResponse:
             yield StreamChunk(
                 content="",
                 metadata={
-                    "tool_result": {"name": "read", "success": True, "elapsed": 0.1, "arguments": {}}
+                    "tool_result": {
+                        "name": "read",
+                        "success": True,
+                        "elapsed": 0.1,
+                        "arguments": {},
+                    }
                 },
             )
             yield StreamChunk(content="Response ", metadata=None)
@@ -718,9 +717,7 @@ class TestStreamResponse:
 
         mock_agent.stream_chat = MagicMock(return_value=mock_stream())
 
-        await stream_response(
-            mock_agent, "test message", mock_renderer, suppress_thinking=True
-        )
+        await stream_response(mock_agent, "test message", mock_renderer, suppress_thinking=True)
 
         # Should still call lifecycle methods
         mock_renderer.start.assert_called()

@@ -325,8 +325,7 @@ class ProjectManifest:
         await manifest._infer_architecture()
 
         logger.info(
-            f"Built manifest: {len(manifest.files)} files, "
-            f"{len(manifest.modules)} modules"
+            f"Built manifest: {len(manifest.files)} files, " f"{len(manifest.modules)} modules"
         )
 
         return manifest
@@ -879,12 +878,10 @@ class ProjectManifest:
             "file_count": len(self.files),
             "module_count": len(self.modules),
             "categories": {
-                cat.value: len(self._file_index.get(cat.value, set()))
-                for cat in FileCategory
+                cat.value: len(self._file_index.get(cat.value, set())) for cat in FileCategory
             },
             "top_files": [
-                {"path": f.path, "importance": f.importance}
-                for f in self.get_important_files(10)
+                {"path": f.path, "importance": f.importance} for f in self.get_important_files(10)
             ],
         }
 

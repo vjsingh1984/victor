@@ -277,7 +277,17 @@ async def _literal_search(
     stages=["initial", "planning", "reading", "analysis"],  # Relevant for exploration stages
     task_types=["search", "analysis"],  # Classification-aware selection
     execution_category="read_only",  # Safe for parallel execution
-    keywords=["search", "semantic", "embedding", "concept", "pattern", "similar", "find", "grep", "literal"],
+    keywords=[
+        "search",
+        "semantic",
+        "embedding",
+        "concept",
+        "pattern",
+        "similar",
+        "find",
+        "grep",
+        "literal",
+    ],
     mandatory_keywords=["search code", "find in code", "search for"],  # Force inclusion
 )
 async def search(
@@ -409,5 +419,3 @@ async def search(
         }
     except Exception as exc:
         return {"success": False, "error": str(exc)}
-
-

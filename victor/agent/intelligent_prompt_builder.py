@@ -78,18 +78,20 @@ logger = logging.getLogger(__name__)
 
 class PromptStrategy(Enum):
     """Prompt generation strategies."""
-    MINIMAL = "minimal"       # Cloud models - minimal guidance
+
+    MINIMAL = "minimal"  # Cloud models - minimal guidance
     STRUCTURED = "structured"  # Capable local models - structured guidance
-    STRICT = "strict"         # Less capable models - strict rules
-    ADAPTIVE = "adaptive"     # Dynamic based on learned performance
+    STRICT = "strict"  # Less capable models - strict rules
+    ADAPTIVE = "adaptive"  # Dynamic based on learned performance
 
 
 class CacheState(Enum):
     """Embedding cache states."""
-    COLD = "cold"       # No embeddings loaded, lazy on demand
+
+    COLD = "cold"  # No embeddings loaded, lazy on demand
     WARMING = "warming"  # Background loading in progress
-    WARM = "warm"       # Embeddings ready for fast retrieval
-    STALE = "stale"     # Cache needs refresh
+    WARM = "warm"  # Embeddings ready for fast retrieval
+    STALE = "stale"  # Cache needs refresh
 
 
 @dataclass
@@ -98,6 +100,7 @@ class ProfileMetrics:
 
     Used for reinforcement learning to optimize prompts.
     """
+
     profile_name: str
     provider: str
     model: str
@@ -147,18 +150,22 @@ class ProfileMetrics:
 
         # Update success rate
         current_rate = self.successful_completions / self.total_requests
-        self.tool_call_success_rate = (1 - alpha) * self.tool_call_success_rate + alpha * current_rate
+        self.tool_call_success_rate = (
+            1 - alpha
+        ) * self.tool_call_success_rate + alpha * current_rate
 
         # Update quality score
         self.avg_quality_score = (1 - alpha) * self.avg_quality_score + alpha * quality_score
 
         # Update response time
-        self.avg_response_time_ms = (1 - alpha) * self.avg_response_time_ms + alpha * response_time_ms
+        self.avg_response_time_ms = (
+            1 - alpha
+        ) * self.avg_response_time_ms + alpha * response_time_ms
 
         # Update tool patterns
         self.avg_tool_calls_per_request = (
-            (1 - alpha) * self.avg_tool_calls_per_request + alpha * tool_calls
-        )
+            1 - alpha
+        ) * self.avg_tool_calls_per_request + alpha * tool_calls
 
         # Update tool budget adherence
         adherence = 1.0 if tool_calls <= tool_budget else tool_budget / tool_calls
@@ -197,6 +204,7 @@ class ProfileMetrics:
 @dataclass
 class ContextFragment:
     """A fragment of relevant context from conversation history."""
+
     content: str
     similarity: float
     task_type: str
@@ -216,6 +224,7 @@ class ContextFragment:
 @dataclass
 class PromptContext:
     """Context for prompt generation."""
+
     task: str
     task_type: str
     profile_name: str
@@ -248,6 +257,7 @@ class ProfileLearningStore:
         """Initialize the learning store."""
         if db_path is None:
             from victor.config.settings import get_project_paths
+
             paths = get_project_paths()
             db_path = paths.victor_dir / "profile_learning.db"
 
@@ -262,7 +272,8 @@ class ProfileLearningStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS profile_metrics (
                     profile_name TEXT PRIMARY KEY,
                     provider TEXT NOT NULL,
@@ -270,9 +281,11 @@ class ProfileLearningStore:
                     metrics_json TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 )
-            """)
+            """
+            )
 
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS interaction_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     profile_name TEXT NOT NULL,
@@ -285,12 +298,15 @@ class ProfileLearningStore:
                     grounded INTEGER NOT NULL,
                     timestamp TEXT NOT NULL
                 )
-            """)
+            """
+            )
 
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_interaction_profile
                 ON interaction_history(profile_name, timestamp)
-            """)
+            """
+            )
 
         self._initialized = True
 
@@ -316,17 +332,20 @@ class ProfileLearningStore:
         }
 
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO profile_metrics
                 (profile_name, provider, model, metrics_json, updated_at)
                 VALUES (?, ?, ?, ?, ?)
-            """, (
-                metrics.profile_name,
-                metrics.provider,
-                metrics.model,
-                json.dumps(metrics_dict),
-                datetime.now().isoformat(),
-            ))
+            """,
+                (
+                    metrics.profile_name,
+                    metrics.provider,
+                    metrics.model,
+                    json.dumps(metrics_dict),
+                    datetime.now().isoformat(),
+                ),
+            )
 
     def load_metrics(self, profile_name: str, provider: str, model: str) -> ProfileMetrics:
         """Load profile metrics from database."""
@@ -334,10 +353,13 @@ class ProfileLearningStore:
 
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            row = conn.execute("""
+            row = conn.execute(
+                """
                 SELECT metrics_json, updated_at FROM profile_metrics
                 WHERE profile_name = ?
-            """, (profile_name,)).fetchone()
+            """,
+                (profile_name,),
+            ).fetchone()
 
             if row:
                 metrics_dict = json.loads(row["metrics_json"])
@@ -356,7 +378,9 @@ class ProfileLearningStore:
                     tool_budget_adherence=metrics_dict.get("tool_budget_adherence", 1.0),
                     mode_transition_success=metrics_dict.get("mode_transition_success", 0.0),
                     optimal_tool_budget=metrics_dict.get("optimal_tool_budget", 10),
-                    prefers_structured_prompts=metrics_dict.get("prefers_structured_prompts", False),
+                    prefers_structured_prompts=metrics_dict.get(
+                        "prefers_structured_prompts", False
+                    ),
                     needs_strict_grounding=metrics_dict.get("needs_strict_grounding", True),
                     supports_parallel_tools=metrics_dict.get("supports_parallel_tools", False),
                     last_updated=datetime.fromisoformat(row["updated_at"]),
@@ -384,22 +408,25 @@ class ProfileLearningStore:
         self._ensure_initialized()
 
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO interaction_history
                 (profile_name, task_type, success, quality_score, response_time_ms,
                  tool_calls, tool_budget, grounded, timestamp)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                profile_name,
-                task_type,
-                1 if success else 0,
-                quality_score,
-                response_time_ms,
-                tool_calls,
-                tool_budget,
-                1 if grounded else 0,
-                datetime.now().isoformat(),
-            ))
+            """,
+                (
+                    profile_name,
+                    task_type,
+                    1 if success else 0,
+                    quality_score,
+                    response_time_ms,
+                    tool_calls,
+                    tool_budget,
+                    1 if grounded else 0,
+                    datetime.now().isoformat(),
+                ),
+            )
 
     def get_recent_interactions(
         self,
@@ -411,12 +438,15 @@ class ProfileLearningStore:
 
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT * FROM interaction_history
                 WHERE profile_name = ?
                 ORDER BY timestamp DESC
                 LIMIT ?
-            """, (profile_name, limit)).fetchall()
+            """,
+                (profile_name, limit),
+            ).fetchall()
 
             return [dict(row) for row in rows]
 
@@ -487,9 +517,7 @@ class EmbeddingScheduler:
         if self._background_task and not self._background_task.done():
             return
 
-        self._background_task = asyncio.create_task(
-            self._background_refresh_loop(session_id)
-        )
+        self._background_task = asyncio.create_task(self._background_refresh_loop(session_id))
 
     async def _background_refresh_loop(self, session_id: Optional[str] = None) -> None:
         """Background loop to keep cache fresh."""
@@ -786,10 +814,23 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
     def _has_native_tool_support(self) -> bool:
         """Check if model has native tool calling support."""
         patterns = [
-            "qwen2.5", "qwen-2.5", "qwen3", "qwen-3",
-            "llama-3.1", "llama3.1", "llama-3.2", "llama3.2", "llama-3.3", "llama3.3",
-            "ministral", "mistral", "mixtral", "command-r",
-            "firefunction", "hermes", "functionary",
+            "qwen2.5",
+            "qwen-2.5",
+            "qwen3",
+            "qwen-3",
+            "llama-3.1",
+            "llama3.1",
+            "llama-3.2",
+            "llama3.2",
+            "llama-3.3",
+            "llama3.3",
+            "ministral",
+            "mistral",
+            "mixtral",
+            "command-r",
+            "firefunction",
+            "hermes",
+            "functionary",
         ]
         return any(pattern in self.model_lower for pattern in patterns)
 

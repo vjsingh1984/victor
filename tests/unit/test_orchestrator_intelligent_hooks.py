@@ -29,6 +29,7 @@ import pytest
 @dataclass
 class MockRequestContext:
     """Mock for RequestContext from intelligent pipeline."""
+
     system_prompt: str = ""
     recommended_tool_budget: int = 15
     recommended_mode: str = "explore"
@@ -38,6 +39,7 @@ class MockRequestContext:
 @dataclass
 class MockResponseResult:
     """Mock for ResponseResult from intelligent pipeline."""
+
     is_valid: bool = True
     quality_score: float = 0.8
     grounding_score: float = 0.9
@@ -90,18 +92,22 @@ class TestOrchestratorIntelligentHooks:
     def mock_integration(self):
         """Create mock OrchestratorIntegration."""
         integration = MagicMock()
-        integration.prepare_request = AsyncMock(return_value=MockRequestContext(
-            system_prompt="Optimized prompt",
-            recommended_tool_budget=20,
-            recommended_mode="build",
-            should_continue=True,
-        ))
-        integration.validate_response = AsyncMock(return_value=MockResponseResult(
-            is_valid=True,
-            quality_score=0.85,
-            grounding_score=0.9,
-            is_grounded=True,
-        ))
+        integration.prepare_request = AsyncMock(
+            return_value=MockRequestContext(
+                system_prompt="Optimized prompt",
+                recommended_tool_budget=20,
+                recommended_mode="build",
+                should_continue=True,
+            )
+        )
+        integration.validate_response = AsyncMock(
+            return_value=MockResponseResult(
+                is_valid=True,
+                quality_score=0.85,
+                grounding_score=0.9,
+                is_grounded=True,
+            )
+        )
         integration.should_continue = MagicMock(return_value=(True, "Continue"))
         integration.pipeline = MagicMock()
         integration.pipeline._mode_controller = MagicMock()
@@ -131,7 +137,7 @@ class TestOrchestratorIntelligentHooks:
 
     def test_validate_intelligent_response_skips_short_responses(self):
         """Should skip validation for very short responses."""
-        integration = MagicMock()
+        _integration = MagicMock()  # noqa: F841
 
         # For responses < 50 chars, validation should be skipped
         short_response = "OK"
@@ -243,12 +249,16 @@ class TestHookIntegration:
         """Test the full flow of prepare_request followed by validate_response."""
         # Create mock integration
         integration = MagicMock()
-        integration.prepare_request = AsyncMock(return_value=MockRequestContext(
-            recommended_tool_budget=25,
-        ))
-        integration.validate_response = AsyncMock(return_value=MockResponseResult(
-            quality_score=0.9,
-        ))
+        integration.prepare_request = AsyncMock(
+            return_value=MockRequestContext(
+                recommended_tool_budget=25,
+            )
+        )
+        integration.validate_response = AsyncMock(
+            return_value=MockResponseResult(
+                quality_score=0.9,
+            )
+        )
 
         # Simulate the flow
         context = await integration.prepare_request(
@@ -281,7 +291,7 @@ class TestHookIntegration:
                 task_type="test",
                 current_mode="explore",
             )
-            assert False, "Should have raised exception"
+            raise AssertionError("Should have raised exception")
         except Exception as e:
             assert "Pipeline error" in str(e)
 

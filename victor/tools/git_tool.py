@@ -655,5 +655,3 @@ async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     analysis.append("4. Continue: git merge --continue or git rebase --continue")
 
     return {"success": True, "output": "\n".join(analysis), "error": ""}
-
-

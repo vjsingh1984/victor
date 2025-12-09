@@ -220,9 +220,7 @@ class User:
         """
         return any(role.has_permission(permission) for role in self.roles)
 
-    def can_use_tool(
-        self, tool_name: str, category: str, required_permission: Permission
-    ) -> bool:
+    def can_use_tool(self, tool_name: str, category: str, required_permission: Permission) -> bool:
         """Check if user can use a specific tool.
 
         Args:
@@ -234,9 +232,7 @@ class User:
             True if user can use this tool
         """
         for role in self.roles:
-            if role.has_permission(required_permission) and role.can_use_tool(
-                tool_name, category
-            ):
+            if role.has_permission(required_permission) and role.can_use_tool(tool_name, category):
                 return True
         return False
 
@@ -378,13 +374,13 @@ class RBACManager:
                 default_role = self._roles.get(self._default_role_name)
                 if default_role:
                     user = User(name, roles={default_role})
-                    logger.debug(f"Created default user '{name}' with role '{self._default_role_name}'")
+                    logger.debug(
+                        f"Created default user '{name}' with role '{self._default_role_name}'"
+                    )
 
             return user
 
-    def check_permission(
-        self, username: str, permission: Permission
-    ) -> bool:
+    def check_permission(self, username: str, permission: Permission) -> bool:
         """Check if a user has a specific permission.
 
         Args:
@@ -436,9 +432,7 @@ class RBACManager:
         with self._lock:
             user = self.get_user(username)
             if user is None:
-                logger.warning(
-                    f"Unknown user '{username}' denied access to tool '{tool_name}'"
-                )
+                logger.warning(f"Unknown user '{username}' denied access to tool '{tool_name}'")
                 return False
 
             result = user.can_use_tool(tool_name, category, required_permission)
@@ -493,7 +487,9 @@ class RBACManager:
             for role_name, role_data in config.get("roles", {}).items():
                 permissions_list = role_data.get("permissions", [])
                 permissions = frozenset(
-                    Permission(p.lower()) for p in permissions_list if hasattr(Permission, p.upper())
+                    Permission(p.lower())
+                    for p in permissions_list
+                    if hasattr(Permission, p.upper())
                 )
                 allowed_categories = frozenset(role_data.get("tool_categories", []))
                 denied_tools = frozenset(role_data.get("denied_tools", []))
@@ -509,17 +505,13 @@ class RBACManager:
             # Load users
             for user_name, user_data in config.get("users", {}).items():
                 role_names = user_data.get("roles", [])
-                roles = {
-                    self._roles[rn] for rn in role_names if rn in self._roles
-                }
+                roles = {self._roles[rn] for rn in role_names if rn in self._roles}
                 metadata = user_data.get("metadata", {})
 
                 user = User(name=user_name, roles=roles, metadata=metadata)
                 self._users[user_name] = user
 
-            logger.info(
-                f"Loaded RBAC config: {len(self._roles)} roles, {len(self._users)} users"
-            )
+            logger.info(f"Loaded RBAC config: {len(self._roles)} roles, {len(self._users)} users")
 
     def load_from_yaml(self, path: Path) -> None:
         """Load RBAC configuration from a YAML file.
@@ -599,6 +591,7 @@ def require_permission(permission: Permission) -> Callable:
 
         # Return appropriate wrapper
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         return sync_wrapper

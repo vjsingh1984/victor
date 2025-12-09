@@ -210,9 +210,7 @@ class MyClass:
 
         result = await verifier.verify(response)
 
-        assert any(
-            issue.issue_type == IssueType.FILE_NOT_FOUND for issue in result.issues
-        )
+        assert any(issue.issue_type == IssueType.FILE_NOT_FOUND for issue in result.issues)
         assert result.confidence < 1.0
 
     @pytest.mark.asyncio
@@ -249,8 +247,7 @@ class MyClass:
 
         # Should detect fabrication indicators
         assert any(
-            issue.issue_type
-            in (IssueType.FABRICATED_CONTENT, IssueType.UNVERIFIABLE)
+            issue.issue_type in (IssueType.FABRICATED_CONTENT, IssueType.UNVERIFIABLE)
             for issue in result.issues
         )
 
@@ -258,9 +255,7 @@ class MyClass:
     async def test_grounding_threshold(self, verifier):
         """Should respect confidence threshold."""
         config = VerifierConfig(min_confidence=0.9)
-        strict_verifier = GroundingVerifier(
-            project_root=verifier.project_root, config=config
-        )
+        strict_verifier = GroundingVerifier(project_root=verifier.project_root, config=config)
 
         response = "Check nonexistent1.py, nonexistent2.py, and nonexistent3.py"
 
@@ -272,9 +267,7 @@ class MyClass:
     async def test_strict_mode_fails_on_any_issue(self, verifier):
         """Strict mode should fail on any issue."""
         config = VerifierConfig(strict_mode=True)
-        strict_verifier = GroundingVerifier(
-            project_root=verifier.project_root, config=config
-        )
+        strict_verifier = GroundingVerifier(project_root=verifier.project_root, config=config)
 
         response = "Check nonexistent.py"
 
@@ -349,7 +342,7 @@ class TestCodeMatching:
 
     def test_partial_match(self, verifier):
         """Should match partial code."""
-        content = '''
+        content = """
 def foo():
     x = 1
     y = 2
@@ -357,7 +350,7 @@ def foo():
 
 def bar():
     pass
-'''
+"""
         snippet = """
 def foo():
     x = 1

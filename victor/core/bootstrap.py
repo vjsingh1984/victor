@@ -59,9 +59,7 @@ T = TypeVar("T")
 class NullMetricsService:
     """No-op metrics service for when metrics are disabled."""
 
-    def record_metric(
-        self, name: str, value: float, tags: Optional[Dict[str, str]] = None
-    ) -> None:
+    def record_metric(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         pass
 
     def increment_counter(self, name: str, tags: Optional[Dict[str, str]] = None) -> None:
@@ -153,23 +151,17 @@ class LazyEmbeddingService:
 class SignatureStoreProtocol:
     """Protocol for failed signature storage."""
 
-    def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool:
-        ...
+    def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool: ...
 
-    def record_failure(
-        self, tool_name: str, args: Dict[str, Any], error_message: str
-    ) -> None:
-        ...
+    def record_failure(self, tool_name: str, args: Dict[str, Any], error_message: str) -> None: ...
 
 
 class UsageLoggerProtocol:
     """Protocol for usage logging."""
 
-    def log_event(self, event_type: str, data: Dict[str, Any]) -> None:
-        ...
+    def log_event(self, event_type: str, data: Dict[str, Any]) -> None: ...
 
-    def is_enabled(self) -> bool:
-        ...
+    def is_enabled(self) -> bool: ...
 
 
 # =============================================================================
@@ -240,9 +232,7 @@ def _register_core_services(container: ServiceContainer, settings: Settings) -> 
     )
 
 
-def _register_analytics_services(
-    container: ServiceContainer, settings: Settings
-) -> None:
+def _register_analytics_services(container: ServiceContainer, settings: Settings) -> None:
     """Register analytics and logging services."""
 
     # Metrics service
@@ -268,9 +258,7 @@ def _register_analytics_services(
     )
 
 
-def _register_embedding_services(
-    container: ServiceContainer, settings: Settings
-) -> None:
+def _register_embedding_services(container: ServiceContainer, settings: Settings) -> None:
     """Register embedding/ML services."""
 
     container.register(
@@ -330,9 +318,7 @@ class NullSignatureStore:
     def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool:
         return False
 
-    def record_failure(
-        self, tool_name: str, args: Dict[str, Any], error_message: str
-    ) -> None:
+    def record_failure(self, tool_name: str, args: Dict[str, Any], error_message: str) -> None:
         pass
 
     def clear_signature(self, tool_name: str, args: Dict[str, Any]) -> bool:

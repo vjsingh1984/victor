@@ -376,7 +376,8 @@ class TestCreatePatch:
             with open(test_file, "w") as f:
                 f.write("line1\nline2\nline3")
 
-            result = await patch(operation="create",
+            result = await patch(
+                operation="create",
                 file_path=test_file,
                 new_content="line1\nline2_modified\nline3",
             )
@@ -393,7 +394,8 @@ class TestCreatePatch:
         with tempfile.TemporaryDirectory() as tmpdir:
             new_file = os.path.join(tmpdir, "nonexistent.py")
 
-            result = await patch(operation="create",
+            result = await patch(
+                operation="create",
                 file_path=new_file,
                 new_content="# New content\nprint('hello')",
             )
@@ -409,7 +411,8 @@ class TestCreatePatch:
             with open(test_file, "w") as f:
                 f.write("line1\nline2\nline3\nline4\nline5")
 
-            result = await patch(operation="create",
+            result = await patch(
+                operation="create",
                 file_path=test_file,
                 new_content="line1\nline2\nline3_modified\nline4\nline5",
                 context_lines=2,

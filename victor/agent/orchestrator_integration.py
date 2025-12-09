@@ -180,9 +180,11 @@ class OrchestratorIntegration:
             provider_name=orchestrator.provider_name,
             model=orchestrator.model,
             profile_name=f"{orchestrator.provider_name}:{orchestrator.model}",
-            project_root=str(orchestrator.project_context.context_file.parent)
-            if orchestrator.project_context.context_file
-            else None,
+            project_root=(
+                str(orchestrator.project_context.context_file.parent)
+                if orchestrator.project_context.context_file
+                else None
+            ),
         )
 
         return cls(orchestrator, pipeline, config)
@@ -353,16 +355,11 @@ class OrchestratorIntegration:
         Returns:
             Optimal tool budget
         """
-        if (
-            self._pipeline._mode_controller
-            and self._config.enable_mode_learning
-        ):
+        if self._pipeline._mode_controller and self._config.enable_mode_learning:
             return self._pipeline._mode_controller.get_optimal_tool_budget(task_type)
         return self._orchestrator.tool_budget
 
-    def add_quality_observer(
-        self, observer: Callable[[float, Dict[str, float]], None]
-    ) -> None:
+    def add_quality_observer(self, observer: Callable[[float, Dict[str, float]], None]) -> None:
         """Add observer for quality score events.
 
         Args:
@@ -370,9 +367,7 @@ class OrchestratorIntegration:
         """
         self._quality_observers.append(observer)
 
-    def add_grounding_observer(
-        self, observer: Callable[[bool, List[str]], None]
-    ) -> None:
+    def add_grounding_observer(self, observer: Callable[[bool, List[str]], None]) -> None:
         """Add observer for grounding verification events.
 
         Args:
@@ -427,8 +422,7 @@ class OrchestratorIntegration:
             "quality_score": round(self._metrics.avg_quality_score, 3),
             "quality_threshold": self._config.min_quality_threshold,
             "grounding_meets_threshold": (
-                self._metrics.avg_grounding_score
-                >= self._config.grounding_confidence_threshold
+                self._metrics.avg_grounding_score >= self._config.grounding_confidence_threshold
             ),
             "grounding_score": round(self._metrics.avg_grounding_score, 3),
             "grounding_threshold": self._config.grounding_confidence_threshold,

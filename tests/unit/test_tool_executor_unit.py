@@ -1063,6 +1063,7 @@ class TestToolExecutorHooks:
         registry, _ = registry_with_hooks
 
         called = []
+
         def before_hook(tool_name, arguments):
             called.append((tool_name, arguments))
 
@@ -1112,6 +1113,7 @@ class TestToolExecutorHooks:
         registry, _ = registry_with_hooks
 
         called = []
+
         def after_hook(result):
             called.append(result)
 

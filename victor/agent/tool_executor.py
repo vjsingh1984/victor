@@ -49,7 +49,15 @@ from victor.core.retry import (
     RetryStrategy,
     tool_retry_strategy,
 )
-from victor.tools.base import AccessMode, BaseTool, Hook, HookError, ToolRegistry, ToolResult, ValidationResult
+from victor.tools.base import (
+    AccessMode,
+    BaseTool,
+    Hook,
+    HookError,
+    ToolRegistry,
+    ToolResult,
+    ValidationResult,
+)
 from victor.tools.metadata_registry import (
     get_idempotent_tools as registry_get_idempotent_tools,
     get_cache_invalidating_tools as registry_get_cache_invalidating_tools,
@@ -504,7 +512,9 @@ class ToolExecutor:
         # RBAC permission check (runs after safety check)
         rbac_allowed, rbac_denial = self._check_rbac(tool, tool_name)
         if not rbac_allowed:
-            logger.warning(f"Tool execution blocked by RBAC: {tool_name} for user {self.current_user}")
+            logger.warning(
+                f"Tool execution blocked by RBAC: {tool_name} for user {self.current_user}"
+            )
             return ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,

@@ -127,6 +127,7 @@ class TestIaCScannerToolProperties:
     def test_tool_name(self, tool):
         """Test tool name uses canonical name from ToolNames."""
         from victor.tools.tool_names import ToolNames
+
         assert tool.name == ToolNames.IAC
         assert tool.name == "iac"  # Canonical short name
 

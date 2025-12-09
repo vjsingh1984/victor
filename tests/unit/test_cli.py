@@ -454,9 +454,7 @@ class TestCheckCodebaseIndex:
         mock_index.check_staleness_by_mtime.side_effect = Exception("Test error")
 
         with patch.dict("sys.modules", {"victor.codebase.indexer": MagicMock()}):
-            with patch(
-                "victor.ui.cli.CodebaseIndex", return_value=mock_index, create=True
-            ):
+            with patch("victor.ui.cli.CodebaseIndex", return_value=mock_index, create=True):
                 # Should not raise
                 await _check_codebase_index("/tmp", mock_console)
 
@@ -468,9 +466,7 @@ class TestCheckCodebaseIndex:
         mock_index = MagicMock()
         mock_index.check_staleness_by_mtime.return_value = (False, [], [])
 
-        with patch(
-            "victor.codebase.indexer.CodebaseIndex", return_value=mock_index
-        ):
+        with patch("victor.codebase.indexer.CodebaseIndex", return_value=mock_index):
             await _check_codebase_index("/tmp", mock_console, silent=True)
             # No output expected when not stale and silent
 
@@ -492,15 +488,11 @@ class TestPreloadSemanticIndex:
             "victor.tools.code_search_tool._get_or_build_index",
             side_effect=ImportError("Test"),
         ):
-            result = await _preload_semantic_index(
-                "/tmp", mock_settings, mock_console
-            )
+            result = await _preload_semantic_index("/tmp", mock_settings, mock_console)
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_preload_semantic_index_generic_error(
-        self, mock_console, mock_settings
-    ):
+    async def test_preload_semantic_index_generic_error(self, mock_console, mock_settings):
         """Test handling of generic errors."""
         from victor.ui.cli import _preload_semantic_index
 
@@ -508,9 +500,7 @@ class TestPreloadSemanticIndex:
             "victor.tools.code_search_tool._get_or_build_index",
             side_effect=Exception("Test error"),
         ):
-            result = await _preload_semantic_index(
-                "/tmp", mock_settings, mock_console
-            )
+            result = await _preload_semantic_index("/tmp", mock_settings, mock_console)
             assert result is False
 
 
@@ -614,6 +604,7 @@ class TestOutputFormatOptions:
 
         # Verify the chat function has the expected parameters
         import inspect
+
         sig = inspect.signature(chat)
         param_names = list(sig.parameters.keys())
 

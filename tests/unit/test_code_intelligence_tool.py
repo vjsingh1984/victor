@@ -205,9 +205,7 @@ def some_function():
 """
         )
 
-        result = await refs(
-            symbol_name="nonexistent_function", search_path=str(tmp_path)
-        )
+        result = await refs(symbol_name="nonexistent_function", search_path=str(tmp_path))
 
         assert isinstance(result, list)
         # Empty list or minimal results expected

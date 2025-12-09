@@ -359,13 +359,15 @@ class TestTraversalOrdering:
             top_level_dirs = [
                 item["path"]
                 for item in items
-                if item["type"] == "directory" and "/" not in item["path"] and "\\" not in item["path"]
+                if item["type"] == "directory"
+                and "/" not in item["path"]
+                and "\\" not in item["path"]
             ]
 
             # BFS should capture all 5 dirs in the first 8 entries
-            assert len(top_level_dirs) == 5, (
-                f"BFS should see all 5 top dirs with limit=8. Got: {top_level_dirs}"
-            )
+            assert (
+                len(top_level_dirs) == 5
+            ), f"BFS should see all 5 top dirs with limit=8. Got: {top_level_dirs}"
 
 
 class TestDepthParameter:

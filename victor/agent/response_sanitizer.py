@@ -182,8 +182,8 @@ class StreamingContentFilter:
             match = pattern.search(text)
             if match:
                 # Output text before the marker
-                before = text[:match.start()]
-                after = text[match.end():]
+                before = text[: match.start()]
+                after = text[match.end() :]
 
                 # Enter thinking state
                 self._state = ThinkingState.IN_THINKING
@@ -239,8 +239,8 @@ class StreamingContentFilter:
             match = pattern.search(text)
             if match:
                 # Get thinking content before end marker
-                thinking_content = text[:match.start()]
-                after = text[match.end():]
+                thinking_content = text[: match.start()]
+                after = text[match.end() :]
                 self._state = ThinkingState.NORMAL
                 logger.debug(
                     f"StreamingContentFilter: Exited thinking state "

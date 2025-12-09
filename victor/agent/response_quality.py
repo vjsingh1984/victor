@@ -395,9 +395,7 @@ class ResponseQualityScorer:
             evidence=evidence,
         )
 
-    async def _score_accuracy(
-        self, response: str, context: Dict[str, Any]
-    ) -> DimensionScore:
+    async def _score_accuracy(self, response: str, context: Dict[str, Any]) -> DimensionScore:
         """Score factual accuracy of the response."""
         score = 0.7  # Default score when no verification possible
         evidence = []
@@ -456,7 +454,7 @@ class ResponseQualityScorer:
         # Very long responses might be verbose
         elif word_count > 1000:
             # Check for repetition
-            unique_words = set(w.lower() for w in words if len(w) > 3)
+            unique_words = {w.lower() for w in words if len(w) > 3}
             repetition_ratio = len(unique_words) / len(words)
 
             if repetition_ratio < 0.3:
@@ -577,9 +575,7 @@ class ResponseQualityScorer:
             "in contrast",
             "similarly",
         ]
-        connector_count = sum(
-            1 for c in connectors if c in response.lower()
-        )
+        connector_count = sum(1 for c in connectors if c in response.lower())
         if connector_count > 2:
             score += 0.1
             evidence.append(f"Good use of connectors ({connector_count})")
@@ -688,9 +684,7 @@ class ResponseQualityScorer:
         """Check if response contains code."""
         return bool(re.search(r"```\w*\n", response))
 
-    def _generate_suggestions(
-        self, dimension_scores: List[DimensionScore]
-    ) -> List[str]:
+    def _generate_suggestions(self, dimension_scores: List[DimensionScore]) -> List[str]:
         """Generate improvement suggestions based on scores."""
         suggestions = []
 

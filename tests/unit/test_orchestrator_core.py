@@ -1024,9 +1024,7 @@ class TestHandleToolCalls:
                 return_value=MagicMock(success=True, result="File contents", error=None)
             )
 
-            await orch._handle_tool_calls(
-                [{"name": "read", "arguments": {"path": "/test.py"}}]
-            )
+            await orch._handle_tool_calls([{"name": "read", "arguments": {"path": "/test.py"}}])
 
             assert "/test.py" in orch.observed_files
 

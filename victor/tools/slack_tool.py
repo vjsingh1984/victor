@@ -26,6 +26,7 @@ from typing import Any, Dict, List, Optional
 try:
     from slack_sdk import WebClient
     from slack_sdk.errors import SlackApiError
+
     SLACK_AVAILABLE = True
 except ImportError:
     WebClient = None  # type: ignore
@@ -121,13 +122,13 @@ async def slack(
     if not SLACK_AVAILABLE:
         return {
             "success": False,
-            "error": "Slack SDK not installed. Install with: pip install slack_sdk"
+            "error": "Slack SDK not installed. Install with: pip install slack_sdk",
         }
 
     if not _slack_client:
         return {
             "success": False,
-            "error": "Slack client is not configured. Call set_slack_config() first."
+            "error": "Slack client is not configured. Call set_slack_config() first.",
         }
 
     try:
@@ -194,11 +195,13 @@ async def slack(
             return {
                 "success": False,
                 "error": f"Unsupported operation: {operation}. "
-                         f"Valid operations: send_message, search_messages, list_channels"
+                f"Valid operations: send_message, search_messages, list_channels",
             }
 
     except SlackApiError as e:
-        logger.error(f"[slack] Error during operation '{operation}': {e.response.get('error', str(e))}")
+        logger.error(
+            f"[slack] Error during operation '{operation}': {e.response.get('error', str(e))}"
+        )
         return {"success": False, "error": e.response.get("error", str(e))}
     except Exception as e:
         logger.error(f"[slack] Unexpected error during operation '{operation}': {e}")

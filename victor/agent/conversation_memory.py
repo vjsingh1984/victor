@@ -122,8 +122,8 @@ class ContextSize(Enum):
 # Extracts ML-friendly features from model name strings
 # =============================================================================
 
-import re
-from dataclasses import dataclass as _dataclass
+import re  # noqa: E402
+from dataclasses import dataclass as _dataclass  # noqa: E402
 
 
 @_dataclass
@@ -805,8 +805,8 @@ class ConversationStore:
 
         # Model sizes with parameter ranges
         sizes = [
-            ("tiny", 0, 1),      # <1B
-            ("small", 1, 8),    # 1-8B
+            ("tiny", 0, 1),  # <1B
+            ("small", 1, 8),  # 1-8B
             ("medium", 8, 32),  # 8-32B
             ("large", 32, 70),  # 32-70B
             ("xlarge", 70, 175),  # 70-175B
@@ -819,7 +819,7 @@ class ConversationStore:
 
         # Context sizes with token ranges
         ctx_sizes = [
-            ("small", 0, 8000),      # <8K
+            ("small", 0, 8000),  # <8K
             ("medium", 8000, 32000),  # 8K-32K
             ("large", 32000, 128000),  # 32K-128K
             ("xlarge", 128000, 999999999),  # 128K+
@@ -2409,12 +2409,8 @@ class ConversationStore:
         """
         with sqlite3.connect(self.db_path) as conn:
             # Total counts
-            session_count = conn.execute(
-                "SELECT COUNT(*) FROM sessions"
-            ).fetchone()[0]
-            message_count = conn.execute(
-                "SELECT COUNT(*) FROM messages"
-            ).fetchone()[0]
+            session_count = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+            message_count = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
 
             # Provider breakdown
             provider_counts = conn.execute(

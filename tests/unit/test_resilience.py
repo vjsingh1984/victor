@@ -174,9 +174,7 @@ class TestCircuitBreaker:
 
     def test_excluded_exceptions_not_counted(self):
         """Excluded exceptions should not count as failures."""
-        config = CircuitBreakerConfig(
-            failure_threshold=2, exclude_exceptions=(ValueError,)
-        )
+        config = CircuitBreakerConfig(failure_threshold=2, exclude_exceptions=(ValueError,))
         breaker = CircuitBreaker(config)
 
         # Record excluded exception

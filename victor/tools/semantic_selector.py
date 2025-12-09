@@ -307,7 +307,10 @@ class SemanticToolSelector:
 
         # Include tool count, names, and cache version in hash for robustness
         # This ensures ANY change (add, remove, rename, modify) triggers rebuild
-        combined = f"v{self.CACHE_VERSION}|count:{tool_count}|names:{','.join(tool_names)}|" + "|".join(tool_strings)
+        combined = (
+            f"v{self.CACHE_VERSION}|count:{tool_count}|names:{','.join(tool_names)}|"
+            + "|".join(tool_strings)
+        )
         return hashlib.sha256(combined.encode()).hexdigest()
 
     def _delete_cache(self, reason: str) -> None:
@@ -402,7 +405,9 @@ class SemanticToolSelector:
                     return False
 
                 if len(embedding.shape) != 1:
-                    logger.warning(f"Tool embeddings: '{tool_name}' has wrong shape: {embedding.shape}")
+                    logger.warning(
+                        f"Tool embeddings: '{tool_name}' has wrong shape: {embedding.shape}"
+                    )
                     self._delete_cache("invalid shape")
                     return False
 

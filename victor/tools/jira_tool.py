@@ -26,6 +26,7 @@ from typing import Any, Dict, Optional
 
 try:
     from jira import JIRA, JIRAError
+
     JIRA_AVAILABLE = True
 except ImportError:
     JIRA = None  # type: ignore
@@ -136,13 +137,13 @@ async def jira(
     if not JIRA_AVAILABLE:
         return {
             "success": False,
-            "error": "Jira library not installed. Install with: pip install jira"
+            "error": "Jira library not installed. Install with: pip install jira",
         }
 
     if not _jira_client:
         return {
             "success": False,
-            "error": "Jira client is not configured. Call set_jira_config() first."
+            "error": "Jira client is not configured. Call set_jira_config() first.",
         }
 
     try:
@@ -227,7 +228,7 @@ async def jira(
             return {
                 "success": False,
                 "error": f"Unsupported operation: {operation}. "
-                         f"Valid operations: search_issues, create_issue, get_issue, add_comment"
+                f"Valid operations: search_issues, create_issue, get_issue, add_comment",
             }
 
     except JIRAError as e:

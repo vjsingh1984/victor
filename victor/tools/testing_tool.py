@@ -129,5 +129,3 @@ def _summarize_report(report: Dict[str, Any]) -> Dict[str, Any]:
         },
         "failures": failures,
     }
-
-

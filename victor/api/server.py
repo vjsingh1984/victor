@@ -488,15 +488,21 @@ class VictorAPIServer:
                             "name": provider_name,
                             "display_name": provider_name.replace("_", " ").title(),
                             "is_local": provider_name in ("ollama", "lmstudio", "vllm"),
-                            "configured": provider.is_configured()
-                            if hasattr(provider, "is_configured")
-                            else True,
-                            "supports_tools": provider.supports_tools()
-                            if hasattr(provider, "supports_tools")
-                            else False,
-                            "supports_streaming": provider.supports_streaming()
-                            if hasattr(provider, "supports_streaming")
-                            else True,
+                            "configured": (
+                                provider.is_configured()
+                                if hasattr(provider, "is_configured")
+                                else True
+                            ),
+                            "supports_tools": (
+                                provider.supports_tools()
+                                if hasattr(provider, "supports_tools")
+                                else False
+                            ),
+                            "supports_streaming": (
+                                provider.supports_streaming()
+                                if hasattr(provider, "supports_streaming")
+                                else True
+                            ),
                         }
                     )
                 except Exception as e:
@@ -557,7 +563,7 @@ class VictorAPIServer:
                 {
                     "tools": tools_info,
                     "total": len(tools_info),
-                    "categories": list(set(t["category"] for t in tools_info)),
+                    "categories": list({t["category"] for t in tools_info}),
                 }
             )
 
@@ -1046,7 +1052,9 @@ class VictorAPIServer:
                 }
 
                 try:
-                    for entry in sorted(path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+                    for entry in sorted(
+                        path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())
+                    ):
                         if entry.name.startswith(".") and entry.name not in {".github", ".vscode"}:
                             continue
                         if entry.name in exclude_dirs:
@@ -1064,12 +1072,14 @@ class VictorAPIServer:
                                 pass
 
                             if depth <= 1:  # Only include files at shallow depth
-                                result["children"].append({
-                                    "name": entry.name,
-                                    "path": str(entry.relative_to(root)),
-                                    "type": "file",
-                                    "extension": ext,
-                                })
+                                result["children"].append(
+                                    {
+                                        "name": entry.name,
+                                        "path": str(entry.relative_to(root)),
+                                        "type": "file",
+                                        "extension": ext,
+                                    }
+                                )
                 except PermissionError:
                     result["error"] = "Permission denied"
 
@@ -1108,23 +1118,41 @@ class VictorAPIServer:
                 "recent_files": [],
             }
 
-            code_extensions = {".py", ".ts", ".js", ".tsx", ".jsx", ".java", ".go", ".rs", ".cpp", ".c", ".h"}
+            code_extensions = {
+                ".py",
+                ".ts",
+                ".js",
+                ".tsx",
+                ".jsx",
+                ".java",
+                ".go",
+                ".rs",
+                ".cpp",
+                ".c",
+                ".h",
+            }
             file_sizes = []
 
             for path in root.rglob("*"):
-                if path.is_file() and not any(p.startswith(".") for p in path.parts[len(root.parts):]):
+                if path.is_file() and not any(
+                    p.startswith(".") for p in path.parts[len(root.parts) :]
+                ):
                     ext = path.suffix.lower()
                     if ext in code_extensions:
                         try:
                             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                                 lines = len(f.readlines())
                                 metrics["lines_of_code"] += lines
-                                metrics["files_by_type"][ext] = metrics["files_by_type"].get(ext, 0) + 1
-                                file_sizes.append({
-                                    "path": str(path.relative_to(root)),
-                                    "lines": lines,
-                                    "size": path.stat().st_size,
-                                })
+                                metrics["files_by_type"][ext] = (
+                                    metrics["files_by_type"].get(ext, 0) + 1
+                                )
+                                file_sizes.append(
+                                    {
+                                        "path": str(path.relative_to(root)),
+                                        "lines": lines,
+                                        "size": path.stat().st_size,
+                                    }
+                                )
                         except Exception:
                             pass
 
@@ -1151,10 +1179,12 @@ class VictorAPIServer:
                     scan_type="secrets",
                 )
                 if tool_result.success:
-                    return web.json_response({
-                        "scan_completed": True,
-                        "results": tool_result.data,
-                    })
+                    return web.json_response(
+                        {
+                            "scan_completed": True,
+                            "results": tool_result.data,
+                        }
+                    )
             except Exception:
                 pass
 
@@ -1168,44 +1198,51 @@ class VictorAPIServer:
             secret_patterns = [
                 (r'(?i)(api[_-]?key|apikey)\s*[:=]\s*["\']?[\w-]{20,}', "API Key"),
                 (r'(?i)(secret|password|passwd|pwd)\s*[:=]\s*["\'][^"\']{8,}', "Secret/Password"),
-                (r'(?i)bearer\s+[\w-]{20,}', "Bearer Token"),
-                (r'sk-[a-zA-Z0-9]{20,}', "OpenAI API Key"),
-                (r'ghp_[a-zA-Z0-9]{36}', "GitHub Token"),
-                (r'AKIA[A-Z0-9]{16}', "AWS Access Key"),
+                (r"(?i)bearer\s+[\w-]{20,}", "Bearer Token"),
+                (r"sk-[a-zA-Z0-9]{20,}", "OpenAI API Key"),
+                (r"ghp_[a-zA-Z0-9]{36}", "GitHub Token"),
+                (r"AKIA[A-Z0-9]{16}", "AWS Access Key"),
             ]
 
             code_extensions = {".py", ".ts", ".js", ".json", ".yaml", ".yml", ".env", ".sh"}
 
             for path in root.rglob("*"):
                 if path.is_file() and path.suffix.lower() in code_extensions:
-                    if any(p.startswith(".") or p in {"node_modules", "__pycache__"} for p in path.parts):
+                    if any(
+                        p.startswith(".") or p in {"node_modules", "__pycache__"}
+                        for p in path.parts
+                    ):
                         continue
 
                     try:
                         content = path.read_text(encoding="utf-8", errors="ignore")
                         for pattern, finding_type in secret_patterns:
                             for match in re.finditer(pattern, content):
-                                line_num = content[:match.start()].count("\n") + 1
-                                findings.append({
-                                    "file": str(path.relative_to(root)),
-                                    "line": line_num,
-                                    "type": finding_type,
-                                    "severity": "high",
-                                    "snippet": match.group()[:30] + "...",
-                                })
+                                line_num = content[: match.start()].count("\n") + 1
+                                findings.append(
+                                    {
+                                        "file": str(path.relative_to(root)),
+                                        "line": line_num,
+                                        "type": finding_type,
+                                        "severity": "high",
+                                        "snippet": match.group()[:30] + "...",
+                                    }
+                                )
                     except Exception:
                         pass
 
-            return web.json_response({
-                "scan_completed": True,
-                "findings": findings[:50],  # Limit to 50 findings
-                "total_findings": len(findings),
-                "severity_counts": {
-                    "high": len([f for f in findings if f["severity"] == "high"]),
-                    "medium": 0,
-                    "low": 0,
-                },
-            })
+            return web.json_response(
+                {
+                    "scan_completed": True,
+                    "findings": findings[:50],  # Limit to 50 findings
+                    "total_findings": len(findings),
+                    "severity_counts": {
+                        "high": len([f for f in findings if f["severity"] == "high"]),
+                        "medium": 0,
+                        "low": 0,
+                    },
+                }
+            )
 
         except Exception as e:
             logger.exception("Workspace security error")
@@ -1274,10 +1311,12 @@ class VictorAPIServer:
                     "exists": True,
                 }
 
-            return web.json_response({
-                "workspace": str(root),
-                "dependencies": {k: v for k, v in dependencies.items() if v is not None},
-            })
+            return web.json_response(
+                {
+                    "workspace": str(root),
+                    "dependencies": {k: v for k, v in dependencies.items() if v is not None},
+                }
+            )
 
         except Exception as e:
             logger.exception("Workspace dependencies error")
@@ -1306,18 +1345,22 @@ class VictorAPIServer:
                 approval["resolved"] = True
 
                 # Broadcast approval status to WebSocket clients
-                await self._broadcast_ws({
-                    "type": "tool_approval_resolved",
-                    "approval_id": approval_id,
-                    "approved": approved,
-                    "tool_name": approval.get("tool_name"),
-                })
+                await self._broadcast_ws(
+                    {
+                        "type": "tool_approval_resolved",
+                        "approval_id": approval_id,
+                        "approved": approved,
+                        "tool_name": approval.get("tool_name"),
+                    }
+                )
 
-                return web.json_response({
-                    "success": True,
-                    "approval_id": approval_id,
-                    "approved": approved,
-                })
+                return web.json_response(
+                    {
+                        "success": True,
+                        "approval_id": approval_id,
+                        "approved": approved,
+                    }
+                )
             else:
                 return web.json_response({"error": "Approval not found"}, status=404)
 
@@ -1341,10 +1384,12 @@ class VictorAPIServer:
                 if not info.get("resolved")
             ]
 
-            return web.json_response({
-                "pending": pending,
-                "count": len(pending),
-            })
+            return web.json_response(
+                {
+                    "pending": pending,
+                    "count": len(pending),
+                }
+            )
 
         except Exception as e:
             logger.exception("Pending approvals error")
@@ -1368,10 +1413,12 @@ class VictorAPIServer:
             )
 
             if result.returncode != 0:
-                return web.json_response({
-                    "is_git_repo": False,
-                    "error": result.stderr,
-                })
+                return web.json_response(
+                    {
+                        "is_git_repo": False,
+                        "error": result.stderr,
+                    }
+                )
 
             lines = result.stdout.strip().split("\n")
             branch_line = lines[0] if lines else ""
@@ -1406,15 +1453,17 @@ class VictorAPIServer:
                 if status == "??":
                     untracked.append(filepath)
 
-            return web.json_response({
-                "is_git_repo": True,
-                "branch": branch,
-                "tracking": tracking,
-                "staged": staged,
-                "unstaged": unstaged,
-                "untracked": untracked,
-                "is_clean": len(staged) == 0 and len(unstaged) == 0 and len(untracked) == 0,
-            })
+            return web.json_response(
+                {
+                    "is_git_repo": True,
+                    "branch": branch,
+                    "tracking": tracking,
+                    "staged": staged,
+                    "unstaged": unstaged,
+                    "untracked": untracked,
+                    "is_clean": len(staged) == 0 and len(unstaged) == 0 and len(untracked) == 0,
+                }
+            )
 
         except subprocess.TimeoutExpired:
             return web.json_response({"error": "Git command timed out"}, status=500)
@@ -1478,16 +1527,20 @@ class VictorAPIServer:
             )
 
             if result.returncode != 0:
-                return web.json_response({
-                    "success": False,
-                    "error": result.stderr or "Commit failed",
-                })
+                return web.json_response(
+                    {
+                        "success": False,
+                        "error": result.stderr or "Commit failed",
+                    }
+                )
 
-            return web.json_response({
-                "success": True,
-                "message": message,
-                "output": result.stdout,
-            })
+            return web.json_response(
+                {
+                    "success": True,
+                    "message": message,
+                    "output": result.stdout,
+                }
+            )
 
         except Exception as e:
             logger.exception("Git commit error")
@@ -1516,13 +1569,15 @@ class VictorAPIServer:
                 if "|" in line:
                     parts = line.split("|", 4)
                     if len(parts) >= 5:
-                        commits.append({
-                            "hash": parts[0],
-                            "author": parts[1],
-                            "email": parts[2],
-                            "relative_date": parts[3],
-                            "message": parts[4],
-                        })
+                        commits.append(
+                            {
+                                "hash": parts[0],
+                                "author": parts[1],
+                                "email": parts[2],
+                                "relative_date": parts[3],
+                                "message": parts[4],
+                            }
+                        )
 
             return web.json_response({"commits": commits})
 
@@ -1553,10 +1608,12 @@ class VictorAPIServer:
                 timeout=30,
             )
 
-            return web.json_response({
-                "diff": result.stdout[:50000],  # Limit size
-                "truncated": len(result.stdout) > 50000,
-            })
+            return web.json_response(
+                {
+                    "diff": result.stdout[:50000],  # Limit size
+                    "truncated": len(result.stdout) > 50000,
+                }
+            )
 
         except Exception as e:
             logger.exception("Git diff error")
@@ -1576,12 +1633,14 @@ class VictorAPIServer:
 
             for name in registry.list_servers():
                 server_info = registry.get_server_info(name)
-                servers.append({
-                    "name": name,
-                    "connected": server_info.get("connected", False),
-                    "tools": server_info.get("tools", []),
-                    "endpoint": server_info.get("endpoint"),
-                })
+                servers.append(
+                    {
+                        "name": name,
+                        "connected": server_info.get("connected", False),
+                        "tools": server_info.get("tools", []),
+                        "endpoint": server_info.get("endpoint"),
+                    }
+                )
 
             return web.json_response({"servers": servers})
 
@@ -1606,10 +1665,12 @@ class VictorAPIServer:
             registry = get_mcp_registry()
             success = await registry.connect(server_name, endpoint=endpoint)
 
-            return web.json_response({
-                "success": success,
-                "server": server_name,
-            })
+            return web.json_response(
+                {
+                    "success": success,
+                    "server": server_name,
+                }
+            )
 
         except ImportError:
             return web.json_response({"error": "MCP not available"}, status=501)
@@ -1631,10 +1692,12 @@ class VictorAPIServer:
             registry = get_mcp_registry()
             await registry.disconnect(server_name)
 
-            return web.json_response({
-                "success": True,
-                "server": server_name,
-            })
+            return web.json_response(
+                {
+                    "success": True,
+                    "server": server_name,
+                }
+            )
 
         except ImportError:
             return web.json_response({"error": "MCP not available"}, status=501)
@@ -1658,8 +1721,7 @@ class VictorAPIServer:
             task_q_summary = {}
             for provider, task_q_table in selector._q_table_by_task.items():
                 task_q_summary[provider] = {
-                    task_type: round(q_val, 3)
-                    for task_type, q_val in task_q_table.items()
+                    task_type: round(q_val, 3) for task_type, q_val in task_q_table.items()
                 }
 
             stats["task_q_tables"] = task_q_summary
@@ -1687,18 +1749,20 @@ class VictorAPIServer:
             available = list(selector._q_table.keys()) if selector._q_table else ["ollama"]
             recommendation = selector.select_provider(available, task_type=task_type)
 
-            return web.json_response({
-                "provider": recommendation.provider,
-                "model": recommendation.model,
-                "q_value": round(recommendation.q_value, 3),
-                "confidence": round(recommendation.confidence, 3),
-                "reason": recommendation.reason,
-                "task_type": task_type,
-                "alternatives": [
-                    {"provider": p, "q_value": round(q, 3)}
-                    for p, q in recommendation.alternatives
-                ],
-            })
+            return web.json_response(
+                {
+                    "provider": recommendation.provider,
+                    "model": recommendation.model,
+                    "q_value": round(recommendation.q_value, 3),
+                    "confidence": round(recommendation.confidence, 3),
+                    "reason": recommendation.reason,
+                    "task_type": task_type,
+                    "alternatives": [
+                        {"provider": p, "q_value": round(q, 3)}
+                        for p, q in recommendation.alternatives
+                    ],
+                }
+            )
 
         except Exception as e:
             logger.exception("RL recommend error")
@@ -1728,11 +1792,13 @@ class VictorAPIServer:
             old_rate = selector.epsilon
             selector.epsilon = rate
 
-            return web.json_response({
-                "success": True,
-                "old_rate": round(old_rate, 3),
-                "new_rate": round(rate, 3),
-            })
+            return web.json_response(
+                {
+                    "success": True,
+                    "old_rate": round(old_rate, 3),
+                    "new_rate": round(rate, 3),
+                }
+            )
 
         except Exception as e:
             logger.exception("RL explore error")
@@ -1753,20 +1819,25 @@ class VictorAPIServer:
                 strategy = SelectionStrategy(strategy_name.lower())
             except ValueError:
                 available = [s.value for s in SelectionStrategy]
-                return web.json_response({
-                    "error": f"Unknown strategy: {strategy_name}",
-                    "available": available,
-                }, status=400)
+                return web.json_response(
+                    {
+                        "error": f"Unknown strategy: {strategy_name}",
+                        "available": available,
+                    },
+                    status=400,
+                )
 
             selector = get_model_selector()
             old_strategy = selector.strategy.value
             selector.strategy = strategy
 
-            return web.json_response({
-                "success": True,
-                "old_strategy": old_strategy,
-                "new_strategy": strategy.value,
-            })
+            return web.json_response(
+                {
+                    "success": True,
+                    "old_strategy": old_strategy,
+                    "new_strategy": strategy.value,
+                }
+            )
 
         except Exception as e:
             logger.exception("RL strategy error")
@@ -1780,10 +1851,12 @@ class VictorAPIServer:
             selector = get_model_selector()
             selector.reset()
 
-            return web.json_response({
-                "success": True,
-                "message": "RL model selector reset to initial state",
-            })
+            return web.json_response(
+                {
+                    "success": True,
+                    "message": "RL model selector reset to initial state",
+                }
+            )
 
         except Exception as e:
             logger.exception("RL reset error")

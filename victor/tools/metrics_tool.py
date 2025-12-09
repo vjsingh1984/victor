@@ -377,5 +377,3 @@ async def metrics(
         "recommendations": recommendations,
         "formatted_report": "\n".join(report),
     }
-
-

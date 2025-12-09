@@ -412,7 +412,9 @@ class ProviderPayloadLimiter:
             truncated_messages.pop(start_idx)
             messages_removed += 1
 
-        bytes_saved = original_bytes - self.estimate_size(truncated_messages, tools, **kwargs).total_bytes
+        bytes_saved = (
+            original_bytes - self.estimate_size(truncated_messages, tools, **kwargs).total_bytes
+        )
 
         logger.info(
             f"Truncated {messages_removed} oldest messages, saved {bytes_saved:,} bytes "
@@ -465,7 +467,9 @@ class ProviderPayloadLimiter:
             else:
                 truncated_messages.append(msg)
 
-        bytes_saved = original_bytes - self.estimate_size(truncated_messages, tools, **kwargs).total_bytes
+        bytes_saved = (
+            original_bytes - self.estimate_size(truncated_messages, tools, **kwargs).total_bytes
+        )
 
         return TruncationResult(
             messages=truncated_messages,
@@ -486,9 +490,7 @@ class ProviderPayloadLimiter:
         """Summarize tool results (placeholder - would need LLM call)."""
         # For now, fall back to truncation
         # A full implementation would call a small/fast LLM to summarize
-        logger.warning(
-            "summarize_tool_results not fully implemented, falling back to truncate"
-        )
+        logger.warning("summarize_tool_results not fully implemented, falling back to truncate")
         return self._truncate_tool_results(messages, tools, estimate, **kwargs)
 
     def _reduce_tools(

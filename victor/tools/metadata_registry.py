@@ -115,14 +115,28 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
 
-from victor.tools.base import AccessMode, BaseTool, CostTier, DangerLevel, ExecutionCategory, Priority
+from victor.tools.base import (
+    AccessMode,
+    BaseTool,
+    CostTier,
+    DangerLevel,
+    ExecutionCategory,
+    Priority,
+)
 
 logger = logging.getLogger(__name__)
 
 
 # Default fallback tools when registry is empty or keyword matching fails
 _FALLBACK_CRITICAL_TOOLS: Set[str] = {
-    "read", "write", "edit", "ls", "shell", "search", "glob", "grep",
+    "read",
+    "write",
+    "edit",
+    "ls",
+    "shell",
+    "search",
+    "glob",
+    "grep",
 }
 
 
@@ -184,9 +198,7 @@ class MatchingMetrics:
 
         # Update running averages
         n = self.total_queries
-        self.avg_match_time_ms = (
-            (self.avg_match_time_ms * (n - 1) + duration_ms) / n
-        )
+        self.avg_match_time_ms = (self.avg_match_time_ms * (n - 1) + duration_ms) / n
         if self.total_queries > 0:
             self.avg_tools_per_match = self.total_matches / self.total_queries
 
@@ -196,9 +208,7 @@ class MatchingMetrics:
 
     def record_category_hit(self, category: str) -> None:
         """Record a category-based lookup."""
-        self.category_hit_counts[category] = (
-            self.category_hit_counts.get(category, 0) + 1
-        )
+        self.category_hit_counts[category] = self.category_hit_counts.get(category, 0) + 1
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert metrics to dictionary for logging/export."""
@@ -250,7 +260,9 @@ class ToolMetadataEntry:
     description: str = ""
     # NEW: Decorator-driven semantic selection fields
     mandatory_keywords: Set[str] = field(default_factory=set)  # Keywords that force inclusion
-    task_types: Set[str] = field(default_factory=set)  # Task types for classification-aware selection
+    task_types: Set[str] = field(
+        default_factory=set
+    )  # Task types for classification-aware selection
     progress_params: Set[str] = field(default_factory=set)  # Params for loop detection
     execution_category: ExecutionCategory = ExecutionCategory.READ_ONLY  # For parallel execution
     # NEW: Availability check for optional tools
@@ -293,9 +305,7 @@ class ToolMetadataEntry:
         try:
             return self._availability_check()
         except Exception as e:
-            logger.warning(
-                f"Availability check for tool '{self.name}' raised exception: {e}"
-            )
+            logger.warning(f"Availability check for tool '{self.name}' raised exception: {e}")
             return False
 
     @classmethod
@@ -309,10 +319,11 @@ class ToolMetadataEntry:
         category = getattr(tool, "category", None)
         # Extract keywords from tool decorator metadata, filtering short keywords
         raw_keywords = getattr(tool, "keywords", None) or []
-        keywords = {
-            k.lower() for k in raw_keywords
-            if len(k) >= MIN_KEYWORD_LENGTH
-        } if raw_keywords else set()
+        keywords = (
+            {k.lower() for k in raw_keywords if len(k) >= MIN_KEYWORD_LENGTH}
+            if raw_keywords
+            else set()
+        )
 
         # Log warning if keywords were filtered out
         filtered_count = len(raw_keywords) - len(keywords) if raw_keywords else 0
@@ -339,7 +350,9 @@ class ToolMetadataEntry:
         progress_params = set(raw_progress_params) if raw_progress_params else set()
 
         # NEW: Extract execution category
-        execution_category = getattr(tool, "execution_category", None) or ExecutionCategory.READ_ONLY
+        execution_category = (
+            getattr(tool, "execution_category", None) or ExecutionCategory.READ_ONLY
+        )
 
         # NEW: Extract availability check for optional tools
         availability_check = getattr(tool, "_availability_check", None)
@@ -785,9 +798,7 @@ class ToolMetadataRegistry:
         """
         return {tt: tools.copy() for tt, tools in self._by_task_type.items()}
 
-    def get_tools_by_execution_category(
-        self, category: ExecutionCategory
-    ) -> Set[str]:
+    def get_tools_by_execution_category(self, category: ExecutionCategory) -> Set[str]:
         """Get tools in the specified execution category.
 
         Used for parallel execution planning to identify which tools
@@ -878,10 +889,7 @@ class ToolMetadataRegistry:
         Returns:
             Dictionary mapping execution category values to sets of tool names
         """
-        return {
-            cat.value: tools.copy()
-            for cat, tools in self._by_execution_category.items()
-        }
+        return {cat.value: tools.copy() for cat, tools in self._by_execution_category.items()}
 
     # =========================================================================
     # Access mode-based tool discovery (replaces static WRITE_TOOL_NAMES, etc.)
@@ -1130,9 +1138,7 @@ class ToolMetadataRegistry:
             List of tools that should be included for this task
         """
         return [
-            entry
-            for entry in self._entries.values()
-            if entry.should_include_for_task(task_type)
+            entry for entry in self._entries.values() if entry.should_include_for_task(task_type)
         ]
 
     def get_tools_up_to_priority(self, max_priority: Priority) -> List[ToolMetadataEntry]:
@@ -1145,9 +1151,7 @@ class ToolMetadataRegistry:
             List of tools at or above this priority
         """
         return [
-            entry
-            for entry in self._entries.values()
-            if entry.priority.value <= max_priority.value
+            entry for entry in self._entries.values() if entry.priority.value <= max_priority.value
         ]
 
     def filter(
@@ -1224,7 +1228,8 @@ class ToolMetadataRegistry:
             List of ToolMetadataEntry for tools that are unavailable
         """
         return [
-            entry for entry in self._entries.values()
+            entry
+            for entry in self._entries.values()
             if entry.requires_configuration and not entry.is_available()
         ]
 
@@ -1237,10 +1242,7 @@ class ToolMetadataRegistry:
         Returns:
             List of ToolMetadataEntry for tools with availability_check
         """
-        return [
-            entry for entry in self._entries.values()
-            if entry.requires_configuration
-        ]
+        return [entry for entry in self._entries.values() if entry.requires_configuration]
 
     def get_available_tool_names(self) -> Set[str]:
         """Get names of all currently available tools.

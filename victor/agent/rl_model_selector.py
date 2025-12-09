@@ -152,9 +152,7 @@ class RLModelSelector:
     """
 
     # Mock/test providers to exclude from Q-table persistence and selection
-    MOCK_PROVIDERS = frozenset({
-        "mock", "mock_provider", "dummy", "dummy-stream", "test"
-    })
+    MOCK_PROVIDERS = frozenset({"mock", "mock_provider", "dummy", "dummy-stream", "test"})
 
     # Warm-up threshold: use higher learning rate until this many real selections
     WARMUP_THRESHOLD = 100
@@ -227,12 +225,10 @@ class RLModelSelector:
 
             # Filter out mock providers from persistence
             filtered_q_table = {
-                k: v for k, v in self._q_table.items()
-                if k not in self.MOCK_PROVIDERS
+                k: v for k, v in self._q_table.items() if k not in self.MOCK_PROVIDERS
             }
             filtered_selection_counts = {
-                k: v for k, v in self._selection_counts.items()
-                if k not in self.MOCK_PROVIDERS
+                k: v for k, v in self._selection_counts.items() if k not in self.MOCK_PROVIDERS
             }
             filtered_q_by_task = {
                 provider: tasks
@@ -247,8 +243,7 @@ class RLModelSelector:
 
             # Calculate real selections (excluding mocks)
             real_selections = sum(
-                v for k, v in self._selection_counts.items()
-                if k not in self.MOCK_PROVIDERS
+                v for k, v in self._selection_counts.items() if k not in self.MOCK_PROVIDERS
             )
 
             data = {
@@ -300,8 +295,7 @@ class RLModelSelector:
             self._task_selection_counts = data.get("task_selection_counts", {})
 
             logger.info(
-                f"Loaded Q-tables for {len(self._q_table)} providers "
-                f"from {self._q_table_path}"
+                f"Loaded Q-tables for {len(self._q_table)} providers " f"from {self._q_table_path}"
             )
             return True
 
@@ -420,9 +414,7 @@ class RLModelSelector:
         tool_score = tool_capable_pct / 100
 
         # Weighted combination
-        q_value = (
-            0.3 * session_score + 0.4 * message_score + 0.3 * tool_score
-        )
+        q_value = 0.3 * session_score + 0.4 * message_score + 0.3 * tool_score
 
         return q_value
 
@@ -623,11 +615,7 @@ class RLModelSelector:
         task_type: Optional[str] = None,
     ) -> List[Tuple[str, float]]:
         """Get alternative providers ranked by Q-value."""
-        alternatives = [
-            (p, self._get_q_value(p, task_type))
-            for p in providers
-            if p != selected
-        ]
+        alternatives = [(p, self._get_q_value(p, task_type)) for p in providers if p != selected]
         return sorted(alternatives, key=lambda x: x[1], reverse=True)[:3]
 
     def _get_effective_learning_rate(self, provider: str) -> float:
@@ -644,8 +632,7 @@ class RLModelSelector:
         """
         # Count real selections (excluding mocks)
         real_selections = sum(
-            v for k, v in self._selection_counts.items()
-            if k not in self.MOCK_PROVIDERS
+            v for k, v in self._selection_counts.items() if k not in self.MOCK_PROVIDERS
         )
 
         # Provider-specific selection count
