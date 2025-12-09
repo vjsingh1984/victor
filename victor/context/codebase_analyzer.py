@@ -1262,7 +1262,9 @@ async def generate_victor_md_with_llm(
         return generate_smart_victor_md(root_path)
 
 
-async def generate_victor_md_from_index(root_path: Optional[str] = None) -> str:
+async def generate_victor_md_from_index(
+    root_path: Optional[str] = None, force: bool = False
+) -> str:
     """Generate init.md from the SymbolStore (pre-indexed symbols).
 
     This uses the SQLite symbol store for fast, accurate init.md generation.
@@ -1271,6 +1273,7 @@ async def generate_victor_md_from_index(root_path: Optional[str] = None) -> str:
 
     Args:
         root_path: Root directory. Defaults to current directory.
+        force: If True, re-index all files ignoring cache.
 
     Returns:
         Generated markdown content for .victor/init.md.
@@ -1280,8 +1283,8 @@ async def generate_victor_md_from_index(root_path: Optional[str] = None) -> str:
     root = Path(root_path) if root_path else Path.cwd()
     store = SymbolStore(str(root))
 
-    # Index if needed (quick operation if already indexed)
-    await store.index_codebase()
+    # Index if needed (quick operation if already indexed, unless force=True)
+    await store.index_codebase(force=force)
 
     stats = store.get_stats()
     key_components = store.find_key_components(limit=15)
@@ -1588,6 +1591,7 @@ async def generate_enhanced_init_md(
     use_llm: bool = False,
     include_conversations: bool = True,
     on_progress: Optional[callable] = None,
+    force: bool = False,
 ) -> str:
     """Generate init.md using symbol index, conversation insights, and optional LLM.
 
@@ -1598,6 +1602,7 @@ async def generate_enhanced_init_md(
         use_llm: Whether to use LLM for enhancement (default: False)
         include_conversations: Whether to include conversation insights (default: True)
         on_progress: Optional callback: fn(stage: str, message: str)
+        force: If True, re-index all files ignoring cache.
 
     Returns:
         Enhanced init.md content. Falls back gracefully if LLM fails.
@@ -1623,7 +1628,7 @@ async def generate_enhanced_init_md(
 
     # Step 1: Index - Use SymbolStore for base content
     progress("index", "Building symbol index...")
-    base_content = await generate_victor_md_from_index(root_path)
+    base_content = await generate_victor_md_from_index(root_path, force=force)
     progress("index", "Symbol index built", complete=True)
 
     # Step 2: Learn - Add conversation insights

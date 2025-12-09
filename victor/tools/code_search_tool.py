@@ -274,7 +274,7 @@ async def _literal_search(
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["query", "path", "mode"],  # Different queries/paths = exploration not loop
-    stages=["initial", "reading", "analysis"],  # Relevant for exploration stages
+    stages=["initial", "planning", "reading", "analysis"],  # Relevant for exploration stages
     task_types=["search", "analysis"],  # Classification-aware selection
     execution_category="read_only",  # Safe for parallel execution
     keywords=["search", "semantic", "embedding", "concept", "pattern", "similar", "find", "grep", "literal"],

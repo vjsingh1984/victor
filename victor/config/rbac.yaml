@@ -1,0 +1,111 @@
+# Victor RBAC Configuration
+# Role-Based Access Control for tool execution security
+#
+# This file defines roles, permissions, and user assignments.
+# Can be loaded via Settings.rbac_config_path or included in profiles.yaml
+#
+# Permissions align with tool AccessMode:
+#   - read: Can execute readonly tools (search, ls, read)
+#   - write: Can execute tools that modify files (edit, write)
+#   - execute: Can run shell commands (shell, sandbox)
+#   - network: Can make external network calls (web, api)
+#   - admin: Full access to all tools including dangerous operations
+#   - tool_manage: Can enable/disable tools
+#   - user_manage: Can manage users and roles (reserved for future use)
+
+rbac:
+  # Master switch - set to false to disable all RBAC checks
+  enabled: false
+
+  # Role assigned to unknown users when allow_unknown_users is true
+  default_role: developer
+
+  # If true, unknown users get the default_role
+  # If false, unknown users are denied all access
+  allow_unknown_users: true
+
+  # Role definitions
+  # Each role has permissions and optional category/tool restrictions
+  roles:
+    # Full access - for administrators
+    admin:
+      permissions:
+        - read
+        - write
+        - execute
+        - network
+        - admin
+        - tool_manage
+      description: "Full access to all tools"
+
+    # Standard developer access - most common role
+    developer:
+      permissions:
+        - read
+        - write
+        - execute
+      tool_categories:
+        - filesystem
+        - git
+        - testing
+        - refactoring
+        - documentation
+        - code_intelligence
+      description: "Read/write/execute for development tools"
+
+    # DevOps/operator access - includes network tools
+    operator:
+      permissions:
+        - read
+        - execute
+        - network
+      tool_categories:
+        - docker
+        - cicd
+        - monitoring
+        - web
+      description: "Operations tools including network access"
+
+    # Analyst/reviewer - read-only access
+    viewer:
+      permissions:
+        - read
+      description: "Read-only access for code review"
+
+    # Restricted sandbox - only code execution in isolated environment
+    sandbox_only:
+      permissions:
+        - read
+        - execute
+      tool_categories:
+        - code_executor
+      denied_tools:
+        - shell  # No direct shell access
+      description: "Restricted to sandboxed code execution"
+
+  # User assignments
+  # Map usernames to roles
+  users:
+    # Example users - customize for your organization
+    # alice:
+    #   roles:
+    #     - admin
+    #   metadata:
+    #     team: platform
+    #
+    # bob:
+    #   roles:
+    #     - developer
+    #   metadata:
+    #     team: backend
+    #
+    # charlie:
+    #   roles:
+    #     - operator
+    #   metadata:
+    #     team: devops
+
+    # Default user for single-user deployments
+    default_user:
+      roles:
+        - developer

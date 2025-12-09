@@ -124,8 +124,10 @@ class TestPipelineAnalyzerToolProperties:
     """Tests for tool properties and metadata."""
 
     def test_tool_name(self, tool):
-        """Test tool name."""
-        assert tool.name == "pipeline_analyzer"
+        """Test tool name uses canonical name from ToolNames."""
+        from victor.tools.tool_names import ToolNames
+        assert tool.name == ToolNames.PIPELINE
+        assert tool.name == "pipeline"  # Canonical short name
 
     def test_tool_description_contains_platforms(self, tool):
         """Test description mentions supported platforms."""

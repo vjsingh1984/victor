@@ -630,7 +630,7 @@ TEXT_EXTENSIONS = {
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["path", "offset", "limit"],  # Params indicating exploration progress
-    stages=["reading", "initial", "analysis"],  # Conversation stages where relevant
+    stages=["reading", "initial", "analysis", "verification"],  # Conversation stages where relevant
     task_types=["analysis", "search"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
@@ -677,6 +677,9 @@ async def read(
     search: str = "",
     ctx: int = 2,
     regex: bool = False,
+    # Parameter aliases for models that use different names (e.g., gpt-oss)
+    line_start: int = None,
+    line_end: int = None,
 ) -> str:
     """Read text/code file. Binary files rejected.
 
@@ -687,10 +690,21 @@ async def read(
         search: Grep pattern
         ctx: Context lines around matches
         regex: Pattern is regex
+        line_start: Alias for offset (some models use this name)
+        line_end: Alias for limit (some models use this name)
 
     Returns:
         File content or matching lines.
     """
+    # Handle parameter aliases from models that use different names
+    if line_start is not None and offset == 0:
+        offset = line_start
+    if line_end is not None and limit == 0:
+        # Convert line_end to limit (line_end is absolute, limit is count)
+        if line_start is not None:
+            limit = max(0, line_end - line_start)
+        else:
+            limit = line_end
     file_path = Path(path).expanduser().resolve()
 
     if not file_path.exists():
@@ -954,7 +968,7 @@ async def read(
     danger_level=DangerLevel.LOW,  # Minor risk, easily undoable
     # Registry-driven metadata for tool selection and cache invalidation
     progress_params=["path"],  # Same file = loop, regardless of content
-    stages=["executing"],  # Conversation stages where relevant
+    stages=["execution"],  # Conversation stages where relevant
     task_types=["edit", "generation", "action"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.WRITE,  # Cannot run in parallel with conflicting ops
     keywords=[
@@ -1045,7 +1059,7 @@ async def write(path: str, content: str) -> str:
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["path", "depth", "pattern"],  # Params indicating exploration progress
-    stages=["initial", "reading"],  # Conversation stages where relevant
+    stages=["initial", "planning", "reading"],  # Conversation stages where relevant
     task_types=["search", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
@@ -1224,7 +1238,7 @@ IMPORTANT_DOC_PATTERNS = [
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["path", "max_depth"],  # Params indicating exploration progress
-    stages=["initial"],  # Best used at start of conversation
+    stages=["initial", "planning", "reading"],  # Best used at start of conversation
     task_types=["analysis", "search"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[

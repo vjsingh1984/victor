@@ -32,10 +32,17 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
-from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import load_settings
+
+# Use TYPE_CHECKING to avoid circular import at runtime
+# Chain: orchestrator → code_correction_middleware → evaluation → agent_adapter → orchestrator
+if TYPE_CHECKING:
+    from victor.agent.orchestrator import AgentOrchestrator
+else:
+    # Deferred import at runtime - only when actually needed
+    AgentOrchestrator = None  # Will be imported lazily in from_profile()
 from victor.evaluation.agentic_harness import (
     AgenticExecutionTrace,
     FileEdit,

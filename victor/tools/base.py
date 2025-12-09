@@ -978,11 +978,12 @@ class BaseTool(ABC):
         return schema
 
     @abstractmethod
-    async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
+    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
         """Execute the tool.
 
         Args:
-            context: A dictionary of shared resources, e.g. {'code_manager': ...}.
+            _exec_ctx: Framework execution context (reserved name to avoid collision
+                      with tool parameters). Contains shared resources like code_manager.
             **kwargs: Tool parameters
 
         Returns:
@@ -1273,7 +1274,7 @@ class ToolRegistry:
             def parameters(self) -> Dict[str, Any]:
                 return parameters
 
-            async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
+            async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
                 # MCP tools are executed via mcp_call, not directly
                 return ToolResult(
                     success=False,
@@ -1436,12 +1437,13 @@ class ToolRegistry:
             summary[tool.cost_tier.value].append(tool.name)
         return summary
 
-    async def execute(self, name: str, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
+    async def execute(self, name: str, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
         """Execute a tool by name.
 
         Args:
             name: Tool name
-            context: A dictionary of shared resources.
+            _exec_ctx: Framework execution context (reserved name to avoid collision
+                      with tool parameters). Contains shared resources.
             **kwargs: Tool parameters
 
         Returns:
@@ -1479,7 +1481,7 @@ class ToolRegistry:
                 )
             else:
                 try:
-                    result = await tool.execute(context, **kwargs)
+                    result = await tool.execute(_exec_ctx, **kwargs)
                 except Exception as e:
                     result = ToolResult(
                         success=False,

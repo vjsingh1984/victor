@@ -12,7 +12,7 @@
 <div align="center">
 
 ![Architecture Overview](./assets/architecture-overview.svg)
-*Victor's Protocol-First Architecture: 7+ LLM providers, 65 tools, 3-layer design*
+*Victor's Protocol-First Architecture: 7+ LLM providers, 42 tools, 3-layer design*
 
 ![Feature Highlights](./assets/feature-highlights.svg)
 *Key features: Multi-provider support, air-gapped mode, enterprise tools, semantic search*

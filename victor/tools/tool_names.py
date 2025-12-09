@@ -189,6 +189,14 @@ class ToolNames:
     SCAFFOLD = "scaffold"   # scaffold → scaffold (already optimal)
     OVERVIEW = "overview"   # get_project_overview → overview
 
+    # ==========================================================================
+    # ANALYSIS TOOLS (Class-based BaseTool implementations)
+    # ==========================================================================
+    MERGE = "merge"         # merge_conflicts → merge (conflict resolution)
+    PIPELINE = "pipeline"   # pipeline_analyzer → pipeline (CI/CD analysis)
+    AUDIT = "audit"         # audit → audit (codebase auditing)
+    IAC = "iac"             # iac_scanner → iac (infrastructure as code)
+
 
 # =============================================================================
 # ALIAS REGISTRY: Maps legacy names to canonical names
@@ -250,6 +258,12 @@ TOOL_ALIASES: Dict[str, str] = {
     "http_request": ToolNames.HTTP,
     "mcp_call": ToolNames.MCP,
     "run_workflow": ToolNames.WORKFLOW,
+
+    # Analysis Tools (Class-based BaseTool implementations)
+    "merge_conflicts": ToolNames.MERGE,
+    "pipeline_analyzer": ToolNames.PIPELINE,
+    "iac_scanner": ToolNames.IAC,
+    # "audit" is already canonical (no alias needed)
 }
 
 # Build reverse lookup: canonical → set of aliases

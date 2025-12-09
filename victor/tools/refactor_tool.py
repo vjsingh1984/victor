@@ -281,7 +281,7 @@ def _rename_in_file(
     keywords=["rename", "refactor", "symbol", "variable", "function", "class", "project", "multi-file", "ast"],
     mandatory_keywords=["rename variable", "rename function", "refactor code"],  # Force inclusion
     task_types=["refactor", "edit"],  # Classification-aware selection
-    stages=["executing", "refactoring"],  # Conversation stages where relevant
+    stages=["execution"],  # Conversation stages where relevant
 )
 async def rename(
     old_name: str,
@@ -456,6 +456,7 @@ async def rename(
     access_mode=AccessMode.WRITE,  # Modifies source files
     danger_level=DangerLevel.LOW,  # Changes are undoable
     keywords=["extract", "refactor", "function", "method", "code block"],
+    stages=["execution"],  # Conversation stages where relevant
 )
 async def extract(
     file: str,

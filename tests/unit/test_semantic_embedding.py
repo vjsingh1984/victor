@@ -409,9 +409,10 @@ class TestCacheOperations:
 
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
-        # Create a valid cache file
+        # Create a valid cache file with all required fields including cache_version
         test_embeddings = {"tool1": np.array([0.1, 0.2, 0.3], dtype=np.float32)}
         cache_data = {
+            "cache_version": selector.CACHE_VERSION,  # Required for cache validation
             "tools_hash": "test_hash",
             "embedding_model": selector.embedding_model,
             "embeddings": test_embeddings,

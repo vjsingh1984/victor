@@ -27,14 +27,23 @@ Legacy locations: .victor.md, VICTOR.md (for backwards compatibility)
 """
 
 import logging
+import threading
+import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from victor.config.settings import (
     VICTOR_DIR_NAME,
     VICTOR_CONTEXT_FILE,
     get_project_paths,
 )
+
+# Cache for ProjectContext instances and their content
+# Key: (root_path, mtime) -> (content, parsed_sections)
+_context_cache: Dict[Tuple[str, float], Tuple[str, Dict[str, str]]] = {}
+_cache_lock = threading.Lock()
+_cache_ttl = 60.0  # Seconds to cache before checking mtime again
+_last_cache_check: Dict[str, float] = {}
 
 logger = logging.getLogger(__name__)
 
@@ -88,8 +97,14 @@ class ProjectContext:
 
         return None
 
-    def load(self) -> bool:
-        """Load project context from file.
+    def load(self, force_reload: bool = False) -> bool:
+        """Load project context from file with caching.
+
+        Uses mtime-based caching to avoid re-reading unchanged files.
+        Cache is automatically invalidated when the file is modified.
+
+        Args:
+            force_reload: Force re-reading the file even if cached.
 
         Returns:
             True if context was loaded successfully, False otherwise.
@@ -101,13 +116,57 @@ class ProjectContext:
             return False
 
         try:
-            self._content = self._context_file.read_text(encoding="utf-8")
-            self._parse_sections()
+            root_key = str(self.root_path)
+            now = time.time()
+
+            # Check if we should skip cache check (within TTL)
+            if not force_reload and root_key in _last_cache_check:
+                if now - _last_cache_check[root_key] < _cache_ttl:
+                    # Use cached content if available
+                    for (cached_root, _), (content, sections) in _context_cache.items():
+                        if cached_root == root_key:
+                            self._content = content
+                            self._parsed_sections = sections
+                            logger.debug(f"Using cached project context for {root_key}")
+                            return True
+
+            # Get file mtime for cache key
+            mtime = self._context_file.stat().st_mtime
+            cache_key = (root_key, mtime)
+
+            with _cache_lock:
+                # Check cache with mtime
+                if not force_reload and cache_key in _context_cache:
+                    self._content, self._parsed_sections = _context_cache[cache_key]
+                    _last_cache_check[root_key] = now
+                    logger.debug(f"Using cached project context for {self._context_file}")
+                    return True
+
+                # Load from file
+                self._content = self._context_file.read_text(encoding="utf-8")
+                self._parse_sections()
+
+                # Update cache (clear old entries for same root)
+                keys_to_remove = [k for k in _context_cache if k[0] == root_key]
+                for k in keys_to_remove:
+                    del _context_cache[k]
+                _context_cache[cache_key] = (self._content, self._parsed_sections)
+                _last_cache_check[root_key] = now
+
             logger.info(f"Loaded project context from {self._context_file}")
             return True
+
         except Exception as e:
             logger.warning(f"Failed to load project context: {e}")
             return False
+
+    @staticmethod
+    def clear_cache() -> None:
+        """Clear the project context cache (for testing or hot-reload)."""
+        with _cache_lock:
+            _context_cache.clear()
+            _last_cache_check.clear()
+        logger.debug("Cleared project context cache")
 
     def _parse_sections(self) -> None:
         """Parse markdown content into sections by headers."""

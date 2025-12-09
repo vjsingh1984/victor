@@ -89,7 +89,7 @@ docs/
 ├── DEVELOPER_GUIDE.md             # Contributor guide
 ├── ENTERPRISE.md                  # Enterprise deployment
 ├── RELEASING.md                   # Release process
-├── TOOL_CATALOG.md                # All 65 tools
+├── TOOL_CATALOG.md                # All 42 tools
 ├── USER_GUIDE.md                  # End-user documentation
 │
 ├── embeddings/                    # Embedding system docs

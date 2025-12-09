@@ -177,7 +177,7 @@ This document provides an exhaustive evaluation of Victor against published codi
 | **mcp** | mcp_call | 1 |
 | **general** | cache, batch, http_request, http_test, apply_patch, create_patch, dependency, run_workflow | 8 |
 
-**Total: 47 tools across 18 categories**
+**Total: 42 tools across 8 categories**
 
 ---
 
@@ -230,7 +230,7 @@ This document provides an exhaustive evaluation of Victor against published codi
 |---------|--------|--------|-------------|----------------|----------|
 | Multi-LLM support | ✅ 7+ providers | ❌ GPT-4/Claude | ❌ Claude only | ❌ OpenAI only | ❌ Amazon only |
 | Air-gapped mode | ✅ Full support | ❌ | ❌ | ❌ | ❌ |
-| Tool calling | ✅ 47 tools | ✅ ~20 tools | ✅ ~15 tools | ⚠️ Limited | ✅ ~30 tools |
+| Tool calling | ✅ 42 tools | ✅ ~20 tools | ✅ ~15 tools | ⚠️ Limited | ✅ ~30 tools |
 | Semantic search | ✅ BGE embeddings | ✅ | ✅ | ⚠️ | ✅ |
 | MCP support | ✅ Client+Server | ❌ | ✅ Native | ❌ | ❌ |
 | Custom plugins | ✅ | ❌ | ❌ | ✅ Extensions | ❌ |
@@ -351,7 +351,7 @@ This document provides an exhaustive evaluation of Victor against published codi
 
 | Dimension | Score | Notes |
 |-----------|-------|-------|
-| **Tool Coverage** | 9/10 | 47 tools, comprehensive |
+| **Tool Coverage** | 9/10 | 42 tools, comprehensive |
 | **SWE-bench Readiness** | 8/10 | All capabilities present |
 | **Enterprise Features** | 8/10 | Audit, security, compliance |
 | **Multi-Provider** | 10/10 | 7+ LLM providers |

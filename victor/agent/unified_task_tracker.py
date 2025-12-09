@@ -955,15 +955,20 @@ class UnifiedTaskTracker:
 
         return None
 
-    def check_response_loop(self, content: str, similarity_threshold: float = 0.7) -> bool:
+    def check_response_loop(self, content: str, similarity_threshold: float = 0.9) -> bool:
         """Check if response content is a repeat of the previous response.
 
         This detects when the model keeps responding with similar text but makes
         no tool calls - a different type of loop than tool call loops.
 
+        NOTE: Threshold raised from 0.7 to 0.9 to reduce false positives.
+        When exploring directories, responses like "Let me examine dir1" and
+        "Let me examine dir2" have high word overlap (~80%) but represent progress.
+        A 0.9 threshold catches near-verbatim repeats while allowing variation.
+
         Args:
             content: The current response content to check
-            similarity_threshold: Word overlap ratio to consider as repeated (default 0.7)
+            similarity_threshold: Word overlap ratio to consider as repeated (default 0.9)
 
         Returns:
             True if a response loop is detected, False otherwise

@@ -74,6 +74,7 @@ def _calculate_maintainability_index(code: str) -> float:
     access_mode=AccessMode.READONLY,  # Only reads files for analysis
     danger_level=DangerLevel.SAFE,  # No side effects
     keywords=["metrics", "analyze", "code", "complexity", "quality"],
+    stages=["analysis"],  # Conversation stages where relevant
 )
 async def metrics(
     path: str,

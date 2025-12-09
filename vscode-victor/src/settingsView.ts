@@ -9,6 +9,7 @@
  */
 
 import * as vscode from 'vscode';
+import { getProviders } from './extension';
 
 interface VictorSettings {
     provider: string;
@@ -19,6 +20,15 @@ interface VictorSettings {
     showInlineCompletions: boolean;
     semanticSearchEnabled: boolean;
     semanticSearchMaxResults: number;
+}
+
+interface ProviderInfo {
+    name: string;
+    display_name: string;
+    is_local: boolean;
+    configured: boolean;
+    supports_tools: boolean;
+    supports_streaming: boolean;
 }
 
 /**
@@ -60,6 +70,12 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
                     break;
                 case 'loadSettings':
                     this._sendSettings();
+                    break;
+                case 'loadProviders':
+                    await this._loadProviders();
+                    break;
+                case 'loadModels':
+                    await this._loadModels();
                     break;
                 case 'testConnection':
                     await this._testConnection();
@@ -138,6 +154,59 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
                 message: 'Server not running',
             });
         }
+    }
+
+    private async _loadProviders(): Promise<void> {
+        const defaultProviders: ProviderInfo[] = [
+            { name: 'anthropic', display_name: 'Anthropic (Claude)', is_local: false, configured: false, supports_tools: true, supports_streaming: true },
+            { name: 'openai', display_name: 'OpenAI (GPT-4)', is_local: false, configured: false, supports_tools: true, supports_streaming: true },
+            { name: 'google', display_name: 'Google (Gemini)', is_local: false, configured: false, supports_tools: true, supports_streaming: true },
+            { name: 'ollama', display_name: 'Ollama (Local)', is_local: true, configured: true, supports_tools: true, supports_streaming: true },
+            { name: 'lmstudio', display_name: 'LM Studio (Local)', is_local: true, configured: true, supports_tools: false, supports_streaming: true },
+            { name: 'xai', display_name: 'xAI (Grok)', is_local: false, configured: false, supports_tools: true, supports_streaming: true },
+        ];
+
+        try {
+            const providers = getProviders();
+            if (providers?.victorClient) {
+                const serverProviders = await providers.victorClient.getProviders();
+                this._view?.webview.postMessage({
+                    type: 'providers',
+                    providers: serverProviders,
+                });
+                return;
+            }
+        } catch (error) {
+            console.error('Failed to load providers from server:', error);
+        }
+
+        // Fallback to defaults
+        this._view?.webview.postMessage({
+            type: 'providers',
+            providers: defaultProviders,
+        });
+    }
+
+    private async _loadModels(): Promise<void> {
+        try {
+            const providers = getProviders();
+            if (providers?.victorClient) {
+                const models = await providers.victorClient.getModels();
+                this._view?.webview.postMessage({
+                    type: 'models',
+                    models,
+                });
+                return;
+            }
+        } catch (error) {
+            console.error('Failed to load models from server:', error);
+        }
+
+        // Fallback to empty - the HTML has hardcoded defaults
+        this._view?.webview.postMessage({
+            type: 'models',
+            models: [],
+        });
     }
 
     private _getHtmlContent(webview: vscode.Webview): string {
@@ -245,46 +314,157 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
         .button-row {
             margin-top: 20px;
         }
+
+        /* Provider Card Styles */
+        .provider-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .provider-card {
+            background: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            padding: 8px 10px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .provider-card:hover {
+            border-color: var(--vscode-focusBorder);
+        }
+
+        .provider-card.selected {
+            border-color: var(--vscode-button-background);
+            background: var(--vscode-list-activeSelectionBackground);
+        }
+
+        .provider-card.not-configured {
+            opacity: 0.6;
+        }
+
+        .provider-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .provider-name {
+            font-weight: 500;
+            flex: 1;
+        }
+
+        .provider-badges {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .provider-badge {
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .provider-badge.local {
+            background: var(--vscode-testing-iconPassed);
+            color: #000;
+        }
+
+        .provider-badge.cloud {
+            background: var(--vscode-charts-blue);
+            color: #fff;
+        }
+
+        .provider-badge.configured {
+            background: var(--vscode-testing-iconPassed);
+            color: #000;
+        }
+
+        .provider-badge.not-configured {
+            background: var(--vscode-errorForeground);
+            color: #fff;
+        }
+
+        .provider-badge.tools {
+            background: var(--vscode-editorInfo-foreground);
+            color: #fff;
+        }
+
+        .provider-badge.streaming {
+            background: var(--vscode-symbolIcon-functionForeground);
+            color: #000;
+        }
+
+        .provider-capabilities {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+            margin-top: 4px;
+        }
+
+        .loading-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--vscode-button-background);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .refresh-btn {
+            font-size: 11px;
+            padding: 4px 8px;
+            background: transparent;
+            border: 1px solid var(--vscode-input-border);
+            color: var(--vscode-foreground);
+            cursor: pointer;
+            border-radius: 2px;
+        }
+
+        .refresh-btn:hover {
+            background: var(--vscode-list-hoverBackground);
+        }
     </style>
 </head>
 <body>
     <div class="section">
-        <div class="section-title">Provider Settings</div>
+        <div class="section-title">
+            Provider Settings
+            <button class="refresh-btn" onclick="refreshProviders()" title="Refresh providers">Refresh</button>
+        </div>
 
         <div class="setting">
-            <label for="provider">AI Provider</label>
-            <select id="provider">
-                <option value="anthropic">Anthropic (Claude)</option>
-                <option value="openai">OpenAI (GPT-4)</option>
-                <option value="google">Google (Gemini)</option>
-                <option value="ollama">Ollama (Local)</option>
-                <option value="lmstudio">LM Studio (Local)</option>
-                <option value="vllm">vLLM (Local)</option>
-                <option value="xai">xAI (Grok)</option>
-            </select>
+            <label>AI Provider</label>
+            <div id="providerList" class="provider-grid">
+                <div class="loading-indicator">
+                    <div class="spinner"></div>
+                    <span>Loading providers...</span>
+                </div>
+            </div>
+            <input type="hidden" id="provider" value="anthropic">
         </div>
 
         <div class="setting">
             <label for="model">Model</label>
             <select id="model">
-                <optgroup label="Anthropic" data-provider="anthropic">
-                    <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
-                    <option value="claude-opus-4-5-20251101">Claude Opus 4.5</option>
-                </optgroup>
-                <optgroup label="OpenAI" data-provider="openai">
-                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                    <option value="gpt-4o">GPT-4o</option>
-                    <option value="gpt-4o-mini">GPT-4o Mini</option>
-                </optgroup>
-                <optgroup label="Google" data-provider="google">
-                    <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                </optgroup>
-                <optgroup label="Ollama" data-provider="ollama">
-                    <option value="qwen2.5-coder:14b">Qwen 2.5 Coder 14B</option>
-                    <option value="llama3.1:8b">Llama 3.1 8B</option>
-                    <option value="codellama:7b">Code Llama 7B</option>
-                </optgroup>
+                <option value="">Loading models...</option>
             </select>
         </div>
 
@@ -341,6 +521,9 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
 
     <script>
         const vscode = acquireVsCodeApi();
+        let currentProviders = [];
+        let currentModels = [];
+        let currentSettings = {};
 
         // Handle messages from extension
         window.addEventListener('message', event => {
@@ -348,7 +531,16 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
 
             switch (message.type) {
                 case 'settings':
+                    currentSettings = message.settings;
                     applySettings(message.settings);
+                    break;
+                case 'providers':
+                    currentProviders = message.providers;
+                    renderProviders(message.providers);
+                    break;
+                case 'models':
+                    currentModels = message.models;
+                    renderModels(message.models);
                     break;
                 case 'connectionStatus':
                     showConnectionStatus(message.status, message.message);
@@ -358,7 +550,6 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
 
         function applySettings(settings) {
             document.getElementById('provider').value = settings.provider;
-            document.getElementById('model').value = settings.model;
             document.getElementById('mode').value = settings.mode;
             document.getElementById('serverPort').value = settings.serverPort;
             document.getElementById('autoStart').checked = settings.autoStart;
@@ -366,7 +557,123 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
             document.getElementById('semanticSearchEnabled').checked = settings.semanticSearchEnabled;
             document.getElementById('semanticSearchMaxResults').value = settings.semanticSearchMaxResults;
 
-            updateModelOptions();
+            // Update provider selection in UI
+            updateProviderSelection(settings.provider);
+
+            // Set model after models are loaded
+            if (currentModels.length > 0) {
+                renderModels(currentModels);
+            }
+            document.getElementById('model').value = settings.model;
+        }
+
+        function renderProviders(providers) {
+            const container = document.getElementById('providerList');
+            const selectedProvider = document.getElementById('provider').value || 'anthropic';
+
+            container.innerHTML = providers.map(p => {
+                const isSelected = p.name === selectedProvider;
+                const badges = [];
+
+                badges.push(p.is_local
+                    ? '<span class="provider-badge local">Local</span>'
+                    : '<span class="provider-badge cloud">Cloud</span>');
+
+                badges.push(p.configured
+                    ? '<span class="provider-badge configured">Ready</span>'
+                    : '<span class="provider-badge not-configured">Not Configured</span>');
+
+                if (p.supports_tools) {
+                    badges.push('<span class="provider-badge tools">Tools</span>');
+                }
+
+                return '<div class="provider-card' +
+                    (isSelected ? ' selected' : '') +
+                    (!p.configured ? ' not-configured' : '') +
+                    '" data-provider="' + p.name + '" onclick="selectProvider(\\'' + p.name + '\\')">' +
+                    '<div class="provider-header">' +
+                    '<span class="provider-name">' + p.display_name + '</span>' +
+                    '<div class="provider-badges">' + badges.join('') + '</div>' +
+                    '</div>' +
+                    '</div>';
+            }).join('');
+        }
+
+        function selectProvider(providerName) {
+            document.getElementById('provider').value = providerName;
+            updateProviderSelection(providerName);
+            loadModelsForProvider(providerName);
+        }
+
+        function updateProviderSelection(providerName) {
+            document.querySelectorAll('.provider-card').forEach(card => {
+                card.classList.toggle('selected', card.dataset.provider === providerName);
+            });
+        }
+
+        function loadModelsForProvider(providerName) {
+            // Filter models for the selected provider
+            const filteredModels = currentModels.filter(m => m.provider === providerName);
+            renderModels(filteredModels.length > 0 ? filteredModels : currentModels);
+        }
+
+        function renderModels(models) {
+            const select = document.getElementById('model');
+            const currentValue = select.value || currentSettings.model;
+            const selectedProvider = document.getElementById('provider').value;
+
+            if (models.length === 0) {
+                // Fallback to hardcoded models
+                select.innerHTML = getDefaultModelOptions(selectedProvider);
+            } else {
+                // Group models by provider
+                const grouped = {};
+                models.forEach(m => {
+                    if (!grouped[m.provider]) grouped[m.provider] = [];
+                    grouped[m.provider].push(m);
+                });
+
+                let html = '';
+                for (const [provider, providerModels] of Object.entries(grouped)) {
+                    const isSelectedProvider = provider === selectedProvider;
+                    html += '<optgroup label="' + provider + '">';
+                    providerModels.forEach(m => {
+                        const style = isSelectedProvider ? '' : 'display:none;';
+                        html += '<option value="' + m.model_id + '" style="' + style + '">' +
+                            (m.is_local ? '[Local] ' : '') + m.display_name + '</option>';
+                    });
+                    html += '</optgroup>';
+                }
+                select.innerHTML = html;
+            }
+
+            // Try to restore previous value
+            if (currentValue && select.querySelector('option[value="' + currentValue + '"]')) {
+                select.value = currentValue;
+            }
+        }
+
+        function getDefaultModelOptions(provider) {
+            const defaults = {
+                anthropic: [
+                    { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4' },
+                    { id: 'claude-opus-4-5-20251101', name: 'Claude Opus 4.5' },
+                ],
+                openai: [
+                    { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+                    { id: 'gpt-4o', name: 'GPT-4o' },
+                ],
+                google: [
+                    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
+                ],
+                ollama: [
+                    { id: 'qwen2.5-coder:14b', name: 'Qwen 2.5 Coder 14B' },
+                    { id: 'llama3.1:8b', name: 'Llama 3.1 8B' },
+                ],
+            };
+
+            const models = defaults[provider] || defaults.anthropic;
+            return models.map(m => '<option value="' + m.id + '">' + m.name + '</option>').join('');
         }
 
         function getSettings() {
@@ -393,6 +700,13 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
             vscode.postMessage({ type: 'loadSettings' });
         }
 
+        function refreshProviders() {
+            document.getElementById('providerList').innerHTML =
+                '<div class="loading-indicator"><div class="spinner"></div><span>Loading providers...</span></div>';
+            vscode.postMessage({ type: 'loadProviders' });
+            vscode.postMessage({ type: 'loadModels' });
+        }
+
         function testConnection() {
             vscode.postMessage({ type: 'testConnection' });
         }
@@ -403,34 +717,10 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
             statusDiv.textContent = message;
         }
 
-        function updateModelOptions() {
-            const provider = document.getElementById('provider').value;
-            const modelSelect = document.getElementById('model');
-
-            // Show/hide optgroups based on provider
-            const optgroups = modelSelect.querySelectorAll('optgroup');
-            optgroups.forEach(group => {
-                const options = group.querySelectorAll('option');
-                options.forEach(opt => {
-                    opt.style.display = group.dataset.provider === provider ? '' : 'none';
-                });
-            });
-
-            // Select first visible option if current is hidden
-            const currentOption = modelSelect.querySelector('option:checked');
-            if (currentOption && currentOption.style.display === 'none') {
-                const firstVisible = modelSelect.querySelector('option[style=""]');
-                if (firstVisible) {
-                    modelSelect.value = firstVisible.value;
-                }
-            }
-        }
-
-        // Update models when provider changes
-        document.getElementById('provider').addEventListener('change', updateModelOptions);
-
-        // Request initial settings
+        // Initial load
         loadSettings();
+        vscode.postMessage({ type: 'loadProviders' });
+        vscode.postMessage({ type: 'loadModels' });
     </script>
 </body>
 </html>`;

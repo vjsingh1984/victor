@@ -35,6 +35,7 @@ from victor.tools.base import (
     ToolMetadata,
     ToolResult,
 )
+from victor.tools.tool_names import ToolNames
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ logger = logging.getLogger(__name__)
 class MergeConflictTool(BaseTool):
     """Tool for detecting and resolving merge conflicts."""
 
-    name = "merge_conflicts"
+    name = ToolNames.MERGE
     description = """Detect and resolve git merge conflicts.
 
     Actions: detect, analyze, resolve (auto), apply (ours/theirs), abort.

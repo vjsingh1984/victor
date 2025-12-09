@@ -53,6 +53,15 @@ defaults:
     exploration_multiplier: 1.0
     # Continuation patience: how many empty turns to allow before forcing completion
     continuation_patience: 3
+    # Payload size limits (bytes) - prevents HTTP 413 errors
+    # Default is generous; providers with strict limits override this
+    max_request_payload_bytes: 10485760  # 10MB default
+    # Truncation strategy when payload exceeds limit:
+    # - truncate_oldest: Remove oldest messages first
+    # - truncate_tool_results: Truncate large tool results
+    # - reduce_tools: Reduce number of tools sent
+    # - fail: Fail with informative error
+    payload_truncation_strategy: truncate_oldest
 
   # Token-optimized serialization settings
   # Controls how tool outputs are formatted to minimize token usage
@@ -202,6 +211,9 @@ provider_defaults:
     requires_strict_prompting: false
     recommended_max_tools: 12
     recommended_tool_budget: 15
+    # Payload size limit (bytes) - Groq LPU constraint
+    max_request_payload_bytes: 4194304  # 4MB - strict Groq limit
+    payload_truncation_strategy: truncate_tool_results  # Prefer truncating tool results
     # Aggressive compression to stay within payload limits
     serialization:
       preferred_format: null  # auto-select most compact
@@ -258,7 +270,10 @@ models:
       ollama:
         native_tool_calls: true   # Custom Modelfile enables it
         parallel_tool_calls: true
-        requires_strict_prompting: false
+        # Set to true for stricter prompts to prevent continuation without action
+        requires_strict_prompting: true
+        # How many empty responses before forcing continuation prompt
+        continuation_patience: 3
       lmstudio:
         native_tool_calls: true
       vllm:
@@ -267,6 +282,8 @@ models:
     settings:
       recommended_tool_budget: 15
       argument_format: xml
+      # Stricter thresholds for this model
+      stage_transition_confidence: 0.75
 
   "qwen3:*":
     # Base Qwen3 (non-coder) - HAS Ollama tool support

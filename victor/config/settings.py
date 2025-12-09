@@ -417,6 +417,17 @@ class Settings(BaseSettings):
     #   - "all_writes": Require for ALL write operations (recommended for task mode)
     write_approval_mode: str = "risky_only"
 
+    # Headless Mode Settings (for CI/CD and automation)
+    # These can be set via CLI flags or environment variables:
+    #   - VICTOR_HEADLESS_MODE=true
+    #   - VICTOR_DRY_RUN_MODE=true
+    #   - VICTOR_MAX_FILE_CHANGES=10
+    headless_mode: bool = False  # Run without prompts, auto-approve safe actions
+    dry_run_mode: bool = False  # Preview changes without applying them
+    auto_approve_safe: bool = False  # Auto-approve read-only and LOW risk operations
+    max_file_changes: Optional[int] = None  # Limit file modifications per session
+    one_shot_mode: bool = False  # Exit after completing a single request
+
     # Unified Embedding Model (Optimized for Memory + Cache Efficiency)
     # Using same model for tool selection AND codebase search provides:
     # - 40% memory reduction (130MB vs 200MB)
@@ -591,6 +602,29 @@ class Settings(BaseSettings):
     serialization_enabled: bool = True  # Enable token-optimized serialization
     serialization_default_format: Optional[str] = None  # None = auto-select best format
     serialization_min_savings_threshold: float = 0.15  # Min savings to use alternative format
+
+    # ==========================================================================
+    # Intelligent Agent Pipeline (RL-based Learning, Quality Scoring)
+    # ==========================================================================
+    # Controls the intelligent agent features including:
+    # - Q-learning based mode transitions (explore -> plan -> build -> review)
+    # - Response quality scoring (coherence, completeness, relevance, grounding)
+    # - Provider resilience integration (circuit breaker, retries)
+    # - Embedding-based prompt optimization
+    intelligent_pipeline_enabled: bool = True  # Master switch for intelligent features
+    intelligent_quality_scoring: bool = True  # Enable multi-dimensional quality scoring
+    intelligent_mode_learning: bool = True  # Enable Q-learning for mode transitions
+    intelligent_prompt_optimization: bool = True  # Enable embedding-based prompt selection
+    intelligent_grounding_verification: bool = True  # Enable hallucination detection
+
+    # Quality thresholds
+    intelligent_min_quality_threshold: float = 0.5  # Minimum quality to accept response
+    intelligent_grounding_threshold: float = 0.7  # Confidence threshold for grounding
+
+    # Learning rate for Q-learning (default exploration rate = 0.3, decay = 0.995)
+    intelligent_exploration_rate: float = 0.3  # Initial exploration vs exploitation
+    intelligent_learning_rate: float = 0.1  # Q-learning alpha parameter
+    intelligent_discount_factor: float = 0.9  # Q-learning gamma parameter
     serialization_include_format_hint: bool = True  # Include format description in output
     serialization_min_rows_for_tabular: int = 3  # Min rows to consider tabular formats
     serialization_debug_mode: bool = False  # Include data characteristics in output

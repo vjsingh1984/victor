@@ -1695,7 +1695,6 @@ class BaseLanguageAnalyzer(ABC):
         Override in subclasses for language-specific traversal.
         """
         results = []
-        complexity_types = COMPLEXITY_NODE_TYPES.get(self.language, set())
 
         def visit(node):
             # Check if this is a function node

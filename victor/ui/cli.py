@@ -85,6 +85,7 @@ async def _graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
     """Perform graceful shutdown of the agent.
 
     Calls the orchestrator's graceful_shutdown() method to properly clean up:
+    - Record RL feedback for the session (interactive mode only)
     - Flush analytics data
     - Stop health monitoring
     - End usage session
@@ -95,6 +96,39 @@ async def _graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
     """
     if agent is None:
         return
+
+    # Record RL feedback for interactive sessions (one-shot handles its own)
+    try:
+        from victor.agent.rl_model_selector import SessionReward, get_model_selector
+
+        selector = get_model_selector()
+        # Only record if: RL available, has provider, and had actual interactions
+        if selector and agent.provider and hasattr(agent, "message_count"):
+            msg_count = agent.message_count
+            if msg_count > 0:  # Had actual interactions
+                import uuid
+
+                # Gather session metrics
+                metrics = {}
+                if hasattr(agent, "get_session_metrics"):
+                    metrics = agent.get_session_metrics() or {}
+
+                reward = SessionReward(
+                    session_id=str(uuid.uuid4())[:8],
+                    provider=agent.provider.name,
+                    model=getattr(agent.provider, "model", "unknown"),
+                    success=True,  # User completed session normally
+                    latency_seconds=metrics.get("total_latency", 0),
+                    token_count=metrics.get("total_tokens", 0),
+                    tool_calls_made=metrics.get("tool_calls", 0),
+                )
+                new_q = selector.update_q_value(reward)
+                logger.info(
+                    f"RL session feedback: {agent.provider.name} "
+                    f"({msg_count} messages, {metrics.get('tool_calls', 0)} tools) → Q={new_q:.3f}"
+                )
+    except Exception as e:
+        logger.debug(f"RL feedback recording skipped: {e}")
 
     try:
         # Call full graceful shutdown which handles all cleanup
@@ -321,6 +355,51 @@ async def _cli_confirmation_callback(request: ConfirmationRequest) -> bool:
 def _setup_safety_confirmation() -> None:
     """Set up the CLI confirmation callback for dangerous operations."""
     set_confirmation_callback(_cli_confirmation_callback)
+
+
+def _get_rl_profile_suggestion(
+    current_provider: str,
+    profiles: dict,
+) -> Optional[tuple[str, str, float]]:
+    """Get RL-based profile suggestion if different from current.
+
+    Args:
+        current_provider: Currently selected provider name
+        profiles: Available profiles dict
+
+    Returns:
+        Tuple of (profile_name, provider_name, q_value) if recommendation differs,
+        or None if current is optimal or RL unavailable
+    """
+    try:
+        from victor.agent.rl_model_selector import get_model_selector
+
+        selector = get_model_selector()
+        if not selector:
+            return None
+
+        rec = selector.recommend()
+        if not rec or rec.confidence < 0.3:
+            return None
+
+        # Check if recommendation differs from current
+        if rec.provider.lower() == current_provider.lower():
+            return None
+
+        # Find profiles that use the recommended provider
+        matching_profiles = [
+            name for name, cfg in profiles.items()
+            if cfg.provider.lower() == rec.provider.lower()
+        ]
+
+        if matching_profiles:
+            # Return the first matching profile
+            return (matching_profiles[0], rec.provider, rec.q_value)
+
+        return None
+
+    except Exception:
+        return None
 
 
 def version_callback(value: bool) -> None:
@@ -574,6 +653,9 @@ async def run_oneshot(
         formatter: Optional OutputFormatter for automation-friendly output
         preindex: Whether to preload semantic code index upfront
     """
+    import time
+    import uuid
+
     from victor.ui.output_formatter import OutputFormatter, OutputMode, create_formatter
 
     # Use provided formatter or create default
@@ -583,9 +665,47 @@ async def run_oneshot(
     # Set one-shot mode in settings (orchestrator reads this to auto-continue on ASKING_INPUT)
     settings.one_shot_mode = True
 
+    # Track timing for RL feedback
+    start_time = time.time()
+    session_id = str(uuid.uuid4())[:8]
+    success = False
+    token_count = 0
+    tool_calls_made = 0
+    task_type: Optional[str] = None
+
+    # Classify task complexity for RL (lightweight keyword-based)
+    try:
+        from victor.agent.complexity_classifier import ComplexityClassifier
+
+        classifier = ComplexityClassifier(use_semantic=False)  # Fast keyword-only
+        classification = classifier.classify(message)
+        task_type = classification.complexity.value  # e.g., "simple", "complex", "action"
+        logger.debug(f"Task classified as: {task_type}")
+    except Exception as e:
+        logger.debug(f"Task classification unavailable: {e}")
+
     try:
         # Create agent with thinking mode if requested
         agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
+
+        # Log RL recommendation (non-intrusive, only at INFO level)
+        try:
+            from victor.agent.rl_model_selector import get_model_selector
+
+            selector = get_model_selector()
+            if selector:
+                rec = selector.recommend()
+                if rec and rec.confidence > 0.3:
+                    current_provider = agent.provider.name if agent.provider else "unknown"
+                    if rec.provider.lower() != current_provider.lower():
+                        logger.info(
+                            f"RL recommends {rec.provider} (Q={rec.q_value:.2f}) "
+                            f"over current {current_provider}"
+                        )
+                    else:
+                        logger.debug(f"RL confirms {current_provider} (Q={rec.q_value:.2f})")
+        except Exception as e:
+            logger.debug(f"RL recommendation unavailable: {e}")
 
         if thinking:
             logger.info("Extended thinking mode enabled (for supported models like Claude)")
@@ -605,46 +725,11 @@ async def run_oneshot(
         model_name = None
 
         if stream and agent.provider.supports_streaming():
-            # Start live markdown rendering (RICH mode only)
-            formatter.start_streaming()
-            async for chunk in agent.stream_chat(message):
-                # Handle status messages separately (tool status, thinking indicator)
-                if chunk.metadata and "status" in chunk.metadata:
-                    # Temporarily pause live rendering to show status
-                    formatter.end_streaming()
-                    formatter.status(chunk.metadata["status"])
-                    formatter.start_streaming()
-                elif chunk.metadata and "file_preview" in chunk.metadata:
-                    # Show file content preview (like Claude Code)
-                    formatter.end_streaming()
-                    path = chunk.metadata.get("path", "")
-                    preview = chunk.metadata["file_preview"]
-                    # Display as a code block with syntax highlighting
-                    from rich.syntax import Syntax
+            # Use unified streaming handler with FormatterRenderer
+            from victor.ui.stream_renderer import FormatterRenderer, stream_response
 
-                    ext = path.split(".")[-1] if "." in path else "txt"
-                    syntax = Syntax(preview, ext, theme="monokai", line_numbers=False)
-                    console.print(Panel(syntax, title=f"[dim]{path}[/]", border_style="dim"))
-                    formatter.start_streaming()
-                elif chunk.metadata and "edit_preview" in chunk.metadata:
-                    # Show edit diff preview
-                    formatter.end_streaming()
-                    path = chunk.metadata.get("path", "")
-                    preview = chunk.metadata["edit_preview"]
-                    console.print(f"[dim]{path}:[/]")
-                    for line in preview.split("\n"):
-                        if line.startswith("-"):
-                            console.print(f"[red]{line}[/]")
-                        elif line.startswith("+"):
-                            console.print(f"[green]{line}[/]")
-                        else:
-                            console.print(f"[dim]{line}[/]")
-                    formatter.start_streaming()
-                elif chunk.content:
-                    formatter.stream_chunk(chunk.content)
-                    content_buffer += chunk.content
-            # Finalize response (also ends streaming)
-            formatter.response(content=content_buffer)
+            renderer = FormatterRenderer(formatter, console)
+            content_buffer = await stream_response(agent, message, renderer)
         else:
             response = await agent.chat(message)
             content_buffer = response.content
@@ -656,10 +741,45 @@ async def run_oneshot(
                 model=model_name,
             )
 
+        # Mark success and gather metrics
+        success = True
+        if usage_stats:
+            token_count = getattr(usage_stats, "total_tokens", 0) or 0
+        # Get tool call count from agent metrics if available
+        if hasattr(agent, "get_session_metrics"):
+            metrics = agent.get_session_metrics()
+            tool_calls_made = metrics.get("tool_calls", 0) if metrics else 0
+
     except Exception as e:
         formatter.error(str(e))
         raise typer.Exit(1)
     finally:
+        # Record RL outcome for learning
+        elapsed = time.time() - start_time
+        try:
+            from victor.agent.rl_model_selector import SessionReward, get_model_selector
+
+            selector = get_model_selector()
+            if selector and agent and agent.provider:
+                reward = SessionReward(
+                    session_id=session_id,
+                    provider=agent.provider.name,
+                    model=getattr(agent.provider, "model", "unknown"),
+                    success=success,
+                    latency_seconds=elapsed,
+                    token_count=token_count,
+                    tool_calls_made=tool_calls_made,
+                    task_type=task_type,
+                )
+                new_q = selector.update_q_value(reward)
+                logger.info(
+                    f"RL feedback: {agent.provider.name} "
+                    f"{'success' if success else 'failure'} "
+                    f"({elapsed:.1f}s, {token_count} tokens) → Q={new_q:.3f}"
+                )
+        except Exception as e:
+            logger.debug(f"RL feedback recording failed: {e}")
+
         # Graceful shutdown - always clean up agent if created
         await _graceful_shutdown(agent)
 
@@ -718,8 +838,11 @@ async def run_interactive(
         # Initialize slash command handler
         cmd_handler = SlashCommandHandler(console, settings, agent)
 
+        # Get RL-based profile suggestion (non-intrusive tip)
+        rl_suggestion = _get_rl_profile_suggestion(profile_config.provider, profiles)
+
         # Run CLI REPL
-        await _run_cli_repl(agent, settings, cmd_handler, profile_config, stream)
+        await _run_cli_repl(agent, settings, cmd_handler, profile_config, stream, rl_suggestion)
 
     except Exception as e:
         console.print(f"[bold red]Error:[/] {str(e)}")
@@ -739,6 +862,7 @@ async def _run_cli_repl(
     cmd_handler: SlashCommandHandler,
     profile_config: Any,
     stream: bool,
+    rl_suggestion: Optional[tuple[str, str, float]] = None,
 ) -> None:
     """Run the CLI-based REPL (fallback for unsupported terminals).
 
@@ -748,13 +872,27 @@ async def _run_cli_repl(
         cmd_handler: Slash command handler
         profile_config: Profile configuration
         stream: Whether to stream responses
+        rl_suggestion: Optional RL-based profile suggestion (profile, provider, q_value)
     """
+    # Build panel content
+    panel_content = (
+        f"[bold blue]Victor[/] - Enterprise-Ready AI Coding Assistant\n\n"
+        f"[bold]Provider:[/] [cyan]{profile_config.provider}[/]  "
+        f"[bold]Model:[/] [cyan]{profile_config.model}[/]\n\n"
+        f"Type [bold]/help[/] for commands, [bold]/exit[/] or [bold]Ctrl+D[/] to quit."
+    )
+
+    # Add RL suggestion if available
+    if rl_suggestion:
+        profile_name, provider_name, q_value = rl_suggestion
+        panel_content += (
+            f"\n\n[dim]RL Tip: [cyan]{provider_name}[/] has higher Q-value ({q_value:.2f}) - "
+            f"try [cyan]-p {profile_name}[/][/]"
+        )
+
     console.print(
         Panel(
-            f"[bold blue]Victor[/] - Enterprise-Ready AI Coding Assistant\n\n"
-            f"[bold]Provider:[/] [cyan]{profile_config.provider}[/]  "
-            f"[bold]Model:[/] [cyan]{profile_config.model}[/]\n\n"
-            f"Type [bold]/help[/] for commands, [bold]/exit[/] or [bold]Ctrl+D[/] to quit.",
+            panel_content,
             title="Victor CLI",
             border_style="blue",
         )
@@ -789,68 +927,12 @@ async def _run_cli_repl(
 
             if stream:
                 from victor.agent.response_sanitizer import sanitize_response
+                from victor.ui.stream_renderer import LiveDisplayRenderer, stream_response
 
-                # Stream the response with live markdown rendering
-                content_buffer = ""
-                live_display = None
-                try:
-                    live_display = Live(Markdown(""), console=console, refresh_per_second=10)
-                    live_display.start()
-
-                    async for chunk in agent.stream_chat(user_input):
-                        # Handle status messages separately (tool status, thinking indicator)
-                        if chunk.metadata and "status" in chunk.metadata:
-                            live_display.stop()
-                            console.print(f"[dim]{chunk.metadata['status']}[/]")
-                            live_display = Live(
-                                Markdown(content_buffer), console=console, refresh_per_second=10
-                            )
-                            live_display.start()
-                        elif chunk.metadata and "file_preview" in chunk.metadata:
-                            # Show file content preview (like Claude Code)
-                            live_display.stop()
-                            path = chunk.metadata.get("path", "")
-                            preview = chunk.metadata["file_preview"]
-                            from rich.syntax import Syntax
-
-                            ext = path.split(".")[-1] if "." in path else "txt"
-                            syntax = Syntax(preview, ext, theme="monokai", line_numbers=False)
-                            console.print(
-                                Panel(syntax, title=f"[dim]{path}[/]", border_style="dim")
-                            )
-                            live_display = Live(
-                                Markdown(content_buffer), console=console, refresh_per_second=10
-                            )
-                            live_display.start()
-                        elif chunk.metadata and "edit_preview" in chunk.metadata:
-                            # Show edit diff preview
-                            live_display.stop()
-                            path = chunk.metadata.get("path", "")
-                            preview = chunk.metadata["edit_preview"]
-                            console.print(f"[dim]{path}:[/]")
-                            for line in preview.split("\n"):
-                                if line.startswith("-"):
-                                    console.print(f"[red]{line}[/]")
-                                elif line.startswith("+"):
-                                    console.print(f"[green]{line}[/]")
-                                else:
-                                    console.print(f"[dim]{line}[/]")
-                            live_display = Live(
-                                Markdown(content_buffer), console=console, refresh_per_second=10
-                            )
-                            live_display.start()
-                        elif chunk.content:
-                            # Accumulate raw content - don't sanitize per-chunk
-                            # as that strips whitespace-only chunks (spaces between words)
-                            content_buffer += chunk.content
-                            # Update live display with accumulated markdown
-                            live_display.update(Markdown(content_buffer))
-                finally:
-                    if live_display:
-                        live_display.stop()
-
+                # Use unified streaming handler with LiveDisplayRenderer
+                renderer = LiveDisplayRenderer(console)
+                content_buffer = await stream_response(agent, user_input, renderer)
                 # Sanitize the full response once streaming is complete
-                # This removes thinking tokens and artifacts without losing spaces
                 content_buffer = sanitize_response(content_buffer)
             else:
                 # Non-streaming response
@@ -2484,8 +2566,69 @@ def embeddings(
             phrase_count = manager.rebuild_task_classifiers_sync(progress_callback)
             console.print(f"  [green]✓[/] Task classifiers rebuilt ({phrase_count} phrases)")
 
+            # Eagerly rebuild tool embeddings if targeted
             if CacheType.TOOL in targets:
-                console.print("  [dim]Tool embeddings will rebuild on next chat (~2s)[/]")
+                import asyncio
+                import importlib
+                import inspect
+                import os as tool_os
+
+                from victor.tools.base import ToolRegistry
+                from victor.tools.semantic_selector import SemanticToolSelector
+
+                try:
+                    console.print("  [dim]Rebuilding tool embeddings...[/]")
+
+                    # Create tool registry (same pattern as MCP server)
+                    registry = ToolRegistry()
+                    tools_dir = tool_os.path.join(tool_os.path.dirname(__file__), "..", "tools")
+                    excluded_files = {"__init__.py", "base.py", "decorators.py", "semantic_selector.py"}
+
+                    for filename in tool_os.listdir(tools_dir):
+                        if filename.endswith(".py") and filename not in excluded_files:
+                            module_name = f"victor.tools.{filename[:-3]}"
+                            try:
+                                module = importlib.import_module(module_name)
+                                for _name, obj in inspect.getmembers(module):
+                                    if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
+                                        registry.register(obj)
+                            except Exception:
+                                pass  # Skip modules that fail to load
+
+                    async def rebuild_tool_embeddings():
+                        selector = SemanticToolSelector(cache_embeddings=True)
+                        await selector.initialize_tool_embeddings(registry)
+                        await selector.close()
+                        return len(registry.list_tools())
+
+                    tool_count = asyncio.run(rebuild_tool_embeddings())
+                    console.print(f"  [green]✓[/] Tool embeddings rebuilt ({tool_count} tools)")
+                except Exception as e:
+                    console.print(f"  [yellow]⚠[/] Tool embeddings: {e}")
+
+            # Eagerly rebuild conversation embeddings if targeted
+            if CacheType.CONVERSATION in targets:
+                import asyncio
+                from victor.agent.conversation_embedding_store import (
+                    ConversationEmbeddingStore,
+                )
+                from victor.embeddings.service import EmbeddingService
+
+                try:
+                    console.print("  [dim]Rebuilding conversation embeddings...[/]")
+
+                    async def rebuild_conversations():
+                        embedding_service = EmbeddingService.get_instance()
+                        store = ConversationEmbeddingStore(embedding_service)
+                        await store.initialize()
+                        count = await store.rebuild()
+                        await store.close()
+                        return count
+
+                    msg_count = asyncio.run(rebuild_conversations())
+                    console.print(f"  [green]✓[/] Conversation embeddings rebuilt ({msg_count} messages)")
+                except Exception as e:
+                    console.print(f"  [yellow]⚠[/] Conversation embeddings: {e}")
 
             console.print("\n[green]✓ Rebuild complete![/]")
         except Exception as e:

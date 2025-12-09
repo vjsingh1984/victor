@@ -151,17 +151,21 @@ class TestToolDecorator:
 
     @pytest.mark.asyncio
     async def test_tool_execution_with_context_injection(self):
-        """Test that context is injected when function has context parameter."""
+        """Test that _exec_ctx is injected when function has _exec_ctx parameter.
+
+        Note: We use _exec_ctx (not context) to avoid collision with tool parameters
+        named 'context' that LLMs commonly generate.
+        """
 
         @tool
-        async def context_aware_tool(context: Dict[str, Any], value: str):
-            """Tool that uses context.
+        async def context_aware_tool(_exec_ctx: Dict[str, Any], value: str):
+            """Tool that uses execution context.
 
             Args:
-                context: The tool context.
+                _exec_ctx: The framework execution context (reserved name).
                 value: A value.
             """
-            return {"has_context": context is not None, "value": value}
+            return {"has_context": _exec_ctx is not None, "value": value}
 
         tool_obj = context_aware_tool.Tool
         test_context = {"test_key": "test_value"}

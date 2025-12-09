@@ -49,7 +49,7 @@ from victor.core.retry import (
     RetryStrategy,
     tool_retry_strategy,
 )
-from victor.tools.base import BaseTool, Hook, HookError, ToolRegistry, ToolResult, ValidationResult
+from victor.tools.base import AccessMode, BaseTool, Hook, HookError, ToolRegistry, ToolResult, ValidationResult
 from victor.tools.metadata_registry import (
     get_idempotent_tools as registry_get_idempotent_tools,
     get_cache_invalidating_tools as registry_get_cache_invalidating_tools,
@@ -75,6 +75,7 @@ class ValidationMode(Enum):
 
 if TYPE_CHECKING:
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
+    from victor.auth.rbac import RBACManager
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +201,8 @@ class ToolExecutor:
         enable_code_correction: bool = False,
         validation_mode: ValidationMode = ValidationMode.LENIENT,
         error_handler: Optional[ErrorHandler] = None,
+        rbac_manager: Optional["RBACManager"] = None,
+        current_user: Optional[str] = None,
     ):
         """Initialize tool executor.
 
@@ -216,6 +219,8 @@ class ToolExecutor:
             enable_code_correction: Enable code correction for code-generating tools
             validation_mode: Pre-execution validation strictness (STRICT, LENIENT, OFF)
             error_handler: Centralized error handler for structured logging (uses global if None)
+            rbac_manager: Optional RBAC manager for permission checks (disabled if None)
+            current_user: Current user for RBAC checks (defaults to 'default_user')
         """
         self.tools = tool_registry
         self.normalizer = argument_normalizer or ArgumentNormalizer()
@@ -233,6 +238,8 @@ class ToolExecutor:
         self.enable_code_correction = enable_code_correction
         self.validation_mode = validation_mode
         self.error_handler = error_handler or get_error_handler()
+        self.rbac_manager = rbac_manager
+        self.current_user = current_user or "default_user"
 
         # Execution statistics
         self._stats: Dict[str, Dict[str, Any]] = {}
@@ -252,6 +259,61 @@ class ToolExecutor:
         """
         self.validation_mode = mode
         logger.info(f"Validation mode changed to: {mode.value}")
+
+    def set_current_user(self, username: str) -> None:
+        """Change the current user for RBAC checks.
+
+        Args:
+            username: New username for permission checks
+        """
+        self.current_user = username
+        logger.info(f"Current user changed to: {username}")
+
+    def _check_rbac(
+        self,
+        tool: BaseTool,
+        tool_name: str,
+    ) -> Tuple[bool, Optional[str]]:
+        """Check RBAC permissions for tool execution.
+
+        Uses the tool's declared access_mode and category to determine
+        if the current user has permission to execute it.
+
+        Args:
+            tool: The tool to check permissions for
+            tool_name: Name of the tool
+
+        Returns:
+            Tuple of (allowed, denial_reason)
+            - allowed: True if execution should proceed
+            - denial_reason: Explanation if denied, None if allowed
+        """
+        # Skip RBAC if no manager configured (disabled by default)
+        if self.rbac_manager is None:
+            return True, None
+
+        # Get tool metadata for permission check
+        access_mode = getattr(tool, "access_mode", AccessMode.READONLY)
+        category = getattr(tool, "category", "general")
+
+        # Check access via RBAC manager
+        if self.rbac_manager.check_tool_access(
+            username=self.current_user,
+            tool_name=tool_name,
+            category=category,
+            access_mode=access_mode,
+        ):
+            return True, None
+        else:
+            # Build informative denial message
+            from victor.auth.rbac import Permission
+
+            required_permission = Permission.from_access_mode(access_mode)
+            return (
+                False,
+                f"RBAC denied: User '{self.current_user}' lacks '{required_permission.value}' "
+                f"permission for tool '{tool_name}' (category: {category})",
+            )
 
     def _validate_arguments(
         self,
@@ -439,6 +501,17 @@ class ToolExecutor:
                 error=rejection_reason or "Operation cancelled by safety check",
             )
 
+        # RBAC permission check (runs after safety check)
+        rbac_allowed, rbac_denial = self._check_rbac(tool, tool_name)
+        if not rbac_allowed:
+            logger.warning(f"Tool execution blocked by RBAC: {tool_name} for user {self.current_user}")
+            return ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                result=None,
+                error=rbac_denial or "Permission denied by RBAC",
+            )
+
         # Execute with retry
         result, success, error, retries, error_info = await self._execute_with_retry(
             tool, normalized_args, exec_context
@@ -559,7 +632,7 @@ class ToolExecutor:
                 self._run_before_hooks(tool.name, arguments)
 
                 # Execute the tool
-                result = await tool.execute(context, **arguments)
+                result = await tool.execute(_exec_ctx=context, **arguments)
 
                 # Run after hooks - critical hooks can raise errors
                 self._run_after_hooks(tool.name, result)

@@ -43,7 +43,13 @@ PYTHON_QUERIES = {
     priority=Priority.HIGH,  # Important for code navigation
     access_mode=AccessMode.READONLY,  # Only reads files for analysis
     danger_level=DangerLevel.SAFE,  # No side effects
-    keywords=["symbol", "find", "definition", "function", "class", "locate", "ast"],
+    keywords=[
+        "symbol", "find", "definition", "function", "class", "locate", "ast",
+        # Natural language patterns for symbol lookup (semantic matching)
+        "method", "where is", "show me", "look up", "go to definition",
+        "find the", "locate the", "get definition", "code for", "implementation",
+    ],
+    stages=["analysis"],  # Conversation stages where relevant
 )
 async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
     """[AST-AWARE] Find function/class definition using tree-sitter parsing.
@@ -115,7 +121,12 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
     priority=Priority.HIGH,  # Important for code navigation
     access_mode=AccessMode.READONLY,  # Only reads files for analysis
     danger_level=DangerLevel.SAFE,  # No side effects
-    keywords=["refs", "references", "find", "usage", "occurrences", "symbol", "ast"],
+    keywords=[
+        "refs", "references", "find", "usage", "occurrences", "symbol", "ast",
+        # Natural language patterns for usage lookup (semantic matching)
+        "where is", "used", "called", "invoked", "callers", "who calls",
+        "find all", "all usages", "find usages", "list references",
+    ],
 )
 async def refs(symbol_name: str, search_path: str = ".") -> List[Dict[str, Any]]:
     """[AST-AWARE] Find all references to a symbol using tree-sitter parsing.

@@ -37,6 +37,7 @@ from victor.tools.base import (
     ToolMetadata,
     ToolResult,
 )
+from victor.tools.tool_names import ToolNames
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ logger = logging.getLogger(__name__)
 class PipelineAnalyzerTool(BaseTool):
     """Tool for analyzing CI/CD pipelines and coverage."""
 
-    name = "pipeline_analyzer"
+    name = ToolNames.PIPELINE
     description = """Analyze CI/CD pipelines (GitHub Actions, GitLab) and coverage.
 
     Actions: analyze, coverage, compare_coverage, summary, detect.

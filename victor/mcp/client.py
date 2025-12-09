@@ -22,6 +22,7 @@ Features:
 - Health monitoring with configurable intervals
 - Automatic reconnection on connection loss
 - Tool and resource caching
+- Optional subprocess sandboxing with resource limits
 """
 
 import asyncio
@@ -30,9 +31,12 @@ import logging
 import subprocess
 import time
 import uuid
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from victor.config.timeouts import McpTimeouts
+
+if TYPE_CHECKING:
+    from victor.mcp.sandbox import SandboxConfig, SandboxedProcess
 from victor.mcp.protocol import (
     MCPClientInfo,
     MCPMessage,
@@ -67,6 +71,7 @@ class MCPClient:
         auto_reconnect: bool = True,
         max_reconnect_attempts: int = 3,
         reconnect_delay: int = 5,
+        sandbox_config: Optional["SandboxConfig"] = None,
     ):
         """Initialize MCP client.
 
@@ -77,6 +82,7 @@ class MCPClient:
             auto_reconnect: Whether to automatically reconnect on failure
             max_reconnect_attempts: Maximum reconnection attempts before giving up
             reconnect_delay: Seconds to wait between reconnection attempts
+            sandbox_config: Optional sandboxing config for subprocess resource limits
         """
         self.name = name
         self.version = version
@@ -94,6 +100,10 @@ class MCPClient:
         self._auto_reconnect = auto_reconnect
         self._max_reconnect_attempts = max_reconnect_attempts
         self._reconnect_delay = reconnect_delay
+
+        # Sandboxing configuration
+        self._sandbox_config = sandbox_config
+        self._sandboxed_process: Optional["SandboxedProcess"] = None
 
         # Connection state
         self._command: Optional[List[str]] = None
@@ -119,15 +129,39 @@ class MCPClient:
         self._command = command  # Store for reconnection
 
         try:
-            # Start server process
-            self.process = subprocess.Popen(
-                command,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,
-            )
+            # Start server process (with optional sandboxing)
+            if self._sandbox_config is not None:
+                # Use sandboxed process for resource limits and isolation
+                try:
+                    from victor.mcp.sandbox import SandboxedProcess
+
+                    self._sandboxed_process = SandboxedProcess(self._sandbox_config)
+                    self.process = await self._sandboxed_process.start(command)
+                    logger.info(
+                        f"Started sandboxed MCP server with limits: "
+                        f"memory={self._sandbox_config.max_memory_mb}MB, "
+                        f"timeout={self._sandbox_config.timeout_seconds}s"
+                    )
+                except Exception as e:
+                    logger.warning(f"Sandboxed process failed, falling back to regular: {e}")
+                    self.process = subprocess.Popen(
+                        command,
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        bufsize=1,
+                    )
+            else:
+                # Standard subprocess without sandboxing
+                self.process = subprocess.Popen(
+                    command,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    bufsize=1,
+                )
 
             # Initialize connection
             success = await self.initialize()
@@ -163,6 +197,16 @@ class MCPClient:
 
     def _cleanup_process(self) -> None:
         """Clean up subprocess and its resources."""
+        # Clean up sandboxed process if used
+        if self._sandboxed_process is not None:
+            try:
+                asyncio.get_event_loop().run_until_complete(
+                    self._sandboxed_process.terminate()
+                )
+            except Exception as e:
+                logger.debug(f"Error terminating sandboxed process: {e}")
+            self._sandboxed_process = None
+
         if self.process:
             try:
                 if self.process.stdin:

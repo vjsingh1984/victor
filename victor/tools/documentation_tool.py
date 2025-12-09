@@ -369,7 +369,7 @@ For complete API documentation, see [API Docs](docs/api.md).
     keywords=["docs", "documentation", "docstring", "api", "readme", "type hints", "generate"],
     mandatory_keywords=["generate docs", "add documentation", "document code"],  # Force inclusion
     task_types=["documentation", "generation"],  # Classification-aware selection
-    stages=["documentation"],  # Conversation stages where relevant
+    stages=["planning", "analysis", "completion"],  # Conversation stages where relevant
 )
 async def docs(
     path: str,

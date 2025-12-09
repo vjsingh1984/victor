@@ -1,6 +1,9 @@
 # Victor AI - VS Code Extension
 
-AI-powered coding assistant with multi-provider support, semantic code search, and 54+ enterprise tools.
+AI-powered coding assistant with multi-provider support, semantic code search, and 46 enterprise tools.
+
+[![GitHub](https://img.shields.io/badge/GitHub-vjsingh1984%2Fvictor-blue)](https://github.com/vjsingh1984/victor)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/vjsingh1984/victor/blob/main/LICENSE)
 
 ## Features
 

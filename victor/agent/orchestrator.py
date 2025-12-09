@@ -51,9 +51,12 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Optional, Set
+from typing import Any, AsyncIterator, Dict, List, Optional, Set, TYPE_CHECKING
 
 from rich.console import Console
+
+if TYPE_CHECKING:
+    from victor.agent.orchestrator_integration import OrchestratorIntegration
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.message_history import MessageHistory
@@ -61,6 +64,16 @@ from victor.agent.conversation_memory import (
     ConversationStore,
     MessageRole,
 )
+
+# DI container bootstrap - ensures services are available
+from victor.core.bootstrap import ensure_bootstrapped, get_service_optional
+from victor.core.container import (
+    MetricsServiceProtocol,
+    LoggerServiceProtocol,
+)
+
+# Config loaders for externalized configuration
+from victor.config.config_loaders import get_provider_limits
 from victor.agent.conversation_embedding_store import (
     ConversationEmbeddingStore,
 )
@@ -121,6 +134,10 @@ from victor.agent.streaming_controller import (
 from victor.agent.task_analyzer import TaskAnalyzer, get_task_analyzer
 from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
 from victor.agent.provider_manager import ProviderManager, ProviderManagerConfig, ProviderState
+
+# Intelligent pipeline integration (lazy initialization to avoid circular imports)
+# These enable RL-based mode learning, quality scoring, and prompt optimization
+from victor.agent.orchestrator_integration import IntegrationConfig
 
 from victor.agent.tool_selection import (
     get_critical_tools,
@@ -202,7 +219,8 @@ PROGRESSIVE_TOOLS = {
 class AgentOrchestrator:
     """Orchestrates agent interactions, tool execution, and provider communication."""
 
-    # Known provider context windows (in tokens)
+    # Legacy fallback context windows (in tokens)
+    # Prefer config loader: get_provider_limits(provider, model).context_window
     PROVIDER_CONTEXT_WINDOWS = {
         "anthropic": 200000,  # Claude models
         "openai": 128000,  # GPT-4 Turbo
@@ -223,6 +241,10 @@ class AgentOrchestrator:
     ) -> int:
         """Calculate maximum context size in characters for a model.
 
+        Uses externalized config from provider_context_limits.yaml with
+        per-provider and per-model overrides. Falls back to hardcoded
+        defaults if config unavailable.
+
         Args:
             settings: Application settings
             provider: LLM provider instance
@@ -236,7 +258,7 @@ class AgentOrchestrator:
         if settings_max and settings_max > 0:
             return settings_max
 
-        # Try to get context window from provider
+        # Try to get context window from provider API
         context_tokens = None
         if hasattr(provider, "get_context_window"):
             try:
@@ -244,10 +266,20 @@ class AgentOrchestrator:
             except Exception:
                 pass
 
-        # Fall back to provider defaults
+        # Fall back to externalized config (YAML-based)
         if context_tokens is None:
             provider_name = getattr(provider, "name", "").lower()
-            context_tokens = AgentOrchestrator.PROVIDER_CONTEXT_WINDOWS.get(provider_name, 100000)
+            try:
+                limits = get_provider_limits(provider_name, model)
+                context_tokens = limits.context_window
+                logger.debug(
+                    f"Using YAML config for {provider_name}/{model}: {context_tokens} tokens"
+                )
+            except Exception:
+                # Final fallback to hardcoded defaults
+                context_tokens = AgentOrchestrator.PROVIDER_CONTEXT_WINDOWS.get(
+                    provider_name, 100000
+                )
 
         # Convert tokens to chars: ~3.5 chars per token with 80% safety margin
         max_chars = int(context_tokens * 3.5 * 0.8)
@@ -265,6 +297,7 @@ class AgentOrchestrator:
         tool_selection: Optional[Dict[str, Any]] = None,
         thinking: bool = False,
         provider_name: Optional[str] = None,
+        profile_name: Optional[str] = None,
     ):
         """Initialize orchestrator.
 
@@ -278,7 +311,14 @@ class AgentOrchestrator:
             tool_selection: Optional tool selection configuration (base_threshold, base_max_tools)
             thinking: Enable extended thinking mode (Claude models only)
             provider_name: Optional provider label from profile (e.g., lmstudio, vllm) to disambiguate OpenAI-compatible providers
+            profile_name: Optional profile name (e.g., "groq-fast", "claude-sonnet") for session tracking
         """
+        # Store profile name for session tracking
+        self._profile_name = profile_name
+        # Bootstrap DI container - ensures all services are available
+        # This is idempotent and will only bootstrap if not already done
+        self._container = ensure_bootstrapped(settings)
+
         self.settings = settings
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -376,11 +416,20 @@ class AgentOrchestrator:
             tool_budget=self.tool_budget,
         )
 
-        # Analytics
+        # Analytics - try DI container first for enhanced logger with rotation/encryption/PII scrubbing
+        # Falls back to basic UsageLogger if container doesn't have enhanced version
         from victor.config.settings import get_project_paths
+        from victor.core.bootstrap import UsageLoggerProtocol
 
-        analytics_log_file = get_project_paths().global_logs_dir / "usage.jsonl"
-        self.usage_logger = UsageLogger(analytics_log_file, enabled=self.settings.analytics_enabled)
+        usage_logger_from_container = self._container.get_optional(UsageLoggerProtocol)
+        if usage_logger_from_container is not None:
+            self.usage_logger = usage_logger_from_container
+            logger.debug("Using enhanced usage logger from DI container")
+        else:
+            analytics_log_file = get_project_paths().global_logs_dir / "usage.jsonl"
+            self.usage_logger = UsageLogger(analytics_log_file, enabled=self.settings.analytics_enabled)
+            logger.debug("Using basic usage logger (enhanced version not available)")
+
         self.usage_logger.log_event(
             "session_start", {"model": self.model, "provider": self.provider.__class__.__name__}
         )
@@ -475,12 +524,15 @@ class AgentOrchestrator:
                     response_reserve=response_reserve,
                 )
                 # Create a session for this orchestrator instance
+                # Pass ML-friendly metadata for RL/analytics aggregation
                 project_path = str(paths.project_root)
                 session = self.memory_manager.create_session(
                     project_path=project_path,
                     provider=self.provider_name,
                     model=model,
                     max_tokens=max_context,
+                    profile=self._profile_name,
+                    tool_capable=self.tool_calling_caps.native_tool_calls,
                 )
                 self._memory_session_id = session.session_id
                 logger.info(
@@ -507,6 +559,19 @@ class AgentOrchestrator:
         # Intent classifier for semantic continuation/completion detection
         # Uses embeddings instead of hardcoded phrase matching
         self.intent_classifier = IntentClassifier.get_instance()
+
+        # Intelligent pipeline integration (lazy initialization)
+        # Provides RL-based mode learning, quality scoring, prompt optimization
+        self._intelligent_integration: Optional["OrchestratorIntegration"] = None
+        self._intelligent_integration_config = IntegrationConfig(
+            enable_resilient_calls=getattr(settings, "intelligent_pipeline_enabled", True),
+            enable_quality_scoring=getattr(settings, "intelligent_quality_scoring", True),
+            enable_mode_learning=getattr(settings, "intelligent_mode_learning", True),
+            enable_prompt_optimization=getattr(settings, "intelligent_prompt_optimization", True),
+            min_quality_threshold=getattr(settings, "intelligent_min_quality_threshold", 0.5),
+            grounding_confidence_threshold=getattr(settings, "intelligent_grounding_threshold", 0.7),
+        )
+        self._intelligent_pipeline_enabled = getattr(settings, "intelligent_pipeline_enabled", True)
 
         # Tool registry
         self.tools = ToolRegistry()
@@ -822,12 +887,73 @@ class AgentOrchestrator:
         self._metrics_collector.on_tool_complete(result)
 
     def _on_streaming_session_complete(self, session: StreamingSession) -> None:
-        """Callback when streaming session completes (from StreamingController)."""
+        """Callback when streaming session completes (from StreamingController).
+
+        This callback:
+        1. Records metrics via MetricsCollector
+        2. Ends UsageAnalytics session
+        3. Sends RL reward signal to update provider Q-values
+        """
         self._metrics_collector.on_streaming_session_complete(session)
 
         # End UsageAnalytics session
         if hasattr(self, "_usage_analytics") and self._usage_analytics:
             self._usage_analytics.end_session()
+
+        # Send RL reward signal for Q-learning model selection
+        self._send_rl_reward_signal(session)
+
+    def _send_rl_reward_signal(self, session: StreamingSession) -> None:
+        """Send reward signal to RL model selector for Q-value updates.
+
+        Converts StreamingSession data into SessionReward and updates Q-values
+        based on session outcome (success, latency, throughput, tool usage).
+        """
+        try:
+            from victor.agent.rl_model_selector import get_model_selector, SessionReward
+
+            selector = get_model_selector()
+            if selector is None:
+                return
+
+            # Extract metrics from session
+            token_count = 0
+            if session.metrics:
+                # Estimate tokens from chunks (streaming metrics)
+                token_count = session.metrics.total_chunks or 0
+
+            # Get tool execution count from metrics collector
+            tool_calls_made = 0
+            if hasattr(self, "_metrics_collector") and self._metrics_collector:
+                tool_calls_made = self._metrics_collector._selection_stats.total_tools_executed
+
+            # Determine success: no error and not cancelled
+            success = session.error is None and not session.cancelled
+
+            # Create reward signal
+            reward = SessionReward(
+                session_id=session.session_id,
+                provider=session.provider,
+                model=session.model,
+                success=success,
+                latency_seconds=session.duration,
+                token_count=token_count,
+                tool_calls_made=tool_calls_made,
+            )
+
+            # Update Q-value with reward signal
+            new_q = selector.update_q_value(reward)
+            logger.debug(
+                f"RL feedback: provider={session.provider} reward={reward.reward:.3f} "
+                f"new_q={new_q:.3f} success={success} duration={session.duration:.1f}s"
+            )
+
+        except ImportError:
+            # RL module not available - skip silently
+            pass
+        except Exception as e:
+            # Don't let RL errors affect main flow
+            logger.warning(f"Failed to send RL reward signal: {e}")
 
     # =====================================================================
     # Component accessors for external use
@@ -877,6 +1003,220 @@ class AgentOrchestrator:
     def code_correction_middleware(self) -> Optional[Any]:
         """Get the code correction middleware for automatic code validation/fixing."""
         return self._code_correction_middleware
+
+    @property
+    def intelligent_integration(self) -> Optional["OrchestratorIntegration"]:
+        """Get the intelligent pipeline integration (lazy initialization).
+
+        Returns None if intelligent pipeline is disabled or initialization fails.
+        Use this for:
+        - RL-based mode learning (explore → plan → build → review)
+        - Response quality scoring
+        - Provider resilience integration
+        - Embedding-based prompt optimization
+        """
+        if not self._intelligent_pipeline_enabled:
+            return None
+
+        if self._intelligent_integration is None:
+            try:
+                from victor.agent.orchestrator_integration import OrchestratorIntegration
+
+                # Synchronous initialization (async version available via enhance_orchestrator)
+                from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+
+                pipeline = IntelligentAgentPipeline(
+                    provider_name=self.provider_name,
+                    model=self.model,
+                    profile_name=f"{self.provider_name}:{self.model}",
+                    project_root=str(self.project_context.context_file.parent)
+                    if self.project_context.context_file
+                    else None,
+                )
+                self._intelligent_integration = OrchestratorIntegration(
+                    orchestrator=self,
+                    pipeline=pipeline,
+                    config=self._intelligent_integration_config,
+                )
+                logger.info(
+                    f"IntelligentPipeline initialized for {self.provider_name}:{self.model}"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to initialize IntelligentPipeline: {e}")
+                self._intelligent_pipeline_enabled = False
+
+        return self._intelligent_integration
+
+    async def _prepare_intelligent_request(
+        self, task: str, task_type: str
+    ) -> Optional[Dict[str, Any]]:
+        """Pre-request hook for intelligent pipeline integration.
+
+        Called at the start of stream_chat to:
+        - Get mode transition recommendations (Q-learning)
+        - Get optimal tool budget for task type
+        - Enable prompt optimization if configured
+
+        Args:
+            task: The user's task/query
+            task_type: Detected task type (analysis, edit, etc.)
+
+        Returns:
+            Dictionary with recommendations, or None if pipeline disabled
+        """
+        integration = self.intelligent_integration
+        if not integration:
+            return None
+
+        try:
+            # Get current mode from conversation state
+            stage = self.conversation_state.get_current_stage()
+            current_mode = stage.value if stage else "explore"
+
+            # Prepare request context (async call to pipeline)
+            context = await integration.prepare_request(
+                task=task,
+                task_type=task_type,
+                current_mode=current_mode,
+            )
+
+            # Apply recommended tool budget if available
+            if context.recommended_tool_budget:
+                current_budget = self.unified_tracker.config.get("max_total_iterations", 50)
+                # Only adjust if recommendation differs significantly
+                if abs(context.recommended_tool_budget - current_budget) > 5:
+                    new_budget = min(context.recommended_tool_budget, current_budget)
+                    self.unified_tracker.set_tool_budget(new_budget)
+                    logger.info(
+                        f"IntelligentPipeline adjusted tool budget: {current_budget} -> {new_budget}"
+                    )
+
+            return {
+                "recommended_mode": context.recommended_mode,
+                "recommended_tool_budget": context.recommended_tool_budget,
+                "should_continue": context.should_continue,
+                "system_prompt_addition": context.system_prompt if context.system_prompt else None,
+            }
+        except Exception as e:
+            logger.debug(f"IntelligentPipeline prepare_request failed: {e}")
+            return None
+
+    async def _validate_intelligent_response(
+        self,
+        response: str,
+        query: str,
+        tool_calls: int,
+        task_type: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Post-response hook for intelligent pipeline integration.
+
+        Called after each streaming iteration to:
+        - Score response quality (coherence, completeness, relevance)
+        - Verify grounding (detect hallucinations)
+        - Record feedback for Q-learning
+
+        Args:
+            response: The model's response content
+            query: Original user query
+            tool_calls: Number of tool calls made so far
+            task_type: Task type for context
+
+        Returns:
+            Dictionary with quality/grounding scores, or None if pipeline disabled
+        """
+        integration = self.intelligent_integration
+        if not integration:
+            return None
+
+        # Skip validation for empty or very short responses
+        if not response or len(response.strip()) < 50:
+            return None
+
+        try:
+            result = await integration.validate_response(
+                response=response,
+                query=query,
+                tool_calls=tool_calls,
+                success=True,
+                task_type=task_type,
+            )
+
+            # Log quality warnings if below threshold
+            if not result.is_valid:
+                logger.warning(
+                    f"IntelligentPipeline: Response below quality threshold "
+                    f"(quality={result.quality_score:.2f}, grounded={result.is_grounded})"
+                )
+
+            return {
+                "quality_score": result.quality_score,
+                "grounding_score": result.grounding_score,
+                "is_grounded": result.is_grounded,
+                "is_valid": result.is_valid,
+                "grounding_issues": result.grounding_issues,
+            }
+        except Exception as e:
+            logger.debug(f"IntelligentPipeline validate_response failed: {e}")
+            return None
+
+    def _record_intelligent_outcome(
+        self,
+        success: bool,
+        quality_score: float = 0.5,
+        user_satisfied: bool = True,
+        completed: bool = True,
+    ) -> None:
+        """Record outcome for Q-learning feedback.
+
+        Called at the end of a conversation to record the outcome
+        for reinforcement learning. This helps the system learn
+        optimal mode transitions and tool budgets.
+
+        Args:
+            success: Whether the task was completed successfully
+            quality_score: Final quality score (0.0-1.0)
+            user_satisfied: Whether user seemed satisfied
+            completed: Whether task reached completion
+        """
+        integration = self.intelligent_integration
+        if not integration:
+            return
+
+        try:
+            # Access the mode controller through the pipeline
+            pipeline = integration.pipeline
+            if hasattr(pipeline, "_mode_controller") and pipeline._mode_controller:
+                pipeline._mode_controller.record_outcome(
+                    success=success,
+                    quality_score=quality_score,
+                    user_satisfied=user_satisfied,
+                    completed=completed,
+                )
+                logger.debug(
+                    f"IntelligentPipeline recorded outcome: "
+                    f"success={success}, quality={quality_score:.2f}"
+                )
+        except Exception as e:
+            logger.debug(f"IntelligentPipeline record_outcome failed: {e}")
+
+    def _should_continue_intelligent(self) -> tuple[bool, str]:
+        """Check if processing should continue using learned behaviors.
+
+        Uses Q-learning based decisions to determine if the agent
+        should continue processing or transition to completion.
+
+        Returns:
+            Tuple of (should_continue, reason)
+        """
+        integration = self.intelligent_integration
+        if not integration:
+            return True, "Pipeline disabled"
+
+        try:
+            return integration.should_continue()
+        except Exception as e:
+            logger.debug(f"IntelligentPipeline should_continue failed: {e}")
+            return True, "Fallback to continue"
 
     @property
     def safety_checker(self) -> SafetyChecker:
@@ -3017,6 +3357,18 @@ These are the actual search results. Reference only the files and matches shown 
         unified_task_type = self.unified_tracker.detect_task_type(user_message)
         logger.info(f"Task type detected: {unified_task_type.value}")
 
+        # Intelligent pipeline pre-request hook: get Q-learning recommendations
+        # This enables RL-based mode transitions and optimal tool budget selection
+        intelligent_context = await self._prepare_intelligent_request(
+            task=user_message,
+            task_type=unified_task_type.value,
+        )
+        if intelligent_context:
+            # Inject optimized system prompt if provided
+            if intelligent_context.get("system_prompt_addition"):
+                self.add_message("system", intelligent_context["system_prompt_addition"])
+                logger.debug("Injected intelligent pipeline optimized prompt")
+
         # Get exploration iterations from unified tracker (replaces TASK_CONFIGS lookup)
         max_exploration_iterations = self.unified_tracker.max_exploration_iterations
 
@@ -3173,11 +3525,21 @@ These are the actual search results. Reference only the files and matches shown 
         # Reset debug logger for new conversation turn
         self.debug_logger.reset()
 
+        # Track quality score for Q-learning outcome recording
+        last_quality_score = 0.5
+
         while True:
             # Check for cancellation request
             if self._check_cancellation():
                 logger.info("Stream cancelled by user request")
                 self._is_streaming = False
+                # Record outcome for Q-learning (cancelled = incomplete)
+                self._record_intelligent_outcome(
+                    success=False,
+                    quality_score=last_quality_score,
+                    user_satisfied=False,
+                    completed=False,
+                )
                 yield StreamChunk(
                     content="\n\n[Cancelled by user]\n",
                     is_final=True,
@@ -3281,6 +3643,13 @@ These are the actual search results. Reference only the files and matches shown 
                                 yield StreamChunk(content=sanitized)
                     except Exception as e:
                         logger.warning(f"Final response after context overflow failed: {e}")
+                    # Record outcome for Q-learning (context overflow = partial success)
+                    self._record_intelligent_outcome(
+                        success=True,  # We provided a response
+                        quality_score=last_quality_score,
+                        user_satisfied=True,
+                        completed=True,
+                    )
                     yield StreamChunk(content="", is_final=True)
                     return
 
@@ -3326,6 +3695,13 @@ These are the actual search results. Reference only the files and matches shown 
                     yield StreamChunk(
                         content="Unable to generate final summary due to iteration limit.\n"
                     )
+                # Record outcome for Q-learning (iteration limit = partial success)
+                self._record_intelligent_outcome(
+                    success=True,  # We provided a summary
+                    quality_score=last_quality_score,
+                    user_satisfied=True,
+                    completed=True,
+                )
                 yield StreamChunk(content="", is_final=True)
                 break
 
@@ -3613,6 +3989,13 @@ These are the actual search results. Reference only the files and matches shown 
                     )
                 else:
                     fallback_msg = "No tool calls were returned and the model provided no content. Please retry or simplify the request."
+                # Record outcome for Q-learning (fallback = partial failure)
+                self._record_intelligent_outcome(
+                    success=False,
+                    quality_score=0.3,  # Low quality since model didn't provide useful content
+                    user_satisfied=False,
+                    completed=False,
+                )
                 yield StreamChunk(content=fallback_msg, is_final=True)
                 return
 
@@ -3629,6 +4012,26 @@ These are the actual search results. Reference only the files and matches shown 
 
             # Record iteration in unified tracker (single source of truth)
             self.unified_tracker.record_iteration(content_length)
+
+            # Intelligent pipeline post-iteration hook: validate response quality
+            # This enables quality scoring, hallucination detection, and Q-learning feedback
+            if full_content and len(full_content.strip()) > 50:
+                quality_result = await self._validate_intelligent_response(
+                    response=full_content,
+                    query=user_message,
+                    tool_calls=self.tool_calls_used,
+                    task_type=unified_task_type.value,
+                )
+                if quality_result and not quality_result.get("is_grounded", True):
+                    # Log grounding issues for debugging
+                    issues = quality_result.get("grounding_issues", [])
+                    if issues:
+                        logger.warning(
+                            f"IntelligentPipeline detected grounding issues: {issues[:3]}"
+                        )
+                # Update quality score for Q-learning outcome recording
+                if quality_result:
+                    last_quality_score = quality_result.get("quality_score", last_quality_score)
 
             # Check for loop warning using UnifiedTaskTracker (primary)
             # This gives the model a chance to correct behavior before we force stop
@@ -3789,6 +4192,13 @@ These are the actual search results. Reference only the files and matches shown 
                     )
 
                 yield StreamChunk(content=f"\n\n{metrics_line}\n")
+                # Record outcome for Q-learning (normal completion = success)
+                self._record_intelligent_outcome(
+                    success=True,
+                    quality_score=last_quality_score,
+                    user_satisfied=True,
+                    completed=True,
+                )
                 yield StreamChunk(content="", is_final=True)
                 break
 
@@ -3837,6 +4247,13 @@ These are the actual search results. Reference only the files and matches shown 
                 ttft_info = ""
                 if final_metrics and final_metrics.time_to_first_token:
                     ttft_info = f" | TTFT: {final_metrics.time_to_first_token:.2f}s"
+                # Record outcome for Q-learning (budget reached = partial success)
+                self._record_intelligent_outcome(
+                    success=True,  # We provided a summary
+                    quality_score=last_quality_score,
+                    user_satisfied=True,
+                    completed=True,
+                )
                 yield StreamChunk(
                     content=f"\n📊 {total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}\n",
                     is_final=True,
@@ -3957,16 +4374,35 @@ These are the actual search results. Reference only the files and matches shown 
                 tool_args = tool_call.get("arguments", {})
                 # Generate user-friendly status message with relevant context
                 status_msg = self._get_tool_status_message(tool_name, tool_args)
-                yield StreamChunk(content="", metadata={"status": status_msg})
+                # Emit structured tool_start event for CLI to format with arguments
+                yield StreamChunk(
+                    content="",
+                    metadata={
+                        "tool_start": {
+                            "name": tool_name,
+                            "arguments": tool_args,
+                            "status_msg": status_msg,
+                        }
+                    },
+                )
 
             tool_results = await self._handle_tool_calls(tool_calls)
             for result in tool_results:
                 tool_name = result.get("name", "tool")
                 elapsed = result.get("elapsed", 0.0)
+                tool_args = result.get("args", {})
                 if result.get("success"):
+                    # Emit structured tool_result event for CLI to format with arguments
                     yield StreamChunk(
                         content="",
-                        metadata={"status": f"✓ {tool_name} ({elapsed:.1f}s)"},
+                        metadata={
+                            "tool_result": {
+                                "name": tool_name,
+                                "success": True,
+                                "elapsed": elapsed,
+                                "arguments": tool_args,
+                            }
+                        },
                     )
                     # Show content preview for write/edit operations (like Claude Code)
                     tool_args = result.get("args", {})
@@ -4002,9 +4438,18 @@ These are the actual search results. Reference only the files and matches shown 
                                         },
                                     )
                 else:
+                    error_msg = result.get("error", "failed")
                     yield StreamChunk(
                         content="",
-                        metadata={"status": f"✗ {tool_name} failed"},
+                        metadata={
+                            "tool_result": {
+                                "name": tool_name,
+                                "success": False,
+                                "elapsed": elapsed,
+                                "arguments": tool_args,
+                                "error": error_msg,
+                            }
+                        },
                     )
 
             yield StreamChunk(content="", metadata={"status": "💭 Thinking..."})
@@ -4692,10 +5137,31 @@ These are the actual search results. Reference only the files and matches shown 
         profile = profiles.get(profile_name)
 
         if not profile:
-            raise ValueError(f"Profile not found: {profile_name}")
+            available = list(profiles.keys())
+            # Use difflib for similar name suggestions
+            import difflib
+            suggestions = difflib.get_close_matches(profile_name, available, n=3, cutoff=0.4)
 
-        # Get provider settings
+            error_msg = f"Profile not found: '{profile_name}'"
+            if suggestions:
+                error_msg += f"\n  Did you mean: {', '.join(suggestions)}?"
+            if available:
+                error_msg += f"\n  Available profiles: {', '.join(sorted(available))}"
+            else:
+                error_msg += "\n  No profiles configured. Run 'victor init' or create ~/.victor/profiles.yaml"
+            raise ValueError(error_msg)
+
+        # Get provider-level settings
         provider_settings = settings.get_provider_settings(profile.provider)
+
+        # Merge profile-level overrides (base_url, timeout, api_key, etc.)
+        # ProfileConfig uses extra="allow" so extra fields are in __pydantic_extra__
+        if hasattr(profile, "__pydantic_extra__") and profile.__pydantic_extra__:
+            # Profile-level settings override provider-level settings
+            provider_settings.update(profile.__pydantic_extra__)
+            logger.debug(
+                f"Profile '{profile_name}' overrides: {list(profile.__pydantic_extra__.keys())}"
+            )
 
         # Create provider instance using registry
         provider = ProviderRegistry.create(profile.provider, **provider_settings)
@@ -4709,4 +5175,5 @@ These are the actual search results. Reference only the files and matches shown 
             tool_selection=profile.tool_selection,
             thinking=thinking,
             provider_name=profile.provider,
+            profile_name=profile_name,
         )

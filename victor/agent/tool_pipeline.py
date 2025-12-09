@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from victor.tools.base import ToolRegistry
     from victor.cache.tool_cache import ToolCache
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
+    from victor.agent.signature_store import SignatureStore
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +145,7 @@ class ToolPipeline:
         tool_cache: Optional["ToolCache"] = None,
         argument_normalizer: Optional[ArgumentNormalizer] = None,
         code_correction_middleware: Optional["CodeCorrectionMiddleware"] = None,
+        signature_store: Optional["SignatureStore"] = None,
         on_tool_start: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         on_tool_complete: Optional[Callable[[ToolCallResult], None]] = None,
     ):
@@ -156,6 +158,7 @@ class ToolPipeline:
             tool_cache: Optional cache for tool results
             argument_normalizer: Optional argument normalizer
             code_correction_middleware: Optional middleware for code validation/fixing
+            signature_store: Optional persistent storage for failed signatures (cross-session learning)
             on_tool_start: Callback when tool execution starts
             on_tool_complete: Callback when tool execution completes
         """
@@ -165,6 +168,7 @@ class ToolPipeline:
         self.tool_cache = tool_cache
         self.normalizer = argument_normalizer or ArgumentNormalizer()
         self.code_correction_middleware = code_correction_middleware
+        self.signature_store = signature_store
 
         # Callbacks
         self.on_tool_start = on_tool_start
@@ -172,6 +176,8 @@ class ToolPipeline:
 
         # State tracking
         self._calls_used = 0
+        # In-memory failed signatures for session-only tracking (backward compatible)
+        # When signature_store is provided, it's used for persistent cross-session tracking
         self._failed_signatures: Set[tuple] = set()
         self._executed_tools: List[str] = []
 
@@ -284,6 +290,92 @@ class ToolPipeline:
         except Exception:
             args_str = str(args)
         return (tool_name, args_str)
+
+    def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool:
+        """Check if a tool call is known to fail.
+
+        Uses persistent SignatureStore when available for cross-session learning,
+        falls back to in-memory set for session-only tracking.
+
+        Args:
+            tool_name: Name of the tool
+            args: Tool arguments
+
+        Returns:
+            True if this call has failed before
+        """
+        if not self.config.enable_failed_signature_tracking:
+            return False
+
+        # Check persistent store first (cross-session)
+        if self.signature_store is not None:
+            try:
+                if self.signature_store.is_known_failure(tool_name, args):
+                    logger.debug(f"Tool call is known failure (persistent): {tool_name}")
+                    return True
+            except Exception as e:
+                logger.warning(f"Signature store check failed: {e}")
+
+        # Fall back to in-memory check (session-only)
+        signature = self._get_call_signature(tool_name, args)
+        return signature in self._failed_signatures
+
+    def record_failure(
+        self, tool_name: str, args: Dict[str, Any], error_message: str
+    ) -> None:
+        """Record a failed tool call.
+
+        Uses persistent SignatureStore when available for cross-session learning,
+        also records in-memory for current session.
+
+        Args:
+            tool_name: Name of the tool
+            args: Tool arguments
+            error_message: Error message from the failure
+        """
+        if not self.config.enable_failed_signature_tracking:
+            return
+
+        # Record in persistent store (cross-session)
+        if self.signature_store is not None:
+            try:
+                self.signature_store.record_failure(tool_name, args, error_message)
+                logger.debug(f"Recorded failure to persistent store: {tool_name}")
+            except Exception as e:
+                logger.warning(f"Failed to record to signature store: {e}")
+
+        # Also record in-memory (session-only, backward compatible)
+        signature = self._get_call_signature(tool_name, args)
+        self._failed_signatures.add(signature)
+
+    def clear_failure(self, tool_name: str, args: Dict[str, Any]) -> bool:
+        """Clear a specific failure signature (e.g., after a fix).
+
+        Args:
+            tool_name: Name of the tool
+            args: Tool arguments
+
+        Returns:
+            True if signature was found and cleared
+        """
+        cleared = False
+
+        # Clear from persistent store
+        if self.signature_store is not None:
+            try:
+                if self.signature_store.clear_signature(tool_name, args):
+                    cleared = True
+                    logger.debug(f"Cleared failure from persistent store: {tool_name}")
+            except Exception as e:
+                logger.warning(f"Failed to clear from signature store: {e}")
+
+        # Clear from in-memory
+        signature = self._get_call_signature(tool_name, args)
+        if signature in self._failed_signatures:
+            self._failed_signatures.discard(signature)
+            cleared = True
+
+        return cleared
 
     async def execute_tool_calls(
         self,

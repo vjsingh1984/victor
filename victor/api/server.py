@@ -16,6 +16,12 @@
 
 Provides REST API endpoints for IDE integrations (VS Code, JetBrains, etc.)
 and external tool access.
+
+Features:
+- REST API for chat, completions, code search
+- WebSocket support for real-time updates
+- Optional rate limiting and API key authentication
+- CORS support for browser-based clients
 """
 
 import asyncio
@@ -26,6 +32,9 @@ from typing import Any, Dict, List, Optional
 
 from aiohttp import web
 from aiohttp.web import Request, Response, StreamResponse
+
+# Import middleware stack for optional rate limiting and auth
+from victor.api.middleware import APIMiddlewareStack
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +47,9 @@ class VictorAPIServer:
         host: str = "127.0.0.1",
         port: int = 8765,
         workspace_root: Optional[str] = None,
+        rate_limit_rpm: Optional[int] = None,
+        api_keys: Optional[Dict[str, str]] = None,
+        enable_cors: bool = True,
     ):
         """Initialize the API server.
 
@@ -45,11 +57,29 @@ class VictorAPIServer:
             host: Host to bind to
             port: Port to listen on
             workspace_root: Root directory of the workspace
+            rate_limit_rpm: Optional requests per minute limit (None = no limit)
+            api_keys: Optional dict of {api_key: client_id} for authentication
+            enable_cors: Enable CORS headers (default: True)
         """
         self.host = host
         self.port = port
         self.workspace_root = workspace_root or str(Path.cwd())
-        self._app = web.Application()
+
+        # Build middleware stack based on configuration
+        middleware_stack = APIMiddlewareStack()
+        if enable_cors:
+            middleware_stack.add_cors()
+        if rate_limit_rpm is not None and rate_limit_rpm > 0:
+            middleware_stack.add_rate_limiting(
+                requests_per_minute=rate_limit_rpm,
+                burst_size=rate_limit_rpm // 4 or 5,  # Allow burst of 25%
+            )
+            logger.info(f"Rate limiting enabled: {rate_limit_rpm} requests/minute")
+        if api_keys:
+            middleware_stack.add_authentication(api_keys=api_keys)
+            logger.info(f"API key authentication enabled for {len(api_keys)} client(s)")
+
+        self._app = web.Application(middlewares=middleware_stack.build())
         self._orchestrator = None
         self._setup_routes()
 
@@ -73,6 +103,8 @@ class VictorAPIServer:
         self._app.router.add_post("/model/switch", self._switch_model)
         self._app.router.add_post("/mode/switch", self._switch_mode)
         self._app.router.add_get("/models", self._list_models)
+        self._app.router.add_get("/providers", self._list_providers)
+        self._app.router.add_get("/tools", self._list_tools)
 
         # Conversation management
         self._app.router.add_post("/conversation/reset", self._reset_conversation)
@@ -97,11 +129,38 @@ class VictorAPIServer:
         # Server management
         self._app.router.add_post("/shutdown", self._shutdown)
 
+        # Workspace analysis endpoints
+        self._app.router.add_get("/workspace/overview", self._workspace_overview)
+        self._app.router.add_get("/workspace/metrics", self._workspace_metrics)
+        self._app.router.add_get("/workspace/security", self._workspace_security)
+        self._app.router.add_get("/workspace/dependencies", self._workspace_dependencies)
+
+        # Tool approval endpoints
+        self._app.router.add_post("/tools/approve", self._approve_tool)
+        self._app.router.add_get("/tools/pending", self._pending_approvals)
+
+        # Git integration endpoints
+        self._app.router.add_get("/git/status", self._git_status)
+        self._app.router.add_post("/git/commit", self._git_commit)
+        self._app.router.add_get("/git/log", self._git_log)
+        self._app.router.add_get("/git/diff", self._git_diff)
+
+        # MCP endpoints
+        self._app.router.add_get("/mcp/servers", self._mcp_servers)
+        self._app.router.add_post("/mcp/connect", self._mcp_connect)
+        self._app.router.add_post("/mcp/disconnect", self._mcp_disconnect)
+
+        # RL Model Selector endpoints
+        self._app.router.add_get("/rl/stats", self._rl_stats)
+        self._app.router.add_get("/rl/recommend", self._rl_recommend)
+        self._app.router.add_post("/rl/explore", self._rl_explore)
+        self._app.router.add_post("/rl/strategy", self._rl_strategy)
+        self._app.router.add_post("/rl/reset", self._rl_reset)
+
         # WebSocket
         self._app.router.add_get("/ws", self._websocket_handler)
 
-        # CORS middleware
-        self._app.middlewares.append(self._cors_middleware)
+        # Note: CORS/rate limiting/auth middleware is configured in __init__ via APIMiddlewareStack
 
         # WebSocket clients
         self._ws_clients: List[web.WebSocketResponse] = []
@@ -413,9 +472,149 @@ class VictorAPIServer:
             }
         )
 
+    async def _list_providers(self, request: Request) -> Response:
+        """List available LLM providers with their configuration status."""
+        try:
+            from victor.providers.registry import get_provider_registry
+
+            registry = get_provider_registry()
+            providers_info = []
+
+            for provider_name in registry.list_providers():
+                try:
+                    provider = registry.get(provider_name)
+                    providers_info.append(
+                        {
+                            "name": provider_name,
+                            "display_name": provider_name.replace("_", " ").title(),
+                            "is_local": provider_name in ("ollama", "lmstudio", "vllm"),
+                            "configured": provider.is_configured()
+                            if hasattr(provider, "is_configured")
+                            else True,
+                            "supports_tools": provider.supports_tools()
+                            if hasattr(provider, "supports_tools")
+                            else False,
+                            "supports_streaming": provider.supports_streaming()
+                            if hasattr(provider, "supports_streaming")
+                            else True,
+                        }
+                    )
+                except Exception as e:
+                    logger.debug(f"Provider {provider_name} not available: {e}")
+                    providers_info.append(
+                        {
+                            "name": provider_name,
+                            "display_name": provider_name.replace("_", " ").title(),
+                            "is_local": provider_name in ("ollama", "lmstudio", "vllm"),
+                            "configured": False,
+                            "supports_tools": False,
+                            "supports_streaming": True,
+                        }
+                    )
+
+            return web.json_response({"providers": providers_info})
+
+        except Exception as e:
+            logger.exception("List providers error")
+            return web.json_response({"providers": [], "error": str(e)})
+
+    async def _list_tools(self, request: Request) -> Response:
+        """List available tools with their metadata."""
+        try:
+            from victor.tools.base import CostTier, ToolRegistry
+
+            registry = ToolRegistry.get_instance()
+            tools_info = []
+
+            for tool in registry.get_all_tools():
+                # Get tool metadata
+                cost_tier = (
+                    tool.cost_tier.value
+                    if hasattr(tool, "cost_tier") and tool.cost_tier
+                    else "free"
+                )
+
+                # Determine category from tool name or module
+                category = self._get_tool_category(tool.name)
+
+                tools_info.append(
+                    {
+                        "name": tool.name,
+                        "description": tool.description or "",
+                        "category": category,
+                        "cost_tier": cost_tier,
+                        "parameters": tool.parameters if hasattr(tool, "parameters") else {},
+                        "is_dangerous": self._is_dangerous_tool(tool.name),
+                        "requires_approval": cost_tier in ("medium", "high")
+                        or self._is_dangerous_tool(tool.name),
+                    }
+                )
+
+            # Sort by category then name
+            tools_info.sort(key=lambda t: (t["category"], t["name"]))
+
+            return web.json_response(
+                {
+                    "tools": tools_info,
+                    "total": len(tools_info),
+                    "categories": list(set(t["category"] for t in tools_info)),
+                }
+            )
+
+        except Exception as e:
+            logger.exception("List tools error")
+            return web.json_response({"tools": [], "total": 0, "error": str(e)})
+
+    def _get_tool_category(self, tool_name: str) -> str:
+        """Get category for a tool based on its name."""
+        categories = {
+            "filesystem": ["read", "write", "ls", "edit", "glob", "overview"],
+            "search": ["search", "grep", "semantic_code_search", "code_search"],
+            "git": ["git", "commit_msg", "conflicts", "pr", "merge"],
+            "shell": ["shell", "bash", "sandbox"],
+            "refactor": ["extract", "inline", "organize_imports", "rename", "refactor"],
+            "code_intelligence": ["symbol", "refs", "lsp"],
+            "web": ["fetch", "http", "web", "web_search", "web_fetch"],
+            "docker": ["docker"],
+            "database": ["database", "db"],
+            "testing": ["test", "pytest"],
+            "documentation": ["docs", "documentation", "docs_coverage"],
+            "analysis": ["code_review", "metrics", "scan", "audit", "iac"],
+            "infrastructure": ["cicd", "pipeline", "dependency"],
+            "batch": ["batch"],
+            "cache": ["cache"],
+            "mcp": ["mcp"],
+            "workflow": ["workflow", "scaffold"],
+            "patch": ["patch"],
+        }
+
+        for category, keywords in categories.items():
+            if any(kw in tool_name.lower() for kw in keywords):
+                return category.replace("_", " ").title()
+
+        return "Other"
+
+    def _is_dangerous_tool(self, tool_name: str) -> bool:
+        """Check if a tool is considered dangerous."""
+        dangerous_tools = {
+            "shell",
+            "bash",
+            "sandbox",
+            "docker",
+            "write",
+            "edit",
+            "delete",
+            "rm",
+            "database",
+        }
+        return tool_name.lower() in dangerous_tools
+
     async def _reset_conversation(self, request: Request) -> Response:
         """Reset conversation history."""
         try:
+            # Record RL feedback before resetting (marks end of session)
+            await self._record_rl_feedback()
+
             if self._orchestrator:
                 self._orchestrator.reset_conversation()
             return web.json_response({"success": True, "message": "Conversation reset"})
@@ -731,6 +930,9 @@ class VictorAPIServer:
         """Shutdown the server."""
         logger.info("Shutdown requested")
 
+        # Record RL feedback before shutdown
+        await self._record_rl_feedback()
+
         # Close all WebSocket connections
         for ws in self._ws_clients:
             await ws.close()
@@ -749,6 +951,843 @@ class VictorAPIServer:
             self._orchestrator = await AgentOrchestrator.from_settings(settings)
 
         return self._orchestrator
+
+    async def _record_rl_feedback(self) -> None:
+        """Record RL feedback for the current session.
+
+        Called when a session ends (conversation reset, server shutdown, etc.)
+        to update Q-values based on session performance.
+        """
+        if self._orchestrator is None:
+            return
+
+        try:
+            from victor.agent.rl_model_selector import SessionReward, get_model_selector
+
+            selector = get_model_selector()
+            if selector is None:
+                return
+
+            provider = self._orchestrator.provider
+            if provider is None:
+                return
+
+            # Check if there were actual interactions
+            msg_count = 0
+            if hasattr(self._orchestrator, "message_count"):
+                msg_count = self._orchestrator.message_count
+            elif hasattr(self._orchestrator, "get_messages"):
+                messages = self._orchestrator.get_messages()
+                msg_count = len(messages) if messages else 0
+
+            if msg_count == 0:
+                return  # No interactions, skip
+
+            # Gather session metrics
+            metrics = {}
+            if hasattr(self._orchestrator, "get_session_metrics"):
+                metrics = self._orchestrator.get_session_metrics() or {}
+
+            import uuid
+
+            reward = SessionReward(
+                session_id=str(uuid.uuid4())[:8],
+                provider=provider.name,
+                model=getattr(provider, "model", "unknown"),
+                success=True,  # Session completed normally
+                latency_seconds=metrics.get("total_latency", 0),
+                token_count=metrics.get("total_tokens", 0),
+                tool_calls_made=metrics.get("tool_calls", 0),
+            )
+
+            new_q = selector.update_q_value(reward)
+            logger.info(
+                f"RL API session feedback: {provider.name} "
+                f"({msg_count} messages, {metrics.get('tool_calls', 0)} tools) → Q={new_q:.3f}"
+            )
+
+        except Exception as e:
+            logger.debug(f"RL feedback recording skipped: {e}")
+
+    # =========================================================================
+    # Workspace Analysis Endpoints
+    # =========================================================================
+
+    async def _workspace_overview(self, request: Request) -> Response:
+        """Get workspace structure overview."""
+        try:
+            import os
+            from pathlib import Path
+
+            root = Path(self.workspace_root)
+            overview = {
+                "root": str(root),
+                "name": root.name,
+                "directories": [],
+                "files": [],
+                "file_counts": {},
+                "total_files": 0,
+                "total_size": 0,
+            }
+
+            # Walk directory tree (limit depth)
+            max_depth = int(request.query.get("depth", "3"))
+            exclude_dirs = {".git", "node_modules", "__pycache__", ".venv", "venv", ".victor"}
+
+            def scan_dir(path: Path, depth: int = 0) -> Dict[str, Any]:
+                if depth > max_depth:
+                    return {"name": path.name, "type": "directory", "truncated": True}
+
+                result: Dict[str, Any] = {
+                    "name": path.name,
+                    "path": str(path.relative_to(root)),
+                    "type": "directory",
+                    "children": [],
+                }
+
+                try:
+                    for entry in sorted(path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+                        if entry.name.startswith(".") and entry.name not in {".github", ".vscode"}:
+                            continue
+                        if entry.name in exclude_dirs:
+                            continue
+
+                        if entry.is_dir():
+                            result["children"].append(scan_dir(entry, depth + 1))
+                        else:
+                            ext = entry.suffix.lower()
+                            overview["file_counts"][ext] = overview["file_counts"].get(ext, 0) + 1
+                            overview["total_files"] += 1
+                            try:
+                                overview["total_size"] += entry.stat().st_size
+                            except OSError:
+                                pass
+
+                            if depth <= 1:  # Only include files at shallow depth
+                                result["children"].append({
+                                    "name": entry.name,
+                                    "path": str(entry.relative_to(root)),
+                                    "type": "file",
+                                    "extension": ext,
+                                })
+                except PermissionError:
+                    result["error"] = "Permission denied"
+
+                return result
+
+            overview["tree"] = scan_dir(root)
+
+            return web.json_response(overview)
+
+        except Exception as e:
+            logger.exception("Workspace overview error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _workspace_metrics(self, request: Request) -> Response:
+        """Get code metrics for the workspace."""
+        try:
+            orchestrator = await self._get_orchestrator()
+
+            # Execute metrics tool if available
+            try:
+                tool_result = await orchestrator.execute_tool("metrics", path=self.workspace_root)
+                if tool_result.success:
+                    return web.json_response(tool_result.data)
+            except Exception:
+                pass  # Fall back to basic metrics
+
+            # Basic metrics fallback
+            import os
+            from pathlib import Path
+
+            root = Path(self.workspace_root)
+            metrics = {
+                "lines_of_code": 0,
+                "files_by_type": {},
+                "largest_files": [],
+                "recent_files": [],
+            }
+
+            code_extensions = {".py", ".ts", ".js", ".tsx", ".jsx", ".java", ".go", ".rs", ".cpp", ".c", ".h"}
+            file_sizes = []
+
+            for path in root.rglob("*"):
+                if path.is_file() and not any(p.startswith(".") for p in path.parts[len(root.parts):]):
+                    ext = path.suffix.lower()
+                    if ext in code_extensions:
+                        try:
+                            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                                lines = len(f.readlines())
+                                metrics["lines_of_code"] += lines
+                                metrics["files_by_type"][ext] = metrics["files_by_type"].get(ext, 0) + 1
+                                file_sizes.append({
+                                    "path": str(path.relative_to(root)),
+                                    "lines": lines,
+                                    "size": path.stat().st_size,
+                                })
+                        except Exception:
+                            pass
+
+            # Get largest files
+            file_sizes.sort(key=lambda x: x["lines"], reverse=True)
+            metrics["largest_files"] = file_sizes[:10]
+
+            return web.json_response(metrics)
+
+        except Exception as e:
+            logger.exception("Workspace metrics error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _workspace_security(self, request: Request) -> Response:
+        """Get security scan results for the workspace."""
+        try:
+            orchestrator = await self._get_orchestrator()
+
+            # Try to execute security scan tool
+            try:
+                tool_result = await orchestrator.execute_tool(
+                    "scan",
+                    path=self.workspace_root,
+                    scan_type="secrets",
+                )
+                if tool_result.success:
+                    return web.json_response({
+                        "scan_completed": True,
+                        "results": tool_result.data,
+                    })
+            except Exception:
+                pass
+
+            # Fallback basic secret detection
+            import re
+            from pathlib import Path
+
+            root = Path(self.workspace_root)
+            findings = []
+
+            secret_patterns = [
+                (r'(?i)(api[_-]?key|apikey)\s*[:=]\s*["\']?[\w-]{20,}', "API Key"),
+                (r'(?i)(secret|password|passwd|pwd)\s*[:=]\s*["\'][^"\']{8,}', "Secret/Password"),
+                (r'(?i)bearer\s+[\w-]{20,}', "Bearer Token"),
+                (r'sk-[a-zA-Z0-9]{20,}', "OpenAI API Key"),
+                (r'ghp_[a-zA-Z0-9]{36}', "GitHub Token"),
+                (r'AKIA[A-Z0-9]{16}', "AWS Access Key"),
+            ]
+
+            code_extensions = {".py", ".ts", ".js", ".json", ".yaml", ".yml", ".env", ".sh"}
+
+            for path in root.rglob("*"):
+                if path.is_file() and path.suffix.lower() in code_extensions:
+                    if any(p.startswith(".") or p in {"node_modules", "__pycache__"} for p in path.parts):
+                        continue
+
+                    try:
+                        content = path.read_text(encoding="utf-8", errors="ignore")
+                        for pattern, finding_type in secret_patterns:
+                            for match in re.finditer(pattern, content):
+                                line_num = content[:match.start()].count("\n") + 1
+                                findings.append({
+                                    "file": str(path.relative_to(root)),
+                                    "line": line_num,
+                                    "type": finding_type,
+                                    "severity": "high",
+                                    "snippet": match.group()[:30] + "...",
+                                })
+                    except Exception:
+                        pass
+
+            return web.json_response({
+                "scan_completed": True,
+                "findings": findings[:50],  # Limit to 50 findings
+                "total_findings": len(findings),
+                "severity_counts": {
+                    "high": len([f for f in findings if f["severity"] == "high"]),
+                    "medium": 0,
+                    "low": 0,
+                },
+            })
+
+        except Exception as e:
+            logger.exception("Workspace security error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _workspace_dependencies(self, request: Request) -> Response:
+        """Get dependency information for the workspace."""
+        try:
+            from pathlib import Path
+            import json
+
+            root = Path(self.workspace_root)
+            dependencies = {
+                "python": None,
+                "node": None,
+                "rust": None,
+                "go": None,
+            }
+
+            # Python dependencies
+            for req_file in ["requirements.txt", "pyproject.toml", "setup.py"]:
+                req_path = root / req_file
+                if req_path.exists():
+                    if req_file == "requirements.txt":
+                        deps = []
+                        for line in req_path.read_text().splitlines():
+                            line = line.strip()
+                            if line and not line.startswith("#"):
+                                deps.append(line.split("==")[0].split(">=")[0].split("<")[0])
+                        dependencies["python"] = {
+                            "file": req_file,
+                            "count": len(deps),
+                            "packages": deps[:20],
+                        }
+                    break
+
+            # Node dependencies
+            pkg_json = root / "package.json"
+            if pkg_json.exists():
+                try:
+                    pkg_data = json.loads(pkg_json.read_text())
+                    deps = list(pkg_data.get("dependencies", {}).keys())
+                    dev_deps = list(pkg_data.get("devDependencies", {}).keys())
+                    dependencies["node"] = {
+                        "file": "package.json",
+                        "dependencies": len(deps),
+                        "devDependencies": len(dev_deps),
+                        "packages": deps[:20],
+                    }
+                except json.JSONDecodeError:
+                    pass
+
+            # Rust dependencies
+            cargo_toml = root / "Cargo.toml"
+            if cargo_toml.exists():
+                dependencies["rust"] = {
+                    "file": "Cargo.toml",
+                    "exists": True,
+                }
+
+            # Go dependencies
+            go_mod = root / "go.mod"
+            if go_mod.exists():
+                dependencies["go"] = {
+                    "file": "go.mod",
+                    "exists": True,
+                }
+
+            return web.json_response({
+                "workspace": str(root),
+                "dependencies": {k: v for k, v in dependencies.items() if v is not None},
+            })
+
+        except Exception as e:
+            logger.exception("Workspace dependencies error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    # =========================================================================
+    # Tool Approval Endpoints
+    # =========================================================================
+
+    # Pending tool approvals (in-memory for now, could be persisted)
+    _pending_tool_approvals: Dict[str, Dict[str, Any]] = {}
+
+    async def _approve_tool(self, request: Request) -> Response:
+        """Approve or reject a pending tool execution."""
+        try:
+            data = await request.json()
+            approval_id = data.get("approval_id")
+            approved = data.get("approved", False)
+
+            if not approval_id:
+                return web.json_response({"error": "approval_id required"}, status=400)
+
+            if approval_id in self._pending_tool_approvals:
+                approval = self._pending_tool_approvals.pop(approval_id)
+                approval["approved"] = approved
+                approval["resolved"] = True
+
+                # Broadcast approval status to WebSocket clients
+                await self._broadcast_ws({
+                    "type": "tool_approval_resolved",
+                    "approval_id": approval_id,
+                    "approved": approved,
+                    "tool_name": approval.get("tool_name"),
+                })
+
+                return web.json_response({
+                    "success": True,
+                    "approval_id": approval_id,
+                    "approved": approved,
+                })
+            else:
+                return web.json_response({"error": "Approval not found"}, status=404)
+
+        except Exception as e:
+            logger.exception("Tool approval error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _pending_approvals(self, request: Request) -> Response:
+        """Get list of pending tool approvals."""
+        try:
+            pending = [
+                {
+                    "approval_id": aid,
+                    "tool_name": info.get("tool_name"),
+                    "arguments": info.get("arguments"),
+                    "danger_level": info.get("danger_level"),
+                    "cost_tier": info.get("cost_tier"),
+                    "created_at": info.get("created_at"),
+                }
+                for aid, info in self._pending_tool_approvals.items()
+                if not info.get("resolved")
+            ]
+
+            return web.json_response({
+                "pending": pending,
+                "count": len(pending),
+            })
+
+        except Exception as e:
+            logger.exception("Pending approvals error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    # =========================================================================
+    # Git Integration Endpoints
+    # =========================================================================
+
+    async def _git_status(self, request: Request) -> Response:
+        """Get git status for the workspace."""
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["git", "status", "--porcelain", "-b"],
+                cwd=self.workspace_root,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            if result.returncode != 0:
+                return web.json_response({
+                    "is_git_repo": False,
+                    "error": result.stderr,
+                })
+
+            lines = result.stdout.strip().split("\n")
+            branch_line = lines[0] if lines else ""
+
+            # Parse branch info
+            branch = "unknown"
+            tracking = None
+            if branch_line.startswith("## "):
+                branch_info = branch_line[3:]
+                if "..." in branch_info:
+                    parts = branch_info.split("...")
+                    branch = parts[0]
+                    tracking = parts[1].split()[0] if len(parts) > 1 else None
+                else:
+                    branch = branch_info.split()[0]
+
+            # Parse file statuses
+            staged = []
+            unstaged = []
+            untracked = []
+
+            for line in lines[1:]:
+                if not line.strip():
+                    continue
+                status = line[:2]
+                filepath = line[3:]
+
+                if status[0] in "MADRC":
+                    staged.append({"status": status[0], "file": filepath})
+                if status[1] in "MD":
+                    unstaged.append({"status": status[1], "file": filepath})
+                if status == "??":
+                    untracked.append(filepath)
+
+            return web.json_response({
+                "is_git_repo": True,
+                "branch": branch,
+                "tracking": tracking,
+                "staged": staged,
+                "unstaged": unstaged,
+                "untracked": untracked,
+                "is_clean": len(staged) == 0 and len(unstaged) == 0 and len(untracked) == 0,
+            })
+
+        except subprocess.TimeoutExpired:
+            return web.json_response({"error": "Git command timed out"}, status=500)
+        except FileNotFoundError:
+            return web.json_response({"is_git_repo": False, "error": "Git not installed"})
+        except Exception as e:
+            logger.exception("Git status error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _git_commit(self, request: Request) -> Response:
+        """Create a git commit with AI-generated message option."""
+        try:
+            import subprocess
+
+            data = await request.json()
+            message = data.get("message")
+            use_ai = data.get("use_ai", False)
+            files = data.get("files")  # Optional list of files to stage
+
+            # Stage files if specified
+            if files:
+                for f in files:
+                    subprocess.run(
+                        ["git", "add", f],
+                        cwd=self.workspace_root,
+                        capture_output=True,
+                        timeout=10,
+                    )
+
+            # Generate AI commit message if requested
+            if use_ai and not message:
+                # Get diff for staged changes
+                diff_result = subprocess.run(
+                    ["git", "diff", "--cached", "--stat"],
+                    cwd=self.workspace_root,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+
+                if diff_result.stdout.strip():
+                    orchestrator = await self._get_orchestrator()
+                    prompt = f"Generate a concise git commit message for these changes:\n{diff_result.stdout[:2000]}"
+                    response = await orchestrator.chat(prompt)
+                    message = response.get("content", "Update files").strip()
+                    # Clean up the message
+                    message = message.replace("```", "").strip()
+                    if message.startswith('"') and message.endswith('"'):
+                        message = message[1:-1]
+
+            if not message:
+                return web.json_response({"error": "Commit message required"}, status=400)
+
+            # Perform commit
+            result = subprocess.run(
+                ["git", "commit", "-m", message],
+                cwd=self.workspace_root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            if result.returncode != 0:
+                return web.json_response({
+                    "success": False,
+                    "error": result.stderr or "Commit failed",
+                })
+
+            return web.json_response({
+                "success": True,
+                "message": message,
+                "output": result.stdout,
+            })
+
+        except Exception as e:
+            logger.exception("Git commit error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _git_log(self, request: Request) -> Response:
+        """Get git commit log."""
+        try:
+            import subprocess
+
+            limit = int(request.query.get("limit", "20"))
+
+            result = subprocess.run(
+                ["git", "log", f"-{limit}", "--pretty=format:%H|%an|%ae|%ar|%s"],
+                cwd=self.workspace_root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            if result.returncode != 0:
+                return web.json_response({"error": result.stderr}, status=500)
+
+            commits = []
+            for line in result.stdout.strip().split("\n"):
+                if "|" in line:
+                    parts = line.split("|", 4)
+                    if len(parts) >= 5:
+                        commits.append({
+                            "hash": parts[0],
+                            "author": parts[1],
+                            "email": parts[2],
+                            "relative_date": parts[3],
+                            "message": parts[4],
+                        })
+
+            return web.json_response({"commits": commits})
+
+        except Exception as e:
+            logger.exception("Git log error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _git_diff(self, request: Request) -> Response:
+        """Get git diff."""
+        try:
+            import subprocess
+
+            staged = request.query.get("staged", "false").lower() == "true"
+            file_path = request.query.get("file")
+
+            cmd = ["git", "diff"]
+            if staged:
+                cmd.append("--cached")
+            if file_path:
+                cmd.append("--")
+                cmd.append(file_path)
+
+            result = subprocess.run(
+                cmd,
+                cwd=self.workspace_root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            return web.json_response({
+                "diff": result.stdout[:50000],  # Limit size
+                "truncated": len(result.stdout) > 50000,
+            })
+
+        except Exception as e:
+            logger.exception("Git diff error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    # =========================================================================
+    # MCP Integration Endpoints
+    # =========================================================================
+
+    async def _mcp_servers(self, request: Request) -> Response:
+        """Get list of configured MCP servers."""
+        try:
+            from victor.mcp.registry import get_mcp_registry
+
+            registry = get_mcp_registry()
+            servers = []
+
+            for name in registry.list_servers():
+                server_info = registry.get_server_info(name)
+                servers.append({
+                    "name": name,
+                    "connected": server_info.get("connected", False),
+                    "tools": server_info.get("tools", []),
+                    "endpoint": server_info.get("endpoint"),
+                })
+
+            return web.json_response({"servers": servers})
+
+        except ImportError:
+            return web.json_response({"servers": [], "error": "MCP not available"})
+        except Exception as e:
+            logger.exception("MCP servers error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _mcp_connect(self, request: Request) -> Response:
+        """Connect to an MCP server."""
+        try:
+            from victor.mcp.registry import get_mcp_registry
+
+            data = await request.json()
+            server_name = data.get("server")
+            endpoint = data.get("endpoint")
+
+            if not server_name:
+                return web.json_response({"error": "server name required"}, status=400)
+
+            registry = get_mcp_registry()
+            success = await registry.connect(server_name, endpoint=endpoint)
+
+            return web.json_response({
+                "success": success,
+                "server": server_name,
+            })
+
+        except ImportError:
+            return web.json_response({"error": "MCP not available"}, status=501)
+        except Exception as e:
+            logger.exception("MCP connect error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _mcp_disconnect(self, request: Request) -> Response:
+        """Disconnect from an MCP server."""
+        try:
+            from victor.mcp.registry import get_mcp_registry
+
+            data = await request.json()
+            server_name = data.get("server")
+
+            if not server_name:
+                return web.json_response({"error": "server name required"}, status=400)
+
+            registry = get_mcp_registry()
+            await registry.disconnect(server_name)
+
+            return web.json_response({
+                "success": True,
+                "server": server_name,
+            })
+
+        except ImportError:
+            return web.json_response({"error": "MCP not available"}, status=501)
+        except Exception as e:
+            logger.exception("MCP disconnect error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    # =========================================================================
+    # RL Model Selector Endpoints
+    # =========================================================================
+
+    async def _rl_stats(self, request: Request) -> Response:
+        """Get RL model selector statistics."""
+        try:
+            from victor.agent.rl_model_selector import get_model_selector
+
+            selector = get_model_selector()
+            stats = selector.get_stats()
+
+            # Add task-specific Q-table info
+            task_q_summary = {}
+            for provider, task_q_table in selector._q_table_by_task.items():
+                task_q_summary[provider] = {
+                    task_type: round(q_val, 3)
+                    for task_type, q_val in task_q_table.items()
+                }
+
+            stats["task_q_tables"] = task_q_summary
+            stats["q_table_path"] = str(selector.q_table_path)
+
+            return web.json_response(stats)
+
+        except Exception as e:
+            logger.exception("RL stats error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _rl_recommend(self, request: Request) -> Response:
+        """Get model recommendation based on Q-values.
+
+        Query params:
+            task_type: Optional task type for context-aware recommendation
+                       (simple, complex, action, generation, analysis)
+        """
+        try:
+            from victor.agent.rl_model_selector import get_model_selector
+
+            selector = get_model_selector()
+            task_type = request.query.get("task_type")
+
+            available = list(selector._q_table.keys()) if selector._q_table else ["ollama"]
+            recommendation = selector.select_provider(available, task_type=task_type)
+
+            return web.json_response({
+                "provider": recommendation.provider,
+                "model": recommendation.model,
+                "q_value": round(recommendation.q_value, 3),
+                "confidence": round(recommendation.confidence, 3),
+                "reason": recommendation.reason,
+                "task_type": task_type,
+                "alternatives": [
+                    {"provider": p, "q_value": round(q, 3)}
+                    for p, q in recommendation.alternatives
+                ],
+            })
+
+        except Exception as e:
+            logger.exception("RL recommend error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _rl_explore(self, request: Request) -> Response:
+        """Set exploration rate for RL model selector."""
+        try:
+            from victor.agent.rl_model_selector import get_model_selector
+
+            data = await request.json()
+            rate = data.get("rate")
+
+            if rate is None:
+                return web.json_response({"error": "rate required"}, status=400)
+
+            try:
+                rate = float(rate)
+                if not 0.0 <= rate <= 1.0:
+                    return web.json_response(
+                        {"error": "rate must be between 0.0 and 1.0"}, status=400
+                    )
+            except ValueError:
+                return web.json_response({"error": "rate must be a number"}, status=400)
+
+            selector = get_model_selector()
+            old_rate = selector.epsilon
+            selector.epsilon = rate
+
+            return web.json_response({
+                "success": True,
+                "old_rate": round(old_rate, 3),
+                "new_rate": round(rate, 3),
+            })
+
+        except Exception as e:
+            logger.exception("RL explore error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _rl_strategy(self, request: Request) -> Response:
+        """Set selection strategy for RL model selector."""
+        try:
+            from victor.agent.rl_model_selector import SelectionStrategy, get_model_selector
+
+            data = await request.json()
+            strategy_name = data.get("strategy")
+
+            if not strategy_name:
+                return web.json_response({"error": "strategy required"}, status=400)
+
+            try:
+                strategy = SelectionStrategy(strategy_name.lower())
+            except ValueError:
+                available = [s.value for s in SelectionStrategy]
+                return web.json_response({
+                    "error": f"Unknown strategy: {strategy_name}",
+                    "available": available,
+                }, status=400)
+
+            selector = get_model_selector()
+            old_strategy = selector.strategy.value
+            selector.strategy = strategy
+
+            return web.json_response({
+                "success": True,
+                "old_strategy": old_strategy,
+                "new_strategy": strategy.value,
+            })
+
+        except Exception as e:
+            logger.exception("RL strategy error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _rl_reset(self, request: Request) -> Response:
+        """Reset RL model selector Q-values to initial state."""
+        try:
+            from victor.agent.rl_model_selector import get_model_selector
+
+            selector = get_model_selector()
+            selector.reset()
+
+            return web.json_response({
+                "success": True,
+                "message": "RL model selector reset to initial state",
+            })
+
+        except Exception as e:
+            logger.exception("RL reset error")
+            return web.json_response({"error": str(e)}, status=500)
 
     def run(self) -> None:
         """Run the server."""

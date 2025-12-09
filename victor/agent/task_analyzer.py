@@ -63,6 +63,9 @@ if TYPE_CHECKING:
     from victor.embeddings.task_classifier import TaskType
     from victor.embeddings.intent_classifier import IntentType
 
+# Import protocols for type hints (available at runtime since protocols.py has no heavy deps)
+from victor.core.protocols import TaskClassifierProtocol, IntentClassifierProtocol
+
 logger = logging.getLogger(__name__)
 
 
@@ -159,8 +162,8 @@ class TaskAnalyzer:
         self._complexity_classifier: Optional[ComplexityClassifier] = None
         self._action_authorizer: Optional[ActionAuthorizer] = None
         self._unified_classifier: Optional[UnifiedTaskClassifier] = None
-        self._task_classifier: Optional[Any] = None  # Lazy import
-        self._intent_classifier: Optional[Any] = None  # Lazy import
+        self._task_classifier: Optional[TaskClassifierProtocol] = None  # Lazy import
+        self._intent_classifier: Optional[IntentClassifierProtocol] = None  # Lazy import
 
     @property
     def complexity_classifier(self) -> ComplexityClassifier:
@@ -187,8 +190,12 @@ class TaskAnalyzer:
         return self._unified_classifier
 
     @property
-    def task_classifier(self) -> Any:
-        """Get or create task type classifier (uses singleton)."""
+    def task_classifier(self) -> Optional[TaskClassifierProtocol]:
+        """Get or create task type classifier (uses singleton).
+
+        Returns a TaskClassifierProtocol-compliant instance or None if unavailable.
+        Uses deferred import to avoid circular import chains.
+        """
         if self._task_classifier is None:
             try:
                 from victor.embeddings.task_classifier import TaskTypeClassifier
@@ -200,8 +207,12 @@ class TaskAnalyzer:
         return self._task_classifier
 
     @property
-    def intent_classifier(self) -> Any:
-        """Get or create intent classifier (uses singleton)."""
+    def intent_classifier(self) -> Optional[IntentClassifierProtocol]:
+        """Get or create intent classifier (uses singleton).
+
+        Returns an IntentClassifierProtocol-compliant instance or None if unavailable.
+        Uses deferred import to avoid circular import chains.
+        """
         if self._intent_classifier is None:
             try:
                 from victor.embeddings.intent_classifier import IntentClassifier

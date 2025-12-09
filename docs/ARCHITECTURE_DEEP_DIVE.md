@@ -62,7 +62,7 @@ flowchart TB
     subgraph SYSTEMS[""]
         direction LR
         PROV["PROVIDER SYSTEM<br/>━━━━━━━━━━━━<br/>Normalize different<br/>LLM APIs"]
-        TOOLS["TOOLS SYSTEM<br/>━━━━━━━━━━━━<br/>46 tools<br/>registered in registry"]
+        TOOLS["TOOLS SYSTEM<br/>━━━━━━━━━━━━<br/>42 tools<br/>registered in registry"]
         MCP_B["MCP BRIDGE<br/>━━━━━━━━━━━━<br/>Client +<br/>Server"]
     end
 
@@ -94,7 +94,7 @@ flowchart TB
 
 **Key Data**:
 - `self.messages`: Full conversation history
-- `self.tools`: ToolRegistry with all 46 tools
+- `self.tools`: ToolRegistry with all 42 tools
 - `self.provider`: Current LLM provider (Claude, Ollama, etc.)
 - `self.semantic_selector`: Optional embedding-based tool selector
 
@@ -350,7 +350,7 @@ result = await self.tools.execute(
 1. **MCP Server** (victor/mcp/server.py): Exposes Victor's tools to external clients
    - Claude Desktop can connect to Victor as an MCP server
    - VS Code can use Victor's tools via MCP
-   - Other MCP clients can discover and call Victor's 46 tools
+   - Other MCP clients can discover and call Victor's 42 tools
 
 2. **MCP Client** (victor/mcp/client.py): Connects to external MCP servers
    - Victor can connect to filesystem servers, database servers, etc.
@@ -365,7 +365,7 @@ result = await self.tools.execute(
 
 ### 3.1 The Current Design
 
-**Question**: Does Victor broadcast all 46 tools to the LLM every time?
+**Question**: Does Victor broadcast all 42 tools to the LLM every time?
 
 **Answer**: **No, but there's a fallback that does!**
 
@@ -393,7 +393,7 @@ if self.provider.supports_tools():
 
 **How it works**:
 1. Generate embedding for user message: "write a Python function to validate emails"
-2. Compare to pre-computed embeddings of all 46 tools
+2. Compare to pre-computed embeddings of all 42 tools
 3. Select top 8 most similar tools using cosine similarity
 4. Threshold: 0.10 (tools with similarity < 0.10 are filtered)
 
@@ -520,7 +520,7 @@ if not tools:
 ```
 
 **The Problem**:
-- If semantic selection returns 0 tools (low similarity), it sends ALL 46 tools
+- If semantic selection returns 0 tools (low similarity), it sends ALL 42 tools
 - This defeats the purpose of intelligent selection
 - Wastes context window on small models
 - Confuses smaller LLMs with too many choices
@@ -538,7 +538,7 @@ if not tools:
 
 **✅ What's Implemented**:
 1. **MCP Server** (victor/mcp/server.py): Fully functional
-   - Exposes Victor's 46 tools via MCP protocol
+   - Exposes Victor's 42 tools via MCP protocol
    - Supports tool calling
    - Supports resource access (file:// URIs)
    - Uses stdio transport
@@ -704,7 +704,7 @@ Based on deep analysis, here are critical missing features:
 
 ### 5.7 Dynamic Tool Loading
 
-**Current**: All 46 tools loaded at startup. Plugin system now implemented.
+**Current**: All 42 tools loaded at startup. Plugin system now implemented.
 
 **Implemented**:
 - **Plugin system**: `victor/tools/plugin.py` - ToolPlugin base class and FunctionToolPlugin
@@ -734,7 +734,7 @@ Based on deep analysis, here are critical missing features:
 
 ### 6.1 Tool Broadcasting Fallback
 
-**Issue**: When semantic selection returns 0 tools, ALL 46 tools are sent.
+**Issue**: When semantic selection returns 0 tools, ALL 42 tools are sent.
 
 **Why it's bad**:
 - Defeats the purpose of intelligent selection
@@ -1419,7 +1419,7 @@ Display to User
 **What Makes Victor Special**:
 - Works with BOTH expensive cloud models AND free local models
 - Air-gapped mode for compliance (100% offline)
-- Intelligent tool selection (not broadcasting all 46 tools)
+- Intelligent tool selection (not broadcasting all 42 tools)
 - Enterprise-grade tools (security scanning, CI/CD, testing, etc.)
 
 **Current Limitations** (as of 2025-12-06):

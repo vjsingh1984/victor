@@ -253,6 +253,8 @@ class ToolMetadataEntry:
     task_types: Set[str] = field(default_factory=set)  # Task types for classification-aware selection
     progress_params: Set[str] = field(default_factory=set)  # Params for loop detection
     execution_category: ExecutionCategory = ExecutionCategory.READ_ONLY  # For parallel execution
+    # NEW: Availability check for optional tools
+    _availability_check: Optional[Callable[[], bool]] = field(default=None, repr=False)
 
     # Derived properties for caching behavior (reuse access_mode instead of new fields)
     @property
@@ -265,6 +267,37 @@ class ToolMetadataEntry:
         """Tool invalidates cache if access_mode modifies state."""
         return self.access_mode in {AccessMode.WRITE, AccessMode.EXECUTE, AccessMode.MIXED}
 
+    @property
+    def requires_configuration(self) -> bool:
+        """Check if this tool requires external configuration.
+
+        Returns True if an availability_check was provided, indicating
+        this tool needs configuration (API keys, credentials, etc.)
+        before it can be used. Examples: Slack, Teams, Jira.
+        """
+        return self._availability_check is not None
+
+    def is_available(self) -> bool:
+        """Check if this tool is currently available for use.
+
+        For tools without an availability_check, always returns True.
+        For tools with an availability_check (e.g., Slack, Teams), calls
+        the provided function to check if the tool is properly configured.
+
+        Returns:
+            True if the tool is available, False if it requires configuration
+            that hasn't been completed.
+        """
+        if self._availability_check is None:
+            return True
+        try:
+            return self._availability_check()
+        except Exception as e:
+            logger.warning(
+                f"Availability check for tool '{self.name}' raised exception: {e}"
+            )
+            return False
+
     @classmethod
     def from_tool(cls, tool: BaseTool) -> "ToolMetadataEntry":
         """Create metadata entry from a tool instance."""
@@ -276,10 +309,10 @@ class ToolMetadataEntry:
         category = getattr(tool, "category", None)
         # Extract keywords from tool decorator metadata, filtering short keywords
         raw_keywords = getattr(tool, "keywords", None) or []
-        keywords = set(
+        keywords = {
             k.lower() for k in raw_keywords
             if len(k) >= MIN_KEYWORD_LENGTH
-        ) if raw_keywords else set()
+        } if raw_keywords else set()
 
         # Log warning if keywords were filtered out
         filtered_count = len(raw_keywords) - len(keywords) if raw_keywords else 0
@@ -291,15 +324,15 @@ class ToolMetadataEntry:
 
         # Extract stages from tool decorator (lowercased for consistency)
         raw_stages = getattr(tool, "stages", None) or []
-        stages = set(s.lower() for s in raw_stages) if raw_stages else set()
+        stages = {s.lower() for s in raw_stages} if raw_stages else set()
 
         # NEW: Extract mandatory keywords (lowercased for matching)
         raw_mandatory = getattr(tool, "mandatory_keywords", None) or []
-        mandatory_keywords = set(k.lower() for k in raw_mandatory) if raw_mandatory else set()
+        mandatory_keywords = {k.lower() for k in raw_mandatory} if raw_mandatory else set()
 
         # NEW: Extract task types (lowercased for consistency)
         raw_task_types = getattr(tool, "task_types", None) or []
-        task_types = set(t.lower() for t in raw_task_types) if raw_task_types else set()
+        task_types = {t.lower() for t in raw_task_types} if raw_task_types else set()
 
         # NEW: Extract progress params
         raw_progress_params = getattr(tool, "progress_params", None) or []
@@ -307,6 +340,9 @@ class ToolMetadataEntry:
 
         # NEW: Extract execution category
         execution_category = getattr(tool, "execution_category", None) or ExecutionCategory.READ_ONLY
+
+        # NEW: Extract availability check for optional tools
+        availability_check = getattr(tool, "_availability_check", None)
 
         return cls(
             name=tool.name,
@@ -323,6 +359,7 @@ class ToolMetadataEntry:
             task_types=task_types,
             progress_params=progress_params,
             execution_category=execution_category,
+            _availability_check=availability_check,
         )
 
     @property
@@ -1161,6 +1198,61 @@ class ToolMetadataRegistry:
 
         return results
 
+    # =========================================================================
+    # Availability filtering for optional tools
+    # =========================================================================
+
+    def get_available_tools(self) -> List[ToolMetadataEntry]:
+        """Get all tools that are currently available for use.
+
+        Filters out tools that require configuration (e.g., Slack, Teams, Jira)
+        but are not yet configured. Tools without an availability_check are
+        always considered available.
+
+        Returns:
+            List of ToolMetadataEntry for tools that are available
+        """
+        return [entry for entry in self._entries.values() if entry.is_available()]
+
+    def get_unavailable_tools(self) -> List[ToolMetadataEntry]:
+        """Get tools that require configuration but are not currently configured.
+
+        Useful for informing users about tools that could be enabled with
+        proper configuration.
+
+        Returns:
+            List of ToolMetadataEntry for tools that are unavailable
+        """
+        return [
+            entry for entry in self._entries.values()
+            if entry.requires_configuration and not entry.is_available()
+        ]
+
+    def get_tools_requiring_configuration(self) -> List[ToolMetadataEntry]:
+        """Get all tools that require external configuration.
+
+        These are tools with an availability_check (e.g., Slack, Teams, Jira)
+        regardless of whether they are currently configured.
+
+        Returns:
+            List of ToolMetadataEntry for tools with availability_check
+        """
+        return [
+            entry for entry in self._entries.values()
+            if entry.requires_configuration
+        ]
+
+    def get_available_tool_names(self) -> Set[str]:
+        """Get names of all currently available tools.
+
+        Convenience method for tool selection that returns just the names
+        of available tools for filtering.
+
+        Returns:
+            Set of tool names that are currently available
+        """
+        return {entry.name for entry in self._entries.values() if entry.is_available()}
+
     def __len__(self) -> int:
         """Return number of registered tools."""
         return len(self._entries)
@@ -1200,6 +1292,10 @@ class ToolMetadataRegistry:
             "safe_tools": len(self.get_safe_tools()),
             "dangerous_tools": len(self.get_dangerous_tools()),
             "parallelizable_tools": len(self.get_parallelizable_tools()),
+            # Availability statistics
+            "available_tools": len(self.get_available_tools()),
+            "unavailable_tools": len(self.get_unavailable_tools()),
+            "tools_requiring_configuration": len(self.get_tools_requiring_configuration()),
         }
 
 
@@ -1531,3 +1627,62 @@ def detect_categories_from_text(text: str) -> Set[str]:
         Set of category names where matching keywords were found
     """
     return get_global_registry().detect_categories_from_text(text)
+
+
+# =========================================================================
+# Availability filtering (module-level convenience functions)
+# =========================================================================
+
+
+def get_available_tools() -> List[ToolMetadataEntry]:
+    """Get all tools that are currently available for use.
+
+    Filters out tools that require configuration (e.g., Slack, Teams, Jira)
+    but are not yet configured.
+
+    Returns:
+        List of ToolMetadataEntry for tools that are available
+    """
+    return get_global_registry().get_available_tools()
+
+
+def get_unavailable_tools() -> List[ToolMetadataEntry]:
+    """Get tools that require configuration but are not currently configured.
+
+    Returns:
+        List of ToolMetadataEntry for tools that are unavailable
+    """
+    return get_global_registry().get_unavailable_tools()
+
+
+def get_tools_requiring_configuration() -> List[ToolMetadataEntry]:
+    """Get all tools that require external configuration.
+
+    Returns:
+        List of ToolMetadataEntry for tools with availability_check
+    """
+    return get_global_registry().get_tools_requiring_configuration()
+
+
+def get_available_tool_names() -> Set[str]:
+    """Get names of all currently available tools.
+
+    Returns:
+        Set of tool names that are currently available
+    """
+    return get_global_registry().get_available_tool_names()
+
+
+def is_tool_available(tool_name: str) -> bool:
+    """Check if a specific tool is available.
+
+    Args:
+        tool_name: Name of the tool to check
+
+    Returns:
+        True if the tool exists and is available, False otherwise
+    """
+    entry = get_global_registry().get(tool_name)
+    if entry is None:
+        return False
+    return entry.is_available()

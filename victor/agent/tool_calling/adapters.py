@@ -25,7 +25,7 @@ falling back to hardcoded defaults for robustness.
 import json
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from victor.agent.tool_calling.base import (
     BaseToolCallingAdapter,
@@ -230,30 +230,99 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
     References:
     - https://docs.ollama.com/capabilities/tool-calling
-    - https://ollama.com/blog/tool-support
+    - https://ollama.com/search?c=tools
     """
 
     # Models with known good native tool calling support
+    # Full list from https://ollama.com/search?c=tools (December 2025)
     NATIVE_TOOL_MODELS = frozenset(
         [
+            # Llama family
             "llama3.1",
             "llama-3.1",
             "llama3.2",
             "llama-3.2",
             "llama3.3",
             "llama-3.3",
+            "llama4",
+            "llama-4",
+            "llama3-groq-tool-use",
+            # Qwen family
+            "qwen2",
+            "qwen-2",
             "qwen2.5",
             "qwen-2.5",
             "qwen3",
             "qwen-3",
+            "qwq",
+            # Mistral family
             "mistral",
             "mixtral",
+            "mistral-small",
+            "mistral-nemo",
+            "mistral-large",
+            "devstral",
+            "magistral",
+            # Command-R family
             "command-r",
+            "command-r-plus",
+            "command-r7b",
+            "command-a",
+            # Tool-specialized models
             "firefunction",
             "hermes",
+            "hermes3",
             "functionary",
+            "athene-v2",
+            # DeepSeek (when using -tools variant)
+            "deepseek",
+            # Granite family (IBM)
+            "granite3",
+            "granite3.1",
+            "granite3.2",
+            "granite3.3",
+            "granite4",
+            # Other tool-capable models
+            "gpt-oss",
+            "nemotron",
+            "nemotron-mini",
+            "smollm2",
+            "aya-expanse",
+            "cogito",
+            "phi4",
         ]
     )
+
+    # Parameter aliases: maps model-specific parameter names to standard names
+    # Format: {tool_name: {model_param: standard_param}}
+    PARAMETER_ALIASES = {
+        "read": {
+            "line_start": "offset",  # gpt-oss uses line_start/line_end
+            "line_end": "_line_end",  # Special handling needed
+            "loc": "offset",  # browser.open style
+            "num_lines": "limit",
+        },
+        "list_directory": {
+            "dir": "path",
+            "directory": "path",
+        },
+        "write": {
+            "file": "path",
+            "file_path": "path",
+            "text": "content",
+        },
+        "edit": {
+            "file": "path",
+            "file_path": "path",
+        },
+        "shell": {
+            "cmd": "command",
+        },
+        "search": {
+            "q": "query",
+            "term": "query",
+        },
+    }
 
     @property
     def provider_name(self) -> str:
@@ -310,6 +379,68 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             for tool in tools
         ]
 
+    def _parse_hybrid_xml_format(
+        self,
+        content: str,
+        validate_name_fn: Optional[Callable[[str], bool]] = None,
+    ) -> ToolCallParseResult:
+        """Parse Ollama-specific hybrid XML format.
+
+        Handles malformed patterns like <function=X>...</tool_call> that some
+        Ollama models (especially Qwen3-coder) produce. This is specific to Ollama
+        and not added to the base class to avoid regressions for other adapters.
+
+        Args:
+            content: Response content to parse
+            validate_name_fn: Optional function to validate tool names
+
+        Returns:
+            ToolCallParseResult with parsed tool calls
+        """
+        import re
+        import json
+
+        # Hybrid pattern: <function=name> with </tool_call> closing
+        # This is a common malformed pattern from Qwen3 models on Ollama
+        hybrid_pattern = r"<function=([^>]+)>(.*?)</tool_call>"
+        hybrid_matches = re.findall(hybrid_pattern, content, re.DOTALL | re.IGNORECASE)
+
+        if not hybrid_matches:
+            return ToolCallParseResult(remaining_content=content)
+
+        tool_calls: List[ToolCall] = []
+        warnings: List[str] = ["Used hybrid XML pattern recovery (Ollama-specific)"]
+
+        for name, params_content in hybrid_matches:
+            name = name.strip()
+
+            # Validate name if validator provided
+            if validate_name_fn and not validate_name_fn(name):
+                warnings.append(f"Skipped invalid tool name: {name}")
+                continue
+
+            # Parse <parameter=X>value</parameter> tags
+            param_pattern = r"<parameter=([^>]+)>\s*(.*?)\s*</parameter>"
+            param_matches = re.findall(param_pattern, params_content, re.DOTALL)
+            args = {p.strip(): v.strip() for p, v in param_matches}
+
+            tool_calls.append(ToolCall(name=name, arguments=args))
+
+        if not tool_calls:
+            return ToolCallParseResult(remaining_content=content)
+
+        # Remove matched content
+        remaining = re.sub(hybrid_pattern, "", content, flags=re.DOTALL | re.IGNORECASE)
+        remaining = remaining.strip()
+
+        return ToolCallParseResult(
+            tool_calls=tool_calls,
+            remaining_content=remaining,
+            parse_method="ollama_hybrid_xml",
+            confidence=0.65,  # Slightly lower confidence for recovered format
+            warnings=warnings,
+        )
+
     def parse_tool_calls(
         self,
         content: str,
@@ -318,6 +449,7 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         """Parse Ollama tool calls with fallback support.
 
         Uses FallbackParsingMixin methods for common parsing logic.
+        Includes Ollama-specific hybrid XML pattern recovery.
         """
         # Try native tool calls first (using mixin method)
         if raw_tool_calls:
@@ -337,6 +469,12 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             result = self.parse_from_content(content, self.is_valid_tool_name)
             if result.tool_calls:
                 return result
+
+            # Ollama-specific: Try hybrid XML pattern recovery
+            # This handles <function=X>...</tool_call> malformed patterns
+            hybrid_result = self._parse_hybrid_xml_format(content, self.is_valid_tool_name)
+            if hybrid_result.tool_calls:
+                return hybrid_result
 
         return ToolCallParseResult(remaining_content=content)
 
