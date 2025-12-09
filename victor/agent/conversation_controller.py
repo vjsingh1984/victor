@@ -97,6 +97,20 @@ class ContextMetrics:
             return 0.0
         return min(1.0, self.char_count / self.max_context_chars)
 
+    @property
+    def max_tokens(self) -> int:
+        """Calculate max tokens from max_context_chars.
+
+        Uses a conversion factor of ~3.5 chars per token with 80% safety margin,
+        consistent with AgentOrchestrator._calculate_max_context_chars().
+        """
+        return int(self.max_context_chars / (3.5 * 0.8))
+
+    @property
+    def remaining_tokens(self) -> int:
+        """Calculate remaining tokens available in context."""
+        return max(0, self.max_tokens - self.estimated_tokens)
+
 
 @dataclass
 class ConversationConfig:

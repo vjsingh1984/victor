@@ -278,16 +278,18 @@ class TestResponseSanitization:
 
 
 class TestProviderChecks:
-    """Tests for provider type checks."""
+    """Tests for provider type checks via prompt_builder."""
 
     def test_is_cloud_provider(self, orchestrator):
-        """Test _is_cloud_provider check (covers line 532)."""
-        result = orchestrator._is_cloud_provider()
+        """Test is_cloud_provider via prompt_builder (dead code removed from orchestrator)."""
+        # Provider checks now delegated to prompt_builder
+        result = orchestrator.prompt_builder.is_cloud_provider()
         assert isinstance(result, bool)
 
     def test_is_local_provider(self, orchestrator):
-        """Test _is_local_provider check (covers line 536)."""
-        result = orchestrator._is_local_provider()
+        """Test is_local_provider via prompt_builder (dead code removed from orchestrator)."""
+        # Provider checks now delegated to prompt_builder
+        result = orchestrator.prompt_builder.is_local_provider()
         assert isinstance(result, bool)
 
 
@@ -301,8 +303,9 @@ class TestSystemPrompt:
         assert len(result) > 0
 
     def test_build_system_prompt_for_provider(self, orchestrator):
-        """Test _build_system_prompt_for_provider (covers line 544)."""
-        result = orchestrator._build_system_prompt_for_provider()
+        """Test prompt building via prompt_builder (dead code removed from orchestrator)."""
+        # _build_system_prompt_for_provider was dead code - use prompt_builder.build() instead
+        result = orchestrator.prompt_builder.build()
         assert isinstance(result, str)
 
 

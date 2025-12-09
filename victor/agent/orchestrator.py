@@ -118,6 +118,12 @@ from victor.agent.tool_sequence_tracker import (
     ToolSequenceTracker,
     create_sequence_tracker,
 )
+from victor.agent.tool_output_formatter import (
+    ToolOutputFormatter,
+    ToolOutputFormatterConfig,
+    FormattingContext,
+    create_tool_output_formatter,
+)
 
 # CodeCorrectionMiddleware imported lazily to avoid circular import
 # (code_correction_middleware -> evaluation.correction -> evaluation.__init__ -> agent_adapter -> orchestrator)
@@ -179,12 +185,6 @@ from victor.tools.semantic_selector import SemanticToolSelector
 from victor.embeddings.intent_classifier import IntentClassifier, IntentType
 from victor.workflows.base import WorkflowRegistry
 from victor.workflows.new_feature_workflow import NewFeatureWorkflow
-
-# Token-optimized serialization for tool outputs
-from victor.serialization import (
-    get_adaptive_serializer,
-    SerializationContext,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -328,7 +328,22 @@ class AgentOrchestrator:
         self.tool_calling_models = getattr(settings, "tool_calling_models", {})
         self.tool_capabilities = ToolCallingMatrix(
             self.tool_calling_models,
-            always_allow_providers=["openai", "anthropic", "google", "xai"],
+            always_allow_providers=[
+                "openai",
+                "anthropic",
+                "google",
+                "xai",
+                # Cloud providers with native tool calling support
+                "cerebras",
+                "groq",
+                "deepseek",
+                "mistral",
+                "together",
+                "fireworks",
+                "openrouter",
+                "cohere",
+                "moonshot",
+            ],
         )
 
         # Initialize ProviderManager for unified provider/model management
@@ -427,7 +442,9 @@ class AgentOrchestrator:
             logger.debug("Using enhanced usage logger from DI container")
         else:
             analytics_log_file = get_project_paths().global_logs_dir / "usage.jsonl"
-            self.usage_logger = UsageLogger(analytics_log_file, enabled=self.settings.analytics_enabled)
+            self.usage_logger = UsageLogger(
+                analytics_log_file, enabled=self.settings.analytics_enabled
+            )
             logger.debug("Using basic usage logger (enhanced version not available)")
 
         self.usage_logger.log_event(
@@ -569,7 +586,9 @@ class AgentOrchestrator:
             enable_mode_learning=getattr(settings, "intelligent_mode_learning", True),
             enable_prompt_optimization=getattr(settings, "intelligent_prompt_optimization", True),
             min_quality_threshold=getattr(settings, "intelligent_min_quality_threshold", 0.5),
-            grounding_confidence_threshold=getattr(settings, "intelligent_grounding_threshold", 0.7),
+            grounding_confidence_threshold=getattr(
+                settings, "intelligent_grounding_threshold", 0.7
+            ),
         )
         self._intelligent_pipeline_enabled = getattr(settings, "intelligent_pipeline_enabled", True)
 
@@ -848,6 +867,20 @@ class AgentOrchestrator:
             enable_tool_truncation=getattr(settings, "tool_result_truncation", True),
         )
 
+        # ToolOutputFormatter: LLM-context-aware formatting of tool results
+        # Provides:
+        # - Anti-hallucination markers (TOOL_OUTPUT tags)
+        # - Token-optimized serialization for structured data
+        # - Smart truncation via ContextCompactor
+        # - File structure extraction for very large files
+        self._tool_output_formatter = create_tool_output_formatter(
+            config=ToolOutputFormatterConfig(
+                max_output_chars=getattr(settings, "max_tool_output_chars", 15000),
+                file_structure_threshold=getattr(settings, "file_structure_threshold", 50000),
+            ),
+            truncator=self._context_compactor,
+        )
+
         # Initialize UsageAnalytics singleton for data-driven optimization
         analytics_cache_dir = (
             Path(settings.cache_dir)
@@ -867,10 +900,19 @@ class AgentOrchestrator:
             learning_rate=getattr(settings, "sequence_learning_rate", 0.3),
         )
 
+        # Initialize ToolOutputFormatter for LLM-context-aware output formatting
+        self._tool_output_formatter = create_tool_output_formatter(
+            config=ToolOutputFormatterConfig(
+                max_output_chars=getattr(settings, "max_tool_output_chars", 15000),
+                file_structure_threshold=getattr(settings, "file_structure_threshold", 50000),
+            ),
+            truncator=self._context_compactor,  # Use context compactor for smart truncation
+        )
+
         logger.info(
             "Orchestrator initialized with decomposed components: "
             "ConversationController, ToolPipeline, StreamingController, TaskAnalyzer, "
-            "ContextCompactor, UsageAnalytics, ToolSequenceTracker"
+            "ContextCompactor, UsageAnalytics, ToolSequenceTracker, ToolOutputFormatter"
         )
 
     # =====================================================================
@@ -990,6 +1032,11 @@ class AgentOrchestrator:
         return self._context_compactor
 
     @property
+    def tool_output_formatter(self) -> ToolOutputFormatter:
+        """Get the tool output formatter for LLM-context-aware formatting."""
+        return self._tool_output_formatter
+
+    @property
     def usage_analytics(self) -> UsageAnalytics:
         """Get the usage analytics singleton."""
         return self._usage_analytics
@@ -1029,9 +1076,11 @@ class AgentOrchestrator:
                     provider_name=self.provider_name,
                     model=self.model,
                     profile_name=f"{self.provider_name}:{self.model}",
-                    project_root=str(self.project_context.context_file.parent)
-                    if self.project_context.context_file
-                    else None,
+                    project_root=(
+                        str(self.project_context.context_file.parent)
+                        if self.project_context.context_file
+                        else None
+                    ),
                 )
                 self._intelligent_integration = OrchestratorIntegration(
                     orchestrator=self,
@@ -2137,21 +2186,9 @@ class AgentOrchestrator:
 
         return result
 
-    def _is_cloud_provider(self) -> bool:
-        """Check if the current provider is a cloud-based API with robust tool calling."""
-        return self.prompt_builder.is_cloud_provider()
-
-    def _is_local_provider(self) -> bool:
-        """Check if the current provider is a local model (Ollama, LMStudio, vLLM)."""
-        return self.prompt_builder.is_local_provider()
-
     def _build_system_prompt_with_adapter(self) -> str:
         """Build system prompt using the tool calling adapter."""
         return self.prompt_builder.build()
-
-    def _build_system_prompt_for_provider(self) -> str:
-        """Build an appropriate system prompt based on the provider type."""
-        return self.prompt_builder._build_for_provider()
 
     def _strip_markup(self, text: str) -> str:
         """Remove simple XML/HTML-like tags to salvage plain text."""
@@ -2521,172 +2558,14 @@ class AgentOrchestrator:
             "updates": updates,
         }
 
-    def _extract_file_structure(self, content: str, file_path: str) -> str:
-        """Extract a structural summary for very large files.
-
-        For Python files, extracts class and function definitions.
-        For other files, shows line count and sample lines.
-
-        Args:
-            content: Full file content
-            file_path: Path to the file
-
-        Returns:
-            Structural summary string
-        """
-        lines = content.split("\n")
-        num_lines = len(lines)
-
-        # Detect file type
-        ext = Path(file_path).suffix.lower()
-
-        summary_parts = [f"FILE STRUCTURE: {file_path}"]
-        summary_parts.append(f"Total lines: {num_lines}")
-
-        if ext in (".py", ".pyi"):
-            # Extract Python structure
-            classes = []
-            functions = []
-            for i, line in enumerate(lines):
-                stripped = line.strip()
-                if stripped.startswith("class ") and ":" in stripped:
-                    class_name = stripped[6:].split("(")[0].split(":")[0].strip()
-                    classes.append(f"  Line {i+1}: class {class_name}")
-                elif stripped.startswith("def ") and "(" in stripped:
-                    func_name = stripped[4:].split("(")[0].strip()
-                    # Only top-level functions (no leading whitespace)
-                    if not line.startswith(" ") and not line.startswith("\t"):
-                        functions.append(f"  Line {i+1}: def {func_name}()")
-
-            if classes:
-                summary_parts.append(f"\nClasses ({len(classes)}):")
-                summary_parts.extend(classes[:20])  # Max 20 classes
-                if len(classes) > 20:
-                    summary_parts.append(f"  ... and {len(classes) - 20} more")
-
-            if functions:
-                summary_parts.append(f"\nFunctions ({len(functions)}):")
-                summary_parts.extend(functions[:30])  # Max 30 functions
-                if len(functions) > 30:
-                    summary_parts.append(f"  ... and {len(functions) - 30} more")
-
-        elif ext in (".js", ".ts", ".jsx", ".tsx"):
-            # Extract JS/TS structure
-            exports = []
-            functions = []
-            for i, line in enumerate(lines):
-                stripped = line.strip()
-                if "function " in stripped or "const " in stripped or "export " in stripped:
-                    if len(stripped) < 100:  # Skip very long lines
-                        if stripped.startswith("export "):
-                            exports.append(f"  Line {i+1}: {stripped[:60]}...")
-                        elif "function " in stripped:
-                            functions.append(f"  Line {i+1}: {stripped[:60]}...")
-
-            if exports:
-                summary_parts.append(f"\nExports ({len(exports)}):")
-                summary_parts.extend(exports[:20])
-            if functions:
-                summary_parts.append(f"\nFunctions ({len(functions)}):")
-                summary_parts.extend(functions[:20])
-
-        # Add first and last few lines as sample
-        summary_parts.append("\n--- FIRST 30 LINES ---")
-        summary_parts.extend(lines[:30])
-        summary_parts.append("\n--- LAST 20 LINES ---")
-        summary_parts.extend(lines[-20:])
-
-        return "\n".join(summary_parts)
-
-    def _serialize_structured_output(
-        self,
-        tool_name: str,
-        output: Any,
-        tool_args: Optional[Dict[str, Any]] = None,
-    ) -> tuple[str, Optional[str]]:
-        """Serialize structured tool output for token efficiency.
-
-        Uses adaptive serialization to convert lists and dicts to compact formats
-        like TOON or CSV, achieving 30-60% token savings for tabular data.
-
-        Full context awareness includes:
-        - Provider and model capabilities
-        - Tool-specific serialization preferences
-        - Current context token pressure (remaining/max tokens)
-        - Tool operation (e.g., git log vs git diff)
-
-        Args:
-            tool_name: Name of the tool (for context)
-            output: Raw output from the tool
-            tool_args: Optional tool arguments (for extracting operation)
-
-        Returns:
-            Tuple of (serialized_string, format_hint_or_none)
-        """
-        # Only serialize structured data (lists, dicts)
-        # Strings, numbers, and other primitives are kept as-is
-        if not isinstance(output, (list, dict)):
-            return str(output) if output is not None else "", None
-
-        # Skip serialization if output is too small (overhead not worth it)
-        if isinstance(output, list) and len(output) < 3:
-            return str(output), None
-        if isinstance(output, dict) and len(output) < 3:
-            return str(output), None
-
-        try:
-            # Get provider name for context-aware serialization
-            provider_name = self.provider.name if self.provider else None
-
-            # Extract tool operation from arguments (e.g., "log" for git)
-            tool_operation = None
-            if tool_args:
-                tool_operation = tool_args.get("operation") or tool_args.get("subcommand")
-
-            # Get context metrics for token pressure awareness
-            context_metrics = self.get_context_metrics()
-            max_context_tokens = self._get_model_context_window()
-            remaining_tokens = max_context_tokens - context_metrics.estimated_tokens
-
-            # Create serialization context with full information
-            context = SerializationContext(
-                provider=provider_name,
-                model=self.model,
-                tool_name=tool_name,
-                tool_operation=tool_operation,
-                remaining_context_tokens=remaining_tokens,
-                max_context_tokens=max_context_tokens,
-                response_token_reserve=self.max_tokens,  # Reserve for response generation
-            )
-
-            # Serialize using adaptive serializer
-            serializer = get_adaptive_serializer()
-            result = serializer.serialize(output, context)
-
-            # Only use if we got meaningful savings
-            if result.estimated_savings_percent >= 0.15:  # 15% threshold
-                format_hint = result.format_hint
-                logger.debug(
-                    f"Serialized {tool_name} output: {result.format.value}, "
-                    f"saved {result.estimated_savings_percent*100:.1f}% tokens"
-                )
-                return result.content, format_hint
-
-            # Fall back to JSON for low savings
-            return str(output), None
-
-        except Exception as e:
-            logger.debug(f"Serialization failed for {tool_name}, using str(): {e}")
-            return str(output), None
-
     def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
         """Format tool output with clear boundaries to prevent model hallucination.
 
-        Uses structured markers that models recognize as authoritative tool output.
-        This prevents the model from ignoring or fabricating tool results.
-
-        For structured data (lists, dicts), uses token-optimized serialization
-        to achieve 30-60% savings on tabular data.
+        Delegates to ToolOutputFormatter for:
+        - Structured output serialization (lists, dicts -> compact formats)
+        - Anti-hallucination markers (TOOL_OUTPUT tags)
+        - Smart truncation for large outputs
+        - File structure extraction for very large files
 
         Args:
             tool_name: Name of the tool that was executed
@@ -2696,100 +2575,23 @@ class AgentOrchestrator:
         Returns:
             Formatted string with clear TOOL_OUTPUT boundaries
         """
-        # Use adaptive serialization for structured outputs
-        # Pass args for tool operation detection (e.g., git log vs git diff)
-        output_str, format_hint = self._serialize_structured_output(tool_name, output, args)
-        original_len = len(output_str)
-        truncated = False
+        # Build formatting context from current orchestrator state
+        context_metrics = self._conversation_controller.get_context_metrics()
+        context = FormattingContext(
+            provider_name=self.provider.name if hasattr(self, "provider") else None,
+            model=getattr(self.settings, "model", None),
+            remaining_tokens=context_metrics.remaining_tokens,
+            max_tokens=context_metrics.max_tokens,
+            response_token_reserve=getattr(self.settings, "response_token_reserve", 4096),
+        )
 
-        # Default max_output_chars for truncation messages
-        max_output_chars = getattr(self.settings, "max_tool_output_chars", 15000)
-
-        # Use ContextCompactor for smart truncation if available
-        if hasattr(self, "_context_compactor") and self._context_compactor:
-            truncation_result = self._context_compactor.truncate_tool_result(output_str)
-            if truncation_result.truncated:
-                truncated = True
-                output_str = truncation_result.content
-                logger.debug(
-                    f"Smart truncated tool output for {tool_name}: "
-                    f"{original_len:,} -> {len(output_str):,} chars "
-                    f"(removed {truncation_result.truncated_chars:,} chars)"
-                )
-        else:
-            # Fallback to simple truncation if compactor not available
-            if original_len > max_output_chars:
-                truncated = True
-                output_str = output_str[:max_output_chars]
-
-        # Special formatting for file reading tools - make content unmistakably clear
-        if tool_name == "read_file":
-            file_path = args.get("path", "unknown")
-
-            # For very large files (>50KB), show structure instead of raw content
-            structure_threshold = getattr(self.settings, "file_structure_threshold", 50000)
-            if original_len > structure_threshold:
-                # Show file structure summary for very large files
-                file_content = str(output) if output is not None else ""
-                structure_summary = self._extract_file_structure(file_content, file_path)
-                return f"""<TOOL_OUTPUT tool="{tool_name}" path="{file_path}">
-═══ FILE IS VERY LARGE ({original_len:,} chars / {len(file_content.splitlines())} lines) ═══
-{structure_summary}
-═══ END OF FILE STRUCTURE ═══
-</TOOL_OUTPUT>
-
-NOTE: This file is very large. Showing structure summary instead of full content.
-To see specific sections, use read_file with offset/limit parameters or code_search to find specific code."""
-
-            header = f"═══ ACTUAL FILE CONTENT: {file_path} ═══"
-            footer = f"═══ END OF FILE: {file_path} ═══"
-            if truncated:
-                footer = f"═══ END OF FILE (TRUNCATED: showing {max_output_chars:,} of {original_len:,} chars): {file_path} ═══"
-
-            return f"""<TOOL_OUTPUT tool="{tool_name}" path="{file_path}">
-{header}
-{output_str}
-{footer}
-</TOOL_OUTPUT>
-
-IMPORTANT: The content above between the ═══ markers is the EXACT content of the file.
-You MUST use this actual content in your analysis. Do NOT fabricate or imagine different content."""
-
-        elif tool_name == "list_directory":
-            dir_path = args.get("path", ".")
-            return f"""<TOOL_OUTPUT tool="{tool_name}" path="{dir_path}">
-═══ ACTUAL DIRECTORY LISTING: {dir_path} ═══
-{output_str}
-═══ END OF DIRECTORY LISTING ═══
-</TOOL_OUTPUT>
-
-Use only the files/directories listed above. Do not invent files that are not shown."""
-
-        elif tool_name in ("code_search", "semantic_code_search"):
-            query = args.get("query", args.get("pattern", ""))
-            return f"""<TOOL_OUTPUT tool="{tool_name}" query="{query}">
-═══ SEARCH RESULTS ═══
-{output_str}
-═══ END OF SEARCH RESULTS ═══
-</TOOL_OUTPUT>
-
-These are the actual search results. Reference only the files and matches shown above."""
-
-        elif tool_name == "execute_bash":
-            command = args.get("command", "")
-            return f"""<TOOL_OUTPUT tool="{tool_name}" command="{command}">
-═══ COMMAND OUTPUT ═══
-{output_str}
-═══ END OF COMMAND OUTPUT ═══
-</TOOL_OUTPUT>"""
-
-        else:
-            # Generic tool output format with optional format hint
-            truncation_note = " [OUTPUT TRUNCATED]" if truncated else ""
-            format_note = f"\n{format_hint}" if format_hint else ""
-            return f"""<TOOL_OUTPUT tool="{tool_name}">{format_note}
-{output_str}{truncation_note}
-</TOOL_OUTPUT>"""
+        # Delegate to the extracted formatter
+        return self._tool_output_formatter.format_tool_output(
+            tool_name=tool_name,
+            args=args,
+            output=output,
+            context=context,
+        )
 
     def _register_default_workflows(self) -> None:
         """Register default workflows."""
@@ -5140,6 +4942,7 @@ These are the actual search results. Reference only the files and matches shown 
             available = list(profiles.keys())
             # Use difflib for similar name suggestions
             import difflib
+
             suggestions = difflib.get_close_matches(profile_name, available, n=3, cutoff=0.4)
 
             error_msg = f"Profile not found: '{profile_name}'"
