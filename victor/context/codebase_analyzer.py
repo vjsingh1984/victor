@@ -1197,6 +1197,29 @@ def gather_project_context(root_path: Optional[str] = None, max_files: int = 50,
         if lang not in context["detected_languages"]:
             context["detected_languages"].append(f"{lang} ({count} files)")
 
+    # Add content of key files
+    context["key_files_content"] = {}
+    
+    # Prioritize key files
+    key_file_candidates = []
+    main_files = [f for f in context["source_files"] if "main" in f or "app" in f or "server" in f or "index" in f]
+    key_file_candidates.extend(main_files)
+    
+    # Add some of the largest files
+    large_files = sorted(context["source_files"], key=lambda f: (root / f).stat().st_size, reverse=True)
+    for f in large_files:
+        if f not in key_file_candidates:
+            key_file_candidates.append(f)
+
+    key_files_to_read = key_file_candidates[:5] # Read up to 5 key files
+
+    for file_path in key_files_to_read:
+        try:
+            content = (root / file_path).read_text(encoding="utf-8")
+            context["key_files_content"][file_path] = content[:8000] # Limit content size
+        except Exception:
+            pass
+
     return context
 
 
@@ -1209,46 +1232,82 @@ def build_llm_prompt_for_victor_md(context: Dict[str, any]) -> str:
     Returns:
         Prompt string for the LLM.
     """
-    prompt = f"""Analyze this project and generate a comprehensive {VICTOR_CONTEXT_FILE} file.
+    
+    # Static part of the prompt (the "80%")
+    prompt_header = f"""You are an expert software architect tasked with creating a high-level "user manual" for an AI coding assistant named Victor. 
+This manual, named {VICTOR_CONTEXT_FILE}, will help Victor understand the project's structure, purpose, and conventions. 
+Your analysis must be comprehensive, distilling the provided information into a clear and actionable guide.
 
-PROJECT: {context['project_name']}
-DETECTED LANGUAGES: {', '.join(context['detected_languages']) or 'Unknown'}
+Analyze the following project data and generate the {VICTOR_CONTEXT_FILE} file.
 
-CONFIG FILES FOUND:
-{chr(10).join('- ' + f for f in context['config_files']) or 'None detected'}
-
-DIRECTORY STRUCTURE:
-{chr(10).join(context['directory_structure'][:50]) or 'Unable to determine'}
-
-SOURCE FILES (sample):
-{chr(10).join(context['source_files'][:30]) or 'No source files found'}
-
-README CONTENT:
-{context['readme_content'][:1500] or '[No README found]'}
-
-MAIN CONFIG CONTENT:
-{context['main_config_content'][:2000] or '[No config found]'}
+**Output Rules:**
+1.  **Start with the Header**: The response MUST begin with `# {VICTOR_CONTEXT_FILE}`.
+2.  **Use Markdown**: Format the entire output in clean, readable Markdown. Use tables for structured data.
+3.  **Be Factual**: Base your analysis exclusively on the provided context. Do not infer or add information not present in the data.
+4.  **Be Concise**: Provide high-level summaries. Focus on the "what" and "why," not implementation details.
+5.  **Follow the Structure**: Generate all of the requested sections.
 
 ---
+"""
 
-Generate a {VICTOR_CONTEXT_FILE} file with these sections:
-1. **Project Overview**: Brief description of what the project does
-2. **Package Layout**: Table showing important directories (use | Path | Status | Description | format)
-3. **Key Components**: Main modules, classes, or files with their purposes
-4. **Common Commands**: Build, test, run commands based on the detected build system
-5. **Architecture**: High-level architecture notes (if determinable)
-6. **Important Notes**: Any special considerations, deprecated paths, etc.
+    # Dynamic part of the prompt (the "20%")
+    dynamic_context = f"""
+**Project Name**: {context['project_name']}
+**Detected Languages**: {', '.join(context['detected_languages']) or 'Unknown'}
 
-IMPORTANT:
-- Be concise but comprehensive
-- Include file paths where relevant
-- Use markdown tables for structured data
-- Don't make up information - only document what's evident from the structure
-- Start with "# {VICTOR_CONTEXT_FILE}" header
+**Configuration Files**:
+{chr(10).join('- ' + f for f in context['config_files']) or 'None detected'}
 
-Output ONLY the {VICTOR_CONTEXT_FILE} content, no explanations."""
+**Directory Structure Overview**:
+```
+{chr(10).join(context['directory_structure'][:50]) or 'Unable to determine'}
+```
 
-    return prompt
+**Sample of Source Files**:
+```
+{chr(10).join(context['source_files'][:30]) or 'No source files found'}
+```
+"""
+
+    if context.get("key_files_content"):
+        dynamic_context += "\n**Content of Key Files**:\n"
+        for file_path, content in context["key_files_content"].items():
+            dynamic_context += f"--- `{file_path}` ---\n```\n{content}\n```\n\n"
+
+    # Static part of the prompt (continued)
+    prompt_footer = f"""
+---
+
+**Generation Task**:
+
+Generate the full content for the `{VICTOR_CONTEXT_FILE}` file, adhering to all rules above. Create the following sections:
+
+1.  `## Project Overview`
+    -   Write a one-paragraph summary of the project's purpose, based on the README and file structure.
+
+2.  `## Package Layout`
+    -   Create a Markdown table with columns: `| Path | Status | Description |`.
+    -   List the most important top-level directories.
+    -   Infer the purpose of each directory (e.g., source code, tests, docs). Mark the main source directory as `**ACTIVE**`.
+
+3.  `## Key Components`
+    -   Identify 5-7 key files or classes from the provided context.
+    -   Create a Markdown table with columns: `| Component | Path | Description |`.
+    -   Provide a one-sentence description for each component.
+
+4.  `## Common Commands`
+    -   Based on the configuration files (e.g., `package.json`, `pyproject.toml`), list the essential commands for building, testing, and running the project inside a `bash` code block.
+
+5.  `## Architecture Notes`
+    -   From the file names and structure, infer 2-3 high-level architectural patterns. (e.g., "Provider Pattern for multiple LLMs", "REST API with FastAPI", "CLI application using Typer").
+
+6.  `## Important Notes`
+    -   Add 2-3 bullet points for an AI assistant to remember, such as "Always use `victor/` for core source code" or "Check `pyproject.toml` for dependencies".
+
+Remember, output ONLY the generated `{VICTOR_CONTEXT_FILE}` content, starting with the `# {VICTOR_CONTEXT_FILE}` header.
+"""
+
+    return prompt_header + dynamic_context + prompt_footer
 
 
 async def generate_victor_md_with_llm(
