@@ -222,13 +222,10 @@ class VictorAPIServer:
             # Process chat
             response = await orchestrator.chat(messages[-1].get("content", ""))
 
-            return web.json_response(
-                {
-                    "role": "assistant",
-                    "content": response.get("content", ""),
-                    "tool_calls": response.get("tool_calls", []),
-                }
-            )
+            # CompletionResponse is a Pydantic model; access attributes
+            content = getattr(response, "content", None) or ""
+            tool_calls = getattr(response, "tool_calls", None) or []
+            return web.json_response({"role": "assistant", "content": content, "tool_calls": tool_calls})
 
         except Exception as e:
             logger.exception("Chat error")
@@ -259,12 +256,24 @@ class VictorAPIServer:
 
             # Stream response
             async for chunk in orchestrator.stream_chat(messages[-1].get("content", "")):
-                if chunk.get("type") == "content":
-                    event = {"type": "content", "content": chunk["content"]}
-                elif chunk.get("type") == "tool_call":
-                    event = {"type": "tool_call", "tool_call": chunk["tool_call"]}
+                # Support both dict and StreamChunk objects
+                if hasattr(chunk, "content") or hasattr(chunk, "tool_calls"):
+                    content = getattr(chunk, "content", "")
+                    tool_calls = getattr(chunk, "tool_calls", None)
+                    event_type = "content" if content else "tool_call" if tool_calls else "chunk"
+                    if event_type == "content":
+                        event = {"type": "content", "content": content}
+                    elif event_type == "tool_call":
+                        event = {"type": "tool_call", "tool_call": tool_calls}
+                    else:
+                        event = {}
                 else:
-                    event = chunk
+                    if chunk.get("type") == "content":
+                        event = {"type": "content", "content": chunk.get("content", "")}
+                    elif chunk.get("type") == "tool_call":
+                        event = {"type": "tool_call", "tool_call": chunk.get("tool_call", {})}
+                    else:
+                        event = chunk
 
                 await response.write(f"data: {json.dumps(event)}\n\n".encode("utf-8"))
 
@@ -299,7 +308,7 @@ class VictorAPIServer:
 {prompt}"""
 
             response = await orchestrator.chat(completion_prompt)
-            content = response.get("content", "")
+            content = getattr(response, "content", None) or ""
 
             # Extract code from response
             completions = [content.strip()]
@@ -548,7 +557,7 @@ class VictorAPIServer:
             registry = ToolRegistry()
             tools_info = []
 
-            for tool in registry.list_tools().values():
+            for tool in registry.list_tools():
                 # Get tool metadata
                 cost_tier = (
                     tool.cost_tier.value
