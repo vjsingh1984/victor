@@ -1,4 +1,8 @@
+import base64
+import hashlib
+import hmac
 import logging
+import secrets
 import asyncio
 import uuid
 import subprocess
@@ -6,8 +10,19 @@ import tempfile
 import time
 import os
 from datetime import datetime
-from typing import Dict, Any
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Response, HTTPException
+from typing import Dict, Any, Optional, Tuple
+from pydantic import BaseModel
+from fastapi import (
+    Depends,
+    FastAPI,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+    Body,
+    Response,
+    HTTPException,
+    Query,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from victor.config.settings import load_settings
 from victor.agent.orchestrator import AgentOrchestrator
@@ -48,9 +63,22 @@ except Exception as e:
 
     sys.exit(1)  # Fail fast - don't start with broken config
 
+# Security and limits (configurable via settings / env vars)
+API_KEY = settings.server_api_key
+SESSION_SECRET = settings.server_session_secret or secrets.token_hex(32)
+SESSION_TTL = settings.server_session_ttl_seconds
+MAX_SESSIONS = settings.server_max_sessions
+MAX_MESSAGE_BYTES = settings.server_max_message_bytes
+RENDER_MAX_BYTES = settings.render_max_payload_bytes
+RENDER_TIMEOUT = settings.render_timeout_seconds
+RENDER_SEMAPHORE = asyncio.Semaphore(settings.render_max_concurrency)
+
 # Session management with metadata
 SESSION_AGENTS: Dict[str, Dict[str, Any]] = {}
 SESSION_LOCK = asyncio.Lock()
+
+# Track issued session tokens for quick lookup (token -> session_id)
+SESSION_TOKENS: Dict[str, str] = {}
 
 # Configuration constants
 HEARTBEAT_INTERVAL = 30  # seconds
@@ -62,7 +90,77 @@ MESSAGE_TIMEOUT = 300  # 5 minutes for receive timeout
 _background_tasks = []
 
 
-def _render_plantuml_svg(source: str) -> str:
+def _get_bearer_token(raw_header: Optional[str]) -> Optional[str]:
+    if not raw_header:
+        return None
+    if raw_header.lower().startswith("bearer "):
+        return raw_header.split(" ", 1)[1].strip()
+    return raw_header.strip()
+
+
+async def _require_api_key(request: Request) -> None:
+    """FastAPI dependency: enforce API key when configured."""
+    if not API_KEY:
+        return  # Auth disabled (development)
+
+    header_token = _get_bearer_token(request.headers.get("Authorization"))
+    query_token = request.query_params.get("api_key")
+    token = header_token or query_token
+
+    if token != API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def _issue_session_token(session_id: str) -> str:
+    """Create an HMAC-signed session token."""
+    issued_at = int(time.time())
+    payload = f"{session_id}:{issued_at}"
+    signature = hmac.new(SESSION_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    token_bytes = f"{payload}:{signature}".encode()
+    return base64.urlsafe_b64encode(token_bytes).decode()
+
+
+def _parse_session_token(token: str) -> Optional[Tuple[str, int]]:
+    """Validate a session token and return (session_id, issued_at)."""
+    try:
+        decoded = base64.urlsafe_b64decode(token.encode()).decode()
+        session_id, issued_at_str, signature = decoded.split(":")
+        expected_sig = hmac.new(
+            SESSION_SECRET.encode(), f"{session_id}:{issued_at_str}".encode(), hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(signature, expected_sig):
+            return None
+        issued_at = int(issued_at_str)
+        if time.time() - issued_at > SESSION_TTL:
+            return None
+        return session_id, issued_at
+    except Exception:
+        return None
+
+
+def _validate_render_payload(payload: str) -> None:
+    if len(payload.encode()) > RENDER_MAX_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Render payload too large (max {RENDER_MAX_BYTES} bytes)",
+        )
+
+
+async def _render_with_limits(render_fn, payload: str) -> str:
+    """Apply size, concurrency, and timeout limits to renderers."""
+    _validate_render_payload(payload)
+    async with RENDER_SEMAPHORE:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, lambda: render_fn(payload, RENDER_TIMEOUT))
+
+
+class SessionTokenRequest(BaseModel):
+    """Request model for issuing session tokens."""
+
+    session_id: Optional[str] = None
+
+
+def _render_plantuml_svg(source: str, timeout: Optional[int] = None) -> str:
     """Render PlantUML text to SVG using local plantuml CLI."""
     try:
         proc = subprocess.run(
@@ -70,6 +168,7 @@ def _render_plantuml_svg(source: str) -> str:
             input=source.encode(),
             capture_output=True,
             check=True,
+            timeout=timeout,
         )
         return proc.stdout.decode()
     except subprocess.CalledProcessError as exc:
@@ -78,7 +177,7 @@ def _render_plantuml_svg(source: str) -> str:
         ) from exc
 
 
-def _render_mermaid_svg(source: str) -> str:
+def _render_mermaid_svg(source: str, timeout: Optional[int] = None) -> str:
     """Render Mermaid text to SVG using local mmdc CLI."""
     try:
         with (
@@ -88,7 +187,7 @@ def _render_mermaid_svg(source: str) -> str:
             fin.write(source)
             fin.flush()
             cmd = ["mmdc", "-i", fin.name, "-o", fout.name]
-            subprocess.run(cmd, check=True, capture_output=True)
+            subprocess.run(cmd, check=True, capture_output=True, timeout=timeout)
             fout.seek(0)
             return fout.read()
     except subprocess.CalledProcessError as exc:
@@ -97,7 +196,7 @@ def _render_mermaid_svg(source: str) -> str:
         ) from exc
 
 
-def _render_drawio_svg(source: str) -> str:
+def _render_drawio_svg(source: str, timeout: Optional[int] = None) -> str:
     """Render Draw.io (or Lucid-style XML) to SVG using local drawio CLI."""
     try:
         with (
@@ -108,7 +207,7 @@ def _render_drawio_svg(source: str) -> str:
             fin.flush()
             # drawio CLI flags: -x (export), -f svg (format), -o output
             cmd = ["drawio", "-x", "-f", "svg", "-o", fout.name, fin.name]
-            subprocess.run(cmd, check=True, capture_output=True)
+            subprocess.run(cmd, check=True, capture_output=True, timeout=timeout)
             fout.seek(0)
             return fout.read()
     except FileNotFoundError:
@@ -122,24 +221,30 @@ def _render_drawio_svg(source: str) -> str:
 
 
 @app.post("/render/plantuml")
-async def render_plantuml(payload: str = Body(..., media_type="text/plain")) -> Response:
-    svg = _render_plantuml_svg(payload)
+async def render_plantuml(
+    payload: str = Body(..., media_type="text/plain"), _: None = Depends(_require_api_key)
+) -> Response:
+    svg = await _render_with_limits(_render_plantuml_svg, payload)
     return Response(content=svg, media_type="image/svg+xml")
 
 
 @app.post("/render/mermaid")
-async def render_mermaid(payload: str = Body(..., media_type="text/plain")) -> Response:
-    svg = _render_mermaid_svg(payload)
+async def render_mermaid(
+    payload: str = Body(..., media_type="text/plain"), _: None = Depends(_require_api_key)
+) -> Response:
+    svg = await _render_with_limits(_render_mermaid_svg, payload)
     return Response(content=svg, media_type="image/svg+xml")
 
 
 @app.post("/render/drawio")
-async def render_drawio(payload: str = Body(..., media_type="text/plain")) -> Response:
-    svg = _render_drawio_svg(payload)
+async def render_drawio(
+    payload: str = Body(..., media_type="text/plain"), _: None = Depends(_require_api_key)
+) -> Response:
+    svg = await _render_with_limits(_render_drawio_svg, payload)
     return Response(content=svg, media_type="image/svg+xml")
 
 
-def _render_graphviz_svg(source: str, engine: str = "dot") -> str:
+def _render_graphviz_svg(source: str, engine: str = "dot", timeout: Optional[int] = None) -> str:
     """Render Graphviz DOT to SVG using local graphviz CLI.
 
     Supported engines: dot, neato, fdp, circo, twopi, sfdp
@@ -163,6 +268,7 @@ def _render_graphviz_svg(source: str, engine: str = "dot") -> str:
             input=source.encode(),
             capture_output=True,
             check=True,
+            timeout=timeout,
         )
         return proc.stdout.decode()
     except FileNotFoundError:
@@ -176,7 +282,7 @@ def _render_graphviz_svg(source: str, engine: str = "dot") -> str:
         )
 
 
-def _render_d2_svg(source: str) -> str:
+def _render_d2_svg(source: str, timeout: Optional[int] = None) -> str:
     """Render D2 diagram to SVG using local d2 CLI.
 
     D2 is a modern diagram scripting language with features:
@@ -193,7 +299,7 @@ def _render_d2_svg(source: str) -> str:
             fin.write(source)
             fin.flush()
             cmd = ["d2", fin.name, fout.name]
-            subprocess.run(cmd, check=True, capture_output=True)
+            subprocess.run(cmd, check=True, capture_output=True, timeout=timeout)
             fout.seek(0)
             return fout.read()
     except FileNotFoundError:
@@ -207,20 +313,26 @@ def _render_d2_svg(source: str) -> str:
 
 @app.post("/render/graphviz")
 async def render_graphviz(
-    payload: str = Body(..., media_type="text/plain"), engine: str = "dot"
+    payload: str = Body(..., media_type="text/plain"),
+    engine: str = "dot",
+    _: None = Depends(_require_api_key),
 ) -> Response:
     """Render Graphviz DOT diagram to SVG.
 
     Query param 'engine' can be: dot (default), neato, fdp, circo, twopi, sfdp
     """
-    svg = _render_graphviz_svg(payload, engine)
+    svg = await _render_with_limits(
+        lambda text, timeout=RENDER_TIMEOUT: _render_graphviz_svg(text, engine, timeout), payload
+    )
     return Response(content=svg, media_type="image/svg+xml")
 
 
 @app.post("/render/d2")
-async def render_d2(payload: str = Body(..., media_type="text/plain")) -> Response:
+async def render_d2(
+    payload: str = Body(..., media_type="text/plain"), _: None = Depends(_require_api_key)
+) -> Response:
     """Render D2 diagram to SVG."""
-    svg = _render_d2_svg(payload)
+    svg = await _render_with_limits(_render_d2_svg, payload)
     return Response(content=svg, media_type="image/svg+xml")
 
 
@@ -265,7 +377,8 @@ async def cleanup_idle_sessions() -> None:
                         logger.info(f"Cleaning up idle session: {session_id}")
                         # Cleanup agent resources
                         try:
-                            agent = SESSION_AGENTS[session_id]["agent"]
+                            session_data = SESSION_AGENTS[session_id]
+                            agent = session_data["agent"]
                             if hasattr(agent, "shutdown"):
                                 agent.shutdown()
                             # Also try closing provider if available
@@ -276,6 +389,7 @@ async def cleanup_idle_sessions() -> None:
                                 f"Error shutting down agent for session {session_id}: {e}"
                             )
 
+                        SESSION_TOKENS.pop(session_data.get("session_token"), None)
                         del SESSION_AGENTS[session_id]
 
                 if sessions_to_remove:
@@ -324,6 +438,8 @@ async def shutdown_event() -> None:
                     logger.info(f"Closed session {session_id} during shutdown")
             except Exception as e:
                 logger.error(f"Error closing session {session_id}: {e}")
+            finally:
+                SESSION_TOKENS.pop(session_data.get("session_token"), None)
 
         SESSION_AGENTS.clear()
 
@@ -331,7 +447,7 @@ async def shutdown_event() -> None:
 
 
 @app.get("/health")
-async def health_check() -> dict[str, Any]:
+async def health_check(_: None = Depends(_require_api_key)) -> dict[str, Any]:
     """Health check endpoint."""
     return {
         "status": "healthy",
@@ -340,22 +456,114 @@ async def health_check() -> dict[str, Any]:
     }
 
 
+@app.post("/session/token")
+async def issue_session_token(
+    payload: SessionTokenRequest, _: None = Depends(_require_api_key)
+) -> Dict[str, str]:
+    """Issue a signed session token for WebSocket reuse."""
+    # Enforce session cap early
+    async with SESSION_LOCK:
+        if len(SESSION_AGENTS) >= MAX_SESSIONS and not payload.session_id:
+            raise HTTPException(status_code=429, detail="Session limit reached")
+
+    # Re-issue token for an existing session
+    if payload.session_id:
+        if payload.session_id not in SESSION_AGENTS:
+            raise HTTPException(status_code=404, detail="Session not found")
+        token = _issue_session_token(payload.session_id)
+        SESSION_TOKENS[token] = payload.session_id
+        return {"session_token": token, "session_id": payload.session_id}
+
+    # New logical session (agent will be created on first WS connect)
+    session_id = str(uuid.uuid4())
+    token = _issue_session_token(session_id)
+    SESSION_TOKENS[token] = session_id
+    return {"session_token": token, "session_id": session_id}
+
+
+# --- Minimal compatibility REST endpoints for VS Code client ---
+
+
+@app.get("/history")
+async def get_history(
+    limit: int = Query(20, ge=1, le=200), _: None = Depends(_require_api_key)
+) -> Dict[str, Any]:
+    """Return an empty history list (placeholder to satisfy VS Code client)."""
+    return {"history": [], "limit": limit}
+
+
+@app.get("/credentials/get")
+async def get_credentials(
+    provider: str = Query(...), _: None = Depends(_require_api_key)
+) -> Dict[str, Any]:
+    """Placeholder credentials endpoint."""
+    return {"provider": provider, "api_key": None}
+
+
+@app.get("/models")
+async def list_models(_: None = Depends(_require_api_key)) -> Dict[str, Any]:
+    """Placeholder models endpoint."""
+    return {"models": []}
+
+
+@app.get("/providers")
+async def list_providers(_: None = Depends(_require_api_key)) -> Dict[str, Any]:
+    """Placeholder providers endpoint."""
+    return {"providers": []}
+
+
+@app.get("/rl/stats")
+async def rl_stats(_: None = Depends(_require_api_key)) -> Dict[str, Any]:
+    """Placeholder RL stats endpoint."""
+    return {"success": True, "stats": {}}
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
     """Enhanced WebSocket endpoint with heartbeat, timeout, and error handling."""
     session_id = None
+    session_token: Optional[str] = None
     heartbeat_task = None
     session_initialized = False  # Track if we successfully initialized session
 
     try:
+        # API key validation (FastAPI deps not available for websockets)
+        if API_KEY:
+            header_token = _get_bearer_token(websocket.headers.get("authorization"))
+            query_token = websocket.query_params.get("api_key")
+            api_token = header_token or query_token
+            if api_token != API_KEY:
+                await websocket.close(code=4401, reason="Unauthorized")
+                return
+
         await websocket.accept()
         logger.info("WebSocket connection established.")
 
-        # Session-aware agent reuse
-        session_id = websocket.query_params.get("session_id") or str(uuid.uuid4())
+        # Session-aware agent reuse with signed tokens
+        incoming_token = websocket.query_params.get("session_token")
+        parsed = _parse_session_token(incoming_token) if incoming_token else None
+
+        if parsed:
+            candidate_session_id, _issued = parsed
+            if candidate_session_id in SESSION_AGENTS:
+                session_id = candidate_session_id
+                session_token = incoming_token
+
+        if not session_id:
+            # Enforce max sessions before creating a new one
+            async with SESSION_LOCK:
+                if len(SESSION_AGENTS) >= MAX_SESSIONS:
+                    await websocket.send_text("[error] Session limit reached, try later.")
+                    await websocket.close(code=1013, reason="Session limit reached")
+                    return
+            session_id = str(uuid.uuid4())
+            session_token = _issue_session_token(session_id)
 
         try:
-            await websocket.send_text(f"[session] {session_id}")
+            # Send session token as both legacy text and JSON for client compatibility
+            if session_token:
+                await websocket.send_text(f"[session] {session_token}")
+                await websocket.send_json({"type": "session", "token": session_token})
         except WebSocketDisconnect:
             logger.info("WebSocket disconnected before session handshake.")
             return
@@ -367,6 +575,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 agent = session_data["agent"]
                 session_data["last_activity"] = time.time()
                 session_data["connection_count"] = session_data.get("connection_count", 0) + 1
+                session_token = session_data.get("session_token", session_token)
                 logger.info(
                     f"Reusing existing agent for session {session_id} (connection #{session_data['connection_count']})"
                 )
@@ -383,7 +592,10 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                         "created_at": time.time(),
                         "last_activity": time.time(),
                         "connection_count": 1,
+                        "session_token": session_token,
                     }
+                    if session_token:
+                        SESSION_TOKENS[session_token] = session_id
                     logger.info(
                         f"Created new AgentOrchestrator for session {session_id} with preload started."
                     )
@@ -406,6 +618,13 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 )
 
                 logger.info(f"Session {session_id}: Received message")
+
+                # Enforce message size limits
+                if len(user_message.encode()) > MAX_MESSAGE_BYTES:
+                    await websocket.send_text(
+                        f"[error] Message too large (max {MAX_MESSAGE_BYTES} bytes)"
+                    )
+                    continue
 
                 # Update last activity
                 async with SESSION_LOCK:

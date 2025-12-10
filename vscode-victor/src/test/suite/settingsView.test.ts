@@ -15,8 +15,9 @@ suite('SettingsViewProvider Test Suite', () => {
                 provider: 'anthropic',
                 model: 'claude-sonnet-4-20250514',
                 mode: 'build',
-                serverPort: 8765,
-                autoStart: true,
+                serverPort: 8000,
+                serverApiKey: 'secret',
+                autoStart: false,
                 showInlineCompletions: true,
                 semanticSearchEnabled: true,
                 semanticSearchMaxResults: 10
@@ -25,7 +26,7 @@ suite('SettingsViewProvider Test Suite', () => {
             assert.strictEqual(settings.provider, 'anthropic');
             assert.strictEqual(settings.model, 'claude-sonnet-4-20250514');
             assert.strictEqual(settings.mode, 'build');
-            assert.strictEqual(settings.serverPort, 8765);
+            assert.strictEqual(settings.serverPort, 8000);
         });
 
         test('Should have valid mode values', () => {
@@ -41,7 +42,7 @@ suite('SettingsViewProvider Test Suite', () => {
                 return port >= 1024 && port <= 65535;
             };
 
-            assert.ok(isValidPort(8765));
+            assert.ok(isValidPort(8000));
             assert.ok(isValidPort(1024));
             assert.ok(isValidPort(65535));
             assert.ok(!isValidPort(80));
@@ -104,8 +105,8 @@ suite('SettingsViewProvider Test Suite', () => {
                     provider: 'openai',
                     model: 'gpt-4-turbo',
                     mode: 'build',
-                    serverPort: 8765,
-                    autoStart: true,
+                    serverPort: 8000,
+                    autoStart: false,
                     showInlineCompletions: true,
                     semanticSearchEnabled: true,
                     semanticSearchMaxResults: 10
@@ -277,8 +278,9 @@ suite('SettingsViewProvider Test Suite', () => {
                 provider: 'anthropic',
                 model: 'claude-sonnet-4',
                 mode: 'build',
-                serverPort: 8765,
-                autoStart: true
+                serverPort: 8000,
+                serverApiKey: '',
+                autoStart: false
             };
 
             const partial = {
@@ -291,7 +293,8 @@ suite('SettingsViewProvider Test Suite', () => {
             assert.strictEqual(merged.provider, 'openai');
             assert.strictEqual(merged.model, 'gpt-4');
             assert.strictEqual(merged.mode, 'build');
-            assert.strictEqual(merged.serverPort, 8765);
+            assert.strictEqual(merged.serverPort, 8000);
+            assert.strictEqual(merged.serverApiKey, '');
         });
     });
 
@@ -349,7 +352,7 @@ suite('SettingsViewProvider Test Suite', () => {
                 return `http://localhost:${port}/health`;
             };
 
-            assert.strictEqual(buildHealthUrl(8765), 'http://localhost:8765/health');
+            assert.strictEqual(buildHealthUrl(8000), 'http://localhost:8000/health');
             assert.strictEqual(buildHealthUrl(9000), 'http://localhost:9000/health');
         });
     });

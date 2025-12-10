@@ -410,6 +410,27 @@ class Settings(BaseSettings):
     # Privacy and Security
     airgapped_mode: bool = False
 
+    # Server Security (FastAPI/WebSocket layer)
+    # When set, API key is required for HTTP + WebSocket requests (Authorization: Bearer <token>)
+    server_api_key: Optional[str] = None
+    # HMAC secret for issuing/verifying session tokens (defaults to random per-process secret)
+    server_session_secret: Optional[str] = None
+    # Hard cap on simultaneous sessions to avoid resource exhaustion
+    server_max_sessions: int = 100
+    # Maximum inbound message payload size (bytes) for WebSocket messages
+    server_max_message_bytes: int = 32768
+    # Session token time-to-live in seconds
+    server_session_ttl_seconds: int = 86400
+    # Diagram rendering limits
+    render_max_payload_bytes: int = 20000
+    render_timeout_seconds: int = 10
+    render_max_concurrency: int = 2
+
+    # Code execution sandbox defaults (used by code_executor_tool)
+    code_executor_network_disabled: bool = True
+    code_executor_memory_limit: Optional[str] = "512m"
+    code_executor_cpu_shares: Optional[int] = 256
+
     # Write Approval Mode (safety for autonomous/task mode)
     # Controls when user confirmation is required for file modifications:
     #   - "off": Never require approval (dangerous, testing only)

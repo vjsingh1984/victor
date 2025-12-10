@@ -27,6 +27,7 @@ Features:
 import asyncio
 import json
 import logging
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -87,6 +88,7 @@ class VictorAPIServer:
         """Set up API routes."""
         self._app.router.add_get("/health", self._health)
         self._app.router.add_get("/status", self._status)
+        self._app.router.add_get("/credentials/get", self._credentials_placeholder)
 
         # Chat endpoints
         self._app.router.add_post("/chat", self._chat)
@@ -114,6 +116,8 @@ class VictorAPIServer:
         self._app.router.add_post("/undo", self._undo)
         self._app.router.add_post("/redo", self._redo)
         self._app.router.add_get("/history", self._history)
+        self._app.router.add_get("/credentials/get", self._credentials_placeholder)
+        self._app.router.add_post("/session/token", self._session_token_placeholder)
 
         # Patch
         self._app.router.add_post("/patch/apply", self._apply_patch)
@@ -524,15 +528,27 @@ class VictorAPIServer:
             logger.exception("List providers error")
             return web.json_response({"providers": [], "error": str(e)})
 
+    async def _credentials_placeholder(self, request: Request) -> Response:
+        """Placeholder credentials endpoint to satisfy IDE clients."""
+        provider = request.query.get("provider", "")
+        return web.json_response({"provider": provider, "api_key": None})
+
+    async def _session_token_placeholder(self, request: Request) -> Response:
+        """Placeholder session token endpoint for clients expecting /session/token."""
+        session_id = str(uuid.uuid4())
+        session_token = str(uuid.uuid4())
+        return web.json_response({"session_token": session_token, "session_id": session_id})
+
     async def _list_tools(self, request: Request) -> Response:
         """List available tools with their metadata."""
         try:
             from victor.tools.base import CostTier, ToolRegistry
 
-            registry = ToolRegistry.get_instance()
+            # ToolRegistry is not a singleton; instantiate to list registered tools
+            registry = ToolRegistry()
             tools_info = []
 
-            for tool in registry.get_all_tools():
+            for tool in registry.list_tools().values():
                 # Get tool metadata
                 cost_tier = (
                     tool.cost_tier.value

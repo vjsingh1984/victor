@@ -128,6 +128,13 @@ suite('VictorClient Test Suite', () => {
         }
     });
 
+    test('prefetchSessionToken should resolve gracefully when server is unavailable', async () => {
+        client.setApiToken('secret');
+        const token = await client.prefetchSessionToken();
+        // With no server running, we expect undefined (no throw)
+        assert.strictEqual(token, undefined);
+    });
+
     test('undo should handle server unavailable', async () => {
         try {
             const result = await client.undo();

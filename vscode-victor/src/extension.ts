@@ -94,7 +94,17 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     // Initialize the Victor client with server URL from state
-    const victorClient = new VictorClient(store.select(selectors.serverUrl));
+    const apiKey = config.get<string>('serverApiKey') || undefined;
+    const victorClient = new VictorClient(store.select(selectors.serverUrl), undefined, apiKey);
+    // Pre-fetch session token when API key is configured; ignore failures (server may be offline)
+    victorClient.prefetchSessionToken().catch(() => {});
+    // Keep Victor client auth in sync with configuration updates
+    context.subscriptions.push(
+        store.subscribe('settings', (_state) => {
+            const latestKey = store.select(selectors.serverApiKey) || undefined;
+            victorClient.setApiToken(latestKey);
+        })
+    );
 
     // Create mode status bar item
     const statusBarItem = vscode.window.createStatusBarItem(

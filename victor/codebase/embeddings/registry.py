@@ -124,6 +124,13 @@ def _auto_register_providers() -> None:
     except ImportError:
         pass  # LanceDB not installed
 
+    try:
+        from victor.codebase.embeddings.proximadb_provider import ProximaDBProvider
+
+        EmbeddingRegistry.register("proximadb", ProximaDBProvider)
+    except ImportError:
+        pass  # ProximaDB not installed
+
 
 # Auto-register on module import
 _auto_register_providers()

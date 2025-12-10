@@ -31,14 +31,89 @@ Resolution order:
 
 import fnmatch
 import logging
+import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
 from victor.agent.tool_calling.base import ToolCallingCapabilities, ToolCallFormat
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# MODEL NAME NORMALIZATION
+# =============================================================================
+# Handles common model naming variants to ensure capability lookup succeeds.
+# E.g., "qwen25-coder" → "qwen2.5-coder", "llama33" → "llama3.3"
+
+# Bidirectional aliases: (pattern, replacement) pairs applied in sequence
+MODEL_NAME_ALIASES: List[Tuple[str, str]] = [
+    # Qwen family - shorthand versions
+    (r"qwen25([^0-9])", r"qwen2.5\1"),  # qwen25-coder → qwen2.5-coder
+    (r"qwen25$", r"qwen2.5"),  # qwen25 at end of string
+    # Llama family
+    (r"llama33([^0-9])", r"llama3.3\1"),  # llama33-70b → llama3.3-70b
+    (r"llama33$", r"llama3.3"),
+    (r"llama31([^0-9])", r"llama3.1\1"),
+    (r"llama31$", r"llama3.1"),
+    (r"llama32([^0-9])", r"llama3.2\1"),
+    (r"llama32$", r"llama3.2"),
+    # DeepSeek variations
+    (r"deepseekr1", r"deepseek-r1"),  # deepseekr1 → deepseek-r1
+    (r"deepseek_r1", r"deepseek-r1"),
+    (r"deepseekcoder", r"deepseek-coder"),
+]
+
+
+def normalize_model_name(model_name: str) -> str:
+    """Normalize model name to canonical form for capability lookup.
+
+    Applies alias patterns to handle common naming variants:
+    - qwen25-coder → qwen2.5-coder
+    - llama33:70b → llama3.3:70b
+    - deepseekr1 → deepseek-r1
+
+    Args:
+        model_name: Original model name (e.g., "qwen25-coder-tools:14b-64K")
+
+    Returns:
+        Normalized model name (e.g., "qwen2.5-coder-tools:14b-64K")
+    """
+    if not model_name:
+        return model_name
+
+    normalized = model_name.lower()
+
+    for pattern, replacement in MODEL_NAME_ALIASES:
+        normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
+
+    if normalized != model_name.lower():
+        logger.debug(f"Normalized model name: {model_name} → {normalized}")
+
+    return normalized
+
+
+def get_model_name_variants(model_name: str) -> List[str]:
+    """Get all naming variants for a model to try during lookup.
+
+    Returns both the original name and normalized form(s) to maximize
+    matching against capability patterns.
+
+    Args:
+        model_name: Original model name
+
+    Returns:
+        List of model name variants to try (original first, then normalized)
+    """
+    variants = [model_name.lower()]
+
+    normalized = normalize_model_name(model_name)
+    if normalized not in variants:
+        variants.append(normalized)
+
+    return variants
 
 
 class ModelCapabilityLoader:
@@ -133,9 +208,18 @@ class ModelCapabilityLoader:
             resolved.update(provider_defaults)
 
         # 3-5. Find and apply matching model configuration
+        # Try multiple model name variants (original + normalized) to maximize matching
         if model_lower:
             models = config_dict.get("models", {})
-            matching = self._find_matching_model(models, model_lower)
+
+            # Get all name variants to try
+            model_variants = get_model_name_variants(model)
+            matching = []
+            for variant in model_variants:
+                matching = self._find_matching_model(models, variant)
+                if matching:
+                    logger.debug(f"Found capability match using variant: {variant}")
+                    break
 
             for pattern, model_config in matching:
                 logger.debug(f"Applying model pattern '{pattern}'")

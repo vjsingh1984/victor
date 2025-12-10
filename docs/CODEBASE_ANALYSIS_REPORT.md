@@ -39,6 +39,9 @@ Victor is an enterprise-ready AI coding assistant with a solid protocol-first ar
 2. **Tool Dependency Injection**: Tools still use global state pattern
 3. **Test Module Coverage**: 68 modules (29%) remain untested
 4. **Resource Management**: MCP/LSP clients need proper cleanup
+5. **Monolithic Execution Loop**: `stream_chat` in `orchestrator.py` is a single, highly coupled control flow that mixes classification, context building, tool selection, execution, and recovery. This is the top maintenance risk and needs decomposition with targeted unit tests.
+6. **VS Code Packaging Gaps**: `.vscodeignore` aggressively strips transitive dependencies (axios → form-data → combined-stream → delayed-stream → mime-types), leading to activation failures. Either bundle the extension or explicitly whitelist the full dependency chain in packaging.
+7. **Underdocumented MCP Integration**: MCP setup is present in tool registration but lacks user-facing documentation and safe defaults (feature flag, auth, and failure modes).
 
 ---
 

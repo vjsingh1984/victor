@@ -157,13 +157,21 @@ class SymbolStore:
         "vendor",
     }
 
-    def __init__(self, root_path: str):
+    def __init__(self, root_path: str, include_dirs: Optional[List[str]] = None, exclude_dirs: Optional[List[str]] = None):
         """Initialize symbol store.
 
         Args:
             root_path: Root directory of the codebase
+            include_dirs: List of directories to include in the analysis.
+            exclude_dirs: List of directories to exclude from the analysis.
         """
         self.root = Path(root_path).resolve()
+        self.include_dirs = include_dirs
+        
+        self.effective_skip_dirs = self.SKIP_DIRS.copy()
+        if exclude_dirs:
+            self.effective_skip_dirs.update(exclude_dirs)
+            
         self._init_db()
 
     @property
@@ -251,7 +259,7 @@ class SymbolStore:
 
     def should_ignore(self, path: Path) -> bool:
         """Check if path should be ignored."""
-        return any(skip in path.parts for skip in self.SKIP_DIRS)
+        return any(skip in path.parts for skip in self.effective_skip_dirs)
 
     def detect_language(self, path: Path) -> Optional[str]:
         """Detect language from file extension."""
@@ -298,11 +306,16 @@ class SymbolStore:
         # Collect all current source files
         current_files: Set[str] = set()
         source_files = []
-        for ext in self.LANGUAGE_EXTENSIONS:
-            for file_path in self.root.rglob(f"*{ext}"):
-                if not self.should_ignore(file_path) and file_path.is_file():
-                    source_files.append(file_path)
-                    current_files.add(str(file_path.relative_to(self.root)))
+        search_paths = [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
+        
+        for search_path in search_paths:
+            if not search_path.is_dir():
+                continue
+            for ext in self.LANGUAGE_EXTENSIONS:
+                for file_path in search_path.rglob(f"*{ext}"):
+                    if not self.should_ignore(file_path) and file_path.is_file():
+                        source_files.append(file_path)
+                        current_files.add(str(file_path.relative_to(self.root)))
 
         print(f"Found {len(source_files)} source files")
 

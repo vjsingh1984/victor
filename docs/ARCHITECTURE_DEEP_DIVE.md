@@ -36,7 +36,7 @@ Victor is an **enterprise-ready, terminal-based AI coding assistant** that acts 
 
 **Solution**: Victor provides a unified abstraction layer that:
 - Normalizes all provider differences into a single interface
-- Provides 46 enterprise-grade tools (git, testing, security, docker, etc.)
+- Provides 45 enterprise-grade tools (git, testing, security, docker, etc.)
 - Enables air-gapped (offline) operation for compliance
 - Uses intelligent semantic tool selection instead of broadcasting all tools
 
@@ -62,7 +62,7 @@ flowchart TB
     subgraph SYSTEMS[""]
         direction LR
         PROV["PROVIDER SYSTEM<br/>━━━━━━━━━━━━<br/>Normalize different<br/>LLM APIs"]
-        TOOLS["TOOLS SYSTEM<br/>━━━━━━━━━━━━<br/>42 tools<br/>registered in registry"]
+        TOOLS["TOOLS SYSTEM<br/>━━━━━━━━━━━━<br/>45 tools<br/>registered in registry"]
         MCP_B["MCP BRIDGE<br/>━━━━━━━━━━━━<br/>Client +<br/>Server"]
     end
 
@@ -87,14 +87,14 @@ flowchart TB
 
 **What it does**:
 1. **Manages Conversation**: Keeps track of all messages (user, assistant, tool results)
-2. **Selects Tools**: Intelligently chooses which tools to send to the LLM (not all 46!)
+2. **Selects Tools**: Intelligently chooses which tools to send to the LLM (not all 45!)
 3. **Executes Tools**: When LLM requests a tool, orchestrator runs it
 4. **Streams Responses**: Shows results in real-time
 5. **Enforces Budget**: Limits tool calls to prevent infinite loops
 
 **Key Data**:
 - `self.messages`: Full conversation history
-- `self.tools`: ToolRegistry with all 42 tools
+- `self.tools`: ToolRegistry with all 45 tools
 - `self.provider`: Current LLM provider (Claude, Ollama, etc.)
 - `self.semantic_selector`: Optional embedding-based tool selector
 

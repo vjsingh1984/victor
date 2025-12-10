@@ -1269,27 +1269,13 @@ def init(
     config_only: bool = typer.Option(
         False, "--config", "-c", help="Only setup global config, skip project analysis"
     ),
+    interactive: bool = typer.Option(
+        True, "--interactive/--no-interactive", "-I", help="Use interactive wizard for scoping"
+    ),
 ) -> None:
-    """Initialize project context and configuration.
-
-    This command does two things:
-    1. Creates global config files (~/.victor/profiles.yaml) if missing
-    2. Analyzes your codebase and creates .victor/init.md (like CLAUDE.md)
-
-    By default, uses LLM + conversation insights for comprehensive analysis.
-    Falls back to --learn (no LLM) if LLM calls fail.
-
-    Examples:
-        victor init              # Comprehensive: LLM + conversation insights (default)
-        victor init --quick      # Fast regex-only analysis (no LLM)
-        victor init --no-deep    # Symbol index + conversation insights (no LLM)
-        victor init --index      # Symbol index only (no LLM, no conversation)
-        victor init --update     # Update analysis, preserve user edits
-        victor init --force      # Regenerate init.md completely
-        victor init --symlinks   # Also create CLAUDE.md symlink
-        victor init --config     # Only setup global config
-    """
+    """Initialize project context and configuration."""
     from victor.config.settings import get_project_paths, VICTOR_CONTEXT_FILE, VICTOR_DIR_NAME
+    from pathlib import Path
 
     paths = get_project_paths()
 
@@ -1331,7 +1317,11 @@ providers:
     if target_path.exists():
         existing_content = target_path.read_text(encoding="utf-8")
 
-        if not force and not update:
+        if not force and not update and interactive:
+             if not Confirm.ask(f"[yellow]{VICTOR_CONTEXT_FILE} already exists. Do you want to overwrite it with new analysis options?[/]", default=False):
+                console.print("[dim]Aborted.[/dim]")
+                return
+        elif not force and not update:
             console.print(f"[yellow]{VICTOR_CONTEXT_FILE} already exists at {target_path}[/]")
             console.print("")
             console.print("[bold]Options:[/]")
@@ -1352,6 +1342,43 @@ providers:
         learn = False
         index = False
 
+    include_dirs = []
+    exclude_dirs = []
+
+    if interactive and not quick:
+        console.print("\n[bold]Interactive Project Scoping[/]")
+        
+        all_dirs = [d.name for d in Path(".").iterdir() if d.is_dir() and not d.name.startswith('.')]
+        common_src_dirs = ['src', 'app', 'lib', 'victor', 'server', 'client']
+        suggested_src = [d for d in common_src_dirs if d in all_dirs]
+        
+        if not suggested_src and all_dirs:
+            # Suggest the project's own directory if it's a common pattern
+            project_dir = Path(".").resolve().name
+            if project_dir in all_dirs:
+                suggested_src.append(project_dir)
+            else: # Fallback to the first found directory
+                suggested_src.append(all_dirs[0])
+
+        include_str = Prompt.ask(
+            f"[cyan]Enter comma-separated source directories to include[/]",
+            default=", ".join(suggested_src)
+        )
+        include_dirs = [d.strip() for d in include_str.split(',')]
+
+        default_exclude = [
+            "__pycache__", ".git", ".pytest_cache", "venv", "env", ".venv", 
+            "node_modules", ".tox", "build", "dist", "egg-info", "htmlcov", 
+            "htmlcov_lang", ".mypy_cache", ".ruff_cache"
+        ]
+        
+        exclude_str = Prompt.ask(
+            f"[cyan]Enter comma-separated directories to exclude[/]",
+            default=", ".join(default_exclude)
+        )
+        exclude_dirs = [d.strip() for d in exclude_str.split(',')]
+
+
     # Determine analysis mode and print status
     if deep and learn:
         console.print("[dim]Comprehensive analysis: Index → Learn → LLM (default)...[/]")
@@ -1367,11 +1394,9 @@ providers:
     try:
         import asyncio
 
-        # Progress callback for user feedback
         def on_progress(stage: str, msg: str):
             console.print(f"[dim]  {msg}[/]")
 
-        # Use the unified pipeline for deep/learn modes
         if deep or learn:
             from victor.context.codebase_analyzer import generate_enhanced_init_md
 
@@ -1381,23 +1406,21 @@ providers:
                     include_conversations=learn,
                     on_progress=on_progress,
                     force=force,
+                    include_dirs=include_dirs or None,
+                    exclude_dirs=exclude_dirs or None,
                 )
             )
         elif index:
-            # Use SymbolStore only
             from victor.context.codebase_analyzer import generate_victor_md_from_index
 
             console.print("[dim]  Building symbol index...[/]")
-            new_content = asyncio.run(generate_victor_md_from_index(force=force))
+            new_content = asyncio.run(generate_victor_md_from_index(force=force, include_dirs=include_dirs or None, exclude_dirs=exclude_dirs or None))
         else:
-            # Quick regex-based analysis
             from victor.context.codebase_analyzer import generate_smart_victor_md
 
-            new_content = generate_smart_victor_md()
+            new_content = generate_smart_victor_md(include_dirs=include_dirs or None, exclude_dirs=exclude_dirs or None)
 
-        # Handle update mode
         if update and existing_content:
-            # Import merge function from slash commands
             from victor.ui.slash_commands import SlashCommandHandler
 
             handler = SlashCommandHandler(console, None)
@@ -1406,17 +1429,14 @@ providers:
         else:
             content = new_content
 
-        # Write the file
         target_path.write_text(content, encoding="utf-8")
         console.print(f"[green]✓[/] Created {target_path}")
 
-        # Show what was detected
         component_count = content.count("| `")
         pattern_count = content.count(". **") + content.count("Pattern:")
         console.print(f"[dim]  - Detected {component_count} key components[/]")
         console.print(f"[dim]  - Found {pattern_count} architecture patterns[/]")
 
-        # Create symlinks if requested
         if symlinks:
             from victor.context.codebase_analyzer import (
                 CONTEXT_FILE_ALIASES,

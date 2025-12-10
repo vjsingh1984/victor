@@ -150,6 +150,8 @@ const DEFAULT_WS_CONFIG: WebSocketConfig = {
 export class VictorClient {
     private client: AxiosInstance;
     private serverUrl: string;
+    private apiToken?: string;
+    private sessionToken?: string;
 
     // WebSocket state
     private wsConnection: WebSocket | null = null;
@@ -165,15 +167,17 @@ export class VictorClient {
     private stateChangeHandlers: ((state: WebSocketState) => void)[] = [];
     private errorHandlers: ((error: VictorError) => void)[] = [];
 
-    constructor(serverUrl: string, wsConfig?: Partial<WebSocketConfig>) {
+    constructor(serverUrl: string, wsConfig?: Partial<WebSocketConfig>, apiToken?: string) {
         this.serverUrl = serverUrl;
         this.wsConfig = { ...DEFAULT_WS_CONFIG, ...wsConfig };
+        this.apiToken = apiToken;
 
         this.client = axios.create({
             baseURL: serverUrl,
             timeout: 60000,
             headers: {
                 'Content-Type': 'application/json',
+                ...(apiToken ? { Authorization: `Bearer ${apiToken}` } : {}),
             },
         });
     }
@@ -181,6 +185,43 @@ export class VictorClient {
     // =========================================================================
     // Connection Management
     // =========================================================================
+
+    setApiToken(token?: string): void {
+        this.apiToken = token;
+        if (token) {
+            this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        } else {
+            delete this.client.defaults.headers.common['Authorization'];
+        }
+    }
+
+    /**
+     * Prefetch a session token over HTTP (auth required).
+     * Useful for obtaining a token before opening the WebSocket.
+     */
+    async prefetchSessionToken(): Promise<string | undefined> {
+        if (!this.apiToken) {
+            return undefined;
+        }
+        try {
+            const resp = await this.client.post('/session/token', {});
+            const token = (resp.data as { session_token?: string }).session_token;
+            if (typeof token === 'string') {
+                this.sessionToken = token;
+                return token;
+            }
+            return undefined;
+        } catch (error) {
+            // Surface as VictorError for listeners but don't throw hard
+            try {
+                const ve = VictorError.fromAxiosError(error as AxiosError);
+                this.emitError(ve);
+            } catch {
+                // ignore conversion errors
+            }
+            return undefined;
+        }
+    }
 
     async checkConnection(): Promise<boolean> {
         try {
@@ -254,6 +295,18 @@ export class VictorClient {
     // WebSocket with Auto-Reconnection
     // =========================================================================
 
+    private buildWebSocketUrl(): string {
+        const base = this.serverUrl.replace(/^http/, 'ws') + '/ws';
+        const url = new URL(base);
+        if (this.apiToken) {
+            url.searchParams.set('api_key', this.apiToken);
+        }
+        if (this.sessionToken) {
+            url.searchParams.set('session_token', this.sessionToken);
+        }
+        return url.toString();
+    }
+
     connectWebSocket(): void {
         if (this.wsState === WebSocketState.Connected || this.wsState === WebSocketState.Connecting) {
             return;
@@ -266,7 +319,7 @@ export class VictorClient {
 
     private _connect(): void {
         try {
-            const wsUrl = this.serverUrl.replace(/^http/, 'ws') + '/ws';
+            const wsUrl = this.buildWebSocketUrl();
             this.wsConnection = new WebSocket(wsUrl);
 
             this.wsConnection.onopen = () => {
@@ -278,11 +331,22 @@ export class VictorClient {
 
             this.wsConnection.onmessage = (event) => {
                 try {
+                    // Handle legacy string control messages
+                    if (typeof event.data === 'string' && event.data.startsWith('[session]')) {
+                        this.sessionToken = event.data.replace('[session]', '').trim();
+                        return;
+                    }
+
                     const data = JSON.parse(event.data);
 
                     // Handle pong response
                     if (data.type === 'pong') {
                         this._handlePong();
+                        return;
+                    }
+
+                    if (data.type === 'session' && typeof data.token === 'string') {
+                        this.sessionToken = data.token;
                         return;
                     }
 

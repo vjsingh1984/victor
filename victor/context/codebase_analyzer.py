@@ -140,14 +140,22 @@ class CodebaseAnalyzer:
         ".cache",
     }
 
-    def __init__(self, root_path: Optional[str] = None):
+    def __init__(self, root_path: Optional[str] = None, include_dirs: Optional[List[str]] = None, exclude_dirs: Optional[List[str]] = None):
         """Initialize analyzer.
 
         Args:
             root_path: Root directory to analyze. Defaults to current directory.
+            include_dirs: List of directories to include in the analysis.
+            exclude_dirs: List of directories to exclude from the analysis.
         """
         self.root = Path(root_path) if root_path else Path.cwd()
         self.analysis = CodebaseAnalysis(project_name=self.root.name, root_path=self.root)
+        self.include_dirs = include_dirs
+        
+        # Combine default and user-provided exclude dirs
+        self.effective_skip_dirs = self.SKIP_DIRS.copy()
+        if exclude_dirs:
+            self.effective_skip_dirs.update(exclude_dirs)
 
     def analyze(self) -> CodebaseAnalysis:
         """Perform full codebase analysis (language-agnostic).
@@ -234,23 +242,26 @@ class CodebaseAnalyzer:
 
     def _analyze_source_files(self) -> None:
         """Analyze source files across all supported languages."""
-        # Determine search paths
         search_paths = []
-        if self.analysis.main_package:
-            main_path = self.root / self.analysis.main_package.replace("/", "/")
-            if main_path.exists():
-                search_paths.append(main_path)
-
-        # Also search common source directories if no main package
-        if not search_paths:
-            for common_dir in ["src", "lib", "app", "components", "pages", "api"]:
-                path = self.root / common_dir
-                if path.exists():
+        if self.include_dirs:
+            for d in self.include_dirs:
+                path = self.root / d
+                if path.exists() and path.is_dir():
                     search_paths.append(path)
-
-        # If still nothing, search root (but limit depth)
+        
         if not search_paths:
-            search_paths.append(self.root)
+            # Fallback to original logic if no include_dirs provided or none exist
+            if self.analysis.main_package:
+                main_path = self.root / self.analysis.main_package.replace("/", "/")
+                if main_path.exists():
+                    search_paths.append(main_path)
+            if not search_paths:
+                for common_dir in ["src", "lib", "app", "components", "pages", "api"]:
+                    path = self.root / common_dir
+                    if path.exists():
+                        search_paths.append(path)
+            if not search_paths:
+                search_paths.append(self.root)
 
         for search_path in search_paths:
             self._scan_directory_for_sources(search_path)
@@ -259,7 +270,8 @@ class CodebaseAnalyzer:
         """Scan directory for source files of any language."""
         for ext, lang in self.LANGUAGE_EXTENSIONS.items():
             for source_file in directory.rglob(f"*{ext}"):
-                if any(skip in source_file.parts for skip in self.SKIP_DIRS):
+                # Use the effective_skip_dirs which includes user-defined exclusions
+                if any(skip in source_file.parts for skip in self.effective_skip_dirs):
                     continue
 
                 # Check depth
@@ -599,7 +611,7 @@ class CodebaseAnalyzer:
                     self.analysis.config_files.append((pattern, description))
 
 
-def generate_smart_victor_md(root_path: Optional[str] = None) -> str:
+def generate_smart_victor_md(root_path: Optional[str] = None, include_dirs: Optional[List[str]] = None, exclude_dirs: Optional[List[str]] = None) -> str:
     """Generate comprehensive project context using codebase analysis.
 
     Works with Python projects (AST-based analysis) and falls back to
@@ -607,16 +619,18 @@ def generate_smart_victor_md(root_path: Optional[str] = None) -> str:
 
     Args:
         root_path: Root directory to analyze. Defaults to current directory.
+        include_dirs: List of directories to include in the analysis.
+        exclude_dirs: List of directories to exclude from the analysis.
 
     Returns:
         Generated markdown content for .victor/init.md.
     """
-    analyzer = CodebaseAnalyzer(root_path)
+    analyzer = CodebaseAnalyzer(root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs)
     analysis = analyzer.analyze()
 
     # If no Python package found, use language-agnostic analysis
     if not analysis.main_package and not analysis.key_components:
-        return _generate_generic_victor_md(root_path)
+        return _generate_generic_victor_md(root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs)
 
     sections = []
 
@@ -730,16 +744,18 @@ def generate_smart_victor_md(root_path: Optional[str] = None) -> str:
     return "\n".join(sections)
 
 
-def _generate_generic_victor_md(root_path: Optional[str] = None) -> str:
+def _generate_generic_victor_md(root_path: Optional[str] = None, include_dirs: Optional[List[str]] = None, exclude_dirs: Optional[List[str]] = None) -> str:
     """Generate init.md for non-Python projects using language-agnostic analysis.
 
     Args:
         root_path: Root directory to analyze. Defaults to current directory.
+        include_dirs: List of directories to include in the analysis.
+        exclude_dirs: List of directories to exclude from the analysis.
 
     Returns:
         Generated markdown content.
     """
-    context = gather_project_context(root_path, max_files=100)
+    context = gather_project_context(root_path, max_files=100, include_dirs=include_dirs, exclude_dirs=exclude_dirs)
     _root = Path(root_path) if root_path else Path.cwd()
 
     sections = []
@@ -1005,7 +1021,7 @@ def _extract_readme_description(root: Path) -> str:
 # =============================================================================
 
 
-def gather_project_context(root_path: Optional[str] = None, max_files: int = 50) -> Dict[str, any]:
+def gather_project_context(root_path: Optional[str] = None, max_files: int = 50, include_dirs: Optional[List[str]] = None, exclude_dirs: Optional[List[str]] = None) -> Dict[str, any]:
     """Gather project context for LLM analysis (works with any language).
 
     This function collects structural information about any project type
@@ -1014,6 +1030,8 @@ def gather_project_context(root_path: Optional[str] = None, max_files: int = 50)
     Args:
         root_path: Root directory to analyze. Defaults to current directory.
         max_files: Maximum number of source files to list.
+        include_dirs: List of directories to include in the analysis.
+        exclude_dirs: List of directories to exclude from the analysis.
 
     Returns:
         Dict containing project structure information.
@@ -1038,6 +1056,8 @@ def gather_project_context(root_path: Optional[str] = None, max_files: int = 50)
         "coverage",
         ".cache",
     }
+    if exclude_dirs:
+        skip_dirs.update(exclude_dirs)
 
     # Project type detection by config files
     project_indicators = {
@@ -1137,23 +1157,40 @@ def gather_project_context(root_path: Optional[str] = None, max_files: int = 50)
         except PermissionError:
             pass
         return dirs
-
-    context["directory_structure"] = walk_dirs(root)[:100]  # Limit to 100 dirs
+    
+    if include_dirs:
+        # Walk only included directories
+        all_found_dirs = []
+        for d in include_dirs:
+            dir_path = root / d
+            if dir_path.is_dir():
+                all_found_dirs.extend(walk_dirs(dir_path))
+        context["directory_structure"] = all_found_dirs[:100]
+    else:
+        context["directory_structure"] = walk_dirs(root)[:100]
 
     # Collect source files with extensions
     file_count = 0
     lang_counts: Dict[str, int] = {}
-    for item in root.rglob("*"):
+    
+    search_paths = [root / d for d in include_dirs] if include_dirs else [root]
+    
+    for search_path in search_paths:
+        if not search_path.is_dir():
+            continue
+        for item in search_path.rglob("*"):
+            if file_count >= max_files:
+                break
+            if any(skip in item.parts for skip in skip_dirs):
+                continue
+            if item.is_file() and item.suffix in source_extensions:
+                rel_path = str(item.relative_to(root))
+                context["source_files"].append(rel_path)
+                lang = source_extensions[item.suffix]
+                lang_counts[lang] = lang_counts.get(lang, 0) + 1
+                file_count += 1
         if file_count >= max_files:
             break
-        if any(skip in item.parts for skip in skip_dirs):
-            continue
-        if item.is_file() and item.suffix in source_extensions:
-            rel_path = str(item.relative_to(root))
-            context["source_files"].append(rel_path)
-            lang = source_extensions[item.suffix]
-            lang_counts[lang] = lang_counts.get(lang, 0) + 1
-            file_count += 1
 
     # Add detected languages from file extensions
     for lang, count in sorted(lang_counts.items(), key=lambda x: -x[1]):
@@ -1219,6 +1256,8 @@ async def generate_victor_md_with_llm(
     model: str,
     root_path: Optional[str] = None,
     max_files: int = 50,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
 ) -> str:
     """Generate project context file using an LLM provider.
 
@@ -1230,6 +1269,8 @@ async def generate_victor_md_with_llm(
         model: Model identifier to use for generation
         root_path: Root directory to analyze. Defaults to current directory.
         max_files: Maximum source files to include in context.
+        include_dirs: List of directories to include in the analysis.
+        exclude_dirs: List of directories to exclude from the analysis.
 
     Returns:
         Generated content for .victor/init.md.
@@ -1237,7 +1278,7 @@ async def generate_victor_md_with_llm(
     from victor.providers.base import Message
 
     # Gather project context
-    context = gather_project_context(root_path, max_files)
+    context = gather_project_context(root_path, max_files, include_dirs=include_dirs, exclude_dirs=exclude_dirs)
 
     # Build prompt
     prompt = build_llm_prompt_for_victor_md(context)
@@ -1253,17 +1294,17 @@ async def generate_victor_md_with_llm(
 
         # Ensure it starts with the header
         if not content.startswith(expected_header):
-            content = f"{expected_header}\n\n" + content
+            content = f"{expected_header}\\n\\n" + content
 
         return content
     except Exception as e:
         logger.error(f"LLM generation failed: {e}")
         # Fall back to basic generation
-        return generate_smart_victor_md(root_path)
+        return generate_smart_victor_md(root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs)
 
 
 async def generate_victor_md_from_index(
-    root_path: Optional[str] = None, force: bool = False
+    root_path: Optional[str] = None, force: bool = False, include_dirs: Optional[List[str]] = None, exclude_dirs: Optional[List[str]] = None
 ) -> str:
     """Generate init.md from the SymbolStore (pre-indexed symbols).
 
@@ -1281,7 +1322,7 @@ async def generate_victor_md_from_index(
     from victor.codebase.symbol_store import SymbolStore
 
     root = Path(root_path) if root_path else Path.cwd()
-    store = SymbolStore(str(root))
+    store = SymbolStore(str(root), include_dirs=include_dirs, exclude_dirs=exclude_dirs)
 
     # Index if needed (quick operation if already indexed, unless force=True)
     await store.index_codebase(force=force)
@@ -1592,6 +1633,8 @@ async def generate_enhanced_init_md(
     include_conversations: bool = True,
     on_progress: Optional[callable] = None,
     force: bool = False,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
 ) -> str:
     """Generate init.md using symbol index, conversation insights, and optional LLM.
 
@@ -1628,7 +1671,7 @@ async def generate_enhanced_init_md(
 
     # Step 1: Index - Use SymbolStore for base content
     progress("index", "Building symbol index...")
-    base_content = await generate_victor_md_from_index(root_path, force=force)
+    base_content = await generate_victor_md_from_index(root_path, force=force, include_dirs=include_dirs, exclude_dirs=exclude_dirs)
     progress("index", "Symbol index built", complete=True)
 
     # Step 2: Learn - Add conversation insights

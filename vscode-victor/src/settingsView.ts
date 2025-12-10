@@ -100,8 +100,8 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
             provider: config.get('provider', 'anthropic'),
             model: config.get('model', 'claude-sonnet-4-20250514'),
             mode: config.get('mode', 'build'),
-            serverPort: config.get('serverPort', 8765),
-            autoStart: config.get('autoStart', true),
+            serverPort: config.get('serverPort', 8000),
+            autoStart: config.get('autoStart', false),
             showInlineCompletions: config.get('showInlineCompletions', true),
             semanticSearchEnabled: config.get('semanticSearch.enabled', true),
             semanticSearchMaxResults: config.get('semanticSearch.maxResults', 10),
@@ -134,7 +134,7 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
 
     private async _testConnection(): Promise<void> {
         const config = vscode.workspace.getConfiguration('victor');
-        const port = config.get('serverPort', 8765);
+        const port = config.get('serverPort', 8000);
 
         try {
             const response = await fetch(`http://localhost:${port}/health`);
@@ -483,7 +483,7 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
 
         <div class="setting">
             <label for="serverPort">Server Port</label>
-            <input type="number" id="serverPort" min="1024" max="65535" value="8765">
+            <input type="number" id="serverPort" min="1024" max="65535" value="8000">
         </div>
 
         <div class="setting checkbox-setting">

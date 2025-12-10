@@ -500,6 +500,26 @@ models:
       recommended_tool_budget: 15
       argument_format: xml
 
+  # Shorthand naming (qwen25 instead of qwen2.5) - matches user-created models
+  "qwen25-coder-tools*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      ollama:
+        native_tool_calls: true   # Custom Modelfile enables it
+        parallel_tool_calls: true
+        requires_strict_prompting: false
+      lmstudio:
+        native_tool_calls: true
+      vllm:
+        native_tool_calls: true
+
+    settings:
+      recommended_tool_budget: 15
+      argument_format: xml
+
   # ---------------------------------------------------------------------------
   # LLAMA FAMILY
   # ---------------------------------------------------------------------------
