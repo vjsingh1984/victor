@@ -48,6 +48,7 @@ from victor.agent.safety import (  # noqa: E402
 )
 from victor.config.settings import load_settings  # noqa: E402
 from victor.ui.commands import SlashCommandHandler  # noqa: E402
+from victor.ui.commands.tools import tools_app # noqa: E402
 
 # Configure default logging (can be overridden by CLI argument)
 logger = logging.getLogger(__name__)
@@ -304,6 +305,8 @@ app = typer.Typer(
     help="Victor - Enterprise-Ready AI Coding Assistant.",
     add_completion=False,
 )
+
+app.add_typer(tools_app)
 
 console = Console()
 
@@ -2199,8 +2202,13 @@ async def _run_server(host: str, port: int, profile: str) -> None:
             workspace_root=str(Path.cwd()),
         )
 
-        # Run server
-        server.run()
+        # Run server asynchronously to avoid nested event loop errors
+        runner = await server.start_async()
+        try:
+            while True:
+                await asyncio.sleep(3600)
+        finally:
+            await runner.cleanup()
 
     except ImportError as e:
         console.print(f"[red]Error:[/] Missing dependency for server: {e}")
