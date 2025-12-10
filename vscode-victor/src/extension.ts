@@ -21,7 +21,6 @@ import { registerCodeActionCommands } from './codeActions';
 import { DiagnosticsViewProvider, registerDiagnosticsCommands } from './diagnosticsView';
 import { SettingsViewProvider, registerSettingsCommands } from './settingsView';
 import { WorkspaceInsightsViewProvider, registerWorkspaceInsightsCommands } from './workspaceInsightsView';
-import { GitPanelViewProvider, registerGitPanelCommands } from './gitPanelView';
 import { McpViewProvider, registerMcpCommands } from './mcpView';
 import { ToolApprovalService, registerToolApprovalCommands } from './toolApprovalService';
 import { ProviderSettingsService, registerProviderSettingsCommands } from './providerSettingsService';
@@ -50,7 +49,6 @@ interface ExtensionProviders {
     diagnosticsViewProvider: DiagnosticsViewProvider;
     settingsViewProvider: SettingsViewProvider;
     workspaceInsightsViewProvider: WorkspaceInsightsViewProvider;
-    gitPanelViewProvider: GitPanelViewProvider;
     mcpViewProvider: McpViewProvider;
     toolApprovalService: ToolApprovalService;
     providerSettingsService: ProviderSettingsService;
@@ -124,17 +122,24 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     // Initialize providers
-    const chatViewProvider = new ChatViewProvider(context.extensionUri, victorClient);
+    const clientOutput = vscode.window.createOutputChannel('Victor Client');
+    clientOutput.appendLine('[Victor] Extension activated');
+    context.subscriptions.push(clientOutput);
+
+    const chatViewProvider = new ChatViewProvider(context.extensionUri, victorClient, clientOutput);
     const semanticSearchProvider = new SemanticSearchProvider(victorClient);
     const inlineCompletionProvider = new InlineCompletionProvider(victorClient);
     const historyViewProvider = new HistoryViewProvider(victorClient);
     const toolsViewProvider = new ToolsViewProvider();
 
+    clientOutput.appendLine('[Victor] Providers initialized');
+
     // Register chat view
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
             'victor.chatView',
-            chatViewProvider
+            chatViewProvider,
+            { webviewOptions: { retainContextWhenHidden: true } }
         )
     );
 
@@ -196,6 +201,7 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     // Helper function to send messages to chat
     const sendToChat = async (message: string) => {
+        clientOutput.appendLine(`[Chat] Queued send from command (${message.length} chars)`);
         await chatViewProvider.sendMessage(message);
         await vscode.commands.executeCommand('victor.chatView.focus');
     };
@@ -224,16 +230,6 @@ export async function activate(context: vscode.ExtensionContext) {
         )
     );
     registerWorkspaceInsightsCommands(context, workspaceInsightsViewProvider);
-
-    // Initialize git panel view
-    const gitPanelViewProvider = new GitPanelViewProvider();
-    context.subscriptions.push(
-        vscode.window.registerTreeDataProvider(
-            'victor.gitPanelView',
-            gitPanelViewProvider
-        )
-    );
-    registerGitPanelCommands(context, gitPanelViewProvider);
 
     // Initialize MCP view
     const mcpViewProvider = new McpViewProvider();
@@ -323,7 +319,6 @@ export async function activate(context: vscode.ExtensionContext) {
         diagnosticsViewProvider,
         settingsViewProvider,
         workspaceInsightsViewProvider,
-        gitPanelViewProvider,
         mcpViewProvider,
         toolApprovalService,
         providerSettingsService,

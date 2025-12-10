@@ -196,26 +196,6 @@
         "icon": "$(shield)"
       },
       {
-        "command": "victor.refreshGitPanel",
-        "title": "Victor: Refresh Git Panel",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "victor.aiCommit",
-        "title": "Victor: AI-Assisted Commit",
-        "icon": "$(sparkle)"
-      },
-      {
-        "command": "victor.stageFile",
-        "title": "Victor: Stage File",
-        "icon": "$(add)"
-      },
-      {
-        "command": "victor.unstageFile",
-        "title": "Victor: Unstage File",
-        "icon": "$(remove)"
-      },
-      {
         "command": "victor.showGitDiff",
         "title": "Victor: Show Git Diff"
       },
@@ -441,16 +421,6 @@
           "group": "navigation"
         },
         {
-          "command": "victor.refreshGitPanel",
-          "when": "view == victor.gitPanelView",
-          "group": "navigation"
-        },
-        {
-          "command": "victor.aiCommit",
-          "when": "view == victor.gitPanelView",
-          "group": "navigation"
-        },
-        {
           "command": "victor.refreshMcp",
           "when": "view == victor.mcpView",
           "group": "navigation"
@@ -475,16 +445,6 @@
         {
           "command": "victor.fixAllInFile",
           "when": "view == victor.diagnosticsView && viewItem == diagnosticFile",
-          "group": "inline"
-        },
-        {
-          "command": "victor.stageFile",
-          "when": "view == victor.gitPanelView && viewItem == file",
-          "group": "inline"
-        },
-        {
-          "command": "victor.unstageFile",
-          "when": "view == victor.gitPanelView && viewItem == stagedFile",
           "group": "inline"
         },
         {
@@ -717,10 +677,6 @@
         {
           "id": "victor.workspaceInsightsView",
           "name": "Workspace Insights"
-        },
-        {
-          "id": "victor.gitPanelView",
-          "name": "Git"
         },
         {
           "id": "victor.mcpView",

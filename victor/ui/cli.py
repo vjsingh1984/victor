@@ -49,6 +49,7 @@ from victor.agent.safety import (  # noqa: E402
 from victor.config.settings import load_settings  # noqa: E402
 from victor.ui.commands import SlashCommandHandler  # noqa: E402
 from victor.ui.commands.tools import tools_app # noqa: E402
+from victor.ui.commands.providers import providers_app # noqa: E402
 
 # Configure default logging (can be overridden by CLI argument)
 logger = logging.getLogger(__name__)
@@ -307,6 +308,7 @@ app = typer.Typer(
 )
 
 app.add_typer(tools_app)
+app.add_typer(providers_app)
 
 console = Console()
 
@@ -1990,40 +1992,7 @@ def security(
             console.print(f"  • {rec}")
 
 
-@app.command()
-def providers() -> None:
-    """List all available providers."""
-    from victor.providers.registry import ProviderRegistry
-    from rich.table import Table
 
-    available_providers = ProviderRegistry.list_providers()
-
-    table = Table(title="Available Providers", show_header=True)
-    table.add_column("Provider", style="cyan", no_wrap=True)
-    table.add_column("Status", style="green")
-    table.add_column("Features")
-
-    provider_info = {
-        "ollama": ("✅ Ready", "Local models, Free, Tool calling"),
-        "anthropic": ("✅ Ready", "Claude, Tool calling, Streaming"),
-        "openai": ("✅ Ready", "GPT-4/3.5, Function calling, Vision"),
-        "google": ("✅ Ready", "Gemini, 1M context, Multimodal"),
-        "xai": ("✅ Ready", "Grok, Real-time info, Vision"),
-        "grok": ("✅ Ready", "Alias for xai"),
-        "lmstudio": ("✅ Ready", "Local models via LMStudio"),
-        "vllm": ("✅ Ready", "High-throughput local inference"),
-        "moonshot": ("✅ Ready", "Kimi K2, 256K context, Reasoning"),
-        "kimi": ("✅ Ready", "Alias for moonshot"),
-        "deepseek": ("✅ Ready", "DeepSeek-V3, 128K, Cheap"),
-        "groqcloud": ("✅ Ready", "Ultra-fast LPU, Free tier, Tool calling"),
-    }
-
-    for provider in sorted(available_providers):
-        status, features = provider_info.get(provider, ("❓ Unknown", ""))
-        table.add_row(provider, status, features)
-
-    console.print(table)
-    console.print("\n[dim]Use 'victor profiles' to see configured profiles[/]")
 
 
 @app.command()

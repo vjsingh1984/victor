@@ -480,7 +480,9 @@ export class VictorClient {
             const response = await this.client.post('/chat', { messages });
             return response.data;
         } catch (error) {
-            throw this._handleError(error);
+            const handled = this._handleError(error);
+            console.error('[VictorClient] chat error', handled);
+            throw handled;
         }
     }
 
@@ -521,10 +523,16 @@ export class VictorClient {
                 });
 
                 response.data.on('end', () => resolve());
-                response.data.on('error', (err: Error) => reject(this._handleError(err)));
+                response.data.on('error', (err: Error) => {
+                    const handled = this._handleError(err);
+                    console.error('[VictorClient] streamChat error', handled);
+                    reject(handled);
+                });
             });
         } catch (error) {
-            throw this._handleError(error);
+            const handled = this._handleError(error);
+            console.error('[VictorClient] streamChat error', handled);
+            throw handled;
         }
     }
 

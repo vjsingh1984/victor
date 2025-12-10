@@ -12,10 +12,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     private _view?: vscode.WebviewView;
     private _messages: ChatMessage[] = [];
     private _disposables: vscode.Disposable[] = [];
+    private _webviewReady = false;
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
-        private readonly _client: VictorClient
+        private readonly _client: VictorClient,
+        private readonly _log?: vscode.OutputChannel
     ) {}
 
     public dispose(): void {
@@ -30,6 +32,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         _token: vscode.CancellationToken
     ) {
         this._view = webviewView;
+        this._log?.appendLine('[Chat] Webview resolved');
 
         webviewView.webview.options = {
             enableScripts: true,
@@ -40,8 +43,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
         // Handle messages from the webview - store disposable for cleanup
         const messageListener = webviewView.webview.onDidReceiveMessage(async (data) => {
+            this._log?.appendLine(`[Chat] Received message from webview: ${data?.type ?? 'unknown'}`);
             switch (data.type) {
+                case 'webviewReady':
+                    this._webviewReady = true;
+                    this._log?.appendLine('[Chat] Webview script reported ready');
+                    break;
+                case 'sendClick':
+                    this._log?.appendLine(`[Chat] Webview send clicked (${data.length ?? 0} chars)`);
+                    break;
                 case 'sendMessage':
+                    this._log?.appendLine(`[Chat] Webview requested send (${(data.message ?? '').length} chars)`);
                     await this.sendMessage(data.message);
                     break;
                 case 'clearHistory':
@@ -58,6 +70,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         // Clean up when webview is disposed
         const viewDisposedListener = webviewView.onDidDispose(() => {
             this._view = undefined;
+            this._webviewReady = false;
         });
         this._disposables.push(viewDisposedListener);
 
@@ -70,8 +83,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
     public async sendMessage(content: string): Promise<void> {
         if (!this._view) {
+            this._log?.appendLine('[Chat] Ignoring send (webview not ready)');
             return;
         }
+
+        if (!content || !content.trim()) {
+            this._log?.appendLine('[Chat] Ignoring send (empty content)');
+            return;
+        }
+
+        if (!this._webviewReady) {
+            this._log?.appendLine('[Chat] Warning: webviewReady not observed yet');
+        }
+
+        this._log?.appendLine(`[Chat] Sending user message (${content.length} chars)`);
 
         // Add user message
         const userMessage: ChatMessage = { role: 'user', content };
@@ -114,11 +139,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
             this._updateMessages();
 
         } catch (error) {
+            this._log?.appendLine(`[Chat] Error: ${error}`);
             this._postMessage({
                 type: 'error',
                 message: `Error: ${error}`,
             });
         } finally {
+            this._log?.appendLine('[Chat] Done');
             this._postMessage({ type: 'thinking', thinking: false });
         }
     }
@@ -728,6 +755,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
     <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
+        // Handshake so the extension knows the webview script loaded
+        vscode.postMessage({ type: 'webviewReady' });
         const chatContainer = document.getElementById('chatContainer');
         const messageInput = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
@@ -761,6 +790,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
             const message = messageInput.value.trim();
             if (!message || isStreaming) return;
 
+            vscode.postMessage({ type: 'sendClick', length: message.length });
             vscode.postMessage({ type: 'sendMessage', message });
             messageInput.value = '';
             messageInput.style.height = 'auto';
