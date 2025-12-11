@@ -283,8 +283,27 @@ class AgentOrchestrator:
                 )
 
         # Convert tokens to chars: ~3.5 chars per token with 80% safety margin
-        max_chars = int(context_tokens * 3.5 * 0.8)
-        logger.info(f"Model context: {context_tokens:,} tokens -> {max_chars:,} chars limit")
+        try:
+            # Try to coerce numeric-like values (including strings) to float
+            token_count = float(context_tokens)
+            max_chars = int(token_count * 3.5 * 0.8)
+        except Exception:
+            # Fallback to a conservative default if parsing fails (e.g., MagicMock)
+            provider_name = getattr(provider, "name", "").lower()
+            fallback_tokens = AgentOrchestrator.PROVIDER_CONTEXT_WINDOWS.get(provider_name, 100000)
+            logger.debug(
+                "Could not parse context token value %r; using fallback %d tokens",
+                context_tokens,
+                fallback_tokens,
+            )
+            max_chars = int(fallback_tokens * 3.5 * 0.8)
+
+        # Log safely depending on whether context_tokens is numeric
+        if isinstance(context_tokens, (int, float)):
+            logger.info(f"Model context: {int(context_tokens):,} tokens -> {max_chars:,} chars limit")
+        else:
+            logger.info("Model context: %r tokens -> %s chars limit", context_tokens, f"{max_chars:,}")
+
         return max_chars
 
     def __init__(
@@ -1004,47 +1023,83 @@ class AgentOrchestrator:
 
     @property
     def conversation_controller(self) -> ConversationController:
-        """Get the conversation controller component."""
+        """Get the conversation controller component.
+        
+        Returns:
+            ConversationController instance for managing conversation state
+        """
         return self._conversation_controller
 
     @property
     def tool_pipeline(self) -> ToolPipeline:
-        """Get the tool pipeline component."""
+        """Get the tool pipeline component.
+        
+        Returns:
+            ToolPipeline instance for coordinating tool execution
+        """
         return self._tool_pipeline
 
     @property
     def streaming_controller(self) -> StreamingController:
-        """Get the streaming controller component."""
+        """Get the streaming controller component.
+        
+        Returns:
+            StreamingController instance for managing streaming sessions
+        """
         return self._streaming_controller
 
     @property
     def task_analyzer(self) -> TaskAnalyzer:
-        """Get the task analyzer component."""
+        """Get the task analyzer component.
+        
+        Returns:
+            TaskAnalyzer instance for unified task analysis
+        """
         return self._task_analyzer
 
     @property
     def provider_manager(self) -> ProviderManager:
-        """Get the provider manager component."""
+        """Get the provider manager component.
+        
+        Returns:
+            ProviderManager instance for unified provider management
+        """
         return self._provider_manager
 
     @property
     def context_compactor(self) -> ContextCompactor:
-        """Get the context compactor component."""
+        """Get the context compactor component.
+        
+        Returns:
+            ContextCompactor instance for proactive context management
+        """
         return self._context_compactor
 
     @property
     def tool_output_formatter(self) -> ToolOutputFormatter:
-        """Get the tool output formatter for LLM-context-aware formatting."""
+        """Get the tool output formatter for LLM-context-aware formatting.
+        
+        Returns:
+            ToolOutputFormatter instance for formatting tool outputs
+        """
         return self._tool_output_formatter
 
     @property
     def usage_analytics(self) -> UsageAnalytics:
-        """Get the usage analytics singleton."""
+        """Get the usage analytics singleton.
+        
+        Returns:
+            UsageAnalytics instance for data-driven optimization
+        """
         return self._usage_analytics
 
     @property
     def sequence_tracker(self) -> ToolSequenceTracker:
-        """Get the tool sequence tracker for intelligent next-tool suggestions."""
+        """Get the tool sequence tracker for intelligent next-tool suggestions.
+        
+        Returns:
+            ToolSequenceTracker instance for pattern learning
+        """
         return self._sequence_tracker
 
     @property
@@ -1276,6 +1331,9 @@ class AgentOrchestrator:
 
         UI layers can use this to set confirmation callbacks:
             orchestrator.safety_checker.confirmation_callback = my_callback
+        
+        Returns:
+            SafetyChecker instance for dangerous operation detection
         """
         return self._safety_checker
 
@@ -1425,8 +1483,20 @@ class AgentOrchestrator:
             # Also set the embedding service for fallback
             self.memory_manager.set_embedding_service(embedding_service)
 
-            # Initialize async (fire and forget for faster startup)
-            asyncio.create_task(self._conversation_embedding_store.initialize())
+            # Initialize async (fire and forget for faster startup).
+            # If there's no running event loop (e.g., unit tests), fall back
+            # to synchronous initialization to avoid 'coroutine was never awaited' warnings.
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self._conversation_embedding_store.initialize())
+            except RuntimeError:
+                try:
+                    asyncio.run(self._conversation_embedding_store.initialize())
+                except Exception as e:
+                    logger.debug(
+                        "Failed to run ConversationEmbeddingStore.initialize() synchronously: %s",
+                        e,
+                    )
 
             logger.info(
                 "[AgentOrchestrator] ConversationEmbeddingStore configured. "
@@ -3087,12 +3157,13 @@ class AgentOrchestrator:
                     fallback_content = self.response_completer.format_tool_failure_message(
                         failure_context
                     )
-        self.add_message("assistant", fallback_content)
-        final_response = CompletionResponse(
-            content=fallback_content,
-            role="assistant",
-            tool_calls=None,
-        )
+                # Add fallback to history and return synthetic response
+                self.add_message("assistant", fallback_content)
+                final_response = CompletionResponse(
+                    content=fallback_content,
+                    role="assistant",
+                    tool_calls=None,
+                )
 
         return final_response
 
@@ -4607,9 +4678,20 @@ class AgentOrchestrator:
                 )
                 continue
 
+            # Resolve legacy/alias names to canonical form before checks
+            try:
+                from victor.tools.decorators import resolve_tool_name
+
+                canonical_tool_name = resolve_tool_name(tool_name)
+            except Exception:
+                canonical_tool_name = tool_name
+
             # Skip unknown tools immediately (no retries, no budget cost)
-            if not self.tools.is_tool_enabled(tool_name):
-                self.console.print(f"[yellow]⚠ Skipping unknown or disabled tool: {tool_name}[/]")
+            if not self.tools.is_tool_enabled(canonical_tool_name):
+                # Log original and canonical names to aid debugging in tests
+                self.console.print(
+                    f"[yellow]⚠ Skipping unknown or disabled tool: {tool_name} (resolved: {canonical_tool_name})[/]"
+                )
                 continue
 
             if self.tool_calls_used >= self.tool_budget:
@@ -4617,6 +4699,9 @@ class AgentOrchestrator:
                     f"[yellow]⚠ Tool budget reached ({self.tool_budget}); skipping remaining tool calls.[/]"
                 )
                 break
+
+            # Use the canonical name for execution and downstream bookkeeping
+            tool_name = canonical_tool_name
 
             tool_args = tool_call.get("arguments", {})
 
@@ -4945,7 +5030,7 @@ class AgentOrchestrator:
         try:
             session = self.memory_manager.get_session(session_id)
             if not session:
-                logger.warning(f"Session not found: {session_id}")
+                logger.warning("Session not found: %s", session_id)
                 return False
 
             # Update current session
@@ -4976,10 +5061,18 @@ class AgentOrchestrator:
         within token budget. Useful for long conversations.
 
         Args:
-            max_tokens: Override max tokens for this retrieval
+            max_tokens: Override max tokens for this retrieval. If None,
+                       uses the default token limit from memory manager.
 
         Returns:
-            List of messages in provider format
+            List of messages in provider format, where each message is a
+            dictionary containing 'role' and 'content' keys.
+
+        Note:
+            If memory manager is not enabled or no session is active,
+            falls back to returning messages from in-memory conversation.
+            If memory retrieval fails, logs a warning and uses in-memory
+            messages as fallback.
         """
         if not self.memory_manager or not self._memory_session_id:
             # Fall back to in-memory conversation

@@ -29,7 +29,7 @@ import secrets
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from functools import wraps
+from functools import lru_cache, wraps
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from aiohttp import web
@@ -129,22 +129,23 @@ class RateLimiter:
         self._request_counts: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
         self._lock = asyncio.Lock()
 
+    @lru_cache(maxsize=1024)
+    def _get_client_id_cached(self, forwarded: str, peername: tuple) -> str:
+        """Cached client ID extraction."""
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+        if peername:
+            return f"{peername[0]}:{peername[1]}"
+        return "unknown"
+
     def _get_client_id(self, request: Request) -> str:
         """Extract client identifier from request.
 
         Uses X-Forwarded-For if behind proxy, falls back to peername.
         """
-        # Check for forwarded header (behind proxy)
         forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
-
-        # Use peer name
         peername = request.transport.get_extra_info("peername")
-        if peername:
-            return f"{peername[0]}:{peername[1]}"
-
-        return "unknown"
+        return self._get_client_id_cached(forwarded, tuple(peername) if peername else None)
 
     def _get_bucket(self, key: str, is_endpoint: bool = False) -> TokenBucket:
         """Get or create token bucket for key."""
@@ -192,9 +193,8 @@ class RateLimiter:
                     "retry_after": 1.0 / self.config.requests_per_minute * 60,
                 }
 
-        # Update counters
-        async with self._lock:
-            self._request_counts[client_id][path] += 1
+        # Update counters (lock-free for better performance)
+        self._request_counts[client_id][path] += 1
 
         return True, None
 
@@ -218,11 +218,18 @@ class APIKeyAuthenticator:
         """
         self.config = config or AuthConfig()
         self._key_hashes: Dict[str, str] = {}  # hash -> client_id
+        self._hash_cache: Dict[str, str] = {}  # key -> hash cache
 
         # Hash API keys for secure comparison
         for key, client_id in self.config.api_keys.items():
-            key_hash = hashlib.sha256(key.encode()).hexdigest()
+            key_hash = self._get_key_hash(key)
             self._key_hashes[key_hash] = client_id
+
+    def _get_key_hash(self, api_key: str) -> str:
+        """Get cached hash for API key."""
+        if api_key not in self._hash_cache:
+            self._hash_cache[api_key] = hashlib.sha256(api_key.encode()).hexdigest()
+        return self._hash_cache[api_key]
 
     def add_key(self, api_key: str, client_id: str) -> None:
         """Add an API key.
@@ -231,7 +238,7 @@ class APIKeyAuthenticator:
             api_key: The API key
             client_id: Client identifier
         """
-        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        key_hash = self._get_key_hash(api_key)
         self._key_hashes[key_hash] = client_id
         self.config.api_keys[api_key] = client_id
 
@@ -275,8 +282,8 @@ class APIKeyAuthenticator:
         if not api_key:
             return False, None
 
-        # Secure comparison using hash
-        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        # Secure comparison using cached hash
+        key_hash = self._get_key_hash(api_key)
         client_id = self._key_hashes.get(key_hash)
 
         return client_id is not None, client_id
