@@ -23,6 +23,7 @@ class FakeProvider:
         self._stream_chunks = stream_chunks
         self._supports_tools = supports_tools
         self.called_chat = False
+        self.stream_called = False
         self.chat_response_content = "final"
 
     def supports_tools(self) -> bool:
@@ -43,6 +44,7 @@ class FakeProvider:
         return Resp()
 
     async def stream(self, **kwargs: Any) -> AsyncIterator[FakeStreamChunk]:
+        self.stream_called = True
         for chunk in self._stream_chunks:
             yield chunk
 
@@ -93,6 +95,7 @@ async def test_streaming_basic_passes_through_chunks():
         out.append(chunk.content)
 
     assert "".join(out) != ""  # streamed something
+    assert provider.stream_called is True
 
 
 @pytest.mark.asyncio
@@ -129,4 +132,3 @@ async def test_non_streaming_path_uses_chat_when_streaming_not_supported():
         out.append(chunk.content)
 
     assert provider.called_chat is True
-

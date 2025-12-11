@@ -3493,6 +3493,120 @@ class AgentOrchestrator:
                     "Only explore if absolutely necessary to complete the task.",
                 )
 
+    async def _select_tools_for_turn(self, context_msg: str, goals: Any) -> Any:
+        """Select and prioritize tools for the current turn."""
+        provider_supports_tools = self.provider.supports_tools()
+        tooling_allowed = provider_supports_tools and self._model_supports_tool_calls()
+
+        if not tooling_allowed:
+            return None
+
+        planned_tools = None
+        if goals:
+            available_inputs = ["query"]
+            if self.observed_files:
+                available_inputs.append("file_contents")
+            planned_tools = self._plan_tools(goals, available_inputs=available_inputs)
+
+        conversation_depth = self.conversation.message_count()
+        conversation_history = (
+            [msg.model_dump() for msg in self.messages] if self.messages else None
+        )
+        tools = await self.tool_selector.select_tools(
+            context_msg,
+            use_semantic=self.use_semantic_selection,
+            conversation_history=conversation_history,
+            conversation_depth=conversation_depth,
+            planned_tools=planned_tools,
+        )
+        tools = self.tool_selector.prioritize_by_stage(context_msg, tools)
+        tools = self._filter_tools_by_intent(tools)
+        return tools
+
+    async def _stream_provider_response(
+        self,
+        tools: Any,
+        provider_kwargs: Dict[str, Any],
+        start_time: float,
+        stream_metrics: Any,
+        cumulative_usage: Dict[str, int],
+    ) -> tuple[str, Any, float]:
+        """Stream response from provider and return full content/tool_calls/tokens."""
+        full_content = ""
+        tool_calls = None
+        garbage_detected = False
+        consecutive_garbage_chunks = 0
+        max_garbage_chunks = 3
+        total_tokens: float = 0
+
+        async for chunk in self.provider.stream(
+            messages=self.messages,
+            model=self.model,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            tools=tools,
+            **provider_kwargs,
+        ):
+            # Garbage detection
+            chunk, consecutive_garbage_chunks, garbage_detected = self._handle_stream_chunk(
+                chunk, consecutive_garbage_chunks, max_garbage_chunks, garbage_detected
+            )
+            if chunk is None:
+                continue
+
+            full_content += chunk.content
+            stream_metrics.total_chunks += 1
+            if chunk.content:
+                self._record_first_token()
+                total_tokens += len(chunk.content) / 4
+                stream_metrics.total_content_length += len(chunk.content)
+
+            if chunk.tool_calls:
+                logger.debug(f"Received tool_calls in chunk: {chunk.tool_calls}")
+                tool_calls = chunk.tool_calls
+                stream_metrics.tool_calls_count += len(chunk.tool_calls)
+
+            if chunk.usage:
+                for key in cumulative_usage:
+                    cumulative_usage[key] += chunk.usage.get(key, 0)
+                logger.debug(
+                    f"Chunk usage: in={chunk.usage.get('prompt_tokens', 0)} "
+                    f"out={chunk.usage.get('completion_tokens', 0)} "
+                    f"cache_read={chunk.usage.get('cache_read_input_tokens', 0)}"
+                )
+
+            yield StreamChunk(content=self._sanitize_response(chunk.content or "")) if chunk.content else StreamChunk()
+
+            if tool_calls:
+                break
+
+        if garbage_detected and not tool_calls:
+            logger.info("Setting force_completion due to garbage detection")
+            # Caller will set force_completion on return
+
+        return full_content, tool_calls, total_tokens
+
+    def _handle_stream_chunk(
+        self,
+        chunk: Any,
+        consecutive_garbage_chunks: int,
+        max_garbage_chunks: int,
+        garbage_detected: bool,
+    ) -> tuple[Any, int, bool]:
+        """Handle garbage detection for a streaming chunk."""
+        if chunk.content and self._is_garbage_content(chunk.content):
+            consecutive_garbage_chunks += 1
+            if consecutive_garbage_chunks >= max_garbage_chunks:
+                if not garbage_detected:
+                    garbage_detected = True
+                    logger.warning(
+                        f"Garbage content detected after {len(chunk.content)} chars - stopping stream early"
+                    )
+                return None, consecutive_garbage_chunks, garbage_detected
+        else:
+            consecutive_garbage_chunks = 0
+        return chunk, consecutive_garbage_chunks, garbage_detected
+
     async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
         """Stream a chat response (public entrypoint).
 
@@ -3658,36 +3772,7 @@ class AgentOrchestrator:
             if handled:
                 break
 
-            # Select tools for this pass
-            tools = None
-            provider_supports_tools = self.provider.supports_tools()
-            tooling_allowed = provider_supports_tools and self._model_supports_tool_calls()
-
-            if tooling_allowed:
-                # Get planned tools if we have inferred goals
-                planned_tools = None
-                if goals:
-                    available_inputs = ["query"]
-                    if self.observed_files:
-                        available_inputs.append("file_contents")
-                    planned_tools = self._plan_tools(goals, available_inputs=available_inputs)
-
-                # Use unified ToolSelector for tool selection
-                conversation_depth = self.conversation.message_count()
-                conversation_history = (
-                    [msg.model_dump() for msg in self.messages] if self.messages else None
-                )
-                tools = await self.tool_selector.select_tools(
-                    context_msg,
-                    use_semantic=self.use_semantic_selection,
-                    conversation_history=conversation_history,
-                    conversation_depth=conversation_depth,
-                    planned_tools=planned_tools,
-                )
-                tools = self.tool_selector.prioritize_by_stage(context_msg, tools)
-
-                # Filter tools based on detected intent (display_only/read_only blocks writes)
-                tools = self._filter_tools_by_intent(tools)
+            tools = await self._select_tools_for_turn(context_msg, goals)
 
             # Prepare optional thinking parameter for providers that support it (Anthropic)
             provider_kwargs = {}
@@ -3695,60 +3780,13 @@ class AgentOrchestrator:
                 # Anthropic extended thinking format
                 provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
 
-            full_content = ""
-            tool_calls = None
-            garbage_detected = False
-            consecutive_garbage_chunks = 0
-            max_garbage_chunks = 3  # Stop after 3 consecutive garbage chunks
-
-            async for chunk in self.provider.stream(
-                messages=self.messages,
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
+            full_content, tool_calls, total_tokens = await self._stream_provider_response(
                 tools=tools,
-                **provider_kwargs,
-            ):
-                # Check for garbage content (local model confusion)
-                if chunk.content and self._is_garbage_content(chunk.content):
-                    consecutive_garbage_chunks += 1
-                    if consecutive_garbage_chunks >= max_garbage_chunks:
-                        if not garbage_detected:
-                            garbage_detected = True
-                            logger.warning(
-                                f"Garbage content detected after {len(full_content)} chars - "
-                                "stopping stream early"
-                            )
-                        # Don't yield garbage content, don't accumulate it
-                        continue
-                else:
-                    consecutive_garbage_chunks = 0
-
-                full_content += chunk.content
-                # Track stream metrics
-                stream_metrics.total_chunks += 1
-                # Estimate tokens (rough: ~4 chars per token)
-                if chunk.content:
-                    # Record TTFT on first content chunk
-                    self._record_first_token()
-                    total_tokens += len(chunk.content) / 4
-                    stream_metrics.total_content_length += len(chunk.content)
-                if chunk.tool_calls:
-                    logger.debug(f"Received tool_calls in chunk: {chunk.tool_calls}")
-                    tool_calls = chunk.tool_calls
-                    stream_metrics.tool_calls_count += len(chunk.tool_calls)
-
-                # Capture usage from final chunks (provider-reported tokens)
-                if chunk.usage:
-                    for key in cumulative_usage:
-                        cumulative_usage[key] += chunk.usage.get(key, 0)
-                    logger.debug(
-                        f"Chunk usage: in={chunk.usage.get('prompt_tokens', 0)} "
-                        f"out={chunk.usage.get('completion_tokens', 0)} "
-                        f"cache_read={chunk.usage.get('cache_read_input_tokens', 0)}"
-                    )
-
-                yield chunk
+                provider_kwargs=provider_kwargs,
+                start_time=start_time,
+                stream_metrics=stream_metrics,
+                cumulative_usage=cumulative_usage,
+            )
 
             # If garbage was detected, force completion on next iteration
             if garbage_detected and not tool_calls:
@@ -3800,17 +3838,17 @@ class AgentOrchestrator:
                     elif args is None:
                         tc["arguments"] = {}
 
-            if full_content:
-                # Sanitize response to remove malformed patterns from local models
-                sanitized = self._sanitize_response(full_content)
-                if sanitized:
-                    self.add_message("assistant", sanitized)
-                else:
-                    # If sanitization removed everything, use stripped markup as fallback
-                    plain_text = self._strip_markup(full_content)
-                    if plain_text:
-                        self.add_message("assistant", plain_text)
-            elif not tool_calls:
+        if full_content:
+            # Sanitize response to remove malformed patterns from local models
+            sanitized = self._sanitize_response(full_content)
+            if sanitized:
+                self.add_message("assistant", sanitized)
+            else:
+                # If sanitization removed everything, use stripped markup as fallback
+                plain_text = self._strip_markup(full_content)
+                if plain_text:
+                    self.add_message("assistant", plain_text)
+        elif not tool_calls:
                 # No content and no tool calls; attempt aggressive recovery
                 logger.warning("Model returned empty response - attempting aggressive recovery")
 
