@@ -81,6 +81,28 @@ def chat(
         "-q",
         help="Suppress status messages (only output response).",
     ),
+    renderer: str = typer.Option(
+        "auto",
+        "--renderer",
+        help="Renderer to use for streaming output: auto, rich, rich-text, or text.",
+        case_sensitive=False,
+    ),
+    mode: Optional[str] = typer.Option(
+        None,
+        "--mode",
+        help="Initial agent mode: build, plan, or explore.",
+        case_sensitive=False,
+    ),
+    tool_budget: Optional[int] = typer.Option(
+        None,
+        "--tool-budget",
+        help="Override tool call budget for this session.",
+    ),
+    max_iterations: Optional[int] = typer.Option(
+        None,
+        "--max-iterations",
+        help="Override maximum total iterations for this session.",
+    ),
     input_file: Optional[str] = typer.Option(
         None,
         "--input-file",
@@ -95,6 +117,17 @@ def chat(
 ):
     """Start interactive chat or send a one-shot message."""
     if ctx.invoked_subcommand is None:
+        renderer = renderer.lower()
+        if renderer not in {"auto", "rich", "rich-text", "text"}:
+            console.print("[bold red]Error:[/] Invalid renderer. Choose from auto, rich, rich-text, text.")
+            raise typer.Exit(1)
+
+        if mode:
+            mode = mode.lower()
+            if mode not in {"build", "plan", "explore"}:
+                console.print("[bold red]Error:[/] Invalid mode. Choose from build, plan, explore.")
+                raise typer.Exit(1)
+
         automation_mode = json_output or plain or code_only
 
         if log_level is None:
@@ -144,13 +177,29 @@ def chat(
                     thinking,
                     formatter=formatter,
                     preindex=preindex,
+                    renderer_choice=renderer,
+                    mode=mode,
+                    tool_budget=tool_budget,
+                    max_iterations=max_iterations,
                 )
             )
         elif stdin or input_file:
             formatter.error("No input received from stdin or file")
             raise typer.Exit(1)
         else:
-            asyncio.run(run_interactive(settings, profile, stream, thinking, preindex=preindex))
+            asyncio.run(
+                run_interactive(
+                    settings,
+                    profile,
+                    stream,
+                    thinking,
+                    preindex=preindex,
+                    renderer_choice=renderer,
+                    mode=mode,
+                    tool_budget=tool_budget,
+                    max_iterations=max_iterations,
+                )
+            )
 
 def _run_default_interactive() -> None:
     """Run the default interactive CLI mode with default options."""
@@ -171,6 +220,10 @@ async def run_oneshot(
     thinking: bool = False,
     formatter: Optional[Any] = None,
     preindex: bool = False,
+    renderer_choice: str = "auto",
+    mode: Optional[str] = None,
+    tool_budget: Optional[int] = None,
+    max_iterations: Optional[int] = None,
 ) -> None:
     """Run a single message and exit."""
     import time
@@ -198,7 +251,24 @@ async def run_oneshot(
 
     agent = None
     try:
+        if tool_budget is not None:
+            settings.tool_call_budget = tool_budget
+
         agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
+        
+        if tool_budget is not None:
+            agent.unified_tracker.set_tool_budget(tool_budget)
+        if max_iterations is not None:
+            agent.unified_tracker.max_total_iterations = max_iterations
+
+        if mode:
+            from victor.agent.mode_controller import AgentMode, get_mode_controller
+            controller = get_mode_controller()
+            try:
+                controller.switch_mode(AgentMode(mode))
+            except Exception:
+                # Fallback: ignore invalid mode silently (validated earlier)
+                pass
         
         if preindex:
             await preload_semantic_index(os.getcwd(), settings, console)
@@ -210,8 +280,11 @@ async def run_oneshot(
         model_name = None
 
         if stream and agent.provider.supports_streaming():
-            from victor.ui.stream_renderer import FormatterRenderer, stream_response
-            renderer = FormatterRenderer(formatter, console)
+            from victor.ui.stream_renderer import FormatterRenderer, LiveDisplayRenderer, stream_response
+            use_live = renderer_choice in {"rich", "auto"}
+            if renderer_choice in {"rich-text", "text"}:
+                use_live = False
+            renderer = LiveDisplayRenderer(console) if use_live else FormatterRenderer(formatter, console)
             content_buffer = await stream_response(agent, message, renderer)
         else:
             response = await agent.chat(message)
@@ -243,6 +316,10 @@ async def run_interactive(
     stream: bool,
     thinking: bool = False,
     preindex: bool = False,
+    renderer_choice: str = "auto",
+    mode: Optional[str] = None,
+    tool_budget: Optional[int] = None,
+    max_iterations: Optional[int] = None,
 ) -> None:
     """Run interactive CLI mode."""
     agent = None
@@ -254,13 +331,37 @@ async def run_interactive(
             console.print(f"[bold red]Error:[/ ] Profile '{profile}' not found")
             raise typer.Exit(1)
 
+        if tool_budget is not None:
+            settings.tool_call_budget = tool_budget
+
         agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
+        
+        if tool_budget is not None:
+            agent.unified_tracker.set_tool_budget(tool_budget)
+        if max_iterations is not None:
+            agent.unified_tracker.max_total_iterations = max_iterations
+
+        if mode:
+            from victor.agent.mode_controller import AgentMode, get_mode_controller
+            controller = get_mode_controller()
+            try:
+                controller.switch_mode(AgentMode(mode))
+            except Exception:
+                pass
         
         from victor.ui.commands import SlashCommandHandler
         cmd_handler = SlashCommandHandler(console, settings, agent)
         
         rl_suggestion = get_rl_profile_suggestion(profile_config.provider, profiles)
-        await _run_cli_repl(agent, settings, cmd_handler, profile_config, stream, rl_suggestion)
+        await _run_cli_repl(
+            agent,
+            settings,
+            cmd_handler,
+            profile_config,
+            stream,
+            rl_suggestion,
+            renderer_choice=renderer_choice,
+        )
 
     except Exception as e:
         console.print(f"[bold red]Error:[/ ] {str(e)}")
@@ -278,6 +379,7 @@ async def _run_cli_repl(
     profile_config: Any,
     stream: bool,
     rl_suggestion: Optional[tuple[str, str, float]] = None,
+    renderer_choice: str = "auto",
 ) -> None:
     """Run the CLI-based REPL (fallback for unsupported terminals)."""
     panel_content = (
@@ -326,9 +428,10 @@ async def _run_cli_repl(
 
             if stream:
                 from victor.agent.response_sanitizer import sanitize_response
-                from victor.ui.stream_renderer import LiveDisplayRenderer, stream_response
+                from victor.ui.stream_renderer import LiveDisplayRenderer, FormatterRenderer, stream_response
 
-                renderer = LiveDisplayRenderer(console)
+                use_live = renderer_choice in {"rich", "auto"}
+                renderer = LiveDisplayRenderer(console) if use_live else FormatterRenderer(create_formatter(), console)
                 content_buffer = await stream_response(agent, user_input, renderer)
                 content_buffer = sanitize_response(content_buffer)
             else:
