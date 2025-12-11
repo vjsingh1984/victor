@@ -512,6 +512,10 @@ class UnifiedTaskTracker:
         self._config_loader = UnifiedTaskConfigLoader()
         self._progress = UnifiedTaskProgress()
         self._task_config: Optional[TaskConfig] = None
+        self._sticky_user_budget: bool = False
+        self._allow_budget_override: bool = False
+        self._sticky_user_iterations: bool = False
+        self._allow_iteration_override: bool = False
 
         # Model-specific settings
         self._exploration_multiplier: float = 1.0
@@ -597,14 +601,43 @@ class UnifiedTaskTracker:
         """Set target files for the task."""
         self._progress.target_files = files
 
-    def set_tool_budget(self, budget: int) -> None:
+    def set_tool_budget(self, budget: int, user_override: bool = False) -> None:
         """Set the tool budget for this task.
 
         Args:
             budget: Maximum number of tool calls allowed
+            user_override: Mark this budget as sticky (prevents auto-adjustment)
         """
+        if self._sticky_user_budget and not user_override and not self._allow_budget_override:
+            logger.debug("UnifiedTaskTracker: sticky user budget set; skipping auto-adjustment")
+            return
+
+        if user_override:
+            self._allow_budget_override = True
+            self._sticky_user_budget = True
+
         self._progress.tool_budget = budget
         logger.debug(f"UnifiedTaskTracker: tool_budget set to {budget}")
+        self._allow_budget_override = False
+
+    def set_max_iterations(self, iterations: int, user_override: bool = False) -> None:
+        """Set the maximum total iterations allowed.
+
+        Args:
+            iterations: Maximum iterations
+            user_override: Mark this limit as sticky (prevents auto-adjustment)
+        """
+        if self._sticky_user_iterations and not user_override and not self._allow_iteration_override:
+            logger.debug("UnifiedTaskTracker: sticky user max iterations set; skipping auto-adjustment")
+            return
+
+        if user_override:
+            self._allow_iteration_override = True
+            self._sticky_user_iterations = True
+
+        self._max_total_iterations = iterations
+        logger.debug(f"UnifiedTaskTracker: max_total_iterations set to {iterations}")
+        self._allow_iteration_override = False
 
     def set_target_entities(self, entities: Set[str]) -> None:
         """Set target entities (functions, classes) for the task."""
@@ -1381,6 +1414,12 @@ class CompatConfig:
 
     @max_total_iterations.setter
     def max_total_iterations(self, value: int) -> None:
+        if (
+            self._tracker._sticky_user_iterations
+            and not self._tracker._allow_iteration_override
+        ):
+            logger.debug("UnifiedTaskTracker: sticky user max iterations set; skipping auto-adjustment")
+            return
         self._tracker._max_total_iterations = value
 
     @property
@@ -1389,6 +1428,12 @@ class CompatConfig:
 
     @tool_budget.setter
     def tool_budget(self, value: int) -> None:
+        if (
+            self._tracker._sticky_user_budget
+            and not self._tracker._allow_budget_override
+        ):
+            logger.debug("UnifiedTaskTracker: sticky user budget set; skipping auto-adjustment")
+            return
         self._tracker._progress.tool_budget = value
 
 

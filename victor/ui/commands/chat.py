@@ -310,9 +310,9 @@ async def run_oneshot(
         agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
         
         if tool_budget is not None:
-            agent.unified_tracker.set_tool_budget(tool_budget)
+            agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
         if max_iterations is not None:
-            agent.unified_tracker.max_total_iterations = max_iterations
+            agent.unified_tracker.set_max_iterations(max_iterations, user_override=True)
 
         if mode:
             from victor.agent.mode_controller import AgentMode, get_mode_controller
@@ -390,9 +390,9 @@ async def run_interactive(
         agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
         
         if tool_budget is not None:
-            agent.unified_tracker.set_tool_budget(tool_budget)
+            agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
         if max_iterations is not None:
-            agent.unified_tracker.max_total_iterations = max_iterations
+            agent.unified_tracker.set_max_iterations(max_iterations, user_override=True)
 
         if mode:
             from victor.agent.mode_controller import AgentMode, get_mode_controller
