@@ -3575,7 +3575,15 @@ class AgentOrchestrator:
                     f"cache_read={chunk.usage.get('cache_read_input_tokens', 0)}"
                 )
 
-            yield StreamChunk(content=self._sanitize_response(chunk.content or "")) if chunk.content else StreamChunk()
+            # Yield raw chunk; caller handles sanitization
+            yield StreamChunk(
+                content=chunk.content,
+                tool_calls=chunk.tool_calls,
+                prompt_cache=getattr(chunk, "prompt_cache", None),
+                cache_creation_input_tokens=getattr(chunk, "cache_creation_input_tokens", None),
+                cache_read_input_tokens=getattr(chunk, "cache_read_input_tokens", None),
+                usage=getattr(chunk, "usage", None),
+            )
 
             if tool_calls:
                 break
