@@ -1104,19 +1104,25 @@ class AgentOrchestrator:
 
     @property
     def code_correction_middleware(self) -> Optional[Any]:
-        """Get the code correction middleware for automatic code validation/fixing."""
+        """Get the code correction middleware for automatic code validation/fixing.
+        
+        Returns:
+            CodeCorrectionMiddleware instance or None if not enabled
+        """
         return self._code_correction_middleware
 
     @property
     def intelligent_integration(self) -> Optional["OrchestratorIntegration"]:
         """Get the intelligent pipeline integration (lazy initialization).
 
-        Returns None if intelligent pipeline is disabled or initialization fails.
         Use this for:
         - RL-based mode learning (explore → plan → build → review)
         - Response quality scoring
         - Provider resilience integration
         - Embedding-based prompt optimization
+        
+        Returns:
+            OrchestratorIntegration instance or None if disabled or failed to initialize
         """
         if not self._intelligent_pipeline_enabled:
             return None
@@ -1347,6 +1353,9 @@ class AgentOrchestrator:
                 description="Add input validation",
                 change_type="feat"
             )
+        
+        Returns:
+            AutoCommitter instance or None if not enabled
         """
         return self._auto_committer
 
@@ -1515,7 +1524,11 @@ class AgentOrchestrator:
         return self._metrics_collector.finalize_stream_metrics()
 
     def get_last_stream_metrics(self) -> Optional[StreamMetrics]:
-        """Get metrics from the last streaming session."""
+        """Get metrics from the last streaming session.
+        
+        Returns:
+            StreamMetrics from the last session or None if no metrics available
+        """
         return self._metrics_collector.get_last_stream_metrics()
 
     def get_streaming_metrics_summary(self) -> Optional[Dict[str, Any]]:
@@ -2340,7 +2353,11 @@ class AgentOrchestrator:
             return tools
 
         def get_tool_name(tool: Any) -> str:
-            """Extract tool name from ToolDefinition object or dict."""
+            """Extract tool name from ToolDefinition object or dict.
+            
+            Returns:
+                Tool name string or empty string if not found
+            """
             if hasattr(tool, "name"):
                 return tool.name
             elif isinstance(tool, dict):
@@ -3689,6 +3706,12 @@ class AgentOrchestrator:
         """Stream a chat response (public entrypoint).
 
         This method wraps the implementation to make phased refactors safer.
+        
+        Args:
+            user_message: User's input message
+            
+        Returns:
+            AsyncIterator yielding StreamChunk objects with incremental response
         """
         async for chunk in self._stream_chat_impl(user_message):
             yield chunk

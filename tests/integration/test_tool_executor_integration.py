@@ -47,6 +47,9 @@ def orchestrator(settings, mock_provider):
             provider=mock_provider,
             model="test-model",
         )
+    # Enable the canonical name for read/write tools used in tests
+    orc.tools.enable_tool("read")
+    orc.tools.enable_tool("write")
     return orc
 
 
@@ -71,7 +74,7 @@ class TestToolExecutorIntegration:
         """Test that _handle_tool_calls routes through ToolExecutor."""
         # Mock the tool_executor.execute method
         mock_result = ToolExecutionResult(
-            tool_name="read_file",
+            tool_name="read",  # Now using canonical name
             success=True,
             result="file contents here",
             error=None,
@@ -87,7 +90,8 @@ class TestToolExecutorIntegration:
             # Verify executor was called
             mock_exec.assert_called_once()
             call_kwargs = mock_exec.call_args
-            assert call_kwargs.kwargs["tool_name"] == "read_file"
+            # Now we expect the canonical name "read" (resolved from "read_file")
+            assert call_kwargs.kwargs["tool_name"] == "read"
 
             # Verify result was processed
             assert len(results) == 1
@@ -97,7 +101,7 @@ class TestToolExecutorIntegration:
     async def test_tool_executor_handles_failure(self, orchestrator):
         """Test that ToolExecutor failure is properly handled."""
         mock_result = ToolExecutionResult(
-            tool_name="read_file",
+            tool_name="read",  # Canonical name
             success=False,
             result=None,
             error="File not found",
