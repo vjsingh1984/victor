@@ -1129,16 +1129,18 @@ class AgentOrchestrator:
                 current_mode=current_mode,
             )
 
-            # Apply recommended tool budget if available
+            # Apply recommended tool budget if available (skip if user made a sticky override)
             if context.recommended_tool_budget:
-                current_budget = self.unified_tracker.config.get("max_total_iterations", 50)
-                # Only adjust if recommendation differs significantly
-                if abs(context.recommended_tool_budget - current_budget) > 5:
-                    new_budget = min(context.recommended_tool_budget, current_budget)
-                    self.unified_tracker.set_tool_budget(new_budget)
-                    logger.info(
-                        f"IntelligentPipeline adjusted tool budget: {current_budget} -> {new_budget}"
-                    )
+                sticky_budget = getattr(self.unified_tracker, "_sticky_user_budget", False)
+                if not sticky_budget:
+                    current_budget = self.unified_tracker.progress.tool_budget
+                    # Only adjust if recommendation differs significantly
+                    if abs(context.recommended_tool_budget - current_budget) > 5:
+                        new_budget = min(context.recommended_tool_budget, current_budget)
+                        self.unified_tracker.set_tool_budget(new_budget)
+                        logger.info(
+                            f"IntelligentPipeline adjusted tool budget: {current_budget} -> {new_budget}"
+                        )
 
             return {
                 "recommended_mode": context.recommended_mode,
@@ -2017,9 +2019,13 @@ class AgentOrchestrator:
             else:
                 self._system_prompt = base_system_prompt
 
-            # Update tool budget based on new adapter's recommendation
-            default_budget = max(self.tool_calling_caps.recommended_tool_budget, 50)
-            self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
+            # Update tool budget based on new adapter's recommendation unless user override is sticky
+            sticky_budget = getattr(self.unified_tracker, "_sticky_user_budget", False)
+            if sticky_budget:
+                logger.debug("Skipping tool budget reset on provider switch (sticky user override)")
+            else:
+                default_budget = max(self.tool_calling_caps.recommended_tool_budget, 50)
+                self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
 
             # Log the switch
             logger.info(
