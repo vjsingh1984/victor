@@ -39,7 +39,7 @@ appropriate extracted components, not added here.
 
 Recent Refactoring (December 2025):
 - Extracted ToolRegistrar from _register_default_tools, _initialize_plugins,
-  _setup_mcp_integration, _plan_tools, and _goal_hints_for_message
+    _setup_mcp_integration, _plan_tools, and _goal_hints_for_message
 - Added ProviderHealthChecker for proactive health monitoring
 - Added ResilienceMetricsExporter for dashboard integration
 - Added classification-aware tool selection in SemanticToolSelector
@@ -3575,16 +3575,6 @@ class AgentOrchestrator:
                     f"cache_read={chunk.usage.get('cache_read_input_tokens', 0)}"
                 )
 
-            # Yield raw chunk; caller handles sanitization
-            yield StreamChunk(
-                content=chunk.content,
-                tool_calls=chunk.tool_calls,
-                prompt_cache=getattr(chunk, "prompt_cache", None),
-                cache_creation_input_tokens=getattr(chunk, "cache_creation_input_tokens", None),
-                cache_read_input_tokens=getattr(chunk, "cache_read_input_tokens", None),
-                usage=getattr(chunk, "usage", None),
-            )
-
             if tool_calls:
                 break
 
@@ -3857,203 +3847,201 @@ class AgentOrchestrator:
                 if plain_text:
                     self.add_message("assistant", plain_text)
         elif not tool_calls:
-                # No content and no tool calls; attempt aggressive recovery
-                logger.warning("Model returned empty response - attempting aggressive recovery")
+            # No content and no tool calls; attempt aggressive recovery
+            logger.warning("Model returned empty response - attempting aggressive recovery")
 
-                # Check if model has thinking disable prefix (e.g., Qwen3 /no_think)
-                thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
-                if thinking_prefix:
-                    logger.debug(f"Using thinking disable prefix '{thinking_prefix}' for recovery")
+            # Check if model has thinking disable prefix (e.g., Qwen3 /no_think)
+            thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
+            if thinking_prefix:
+                logger.debug(f"Using thinking disable prefix '{thinking_prefix}' for recovery")
 
-                # Build recovery prompts - _get_thinking_disabled_prompt adds prefix if available
-                # Use simpler prompts and lower temps for models with thinking mode
-                has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
-                if has_thinking_mode:
-                    # Simpler prompts and lower temps for thinking models
-                    recovery_prompts = [
-                        (
-                            self._get_thinking_disabled_prompt(
-                                "Respond in 2-3 sentences: What files did you read and what did you find?"
-                            ),
-                            min(self.temperature + 0.1, 0.7),
+            # Build recovery prompts - _get_thinking_disabled_prompt adds prefix if available
+            # Use simpler prompts and lower temps for models with thinking mode
+            has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
+            if has_thinking_mode:
+                # Simpler prompts and lower temps for thinking models
+                recovery_prompts = [
+                    (
+                        self._get_thinking_disabled_prompt(
+                            "Respond in 2-3 sentences: What files did you read and what did you find?"
                         ),
-                        (
-                            self._get_thinking_disabled_prompt(
-                                "List 3 bullet points about the code you examined."
-                            ),
-                            min(self.temperature + 0.2, 0.8),
+                        min(self.temperature + 0.1, 0.7),
+                    ),
+                    (
+                        self._get_thinking_disabled_prompt(
+                            "List 3 bullet points about the code you examined."
                         ),
-                        (
-                            self._get_thinking_disabled_prompt(
-                                "One sentence answer: What is the main thing you learned?"
-                            ),
-                            min(self.temperature + 0.3, 0.9),
+                        min(self.temperature + 0.2, 0.8),
+                    ),
+                    (
+                        self._get_thinking_disabled_prompt(
+                            "One sentence answer: What is the main thing you learned?"
                         ),
-                    ]
-                else:
-                    # Standard recovery prompts
-                    recovery_prompts = [
-                        (
-                            "Summarize your findings so far. What files did you examine? "
-                            "What patterns or issues did you notice? Keep it brief.",
-                            min(self.temperature + 0.2, 1.0),
-                        ),
-                        (
-                            "Based on the code you've seen, list 3-5 observations or suggestions.",
-                            min(self.temperature + 0.3, 1.0),
-                        ),
-                        (
-                            "What did you learn from the files? One paragraph summary.",
-                            min(self.temperature + 0.4, 1.0),
-                        ),
-                    ]
+                        min(self.temperature + 0.3, 0.9),
+                    ),
+                ]
+            else:
+                # Standard recovery prompts
+                recovery_prompts = [
+                    (
+                        "Summarize your findings so far. What files did you examine? "
+                        "What patterns or issues did you notice? Keep it brief.",
+                        min(self.temperature + 0.2, 1.0),
+                    ),
+                    (
+                        "Based on the code you've seen, list 3-5 observations or suggestions.",
+                        min(self.temperature + 0.3, 1.0),
+                    ),
+                    (
+                        "What did you learn from the files? One paragraph summary.",
+                        min(self.temperature + 0.4, 1.0),
+                    ),
+                ]
 
-                recovery_success = False
-                for attempt, (prompt, temp) in enumerate(recovery_prompts, 1):
-                    logger.info(f"Recovery attempt {attempt}/3 with temp={temp:.1f}")
+            recovery_success = False
+            for attempt, (prompt, temp) in enumerate(recovery_prompts, 1):
+                logger.info(f"Recovery attempt {attempt}/3 with temp={temp:.1f}")
 
-                    # Create temporary message list to avoid polluting conversation history
-                    # Include only recent context (last 5 exchanges) to reduce token load
-                    recent_messages = (
-                        self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
-                    )
-                    recovery_messages = recent_messages + [Message(role="user", content=prompt)]
-
-                    try:
-                        response = await self.provider.chat(
-                            messages=recovery_messages,
-                            model=self.model,
-                            temperature=temp,
-                            max_tokens=min(self.max_tokens, 1024),  # Limit output for recovery
-                            tools=None,  # Force text response
-                        )
-                        if response and response.content:
-                            logger.debug(
-                                f"Recovery attempt {attempt}: got {len(response.content)} chars"
-                            )
-                            sanitized = self._sanitize_response(response.content)
-                            if sanitized and len(sanitized) > 20:
-                                self.add_message("assistant", sanitized)
-                                yield StreamChunk(content=sanitized, is_final=True)
-                                recovery_success = True
-                                break
-                            elif response.content and len(response.content) > 20:
-                                # Use raw if sanitization failed but content exists
-                                self.add_message("assistant", response.content)
-                                yield StreamChunk(content=response.content, is_final=True)
-                                recovery_success = True
-                                break
-                        else:
-                            logger.debug(f"Recovery attempt {attempt}: empty response")
-                    except Exception as exc:
-                        exc_str = str(exc)
-                        logger.warning(f"Recovery attempt {attempt} failed: {exc}")
-
-                        # Check for rate limit errors and extract wait time
-                        if "rate_limit" in exc_str.lower() or "429" in exc_str:
-                            import re
-
-                            # Try to extract "try again in X.XXs" or similar patterns
-                            wait_match = re.search(
-                                r"try again in (\d+(?:\.\d+)?)\s*s", exc_str, re.I
-                            )
-                            if wait_match:
-                                wait_time = float(wait_match.group(1))
-                                logger.info(
-                                    f"Rate limited. Waiting {wait_time:.1f}s before retry..."
-                                )
-                                await asyncio.sleep(
-                                    min(wait_time + 0.5, 30.0)
-                                )  # Add 0.5s buffer, cap at 30s
-                            else:
-                                # Default exponential backoff for rate limits
-                                backoff = min(2**attempt, 15)  # 2, 4, 8 seconds
-                                logger.info(f"Rate limited. Waiting {backoff}s before retry...")
-                                await asyncio.sleep(backoff)
-
-                if recovery_success:
-                    return
-
-                # All recovery attempts failed - provide helpful error
-                if is_analysis_task and self.tool_calls_used > 0:
-                    # Generate a minimal summary from what we know
-                    unique_resources = self.unified_tracker.unique_resources
-                    files_examined = list(unique_resources)[:10]
-                    fallback_msg = (
-                        f"\n\n**Analysis Summary** (auto-generated)\n\n"
-                        f"Examined {len(unique_resources)} files including:\n"
-                        + "\n".join(f"- {f}" for f in files_examined)
-                        + "\n\nThe model was unable to provide detailed analysis. "
-                        "Try with a simpler query like 'analyze victor/agent/' or use a different model."
-                    )
-                else:
-                    fallback_msg = "No tool calls were returned and the model provided no content. Please retry or simplify the request."
-                # Record outcome for Q-learning (fallback = partial failure)
-                self._record_intelligent_outcome(
-                    success=False,
-                    quality_score=0.3,  # Low quality since model didn't provide useful content
-                    user_satisfied=False,
-                    completed=False,
+                # Create temporary message list to avoid polluting conversation history
+                # Include only recent context (last 5 exchanges) to reduce token load
+                recent_messages = (
+                    self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
                 )
-                yield StreamChunk(content=fallback_msg, is_final=True)
+                recovery_messages = recent_messages + [Message(role="user", content=prompt)]
+
+                try:
+                    response = await self.provider.chat(
+                        messages=recovery_messages,
+                        model=self.model,
+                        temperature=temp,
+                        max_tokens=min(self.max_tokens, 1024),  # Limit output for recovery
+                        tools=None,  # Force text response
+                    )
+                    if response and response.content:
+                        logger.debug(
+                            f"Recovery attempt {attempt}: got {len(response.content)} chars"
+                        )
+                        sanitized = self._sanitize_response(response.content)
+                        if sanitized and len(sanitized) > 20:
+                            self.add_message("assistant", sanitized)
+                            yield StreamChunk(content=sanitized, is_final=True)
+                            recovery_success = True
+                            break
+                        elif response.content and len(response.content) > 20:
+                            # Use raw if sanitization failed but content exists
+                            self.add_message("assistant", response.content)
+                            yield StreamChunk(content=response.content, is_final=True)
+                            recovery_success = True
+                            break
+                    else:
+                        logger.debug(f"Recovery attempt {attempt}: empty response")
+                except Exception as exc:
+                    exc_str = str(exc)
+                    logger.warning(f"Recovery attempt {attempt} failed: {exc}")
+
+                    # Check for rate limit errors and extract wait time
+                    if "rate_limit" in exc_str.lower() or "429" in exc_str:
+                        import re
+
+                        # Try to extract "try again in X.XXs" or similar patterns
+                        wait_match = re.search(
+                            r"try again in (\d+(?:\.\d+)?)\s*s", exc_str, re.I
+                        )
+                        if wait_match:
+                            wait_time = float(wait_match.group(1))
+                            logger.info(
+                                f"Rate limited. Waiting {wait_time:.1f}s before retry..."
+                            )
+                            await asyncio.sleep(
+                                min(wait_time + 0.5, 30.0)
+                            )  # Add 0.5s buffer, cap at 30s
+                        else:
+                            # Default exponential backoff for rate limits
+                            backoff = min(2**attempt, 15)  # 2, 4, 8 seconds
+                            logger.info(f"Rate limited. Waiting {backoff}s before retry...")
+                            await asyncio.sleep(backoff)
+
+            if recovery_success:
                 return
 
-            # Record tool calls in progress tracker for loop detection
-            # Progress tracker handles unique resource tracking internally
-            for tc in tool_calls or []:
-                tool_name = tc.get("name", "")
-                tool_args = tc.get("arguments", {})
-
-                # Record tool call in unified tracker (single source of truth)
-                self.unified_tracker.record_tool_call(tool_name, tool_args)
-
-            content_length = len(full_content.strip())
-
-            # Record iteration in unified tracker (single source of truth)
-            self.unified_tracker.record_iteration(content_length)
-
-            # Intelligent pipeline post-iteration hook: validate response quality
-            # This enables quality scoring, hallucination detection, and Q-learning feedback
-            if full_content and len(full_content.strip()) > 50:
-                quality_result = await self._validate_intelligent_response(
-                    response=full_content,
-                    query=user_message,
-                    tool_calls=self.tool_calls_used,
-                    task_type=unified_task_type.value,
+            # All recovery attempts failed - provide helpful error
+            if is_analysis_task and self.tool_calls_used > 0:
+                # Generate a minimal summary from what we know
+                unique_resources = self.unified_tracker.unique_resources
+                files_examined = list(unique_resources)[:10]
+                fallback_msg = (
+                    f"\n\n**Analysis Summary** (auto-generated)\n\n"
+                    f"Examined {len(unique_resources)} files including:\n"
+                    + "\n".join(f"- {f}" for f in files_examined)
+                    + "\n\nThe model was unable to provide detailed analysis. "
+                    "Try with a simpler query like 'analyze victor/agent/' or use a different model."
                 )
-                if quality_result and not quality_result.get("is_grounded", True):
-                    # Log grounding issues for debugging
-                    issues = quality_result.get("grounding_issues", [])
-                    if issues:
-                        logger.warning(
-                            f"IntelligentPipeline detected grounding issues: {issues[:3]}"
-                        )
-                # Update quality score for Q-learning outcome recording
-                if quality_result:
-                    last_quality_score = quality_result.get("quality_score", last_quality_score)
+            else:
+                fallback_msg = "No tool calls were returned and the model provided no content. Please retry or simplify the request."
+            # Record outcome for Q-learning (fallback = partial failure)
+            self._record_intelligent_outcome(
+                success=False,
+                quality_score=0.3,  # Low quality since model didn't provide useful content
+                user_satisfied=False,
+                completed=False,
+            )
+            yield StreamChunk(content=fallback_msg, is_final=True)
+            return
 
-            # Check for loop warning using UnifiedTaskTracker (primary)
-            # This gives the model a chance to correct behavior before we force stop
-            unified_loop_warning = self.unified_tracker.check_loop_warning()
-            if unified_loop_warning and not force_completion:
-                logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
-                yield StreamChunk(
-                    content=f"\n[loop] ⚠ Warning: Approaching loop limit - {unified_loop_warning}\n"
-                )
-                # Inject system message to warn the model
-                self.add_message(
-                    "system",
-                    "WARNING: You are about to hit loop detection. You have been performing "
-                    "the same operation repeatedly (e.g., writing the same file, making the same call). "
-                    "Please do something DIFFERENT now:\n"
-                    "- If you're writing a file repeatedly, STOP and move to a different task\n"
-                    "- If you're stuck, provide your current progress and ask for clarification\n"
-                    "- If you've completed the task, provide a summary and finish\n\n"
-                    "Continuing the same operation will force the conversation to end.",
-                )
-                # Continue to give the model one more chance
-                continue
+        # Record tool calls in progress tracker for loop detection
+        # Progress tracker handles unique resource tracking internally
+        for tc in tool_calls or []:
+            tool_name = tc.get("name", "")
+            tool_args = tc.get("arguments", {})
 
+            # Record tool call in unified tracker (single source of truth)
+            self.unified_tracker.record_tool_call(tool_name, tool_args)
+
+        content_length = len(full_content.strip())
+
+        # Record iteration in unified tracker (single source of truth)
+        self.unified_tracker.record_iteration(content_length)
+
+        # Intelligent pipeline post-iteration hook: validate response quality
+        # This enables quality scoring, hallucination detection, and Q-learning feedback
+        if full_content and len(full_content.strip()) > 50:
+            quality_result = await self._validate_intelligent_response(
+                response=full_content,
+                query=user_message,
+                tool_calls=self.tool_calls_used,
+                task_type=unified_task_type.value,
+            )
+            if quality_result and not quality_result.get("is_grounded", True):
+                # Log grounding issues for debugging
+                issues = quality_result.get("grounding_issues", [])
+                if issues:
+                    logger.warning(
+                        f"IntelligentPipeline detected grounding issues: {issues[:3]}"
+                    )
+            # Update quality score for Q-learning outcome recording
+            if quality_result:
+                last_quality_score = quality_result.get("quality_score", last_quality_score)
+
+        # Check for loop warning using UnifiedTaskTracker (primary)
+        # This gives the model a chance to correct behavior before we force stop
+        unified_loop_warning = self.unified_tracker.check_loop_warning()
+        if unified_loop_warning and not force_completion:
+            logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
+            yield StreamChunk(
+                content=f"\n[loop] ⚠ Warning: Approaching loop limit - {unified_loop_warning}\n"
+            )
+            # Inject system message to warn the model
+            self.add_message(
+                "system",
+                "WARNING: You are about to hit loop detection. You have been performing "
+                "the same operation repeatedly (e.g., writing the same file, making the same call). "
+                "Please do something DIFFERENT now:\n"
+                "- If you're writing a file repeatedly, STOP and move to a different task\n"
+                "- If you're stuck, provide your current progress and ask for clarification\n"
+                "- If you've completed the task, provide a summary and finish\n\n"
+                "Continuing the same operation will force the conversation to end.",
+            )
+        else:
             # PRIMARY: Check UnifiedTaskTracker for stop decision (single source of truth)
             unified_should_force, unified_hint = self.unified_tracker.should_force_action()
             if unified_should_force and not force_completion:
@@ -4126,80 +4114,85 @@ class AgentOrchestrator:
                 else:
                     logger.info(f"Continuation action: {action} - {action_result['reason']}")
 
+                skip_rest = False
+
                 # Handle action: continue_asking_input
                 if action == "continue_asking_input":
                     self.add_message("user", action_result["message"])
-                    continue
+                    skip_rest = True
 
                 # Handle action: return_to_user
-                if action == "return_to_user":
-                    break
+                elif action == "return_to_user":
+                    return
 
                 # Handle action: prompt_tool_call
-                if action == "prompt_tool_call":
+                elif action == "prompt_tool_call":
                     self.add_message("system", action_result["message"])
                     self.unified_tracker.increment_turn()
-                    continue
+                    skip_rest = True
 
                 # Handle action: request_summary
-                if action == "request_summary":
+                elif action == "request_summary":
                     self.add_message("system", action_result["message"])
-                    continue
+                    skip_rest = True
 
                 # Handle action: request_completion
-                if action == "request_completion":
+                elif action == "request_completion":
                     self.add_message("system", action_result["message"])
-                    continue
+                    skip_rest = True
 
-                # Handle action: finish - No more tool calls requested
-                # Display performance metrics
-                elapsed_time = time.time() - start_time
-
-                # Build token usage summary
-                # Use actual provider-reported usage if available, else use estimate
-                if cumulative_usage["total_tokens"] > 0:
-                    # Provider-reported tokens (accurate)
-                    input_tokens = cumulative_usage["prompt_tokens"]
-                    output_tokens = cumulative_usage["completion_tokens"]
-                    _display_tokens = cumulative_usage["total_tokens"]
-                    cache_read = cumulative_usage.get("cache_read_input_tokens", 0)
-                    cache_create = cumulative_usage.get("cache_creation_input_tokens", 0)
-
-                    # Build metrics line
-                    tokens_per_second = output_tokens / elapsed_time if elapsed_time > 0 else 0
-                    metrics_parts = [
-                        f"📊 in={input_tokens:,}",
-                        f"out={output_tokens:,}",
-                    ]
-                    if cache_read > 0:
-                        metrics_parts.append(f"cached={cache_read:,}")
-                    if cache_create > 0:
-                        metrics_parts.append(f"cache_new={cache_create:,}")
-                    metrics_parts.extend(
-                        [
-                            f"| {elapsed_time:.1f}s",
-                            f"| {tokens_per_second:.1f} tok/s",
-                        ]
-                    )
-                    metrics_line = " ".join(metrics_parts)
+                if skip_rest:
+                    pass
                 else:
-                    # Fallback to estimate
-                    tokens_per_second = total_tokens / elapsed_time if elapsed_time > 0 else 0
-                    metrics_line = (
-                        f"📊 ~{total_tokens:.0f} tokens (est.) | "
-                        f"{elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s"
-                    )
+                    # Handle action: finish - No more tool calls requested
+                    # Display performance metrics
+                    elapsed_time = time.time() - start_time
 
-                yield StreamChunk(content=f"\n\n{metrics_line}\n")
-                # Record outcome for Q-learning (normal completion = success)
-                self._record_intelligent_outcome(
-                    success=True,
-                    quality_score=last_quality_score,
-                    user_satisfied=True,
-                    completed=True,
-                )
-                yield StreamChunk(content="", is_final=True)
-                break
+                    # Build token usage summary
+                    # Use actual provider-reported usage if available, else use estimate
+                    if cumulative_usage["total_tokens"] > 0:
+                        # Provider-reported tokens (accurate)
+                        input_tokens = cumulative_usage["prompt_tokens"]
+                        output_tokens = cumulative_usage["completion_tokens"]
+                        _display_tokens = cumulative_usage["total_tokens"]
+                        cache_read = cumulative_usage.get("cache_read_input_tokens", 0)
+                        cache_create = cumulative_usage.get("cache_creation_input_tokens", 0)
+
+                        # Build metrics line
+                        tokens_per_second = output_tokens / elapsed_time if elapsed_time > 0 else 0
+                        metrics_parts = [
+                            f"📊 in={input_tokens:,}",
+                            f"out={output_tokens:,}",
+                        ]
+                        if cache_read > 0:
+                            metrics_parts.append(f"cached={cache_read:,}")
+                        if cache_create > 0:
+                            metrics_parts.append(f"cache_new={cache_create:,}")
+                        metrics_parts.extend(
+                            [
+                                f"| {elapsed_time:.1f}s",
+                                f"| {tokens_per_second:.1f} tok/s",
+                            ]
+                        )
+                        metrics_line = " ".join(metrics_parts)
+                    else:
+                        # Fallback to estimate
+                        tokens_per_second = total_tokens / elapsed_time if elapsed_time > 0 else 0
+                        metrics_line = (
+                            f"📊 ~{total_tokens:.0f} tokens (est.) | "
+                            f"{elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s"
+                        )
+
+                    yield StreamChunk(content=f"\n\n{metrics_line}\n")
+                    # Record outcome for Q-learning (normal completion = success)
+                    self._record_intelligent_outcome(
+                        success=True,
+                        quality_score=last_quality_score,
+                        user_satisfied=True,
+                        completed=True,
+                    )
+                    yield StreamChunk(content="", is_final=True)
+                    return
 
             remaining = max(0, self.tool_budget - self.tool_calls_used)
 
@@ -4257,7 +4250,7 @@ class AgentOrchestrator:
                     content=f"\n📊 {total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}\n",
                     is_final=True,
                 )
-                break
+                return
 
             # Force final response after too many consecutive tool calls without output
             # This prevents endless tool call loops
@@ -4338,7 +4331,7 @@ class AgentOrchestrator:
                     yield StreamChunk(
                         content="Unable to generate final summary. Please try a simpler query."
                     )
-                break  # Exit the loop after forcing final response
+                return  # Exit the loop after forcing final response
 
             tool_calls = tool_calls[:remaining]
 
