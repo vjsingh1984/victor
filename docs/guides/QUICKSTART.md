@@ -57,40 +57,21 @@ ollama pull codellama:13b
 
 ## First Run
 
-### Interactive Mode (TUI - Default)
-
-Victor features a modern **Text User Interface (TUI)** with a rich terminal experience:
+### Streaming CLI (Default)
 
 ```bash
-# Start interactive TUI mode (default)
+# Start streaming chat (Rich output by default)
 victor chat
-
-# Or simply
-victor
 ```
 
-**TUI Features:**
-- Modern terminal interface with colors and formatting
-- Status bar showing provider, model, and tool budget
-- Message history with user/assistant distinction
-- Keyboard shortcuts (Ctrl+C to cancel, Ctrl+D to quit)
-- Logs written to `~/.victor/logs/victor.log`
-
-![TUI Screenshot](../../assets/victor-tui.png)
-
-### CLI Mode (For Debugging)
-
-Use `--no-tui` or `--cli` flag for classic console output with visible logs:
+### Plain/Debug Output
 
 ```bash
-# CLI mode with debug logging
-victor chat --no-tui --log-level DEBUG
-
-# Or use the shorter alias
-victor chat --cli --log-level DEBUG
+# Force plain text and show debug logs
+victor chat --renderer text --log-level DEBUG
 ```
 
-**When to use CLI mode:**
+**When to use plain mode:**
 - Debugging issues (see all log output in console)
 - Running in non-interactive terminals
 - Piping output to files
