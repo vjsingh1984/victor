@@ -145,6 +145,10 @@ def chat(
         if log_level == "WARN":
             log_level = "WARNING"
 
+        # For troubleshooting, prefer plain text output when verbose logging is enabled
+        if log_level in {"DEBUG", "INFO"}:
+            renderer = "text"
+
         configure_logging(log_level, stream=sys.stderr)
         
         from victor.agent.debug_logger import configure_logging_levels
