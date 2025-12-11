@@ -3087,14 +3087,33 @@ class AgentOrchestrator:
                     fallback_content = self.response_completer.format_tool_failure_message(
                         failure_context
                     )
-                self.add_message("assistant", fallback_content)
-                final_response = CompletionResponse(
-                    content=fallback_content,
-                    role="assistant",
-                    tool_calls=None,
-                )
+        self.add_message("assistant", fallback_content)
+        final_response = CompletionResponse(
+            content=fallback_content,
+            role="assistant",
+            tool_calls=None,
+        )
 
         return final_response
+
+    def _handle_cancellation(self, last_quality_score: float) -> Optional[StreamChunk]:
+        """Handle user cancellation if requested."""
+        if not self._check_cancellation():
+            return None
+
+        logger.info("Stream cancelled by user request")
+        self._is_streaming = False
+        # Record outcome for Q-learning (cancelled = incomplete)
+        self._record_intelligent_outcome(
+            success=False,
+            quality_score=last_quality_score,
+            user_satisfied=False,
+            completed=False,
+        )
+        return StreamChunk(
+            content="\n\n[Cancelled by user]\n",
+            is_final=True,
+        )
 
     async def _prepare_stream(
         self, user_message: str
@@ -3440,21 +3459,9 @@ class AgentOrchestrator:
         last_quality_score = 0.5
 
         while True:
-            # Check for cancellation request
-            if self._check_cancellation():
-                logger.info("Stream cancelled by user request")
-                self._is_streaming = False
-                # Record outcome for Q-learning (cancelled = incomplete)
-                self._record_intelligent_outcome(
-                    success=False,
-                    quality_score=last_quality_score,
-                    user_satisfied=False,
-                    completed=False,
-                )
-                yield StreamChunk(
-                    content="\n\n[Cancelled by user]\n",
-                    is_final=True,
-                )
+            cancellation_chunk = self._handle_cancellation(last_quality_score)
+            if cancellation_chunk:
+                yield cancellation_chunk
                 return
 
             # Proactive context compaction check (triggers before overflow)
