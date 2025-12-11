@@ -3245,6 +3245,82 @@ class AgentOrchestrator:
 
         return task_classification, complexity_tool_budget
 
+    def _apply_intent_guard(self, user_message: str) -> None:
+        """Detect intent and inject prompt guards for read-only tasks."""
+        intent_result = self.intent_detector.detect(user_message)
+        self._current_intent = intent_result.intent
+        if intent_result.intent in (ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY):
+            if intent_result.prompt_guard:
+                self.add_message("system", intent_result.prompt_guard.strip())
+                logger.info(f"Intent: {intent_result.intent.value}, injected prompt guard")
+        elif intent_result.intent == ActionIntent.WRITE_ALLOWED:
+            logger.info("Intent: write_allowed, no prompt guard needed")
+
+    def _apply_task_guidance(
+        self,
+        user_message: str,
+        unified_task_type: TaskType,
+        is_analysis_task: bool,
+        is_action_task: bool,
+        needs_execution: bool,
+        max_exploration_iterations: int,
+    ) -> None:
+        """Apply guidance and budget tweaks for analysis/action tasks."""
+        if is_analysis_task:
+            analysis_temp = min(self.temperature + 0.2, 1.0)
+            logger.info(
+                f"Analysis task: increasing temperature {self.temperature:.1f} -> {analysis_temp:.1f}"
+            )
+            self.temperature = analysis_temp
+
+            self.add_message(
+                "system",
+                "ANALYSIS APPROACH: Work through the codebase one module at a time. "
+                "For each module: 1) List its files, 2) Read 2-3 key files, 3) Note observations. "
+                "After examining 3-4 modules, provide your summary. Keep responses concise.",
+            )
+
+            original_budget = self.tool_budget
+            self.tool_budget = max(self.tool_budget, 200)
+            if self.tool_budget != original_budget:
+                logger.info(
+                    f"Analysis task: increased tool_budget from {original_budget} to {self.tool_budget}"
+                )
+
+            self.add_message(
+                "system",
+                "This is an ANALYSIS task requiring thorough exploration of the codebase. "
+                "You MUST systematically examine multiple modules and files using tools like "
+                "read_file, list_directory, and code_search. "
+                "DO NOT stop after examining just a few files. "
+                "Continue using tools until you have gathered comprehensive information about "
+                "all major components of the codebase. "
+                "Only provide your final analysis AFTER you have examined all relevant modules.",
+            )
+
+        if is_action_task:
+            logger.info(
+                f"Detected action-oriented task - allowing up to {max_exploration_iterations} exploration iterations"
+            )
+
+            if needs_execution:
+                self.add_message(
+                    "system",
+                    "This is an action-oriented task requiring execution. "
+                    "Follow this workflow: "
+                    "1. CREATE the file/script with write_file or edit_files "
+                    "2. EXECUTE it immediately with execute_bash (don't skip this step!) "
+                    "3. SHOW the output to the user. "
+                    "Minimize exploration and proceed directly to create→execute→show results.",
+                )
+            else:
+                self.add_message(
+                    "system",
+                    "This is an action-oriented task (create/write/build). "
+                    "Minimize exploration and proceed directly to creating what was requested. "
+                    "Only explore if absolutely necessary to complete the task.",
+                )
+
     async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
         """Stream a chat response (public entrypoint).
 
@@ -3285,15 +3361,7 @@ class AgentOrchestrator:
         ) = await self._prepare_stream(user_message)
 
         # Detect intent and inject prompt guard for non-write tasks
-        intent_result = self.intent_detector.detect(user_message)
-        # Store intent for tool filtering (accessible throughout session)
-        self._current_intent = intent_result.intent
-        if intent_result.intent in (ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY):
-            if intent_result.prompt_guard:
-                self.add_message("system", intent_result.prompt_guard.strip())
-                logger.info(f"Intent: {intent_result.intent.value}, injected prompt guard")
-        elif intent_result.intent == ActionIntent.WRITE_ALLOWED:
-            logger.info("Intent: write_allowed, no prompt guard needed")
+        self._apply_intent_guard(user_message)
 
         # Get tool definitions
         # Iteratively stream → run tools → stream follow-up until no tool calls or budget exhausted
@@ -3318,45 +3386,15 @@ class AgentOrchestrator:
             f"unified={unified_task_type.value}, is_analysis={is_analysis_task}, is_action={is_action_task}"
         )
 
-        # For analysis tasks: increase temperature to reduce repetition/getting stuck
-        if is_analysis_task:
-            # Bump temperature for analysis tasks (helps prevent getting stuck)
-            analysis_temp = min(self.temperature + 0.2, 1.0)
-            logger.info(
-                f"Analysis task: increasing temperature {self.temperature:.1f} -> {analysis_temp:.1f}"
-            )
-            self.temperature = analysis_temp
-
-            # Add simplified analysis guidance - focus on one module at a time
-            self.add_message(
-                "system",
-                "ANALYSIS APPROACH: Work through the codebase one module at a time. "
-                "For each module: 1) List its files, 2) Read 2-3 key files, 3) Note observations. "
-                "After examining 3-4 modules, provide your summary. Keep responses concise.",
-            )
-
-        # Add guidance for analysis tasks - encourage thorough exploration
-        if is_analysis_task:
-            # Increase tool budget for analysis tasks
-            original_budget = self.tool_budget
-            self.tool_budget = max(
-                self.tool_budget, 200
-            )  # Allow at least 200 tool calls for analysis
-            if self.tool_budget != original_budget:
-                logger.info(
-                    f"Analysis task: increased tool_budget from {original_budget} to {self.tool_budget}"
-                )
-
-            self.add_message(
-                "system",
-                "This is an ANALYSIS task requiring thorough exploration of the codebase. "
-                "You MUST systematically examine multiple modules and files using tools like "
-                "read_file, list_directory, and code_search. "
-                "DO NOT stop after examining just a few files. "
-                "Continue using tools until you have gathered comprehensive information about "
-                "all major components of the codebase. "
-                "Only provide your final analysis AFTER you have examined all relevant modules.",
-            )
+        # Apply guidance for analysis/action tasks
+        self._apply_task_guidance(
+            user_message,
+            unified_task_type,
+            is_analysis_task,
+            is_action_task,
+            needs_execution,
+            max_exploration_iterations,
+        )
 
         # Add guidance for action-oriented tasks
         if is_action_task:
