@@ -3530,8 +3530,17 @@ class AgentOrchestrator:
         start_time: float,
         stream_metrics: Any,
         cumulative_usage: Dict[str, int],
-    ) -> tuple[str, Any, float]:
-        """Stream response from provider and return full content/tool_calls/tokens."""
+    ) -> tuple[str, Any, float, bool]:
+        """
+        Stream response from provider and return the full content, tool_calls, total tokens, and garbage detection flag.
+
+        Returns:
+            tuple:
+                - full_content (str): The accumulated content from the provider stream.
+                - tool_calls (Any): Tool calls detected in the stream, if any.
+                - total_tokens (float): Estimated total tokens in the streamed content.
+                - garbage_detected (bool): True if garbage content was detected and the stream was stopped early, otherwise False.
+        """
         full_content = ""
         tool_calls = None
         garbage_detected = False
@@ -3582,7 +3591,7 @@ class AgentOrchestrator:
             logger.info("Setting force_completion due to garbage detection")
             # Caller will set force_completion on return
 
-        return full_content, tool_calls, total_tokens
+        return full_content, tool_calls, total_tokens, garbage_detected
 
     def _handle_stream_chunk(
         self,
@@ -3778,7 +3787,7 @@ class AgentOrchestrator:
                 # Anthropic extended thinking format
                 provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
 
-            full_content, tool_calls, total_tokens = await self._stream_provider_response(
+            full_content, tool_calls, total_tokens, garbage_detected = await self._stream_provider_response(
                 tools=tools,
                 provider_kwargs=provider_kwargs,
                 start_time=start_time,
@@ -4346,6 +4355,7 @@ class AgentOrchestrator:
                     yield StreamChunk(content=f"\n[loop] ⛔ {block_reason}\n")
                     # Inject message to guide model to different approach
                     self.add_message(
+                        # amazonq-ignore-next-line
                         "system",
                         f"BLOCKED: {block_reason}\n"
                         "You MUST try a different approach. Do NOT repeat the same operation.\n"
@@ -4355,7 +4365,10 @@ class AgentOrchestrator:
                 else:
                     filtered_tool_calls.append(tc)
 
-            if filtered_tool_calls or not tool_calls:
+            if not filtered_tool_calls and tool_calls:
+                # All tool calls were blocked - continue loop for model to respond
+                pass
+            else:
                 tool_calls = filtered_tool_calls
 
                 for tool_call in tool_calls:
@@ -4365,17 +4378,17 @@ class AgentOrchestrator:
                     status_msg = self._get_tool_status_message(tool_name, tool_args)
                     # Emit structured tool_start event for CLI to format with arguments
                     yield StreamChunk(
-                    content="",
-                    metadata={
-                        "tool_start": {
-                            "name": tool_name,
-                            "arguments": tool_args,
-                            "status_msg": status_msg,
-                        }
-                    },
-                )
+                        content="",
+                        metadata={
+                            "tool_start": {
+                                "name": tool_name,
+                                "arguments": tool_args,
+                                "status_msg": status_msg,
+                            }
+                        },
+                    )
 
-            tool_results = await self._handle_tool_calls(tool_calls)
+                tool_results = await self._handle_tool_calls(tool_calls)
             for result in tool_results:
                 tool_name = result.get("name", "tool")
                 elapsed = result.get("elapsed", 0.0)
@@ -4940,11 +4953,12 @@ class AgentOrchestrator:
 
             # Restore messages to in-memory conversation
             self.conversation.clear()
-            # Batch restore messages to avoid repeated dict access
-            messages = [(msg.to_provider_format()["role"], msg.to_provider_format()["content"]) 
-                       for msg in session.messages]
-            for role, content in messages:
-                self.conversation.add_message(role=role, content=content)
+            for msg in session.messages:
+                provider_msg = msg.to_provider_format()
+                self.conversation.add_message(
+                    role=provider_msg["role"],
+                    content=provider_msg["content"],
+                )
 
             logger.info(
                 f"Recovered session {session_id[:8]}... " f"with {len(session.messages)} messages"
@@ -4968,7 +4982,7 @@ class AgentOrchestrator:
             List of messages in provider format
         """
         if not self.memory_manager or not self._memory_session_id:
-            # Cache in-memory conversion to avoid repeated model_dump calls
+            # Fall back to in-memory conversation
             return [msg.model_dump() for msg in self.messages]
 
         try:
@@ -4976,8 +4990,8 @@ class AgentOrchestrator:
                 session_id=self._memory_session_id,
                 max_tokens=max_tokens,
             )
-        except Exception:
-            # Avoid expensive string formatting in hot path
+        except Exception as e:
+            logger.warning(f"Failed to get memory context: {e}, using in-memory")
             return [msg.model_dump() for msg in self.messages]
 
     def get_session_stats(self) -> Dict[str, Any]:
@@ -5002,19 +5016,15 @@ class AgentOrchestrator:
                     "error": "Session not found",
                 }
 
-            # Pre-calculate values to avoid redundant operations
-            message_count = len(session.messages)
             total_tokens = sum(m.token_count for m in session.messages)
-            used_tokens = session.reserved_tokens + total_tokens
-            
             return {
                 "enabled": True,
                 "session_id": self._memory_session_id,
-                "message_count": message_count,
+                "message_count": len(session.messages),
                 "total_tokens": total_tokens,
                 "max_tokens": session.max_tokens,
                 "reserved_tokens": session.reserved_tokens,
-                "available_tokens": session.max_tokens - used_tokens,
+                "available_tokens": session.max_tokens - session.reserved_tokens - total_tokens,
                 "project_path": session.project_path,
                 "provider": session.provider,
                 "model": session.model,
@@ -5038,13 +5048,13 @@ class AgentOrchestrator:
 
         # Cancel all background tasks first
         if self._background_tasks:
-            # Batch cancel active tasks
-            active_tasks = [task for task in self._background_tasks if not task.done()]
-            if active_tasks:
-                logger.debug(f"Cancelling {len(active_tasks)} background task(s)...")
-                for task in active_tasks:
+            logger.debug("Cancelling %d background task(s)...", len(self._background_tasks))
+            for task in self._background_tasks:
+                if not task.done():
                     task.cancel()
-                # Wait for all tasks to complete cancellation
+
+            # Wait for all tasks to complete cancellation
+            if self._background_tasks:
                 await asyncio.gather(*self._background_tasks, return_exceptions=True)
             self._background_tasks.clear()
             logger.debug("Background tasks cancelled")
@@ -5058,31 +5068,29 @@ class AgentOrchestrator:
             },
         )
 
-        # Batch resource cleanup with minimal exception handling
-        cleanup_tasks = []
-        
+        # Close provider connection
         if self.provider:
-            cleanup_tasks.append(("provider", self.provider.close()))
-        
-        if self.semantic_selector:
-            cleanup_tasks.append(("semantic_selector", self.semantic_selector.close()))
-            
-        # Execute async cleanups concurrently
-        if cleanup_tasks:
-            results = await asyncio.gather(
-                *[task[1] for task in cleanup_tasks], 
-                return_exceptions=True
-            )
-            for (name, _), result in zip(cleanup_tasks, results):
-                if isinstance(result, Exception):
-                    logger.warning(f"Error closing {name}: {result}")
-        
-        # Sync cleanup
+            try:
+                await self.provider.close()
+                logger.debug("Provider connection closed")
+            except (AttributeError, RuntimeError, ConnectionError) as e:
+                logger.warning("Error closing provider: %s", str(e))
+
+        # Stop code execution manager (cleans up Docker containers)
         if hasattr(self, "code_manager") and self.code_manager:
             try:
                 self.code_manager.stop()
-            except Exception:
-                pass  # Silent fail for performance
+                logger.debug("Code execution manager stopped")
+            except Exception as e:
+                logger.warning(f"Error stopping code manager: {e}")
+
+        # Close semantic selector
+        if self.semantic_selector:
+            try:
+                await self.semantic_selector.close()
+                logger.debug("Semantic selector closed")
+            except (AttributeError, RuntimeError, ConnectionError) as e:
+                logger.warning("Error closing semantic selector: %s", str(e))
 
         # Signal shutdown to EmbeddingService singleton
         # This prevents post-shutdown embedding operations
