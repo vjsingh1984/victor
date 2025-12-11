@@ -58,6 +58,19 @@ victor init
 victor chat
 ```
 
+**Common CLI overrides**
+
+```bash
+# Pick a provider/model directly (bypasses profiles.yaml)
+victor chat --provider ollama --model qwen3-coder:30b --endpoint http://localhost:11434
+
+# Switch output renderer (auto|rich|rich-text|text); text is best for debugging
+victor chat --renderer text --log-level DEBUG "Hi"
+
+# Set initial mode (build|plan|explore) and tighten budgets
+victor chat --mode explore --tool-budget 20 --max-iterations 60
+```
+
 <details>
 <summary><b>Local Model (Free, Private)</b></summary>
 

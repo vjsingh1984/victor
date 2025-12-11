@@ -1214,7 +1214,7 @@ flowchart TD
 victor providers                    # List available providers
 victor keys --list                  # Check configured API keys
 victor chat -p groqcloud "test"     # Quick test
-victor chat -p groqcloud --log-level DEBUG "test"  # Debug mode
+victor chat -p groqcloud --renderer text --log-level DEBUG "test"  # Debug mode
 ```
 
 ---

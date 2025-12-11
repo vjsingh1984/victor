@@ -77,6 +77,20 @@ victor chat --renderer text --log-level DEBUG
 - Piping output to files
 - CI/CD environments
 
+### Provider/Model Overrides
+
+```bash
+# Override provider/model (bypass profiles.yaml) and set endpoint for local providers
+victor chat --provider ollama --model qwen3-coder:30b --endpoint http://localhost:11434
+```
+
+### Modes and Budgets
+
+```bash
+# Start in explore mode with tighter budgets
+victor chat --mode explore --tool-budget 20 --max-iterations 60
+```
+
 ### One-Shot Command
 
 ```bash
