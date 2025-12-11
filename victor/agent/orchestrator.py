@@ -3115,6 +3115,36 @@ class AgentOrchestrator:
             is_final=True,
         )
 
+    def _handle_compaction(self, user_message: str) -> Optional[StreamChunk]:
+        """Perform proactive compaction if enabled."""
+        if not (hasattr(self, "_context_compactor") and self._context_compactor):
+            return None
+
+        compaction_action = self._context_compactor.check_and_compact(
+            current_query=user_message
+        )
+        if not compaction_action.action_taken:
+            return None
+
+        logger.info(
+            f"Proactive compaction: {compaction_action.trigger.value}, "
+            f"removed {compaction_action.messages_removed} messages, "
+            f"freed {compaction_action.chars_freed:,} chars"
+        )
+        chunk: Optional[StreamChunk] = None
+        if compaction_action.messages_removed > 0:
+            chunk = StreamChunk(
+                content=(
+                    f"\n[context] Proactively compacted history "
+                    f"({compaction_action.messages_removed} messages, "
+                    f"{compaction_action.chars_freed:,} chars freed).\n"
+                )
+            )
+            # Inject context reminder about compacted content
+            self._conversation_controller.inject_compaction_context()
+
+        return chunk
+
     async def _prepare_stream(
         self, user_message: str
     ) -> tuple[
@@ -3464,26 +3494,9 @@ class AgentOrchestrator:
                 yield cancellation_chunk
                 return
 
-            # Proactive context compaction check (triggers before overflow)
-            # This prevents context overflow by compacting at 70% utilization
-            if hasattr(self, "_context_compactor") and self._context_compactor:
-                compaction_action = self._context_compactor.check_and_compact(
-                    current_query=user_message
-                )
-                if compaction_action.action_taken:
-                    logger.info(
-                        f"Proactive compaction: {compaction_action.trigger.value}, "
-                        f"removed {compaction_action.messages_removed} messages, "
-                        f"freed {compaction_action.chars_freed:,} chars"
-                    )
-                    if compaction_action.messages_removed > 0:
-                        yield StreamChunk(
-                            content=f"\n[context] Proactively compacted history "
-                            f"({compaction_action.messages_removed} messages, "
-                            f"{compaction_action.chars_freed:,} chars freed).\n"
-                        )
-                        # Inject context reminder about compacted content
-                        self._conversation_controller.inject_compaction_context()
+            compaction_chunk = self._handle_compaction(user_message)
+            if compaction_chunk:
+                yield compaction_chunk
 
             # Check hard iteration limit
             total_iterations += 1
