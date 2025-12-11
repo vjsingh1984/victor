@@ -3145,6 +3145,129 @@ class AgentOrchestrator:
 
         return chunk
 
+    async def _handle_context_and_iteration_limits(
+        self,
+        user_message: str,
+        max_total_iterations: int,
+        max_context: int,
+        total_iterations: int,
+        last_quality_score: float,
+    ) -> tuple[bool, Optional[StreamChunk]]:
+        """Handle context overflow and hard iteration limits.
+
+        Returns:
+            handled (bool): True if the caller should stop processing
+            chunk (Optional[StreamChunk]): Chunk to yield if produced
+        """
+        # Context overflow handling
+        if self._check_context_overflow(max_context):
+            logger.warning("Context overflow detected. Attempting smart compaction...")
+            removed = self._conversation_controller.smart_compact_history(
+                current_query=user_message
+            )
+            if removed > 0:
+                logger.info(f"Smart compaction removed {removed} messages")
+                chunk = StreamChunk(
+                    content=f"\n[context] Compacted history ({removed} messages) to continue.\n"
+                )
+                self._conversation_controller.inject_compaction_context()
+                return False, chunk
+
+            # If still overflowing, force completion
+            if self._check_context_overflow(max_context):
+                logger.warning("Still overflowing after compaction. Forcing completion.")
+                chunk = StreamChunk(
+                    content="\n[tool] ⚠ Context size limit reached. Providing summary.\n"
+                )
+                completion_prompt = self._get_thinking_disabled_prompt(
+                    "Context limit reached. Summarize in 2-3 sentences."
+                )
+                recent_messages = (
+                    self.messages[-8:] if len(self.messages) > 8 else self.messages[:]
+                )
+                completion_messages = recent_messages + [
+                    Message(role="user", content=completion_prompt)
+                ]
+
+                try:
+                    response = await self.provider.chat(
+                        messages=completion_messages,
+                        model=self.model,
+                        temperature=self.temperature,
+                        max_tokens=min(self.max_tokens, 1024),
+                        tools=None,
+                    )
+                    if response and response.content:
+                        sanitized = self._sanitize_response(response.content)
+                        if sanitized:
+                            self.add_message("assistant", sanitized)
+                            chunk = StreamChunk(content=sanitized, is_final=True)
+                            self._record_intelligent_outcome(
+                                success=True,
+                                quality_score=last_quality_score,
+                                user_satisfied=True,
+                                completed=True,
+                            )
+                            return True, chunk
+                except Exception as e:
+                    logger.warning(f"Final response after context overflow failed: {e}")
+                self._record_intelligent_outcome(
+                    success=True,
+                    quality_score=last_quality_score,
+                    user_satisfied=True,
+                    completed=True,
+                )
+                return True, StreamChunk(content="", is_final=True)
+
+        # Iteration limit handling
+        if total_iterations > max_total_iterations:
+            logger.warning(
+                f"Hard iteration limit reached ({max_total_iterations}). Forcing completion."
+            )
+            iteration_prompt = self._get_thinking_disabled_prompt(
+                "Max iterations reached. Summarize key findings in 3-4 sentences. "
+                "Do NOT attempt any more tool calls."
+            )
+            recent_messages = (
+                self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
+            )
+            completion_messages = recent_messages + [
+                Message(role="user", content=iteration_prompt)
+            ]
+
+            chunk = StreamChunk(
+                content=f"\n[tool] ⚠ Maximum iterations ({max_total_iterations}) reached. Providing summary.\n"
+            )
+
+            try:
+                response = await self.provider.chat(
+                    messages=completion_messages,
+                    model=self.model,
+                    temperature=self.temperature,
+                    max_tokens=min(self.max_tokens, 1024),
+                    tools=None,
+                )
+                if response and response.content:
+                    sanitized = self._sanitize_response(response.content)
+                    if sanitized:
+                        self.add_message("assistant", sanitized)
+                        chunk = StreamChunk(content=sanitized)
+            except Exception as e:
+                logger.warning(f"Final response generation failed: {e}")
+                chunk = StreamChunk(
+                    content="Unable to generate final summary due to iteration limit.\n"
+                )
+
+            self._record_intelligent_outcome(
+                success=True,
+                quality_score=last_quality_score,
+                user_satisfied=True,
+                completed=True,
+            )
+            return True, StreamChunk(content="", is_final=True)
+
+        return False, None
+
     async def _prepare_stream(
         self, user_message: str
     ) -> tuple[
@@ -3522,118 +3645,17 @@ class AgentOrchestrator:
                 is_analysis_task=is_analysis_task,
             )
 
-            # Check for context overflow (using model-aware limit)
             max_context = self._get_max_context_chars()
-            if self._check_context_overflow(max_context):
-                # Try smart compaction first before forcing completion
-                logger.warning("Context overflow detected. Attempting smart compaction...")
-                removed = self._conversation_controller.smart_compact_history(
-                    current_query=user_message
-                )
-                if removed > 0:
-                    logger.info(f"Smart compaction removed {removed} messages")
-                    yield StreamChunk(
-                        content=f"\n[context] Compacted history ({removed} messages) to continue.\n"
-                    )
-                    # Inject context reminder about compacted content
-                    self._conversation_controller.inject_compaction_context()
-
-                # Check if still overflowing after compaction
-                if self._check_context_overflow(max_context):
-                    logger.warning("Still overflowing after compaction. Forcing completion.")
-                    yield StreamChunk(
-                        content="\n[tool] ⚠ Context size limit reached. Providing summary.\n"
-                    )
-                    # Force completion due to context overflow
-                    # Use temporary messages to avoid polluting conversation history
-                    # Use thinking disable prefix if model supports it (e.g., Qwen3 /no_think)
-                    completion_prompt = self._get_thinking_disabled_prompt(
-                        "Context limit reached. Summarize in 2-3 sentences."
-                    )
-
-                    # Take only recent context (last 8 messages) for the completion request
-                    recent_messages = (
-                        self.messages[-8:] if len(self.messages) > 8 else self.messages[:]
-                    )
-                    completion_messages = recent_messages + [
-                        Message(role="user", content=completion_prompt)
-                    ]
-
-                    try:
-                        response = await self.provider.chat(
-                            messages=completion_messages,
-                            model=self.model,
-                            temperature=self.temperature,
-                            max_tokens=min(self.max_tokens, 1024),  # Limit output for overflow
-                            tools=None,
-                        )
-                        if response and response.content:
-                            sanitized = self._sanitize_response(response.content)
-                            if sanitized:
-                                self.add_message("assistant", sanitized)
-                                yield StreamChunk(content=sanitized)
-                    except Exception as e:
-                        logger.warning(f"Final response after context overflow failed: {e}")
-                    # Record outcome for Q-learning (context overflow = partial success)
-                    self._record_intelligent_outcome(
-                        success=True,  # We provided a response
-                        quality_score=last_quality_score,
-                        user_satisfied=True,
-                        completed=True,
-                    )
-                    yield StreamChunk(content="", is_final=True)
-                    return
-
-            if total_iterations > max_total_iterations:
-                logger.warning(
-                    f"Hard iteration limit reached ({max_total_iterations}). Forcing completion."
-                )
-                yield StreamChunk(
-                    content=f"\n[tool] ⚠ Maximum iterations ({max_total_iterations}) reached. Providing summary.\n"
-                )
-                # Force a final response without tools
-                # Use temporary messages to avoid polluting conversation history
-                # Use thinking disable prefix if model supports it (e.g., Qwen3 /no_think)
-                iteration_prompt = self._get_thinking_disabled_prompt(
-                    "Max iterations reached. Summarize key findings in 3-4 sentences. "
-                    "Do NOT attempt any more tool calls."
-                )
-
-                # Take only recent context (last 10 messages) for the completion request
-                recent_messages = (
-                    self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
-                )
-                completion_messages = recent_messages + [
-                    Message(role="user", content=iteration_prompt)
-                ]
-
-                # Make one final call without tools
-                try:
-                    response = await self.provider.chat(
-                        messages=completion_messages,
-                        model=self.model,
-                        temperature=self.temperature,
-                        max_tokens=min(self.max_tokens, 1024),  # Limit output for forced completion
-                        tools=None,  # No tools - force text response
-                    )
-                    if response and response.content:
-                        sanitized = self._sanitize_response(response.content)
-                        if sanitized:
-                            self.add_message("assistant", sanitized)
-                            yield StreamChunk(content=sanitized)
-                except Exception as e:
-                    logger.warning(f"Final response generation failed: {e}")
-                    yield StreamChunk(
-                        content="Unable to generate final summary due to iteration limit.\n"
-                    )
-                # Record outcome for Q-learning (iteration limit = partial success)
-                self._record_intelligent_outcome(
-                    success=True,  # We provided a summary
-                    quality_score=last_quality_score,
-                    user_satisfied=True,
-                    completed=True,
-                )
-                yield StreamChunk(content="", is_final=True)
+            handled, iter_chunk = await self._handle_context_and_iteration_limits(
+                user_message,
+                max_total_iterations,
+                max_context,
+                total_iterations,
+                last_quality_score,
+            )
+            if iter_chunk:
+                yield iter_chunk
+            if handled:
                 break
 
             # Select tools for this pass
