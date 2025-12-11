@@ -10,7 +10,7 @@ from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 
 from victor.agent.orchestrator import AgentOrchestrator
-from victor.config.settings import load_settings
+from victor.config.settings import load_settings, ProfileConfig
 from victor.ui.output_formatter import InputReader, create_formatter
 from victor.ui.commands.utils import (
     preload_semantic_index,
@@ -103,6 +103,22 @@ def chat(
         "--max-iterations",
         help="Override maximum total iterations for this session.",
     ),
+    provider: Optional[str] = typer.Option(
+        None,
+        "--provider",
+        help="Override provider (e.g., ollama, lmstudio, vllm, openai).",
+        case_sensitive=False,
+    ),
+    model: Optional[str] = typer.Option(
+        None,
+        "--model",
+        help="Override model identifier.",
+    ),
+    endpoint: Optional[str] = typer.Option(
+        None,
+        "--endpoint",
+        help="Override base URL for local providers (ollama, lmstudio, vllm).",
+    ),
     input_file: Optional[str] = typer.Option(
         None,
         "--input-file",
@@ -170,6 +186,39 @@ def chat(
 
         settings = load_settings()
         setup_safety_confirmation()
+
+        # Apply provider/model/endpoint overrides by creating a synthetic profile
+        if provider or model or endpoint:
+            if not provider or not model:
+                console.print("[bold red]Error:[/] --provider and --model must be provided together when overriding profiles.")
+                raise typer.Exit(1)
+            provider = provider.lower()
+
+            extra_fields = {}
+            if endpoint:
+                extra_fields["base_url"] = endpoint
+                if provider in {"ollama", "lmstudio", "vllm"}:
+                    if provider == "ollama":
+                        settings.ollama_base_url = endpoint
+                    elif provider == "lmstudio":
+                        settings.lmstudio_base_urls = [endpoint]
+                    elif provider == "vllm":
+                        settings.vllm_base_url = endpoint
+                else:
+                    console.print("[bold yellow]Warning:[/] --endpoint is ignored for this provider.")
+
+            override_profile = ProfileConfig(
+                provider=provider,
+                model=model,
+                temperature=settings.default_temperature,
+                max_tokens=settings.default_max_tokens,
+                **extra_fields,
+            )
+
+            # Replace profile loader to use the synthetic profile
+            settings.load_profiles = lambda: {profile: override_profile}  # type: ignore[attr-defined]
+            settings.default_provider = provider
+            settings.default_model = model
 
         if actual_message:
             asyncio.run(
