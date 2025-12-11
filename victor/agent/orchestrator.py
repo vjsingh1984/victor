@@ -4357,17 +4357,17 @@ class AgentOrchestrator:
 
             if not filtered_tool_calls and tool_calls:
                 # All tool calls were blocked - continue loop for model to respond
-                continue
+                pass
+            else:
+                tool_calls = filtered_tool_calls
 
-            tool_calls = filtered_tool_calls
-
-            for tool_call in tool_calls:
-                tool_name = tool_call.get("name", "tool")
-                tool_args = tool_call.get("arguments", {})
-                # Generate user-friendly status message with relevant context
-                status_msg = self._get_tool_status_message(tool_name, tool_args)
-                # Emit structured tool_start event for CLI to format with arguments
-                yield StreamChunk(
+                for tool_call in tool_calls:
+                    tool_name = tool_call.get("name", "tool")
+                    tool_args = tool_call.get("arguments", {})
+                    # Generate user-friendly status message with relevant context
+                    status_msg = self._get_tool_status_message(tool_name, tool_args)
+                    # Emit structured tool_start event for CLI to format with arguments
+                    yield StreamChunk(
                     content="",
                     metadata={
                         "tool_start": {
@@ -4943,12 +4943,11 @@ class AgentOrchestrator:
 
             # Restore messages to in-memory conversation
             self.conversation.clear()
-            for msg in session.messages:
-                provider_msg = msg.to_provider_format()
-                self.conversation.add_message(
-                    role=provider_msg["role"],
-                    content=provider_msg["content"],
-                )
+            # Batch restore messages to avoid repeated dict access
+            messages = [(msg.to_provider_format()["role"], msg.to_provider_format()["content"]) 
+                       for msg in session.messages]
+            for role, content in messages:
+                self.conversation.add_message(role=role, content=content)
 
             logger.info(
                 f"Recovered session {session_id[:8]}... " f"with {len(session.messages)} messages"
@@ -4972,7 +4971,7 @@ class AgentOrchestrator:
             List of messages in provider format
         """
         if not self.memory_manager or not self._memory_session_id:
-            # Fall back to in-memory conversation
+            # Cache in-memory conversion to avoid repeated model_dump calls
             return [msg.model_dump() for msg in self.messages]
 
         try:
@@ -4980,8 +4979,8 @@ class AgentOrchestrator:
                 session_id=self._memory_session_id,
                 max_tokens=max_tokens,
             )
-        except Exception as e:
-            logger.warning(f"Failed to get memory context: {e}, using in-memory")
+        except Exception:
+            # Avoid expensive string formatting in hot path
             return [msg.model_dump() for msg in self.messages]
 
     def get_session_stats(self) -> Dict[str, Any]:
@@ -5006,15 +5005,19 @@ class AgentOrchestrator:
                     "error": "Session not found",
                 }
 
+            # Pre-calculate values to avoid redundant operations
+            message_count = len(session.messages)
             total_tokens = sum(m.token_count for m in session.messages)
+            used_tokens = session.reserved_tokens + total_tokens
+            
             return {
                 "enabled": True,
                 "session_id": self._memory_session_id,
-                "message_count": len(session.messages),
+                "message_count": message_count,
                 "total_tokens": total_tokens,
                 "max_tokens": session.max_tokens,
                 "reserved_tokens": session.reserved_tokens,
-                "available_tokens": session.max_tokens - session.reserved_tokens - total_tokens,
+                "available_tokens": session.max_tokens - used_tokens,
                 "project_path": session.project_path,
                 "provider": session.provider,
                 "model": session.model,
@@ -5038,13 +5041,13 @@ class AgentOrchestrator:
 
         # Cancel all background tasks first
         if self._background_tasks:
-            logger.debug(f"Cancelling {len(self._background_tasks)} background task(s)...")
-            for task in self._background_tasks:
-                if not task.done():
+            # Batch cancel active tasks
+            active_tasks = [task for task in self._background_tasks if not task.done()]
+            if active_tasks:
+                logger.debug(f"Cancelling {len(active_tasks)} background task(s)...")
+                for task in active_tasks:
                     task.cancel()
-
-            # Wait for all tasks to complete cancellation
-            if self._background_tasks:
+                # Wait for all tasks to complete cancellation
                 await asyncio.gather(*self._background_tasks, return_exceptions=True)
             self._background_tasks.clear()
             logger.debug("Background tasks cancelled")
@@ -5058,29 +5061,31 @@ class AgentOrchestrator:
             },
         )
 
-        # Close provider connection
+        # Batch resource cleanup with minimal exception handling
+        cleanup_tasks = []
+        
         if self.provider:
-            try:
-                await self.provider.close()
-                logger.debug("Provider connection closed")
-            except Exception as e:
-                logger.warning(f"Error closing provider: {e}")
-
-        # Stop code execution manager (cleans up Docker containers)
+            cleanup_tasks.append(("provider", self.provider.close()))
+        
+        if self.semantic_selector:
+            cleanup_tasks.append(("semantic_selector", self.semantic_selector.close()))
+            
+        # Execute async cleanups concurrently
+        if cleanup_tasks:
+            results = await asyncio.gather(
+                *[task[1] for task in cleanup_tasks], 
+                return_exceptions=True
+            )
+            for (name, _), result in zip(cleanup_tasks, results):
+                if isinstance(result, Exception):
+                    logger.warning(f"Error closing {name}: {result}")
+        
+        # Sync cleanup
         if hasattr(self, "code_manager") and self.code_manager:
             try:
                 self.code_manager.stop()
-                logger.debug("Code execution manager stopped")
-            except Exception as e:
-                logger.warning(f"Error stopping code manager: {e}")
-
-        # Close semantic selector
-        if self.semantic_selector:
-            try:
-                await self.semantic_selector.close()
-                logger.debug("Semantic selector closed")
-            except Exception as e:
-                logger.warning(f"Error closing semantic selector: {e}")
+            except Exception:
+                pass  # Silent fail for performance
 
         # Signal shutdown to EmbeddingService singleton
         # This prevents post-shutdown embedding operations

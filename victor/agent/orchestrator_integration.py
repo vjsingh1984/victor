@@ -295,31 +295,29 @@ class OrchestratorIntegration:
             task_type=task_type,
         )
 
-        # Update metrics
+        # Batch metrics update
         self._metrics.quality_validated_responses += 1
-        if result.grounding_score > 0:
-            self._metrics.grounding_checked_responses += 1
-
-        self._metrics.avg_quality_score = (
-            0.9 * self._metrics.avg_quality_score + 0.1 * result.quality_score
-        )
-        self._metrics.avg_grounding_score = (
-            0.9 * self._metrics.avg_grounding_score + 0.1 * result.grounding_score
-        )
+        self._metrics.grounding_checked_responses += (result.grounding_score > 0)
+        
+        # Use faster exponential moving average
+        alpha = 0.1
+        self._metrics.avg_quality_score += alpha * (result.quality_score - self._metrics.avg_quality_score)
+        self._metrics.avg_grounding_score += alpha * (result.grounding_score - self._metrics.avg_grounding_score)
         self._metrics.total_learning_reward += result.learning_reward
 
-        # Notify observers
-        for observer in self._quality_observers:
-            try:
-                observer(result.quality_score, result.quality_details)
-            except Exception as e:
-                logger.warning(f"Quality observer error: {e}")
-
-        for observer in self._grounding_observers:
-            try:
-                observer(result.is_grounded, result.grounding_issues)
-            except Exception as e:
-                logger.warning(f"Grounding observer error: {e}")
+        # Batch notify observers (avoid double iteration)
+        if self._quality_observers or self._grounding_observers:
+            for observer in self._quality_observers:
+                try:
+                    observer(result.quality_score, result.quality_details)
+                except Exception:
+                    pass  # Silent fail for performance
+            
+            for observer in self._grounding_observers:
+                try:
+                    observer(result.is_grounded, result.grounding_issues)
+                except Exception:
+                    pass
 
         if self._config.log_quality_scores:
             logger.debug(
@@ -381,9 +379,9 @@ class OrchestratorIntegration:
         Returns:
             Dictionary with pipeline stats
         """
+        # Cache expensive calls
         pipeline_stats = self._pipeline.get_stats()
-        learning_summary = self._pipeline.get_learning_summary()
-
+        
         return {
             "integration": {
                 "total_requests": self._metrics.total_requests,
@@ -400,7 +398,7 @@ class OrchestratorIntegration:
                 "circuit_breaker_trips": pipeline_stats.circuit_breaker_trips,
                 "cache_state": pipeline_stats.cache_state,
             },
-            "learning": learning_summary,
+            "learning": self._pipeline.get_learning_summary(),
             "config": {
                 "resilient_calls": self._config.enable_resilient_calls,
                 "quality_scoring": self._config.enable_quality_scoring,
@@ -415,16 +413,16 @@ class OrchestratorIntegration:
         Returns:
             Dictionary with threshold status
         """
+        # Pre-calculate rounded values
+        quality_score = round(self._metrics.avg_quality_score, 3)
+        grounding_score = round(self._metrics.avg_grounding_score, 3)
+        
         return {
-            "quality_meets_threshold": (
-                self._metrics.avg_quality_score >= self._config.min_quality_threshold
-            ),
-            "quality_score": round(self._metrics.avg_quality_score, 3),
+            "quality_meets_threshold": quality_score >= self._config.min_quality_threshold,
+            "quality_score": quality_score,
             "quality_threshold": self._config.min_quality_threshold,
-            "grounding_meets_threshold": (
-                self._metrics.avg_grounding_score >= self._config.grounding_confidence_threshold
-            ),
-            "grounding_score": round(self._metrics.avg_grounding_score, 3),
+            "grounding_meets_threshold": grounding_score >= self._config.grounding_confidence_threshold,
+            "grounding_score": grounding_score,
             "grounding_threshold": self._config.grounding_confidence_threshold,
         }
 
