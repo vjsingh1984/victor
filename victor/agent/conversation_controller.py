@@ -340,9 +340,10 @@ class ConversationController:
         metrics = self.get_context_metrics()
         if metrics.is_overflow_risk:
             logger.warning(
-                f"Context overflow risk: {metrics.char_count:,} chars "
-                f"(~{metrics.estimated_tokens:,} tokens). "
-                f"Max: {metrics.max_context_chars:,} chars"
+                "Context overflow risk: %d chars (~%d tokens). Max: %d chars",
+                metrics.char_count,
+                metrics.estimated_tokens,
+                metrics.max_context_chars
             )
         return metrics.is_overflow_risk
 
