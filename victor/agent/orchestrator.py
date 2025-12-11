@@ -96,6 +96,7 @@ from victor.agent.metrics_collector import (
 )
 from victor.agent.unified_task_tracker import (
     UnifiedTaskTracker,
+    TaskType,
 )
 
 # New decomposed components (facades for orchestrator responsibilities)
@@ -3095,22 +3096,22 @@ class AgentOrchestrator:
 
         return final_response
 
-    async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
-        """Stream a chat response.
-
-        Args:
-            user_message: User's message
-
-        Yields:
-            StreamChunk objects with incremental response
-
-        Note:
-            Stream metrics (TTFT, throughput) are available via get_last_stream_metrics()
-            after the stream completes.
-
-        The stream can be cancelled by calling request_cancellation(). When cancelled,
-        the stream will yield a final chunk indicating cancellation and stop.
-        """
+    async def _prepare_stream(
+        self, user_message: str
+    ) -> tuple[
+        Any,
+        float,
+        float,
+        Dict[str, int],
+        int,
+        int,
+        int,
+        bool,
+        TaskType,
+        Any,
+        int,
+    ]:
+        """Prepare streaming state and return commonly used values."""
         # Initialize cancellation support
         self._cancel_event = asyncio.Event()
         self._is_streaming = True
@@ -3180,13 +3181,36 @@ class AgentOrchestrator:
         # Get exploration iterations from unified tracker (replaces TASK_CONFIGS lookup)
         max_exploration_iterations = self.unified_tracker.max_exploration_iterations
 
+        # Task prep: hints, complexity, reminders
+        task_classification, complexity_tool_budget = self._prepare_task(
+            user_message, unified_task_type
+        )
+
+        return (
+            stream_metrics,
+            start_time,
+            total_tokens,
+            cumulative_usage,
+            max_total_iterations,
+            max_exploration_iterations,
+            total_iterations,
+            force_completion,
+            unified_task_type,
+            task_classification,
+            complexity_tool_budget,
+        )
+
+    def _prepare_task(
+        self, user_message: str, unified_task_type: TaskType
+    ) -> tuple[Any, int]:
+        """Prepare task-specific guidance and budget adjustments."""
         # Inject task-specific prompt hint for better guidance
         task_hint = get_task_type_hint(unified_task_type.value)
         if task_hint:
             self.add_message("system", task_hint.strip())
             logger.debug(f"Injected task hint for task type: {unified_task_type.value}")
 
-        # Gap 1: Classify task complexity and adjust tool budget
+        # Classify task complexity and adjust tool budget
         task_classification = self.task_classifier.classify(user_message)
         complexity_tool_budget = DEFAULT_BUDGETS.get(task_classification.complexity, 15)
         if task_classification.complexity == TaskComplexity.SIMPLE:
@@ -3219,7 +3243,48 @@ class AgentOrchestrator:
             tool_budget=complexity_tool_budget,
         )
 
-        # Gap 4: Detect intent and inject prompt guard for non-write tasks
+        return task_classification, complexity_tool_budget
+
+    async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
+        """Stream a chat response (public entrypoint).
+
+        This method wraps the implementation to make phased refactors safer.
+        """
+        async for chunk in self._stream_chat_impl(user_message):
+            yield chunk
+
+    async def _stream_chat_impl(self, user_message: str) -> AsyncIterator[StreamChunk]:
+        """Implementation for streaming chat.
+
+        Args:
+            user_message: User's message
+
+        Yields:
+            StreamChunk objects with incremental response
+
+        Note:
+            Stream metrics (TTFT, throughput) are available via get_last_stream_metrics()
+            after the stream completes.
+
+        The stream can be cancelled by calling request_cancellation(). When cancelled,
+        the stream will yield a final chunk indicating cancellation and stop.
+        """
+        # Initialize and prepare
+        (
+            stream_metrics,
+            start_time,
+            total_tokens,
+            cumulative_usage,
+            max_total_iterations,
+            max_exploration_iterations,
+            total_iterations,
+            force_completion,
+            unified_task_type,
+            task_classification,
+            complexity_tool_budget,
+        ) = await self._prepare_stream(user_message)
+
+        # Detect intent and inject prompt guard for non-write tasks
         intent_result = self.intent_detector.detect(user_message)
         # Store intent for tool filtering (accessible throughout session)
         self._current_intent = intent_result.intent
