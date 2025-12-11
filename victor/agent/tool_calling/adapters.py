@@ -40,16 +40,22 @@ from victor.providers.base import ToolDefinition
 
 logger = logging.getLogger(__name__)
 
-# Singleton capability loader
-_capability_loader: Optional[ModelCapabilityLoader] = None
+# Capability loader instance (lazy-initialized)
+class _CapabilityLoaderHolder:
+    """Holder for capability loader singleton."""
+    _instance: Optional[ModelCapabilityLoader] = None
+
+    @classmethod
+    def get(cls) -> ModelCapabilityLoader:
+        """Get or create the capability loader singleton."""
+        if cls._instance is None:
+            cls._instance = ModelCapabilityLoader()
+        return cls._instance
 
 
 def _get_capability_loader() -> ModelCapabilityLoader:
     """Get or create the capability loader singleton."""
-    global _capability_loader
-    if _capability_loader is None:
-        _capability_loader = ModelCapabilityLoader()
-    return _capability_loader
+    return _CapabilityLoaderHolder.get()
 
 
 class AnthropicToolCallingAdapter(BaseToolCallingAdapter):

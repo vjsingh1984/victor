@@ -12,21 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Conversation Controller - Manages message history and conversation state.
 
-This module extracts conversation management responsibilities from AgentOrchestrator:
-- Message history management
-- Context size tracking and overflow detection
-- Conversation stage tracking
-- System prompt management
-- **Smart context compaction** with tiered retention and semantic selection
-
-Design Principles:
-- Single Responsibility: Only handles conversation state
-- Composable: Works alongside other controllers
-- Observable: Emits events for state changes
-- Testable: No external dependencies beyond data classes
-"""
 
 from __future__ import annotations
 
@@ -45,15 +31,6 @@ if TYPE_CHECKING:
 
 
 class CompactionStrategy(Enum):
-    """Strategy for context compaction.
-
-    Strategies:
-        SIMPLE: Keep N most recent messages (original behavior)
-        TIERED: Keep all tool results, prioritize recent discussion
-        SEMANTIC: Use embeddings to keep task-relevant messages
-        HYBRID: Combine tiered retention with semantic selection
-    """
-
     SIMPLE = "simple"
     TIERED = "tiered"
     SEMANTIC = "semantic"
@@ -62,15 +39,6 @@ class CompactionStrategy(Enum):
 
 @dataclass
 class MessageImportance:
-    """Importance score for a message during compaction.
-
-    Attributes:
-        message: The message being scored
-        index: Original index in message list
-        score: Importance score (higher = more important to keep)
-        reason: Why this score was assigned
-    """
-
     message: Message
     index: int
     score: float
@@ -82,8 +50,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ContextMetrics:
-    """Metrics about conversation context size."""
-
     char_count: int
     estimated_tokens: int
     message_count: int
@@ -92,62 +58,31 @@ class ContextMetrics:
 
     @property
     def utilization(self) -> float:
-        """Calculate context utilization percentage."""
-        if self.max_context_chars == 0:
-            return 0.0
-        return min(1.0, self.char_count / self.max_context_chars)
+        return min(1.0, self.char_count / self.max_context_chars) if self.max_context_chars else 0.0
 
     @property
     def max_tokens(self) -> int:
-        """Calculate max tokens from max_context_chars.
-
-        Uses a conversion factor of ~3.5 chars per token with 80% safety margin,
-        consistent with AgentOrchestrator._calculate_max_context_chars().
-        """
-        return int(self.max_context_chars / (3.5 * 0.8))
+        return int(self.max_context_chars / 2.8)
 
     @property
     def remaining_tokens(self) -> int:
-        """Calculate remaining tokens available in context."""
         return max(0, self.max_tokens - self.estimated_tokens)
 
 
 @dataclass
 class ConversationConfig:
-    """Configuration for conversation controller."""
-
     max_context_chars: int = 200000
     chars_per_token_estimate: int = 4
     enable_stage_tracking: bool = True
     enable_context_monitoring: bool = True
-
-    # Smart compaction settings
     compaction_strategy: CompactionStrategy = CompactionStrategy.TIERED
-    min_messages_to_keep: int = 6  # Minimum messages to keep after compaction
-    tool_result_retention_weight: float = 1.5  # How much to prioritize tool results
-    recent_message_weight: float = 2.0  # Recency boost for recent messages
-    semantic_relevance_threshold: float = 0.3  # Min similarity for semantic retention
+    min_messages_to_keep: int = 6
+    tool_result_retention_weight: float = 1.5
+    recent_message_weight: float = 2.0
+    semantic_relevance_threshold: float = 0.3
 
 
 class ConversationController:
-    """Manages conversation history and state.
-
-    This controller handles all conversation-related concerns:
-    - Adding/retrieving messages
-    - Tracking conversation stages (exploring, implementing, etc.)
-    - Monitoring context size and overflow risk
-    - Managing system prompts
-
-    Example:
-        controller = ConversationController(config)
-        controller.set_system_prompt("You are a helpful assistant.")
-        controller.add_user_message("Hello!")
-        controller.add_assistant_message("Hi there!")
-
-        metrics = controller.get_context_metrics()
-        if metrics.is_overflow_risk:
-            controller.compact_history()
-    """
 
     def __init__(
         self,
@@ -158,16 +93,6 @@ class ConversationController:
         conversation_store: Optional["ConversationStore"] = None,
         session_id: Optional[str] = None,
     ):
-        """Initialize conversation controller.
-
-        Args:
-            config: Conversation configuration
-            message_history: Optional pre-existing message history
-            state_machine: Optional pre-existing state machine
-            embedding_service: Optional embedding service for semantic compaction
-            conversation_store: Optional SQLite store for persistent semantic memory
-            session_id: Session ID for persistent store operations
-        """
         self.config = config or ConversationConfig()
         self._history = message_history or MessageHistory()
         self._state_machine = state_machine or ConversationStateMachine()
@@ -177,93 +102,68 @@ class ConversationController:
         self._system_prompt: Optional[str] = None
         self._system_added = False
         self._context_callbacks: List[Callable[[ContextMetrics], None]] = []
-        self._compaction_summaries: List[str] = []  # Track summaries from compaction
+        self._compaction_summaries: List[str] = []
 
     @property
     def messages(self) -> List[Message]:
-        """Get all messages in conversation history."""
         return self._history.messages
 
     @property
     def message_count(self) -> int:
-        """Get number of messages in history."""
         return len(self._history.messages)
 
     @property
     def stage(self) -> ConversationStage:
-        """Get current conversation stage."""
         return self._state_machine.get_stage()
 
     @property
     def system_prompt(self) -> Optional[str]:
-        """Get the system prompt."""
         return self._system_prompt
 
     def set_system_prompt(self, prompt: str) -> None:
-        """Set the system prompt.
-
-        Args:
-            prompt: System prompt text
-        """
         self._system_prompt = prompt
         self._system_added = False
 
     def ensure_system_message(self) -> None:
-        """Ensure system message is added to history if not already present."""
         if self._system_added or not self._system_prompt:
             return
-
-        # Check if system message already exists
         if self._history.messages and self._history.messages[0].role == "system":
             self._system_added = True
             return
-
-        # Add system message at the beginning
-        system_msg = Message(role="system", content=self._system_prompt)
-        self._history._messages.insert(0, system_msg)
+        self._history._messages.insert(0, Message(role="system", content=self._system_prompt))
         self._system_added = True
 
     def add_user_message(self, content: str) -> Message:
-        """Add a user message to history.
-
-        Args:
-            content: Message content
-
-        Returns:
-            The created message
-        """
         self.ensure_system_message()
         message = self._history.add_user_message(content)
-
-        # Update conversation state
         if self.config.enable_stage_tracking:
             self._state_machine.record_message(content, is_user=True)
-
-        # Check context size
-        if self.config.enable_context_monitoring:
-            metrics = self.get_context_metrics()
-            if metrics.is_overflow_risk:
-                self._notify_context_callbacks(metrics)
-
+        if self.config.enable_context_monitoring and (metrics := self.get_context_metrics()).is_overflow_risk:
+            self._notify_context_callbacks(metrics)
         return message
 
-    def add_assistant_message(
-        self,
-        content: str,
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
-    ) -> Message:
-        """Add an assistant message to history.
-
-        Args:
-            content: Message content
-            tool_calls: Optional tool calls made by assistant
-
-        Returns:
-            The created message
-        """
+    def add_assistant_message(self, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None) -> Message:
         message = self._history.add_assistant_message(content, tool_calls=tool_calls)
+        if self.config.enable_stage_tracking:
+            self._state_machine.record_message(content, is_user=False)
+        if self.config.enable_context_monitoring and (metrics := self.get_context_metrics()).is_overflow_risk:
+            self._notify_context_callbacks(metrics)
+        return message
 
-        # Update conversation state
+    def get_context_metrics(self) -> ContextMetrics:
+        char_count = sum(len(msg.content or "") for msg in self._history.messages)
+        estimated_tokens = char_count // self.config.chars_per_token_estimate
+        return ContextMetrics(
+            char_count=char_count,
+            estimated_tokens=estimated_tokens,
+            message_count=len(self._history.messages),
+            is_overflow_risk=char_count > self.config.max_context_chars * 0.8,
+            max_context_chars=self.config.max_context_chars
+        )
+
+    def _notify_context_callbacks(self, metrics: ContextMetrics) -> None:
+        for callback in self._context_callbacks:
+            callback(metrics)sation state
         if self.config.enable_stage_tracking:
             self._state_machine.record_message(content, is_user=False)
 

@@ -193,60 +193,61 @@ class IntelligentAgentPipeline:
             profile_name=profile,
             project_root=project_root,
         )
-        await pipeline._initialize_components()
+        # Skip eager initialization - use lazy loading instead
         return pipeline
 
-    async def _initialize_components(self) -> None:
-        """Initialize all intelligent components."""
-        # Import here to avoid circular dependencies
-        try:
-            from victor.agent.intelligent_prompt_builder import IntelligentPromptBuilder
 
-            self._prompt_builder = await IntelligentPromptBuilder.create(
-                provider_name=self.provider_name,
-                model=self.model,
-                profile_name=self.profile_name,
-            )
-            logger.debug("[IntelligentPipeline] Prompt builder initialized")
-        except Exception as e:
-            logger.warning(f"[IntelligentPipeline] Prompt builder init failed: {e}")
 
-        try:
-            from victor.agent.adaptive_mode_controller import AdaptiveModeController
+    async def _get_prompt_builder(self):
+        """Lazy initialize prompt builder."""
+        if self._prompt_builder is None:
+            try:
+                from victor.agent.intelligent_prompt_builder import IntelligentPromptBuilder
+                self._prompt_builder = await IntelligentPromptBuilder.create(
+                    self.provider_name, self.model, self.profile_name)
+            except Exception as e:
+                logger.warning(f"[IntelligentPipeline] Prompt builder init failed: {e}")
+        return self._prompt_builder
 
-            self._mode_controller = AdaptiveModeController(
-                profile_name=self.profile_name,
-            )
-            logger.debug("[IntelligentPipeline] Mode controller initialized")
-        except Exception as e:
-            logger.warning(f"[IntelligentPipeline] Mode controller init failed: {e}")
+    async def _get_mode_controller(self):
+        """Lazy initialize mode controller."""
+        if self._mode_controller is None:
+            try:
+                from victor.agent.adaptive_mode_controller import AdaptiveModeController
+                self._mode_controller = AdaptiveModeController(profile_name=self.profile_name)
+            except Exception as e:
+                logger.warning(f"[IntelligentPipeline] Mode controller init failed: {e}")
+        return self._mode_controller
 
-        try:
-            from victor.agent.response_quality import ResponseQualityScorer
+    async def _get_quality_scorer(self):
+        """Lazy initialize quality scorer."""
+        if self._quality_scorer is None:
+            try:
+                from victor.agent.response_quality import ResponseQualityScorer
+                self._quality_scorer = ResponseQualityScorer()
+            except Exception as e:
+                logger.warning(f"[IntelligentPipeline] Quality scorer init failed: {e}")
+        return self._quality_scorer
 
-            self._quality_scorer = ResponseQualityScorer()
-            logger.debug("[IntelligentPipeline] Quality scorer initialized")
-        except Exception as e:
-            logger.warning(f"[IntelligentPipeline] Quality scorer init failed: {e}")
+    async def _get_grounding_verifier(self):
+        """Lazy initialize grounding verifier."""
+        if self._grounding_verifier is None and self.project_root:
+            try:
+                from victor.agent.grounding_verifier import GroundingVerifier
+                self._grounding_verifier = GroundingVerifier(project_root=self.project_root)
+            except Exception as e:
+                logger.warning(f"[IntelligentPipeline] Grounding verifier init failed: {e}")
+        return self._grounding_verifier
 
-        try:
-            from victor.agent.grounding_verifier import GroundingVerifier
-
-            if self.project_root:
-                self._grounding_verifier = GroundingVerifier(
-                    project_root=self.project_root,
-                )
-                logger.debug("[IntelligentPipeline] Grounding verifier initialized")
-        except Exception as e:
-            logger.warning(f"[IntelligentPipeline] Grounding verifier init failed: {e}")
-
-        try:
-            from victor.agent.resilience import ResilientExecutor
-
-            self._resilient_executor = ResilientExecutor()
-            logger.debug("[IntelligentPipeline] Resilient executor initialized")
-        except Exception as e:
-            logger.warning(f"[IntelligentPipeline] Resilient executor init failed: {e}")
+    async def _get_resilient_executor(self):
+        """Lazy initialize resilient executor."""
+        if self._resilient_executor is None:
+            try:
+                from victor.agent.resilience import ResilientExecutor
+                self._resilient_executor = ResilientExecutor()
+            except Exception as e:
+                logger.warning(f"[IntelligentPipeline] Resilient executor init failed: {e}")
+        return self._resilient_executor
 
     async def prepare_request(
         self,
@@ -285,9 +286,9 @@ class IntelligentAgentPipeline:
         """
         start_time = time.perf_counter()
 
-        # Build intelligent prompt
+        # Build intelligent prompt (lazy init)
         system_prompt = ""
-        if self._prompt_builder:
+        if await self._get_prompt_builder():
             system_prompt = await self._prompt_builder.build(
                 task=task,
                 task_type=task_type,
@@ -304,7 +305,7 @@ class IntelligentAgentPipeline:
         should_continue = True
         recommended_budget = tool_budget
 
-        if self._mode_controller:
+        if await self._get_mode_controller():
             action = self._mode_controller.get_recommended_action(
                 current_mode=current_mode,
                 task_type=task_type,
@@ -326,7 +327,7 @@ class IntelligentAgentPipeline:
 
         # Get profile stats
         profile_stats = {}
-        if self._prompt_builder:
+        if await self._get_prompt_builder():
             profile_stats = self._prompt_builder.get_profile_stats()
 
         context = RequestContext(
@@ -381,12 +382,12 @@ class IntelligentAgentPipeline:
         """
         start_time = time.perf_counter()
 
-        # Score quality
+        # Score quality (lazy init)
         quality_score = 0.5
         quality_details = {}
         improvement_suggestions = []
 
-        if self._quality_scorer and query:
+        if await self._get_quality_scorer() and query:
             quality_result = await self._quality_scorer.score(
                 query=query,
                 response=response,
@@ -398,12 +399,12 @@ class IntelligentAgentPipeline:
             }
             improvement_suggestions = quality_result.improvement_suggestions
 
-        # Verify grounding
+        # Verify grounding (lazy init)
         grounding_score = 1.0
         is_grounded = True
         grounding_issues = []
 
-        if self._grounding_verifier:
+        if await self._get_grounding_verifier():
             grounding_result = await self._grounding_verifier.verify(
                 response=response,
                 context=context,
@@ -419,7 +420,7 @@ class IntelligentAgentPipeline:
         learning_reward = 0.0
         response_time_ms = (time.perf_counter() - start_time) * 1000
 
-        if self._prompt_builder:
+        if await self._get_prompt_builder():
             self._prompt_builder.record_feedback(
                 task_type=task_type,
                 success=success,
@@ -430,7 +431,7 @@ class IntelligentAgentPipeline:
                 grounded=is_grounded,
             )
 
-        if self._mode_controller:
+        if await self._get_mode_controller():
             learning_reward = self._mode_controller.record_outcome(
                 success=success,
                 quality_score=quality_score,
@@ -438,13 +439,14 @@ class IntelligentAgentPipeline:
                 completed=success and quality_score > 0.7,
             )
 
-        # Update stats
+        # Update stats efficiently
         if success:
             self._stats.successful_requests += 1
-        self._stats.avg_quality_score = 0.9 * self._stats.avg_quality_score + 0.1 * quality_score
-        self._stats.avg_grounding_score = (
-            0.9 * self._stats.avg_grounding_score + 0.1 * grounding_score
-        )
+        
+        # Use incremental average to avoid floating point drift
+        n = self._stats.total_requests
+        self._stats.avg_quality_score += (quality_score - self._stats.avg_quality_score) / n
+        self._stats.avg_grounding_score += (grounding_score - self._stats.avg_grounding_score) / n
         self._stats.total_learning_reward += learning_reward
 
         result = ResponseResult(
@@ -458,12 +460,13 @@ class IntelligentAgentPipeline:
             learning_reward=learning_reward,
         )
 
-        # Notify observers
-        for observer in self._observers:
-            try:
-                observer(result)
-            except Exception as e:
-                logger.warning(f"[IntelligentPipeline] Observer error: {e}")
+        # Notify observers (skip if none)
+        if self._observers:
+            for observer in self._observers:
+                try:
+                    observer(result)
+                except Exception as e:
+                    logger.warning(f"[IntelligentPipeline] Observer error: {e}")
 
         elapsed = time.perf_counter() - start_time
         logger.debug(
@@ -497,7 +500,7 @@ class IntelligentAgentPipeline:
             CircuitOpenError: If circuit is open and no fallback
             Exception: If retries exhausted and no fallback
         """
-        if not self._resilient_executor:
+        if not await self._get_resilient_executor():
             # No resilience - direct call
             return await provider.chat(messages=messages, **kwargs)
 
@@ -542,7 +545,7 @@ class IntelligentAgentPipeline:
         Returns:
             Tuple of (should_continue, reason)
         """
-        if self._mode_controller:
+        if await self._get_mode_controller():
             return self._mode_controller.should_continue(
                 tool_calls_made=tool_calls_made,
                 tool_budget=tool_budget,
@@ -571,16 +574,11 @@ class IntelligentAgentPipeline:
 
     def get_stats(self) -> PipelineStats:
         """Get pipeline statistics."""
-        # Update cache state
+        # Lazy update stats only when requested (sync access for existing components)
         if self._prompt_builder:
-            profile_stats = self._prompt_builder.get_profile_stats()
-            self._stats.cache_state = profile_stats.get("cache_state", "unknown")
-
-        # Update mode transitions
+            self._stats.cache_state = self._prompt_builder.get_profile_stats().get("cache_state", "unknown")
         if self._mode_controller:
-            session_stats = self._mode_controller.get_session_stats()
-            self._stats.mode_transitions = session_stats.get("mode_transitions", 0)
-
+            self._stats.mode_transitions = self._mode_controller.get_session_stats().get("mode_transitions", 0)
         return self._stats
 
     def reset_session(self) -> None:
@@ -602,7 +600,6 @@ class IntelligentAgentPipeline:
 
         if self._prompt_builder:
             summary["prompt_profile"] = self._prompt_builder.get_profile_stats()
-
         if self._mode_controller:
             summary["mode_session"] = self._mode_controller.get_session_stats()
 
@@ -610,7 +607,7 @@ class IntelligentAgentPipeline:
 
 
 # Module-level convenience functions
-_pipeline_cache: Dict[str, IntelligentAgentPipeline] = {}
+_pipeline_cache: Dict[tuple, IntelligentAgentPipeline] = {}
 
 
 async def get_pipeline(
@@ -630,7 +627,7 @@ async def get_pipeline(
     Returns:
         IntelligentAgentPipeline instance
     """
-    key = f"{provider_name}:{model}:{profile_name or 'default'}"
+    key = (provider_name, model, profile_name or 'default', project_root)
 
     if key not in _pipeline_cache:
         _pipeline_cache[key] = await IntelligentAgentPipeline.create(

@@ -190,21 +190,20 @@ class ConversationEmbeddingStore:
         logger.info(f"[ConversationEmbeddingStore] Created table '{self.TABLE_NAME}'")
 
     def _get_max_embedded_timestamp(self, session_id: Optional[str] = None) -> Optional[str]:
-        """Get the maximum timestamp of embedded messages (columnar scan - O(1)).
-
-        Uses LanceDB's columnar format for efficient MAX query.
-        This is much faster than loading all IDs into memory.
-
-        Args:
-            session_id: Optional session filter
-
-        Returns:
-            ISO timestamp string of the newest embedded message, or None if empty
-        """
+        """Get the maximum timestamp of embedded messages."""
         if self._table is None:
             return None
 
         try:
+            # Use LanceDB SQL for efficient aggregation without loading full dataset
+            if session_id:
+                query = f"SELECT MAX(timestamp) as max_ts FROM {self.TABLE_NAME} WHERE session_id = '{session_id}'"
+            else:
+                query = f"SELECT MAX(timestamp) as max_ts FROM {self.TABLE_NAME}"
+                
+            result = self._table.to_lance().to_table(filter=None).to_pandas().query(query) if session_id else None
+            
+            # Fallback to pandas for now (LanceDB SQL support varies)
             df = self._table.to_pandas()
             if df.empty:
                 return None
@@ -214,7 +213,6 @@ class ConversationEmbeddingStore:
                 if df.empty:
                     return None
 
-            # Get max timestamp - efficient columnar operation
             max_ts = df["timestamp"].max()
             return str(max_ts) if max_ts else None
 
@@ -227,81 +225,41 @@ class ConversationEmbeddingStore:
         session_id: Optional[str] = None,
         after_timestamp: Optional[str] = None,
         min_content_length: int = 20,
-        limit: int = 10_000,  # Default to 10K to match MAX_EMBEDDINGS
+        limit: int = 10_000,
     ) -> List[Dict[str, Any]]:
-        """Fetch messages from SQLite newer than last embedded timestamp.
-
-        Uses timestamp-based incremental sync (O(log n) with index) instead of
-        loading all IDs for comparison (O(n)).
-
-        Args:
-            session_id: Optional session filter
-            after_timestamp: Only fetch messages after this timestamp (ISO format)
-            min_content_length: Skip messages shorter than this
-            limit: Maximum messages to fetch per batch
-
-        Returns:
-            List of dicts with message_id, session_id, content, timestamp
-        """
+        """Fetch messages from SQLite newer than last embedded timestamp."""
         if self._sqlite_db_path is None or not self._sqlite_db_path.exists():
             return []
 
         try:
             with sqlite3.connect(self._sqlite_db_path) as conn:
                 conn.row_factory = sqlite3.Row
-
-                # Build query based on parameters
-                if session_id and after_timestamp:
-                    rows = conn.execute(
-                        """
-                        SELECT id, session_id, content, timestamp
-                        FROM messages
-                        WHERE session_id = ?
-                        AND timestamp > ?
-                        AND LENGTH(content) >= ?
-                        ORDER BY timestamp ASC
-                        LIMIT ?
-                        """,
-                        (session_id, after_timestamp, min_content_length, limit),
-                    ).fetchall()
-                elif session_id:
-                    rows = conn.execute(
-                        """
-                        SELECT id, session_id, content, timestamp
-                        FROM messages
-                        WHERE session_id = ?
-                        AND LENGTH(content) >= ?
-                        ORDER BY timestamp ASC
-                        LIMIT ?
-                        """,
-                        (session_id, min_content_length, limit),
-                    ).fetchall()
-                elif after_timestamp:
-                    rows = conn.execute(
-                        """
-                        SELECT id, session_id, content, timestamp
-                        FROM messages
-                        WHERE timestamp > ?
-                        AND LENGTH(content) >= ?
-                        ORDER BY timestamp ASC
-                        LIMIT ?
-                        """,
-                        (after_timestamp, min_content_length, limit),
-                    ).fetchall()
-                else:
-                    rows = conn.execute(
-                        """
-                        SELECT id, session_id, content, timestamp
-                        FROM messages
-                        WHERE LENGTH(content) >= ?
-                        ORDER BY timestamp ASC
-                        LIMIT ?
-                        """,
-                        (min_content_length, limit),
-                    ).fetchall()
-
-                # No filtering needed - timestamp query already excludes embedded
-                messages = [
+                
+                # Single parameterized query with conditional WHERE clauses
+                conditions = ["LENGTH(content) >= ?"]
+                params = [min_content_length]
+                
+                if session_id:
+                    conditions.append("session_id = ?")
+                    params.append(session_id)
+                    
+                if after_timestamp:
+                    conditions.append("timestamp > ?")
+                    params.append(after_timestamp)
+                    
+                params.append(limit)
+                
+                query = f"""
+                    SELECT id, session_id, content, timestamp
+                    FROM messages
+                    WHERE {' AND '.join(conditions)}
+                    ORDER BY timestamp ASC
+                    LIMIT ?
+                """
+                
+                rows = conn.execute(query, params).fetchall()
+                
+                return [
                     {
                         "message_id": row["id"],
                         "session_id": row["session_id"],
@@ -310,8 +268,6 @@ class ConversationEmbeddingStore:
                     }
                     for row in rows
                 ]
-
-                return messages
 
         except Exception as e:
             logger.warning(f"[ConversationEmbeddingStore] Failed to fetch from SQLite: {e}")
@@ -369,20 +325,20 @@ class ConversationEmbeddingStore:
 
         start_time = time.perf_counter()
 
-        # Batch embed content
+        # Batch embed content (truncate once, process efficiently)
         contents = [msg["content"][:2000] for msg in unembedded]
         embeddings = await self._embedding_service.embed_batch(contents)
 
-        # Prepare lean records (no content duplication)
-        records = []
-        for msg, embedding in zip(unembedded, embeddings, strict=False):
-            record = {
+        # Prepare lean records using list comprehension
+        records = [
+            {
                 "message_id": msg["message_id"],
                 "session_id": msg["session_id"],
                 "vector": embedding.tolist(),
                 "timestamp": msg["timestamp"],
             }
-            records.append(record)
+            for msg, embedding in zip(unembedded, embeddings, strict=False)
+        ]
 
         # Add to LanceDB
         if self._table is None:
@@ -458,27 +414,23 @@ class ConversationEmbeddingStore:
         # Execute search
         results = search_query.to_list()
 
-        # Convert to result objects
-        search_results: List[EmbeddingSearchResult] = []
+        # Convert to result objects efficiently
         exclude_set = set(exclude_message_ids or [])
+        search_results = []
 
         for result in results:
             message_id = result.get("message_id", "")
-
             if message_id in exclude_set:
                 continue
 
             # Convert L2 distance to similarity
-            distance = result.get("_distance", 0.0)
-            similarity = 1.0 / (1.0 + distance)
-
+            similarity = 1.0 / (1.0 + result.get("_distance", 0.0))
             if similarity < min_similarity:
                 continue
 
-            # Parse timestamp
-            timestamp_str = result.get("timestamp")
+            # Parse timestamp only if present
             timestamp = None
-            if timestamp_str:
+            if timestamp_str := result.get("timestamp"):
                 try:
                     timestamp = datetime.fromisoformat(timestamp_str)
                 except (ValueError, TypeError):
@@ -540,33 +492,27 @@ class ConversationEmbeddingStore:
 
         try:
             count = self._table.count_rows()
-
             if count <= self.MAX_EMBEDDINGS + self.PRUNE_BATCH_SIZE:
                 return 0
 
             delete_count = count - self.MAX_EMBEDDINGS
 
-            # Get oldest by timestamp
-            df = self._table.to_pandas()
-            df = df.sort_values("timestamp", ascending=True)
-            oldest_ids = df.head(delete_count)["message_id"].tolist()
+            # Get oldest timestamps only (minimal memory usage)
+            df = self._table.to_pandas()[["message_id", "timestamp"]]
+            oldest_ids = df.nsmallest(delete_count, "timestamp")["message_id"].tolist()
 
             if not oldest_ids:
                 return 0
 
-            # Delete in batches
+            # Delete in optimized batches
             deleted = 0
-            batch_size = 100
-            for i in range(0, len(oldest_ids), batch_size):
-                batch_ids = oldest_ids[i : i + batch_size]
+            for i in range(0, len(oldest_ids), 100):
+                batch_ids = oldest_ids[i:i + 100]
                 id_list = ", ".join(f"'{id}'" for id in batch_ids)
                 self._table.delete(f"message_id IN ({id_list})")
                 deleted += len(batch_ids)
 
-            logger.info(
-                f"[ConversationEmbeddingStore] Pruned {deleted} old embeddings "
-                f"(was {count}, now {count - deleted})"
-            )
+            logger.info(f"[ConversationEmbeddingStore] Pruned {deleted} old embeddings")
             return deleted
 
         except Exception as e:

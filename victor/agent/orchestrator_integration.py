@@ -297,7 +297,8 @@ class OrchestratorIntegration:
 
         # Batch metrics update
         self._metrics.quality_validated_responses += 1
-        self._metrics.grounding_checked_responses += (result.grounding_score > 0)
+        if result.grounding_score > 0:
+            self._metrics.grounding_checked_responses += 1
         
         # Use faster exponential moving average
         alpha = 0.1
@@ -305,14 +306,14 @@ class OrchestratorIntegration:
         self._metrics.avg_grounding_score += alpha * (result.grounding_score - self._metrics.avg_grounding_score)
         self._metrics.total_learning_reward += result.learning_reward
 
-        # Batch notify observers (avoid double iteration)
-        if self._quality_observers or self._grounding_observers:
+        # Single-pass observer notification
+        if self._quality_observers:
             for observer in self._quality_observers:
                 try:
                     observer(result.quality_score, result.quality_details)
                 except Exception:
-                    pass  # Silent fail for performance
-            
+                    pass
+        if self._grounding_observers:
             for observer in self._grounding_observers:
                 try:
                     observer(result.is_grounded, result.grounding_issues)
@@ -379,7 +380,6 @@ class OrchestratorIntegration:
         Returns:
             Dictionary with pipeline stats
         """
-        # Cache expensive calls
         pipeline_stats = self._pipeline.get_stats()
         
         return {
@@ -413,7 +413,6 @@ class OrchestratorIntegration:
         Returns:
             Dictionary with threshold status
         """
-        # Pre-calculate rounded values
         quality_score = round(self._metrics.avg_quality_score, 3)
         grounding_score = round(self._metrics.avg_grounding_score, 3)
         

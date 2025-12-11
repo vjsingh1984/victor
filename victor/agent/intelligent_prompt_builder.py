@@ -142,51 +142,31 @@ class ProfileMetrics:
         grounded: bool,
     ) -> None:
         """Update metrics from an interaction using exponential moving average."""
-        alpha = 0.1  # Learning rate
+        alpha = 0.1
+        beta = 1 - alpha  # Pre-calculate for efficiency
 
         self.total_requests += 1
         if success:
             self.successful_completions += 1
 
-        # Update success rate
+        # Batch EMA updates
         current_rate = self.successful_completions / self.total_requests
-        self.tool_call_success_rate = (
-            1 - alpha
-        ) * self.tool_call_success_rate + alpha * current_rate
-
-        # Update quality score
-        self.avg_quality_score = (1 - alpha) * self.avg_quality_score + alpha * quality_score
-
-        # Update response time
-        self.avg_response_time_ms = (
-            1 - alpha
-        ) * self.avg_response_time_ms + alpha * response_time_ms
-
-        # Update tool patterns
-        self.avg_tool_calls_per_request = (
-            1 - alpha
-        ) * self.avg_tool_calls_per_request + alpha * tool_calls
-
-        # Update tool budget adherence
         adherence = 1.0 if tool_calls <= tool_budget else tool_budget / tool_calls
-        self.tool_budget_adherence = (1 - alpha) * self.tool_budget_adherence + alpha * adherence
+        grounding_score = float(grounded)
 
-        # Update grounding accuracy
-        grounding_score = 1.0 if grounded else 0.0
-        self.grounding_accuracy = (1 - alpha) * self.grounding_accuracy + alpha * grounding_score
+        self.tool_call_success_rate = beta * self.tool_call_success_rate + alpha * current_rate
+        self.avg_quality_score = beta * self.avg_quality_score + alpha * quality_score
+        self.avg_response_time_ms = beta * self.avg_response_time_ms + alpha * response_time_ms
+        self.avg_tool_calls_per_request = beta * self.avg_tool_calls_per_request + alpha * tool_calls
+        self.tool_budget_adherence = beta * self.tool_budget_adherence + alpha * adherence
+        self.grounding_accuracy = beta * self.grounding_accuracy + alpha * grounding_score
 
-        # Learn optimal tool budget
+        # Update derived metrics
         if success and tool_calls > 0:
-            self.optimal_tool_budget = int(
-                (1 - alpha) * self.optimal_tool_budget + alpha * tool_calls
-            )
-
-        # Learn prompt preferences based on success patterns
+            self.optimal_tool_budget = int(beta * self.optimal_tool_budget + alpha * tool_calls)
         if success and quality_score > 0.7:
             self.prefers_structured_prompts = tool_calls > 3
-
         self.needs_strict_grounding = self.grounding_accuracy < 0.8
-
         self.last_updated = datetime.now()
 
     def get_recommended_strategy(self) -> PromptStrategy:
@@ -314,37 +294,17 @@ class ProfileLearningStore:
         """Save profile metrics to database."""
         self._ensure_initialized()
 
-        metrics_dict = {
-            "total_requests": metrics.total_requests,
-            "successful_completions": metrics.successful_completions,
-            "tool_call_success_rate": metrics.tool_call_success_rate,
-            "grounding_accuracy": metrics.grounding_accuracy,
-            "avg_quality_score": metrics.avg_quality_score,
-            "avg_response_time_ms": metrics.avg_response_time_ms,
-            "avg_token_usage": metrics.avg_token_usage,
-            "avg_tool_calls_per_request": metrics.avg_tool_calls_per_request,
-            "tool_budget_adherence": metrics.tool_budget_adherence,
-            "mode_transition_success": metrics.mode_transition_success,
-            "optimal_tool_budget": metrics.optimal_tool_budget,
-            "prefers_structured_prompts": metrics.prefers_structured_prompts,
-            "needs_strict_grounding": metrics.needs_strict_grounding,
-            "supports_parallel_tools": metrics.supports_parallel_tools,
-        }
-
+        # Use __dict__ and filter out non-serializable fields for efficiency
+        metrics_dict = {k: v for k, v in metrics.__dict__.items() 
+                       if k not in ('profile_name', 'provider', 'model', 'last_updated')}
+        
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                """
-                INSERT OR REPLACE INTO profile_metrics
-                (profile_name, provider, model, metrics_json, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-            """,
-                (
-                    metrics.profile_name,
-                    metrics.provider,
-                    metrics.model,
-                    json.dumps(metrics_dict),
-                    datetime.now().isoformat(),
-                ),
+                "INSERT OR REPLACE INTO profile_metrics "
+                "(profile_name, provider, model, metrics_json, updated_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (metrics.profile_name, metrics.provider, metrics.model,
+                 json.dumps(metrics_dict, default=str), datetime.now().isoformat())
             )
 
     def load_metrics(self, profile_name: str, provider: str, model: str) -> ProfileMetrics:
@@ -477,9 +437,9 @@ class EmbeddingScheduler:
     @property
     def state(self) -> CacheState:
         """Get current cache state."""
-        if self._state == CacheState.WARM and self._last_refresh:
-            if datetime.now() - self._last_refresh > self._cache_ttl:
-                return CacheState.STALE
+        if (self._state == CacheState.WARM and self._last_refresh and 
+            datetime.now() - self._last_refresh > self._cache_ttl):
+            return CacheState.STALE
         return self._state
 
     async def ensure_warm(self, session_id: Optional[str] = None) -> None:
@@ -521,9 +481,10 @@ class EmbeddingScheduler:
 
     async def _background_refresh_loop(self, session_id: Optional[str] = None) -> None:
         """Background loop to keep cache fresh."""
+        sleep_duration = self._cache_ttl.total_seconds() / 2
         while True:
             try:
-                await asyncio.sleep(self._cache_ttl.total_seconds() / 2)
+                await asyncio.sleep(sleep_duration)
                 await self._warm_cache(session_id)
             except asyncio.CancelledError:
                 break
@@ -813,63 +774,31 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
 
     def _has_native_tool_support(self) -> bool:
         """Check if model has native tool calling support."""
-        patterns = [
-            "qwen2.5",
-            "qwen-2.5",
-            "qwen3",
-            "qwen-3",
-            "llama-3.1",
-            "llama3.1",
-            "llama-3.2",
-            "llama3.2",
-            "llama-3.3",
-            "llama3.3",
-            "ministral",
-            "mistral",
-            "mixtral",
-            "command-r",
-            "firefunction",
-            "hermes",
-            "functionary",
-        ]
+        # Use set for O(1) lookup instead of list iteration
+        patterns = {
+            "qwen2.5", "qwen-2.5", "qwen3", "qwen-3", "llama-3.1", "llama3.1",
+            "llama-3.2", "llama3.2", "llama-3.3", "llama3.3", "ministral",
+            "mistral", "mixtral", "command-r", "firefunction", "hermes", "functionary"
+        }
         return any(pattern in self.model_lower for pattern in patterns)
 
     def _generate_prompt(self, context: PromptContext, strategy: PromptStrategy) -> str:
         """Generate the system prompt based on strategy."""
-        parts = []
-
-        # Base identity
-        parts.append(self._get_base_identity(strategy))
-
-        # Task-specific hints
-        task_hint = self._get_task_hint(context.task_type)
-        if task_hint:
-            parts.append(task_hint)
-
-        # Mode context
-        mode_hint = self._get_mode_hint(context.current_mode, context.iteration_budget)
-        if mode_hint:
-            parts.append(mode_hint)
-
-        # Tool guidance
-        tool_guidance = self._get_tool_guidance(context, strategy)
-        if tool_guidance:
-            parts.append(tool_guidance)
-
-        # Continuation context
-        if context.continuation_context:
-            parts.append(f"\nCONTINUATION CONTEXT:\n{context.continuation_context}")
-
-        # Relevant historical context
-        if context.relevant_fragments:
-            context_hint = self._format_context_fragments(context.relevant_fragments)
-            if context_hint:
-                parts.append(context_hint)
-
-        # Grounding rules (based on learned needs)
-        grounding = self._get_grounding_rules(strategy, context.profile_metrics)
-        parts.append(grounding)
-
+        # Build parts list efficiently
+        parts = [self._get_base_identity(strategy)]
+        
+        # Add optional parts only if they exist
+        optional_parts = [
+            self._get_task_hint(context.task_type),
+            self._get_mode_hint(context.current_mode, context.iteration_budget),
+            self._get_tool_guidance(context, strategy),
+            f"\nCONTINUATION CONTEXT:\n{context.continuation_context}" if context.continuation_context else None,
+            self._format_context_fragments(context.relevant_fragments) if context.relevant_fragments else None
+        ]
+        
+        parts.extend(part for part in optional_parts if part)
+        parts.append(self._get_grounding_rules(strategy, context.profile_metrics))
+        
         return "\n\n".join(parts)
 
     def _get_base_identity(self, strategy: PromptStrategy) -> str:
