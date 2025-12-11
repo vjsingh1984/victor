@@ -4355,10 +4355,7 @@ class AgentOrchestrator:
                 else:
                     filtered_tool_calls.append(tc)
 
-            if not filtered_tool_calls and tool_calls:
-                # All tool calls were blocked - continue loop for model to respond
-                pass
-            else:
+            if filtered_tool_calls or not tool_calls:
                 tool_calls = filtered_tool_calls
 
                 for tool_call in tool_calls:
