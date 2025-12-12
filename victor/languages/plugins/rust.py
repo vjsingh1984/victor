@@ -99,6 +99,25 @@ class RustPlugin(BaseLanguagePlugin):
                 (call_expression function: (field_expression field: (field_identifier) @callee))
                 (call_expression function: (scoped_identifier name: (identifier) @callee))
             """,
+            references="""
+                (call_expression function: (identifier) @name)
+                (call_expression function: (field_expression field: (field_identifier) @name))
+                (call_expression function: (scoped_identifier name: (identifier) @name))
+                (identifier) @name
+                (type_identifier) @name
+            """,
+            implements="""
+                (impl_item
+                    trait: (type_identifier) @interface
+                    type: (type_identifier) @child)
+            """,
+            composition="""
+                (struct_item
+                    name: (type_identifier) @owner
+                    body: (field_declaration_list
+                        (field_declaration
+                            type: (type_identifier) @type)))
+            """,
             enclosing_scopes=[
                 ("function_item", "name"),
                 ("impl_item", "type"),

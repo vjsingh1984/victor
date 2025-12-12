@@ -55,22 +55,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# =============================================================================
-# LEGACY QUERY DICTIONARIES
-# =============================================================================
-# These hardcoded dictionaries are LEGACY and will be DEPRECATED.
-# The new plugin-based architecture (victor/languages/plugins/) provides
-# these queries via TreeSitterQueries in each LanguagePlugin.
-#
-# Migration path:
-# 1. Use LanguageRegistry.get(language).tree_sitter_queries for new code
-# 2. These dicts remain for backward compatibility during transition
-# 3. Eventually remove once all callers migrate to plugin-based approach
-#
-# See: victor/languages/plugins/*.py for the new query definitions
-# See: victor/codebase/tree_sitter_extractor.py for the new unified extractor
-# =============================================================================
-
 REFERENCE_QUERIES: Dict[str, str] = {
     "python": """
         (call function: (identifier) @name)
@@ -879,13 +863,337 @@ class CodebaseIndex:
 
         return [(k, v) for k, v in keys.items()]
 
+    def _extract_symbols_with_tree_sitter(self, file_path: Path, language: str) -> List[Symbol]:
+        """Extract lightweight symbol declarations for non-Python languages via tree-sitter."""
+        query_defs = SYMBOL_QUERIES.get(language)
+        if not query_defs:
+            return []
+        symbols: List[Symbol] = []
+        parser = None
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
 
-    # ========================================================================
-    # ARCHIVED: First duplicate block of tree-sitter extraction methods
-    # These methods were duplicated and have been consolidated.
-    # The active versions are now the LAST definitions in the class.
-    # Lines 866-1197 removed on 2025-12-11 during plugin architecture refactoring.
-    # ========================================================================
+            try:
+                parser = get_parser(language)
+            except Exception:
+                parser = None
+        except Exception:
+            parser = None
+
+        if parser is not None:
+            try:
+                content = file_path.read_bytes()
+                tree = parser.parse(content)
+                for sym_type, query_src in query_defs:
+                    try:
+                        from tree_sitter import QueryCursor
+                        query = Query(parser.language, query_src)
+                        cursor = QueryCursor(query)
+                        captures_dict = cursor.captures(tree.root_node)
+                        for capture_name, nodes in captures_dict.items():
+                            for node in nodes:
+                                text = node.text.decode("utf-8", errors="ignore")
+                                if not text:
+                                    continue
+                                symbols.append(
+                                    Symbol(
+                                        name=text,
+                                        type=sym_type,
+                                        file_path=str(file_path.relative_to(self.root)),
+                                        line_number=node.start_point[0] + 1,
+                                    )
+                                )
+                    except Exception:
+                        continue
+            except Exception:
+                symbols = []
+        if symbols:
+            return symbols
+
+        # Regex fallback when grammar support is unavailable
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return []
+
+        regex_fallbacks: Dict[str, list[tuple[str, str]]] = {
+            "javascript": [
+                ("class", r"class\s+(\w+)"),
+                ("function", r"function\s+(\w+)"),
+            ],
+            "typescript": [
+                ("class", r"class\s+(\w+)"),
+                ("function", r"function\s+(\w+)"),
+            ],
+            "go": [
+                ("function", r"func\s+(?:\([\w\*\s,]+\)\s*)?(\w+)"),
+                ("class", r"type\s+(\w+)\s+struct"),
+            ],
+            "java": [
+                ("class", r"(?:class|interface)\s+(\w+)"),
+                ("function", r"(?:public|private|protected|\s)+\s*\w+\s+(\w+)\s*\("),
+            ],
+        }
+        for sym_type, pattern in regex_fallbacks.get(language, []):
+            for match in re.finditer(pattern, text):
+                name = match.group(1)
+                symbols.append(
+                    Symbol(
+                        name=name,
+                        type=sym_type,
+                        file_path=str(file_path.relative_to(self.root)),
+                        line_number=text.count("\n", 0, match.start()) + 1,
+                    )
+                )
+        return symbols
+
+    def _extract_inheritance(
+        self, file_path: Path, language: str, symbols: List[Symbol]
+    ) -> List[tuple[str, str]]:
+        """Extract child->base inheritance edges."""
+        edges: List[tuple[str, str]] = []
+        # First check if symbols have base_classes populated (from AST path)
+        if language == "python":
+            for sym in symbols:
+                if sym.type == "class" and sym.base_classes:
+                    for base in sym.base_classes:
+                        edges.append((sym.name, base))
+            # If we found edges via AST, return them; otherwise try tree-sitter
+            if edges:
+                return edges
+
+        query_src = INHERITS_QUERIES.get(language)
+        parser = None
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
+
+            parser = get_parser(language)
+        except Exception:
+            parser = None
+
+        if parser is not None and query_src:
+            try:
+                content = file_path.read_bytes()
+                tree = parser.parse(content)
+                query = Query(parser.language, query_src)
+                captures = query.captures(tree.root_node)
+                child = None
+                for node, capture_name in captures:
+                    text = node.text.decode("utf-8", errors="ignore")
+                    if capture_name == "child":
+                        child = text
+                    elif capture_name == "base" and child:
+                        edges.append((child, text))
+                        child = None
+            except Exception:
+                pass
+
+        if not edges:
+            # Regex fallback
+            try:
+                text = file_path.read_text(encoding="utf-8")
+            except Exception:
+                return edges
+            for match in re.finditer(r"class\s+(\w+)\s+extends\s+(\w+)", text):
+                edges.append((match.group(1), match.group(2)))
+        return edges
+
+    def _extract_implements(
+        self, file_path: Path, language: str, symbols: List[Symbol]
+    ) -> List[tuple[str, str]]:
+        """Extract child->interface implements edges for typed languages."""
+        edges: List[tuple[str, str]] = []
+        query_src = IMPLEMENTS_QUERIES.get(language)
+        parser = None
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
+
+            parser = get_parser(language)
+        except Exception:
+            parser = None
+
+        if parser is not None and query_src:
+            try:
+                content = file_path.read_bytes()
+                tree = parser.parse(content)
+                query = Query(parser.language, query_src)
+                captures = query.captures(tree.root_node)
+                child = None
+                for node, capture_name in captures:
+                    text = node.text.decode("utf-8", errors="ignore")
+                    if capture_name == "child":
+                        child = text
+                    elif capture_name in {"interface", "base"} and child:
+                        edges.append((child, text))
+                        child = None
+            except Exception:
+                pass
+
+        if not edges:
+            # Regex fallback for implements
+            try:
+                text = file_path.read_text(encoding="utf-8")
+            except Exception:
+                return edges
+            for match in re.finditer(r"class\s+(\w+)\s+implements\s+([\w, ]+)", text):
+                child = match.group(1)
+                bases = [b.strip() for b in match.group(2).split(",") if b.strip()]
+                for base in bases:
+                    edges.append((child, base))
+        return edges
+
+    def _extract_composition(
+        self, file_path: Path, language: str, symbols: List[Symbol]
+    ) -> List[tuple[str, str]]:
+        """Extract has-a/composition edges (owner -> member type)."""
+        edges: List[tuple[str, str]] = []
+
+        # Python handled via AST visitor (class attributes)
+        if language == "python":
+            for sym in symbols:
+                if sym.type == "class" and hasattr(sym, "composition"):
+                    edges.extend(getattr(sym, "composition"))
+            return edges
+
+        query_src = COMPOSITION_QUERIES.get(language)
+        parser = None
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
+
+            parser = get_parser(language)
+        except Exception:
+            parser = None
+
+        if parser is not None and query_src:
+            try:
+                content = file_path.read_bytes()
+                tree = parser.parse(content)
+                query = Query(parser.language, query_src)
+                captures = query.captures(tree.root_node)
+                owner = None
+                for node, capture_name in captures:
+                    text = node.text.decode("utf-8", errors="ignore")
+                    if capture_name == "owner":
+                        owner = text
+                    elif capture_name == "type" and owner:
+                        edges.append((owner, text))
+                # Do not clear owner on missing type; next owner will overwrite.
+            except Exception:
+                pass
+
+        if edges:
+            return edges
+
+        # Regex fallback for typed declarations and new expressions
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return edges
+
+        owner: Optional[str] = None
+        for line in text.splitlines():
+            class_match = re.search(r"class\s+(\w+)", line)
+            if class_match:
+                owner = class_match.group(1)
+                continue
+            if line.strip().startswith("}"):
+                owner = owner if "class" in line else None
+            # TypeScript/Java style property: field: Type or Type field;
+            field_match = re.search(r"(\w+)\s*[:]\s*(\w+)", line)
+            java_field = re.search(r"(\w+)\s+(\w+)\s*;", line)
+            new_expr = re.search(r"new\s+(\w+)\s*\(", line)
+            target_type = None
+            if field_match:
+                target_type = field_match.group(2)
+            elif java_field and owner:
+                target_type = java_field.group(1)
+            elif new_expr:
+                target_type = new_expr.group(1)
+            if owner and target_type:
+                edges.append((owner, target_type))
+        return edges
+
+    def _find_enclosing_symbol_name(self, node, language: str) -> Optional[str]:
+        """Best-effort caller lookup by walking ancestors."""
+        fields = ENCLOSING_NAME_FIELDS.get(language, [])
+        current = node.parent
+        method_name: Optional[str] = None
+        class_name: Optional[str] = None
+        while current is not None:
+            for node_type, field_name in fields:
+                if current.type == node_type:
+                    field = current.child_by_field_name(field_name)
+                    if not field:
+                        continue
+                    text = field.text.decode("utf-8", errors="ignore")
+                    if node_type in ("class_declaration", "interface_declaration", "class_specifier"):
+                        class_name = class_name or text
+                    else:
+                        method_name = method_name or text
+            current = current.parent
+        if method_name:
+            if class_name:
+                return f"{class_name}.{method_name}"
+            return method_name
+        return class_name
+
+    def _extract_calls_with_tree_sitter(
+        self, file_path: Path, language: str
+    ) -> List[tuple[str, str]]:
+        """Extract caller->callee pairs using tree-sitter (non-Python)."""
+        query_src = CALL_QUERIES.get(language)
+        if not query_src:
+            return []
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
+        except Exception:
+            return []
+        try:
+            parser = get_parser(language)
+        except Exception:
+            return []
+        if parser is None:
+            return []
+
+        content = file_path.read_bytes()
+        tree = parser.parse(content)
+        try:
+            query = Query(parser.language, query_src)
+        except Exception:
+            return []
+
+        call_edges: List[tuple[str, str]] = []
+        try:
+            captures = query.captures(tree.root_node)
+            for node, _ in captures:
+                callee = node.text.decode("utf-8", errors="ignore")
+                caller = self._find_enclosing_symbol_name(node, language)
+                if caller and callee:
+                    call_edges.append((caller, callee))
+        except Exception:
+            call_edges = []
+
+        if call_edges:
+            return call_edges
+
+        # Regex fallback when tree-sitter capture fails
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return []
+        pattern = re.compile(r"(\w+)\s*\(")
+        caller = None
+        for line in text.splitlines():
+            func_decl = re.search(r"function\s+(\w+)", line)
+            if func_decl:
+                caller = func_decl.group(1)
+            method_decl = re.search(r"(\w+)\s*\([^)]*\)\s*\{", line)
+            if method_decl:
+                caller = method_decl.group(1)
+            for callee in pattern.findall(line):
+                if caller and callee and callee not in {"function", caller}:
+                    call_edges.append((caller, callee))
+        return call_edges
 
     def _extract_symbols_with_tree_sitter(self, file_path: Path, language: str) -> List[Symbol]:
         """Extract lightweight symbol declarations for non-Python languages via tree-sitter."""
@@ -1217,6 +1525,90 @@ class CodebaseIndex:
                 if caller and callee and callee not in {"function", caller}:
                     call_edges.append((caller, callee))
         return call_edges
+
+    def _extract_symbols_with_tree_sitter(self, file_path: Path, language: str) -> List[Symbol]:
+        """Extract lightweight symbol declarations for non-Python languages via tree-sitter."""
+        query_defs = SYMBOL_QUERIES.get(language)
+        if not query_defs:
+            return []
+        symbols: List[Symbol] = []
+        parser = None
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
+
+            try:
+                parser = get_parser(language)
+            except Exception:
+                parser = None
+        except Exception:
+            parser = None
+
+        if parser is not None:
+            try:
+                content = file_path.read_bytes()
+                tree = parser.parse(content)
+                for sym_type, query_src in query_defs:
+                    try:
+                        from tree_sitter import QueryCursor
+                        query = Query(parser.language, query_src)
+                        cursor = QueryCursor(query)
+                        captures_dict = cursor.captures(tree.root_node)
+                        for capture_name, nodes in captures_dict.items():
+                            for node in nodes:
+                                text = node.text.decode("utf-8", errors="ignore")
+                                if not text:
+                                    continue
+                                symbols.append(
+                                    Symbol(
+                                        name=text,
+                                        type=sym_type,
+                                        file_path=str(file_path.relative_to(self.root)),
+                                        line_number=node.start_point[0] + 1,
+                                    )
+                                )
+                    except Exception:
+                        continue
+            except Exception:
+                symbols = []
+        if symbols:
+            return symbols
+
+        # Regex fallback when grammar support is unavailable
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return []
+
+        regex_fallbacks: Dict[str, list[tuple[str, str]]] = {
+            "javascript": [
+                ("class", r"class\s+(\w+)"),
+                ("function", r"function\s+(\w+)"),
+            ],
+            "typescript": [
+                ("class", r"class\s+(\w+)"),
+                ("function", r"function\s+(\w+)"),
+            ],
+            "go": [
+                ("function", r"func\s+(?:\([\w\*\s,]+\)\s*)?(\w+)"),
+                ("class", r"type\s+(\w+)\s+struct"),
+            ],
+            "java": [
+                ("class", r"(?:class|interface)\s+(\w+)"),
+                ("function", r"(?:public|private|protected|\s)+\s*\w+\s+(\w+)\s*\("),
+            ],
+        }
+        for sym_type, pattern in regex_fallbacks.get(language, []):
+            for match in re.finditer(pattern, text):
+                name = match.group(1)
+                symbols.append(
+                    Symbol(
+                        name=name,
+                        type=sym_type,
+                        file_path=str(file_path.relative_to(self.root)),
+                        line_number=text.count("\n", 0, match.start()) + 1,
+                    )
+                )
+        return symbols
 
     async def _index_tree_sitter_file(self, file_path: Path, language: str) -> None:
         """Index a non-Python file using tree-sitter for symbols/references."""

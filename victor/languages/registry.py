@@ -253,6 +253,7 @@ class LanguageRegistry:
             Number of plugins registered
         """
         from victor.languages.plugins import (
+            # Core languages
             PythonPlugin,
             JavaScriptPlugin,
             TypeScriptPlugin,
@@ -260,9 +261,34 @@ class LanguageRegistry:
             GoPlugin,
             JavaPlugin,
             CppPlugin,
+            # Config files
+            JsonPlugin,
+            YamlPlugin,
+            TomlPlugin,
+            IniPlugin,
+            HoconPlugin,
+            # Additional languages
+            CPlugin,
+            KotlinPlugin,
+            CSharpPlugin,
+            RubyPlugin,
+            PhpPlugin,
+            SwiftPlugin,
+            ScalaPlugin,
+            BashPlugin,
+            SqlPlugin,
+            HtmlPlugin,
+            CssPlugin,
+            LuaPlugin,
+            ElixirPlugin,
+            HaskellPlugin,
+            RPlugin,
+            MarkdownPlugin,
+            XmlPlugin,
         )
 
         plugins = [
+            # Core languages
             ("python", PythonPlugin),
             ("javascript", JavaScriptPlugin),
             ("typescript", TypeScriptPlugin),
@@ -270,6 +296,30 @@ class LanguageRegistry:
             ("go", GoPlugin),
             ("java", JavaPlugin),
             ("cpp", CppPlugin),
+            # Config files
+            ("json", JsonPlugin),
+            ("yaml", YamlPlugin),
+            ("toml", TomlPlugin),
+            ("ini", IniPlugin),
+            ("hocon", HoconPlugin),
+            # Additional languages
+            ("c", CPlugin),
+            ("kotlin", KotlinPlugin),
+            ("csharp", CSharpPlugin),
+            ("ruby", RubyPlugin),
+            ("php", PhpPlugin),
+            ("swift", SwiftPlugin),
+            ("scala", ScalaPlugin),
+            ("bash", BashPlugin),
+            ("sql", SqlPlugin),
+            ("html", HtmlPlugin),
+            ("css", CssPlugin),
+            ("lua", LuaPlugin),
+            ("elixir", ElixirPlugin),
+            ("haskell", HaskellPlugin),
+            ("r", RPlugin),
+            ("markdown", MarkdownPlugin),
+            ("xml", XmlPlugin),
         ]
 
         count = 0

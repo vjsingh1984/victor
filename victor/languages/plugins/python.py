@@ -106,6 +106,18 @@ class PythonPlugin(BaseLanguagePlugin):
                     name: (identifier) @child
                     superclasses: (argument_list (identifier) @base))
             """,
+            composition="""
+                (class_definition
+                    name: (identifier) @owner
+                    body: (block
+                        (function_definition
+                            name: (identifier) @_init (#eq? @_init "__init__")
+                            body: (block
+                                (expression_statement
+                                    (assignment
+                                        left: (attribute object: (identifier) @_self (#eq? @_self "self"))
+                                        right: (call function: (identifier) @type)))))))
+            """,
             enclosing_scopes=[
                 ("function_definition", "name"),
                 ("class_definition", "name"),
