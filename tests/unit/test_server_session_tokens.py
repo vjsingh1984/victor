@@ -8,7 +8,8 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def server_module(monkeypatch):
     # Ensure API key is set before module import so dependency enforces auth
-    monkeypatch.setenv("VICTOR_SERVER_API_KEY", "secret")
+    # Note: pydantic-settings expects the env var name to match the field name (uppercase)
+    monkeypatch.setenv("SERVER_API_KEY", "secret")
     # Reload module to pick up env changes
     import web.server.main as main
 

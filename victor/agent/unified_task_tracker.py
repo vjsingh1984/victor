@@ -575,7 +575,10 @@ class UnifiedTaskTracker:
         """Set the task type and load corresponding configuration."""
         self._progress.task_type = task_type
         self._task_config = self._config_loader.get_task_config(task_type)
-        self._progress.tool_budget = self._task_config.tool_budget
+
+        # Respect sticky user budget - only update if not user-set
+        if not self._sticky_user_budget:
+            self._progress.tool_budget = self._task_config.tool_budget
 
         logger.info(
             f"UnifiedTaskTracker: task_type={task_type.value}, "
@@ -703,9 +706,23 @@ class UnifiedTaskTracker:
         self._progress.forced_stop = reason
 
     def reset(self) -> None:
-        """Reset all state for a new conversation."""
+        """Reset all state for a new conversation.
+
+        Preserves user-overridden sticky values (budget, max_iterations) to
+        honor explicit user settings across conversation turns.
+        """
+        # Preserve sticky values before reset
+        sticky_budget = self._progress.tool_budget if self._sticky_user_budget else None
+        sticky_max_iter = self._max_total_iterations if self._sticky_user_iterations else None
+
         self._progress = UnifiedTaskProgress()
         self._task_config = None
+
+        # Restore sticky values after reset
+        if sticky_budget is not None:
+            self._progress.tool_budget = sticky_budget
+        if sticky_max_iter is not None:
+            self._max_total_iterations = sticky_max_iter
 
     # =========================================================================
     # Stop Decision

@@ -25,7 +25,9 @@ from victor.languages.base import (
     LanguageCapabilities,
     LanguageConfig,
     Linter,
+    QueryPattern,
     TestRunner,
+    TreeSitterQueries,
 )
 
 
@@ -80,6 +82,73 @@ class TypeScriptPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        """Create tree-sitter queries for TypeScript symbol/call extraction."""
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern("class", "(class_declaration name: (identifier) @name)"),
+                QueryPattern("function", "(function_declaration name: (identifier) @name)"),
+                QueryPattern("function", "(method_signature name: (property_identifier) @name)"),
+                QueryPattern("function", "(method_definition name: (property_identifier) @name)"),
+                QueryPattern(
+                    "function",
+                    "(lexical_declaration (variable_declarator name: (identifier) @name value: (arrow_function)))",
+                ),
+                QueryPattern(
+                    "function",
+                    "(lexical_declaration (variable_declarator name: (identifier) @name value: (function_expression)))",
+                ),
+                QueryPattern(
+                    "function",
+                    "(assignment_expression left: (identifier) @name right: (arrow_function))",
+                ),
+            ],
+            calls="""
+                (call_expression function: (identifier) @callee)
+                (call_expression function: (member_expression property: (property_identifier) @callee))
+                (call_expression function: (subscript_expression index: (property_identifier) @callee))
+                (new_expression constructor: (identifier) @callee)
+            """,
+            references="""
+                (call_expression function: (identifier) @name)
+                (call_expression function: (member_expression property: (property_identifier) @name))
+                (member_expression property: (property_identifier) @name)
+                (new_expression constructor: (identifier) @name)
+                (identifier) @name
+            """,
+            inheritance="""
+                (class_declaration
+                    name: (identifier) @child
+                    heritage: (class_heritage (identifier) @base))
+            """,
+            implements="""
+                (class_declaration
+                    name: (identifier) @child
+                    (heritage_clause (identifier) @interface))
+            """,
+            composition="""
+                (class_declaration
+                    name: (identifier) @owner
+                    body: (class_body
+                        (field_definition
+                            type: (type_annotation (type_identifier) @type))
+                        (public_field_definition
+                            type: (type_annotation (type_identifier) @type))
+                        (method_definition
+                            body: (statement_block
+                                (expression_statement
+                                    (assignment_expression
+                                        left: (member_expression object: (this) property: (property_identifier))
+                                        right: (new_expression constructor: (identifier) @type)))))))
+            """,
+            enclosing_scopes=[
+                ("function_declaration", "name"),
+                ("method_definition", "name"),
+                ("method_signature", "name"),
+                ("class_declaration", "name"),
+            ],
         )
 
     def get_test_runner(self, project_root: Path) -> Optional[TestRunner]:

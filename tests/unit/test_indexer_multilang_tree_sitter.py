@@ -53,7 +53,7 @@ async def test_indexer_tree_sitter_javascript(tmp_path: Path):
         enable_watcher=False,
     )
 
-    await index.index_codebase(force=True)
+    await index.index_codebase()
 
     rel = str(src.relative_to(tmp_path))
     assert rel in index.files

@@ -58,11 +58,19 @@ NETWORK_TOOLS = frozenset({
     "web_search", "web_fetch", "http_request"
 })
 
+# TOOL_CATEGORIES dictionary for backward compatibility with tests
+TOOL_CATEGORIES: Dict[str, ToolCategory] = {
+    **{name: ToolCategory.READ_ONLY for name in READ_TOOLS},
+    **{name: ToolCategory.WRITE for name in WRITE_TOOLS},
+    **{name: ToolCategory.NETWORK for name in NETWORK_TOOLS},
+}
+
 
 @dataclass
 class ParallelExecutionConfig:
     max_concurrent: int = 5
     enable_parallel: bool = True
+    parallelize_reads: bool = True
     timeout_per_tool: float = 60.0
 
 
@@ -73,6 +81,7 @@ class ParallelExecutionResult:
     errors: List[str] = field(default_factory=list)
     completed_count: int = 0
     failed_count: int = 0
+    parallel_speedup: float = 1.0  # Speedup ratio vs sequential execution
 
 
 class ParallelToolExecutor:
@@ -97,6 +106,26 @@ class ParallelToolExecutor:
 
     def _has_write_tools(self, tool_calls: List[Dict[str, Any]]) -> bool:
         return any(tc.get("name", "") in WRITE_TOOLS for tc in tool_calls)
+
+    def _can_parallelize(self, tool_calls: List[Dict[str, Any]]) -> bool:
+        """Check if the given tool calls can be parallelized.
+
+        Args:
+            tool_calls: List of tool call dictionaries
+
+        Returns:
+            True if calls can be parallelized, False otherwise
+        """
+        # Cannot parallelize if disabled
+        if not self.config.enable_parallel:
+            return False
+        # Cannot parallelize single or empty calls
+        if len(tool_calls) <= 1:
+            return False
+        # Cannot parallelize if writes are present
+        if self._has_write_tools(tool_calls):
+            return False
+        return True
 
     def _extract_file_dependencies(self, tool_calls: List[Dict[str, Any]]) -> Dict[int, Set[int]]:
         dependencies = {i: set() for i in range(len(tool_calls))}

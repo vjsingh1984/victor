@@ -47,7 +47,8 @@ class TaskClassification:
 # Consolidated pattern definitions
 PATTERNS = {
     TaskComplexity.SIMPLE: [
-        (r"\b(list|show|display)\s+(files?|directories?|folders?)\b", 1.0, "list_files"),
+        (r"\b(list|show|display)\s+.*?(files?|directories?|folders?)\b", 1.0, "list_files"),
+        (r"\bwhat\s+files\s+(are\s+)?(in|at)\b", 1.0, "what_files"),
         (r"\bgit\s+(status|log|branch)\b", 1.0, "git_status"),
         (r"\b(show|what|get)\s+(the\s+)?(current\s+)?(git\s+)?status\b", 0.9, "status_query"),
         (r"\bpwd\b|\bcurrent\s+(directory|dir|folder)\b", 1.0, "pwd"),
@@ -59,7 +60,7 @@ PATTERNS = {
         (r"\bread\s+(and\s+)?(explain|summarize)\b", 0.9, "read_explain"),
         (r"\bfind\s+(all\s+)?(classes?|functions?|methods?)\b", 0.8, "find_definitions"),
         (r"\bwhere\s+(is|are|does)\b", 0.8, "where_query"),
-        (r"\bhow\s+(does|do|is)\s+\w+\s+(work|implemented)\b", 0.8, "how_works"),
+        (r"\bhow\s+(does|do|is)\s+.+\s+(work|implemented)\b", 0.9, "how_works"),
     ],
     TaskComplexity.COMPLEX: [
         (r"\b(analyze|review|audit)\s+(the\s+)?(entire\s+)?(codebase|project|code)\b", 1.0, "analyze_codebase"),
@@ -71,6 +72,8 @@ PATTERNS = {
         (r"\b(create|write|generate)\s+(a\s+)?(simple\s+)?(function|script|code)\b", 1.0, "generate_code"),
         (r"\bwrite\s+(a\s+)?(python|javascript|bash|ruby|go|rust)\s+(script|program|code)\b", 1.0, "write_lang_script"),
         (r"\bcomplete\s+(this|the)\s+(function|code|implementation)\b", 1.0, "complete_function"),
+        (r"\bshow\s+(me\s+)?(a\s+)?code\s+(example|sample)\b", 0.95, "show_code_example"),
+        (r"\bimplement\s+(the\s+)?function\s+to\s+pass\b", 0.95, "implement_function"),
         (r"\bdef\s+\w+\s*\([^)]*\)\s*:", 0.95, "function_definition"),
         (r'"""\s*\n.*?>>>', 0.95, "doctest_pattern"),
     ],
@@ -176,8 +179,8 @@ class ComplexityClassifier:
             if result := classifier(message):
                 return result
 
-        # Check high-confidence patterns
-        for complexity in [TaskComplexity.SIMPLE, TaskComplexity.GENERATION, TaskComplexity.ACTION, TaskComplexity.COMPLEX]:
+        # Check high-confidence patterns (order matters: more specific before general)
+        for complexity in [TaskComplexity.SIMPLE, TaskComplexity.GENERATION, TaskComplexity.ACTION, TaskComplexity.MEDIUM, TaskComplexity.COMPLEX, TaskComplexity.ANALYSIS]:
             for pattern, weight, name in self._patterns[complexity]:
                 if weight >= 0.9 and pattern.search(message):
                     return TaskClassification(complexity, self.budgets[complexity], PROMPT_HINTS[complexity], 0.95, [name])

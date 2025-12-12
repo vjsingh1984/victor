@@ -24,7 +24,119 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, List, Optional, Protocol, Tuple, runtime_checkable
+
+if TYPE_CHECKING:
+    from tree_sitter import Tree
+
+
+# ---------------------------------------------------------------------------
+# Tree-sitter Query Types
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class QueryPattern:
+    """Single tree-sitter query pattern for symbol extraction.
+
+    Attributes:
+        symbol_type: The type of symbol this query extracts (e.g., "class", "function")
+        query: The tree-sitter query string with @name capture
+    """
+
+    symbol_type: str
+    query: str
+
+
+@dataclass
+class TreeSitterQueries:
+    """Collection of tree-sitter queries for a language.
+
+    All queries should use the new tree-sitter API format and capture
+    nodes using @name syntax. Queries are optional - if not provided,
+    that feature will not be available for the language.
+
+    Example Python queries:
+        symbols: [
+            QueryPattern("class", "(class_definition name: (identifier) @name)"),
+            QueryPattern("function", "(function_definition name: (identifier) @name)"),
+        ]
+        calls: "(call function: (identifier) @callee)"
+
+    Attributes:
+        symbols: List of query patterns for symbol extraction (classes, functions, etc.)
+        calls: Query for call expressions (captures @callee)
+        references: Query for identifier references
+        inheritance: Query for class inheritance (captures @child and @base)
+        implements: Query for interface implementation (captures @child and @interface)
+        composition: Query for has-a relationships (captures @owner and @type)
+        enclosing_scopes: List of (node_type, name_field) for caller resolution
+    """
+
+    # Symbol extraction queries
+    symbols: List[QueryPattern] = field(default_factory=list)
+
+    # Relationship extraction queries
+    calls: Optional[str] = None
+    references: Optional[str] = None
+    inheritance: Optional[str] = None
+    implements: Optional[str] = None
+    composition: Optional[str] = None
+
+    # For resolving enclosing scope (e.g., which function a call is inside)
+    # List of (node_type, name_field) tuples
+    enclosing_scopes: List[Tuple[str, str]] = field(default_factory=list)
+
+
+@dataclass
+class CodeChunk:
+    """A semantic code chunk for embedding.
+
+    Represents a meaningful unit of code extracted using AST-aware
+    chunking. This preserves semantic boundaries like function/class
+    definitions rather than arbitrary text splits.
+
+    Attributes:
+        text: The actual code text for this chunk
+        start_line: Starting line number (1-indexed)
+        end_line: Ending line number (1-indexed)
+        chunk_type: Type of chunk ("function", "class", "module_header", etc.)
+        symbol_name: Name of the symbol if this chunk represents one
+        parent_symbol: Name of parent symbol (e.g., class name for a method)
+        file_path: Path to the source file
+    """
+
+    text: str
+    start_line: int
+    end_line: int
+    chunk_type: str
+    symbol_name: Optional[str] = None
+    parent_symbol: Optional[str] = None
+    file_path: Optional[str] = None
+
+
+class ChunkStrategy(Protocol):
+    """Protocol for AST-aware code chunking strategies.
+
+    Implementations split code into semantic chunks using the parsed
+    AST tree rather than arbitrary text boundaries. This produces
+    better embeddings for code search.
+    """
+
+    def chunk_file(
+        self, tree: "Tree", content: bytes, file_path: Optional[str] = None
+    ) -> List[CodeChunk]:
+        """Split a file into semantic chunks using AST.
+
+        Args:
+            tree: Parsed tree-sitter tree
+            content: Raw file content as bytes
+            file_path: Optional file path for metadata
+
+        Returns:
+            List of semantic code chunks
+        """
+        ...
 
 
 class CommentStyle(Enum):
@@ -185,6 +297,11 @@ class LanguagePlugin(Protocol):
         """Get language capabilities."""
         ...
 
+    @property
+    def tree_sitter_queries(self) -> TreeSitterQueries:
+        """Get tree-sitter queries for symbol/call extraction."""
+        ...
+
     def detect_from_file(self, path: Path) -> bool:
         """Check if this language handles the given file.
 
@@ -260,6 +377,7 @@ class BaseLanguagePlugin(ABC):
         """Initialize plugin."""
         self._config: Optional[LanguageConfig] = None
         self._capabilities: Optional[LanguageCapabilities] = None
+        self._tree_sitter_queries: Optional[TreeSitterQueries] = None
 
     @property
     def config(self) -> LanguageConfig:
@@ -275,6 +393,17 @@ class BaseLanguagePlugin(ABC):
             self._capabilities = self._create_capabilities()
         return self._capabilities
 
+    @property
+    def tree_sitter_queries(self) -> TreeSitterQueries:
+        """Get tree-sitter queries for this language.
+
+        Returns queries for symbol extraction, call analysis,
+        inheritance detection, etc. using tree-sitter.
+        """
+        if self._tree_sitter_queries is None:
+            self._tree_sitter_queries = self._create_tree_sitter_queries()
+        return self._tree_sitter_queries
+
     @abstractmethod
     def _create_config(self) -> LanguageConfig:
         """Create language configuration."""
@@ -284,6 +413,14 @@ class BaseLanguagePlugin(ABC):
     def _create_capabilities(self) -> LanguageCapabilities:
         """Create capabilities description."""
         ...
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        """Create tree-sitter queries for this language.
+
+        Override in subclasses to provide language-specific queries.
+        Default returns empty queries (no tree-sitter support).
+        """
+        return TreeSitterQueries()
 
     def detect_from_file(self, path: Path) -> bool:
         """Check if this language handles the file."""

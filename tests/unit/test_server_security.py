@@ -8,7 +8,8 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def server_module(monkeypatch):
     # Enforce API key for these tests
-    monkeypatch.setenv("VICTOR_SERVER_API_KEY", "secret")
+    # Note: pydantic-settings expects the env var name to match the field name (uppercase)
+    monkeypatch.setenv("SERVER_API_KEY", "secret")
     import web.server.main as main
 
     importlib.reload(main)
@@ -36,15 +37,19 @@ def test_render_requires_auth_and_size_limit(monkeypatch, client, server_module)
     # Set small limit to force 413
     monkeypatch.setattr(server_module, "RENDER_MAX_BYTES", 10)
 
-    # Unauthorized should be blocked
-    resp = client.post("/render/plantuml", data="@startuml\nA-->B\n@enduml")
+    # Unauthorized should be blocked - must send content-type for FastAPI Body validation
+    resp = client.post(
+        "/render/plantuml",
+        content="@startuml\nA-->B\n@enduml",
+        headers={"Content-Type": "text/plain"},
+    )
     assert resp.status_code == 401
 
     # Authorized but too large should return 413
     payload = "x" * 50
     resp = client.post(
         "/render/plantuml",
-        data=payload,
-        headers={"Authorization": "Bearer secret"},
+        content=payload,
+        headers={"Authorization": "Bearer secret", "Content-Type": "text/plain"},
     )
     assert resp.status_code == 413

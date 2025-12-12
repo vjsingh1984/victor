@@ -45,14 +45,13 @@ async def test_cpp_indexing(tmp_path: Path):
     file_metadata = indexer.files["main.cpp"]
 
     symbols = {s.name: s for s in file_metadata.symbols}
-    print(symbols)
     assert "MyClass" in symbols
-    # assert "myMethod" in symbols
-    # assert "main" in symbols
+    assert "myMethod" in symbols
+    assert "main" in symbols
 
-    # assert symbols["MyClass"].type == "class"
-    # assert symbols["myMethod"].type == "function"
-    # assert symbols["main"].type == "function"
+    assert symbols["MyClass"].type == "class"
+    assert symbols["myMethod"].type == "function"
+    assert symbols["main"].type == "function"
 
-    # call_edges = file_metadata.call_edges
-    # assert ("main", "myMethod") in call_edges
+    call_edges = file_metadata.call_edges
+    assert ("main", "myMethod") in call_edges

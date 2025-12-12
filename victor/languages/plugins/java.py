@@ -25,7 +25,9 @@ from victor.languages.base import (
     LanguageCapabilities,
     LanguageConfig,
     Linter,
+    QueryPattern,
     TestRunner,
+    TreeSitterQueries,
 )
 
 
@@ -80,6 +82,51 @@ class JavaPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        """Create tree-sitter queries for Java symbol/call extraction."""
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern("class", "(class_declaration name: (identifier) @name)"),
+                QueryPattern("class", "(interface_declaration name: (identifier) @name)"),
+                QueryPattern("function", "(method_declaration name: (identifier) @name)"),
+            ],
+            calls="""
+                (method_invocation name: (identifier) @callee)
+                (object_creation_expression type: (type_identifier) @callee)
+                (super_method_invocation name: (identifier) @callee)
+            """,
+            references="""
+                (method_invocation name: (identifier) @name)
+                (method_invocation object: (identifier) @name)
+                (field_access field: (identifier) @name)
+            """,
+            inheritance="""
+                (class_declaration
+                    name: (identifier) @child
+                    super_classes: (superclass (type_identifier) @base))
+            """,
+            implements="""
+                (class_declaration
+                    name: (identifier) @child
+                    interfaces: (super_interfaces (type_list (type_identifier) @interface)))
+                (interface_declaration
+                    name: (identifier) @child
+                    interfaces: (super_interfaces (type_list (type_identifier) @interface)))
+            """,
+            composition="""
+                (class_declaration
+                    name: (identifier) @owner
+                    body: (class_body
+                        (field_declaration
+                            type: (type_identifier) @type)))
+            """,
+            enclosing_scopes=[
+                ("method_declaration", "name"),
+                ("class_declaration", "name"),
+                ("interface_declaration", "name"),
+            ],
         )
 
     def get_test_runner(self, project_root: Path) -> Optional[TestRunner]:

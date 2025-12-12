@@ -43,6 +43,8 @@ from pydantic import BaseModel, Field
 from tree_sitter import Query
 
 from victor.codebase.graph.protocol import GraphEdge, GraphNode
+from victor.codebase.tree_sitter_extractor import TreeSitterExtractor
+from victor.languages.registry import get_language_registry
 from victor.codebase.graph.registry import create_graph_store
 from victor.codebase.graph.sqlite_store import SqliteGraphStore
 from victor.codebase.symbol_resolver import SymbolResolver
@@ -115,6 +117,10 @@ EXTENSION_TO_LANGUAGE: Dict[str, str] = {
 
 # Tree-sitter symbol queries per language for lightweight multi-language graph capture.
 SYMBOL_QUERIES: Dict[str, List[tuple[str, str]]] = {
+    "python": [
+        ("class", "(class_definition name: (identifier) @name)"),
+        ("function", "(function_definition name: (identifier) @name)"),
+    ],
     "javascript": [
         ("class", "(class_declaration name: (identifier) @name)"),
         ("function", "(function_declaration name: (identifier) @name)"),
@@ -150,6 +156,11 @@ SYMBOL_QUERIES: Dict[str, List[tuple[str, str]]] = {
 }
 
 INHERITS_QUERIES: Dict[str, str] = {
+    "python": """
+        (class_definition
+            name: (identifier) @child
+            superclasses: (argument_list (identifier) @base))
+    """,
     "javascript": """
         (class_declaration
             name: (identifier) @child
@@ -248,6 +259,10 @@ COMPOSITION_QUERIES: Dict[str, str] = {
 
 # Tree-sitter call queries (callee only) for multi-language call/reference edges.
 CALL_QUERIES: Dict[str, str] = {
+    "python": """
+        (call function: (identifier) @callee)
+        (call function: (attribute attribute: (identifier) @callee))
+    """,
     "javascript": """
         (call_expression function: (identifier) @callee)
         (call_expression function: (member_expression property: (property_identifier) @callee))
@@ -279,6 +294,10 @@ CALL_QUERIES: Dict[str, str] = {
 
 # Mapping of function/method node types to name field for caller resolution.
 ENCLOSING_NAME_FIELDS: Dict[str, List[tuple[str, str]]] = {
+    "python": [
+        ("function_definition", "name"),
+        ("class_definition", "name"),
+    ],
     "javascript": [
         ("function_declaration", "name"),
         ("method_definition", "name"),
@@ -663,6 +682,11 @@ class CodebaseIndex:
         if use_embeddings:
             self._initialize_embeddings(embedding_config)
 
+        # Unified tree-sitter extractor using language registry
+        self._language_registry = get_language_registry()
+        self._language_registry.discover_plugins()
+        self._tree_sitter_extractor = TreeSitterExtractor(self._language_registry)
+
     def _reset_graph_buffers(self) -> None:
         self._graph_nodes = []
         self._graph_edges = []
@@ -672,8 +696,79 @@ class CodebaseIndex:
         self._pending_compose_edges = []
         self._symbol_resolver = SymbolResolver()
 
+    def _should_ignore(self, path: Path) -> bool:
+        """Check if a path should be ignored based on ignore patterns."""
+        path_str = str(path)
+        for pattern in self.ignore_patterns:
+            if pattern.endswith("/"):
+                # Directory pattern
+                if pattern[:-1] in path_str or f"/{pattern[:-1]}/" in path_str:
+                    return True
+            elif "*" in pattern:
+                # Glob pattern
+                import fnmatch
+                if fnmatch.fnmatch(path.name, pattern):
+                    return True
+            else:
+                # Exact match
+                if pattern in path_str:
+                    return True
+        return False
+
+    async def index_codebase(self) -> None:
+        """Index the entire codebase.
+
+        Scans all source files matching WATCHED_PATTERNS and extracts:
+        - Symbols (classes, functions, methods)
+        - Imports and dependencies
+        - Call edges for function relationships
+
+        After indexing:
+        - `self.files` contains FileMetadata for each indexed file
+        - `self.symbols` contains all extracted symbols
+        - Graph store (if configured) contains relationship data
+        """
+        self._reset_graph_buffers()
+        self.files.clear()
+        self.symbols.clear()
+        self.symbol_index.clear()
+
+        # Discover files matching watched patterns
+        for pattern in self.WATCHED_PATTERNS:
+            for file_path in self.root.rglob(pattern):
+                if file_path.is_file() and not self._should_ignore(file_path):
+                    language = self._detect_language(file_path)
+                    try:
+                        await self._index_tree_sitter_file(file_path, language)
+                    except Exception as exc:
+                        logger.debug(f"Failed to index {file_path}: {exc}")
+
+        # Resolve cross-file dependencies
+        self._resolve_cross_file_calls()
+        self._build_dependency_graph()
+
+        # Flush graph buffers to store
+        if self.graph_store and self._graph_nodes:
+            await self.graph_store.upsert_nodes(self._graph_nodes)
+        if self.graph_store and self._graph_edges:
+            await self.graph_store.upsert_edges(self._graph_edges)
+
+        self._is_indexed = True
+        self._is_stale = False
+        self._last_indexed = time.time()
+        logger.info(f"Indexed {len(self.files)} files with {len(self.symbols)} symbols")
+
     def _detect_language(self, file_path: Path, default: str = "python") -> str:
-        """Detect language from extension for tree-sitter queries."""
+        """Detect language from extension for tree-sitter queries.
+
+        Uses the language registry for detection, with fallback to legacy
+        EXTENSION_TO_LANGUAGE dict for config files.
+        """
+        # Try registry first (unified approach)
+        detected = self._language_registry.detect_language(file_path)
+        if detected:
+            return detected
+        # Fallback to legacy dict (for config files not in registry)
         return EXTENSION_TO_LANGUAGE.get(file_path.suffix.lower(), default)
 
     def _is_config_language(self, language: str) -> bool:
@@ -771,8 +866,6 @@ class CodebaseIndex:
     def _extract_symbols_with_tree_sitter(self, file_path: Path, language: str) -> List[Symbol]:
         """Extract lightweight symbol declarations for non-Python languages via tree-sitter."""
         query_defs = SYMBOL_QUERIES.get(language)
-        print(f"Extracting symbols for {language} from {file_path}")
-        print(f"Query defs: {query_defs}")
         if not query_defs:
             return []
         symbols: List[Symbol] = []
@@ -793,21 +886,23 @@ class CodebaseIndex:
                 tree = parser.parse(content)
                 for sym_type, query_src in query_defs:
                     try:
+                        from tree_sitter import QueryCursor
                         query = Query(parser.language, query_src)
-                        captures = query.captures(tree.root_node)
-                        print(f"Captures for {query_src}: {captures}")
-                        for node, _ in captures:
-                            text = node.text.decode("utf-8", errors="ignore")
-                            if not text:
-                                continue
-                            symbols.append(
-                                Symbol(
-                                    name=text,
-                                    type=sym_type,
-                                    file_path=str(file_path.relative_to(self.root)),
-                                    line_number=node.start_point[0] + 1,
+                        cursor = QueryCursor(query)
+                        captures_dict = cursor.captures(tree.root_node)
+                        for capture_name, nodes in captures_dict.items():
+                            for node in nodes:
+                                text = node.text.decode("utf-8", errors="ignore")
+                                if not text:
+                                    continue
+                                symbols.append(
+                                    Symbol(
+                                        name=text,
+                                        type=sym_type,
+                                        file_path=str(file_path.relative_to(self.root)),
+                                        line_number=node.start_point[0] + 1,
+                                    )
                                 )
-                            )
                     except Exception:
                         continue
             except Exception:
@@ -857,13 +952,15 @@ class CodebaseIndex:
     ) -> List[tuple[str, str]]:
         """Extract child->base inheritance edges."""
         edges: List[tuple[str, str]] = []
-        # Python handled separately via AST (base_classes on symbols)
+        # First check if symbols have base_classes populated (from AST path)
         if language == "python":
             for sym in symbols:
                 if sym.type == "class" and sym.base_classes:
                     for base in sym.base_classes:
                         edges.append((sym.name, base))
-            return edges
+            # If we found edges via AST, return them; otherwise try tree-sitter
+            if edges:
+                return edges
 
         query_src = INHERITS_QUERIES.get(language)
         parser = None
@@ -1029,7 +1126,7 @@ class CodebaseIndex:
                     if not field:
                         continue
                     text = field.text.decode("utf-8", errors="ignore")
-                    if node_type in ("class_declaration", "interface_declaration"):
+                    if node_type in ("class_declaration", "interface_declaration", "class_specifier"):
                         class_name = class_name or text
                     else:
                         method_name = method_name or text
@@ -1098,926 +1195,420 @@ class CodebaseIndex:
                     call_edges.append((caller, callee))
         return call_edges
 
-    @property
-    def is_stale(self) -> bool:
-        """Check if index is stale and needs refresh.
-
-        Returns:
-            True if files have changed since last indexing
-        """
-        with self._staleness_lock:
-            return self._is_stale or not self._is_indexed
-
-    @property
-    def changed_files_count(self) -> int:
-        """Get count of changed files since last index."""
-        with self._staleness_lock:
-            return len(self._changed_files)
-
-    @property
-    def _metadata_file(self) -> Path:
-        """Path to persistent metadata file."""
-        from victor.config.settings import get_project_paths
-
-        return get_project_paths(self.root).index_metadata
-
-    def _compute_file_hash(self, file_path: Path) -> str:
-        """Compute SHA256 hash of file contents.
-
-        Args:
-            file_path: Path to file
-
-        Returns:
-            SHA256 hash as hex string
-        """
+    def _extract_symbols_with_tree_sitter(self, file_path: Path, language: str) -> List[Symbol]:
+        """Extract lightweight symbol declarations for non-Python languages via tree-sitter."""
+        query_defs = SYMBOL_QUERIES.get(language)
+        if not query_defs:
+            return []
+        symbols: List[Symbol] = []
+        parser = None
         try:
-            content = file_path.read_bytes()
-            return hashlib.sha256(content).hexdigest()[:16]  # First 16 chars
+            from victor.codebase.tree_sitter_manager import get_parser
+
+            try:
+                parser = get_parser(language)
+            except Exception:
+                parser = None
         except Exception:
-            return ""
+            parser = None
 
-    def _save_metadata(self) -> None:
-        """Persist file metadata to disk for restart recovery."""
-        try:
-            self._metadata_file.parent.mkdir(parents=True, exist_ok=True)
-
-            # Convert to serializable format
-            metadata = {
-                "last_indexed": self._last_indexed,
-                "root_path": str(self.root),
-                "files": {
-                    path: {
-                        "last_modified": meta.last_modified,
-                        "indexed_at": meta.indexed_at,
-                        "size": meta.size,
-                        "lines": meta.lines,
-                        "content_hash": meta.content_hash,
-                        "symbol_count": len(meta.symbols),
-                    }
-                    for path, meta in self.files.items()
-                },
-            }
-
-            self._metadata_file.write_text(json.dumps(metadata, indent=2))
-            logger.debug(f"Saved index metadata to {self._metadata_file}")
-
-        except Exception as e:
-            logger.warning(f"Failed to save index metadata: {e}")
-
-    def _load_metadata(self) -> Optional[Dict[str, Any]]:
-        """Load persisted metadata from disk.
-
-        Returns:
-            Metadata dict if available, None otherwise
-        """
-        try:
-            if self._metadata_file.exists():
-                content = self._metadata_file.read_text()
-                return json.loads(content)
-        except Exception as e:
-            logger.warning(f"Failed to load index metadata: {e}")
-        return None
-
-    def check_staleness_by_mtime(self) -> Tuple[bool, List[str], List[str]]:
-        """Check if files have changed by comparing mtimes.
-
-        This is the reliable method for startup - compares current file
-        mtimes with stored mtimes from last indexing.
-
-        Returns:
-            Tuple of (is_stale, modified_files, deleted_files)
-        """
-        saved = self._load_metadata()
-        if not saved:
-            # No saved metadata, need full index
-            return True, [], []
-
-        stored_files = saved.get("files", {})
-        modified_files = []
-        deleted_files = []
-
-        # Check each stored file
-        for rel_path, file_info in stored_files.items():
-            file_path = self.root / rel_path
-            stored_mtime = file_info.get("last_modified", 0)
-
-            if not file_path.exists():
-                # File was deleted
-                deleted_files.append(rel_path)
-            else:
-                current_mtime = file_path.stat().st_mtime
-                if current_mtime > stored_mtime:
-                    # File was modified
-                    modified_files.append(rel_path)
-
-        # Check for new files (files that exist but weren't indexed)
-        for py_file in self.root.rglob("*.py"):
-            if self.should_ignore(py_file):
-                continue
+        if parser is not None:
             try:
-                rel_path = str(py_file.relative_to(self.root))
-                if rel_path not in stored_files:
-                    # New file
-                    modified_files.append(rel_path)
-            except ValueError:
-                pass
-
-        is_stale = len(modified_files) > 0 or len(deleted_files) > 0
-        return is_stale, modified_files, deleted_files
-
-    def _check_embeddings_integrity(self) -> bool:
-        """Check if embeddings storage exists and has data.
-
-        Supports multiple vector stores configured via settings:
-        - LanceDB (default): Creates .lance directories for tables
-        - ChromaDB: Creates chroma.sqlite3 file
-
-        Returns:
-            True if embeddings are intact, False if missing or empty
-        """
-        if not self.use_embeddings:
-            return True  # Not using embeddings, so they're "intact"
-
-        try:
-            from victor.config.settings import get_project_paths, load_settings
-
-            settings = load_settings()
-            vector_store = getattr(settings, "codebase_vector_store", "lancedb")
-            embeddings_dir = get_project_paths(self.root).embeddings_dir
-
-            # Check if directory exists
-            if not embeddings_dir.exists():
-                logger.warning(f"Embeddings directory missing: {embeddings_dir}")
-                return False
-
-            # Check if directory has content
-            contents = list(embeddings_dir.iterdir())
-            if not contents:
-                logger.warning(f"Embeddings directory is empty: {embeddings_dir}")
-                return False
-
-            # Vector store specific validation
-            if vector_store == "lancedb":
-                # LanceDB creates .lance directories for each table
-                lance_tables = [d for d in contents if d.is_dir() and d.suffix == ".lance"]
-                if not lance_tables:
-                    # Also check for any subdirectories with data (table directories)
-                    has_data = any(d.is_dir() and list(d.iterdir()) for d in contents if d.is_dir())
-                    if not has_data:
-                        logger.warning(f"LanceDB has no tables: {embeddings_dir}")
-                        return False
-            elif vector_store == "chromadb":
-                # ChromaDB creates chroma.sqlite3 file
-                chroma_db = embeddings_dir / "chroma.sqlite3"
-                if not chroma_db.exists():
-                    logger.warning(f"ChromaDB database missing: {chroma_db}")
-                    return False
-            else:
-                # Generic check: any files or non-empty subdirectories
-                has_data = any(f.is_file() for f in contents) or any(
-                    d.is_dir() and list(d.iterdir()) for d in contents if d.is_dir()
-                )
-                if not has_data:
-                    logger.warning(f"Embeddings directory has no valid data: {embeddings_dir}")
-                    return False
-
-            return True
-
-        except Exception as e:
-            logger.warning(f"Failed to check embeddings integrity: {e}")
-            return False
-
-    async def startup_check(self, auto_reindex: bool = True) -> Dict[str, Any]:
-        """Check index status at startup and reindex if needed.
-
-        This should be called when Victor starts to ensure the index
-        is up-to-date. It compares file mtimes with stored mtimes and
-        verifies embeddings storage exists if embeddings are enabled.
-
-        Args:
-            auto_reindex: If True, automatically reindex stale files
-
-        Returns:
-            Dictionary with status information
-        """
-        logger.info("Checking codebase index status at startup...")
-
-        # Check if we have any saved metadata
-        saved = self._load_metadata()
-        if not saved:
-            logger.info("No existing index found. Full indexing required.")
-            if auto_reindex:
-                await self.index_codebase(force=True)
-            return {
-                "status": "indexed" if auto_reindex else "needs_index",
-                "action": "full_index" if auto_reindex else "none",
-                "files_indexed": len(self.files) if auto_reindex else 0,
-            }
-
-        # Check if embeddings are enabled but storage is missing
-        embeddings_intact = self._check_embeddings_integrity()
-        if not embeddings_intact:
-            logger.info("Embeddings storage missing or empty. Full indexing required.")
-            print("⚠️  Embeddings storage missing or corrupted. Triggering full reindex...")
-            if auto_reindex:
-                await self.index_codebase(force=True)
-            return {
-                "status": "indexed" if auto_reindex else "needs_index",
-                "action": "full_index" if auto_reindex else "none",
-                "reason": "embeddings_missing",
-                "files_indexed": len(self.files) if auto_reindex else 0,
-            }
-
-        # Check for mtime-based staleness
-        is_stale, modified, deleted = self.check_staleness_by_mtime()
-
-        if not is_stale:
-            logger.info("Index is up to date based on file mtimes.")
-            # Restore in-memory state from saved metadata
-            self._is_indexed = True
-            self._last_indexed = saved.get("last_indexed")
-            file_count = len(saved.get("files", {}))
-            print(f"✅ Index up to date ({file_count} files)")
-            return {
-                "status": "up_to_date",
-                "action": "none",
-                "files_in_index": file_count,
-            }
-
-        print(f"Index stale: {len(modified)} modified, {len(deleted)} deleted files")
-
-        if auto_reindex:
-            # Mark these files for reindexing
-            with self._staleness_lock:
-                self._changed_files.update(modified)
-                self._is_stale = True
-
-            # Use incremental or full reindex based on change count
-            total_changes = len(modified) + len(deleted)
-            if total_changes <= 10:
-                result = await self.incremental_reindex()
-                return {
-                    "status": "reindexed",
-                    "action": "incremental",
-                    "files_modified": len(modified),
-                    "files_deleted": len(deleted),
-                    **result,
-                }
-            else:
-                result = await self.reindex()
-                return {
-                    "status": "reindexed",
-                    "action": "full",
-                    "files_modified": len(modified),
-                    "files_deleted": len(deleted),
-                    **result,
-                }
-
-        return {
-            "status": "stale",
-            "action": "none",
-            "files_modified": modified,
-            "files_deleted": deleted,
-        }
-
-    def register_change_callback(self, callback: Callable[[str], None]) -> None:
-        """Register a callback to be notified when files change.
-
-        This allows other systems (like SymbolStore) to stay synchronized.
-
-        Args:
-            callback: Function to call with the changed file path
-        """
-        self._change_callbacks.append(callback)
-
-    def _on_file_changed(self, file_path: str) -> None:
-        """Callback when a file changes.
-
-        Args:
-            file_path: Path to the changed file
-        """
-        with self._staleness_lock:
-            self._is_stale = True
-            try:
-                rel_path = str(Path(file_path).relative_to(self.root))
-                self._changed_files.add(rel_path)
-                logger.debug(f"File changed, index marked stale: {rel_path}")
-
-                # Notify registered callbacks
-                for callback in self._change_callbacks:
+                content = file_path.read_bytes()
+                tree = parser.parse(content)
+                for sym_type, query_src in query_defs:
                     try:
-                        callback(file_path)
-                    except Exception as e:
-                        logger.warning(f"Change callback failed: {e}")
-
-            except ValueError:
-                # File outside root, ignore
-                pass
-
-    def start_watcher(self) -> bool:
-        """Start file watcher for automatic staleness detection.
-
-        Watches all supported source file types (Python, JS, TS, Go, Rust, etc.)
-
-        Returns:
-            True if watcher started successfully, False otherwise
-        """
-        if not WATCHDOG_AVAILABLE:
-            logger.warning("watchdog not installed. Install with: pip install watchdog")
-            return False
-
-        if self._observer is not None:
-            logger.debug("File watcher already running")
-            return True
-
-        try:
-            self._file_handler = CodebaseFileHandler(
-                on_change=self._on_file_changed,
-                file_patterns=self.WATCHED_PATTERNS,
-                ignore_patterns=self.ignore_patterns,
-            )
-
-            self._observer = Observer()
-            self._observer.schedule(self._file_handler, str(self.root), recursive=True)
-            self._observer.start()
-
-            logger.info(f"Started file watcher for {self.root} (all languages)")
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to start file watcher: {e}")
-            self._observer = None
-            return False
-
-    def stop_watcher(self) -> None:
-        """Stop file watcher."""
-        if self._observer is not None:
-            self._observer.stop()
-            self._observer.join(timeout=2.0)
-            self._observer = None
-            self._file_handler = None
-            logger.info("Stopped file watcher")
-
-    def should_ignore(self, path: Path) -> bool:
-        """Check if path should be ignored."""
-        rel_path = str(path.relative_to(self.root))
-        return any(pattern in rel_path for pattern in self.ignore_patterns)
-
-    async def index_codebase(self, force: bool = False) -> None:
-        """Index the entire codebase.
-
-        This is the main entry point for building the index.
-        Includes both AST indexing and optional semantic indexing with embeddings.
-
-        Uses ProcessPoolExecutor for parallel AST parsing on multi-core systems.
-
-        Args:
-            force: Force full reindex even if not stale
-        """
-        if not force and self._is_indexed and not self.is_stale:
-            logger.debug("Index is up to date, skipping reindex")
-            return
-
-        print(f"🔍 Indexing codebase at {self.root}")
-
-        # Reset graph buffers and clear existing graph store for this repo
-        self._reset_graph_buffers()
-        self._pending_call_edges = []
-        if self.graph_store:
-            await self.graph_store.delete_by_repo()
-
-        # Collect files by language (extension driven)
-        language_files: Dict[str, List[Path]] = {}
-        for ext, lang in EXTENSION_TO_LANGUAGE.items():
-            for file_path in self.root.rglob(f"*{ext}"):
-                if file_path.is_file() and not self.should_ignore(file_path):
-                    language_files.setdefault(lang, []).append(file_path)
-
-        python_files = language_files.pop("python", [])
-
-        print(
-            f"Found {len(python_files)} Python files and "
-            f"{sum(len(v) for v in language_files.values())} non-Python files"
-        )
-
-        # Index files using parallel processing for CPU-bound AST parsing
-        start_time = time.perf_counter()
-        await self._parallel_index_files(python_files)
-
-        # Index non-Python files sequentially (tree-sitter powered, lightweight)
-        for language, files in language_files.items():
-            for file_path in files:
-                if self._is_config_language(language):
-                    await self._index_config_file(file_path, language)
-                else:
-                    await self._index_tree_sitter_file(file_path, language)
-
-        parse_time = time.perf_counter() - start_time
-
-        # Persist graph nodes/edges if configured
-        if self.graph_store:
-            self._resolve_cross_file_calls()
-        await self._persist_graph_store()
-
-        # Build dependency graph
-        self._build_dependency_graph()
-
-        # Update staleness tracking
-        with self._staleness_lock:
-            self._is_indexed = True
-            self._is_stale = False
-            self._changed_files.clear()
-            self._last_indexed = time.time()
-
-        print(
-            f"✅ Indexed {len(self.files)} files, {len(self.symbols)} symbols "
-            f"in {parse_time:.2f}s"
-        )
-
-        # Index with embeddings if enabled
-        if self.use_embeddings and self.embedding_provider:
-            await self._index_with_embeddings()
-
-        # Start watcher if enabled
-        if self._watcher_enabled and self._observer is None:
-            self.start_watcher()
-
-    async def _parallel_index_files(self, python_files: List[Path]) -> None:
-        """Index files using parallel processing.
-
-        Uses ProcessPoolExecutor for CPU-bound AST parsing on systems with
-        multiple cores. Falls back to sequential processing for small file
-        counts or single-core systems.
-
-        Args:
-            python_files: List of Python files to index
-        """
-        # Determine optimal worker count
-        cpu_count = os.cpu_count() or 1
-        num_workers = min(cpu_count, len(python_files), 8)  # Cap at 8 workers
-
-        # Use parallel processing for larger codebases
-        if len(python_files) >= 10 and num_workers > 1:
-            logger.info(
-                f"[Indexer] Using parallel AST parsing: "
-                f"{len(python_files)} files, {num_workers} workers"
-            )
-
-            # Prepare arguments for workers
-            root_str = str(self.root)
-            work_items = [(str(f), root_str) for f in python_files]
-
-            # Run in executor to not block the event loop
-            loop = asyncio.get_event_loop()
-            results = await loop.run_in_executor(
-                None,
-                lambda: self._run_parallel_parsing(work_items, num_workers),
-            )
-
-            # Process results
-            for result in results:
-                if result is not None:
-                    self._store_parsed_result(result)
-        else:
-            # Sequential processing for small codebases
-            logger.debug(f"[Indexer] Using sequential parsing: {len(python_files)} files")
-            for file_path in python_files:
-                await self.index_file(file_path)
-
-    def _run_parallel_parsing(
-        self,
-        work_items: List[Tuple[str, str]],
-        num_workers: int,
-    ) -> List[Optional[Dict[str, Any]]]:
-        """Run parallel file parsing using ProcessPoolExecutor.
-
-        Args:
-            work_items: List of (file_path, root_path) tuples
-            num_workers: Number of worker processes
-
-        Returns:
-            List of parsed results (some may be None for failed parses)
-        """
-        results = []
-        with ProcessPoolExecutor(max_workers=num_workers) as executor:
-            futures = {executor.submit(_parse_file_worker, item): item for item in work_items}
-            for future in as_completed(futures):
-                try:
-                    result = future.result(timeout=30)  # 30s timeout per file
-                    results.append(result)
-                except Exception as e:
-                    item = futures[future]
-                    logger.warning(f"Failed to parse {item[0]}: {e}")
-                    results.append(None)
-        return results
-
-    def _store_parsed_result(self, result: Dict[str, Any]) -> None:
-        """Store a parsed file result into the index.
-
-        Args:
-            result: Dict with file metadata from _parse_file_worker
-        """
-        # Convert symbol dicts to Symbol objects
-        symbols = [
-            Symbol(
-                name=s["name"],
-                type=s["type"],
-                file_path=s["file_path"],
-                line_number=s["line_number"],
-                docstring=s.get("docstring"),
-                signature=s.get("signature"),
-            )
-            for s in result.get("symbols", [])
-        ]
-
-        # Create FileMetadata
-        metadata = FileMetadata(
-            path=result["path"],
-            language=result["language"],
-            symbols=symbols,
-            imports=result.get("imports", []),
-            last_modified=result["last_modified"],
-            indexed_at=result["indexed_at"],
-            size=result["size"],
-            lines=result["lines"],
-            content_hash=result.get("content_hash"),
-        )
-
-        # Store in index
-        self.files[metadata.path] = metadata
-
-        self._record_symbols(metadata)
-
-    async def reindex(self) -> Dict[str, Any]:
-        """Force a full reindex of the codebase.
-
-        This is the method to call from slash commands like /reindex.
-
-        Returns:
-            Dictionary with reindex statistics
-        """
-        start_time = time.time()
-
-        # Clear existing data
-        self.files.clear()
-        self.symbols.clear()
-        self.symbol_index.clear()
-        self._reset_graph_buffers()
-        self._pending_call_edges = []
-
-        # Force reindex
-        await self.index_codebase(force=True)
-
-        elapsed = time.time() - start_time
-
-        # Persist metadata for startup recovery
-        self._save_metadata()
-
-        return {
-            "success": True,
-            "files_indexed": len(self.files),
-            "symbols_indexed": len(self.symbols),
-            "elapsed_seconds": round(elapsed, 2),
-            "embeddings_enabled": self.use_embeddings,
-        }
-
-    async def _persist_graph_store(self) -> None:
-        """Flush buffered nodes/edges to the graph store."""
-        if not self.graph_store:
-            self._reset_graph_buffers()
-            return
-
-        if self._graph_nodes:
-            await self.graph_store.upsert_nodes(self._graph_nodes)
-        if self._graph_edges:
-            await self.graph_store.upsert_edges(self._graph_edges)
-        self._reset_graph_buffers()
-
-    async def incremental_reindex(self) -> Dict[str, Any]:
-        """Incrementally reindex only changed files.
-
-        More efficient than full reindex when few files have changed.
-        Uses incremental embedding updates to only re-embed changed files.
-
-        Returns:
-            Dictionary with reindex statistics
-        """
-        # Graph store currently rebuilt via full reindex to keep consistency
-        if self.graph_store:
-            return await self.reindex()
-
-        with self._staleness_lock:
-            changed = list(self._changed_files)
-            changed_set = set(changed)
-
-        if not changed:
-            return {
-                "success": True,
-                "files_reindexed": 0,
-                "message": "No files changed since last index",
-            }
-
-        start_time = time.time()
-        reindexed_count = 0
-        deleted_count = 0
-
-        for rel_path in changed:
-            file_path = self.root / rel_path
-
-            if file_path.exists():
-                # Remove old data for this file
-                if rel_path in self.files:
-                    del self.files[rel_path]
-                    # Remove old symbols
-                    for key in list(self.symbols.keys()):
-                        if key.startswith(f"{rel_path}:"):
-                            del self.symbols[key]
-                    if rel_path in self.symbol_index:
-                        del self.symbol_index[rel_path]
-
-                # Reindex the file
-                await self.index_file(file_path)
-                reindexed_count += 1
-            else:
-                # File was deleted, just remove it
-                if rel_path in self.files:
-                    del self.files[rel_path]
-                    for key in list(self.symbols.keys()):
-                        if key.startswith(f"{rel_path}:"):
-                            del self.symbols[key]
-                    if rel_path in self.symbol_index:
-                        del self.symbol_index[rel_path]
-                deleted_count += 1
-
-        # Rebuild dependency graph
-        self._build_dependency_graph()
-
-        # Update embeddings incrementally if enabled
-        if self.use_embeddings and self.embedding_provider:
-            await self._index_with_embeddings(
-                incremental=True,
-                changed_files=changed_set,
-            )
-
-        # Update staleness tracking
-        with self._staleness_lock:
-            self._is_stale = False
-            self._changed_files.clear()
-            self._last_indexed = time.time()
-
-        elapsed = time.time() - start_time
-
-        # Persist metadata for startup recovery
-        self._save_metadata()
-
-        return {
-            "success": True,
-            "files_reindexed": reindexed_count,
-            "files_deleted": deleted_count,
-            "elapsed_seconds": round(elapsed, 2),
-        }
-
-    async def ensure_indexed(self, auto_reindex: bool = True) -> None:
-        """Ensure the index is up to date before searching.
-
-        This implements lazy reindexing - reindex only when needed.
-
-        Args:
-            auto_reindex: If True, automatically reindex when stale
-        """
-        if not self._is_indexed:
-            # Never indexed, do full index
-            await self.index_codebase()
-        elif self.is_stale and auto_reindex:
-            # Index is stale, do incremental reindex if few files changed
-            if self.changed_files_count <= 10:
-                logger.info(
-                    f"Index stale ({self.changed_files_count} files changed), "
-                    "doing incremental reindex"
-                )
-                await self.incremental_reindex()
-            else:
-                logger.info(
-                    f"Index stale ({self.changed_files_count} files changed), " "doing full reindex"
-                )
-                await self.reindex()
-
-    async def _index_with_embeddings(
-        self,
-        use_advanced_chunking: bool = True,
-        incremental: bool = False,
-        changed_files: Optional[Set[str]] = None,
-    ) -> None:
-        """Index codebase with embeddings for semantic search.
-
-        Uses the robust CodeChunker for AST-aware, hierarchical chunking.
-        Supports incremental updates and content-based deduplication.
-
-        Args:
-            use_advanced_chunking: If True, use CodeChunker with body-aware chunking.
-                                   If False, use simple symbol-based chunking (legacy).
-            incremental: If True, only process changed files (requires changed_files).
-            changed_files: Set of file paths that changed (for incremental updates).
-        """
-        if not self.embedding_provider:
-            return
-
-        print("\n🤖 Generating embeddings for semantic search...")
-
-        # Initialize provider if needed
-        if not self.embedding_provider._initialized:
-            await self.embedding_provider.initialize()
-
-        documents = []
-        content_hashes: Set[str] = set()  # For deduplication
-        duplicate_count = 0
-
-        # Determine which files to process
-        if incremental and changed_files:
-            files_to_process = {fp: self.files[fp] for fp in changed_files if fp in self.files}
-            print(f"🔄 Incremental mode: processing {len(files_to_process)} changed files")
-        else:
-            files_to_process = self.files
-
-        if use_advanced_chunking:
-            # Use robust CodeChunker for hierarchical, body-aware chunking
-            try:
-                from victor.codebase.chunker import (
-                    CodeChunker,
-                    ChunkConfig,
-                    ChunkingStrategy,
-                )
-
-                config = ChunkConfig(
-                    strategy=ChunkingStrategy.BODY_AWARE,
-                    max_chunk_tokens=512,  # ~2048 chars
-                    overlap_tokens=64,  # ~256 chars overlap
-                    large_symbol_threshold=30,  # Chunk functions >30 lines
-                    include_file_summary=True,
-                    include_class_summary=True,
-                )
-
-                chunker = CodeChunker(config)
-                total_chunks = 0
-
-                for file_path in files_to_process.keys():
-                    abs_path = self.root / file_path
-                    if abs_path.exists():
-                        chunks = chunker.chunk_file(abs_path, file_path)
-                        for chunk in chunks:
-                            doc = chunk.to_document()
-                            # Content-based deduplication
-                            content_hash = hashlib.sha256(doc["content"].encode()).hexdigest()[:16]
-                            if content_hash not in content_hashes:
-                                content_hashes.add(content_hash)
-                                # Add hash to metadata for future incremental updates
-                                doc["metadata"]["content_hash"] = content_hash
-                                documents.append(doc)
-                            else:
-                                duplicate_count += 1
-                        total_chunks += len(chunks)
-
-                print("📊 Chunking strategy: BODY_AWARE (hierarchical)")
-                print(f"📁 Files processed: {len(files_to_process)}")
-                print(f"🧩 Chunks created: {total_chunks}")
-                if duplicate_count > 0:
-                    print(f"🔁 Duplicates removed: {duplicate_count}")
-
-            except ImportError as e:
-                logger.warning(f"CodeChunker not available, falling back to simple chunking: {e}")
-                use_advanced_chunking = False
-
-        if not use_advanced_chunking:
-            # Fallback: Simple symbol-based chunking (legacy)
-            print("📊 Chunking strategy: SYMBOL_ONLY (legacy)")
-            for file_path, metadata in files_to_process.items():
-                for symbol in metadata.symbols:
-                    content = self._build_symbol_context(symbol)
-                    content_hash = hashlib.sha256(content.encode()).hexdigest()[:16]
-
-                    # Content-based deduplication
-                    if content_hash in content_hashes:
-                        duplicate_count += 1
+                        from tree_sitter import QueryCursor
+                        query = Query(parser.language, query_src)
+                        cursor = QueryCursor(query)
+                        captures_dict = cursor.captures(tree.root_node)
+                        for capture_name, nodes in captures_dict.items():
+                            for node in nodes:
+                                text = node.text.decode("utf-8", errors="ignore")
+                                if not text:
+                                    continue
+                                symbols.append(
+                                    Symbol(
+                                        name=text,
+                                        type=sym_type,
+                                        file_path=str(file_path.relative_to(self.root)),
+                                        line_number=node.start_point[0] + 1,
+                                    )
+                                )
+                    except Exception:
                         continue
+            except Exception:
+                symbols = []
+        if symbols:
+            return symbols
 
-                    content_hashes.add(content_hash)
-                    doc = {
-                        "id": f"{file_path}:{symbol.name}",
-                        "content": content,
-                        "metadata": {
-                            "file_path": file_path,
-                            "symbol_name": symbol.name,
-                            "symbol_type": symbol.type,
-                            "line_number": symbol.line_number,
-                            "content_hash": content_hash,
-                        },
-                    }
-                    documents.append(doc)
-
-            if duplicate_count > 0:
-                print(f"🔁 Duplicates removed: {duplicate_count}")
-
-        if documents:
-            if incremental and changed_files:
-                # For incremental updates, delete old documents first then add new
-                for file_path in changed_files:
-                    await self.embedding_provider.delete_by_file(file_path)
-                await self.embedding_provider.index_documents(documents)
-                print(f"✅ Updated embeddings for {len(documents)} chunks")
-            else:
-                # Full rebuild: clear and add all
-                await self.embedding_provider.clear_index()
-                await self.embedding_provider.index_documents(documents)
-                print(f"✅ Generated embeddings for {len(documents)} chunks")
-        else:
-            print("⚠️  No content to index with embeddings")
-
-    async def index_file(self, file_path: Path) -> None:
-        """Index a single file."""
+        # Regex fallback when grammar support is unavailable
         try:
-            content = file_path.read_text(encoding="utf-8")
-            tree = ast.parse(content, filename=str(file_path))
+            text = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return []
 
-            # Extract metadata with timestamps and hash
-            stat = file_path.stat()
-            content_hash = self._compute_file_hash(file_path)
-
-            metadata = FileMetadata(
-                path=str(file_path.relative_to(self.root)),
-                language="python",
-                last_modified=stat.st_mtime,
-                indexed_at=time.time(),  # When we indexed it
-                size=stat.st_size,
-                lines=content.count("\n") + 1,
-                content_hash=content_hash,
-            )
-
-            # Extract symbols and imports
-            visitor = SymbolVisitor(metadata)
-            visitor.visit(tree)
-            metadata.call_edges = visitor.call_edges
-            metadata.compose_edges = visitor.composition_edges
-            # Map base classes into inheritance edges
-            metadata.inherit_edges = []
-            for sym in metadata.symbols:
+        regex_fallbacks: Dict[str, list[tuple[str, str]]] = {
+            "javascript": [
+                ("class", r"class\s+(\w+)"),
+                ("function", r"function\s+(\w+)"),
+            ],
+            "typescript": [
+                ("class", r"class\s+(\w+)"),
+                ("function", r"function\s+(\w+)"),
+            ],
+            "go": [
+                ("function", r"func\s+(?:\([\w\*\s,]+\)\s*)?(\w+)"),
+                ("class", r"type\s+(\w+)\s+struct"),
+            ],
+            "java": [
+                ("class", r"(?:class|interface)\s+(\w+)"),
+                ("function", r"(?:public|private|protected|\s)+\s*\w+\s+(\w+)\s*\("),
+            ],
+        }
+        for sym_type, pattern in regex_fallbacks.get(language, []):
+            for match in re.finditer(pattern, text):
+                name = match.group(1)
+                symbols.append(
+                    Symbol(
+                        name=name,
+                        type=sym_type,
+                        file_path=str(file_path.relative_to(self.root)),
+                        line_number=text.count("\n", 0, match.start()) + 1,
+                    )
+                )
+        return symbols
+    def _extract_inheritance(
+        self, file_path: Path, language: str, symbols: List[Symbol]
+    ) -> List[tuple[str, str]]:
+        """Extract child->base inheritance edges."""
+        edges: List[tuple[str, str]] = []
+        # First check if symbols have base_classes populated (from AST path)
+        if language == "python":
+            for sym in symbols:
                 if sym.type == "class" and sym.base_classes:
                     for base in sym.base_classes:
-                        metadata.inherit_edges.append((sym.name, base))
-                if sym.type == "class":
-                    sym.composition = [
-                        edge for edge in visitor.composition_edges if edge[0] == sym.name
-                    ]
-            metadata.references = self._extract_references(
-                file_path,
-                self._detect_language(file_path, metadata.language),
-                [callee for _, callee in metadata.call_edges],
-                metadata.imports,
-            )
+                        edges.append((sym.name, base))
+            # If we found edges via AST, return them; otherwise try tree-sitter
+            if edges:
+                return edges
 
-            self.files[metadata.path] = metadata
-            self._record_symbols(metadata)
-
-            # Graph capture for sequential indexing
-            self._record_symbols(metadata)
-
-        except Exception as e:
-            print(f"Error indexing {file_path}: {e}")
-
-    async def _index_config_file(self, file_path: Path, language: str) -> None:
-        """Lightweight indexing for config/metadata files."""
+        query_src = INHERITS_QUERIES.get(language)
+        parser = None
         try:
-            stat = file_path.stat()
-            content = file_path.read_text(encoding="utf-8")
-        except Exception as exc:
-            logger.debug(f"Skipping config file {file_path}: {exc}")
-            return
+            from victor.codebase.tree_sitter_manager import get_parser
 
-        keys_with_line = self._extract_config_keys(content, language)
+            parser = get_parser(language)
+        except Exception:
+            parser = None
+
+        if parser is not None and query_src:
+            try:
+                content = file_path.read_bytes()
+                tree = parser.parse(content)
+                query = Query(parser.language, query_src)
+                captures = query.captures(tree.root_node)
+                child = None
+                for node, capture_name in captures:
+                    text = node.text.decode("utf-8", errors="ignore")
+                    if capture_name == "child":
+                        child = text
+                    elif capture_name == "base" and child:
+                        edges.append((child, text))
+                        child = None
+            except Exception:
+                pass
+
+        if not edges:
+            # Regex fallback
+            try:
+                text = file_path.read_text(encoding="utf-8")
+            except Exception:
+                return edges
+            for match in re.finditer(r"class\s+(\w+)\s+extends\s+(\w+)", text):
+                edges.append((match.group(1), match.group(2)))
+        return edges
+
+    def _extract_implements(
+        self, file_path: Path, language: str, symbols: List[Symbol]
+    ) -> List[tuple[str, str]]:
+        """Extract child->interface implements edges for typed languages."""
+        edges: List[tuple[str, str]] = []
+        query_src = IMPLEMENTS_QUERIES.get(language)
+        parser = None
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
+
+            parser = get_parser(language)
+        except Exception:
+            parser = None
+
+        if parser is not None and query_src:
+            try:
+                content = file_path.read_bytes()
+                tree = parser.parse(content)
+                query = Query(parser.language, query_src)
+                captures = query.captures(tree.root_node)
+                child = None
+                for node, capture_name in captures:
+                    text = node.text.decode("utf-8", errors="ignore")
+                    if capture_name == "child":
+                        child = text
+                    elif capture_name in {"interface", "base"} and child:
+                        edges.append((child, text))
+                        child = None
+            except Exception:
+                pass
+
+        if not edges:
+            # Regex fallback for implements
+            try:
+                text = file_path.read_text(encoding="utf-8")
+            except Exception:
+                return edges
+            for match in re.finditer(r"class\s+(\w+)\s+implements\s+([\w, ]+)", text):
+                child = match.group(1)
+                bases = [b.strip() for b in match.group(2).split(",") if b.strip()]
+                for base in bases:
+                    edges.append((child, base))
+        return edges
+
+    def _extract_composition(
+        self, file_path: Path, language: str, symbols: List[Symbol]
+    ) -> List[tuple[str, str]]:
+        """Extract has-a/composition edges (owner -> member type)."""
+        edges: List[tuple[str, str]] = []
+
+        # Python handled via AST visitor (class attributes)
+        if language == "python":
+            for sym in symbols:
+                if sym.type == "class" and hasattr(sym, "composition"):
+                    edges.extend(getattr(sym, "composition"))
+            return edges
+
+        query_src = COMPOSITION_QUERIES.get(language)
+        parser = None
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
+
+            parser = get_parser(language)
+        except Exception:
+            parser = None
+
+        if parser is not None and query_src:
+            try:
+                content = file_path.read_bytes()
+                tree = parser.parse(content)
+                query = Query(parser.language, query_src)
+                captures = query.captures(tree.root_node)
+                owner = None
+                for node, capture_name in captures:
+                    text = node.text.decode("utf-8", errors="ignore")
+                    if capture_name == "owner":
+                        owner = text
+                    elif capture_name == "type" and owner:
+                        edges.append((owner, text))
+                # Do not clear owner on missing type; next owner will overwrite.
+            except Exception:
+                pass
+
+        if edges:
+            return edges
+
+        # Regex fallback for typed declarations and new expressions
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return edges
+
+        owner: Optional[str] = None
+        for line in text.splitlines():
+            class_match = re.search(r"class\s+(\w+)", line)
+            if class_match:
+                owner = class_match.group(1)
+                continue
+            if line.strip().startswith("}"):
+                owner = owner if "class" in line else None
+            # TypeScript/Java style property: field: Type or Type field;
+            field_match = re.search(r"(\w+)\s*[:]\s*(\w+)", line)
+            java_field = re.search(r"(\w+)\s+(\w+)\s*;", line)
+            new_expr = re.search(r"new\s+(\w+)\s*\(", line)
+            target_type = None
+            if field_match:
+                target_type = field_match.group(2)
+            elif java_field and owner:
+                target_type = java_field.group(1)
+            elif new_expr:
+                target_type = new_expr.group(1)
+            if owner and target_type:
+                edges.append((owner, target_type))
+        return edges
+
+    def _find_enclosing_symbol_name(self, node, language: str) -> Optional[str]:
+        """Best-effort caller lookup by walking ancestors."""
+        fields = ENCLOSING_NAME_FIELDS.get(language, [])
+        current = node.parent
+        method_name: Optional[str] = None
+        class_name: Optional[str] = None
+        while current is not None:
+            for node_type, field_name in fields:
+                if current.type == node_type:
+                    field = current.child_by_field_name(field_name)
+                    if not field:
+                        continue
+                    text = field.text.decode("utf-8", errors="ignore")
+                    if node_type in ("class_declaration", "interface_declaration", "class_specifier"):
+                        class_name = class_name or text
+                    else:
+                        method_name = method_name or text
+            current = current.parent
+        if method_name:
+            if class_name:
+                return f"{class_name}.{method_name}"
+            return method_name
+        return class_name
+
+    def _extract_calls_with_tree_sitter(
+        self, file_path: Path, language: str
+    ) -> List[tuple[str, str]]:
+        """Extract caller->callee pairs using tree-sitter (non-Python)."""
+        query_src = CALL_QUERIES.get(language)
+        if not query_src:
+            return []
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
+        except Exception:
+            return []
+        try:
+            parser = get_parser(language)
+        except Exception:
+            return []
+        if parser is None:
+            return []
+
+        content = file_path.read_bytes()
+        tree = parser.parse(content)
+        try:
+            query = Query(parser.language, query_src)
+        except Exception:
+            return []
+
+        call_edges: List[tuple[str, str]] = []
+        try:
+            captures = query.captures(tree.root_node)
+            for node, _ in captures:
+                callee = node.text.decode("utf-8", errors="ignore")
+                caller = self._find_enclosing_symbol_name(node, language)
+                if caller and callee:
+                    call_edges.append((caller, callee))
+        except Exception:
+            call_edges = []
+
+        if call_edges:
+            return call_edges
+
+        # Regex fallback when tree-sitter capture fails
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return []
+        pattern = re.compile(r"(\w+)\s*\(")
+        caller = None
+        for line in text.splitlines():
+            func_decl = re.search(r"function\s+(\w+)", line)
+            if func_decl:
+                caller = func_decl.group(1)
+            method_decl = re.search(r"(\w+)\s*\([^)]*\)\s*\{", line)
+            if method_decl:
+                caller = method_decl.group(1)
+            for callee in pattern.findall(line):
+                if caller and callee and callee not in {"function", caller}:
+                    call_edges.append((caller, callee))
+        return call_edges
+
+    def _extract_symbols_with_tree_sitter(self, file_path: Path, language: str) -> List[Symbol]:
+        """Extract lightweight symbol declarations for non-Python languages via tree-sitter."""
+        query_defs = SYMBOL_QUERIES.get(language)
+        if not query_defs:
+            return []
         symbols: List[Symbol] = []
-        for key, line_no in keys_with_line:
-            symbols.append(
-                Symbol(
-                    name=key,
-                    type="config_key",
-                    file_path=str(file_path.relative_to(self.root)),
-                    line_number=line_no,
-                )
-            )
+        parser = None
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
 
-        metadata = FileMetadata(
-            path=str(file_path.relative_to(self.root)),
-            language=language,
-            symbols=symbols,
-            imports=[],
-            last_modified=stat.st_mtime,
-            indexed_at=time.time(),
-            size=stat.st_size,
-            lines=content.count("\n") + 1,
-            content_hash=self._compute_file_hash(file_path),
-        )
-        metadata.references = [name for name, _ in keys_with_line]
-        self.files[metadata.path] = metadata
-        self._record_symbols(metadata)
+            try:
+                parser = get_parser(language)
+            except Exception:
+                parser = None
+        except Exception:
+            parser = None
+
+        if parser is not None:
+            try:
+                content = file_path.read_bytes()
+                tree = parser.parse(content)
+                for sym_type, query_src in query_defs:
+                    try:
+                        from tree_sitter import QueryCursor
+                        query = Query(parser.language, query_src)
+                        cursor = QueryCursor(query)
+                        captures_dict = cursor.captures(tree.root_node)
+                        for capture_name, nodes in captures_dict.items():
+                            for node in nodes:
+                                text = node.text.decode("utf-8", errors="ignore")
+                                if not text:
+                                    continue
+                                symbols.append(
+                                    Symbol(
+                                        name=text,
+                                        type=sym_type,
+                                        file_path=str(file_path.relative_to(self.root)),
+                                        line_number=node.start_point[0] + 1,
+                                    )
+                                )
+                    except Exception:
+                        continue
+            except Exception:
+                symbols = []
+        if symbols:
+            return symbols
+
+        # Regex fallback when grammar support is unavailable
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return []
+
+        regex_fallbacks: Dict[str, list[tuple[str, str]]] = {
+            "javascript": [
+                ("class", r"class\s+(\w+)"),
+                ("function", r"function\s+(\w+)"),
+            ],
+            "typescript": [
+                ("class", r"class\s+(\w+)"),
+                ("function", r"function\s+(\w+)"),
+            ],
+            "go": [
+                ("function", r"func\s+(?:\([\w\*\s,]+\)\s*)?(\w+)"),
+                ("class", r"type\s+(\w+)\s+struct"),
+            ],
+            "java": [
+                ("class", r"(?:class|interface)\s+(\w+)"),
+                ("function", r"(?:public|private|protected|\s)+\s*\w+\s+(\w+)\s*\("),
+            ],
+        }
+        for sym_type, pattern in regex_fallbacks.get(language, []):
+            for match in re.finditer(pattern, text):
+                name = match.group(1)
+                symbols.append(
+                    Symbol(
+                        name=name,
+                        type=sym_type,
+                        file_path=str(file_path.relative_to(self.root)),
+                        line_number=text.count("\n", 0, match.start()) + 1,
+                    )
+                )
+        return symbols
 
     async def _index_tree_sitter_file(self, file_path: Path, language: str) -> None:
         """Index a non-Python file using tree-sitter for symbols/references."""

@@ -25,7 +25,9 @@ from victor.languages.base import (
     LanguageCapabilities,
     LanguageConfig,
     Linter,
+    QueryPattern,
     TestRunner,
+    TreeSitterQueries,
 )
 
 
@@ -80,6 +82,27 @@ class RustPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        """Create tree-sitter queries for Rust symbol/call extraction."""
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern("class", "(struct_item name: (type_identifier) @name)"),
+                QueryPattern("class", "(enum_item name: (type_identifier) @name)"),
+                QueryPattern("class", "(trait_item name: (type_identifier) @name)"),
+                QueryPattern("function", "(function_item name: (identifier) @name)"),
+                QueryPattern("function", "(impl_item (function_item name: (identifier) @name))"),
+            ],
+            calls="""
+                (call_expression function: (identifier) @callee)
+                (call_expression function: (field_expression field: (field_identifier) @callee))
+                (call_expression function: (scoped_identifier name: (identifier) @callee))
+            """,
+            enclosing_scopes=[
+                ("function_item", "name"),
+                ("impl_item", "type"),
+            ],
         )
 
     def get_test_runner(self, project_root: Path) -> Optional[TestRunner]:

@@ -603,7 +603,7 @@ FULL_CORPUS: List[CorpusEntry] = _build_extended_corpus()
 # =============================================================================
 
 # Simplified builder system using a mapping approach
-PROMPT_TEMPLATES = {
+PROMPT_TEMPLATES: Dict[PromptCategory, Dict[str, Any]] = {
     PromptCategory.FUNCTION_COMPLETION: {
         "system": """You are an expert programmer completing Python functions.
 
@@ -812,6 +812,93 @@ OUTPUT FORMAT:
 }
 
 
+# =============================================================================
+# PROMPT BUILDER CLASSES
+# =============================================================================
+
+
+class PromptBuilder:
+    """Base class for category-specific prompt builders."""
+
+    category: PromptCategory = PromptCategory.GENERAL_CODING
+
+    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
+        """Build an enriched prompt.
+
+        Args:
+            user_prompt: The user's prompt
+            match: The match result from corpus
+
+        Returns:
+            EnrichedPrompt with system and user prompts
+        """
+        template = PROMPT_TEMPLATES.get(self.category, PROMPT_TEMPLATES[PromptCategory.GENERAL_CODING])
+        return EnrichedPrompt(
+            system_prompt=template["system"],
+            user_prompt=user_prompt,
+            category=self.category,
+            hints=template["hints"],
+        )
+
+
+class FunctionCompletionBuilder(PromptBuilder):
+    """Builder for function completion prompts."""
+    category = PromptCategory.FUNCTION_COMPLETION
+
+
+class AlgorithmImplementationBuilder(PromptBuilder):
+    """Builder for algorithm implementation prompts."""
+    category = PromptCategory.ALGORITHM_IMPLEMENTATION
+
+
+class DataStructureBuilder(PromptBuilder):
+    """Builder for data structure prompts."""
+    category = PromptCategory.DATA_STRUCTURE
+
+
+class StringManipulationBuilder(PromptBuilder):
+    """Builder for string manipulation prompts."""
+    category = PromptCategory.STRING_MANIPULATION
+
+
+class MathematicalBuilder(PromptBuilder):
+    """Builder for mathematical prompts."""
+    category = PromptCategory.MATHEMATICAL
+
+
+class FileIOBuilder(PromptBuilder):
+    """Builder for file I/O prompts."""
+    category = PromptCategory.FILE_IO
+
+
+class CodeDebuggingBuilder(PromptBuilder):
+    """Builder for code debugging prompts."""
+    category = PromptCategory.CODE_DEBUGGING
+
+
+class CodeExplanationBuilder(PromptBuilder):
+    """Builder for code explanation prompts."""
+    category = PromptCategory.CODE_EXPLANATION
+
+
+class CodeRefactoringBuilder(PromptBuilder):
+    """Builder for code refactoring prompts."""
+    category = PromptCategory.CODE_REFACTORING
+
+
+class APIIntegrationBuilder(PromptBuilder):
+    """Builder for API integration prompts."""
+    category = PromptCategory.API_INTEGRATION
+
+
+class TestingBuilder(PromptBuilder):
+    """Builder for testing prompts."""
+    category = PromptCategory.TESTING
+
+
+class GeneralCodingBuilder(PromptBuilder):
+    """Builder for general coding prompts."""
+    category = PromptCategory.GENERAL_CODING
 
 
 
@@ -870,7 +957,29 @@ class PromptCorpusRegistry:
         # Hash of corpus for change detection
         self._corpus_hash: Optional[str] = None
 
+        # Initialize default builders
+        self._builders: Dict[PromptCategory, PromptBuilder] = {
+            PromptCategory.FUNCTION_COMPLETION: FunctionCompletionBuilder(),
+            PromptCategory.ALGORITHM_IMPLEMENTATION: AlgorithmImplementationBuilder(),
+            PromptCategory.DATA_STRUCTURE: DataStructureBuilder(),
+            PromptCategory.STRING_MANIPULATION: StringManipulationBuilder(),
+            PromptCategory.MATHEMATICAL: MathematicalBuilder(),
+            PromptCategory.FILE_IO: FileIOBuilder(),
+            PromptCategory.CODE_DEBUGGING: CodeDebuggingBuilder(),
+            PromptCategory.CODE_EXPLANATION: CodeExplanationBuilder(),
+            PromptCategory.CODE_REFACTORING: CodeRefactoringBuilder(),
+            PromptCategory.API_INTEGRATION: APIIntegrationBuilder(),
+            PromptCategory.TESTING: TestingBuilder(),
+            PromptCategory.GENERAL_CODING: GeneralCodingBuilder(),
+        }
 
+    def register_builder(self, builder: PromptBuilder) -> None:
+        """Register a custom builder for a category.
+
+        Args:
+            builder: The builder to register
+        """
+        self._builders[builder.category] = builder
 
     def add_corpus_entry(self, entry: CorpusEntry) -> None:
         """Add an entry to the corpus.

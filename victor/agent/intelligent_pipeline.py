@@ -442,9 +442,14 @@ class IntelligentAgentPipeline:
         # Update stats efficiently
         if success:
             self._stats.successful_requests += 1
-        
+
         # Use incremental average to avoid floating point drift
+        # Guard against division by zero when process_response is called without prepare_request
         n = self._stats.total_requests
+        if n == 0:
+            # First response without prepare_request - initialize stats
+            self._stats.total_requests = 1
+            n = 1
         self._stats.avg_quality_score += (quality_score - self._stats.avg_quality_score) / n
         self._stats.avg_grounding_score += (grounding_score - self._stats.avg_grounding_score) / n
         self._stats.total_learning_reward += learning_reward
@@ -516,8 +521,8 @@ class IntelligentAgentPipeline:
 
         try:
             result = await self._resilient_executor.execute(
-                circuit_name=circuit,
-                func=call_provider,
+                circuit,  # name (positional)
+                call_provider,  # func (positional)
                 fallback=fallback_func if fallback else None,
             )
             return result

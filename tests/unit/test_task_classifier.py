@@ -123,13 +123,18 @@ class TestTaskClassifierComplex:
         assert result.complexity == TaskComplexity.COMPLEX
 
     def test_comprehensive_analysis_complex(self):
-        """Test that 'comprehensive analysis' is classified as COMPLEX."""
+        """Test that 'comprehensive analysis' is classified as ANALYSIS (not COMPLEX).
+
+        Note: ANALYSIS is a more specific category for thorough/comprehensive analysis tasks,
+        while COMPLEX is for tasks like refactoring or implementing new features.
+        """
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Provide a comprehensive analysis of the project architecture")
 
-        assert result.complexity == TaskComplexity.COMPLEX
+        # ANALYSIS is the correct classification for comprehensive analysis tasks
+        assert result.complexity == TaskComplexity.ANALYSIS
 
 
 class TestTaskClassifierGeneration:

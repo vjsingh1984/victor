@@ -259,6 +259,7 @@ class LanguageRegistry:
             RustPlugin,
             GoPlugin,
             JavaPlugin,
+            CppPlugin,
         )
 
         plugins = [
@@ -268,6 +269,7 @@ class LanguageRegistry:
             ("rust", RustPlugin),
             ("go", GoPlugin),
             ("java", JavaPlugin),
+            ("cpp", CppPlugin),
         ]
 
         count = 0

@@ -450,7 +450,7 @@ class ToolExecutor:
                         tool_name,
                         list(correction_result.validation.errors)
                     )
-            except (AttributeError, TypeError, ValueError) as e:
+            except (AttributeError, TypeError, ValueError, RuntimeError) as e:
                 logger.warning("Code correction middleware failed: %s", str(e))
 
         # Check cache first

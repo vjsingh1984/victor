@@ -209,7 +209,6 @@ class ToolPipeline:
             parallel_config = ParallelExecutionConfig(
                 max_concurrent=self.config.max_concurrent_tools,
                 enable_parallel=self.config.enable_parallel_execution,
-                batch_size=self.config.parallel_batch_size,
                 timeout_per_tool=self.config.parallel_timeout_per_tool,
             )
             self._parallel_executor = ParallelToolExecutor(

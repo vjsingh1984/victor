@@ -1015,6 +1015,10 @@ class ToolSelector:
         else:
             self._record_selection("semantic", len(tools))
 
+        # Cap to fallback_max_tools to avoid broadcasting too many tools
+        if len(tools) > self.fallback_max_tools:
+            tools = tools[: self.fallback_max_tools]
+
         return tools
 
     def select_keywords(
@@ -1308,6 +1312,10 @@ class ToolSelector:
         for keyword_tool in keyword_tools:
             if keyword_tool.name not in existing_names:
                 tools.append(keyword_tool)
+
+        # Cap to fallback_max_tools to avoid broadcasting too many
+        if len(tools) > self.fallback_max_tools:
+            tools = tools[: self.fallback_max_tools]
 
         logger.info(
             f"Smart fallback selected {len(tools)} tools: " f"{', '.join(t.name for t in tools)}"

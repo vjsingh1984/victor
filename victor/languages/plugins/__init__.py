@@ -21,6 +21,7 @@ Provides language support for:
 - Rust (cargo test, rustfmt, clippy)
 - Go (go test, gofmt, golint)
 - Java (junit, google-java-format, checkstyle)
+- C++ (gtest, clang-format, clang-tidy)
 """
 
 from victor.languages.plugins.python import PythonPlugin
@@ -29,6 +30,7 @@ from victor.languages.plugins.typescript import TypeScriptPlugin
 from victor.languages.plugins.rust import RustPlugin
 from victor.languages.plugins.go import GoPlugin
 from victor.languages.plugins.java import JavaPlugin
+from victor.languages.plugins.cpp import CppPlugin
 
 __all__ = [
     "PythonPlugin",
@@ -37,4 +39,5 @@ __all__ = [
     "RustPlugin",
     "GoPlugin",
     "JavaPlugin",
+    "CppPlugin",
 ]

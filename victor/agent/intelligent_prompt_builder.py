@@ -239,7 +239,7 @@ class ProfileLearningStore:
             from victor.config.settings import get_project_paths
 
             paths = get_project_paths()
-            db_path = paths.victor_dir / "profile_learning.db"
+            db_path = paths.project_victor_dir / "profile_learning.db"
 
         self.db_path = db_path
         self._initialized = False

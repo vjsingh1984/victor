@@ -4427,7 +4427,12 @@ class AgentOrchestrator:
                     )
                 return  # Exit the loop after forcing final response
 
-            tool_calls = tool_calls[:remaining]
+            # Guard against None tool_calls (can happen when model response has no tool calls
+            # but continuation logic decided to continue the loop)
+            if not tool_calls:
+                tool_calls = []
+            else:
+                tool_calls = tool_calls[:remaining]
 
             # Filter out tool calls that are blocked after loop warning
             # After warning, the same signature cannot be attempted again
@@ -4449,6 +4454,10 @@ class AgentOrchestrator:
                     )
                 else:
                     filtered_tool_calls.append(tc)
+
+            # Initialize variables that may not be set if no tool calls
+            tool_name = None
+            tool_results = []
 
             if not filtered_tool_calls and tool_calls:
                 # All tool calls were blocked - continue loop for model to respond
@@ -4474,6 +4483,8 @@ class AgentOrchestrator:
                     )
 
                 tool_results = await self._handle_tool_calls(tool_calls)
+                # CRITICAL FIX: Increment tool_calls_used counter to prevent infinite loops
+                self.tool_calls_used += len(tool_calls)
             for result in tool_results:
                 tool_name = result.get("name", "tool")
                 elapsed = result.get("elapsed", 0.0)
@@ -5180,7 +5191,7 @@ class AgentOrchestrator:
             try:
                 await self.provider.close()
                 logger.debug("Provider connection closed")
-            except (AttributeError, RuntimeError, ConnectionError) as e:
+            except Exception as e:
                 logger.warning("Error closing provider: %s", str(e))
 
         # Stop code execution manager (cleans up Docker containers)
@@ -5196,7 +5207,7 @@ class AgentOrchestrator:
             try:
                 await self.semantic_selector.close()
                 logger.debug("Semantic selector closed")
-            except (AttributeError, RuntimeError, ConnectionError) as e:
+            except Exception as e:
                 logger.warning("Error closing semantic selector: %s", str(e))
 
         # Signal shutdown to EmbeddingService singleton

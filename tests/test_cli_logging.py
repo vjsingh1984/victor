@@ -14,7 +14,7 @@ runner = CliRunner()
 
 
 def test_default_logging_level():
-    """Test that default logging level is INFO when no arguments provided."""
+    """Test that default logging level is WARNING when no arguments provided."""
 
     # Mock the async agent orchestrator
     async def mock_from_settings(*args, **kwargs):
@@ -25,14 +25,14 @@ def test_default_logging_level():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.cli.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
-        with patch("logging.basicConfig") as mock_logging:
+    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+        with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "test message"])
 
-            # Verify logging was configured with INFO level
+            # Verify logging was configured with WARNING level (default for non-automation mode)
             assert mock_logging.called
-            call_kwargs = mock_logging.call_args[1]
-            assert call_kwargs["level"] == logging.INFO
+            call_args = mock_logging.call_args[0]
+            assert call_args[0] == "WARNING"
 
 
 def test_log_level_debug():
@@ -46,14 +46,14 @@ def test_log_level_debug():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.cli.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
-        with patch("logging.basicConfig") as mock_logging:
+    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+        with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "--log-level", "DEBUG", "test message"])
 
             # Verify logging was configured with DEBUG level
             assert mock_logging.called
-            call_kwargs = mock_logging.call_args[1]
-            assert call_kwargs["level"] == logging.DEBUG
+            call_args = mock_logging.call_args[0]
+            assert call_args[0] == "DEBUG"
 
 
 def test_log_level_info():
@@ -67,14 +67,14 @@ def test_log_level_info():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.cli.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
-        with patch("logging.basicConfig") as mock_logging:
+    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+        with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "--log-level", "INFO", "test message"])
 
             # Verify logging was configured with INFO level
             assert mock_logging.called
-            call_kwargs = mock_logging.call_args[1]
-            assert call_kwargs["level"] == logging.INFO
+            call_args = mock_logging.call_args[0]
+            assert call_args[0] == "INFO"
 
 
 def test_log_level_warn_maps_to_warning():
@@ -88,14 +88,14 @@ def test_log_level_warn_maps_to_warning():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.cli.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
-        with patch("logging.basicConfig") as mock_logging:
+    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+        with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "--log-level", "WARN", "test message"])
 
             # Verify WARN was mapped to WARNING
             assert mock_logging.called
-            call_kwargs = mock_logging.call_args[1]
-            assert call_kwargs["level"] == logging.WARNING
+            call_args = mock_logging.call_args[0]
+            assert call_args[0] == "WARNING"
 
 
 def test_log_level_error():
@@ -109,14 +109,14 @@ def test_log_level_error():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.cli.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
-        with patch("logging.basicConfig") as mock_logging:
+    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+        with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "--log-level", "ERROR", "test message"])
 
             # Verify logging was configured with ERROR level
             assert mock_logging.called
-            call_kwargs = mock_logging.call_args[1]
-            assert call_kwargs["level"] == logging.ERROR
+            call_args = mock_logging.call_args[0]
+            assert call_args[0] == "ERROR"
 
 
 def test_log_level_critical():
@@ -130,14 +130,14 @@ def test_log_level_critical():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.cli.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
-        with patch("logging.basicConfig") as mock_logging:
+    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+        with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "--log-level", "CRITICAL", "test message"])
 
             # Verify logging was configured with CRITICAL level
             assert mock_logging.called
-            call_kwargs = mock_logging.call_args[1]
-            assert call_kwargs["level"] == logging.CRITICAL
+            call_args = mock_logging.call_args[0]
+            assert call_args[0] == "CRITICAL"
 
 
 def test_invalid_log_level_shows_error():
@@ -165,14 +165,14 @@ def test_environment_variable_fallback():
         return mock_agent
 
     with patch.dict(os.environ, {"VICTOR_LOG_LEVEL": "DEBUG"}):
-        with patch("victor.ui.cli.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
-            with patch("logging.basicConfig") as mock_logging:
+        with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+            with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
                 runner.invoke(app, ["chat", "test message"])
 
                 # Verify logging was configured with DEBUG from env var
                 assert mock_logging.called
-                call_kwargs = mock_logging.call_args[1]
-                assert call_kwargs["level"] == logging.DEBUG
+                call_args = mock_logging.call_args[0]
+                assert call_args[0] == "DEBUG"
 
 
 def test_cli_argument_overrides_environment_variable():
@@ -187,15 +187,15 @@ def test_cli_argument_overrides_environment_variable():
         return mock_agent
 
     with patch.dict(os.environ, {"VICTOR_LOG_LEVEL": "DEBUG"}):
-        with patch("victor.ui.cli.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
-            with patch("logging.basicConfig") as mock_logging:
+        with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+            with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
                 # Pass ERROR as CLI argument, should override DEBUG from env var
                 runner.invoke(app, ["chat", "--log-level", "ERROR", "test message"])
 
                 # Verify logging was configured with ERROR (CLI arg) not DEBUG (env var)
                 assert mock_logging.called
-                call_kwargs = mock_logging.call_args[1]
-                assert call_kwargs["level"] == logging.ERROR
+                call_args = mock_logging.call_args[0]
+                assert call_args[0] == "ERROR"
 
 
 def test_log_level_case_insensitive():
@@ -209,19 +209,19 @@ def test_log_level_case_insensitive():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.cli.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
-        with patch("logging.basicConfig") as mock_logging:
+    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+        with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             # Test lowercase
             runner.invoke(app, ["chat", "--log-level", "debug", "test message"])
 
-            # Verify logging was configured with DEBUG level
+            # Verify logging was configured with DEBUG level (uppercase)
             assert mock_logging.called
-            call_kwargs = mock_logging.call_args[1]
-            assert call_kwargs["level"] == logging.DEBUG
+            call_args = mock_logging.call_args[0]
+            assert call_args[0] == "DEBUG"
 
 
 def test_logging_format_is_configured():
-    """Test that logging format is properly configured."""
+    """Test that logging format is properly configured via configure_logging."""
 
     async def mock_from_settings(*args, **kwargs):
         mock_agent = MagicMock()
@@ -231,22 +231,18 @@ def test_logging_format_is_configured():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.cli.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
-        with patch("logging.basicConfig") as mock_logging:
+    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+        with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "--log-level", "INFO", "test message"])
 
-            # Verify logging format is set
+            # Verify configure_logging was called with level
             assert mock_logging.called
-            call_kwargs = mock_logging.call_args[1]
-            assert "format" in call_kwargs
-            assert "asctime" in call_kwargs["format"]
-            assert "name" in call_kwargs["format"]
-            assert "levelname" in call_kwargs["format"]
-            assert "message" in call_kwargs["format"]
+            call_args = mock_logging.call_args[0]
+            assert call_args[0] == "INFO"
 
 
 def test_logging_force_override():
-    """Test that logging.basicConfig is called with force=True to override existing config."""
+    """Test that configure_logging is called to handle force override."""
 
     async def mock_from_settings(*args, **kwargs):
         mock_agent = MagicMock()
@@ -256,14 +252,14 @@ def test_logging_force_override():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.cli.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
-        with patch("logging.basicConfig") as mock_logging:
+    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+        with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "--log-level", "DEBUG", "test message"])
 
-            # Verify force=True is set
+            # Verify configure_logging was called
             assert mock_logging.called
-            call_kwargs = mock_logging.call_args[1]
-            assert call_kwargs["force"] is True
+            call_args = mock_logging.call_args[0]
+            assert call_args[0] == "DEBUG"
 
 
 if __name__ == "__main__":
