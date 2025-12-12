@@ -28,6 +28,9 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
+from victor.agent.conversation_state import ConversationStage
+from victor.tools.base import AccessMode, ExecutionCategory
+
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStateMachine
     from victor.agent.milestone_monitor import TaskMilestoneMonitor, TaskToolConfigLoader
@@ -663,6 +666,7 @@ class ToolSelector:
 
         # Cached core and web tools (lazy loaded for dynamic discovery)
         self._cached_core_tools: Optional[Set[str]] = None
+        self._cached_core_readonly: Optional[Set[str]] = None
         self._cached_web_tools: Optional[Set[str]] = None
 
         # Populate global metadata registry for keyword-based tool selection
@@ -703,6 +707,71 @@ class ToolSelector:
             self._cached_core_tools = get_critical_tools(self.tools)
         return self._cached_core_tools
 
+    def _get_core_readonly_cached(self) -> Set[str]:
+        """Get core read-only tools with caching."""
+        if self._cached_core_readonly is None:
+            try:
+                from victor.tools.metadata_registry import get_core_readonly_tools
+
+                self._cached_core_readonly = set(get_core_readonly_tools())
+            except Exception:
+                # Fallback to an empty set; caller will layer other tools.
+                self._cached_core_readonly = set()
+        return self._cached_core_readonly
+
+    def _get_stage_core_tools(self, stage: Optional[ConversationStage]) -> Set[str]:
+        """Choose core set based on stage (safe for exploration/analysis)."""
+        if stage in {
+            ConversationStage.INITIAL,
+            ConversationStage.PLANNING,
+            ConversationStage.READING,
+            ConversationStage.ANALYSIS,
+        }:
+            return self._get_core_readonly_cached()
+        return self._get_core_tools_cached()
+
+    def _is_readonly_tool(self, tool_name: str) -> bool:
+        """Check if a tool is readonly via metadata registry."""
+        try:
+            from victor.tools.metadata_registry import get_global_registry
+
+            entry = get_global_registry().get(tool_name)
+            if not entry:
+                return False
+            return entry.access_mode == AccessMode.READONLY or entry.execution_category == ExecutionCategory.READ_ONLY
+        except Exception:
+            return False
+
+    def _filter_tools_for_stage(
+        self, tools: List["ToolDefinition"], stage: Optional[ConversationStage]
+    ) -> List["ToolDefinition"]:
+        """Remove write/execute tools during exploration/analysis stages."""
+        if stage not in {
+            ConversationStage.INITIAL,
+            ConversationStage.PLANNING,
+            ConversationStage.READING,
+            ConversationStage.ANALYSIS,
+        }:
+            return tools
+
+        filtered = [t for t in tools if self._is_readonly_tool(t.name)]
+        if filtered:
+            return filtered
+
+        # Fallback to core readonly if filtering removed everything
+        readonly_core = self._get_stage_core_tools(stage)
+        fallback: List["ToolDefinition"] = []
+        for tool in self.tools.list_tools():
+            if tool.name in readonly_core:
+                from victor.providers.base import ToolDefinition
+
+                fallback.append(
+                    ToolDefinition(
+                        name=tool.name, description=tool.description, parameters=tool.parameters
+                    )
+                )
+        return fallback or tools
+
     def _get_web_tools_cached(self) -> Set[str]:
         """Get web tools with caching for performance.
 
@@ -728,6 +797,7 @@ class ToolSelector:
         recreating the ToolSelector instance.
         """
         self._cached_core_tools = None
+        self._cached_core_readonly = None
         self._cached_web_tools = None
         logger.debug("Tool selection cache invalidated - will re-discover on next access")
 
@@ -925,6 +995,10 @@ class ToolSelector:
             dedup[t.name] = t
         tools = list(dedup.values())
 
+        # Stage-aware filtering (keep read-only tools for exploration/analysis)
+        stage = self.conversation_state.get_stage() if self.conversation_state else None
+        tools = self._filter_tools_for_stage(tools, stage)
+
         logger.debug(
             f"Semantic+keyword tools selected ({len(tools)}): "
             f"{', '.join(t.name for t in tools)}"
@@ -967,7 +1041,8 @@ class ToolSelector:
 
         # Build selected tool names: core tools + registry keyword matches
         # Uses keywords from @tool decorators as single source of truth
-        selected_tool_names = self._get_core_tools_cached().copy()
+        stage = self.conversation_state.get_stage() if self.conversation_state else None
+        selected_tool_names = self._get_stage_core_tools(stage).copy()
 
         # Use registry-based keyword matching (from @tool decorators)
         registry_matches = get_tools_from_message(user_message)
@@ -990,10 +1065,13 @@ class ToolSelector:
 
         # For small models, limit to max 10 tools
         if small_model and len(selected_tools) > 10:
-            core_tools_set = self._get_core_tools_cached()
+            core_tools_set = self._get_stage_core_tools(stage)
             core_tools = [t for t in selected_tools if t.name in core_tools_set]
             other_tools = [t for t in selected_tools if t.name not in core_tools_set]
             selected_tools = core_tools + other_tools[: max(0, 10 - len(core_tools))]
+
+        # Enforce read-only set during exploration/analysis stages
+        selected_tools = self._filter_tools_for_stage(selected_tools, stage)
 
         tool_names = [t.name for t in selected_tools]
         tool_names_set = set(tool_names)
@@ -1042,8 +1120,8 @@ class ToolSelector:
 
         logger.debug(f"Stage detection: {current_stage.name}, " f"recommended tools: {stage_tools}")
 
-        # Core tools always included (dynamic discovery)
-        core = self._get_core_tools_cached()
+        # Core tools always included (stage-aware, read-only for explore/analysis)
+        core = self._get_stage_core_tools(current_stage)
 
         # Web tools check (dynamic discovery)
         web_tools = self._get_web_tools_cached() if needs_web_tools(user_message) else set()
@@ -1074,8 +1152,8 @@ class ToolSelector:
             )
             return pruned
 
-        # Fallback to core tools (dynamic discovery)
-        core_fallback = self._get_core_tools_cached()
+        # Fallback to core tools (stage-aware)
+        core_fallback = self._get_stage_core_tools(current_stage)
         fallback_tools = [t for t in tools if t.name in core_fallback]
 
         if fallback_tools:
@@ -1101,8 +1179,14 @@ class ToolSelector:
         Returns:
             Set of tool names appropriate for the task and stage
         """
+        stage_enum: Optional[ConversationStage] = None
+        try:
+            stage_enum = ConversationStage[stage.upper()]
+        except Exception:
+            stage_enum = None
+
         if not self.task_tracker:
-            return self._get_core_tools_cached().copy()
+            return self._get_stage_core_tools(stage_enum).copy()
 
         # Lazy load the config loader
         if self._task_config_loader is None:
@@ -1162,7 +1246,11 @@ class ToolSelector:
         task_tools = self.get_task_aware_tools(stage)
 
         # Always include core tools (dynamic discovery)
-        allowed = task_tools | self._get_core_tools_cached()
+        try:
+            stage_enum = ConversationStage[stage.upper()]
+        except Exception:
+            stage_enum = None
+        allowed = task_tools | self._get_stage_core_tools(stage_enum)
 
         # Check if we need to force action tools
         if self.task_tracker.progress.task_type.value == "edit":
@@ -1201,8 +1289,9 @@ class ToolSelector:
         all_tools_map = {tool.name: tool for tool in self.tools.list_tools()}
         tools: List[ToolDefinition] = []
 
+        stage = self.conversation_state.get_stage() if self.conversation_state else None
         # Add core tools first (dynamic discovery)
-        for tool_name in self._get_core_tools_cached():
+        for tool_name in self._get_stage_core_tools(stage):
             if tool_name in all_tools_map:
                 tool = all_tools_map[tool_name]
                 tools.append(

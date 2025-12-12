@@ -150,25 +150,6 @@ class ConversationController:
             self._notify_context_callbacks(metrics)
         return message
 
-    def get_context_metrics(self) -> ContextMetrics:
-        char_count = sum(len(msg.content or "") for msg in self._history.messages)
-        estimated_tokens = char_count // self.config.chars_per_token_estimate
-        return ContextMetrics(
-            char_count=char_count,
-            estimated_tokens=estimated_tokens,
-            message_count=len(self._history.messages),
-            is_overflow_risk=char_count > self.config.max_context_chars * 0.8,
-            max_context_chars=self.config.max_context_chars
-        )
-
-    def _notify_context_callbacks(self, metrics: ContextMetrics) -> None:
-        for callback in self._context_callbacks:
-            callback(metrics)sation state
-        if self.config.enable_stage_tracking:
-            self._state_machine.record_message(content, is_user=False)
-
-        return message
-
     def add_tool_result(
         self,
         tool_call_id: str,
@@ -227,7 +208,7 @@ class ConversationController:
             char_count=total_chars,
             estimated_tokens=estimated_tokens,
             message_count=len(self.messages),
-            is_overflow_risk=total_chars > self.config.max_context_chars,
+            is_overflow_risk=total_chars > self.config.max_context_chars * 0.8,
             max_context_chars=self.config.max_context_chars,
         )
 

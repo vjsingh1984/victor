@@ -207,11 +207,16 @@ async def _get_or_build_index(
         "extra_config": {},
     }
 
+    graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
+    graph_path = getattr(settings, "codebase_graph_path", None)
+
     # Create new index - it will load from disk if available
     index = CodebaseIndex(
         root_path=str(root),
         use_embeddings=True,
         embedding_config=embedding_config,
+        graph_store_name=graph_store_name,
+        graph_path=Path(graph_path) if graph_path else None,
     )
 
     # Only do full index if forced or no persistent data exists

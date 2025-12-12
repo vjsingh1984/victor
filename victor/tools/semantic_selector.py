@@ -35,6 +35,7 @@ from victor.embeddings.service import EmbeddingService
 from victor.agent.tool_sequence_tracker import ToolSequenceTracker, create_sequence_tracker
 from victor.agent.debug_logger import TRACE  # Import TRACE level
 from victor.tools.metadata_registry import (
+    get_core_readonly_tools,
     get_tools_matching_mandatory_keywords,
     get_tools_by_task_type,
 )
@@ -787,6 +788,12 @@ class SemanticToolSelector:
 
         return list(set(relevant_tools))
 
+    def _is_analysis_query(self, query: str) -> bool:
+        """Heuristic check for analysis/review intents."""
+        query_lower = query.lower()
+        analysis_keywords = ["analyze", "analysis", "review", "check", "scan", "audit", "inspect"]
+        return any(kw in query_lower for kw in analysis_keywords)
+
     def _extract_pending_actions(self, conversation_history: List[Dict[str, Any]]) -> List[str]:
         """Extract actions mentioned in original request but not yet completed.
 
@@ -1276,6 +1283,10 @@ class SemanticToolSelector:
         # Phase 1: Get mandatory tools (including those for pending actions)
         mandatory_tool_names = self._get_mandatory_tools(enhanced_query)
 
+        # Always include core read-only tools for analysis-style queries.
+        if self._is_analysis_query(enhanced_query):
+            mandatory_tool_names.extend(get_core_readonly_tools())
+
         # Add mandatory tools for pending actions
         # NOTE: Uses canonical short names for token efficiency
         pending_action_tools = {
@@ -1429,6 +1440,10 @@ class SemanticToolSelector:
         mandatory_tool_names = self._get_mandatory_tools(user_message)
         if mandatory_tool_names:
             logger.debug(f"Mandatory tools: {mandatory_tool_names}")
+
+        # Always include core read-only tools for analysis-style queries.
+        if self._is_analysis_query(user_message):
+            mandatory_tool_names.extend(get_core_readonly_tools())
 
         # Phase 1: Get relevant categories
         category_tools = self._get_relevant_categories(user_message)

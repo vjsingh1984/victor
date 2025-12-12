@@ -209,8 +209,8 @@ class IntelligentAgentPipeline:
                 logger.warning(f"[IntelligentPipeline] Prompt builder init failed: {e}")
         return self._prompt_builder
 
-    async def _get_mode_controller(self):
-        """Lazy initialize mode controller."""
+    def _get_mode_controller(self):
+        """Lazy initialize mode controller (sync)."""
         if self._mode_controller is None:
             try:
                 from victor.agent.adaptive_mode_controller import AdaptiveModeController
@@ -305,7 +305,7 @@ class IntelligentAgentPipeline:
         should_continue = True
         recommended_budget = tool_budget
 
-        if await self._get_mode_controller():
+        if self._get_mode_controller():
             action = self._mode_controller.get_recommended_action(
                 current_mode=current_mode,
                 task_type=task_type,
@@ -431,7 +431,7 @@ class IntelligentAgentPipeline:
                 grounded=is_grounded,
             )
 
-        if await self._get_mode_controller():
+        if self._get_mode_controller():
             learning_reward = self._mode_controller.record_outcome(
                 success=success,
                 quality_score=quality_score,
@@ -545,7 +545,7 @@ class IntelligentAgentPipeline:
         Returns:
             Tuple of (should_continue, reason)
         """
-        if await self._get_mode_controller():
+        if self._get_mode_controller():
             return self._mode_controller.should_continue(
                 tool_calls_made=tool_calls_made,
                 tool_budget=tool_budget,

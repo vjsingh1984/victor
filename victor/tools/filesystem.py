@@ -1064,7 +1064,7 @@ async def write(path: str, content: str) -> str:
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["path", "depth", "pattern"],  # Params indicating exploration progress
-    stages=["initial", "planning", "reading"],  # Conversation stages where relevant
+    stages=["initial", "planning", "reading", "analysis"],  # Conversation stages where relevant
     task_types=["search", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
@@ -1248,7 +1248,7 @@ IMPORTANT_DOC_PATTERNS = [
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["path", "max_depth"],  # Params indicating exploration progress
-    stages=["initial", "planning", "reading"],  # Best used at start of conversation
+    stages=["initial", "planning", "reading", "analysis"],  # Best used at start of conversation
     task_types=["analysis", "search"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[

@@ -32,18 +32,278 @@ import hashlib
 import json
 import logging
 import os
+import re
 import threading
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from tree_sitter import Query
+
+from victor.codebase.graph.protocol import GraphEdge, GraphNode
+from victor.codebase.graph.registry import create_graph_store
+from victor.codebase.graph.sqlite_store import SqliteGraphStore
+from victor.codebase.symbol_resolver import SymbolResolver
 
 if TYPE_CHECKING:
     from victor.codebase.embeddings.base import BaseEmbeddingProvider
+    from victor.codebase.graph.protocol import GraphStoreProtocol
 
 logger = logging.getLogger(__name__)
+
+REFERENCE_QUERIES: Dict[str, str] = {
+    "python": """
+        (call function: (identifier) @name)
+        (call function: (attribute attribute: (identifier) @name))
+        (attribute object: (_) attribute: (identifier) @name)
+        (identifier) @name
+    """,
+    "javascript": """
+        (call_expression function: (identifier) @name)
+        (call_expression function: (member_expression property: (property_identifier) @name))
+        (member_expression property: (property_identifier) @name)
+        (new_expression constructor: (identifier) @name)
+        (identifier) @name
+    """,
+    "typescript": """
+        (call_expression function: (identifier) @name)
+        (call_expression function: (member_expression property: (property_identifier) @name))
+        (member_expression property: (property_identifier) @name)
+        (new_expression constructor: (identifier) @name)
+        (identifier) @name
+    """,
+    "java": """
+        (method_invocation name: (identifier) @name)
+        (method_invocation object: (identifier) @name)
+        (field_access field: (identifier) @name)
+    """,
+    "go": """
+        (call_expression function: (identifier) @name)
+        (call_expression function: (selector_expression field: (field_identifier) @name))
+        (selector_expression field: (field_identifier) @name)
+        (identifier) @name
+    """,
+}
+
+# Map file extensions to tree-sitter language ids
+EXTENSION_TO_LANGUAGE: Dict[str, str] = {
+    ".py": "python",
+    ".js": "javascript",
+    ".mjs": "javascript",
+    ".cjs": "javascript",
+    ".ts": "typescript",
+    ".tsx": "typescript",
+    ".jsx": "javascript",
+    ".go": "go",
+    ".java": "java",
+    ".json": "config-json",
+    ".yaml": "config-yaml",
+    ".yml": "config-yaml",
+    ".toml": "config-toml",
+    ".ini": "config-ini",
+    ".properties": "config-properties",
+    ".conf": "config-hocon",
+    ".hocon": "config-hocon",
+    ".cpp": "cpp",
+    ".cc": "cpp",
+    ".cxx": "cpp",
+    ".h": "cpp",
+    ".hpp": "cpp",
+}
+
+# Tree-sitter symbol queries per language for lightweight multi-language graph capture.
+SYMBOL_QUERIES: Dict[str, List[tuple[str, str]]] = {
+    "javascript": [
+        ("class", "(class_declaration name: (identifier) @name)"),
+        ("function", "(function_declaration name: (identifier) @name)"),
+        ("function", "(method_definition name: (property_identifier) @name)"),
+        ("function", "(lexical_declaration (variable_declarator name: (identifier) @name value: (arrow_function)))"),
+        ("function", "(lexical_declaration (variable_declarator name: (identifier) @name value: (function_expression)))"),
+        ("function", "(assignment_expression left: (identifier) @name right: (arrow_function))"),
+    ],
+    "typescript": [
+        ("class", "(class_declaration name: (identifier) @name)"),
+        ("function", "(function_declaration name: (identifier) @name)"),
+        ("function", "(method_signature name: (property_identifier) @name)"),
+        ("function", "(method_definition name: (property_identifier) @name)"),
+        ("function", "(lexical_declaration (variable_declarator name: (identifier) @name value: (arrow_function)))"),
+        ("function", "(lexical_declaration (variable_declarator name: (identifier) @name value: (function_expression)))"),
+        ("function", "(assignment_expression left: (identifier) @name right: (arrow_function))"),
+    ],
+    "go": [
+        ("function", "(function_declaration name: (identifier) @name)"),
+        ("function", "(method_declaration name: (field_identifier) @name)"),
+        ("class", "(type_declaration (type_spec name: (type_identifier) @name))"),
+    ],
+    "java": [
+        ("class", "(class_declaration name: (identifier) @name)"),
+        ("class", "(interface_declaration name: (identifier) @name)"),
+        ("function", "(method_declaration name: (identifier) @name)"),
+    ],
+    "cpp": [
+        ("class", "(class_specifier name: (type_identifier) @name)"),
+        ("function", "(function_definition declarator: (function_declarator declarator: (identifier) @name))"),
+        ("function", "(function_definition declarator: (function_declarator declarator: (field_identifier) @name))"),
+    ],
+}
+
+INHERITS_QUERIES: Dict[str, str] = {
+    "javascript": """
+        (class_declaration
+            name: (identifier) @child
+            heritage: (class_heritage (identifier) @base))
+    """,
+    "typescript": """
+        (class_declaration
+            name: (identifier) @child
+            heritage: (class_heritage (identifier) @base))
+    """,
+    "java": """
+        (class_declaration
+            name: (identifier) @child
+            super_classes: (superclass (type_identifier) @base))
+    """,
+    "cpp": """
+        (class_specifier
+            name: (type_identifier) @child
+            (base_class_clause (base_class (type_identifier) @base))
+        )
+    """,
+}
+
+IMPLEMENTS_QUERIES: Dict[str, str] = {
+    "typescript": """
+        (class_declaration
+            name: (identifier) @child
+            (heritage_clause (identifier) @interface))
+    """,
+    "java": """
+        (class_declaration
+            name: (identifier) @child
+            interfaces: (super_interfaces (type_list (type_identifier) @interface)))
+        (interface_declaration
+            name: (identifier) @child
+            interfaces: (super_interfaces (type_list (type_identifier) @interface)))
+    """,
+    "cpp": """
+        (class_specifier
+            name: (type_identifier) @child
+            (base_class_clause (base_class (type_identifier) @base))
+        )
+    """,
+}
+
+COMPOSITION_QUERIES: Dict[str, str] = {
+    "javascript": """
+        (class_declaration
+            name: (identifier) @owner
+            body: (class_body
+                (method_definition
+                    body: (statement_block
+                        (expression_statement
+                            (assignment_expression
+                                left: (member_expression object: (this) property: (property_identifier))
+                                right: (new_expression constructor: (identifier) @type)))))))
+    """,
+    "typescript": """
+        (class_declaration
+            name: (identifier) @owner
+            body: (class_body
+                (field_definition
+                    type: (type_annotation (type_identifier) @type))
+                (public_field_definition
+                    type: (type_annotation (type_identifier) @type))
+                (method_definition
+                    body: (statement_block
+                        (expression_statement
+                            (assignment_expression
+                                left: (member_expression object: (this) property: (property_identifier))
+                                right: (new_expression constructor: (identifier) @type)))))))
+    """,
+    "go": """
+        (type_declaration
+            (type_spec
+                name: (type_identifier) @owner
+                type: (struct_type
+                    (field_declaration
+                        type: (type_identifier) @type))))
+    """,
+    "java": """
+        (class_declaration
+            name: (identifier) @owner
+            body: (class_body
+                (field_declaration
+                    type: (type_identifier) @type)))
+    """,
+    "cpp": """
+        (class_specifier
+            name: (type_identifier) @owner
+            body: (field_declaration_list
+                (field_declaration
+                    type: (type_identifier) @type)))
+    """,
+}
+
+# Tree-sitter call queries (callee only) for multi-language call/reference edges.
+CALL_QUERIES: Dict[str, str] = {
+    "javascript": """
+        (call_expression function: (identifier) @callee)
+        (call_expression function: (member_expression property: (property_identifier) @callee))
+        (call_expression function: (subscript_expression index: (property_identifier) @callee))
+        (new_expression constructor: (identifier) @callee)
+    """,
+    "typescript": """
+        (call_expression function: (identifier) @callee)
+        (call_expression function: (member_expression property: (property_identifier) @callee))
+        (call_expression function: (subscript_expression index: (property_identifier) @callee))
+        (new_expression constructor: (identifier) @callee)
+    """,
+    "go": """
+        (call_expression function: (identifier) @callee)
+        (call_expression function: (selector_expression field: (field_identifier) @callee))
+        (type_conversion_expression type: (type_identifier) @callee)
+    """,
+    "java": """
+        (method_invocation name: (identifier) @callee)
+        (object_creation_expression type: (type_identifier) @callee)
+        (super_method_invocation name: (identifier) @callee)
+    """,
+    "cpp": """
+        (call_expression function: (identifier) @callee)
+        (call_expression function: (field_expression field: (field_identifier) @callee))
+        (new_expression type: (type_identifier) @callee)
+    """,
+}
+
+# Mapping of function/method node types to name field for caller resolution.
+ENCLOSING_NAME_FIELDS: Dict[str, List[tuple[str, str]]] = {
+    "javascript": [
+        ("function_declaration", "name"),
+        ("method_definition", "name"),
+        ("class_declaration", "name"),  # used for Class.method combination
+    ],
+    "typescript": [
+        ("function_declaration", "name"),
+        ("method_definition", "name"),
+        ("method_signature", "name"),
+        ("class_declaration", "name"),
+    ],
+    "go": [
+        ("function_declaration", "name"),
+        ("method_declaration", "name"),
+    ],
+    "java": [
+        ("method_declaration", "name"),
+        ("class_declaration", "name"),
+        ("interface_declaration", "name"),
+    ],
+    "cpp": [
+        ("function_definition", "declarator"),
+        ("class_specifier", "name"),
+    ],
+}
 
 
 # Try to import watchdog for file watching
@@ -235,6 +495,9 @@ class CodebaseFileHandler(FileSystemEventHandler):
             self._schedule_notification(event.src_path)
 
 
+from pydantic import BaseModel, Field
+
+
 class Symbol(BaseModel):
     """Represents a code symbol (function, class, variable)."""
 
@@ -244,7 +507,9 @@ class Symbol(BaseModel):
     line_number: int
     docstring: Optional[str] = None
     signature: Optional[str] = None
-    references: List[str] = []  # Files that reference this symbol
+    references: List[str] = Field(default_factory=list)  # Files that reference this symbol
+    base_classes: List[str] = Field(default_factory=list)  # inheritance targets
+    composition: List[tuple[str, str]] = Field(default_factory=list)  # (owner, member) for has-a
 
 
 class FileMetadata(BaseModel):
@@ -252,9 +517,14 @@ class FileMetadata(BaseModel):
 
     path: str
     language: str
-    symbols: List[Symbol] = []
-    imports: List[str] = []
-    dependencies: List[str] = []  # Files this file depends on
+    symbols: List[Symbol] = Field(default_factory=list)
+    imports: List[str] = Field(default_factory=list)
+    dependencies: List[str] = Field(default_factory=list)  # Files this file depends on
+    call_edges: List[tuple[str, str]] = Field(default_factory=list)  # (caller, callee) pairs
+    inherit_edges: List[tuple[str, str]] = Field(default_factory=list)  # (child, base)
+    implements_edges: List[tuple[str, str]] = Field(default_factory=list)  # (child, interface)
+    compose_edges: List[tuple[str, str]] = Field(default_factory=list)  # (owner, member)
+    references: List[str] = Field(default_factory=list)  # Identifier references (tree-sitter/AST)
     last_modified: float  # File mtime when indexed
     indexed_at: float = 0.0  # When this file was indexed
     size: int
@@ -298,6 +568,14 @@ class CodebaseIndex:
         "*.hpp",  # C/C++
         "*.swift",  # Swift
         "*.dart",  # Dart
+        "*.json",
+        "*.yaml",
+        "*.yml",
+        "*.toml",
+        "*.ini",
+        "*.properties",
+        "*.conf",
+        "*.hocon",
     ]
 
     def __init__(
@@ -307,6 +585,9 @@ class CodebaseIndex:
         use_embeddings: bool = False,
         embedding_config: Optional[Dict[str, Any]] = None,
         enable_watcher: bool = True,
+        graph_store: Optional["GraphStoreProtocol"] = None,
+        graph_store_name: Optional[str] = None,
+        graph_path: Optional[Path] = None,
     ):
         """Initialize codebase indexer.
 
@@ -316,6 +597,10 @@ class CodebaseIndex:
             use_embeddings: Whether to use semantic search with embeddings
             embedding_config: Configuration for embedding provider (optional)
             enable_watcher: Whether to enable file watching for auto-staleness detection
+            graph_store: Optional graph store for symbol relationships. If None,
+                a per-repo store is created under .victor/graph/graph.db.
+            graph_store_name: Optional graph backend name (currently only "sqlite")
+            graph_path: Optional explicit graph store path
         """
         self.root = Path(root_path).resolve()
         self.ignore_patterns = ignore_patterns or [
@@ -352,11 +637,466 @@ class CodebaseIndex:
         # Callbacks for change notifications (e.g., SymbolStore)
         self._change_callbacks: List[Callable[[str], None]] = []
 
+        # Graph store (per-repo, embedded)
+        if graph_store is None:
+            backend = graph_store_name or os.getenv("VICTOR_GRAPH_STORE", "sqlite")
+            if graph_path is None:
+                from victor.config.settings import get_project_paths
+
+                graph_path = get_project_paths(self.root).project_victor_dir / "graph" / "graph.db"
+            self.graph_store: Optional["GraphStoreProtocol"] = create_graph_store(
+                backend, Path(graph_path)
+            )
+        else:
+            self.graph_store = graph_store
+        self._graph_nodes: List[GraphNode] = []
+        self._graph_edges: List[GraphEdge] = []
+        self._pending_call_edges: List[tuple[str, str, str]] = []  # caller_id, callee_name, file
+        self._pending_inherit_edges: List[tuple[str, str, str]] = []  # child_id, base_name, file
+        self._pending_implements_edges: List[tuple[str, str, str]] = []  # child_id, interface, file
+        self._pending_compose_edges: List[tuple[str, str, str]] = []  # owner_id, member_type, file
+        self._symbol_resolver = SymbolResolver()
+
         # Embedding support (optional)
         self.use_embeddings = use_embeddings
         self.embedding_provider: Optional["BaseEmbeddingProvider"] = None
         if use_embeddings:
             self._initialize_embeddings(embedding_config)
+
+    def _reset_graph_buffers(self) -> None:
+        self._graph_nodes = []
+        self._graph_edges = []
+        self._pending_call_edges = []
+        self._pending_inherit_edges = []
+        self._pending_implements_edges = []
+        self._pending_compose_edges = []
+        self._symbol_resolver = SymbolResolver()
+
+    def _detect_language(self, file_path: Path, default: str = "python") -> str:
+        """Detect language from extension for tree-sitter queries."""
+        return EXTENSION_TO_LANGUAGE.get(file_path.suffix.lower(), default)
+
+    def _is_config_language(self, language: str) -> bool:
+        """Return True if the language is a config/metadata file."""
+        return language.startswith("config")
+
+    def _extract_references(
+        self, file_path: Path, language: str, fallback_calls: List[str], imports: List[str]
+    ) -> List[str]:
+        """Extract identifier references using tree-sitter when available."""
+        refs: Set[str] = set(fallback_calls) | set(imports)
+        query_src = REFERENCE_QUERIES.get(language)
+        if not query_src:
+            return list(refs)
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
+        except Exception:
+            return list(refs)
+
+        try:
+            parser = get_parser(language)
+        except Exception:
+            return list(refs)
+
+        if parser is None:
+            return list(refs)
+
+        try:
+            content = file_path.read_bytes()
+            tree = parser.parse(content)
+            query = Query(parser.language, query_src)
+            captures = query.captures(tree.root_node)
+            for node, _capture_name in captures:
+                text = node.text.decode("utf-8", errors="ignore")
+                if text:
+                    refs.add(text)
+        except Exception:
+            # Graceful degradation; fall back to existing refs
+            pass
+
+        # Regex fallback to catch simple identifier usage when tree-sitter misses
+        if not refs:
+            try:
+                text = file_path.read_text(encoding="utf-8")
+                for match in re.finditer(r"[A-Za-z_][A-Za-z0-9_]*", text):
+                    refs.add(match.group(0))
+            except Exception:
+                return list(refs)
+
+        return list(refs)
+
+    def _extract_config_keys(self, content: str, language: str) -> List[tuple[str, int]]:
+        """Extract top-level-ish config keys for JSON/YAML/INI/property files."""
+        keys: dict[str, int] = {}
+
+        def _walk(obj: Any, prefix: str = "") -> None:
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    dotted = f"{prefix}.{k}" if prefix else str(k)
+                    keys.setdefault(dotted, 1)
+                    _walk(v, dotted)
+            elif isinstance(obj, list):
+                for idx, item in enumerate(obj):
+                    dotted = f"{prefix}[{idx}]" if prefix else f"[{idx}]"
+                    keys.setdefault(dotted, 1)
+                    _walk(item, dotted)
+
+        try:
+            if language == "config-json":
+                data = json.loads(content)
+                _walk(data)
+            elif language == "config-yaml":
+                try:
+                    import yaml  # type: ignore
+
+                    data = yaml.safe_load(content)
+                    _walk(data)
+                except Exception:
+                    pass
+        except Exception:
+            # Fall back to regex below
+            pass
+
+        if not keys:
+            # Regex fallback for generic key/value formats
+            for match in re.finditer(
+                r'^[\s"\']*([A-Za-z0-9_.\-]+)\s*[:=]', content, flags=re.MULTILINE
+            ):
+                key = match.group(1)
+                line_no = content.count("\n", 0, match.start()) + 1
+                keys.setdefault(key, line_no)
+
+        return [(k, v) for k, v in keys.items()]
+
+    def _extract_symbols_with_tree_sitter(self, file_path: Path, language: str) -> List[Symbol]:
+        """Extract lightweight symbol declarations for non-Python languages via tree-sitter."""
+        query_defs = SYMBOL_QUERIES.get(language)
+        print(f"Extracting symbols for {language} from {file_path}")
+        print(f"Query defs: {query_defs}")
+        if not query_defs:
+            return []
+        symbols: List[Symbol] = []
+        parser = None
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
+
+            try:
+                parser = get_parser(language)
+            except Exception:
+                parser = None
+        except Exception:
+            parser = None
+
+        if parser is not None:
+            try:
+                content = file_path.read_bytes()
+                tree = parser.parse(content)
+                for sym_type, query_src in query_defs:
+                    try:
+                        query = Query(parser.language, query_src)
+                        captures = query.captures(tree.root_node)
+                        print(f"Captures for {query_src}: {captures}")
+                        for node, _ in captures:
+                            text = node.text.decode("utf-8", errors="ignore")
+                            if not text:
+                                continue
+                            symbols.append(
+                                Symbol(
+                                    name=text,
+                                    type=sym_type,
+                                    file_path=str(file_path.relative_to(self.root)),
+                                    line_number=node.start_point[0] + 1,
+                                )
+                            )
+                    except Exception:
+                        continue
+            except Exception:
+                symbols = []
+        if symbols:
+            return symbols
+
+        # Regex fallback when grammar support is unavailable
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return []
+
+        regex_fallbacks: Dict[str, list[tuple[str, str]]] = {
+            "javascript": [
+                ("class", r"class\s+(\w+)"),
+                ("function", r"function\s+(\w+)"),
+            ],
+            "typescript": [
+                ("class", r"class\s+(\w+)"),
+                ("function", r"function\s+(\w+)"),
+            ],
+            "go": [
+                ("function", r"func\s+(?:\([\w\*\s,]+\)\s*)?(\w+)"),
+                ("class", r"type\s+(\w+)\s+struct"),
+            ],
+            "java": [
+                ("class", r"(?:class|interface)\s+(\w+)"),
+                ("function", r"(?:public|private|protected|\s)+\s*\w+\s+(\w+)\s*\("),
+            ],
+        }
+        for sym_type, pattern in regex_fallbacks.get(language, []):
+            for match in re.finditer(pattern, text):
+                name = match.group(1)
+                symbols.append(
+                    Symbol(
+                        name=name,
+                        type=sym_type,
+                        file_path=str(file_path.relative_to(self.root)),
+                        line_number=text.count("\n", 0, match.start()) + 1,
+                    )
+                )
+        return symbols
+
+    def _extract_inheritance(
+        self, file_path: Path, language: str, symbols: List[Symbol]
+    ) -> List[tuple[str, str]]:
+        """Extract child->base inheritance edges."""
+        edges: List[tuple[str, str]] = []
+        # Python handled separately via AST (base_classes on symbols)
+        if language == "python":
+            for sym in symbols:
+                if sym.type == "class" and sym.base_classes:
+                    for base in sym.base_classes:
+                        edges.append((sym.name, base))
+            return edges
+
+        query_src = INHERITS_QUERIES.get(language)
+        parser = None
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
+
+            parser = get_parser(language)
+        except Exception:
+            parser = None
+
+        if parser is not None and query_src:
+            try:
+                content = file_path.read_bytes()
+                tree = parser.parse(content)
+                query = Query(parser.language, query_src)
+                captures = query.captures(tree.root_node)
+                child = None
+                for node, capture_name in captures:
+                    text = node.text.decode("utf-8", errors="ignore")
+                    if capture_name == "child":
+                        child = text
+                    elif capture_name == "base" and child:
+                        edges.append((child, text))
+                        child = None
+            except Exception:
+                pass
+
+        if not edges:
+            # Regex fallback
+            try:
+                text = file_path.read_text(encoding="utf-8")
+            except Exception:
+                return edges
+            for match in re.finditer(r"class\s+(\w+)\s+extends\s+(\w+)", text):
+                edges.append((match.group(1), match.group(2)))
+        return edges
+
+    def _extract_implements(
+        self, file_path: Path, language: str, symbols: List[Symbol]
+    ) -> List[tuple[str, str]]:
+        """Extract child->interface implements edges for typed languages."""
+        edges: List[tuple[str, str]] = []
+        query_src = IMPLEMENTS_QUERIES.get(language)
+        parser = None
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
+
+            parser = get_parser(language)
+        except Exception:
+            parser = None
+
+        if parser is not None and query_src:
+            try:
+                content = file_path.read_bytes()
+                tree = parser.parse(content)
+                query = Query(parser.language, query_src)
+                captures = query.captures(tree.root_node)
+                child = None
+                for node, capture_name in captures:
+                    text = node.text.decode("utf-8", errors="ignore")
+                    if capture_name == "child":
+                        child = text
+                    elif capture_name in {"interface", "base"} and child:
+                        edges.append((child, text))
+                        child = None
+            except Exception:
+                pass
+
+        if not edges:
+            # Regex fallback for implements
+            try:
+                text = file_path.read_text(encoding="utf-8")
+            except Exception:
+                return edges
+            for match in re.finditer(r"class\s+(\w+)\s+implements\s+([\w, ]+)", text):
+                child = match.group(1)
+                bases = [b.strip() for b in match.group(2).split(",") if b.strip()]
+                for base in bases:
+                    edges.append((child, base))
+        return edges
+
+    def _extract_composition(
+        self, file_path: Path, language: str, symbols: List[Symbol]
+    ) -> List[tuple[str, str]]:
+        """Extract has-a/composition edges (owner -> member type)."""
+        edges: List[tuple[str, str]] = []
+
+        # Python handled via AST visitor (class attributes)
+        if language == "python":
+            for sym in symbols:
+                if sym.type == "class" and hasattr(sym, "composition"):
+                    edges.extend(getattr(sym, "composition"))
+            return edges
+
+        query_src = COMPOSITION_QUERIES.get(language)
+        parser = None
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
+
+            parser = get_parser(language)
+        except Exception:
+            parser = None
+
+        if parser is not None and query_src:
+            try:
+                content = file_path.read_bytes()
+                tree = parser.parse(content)
+                query = Query(parser.language, query_src)
+                captures = query.captures(tree.root_node)
+                owner = None
+                for node, capture_name in captures:
+                    text = node.text.decode("utf-8", errors="ignore")
+                    if capture_name == "owner":
+                        owner = text
+                    elif capture_name == "type" and owner:
+                        edges.append((owner, text))
+                # Do not clear owner on missing type; next owner will overwrite.
+            except Exception:
+                pass
+
+        if edges:
+            return edges
+
+        # Regex fallback for typed declarations and new expressions
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return edges
+
+        owner: Optional[str] = None
+        for line in text.splitlines():
+            class_match = re.search(r"class\s+(\w+)", line)
+            if class_match:
+                owner = class_match.group(1)
+                continue
+            if line.strip().startswith("}"):
+                owner = owner if "class" in line else None
+            # TypeScript/Java style property: field: Type or Type field;
+            field_match = re.search(r"(\w+)\s*[:]\s*(\w+)", line)
+            java_field = re.search(r"(\w+)\s+(\w+)\s*;", line)
+            new_expr = re.search(r"new\s+(\w+)\s*\(", line)
+            target_type = None
+            if field_match:
+                target_type = field_match.group(2)
+            elif java_field and owner:
+                target_type = java_field.group(1)
+            elif new_expr:
+                target_type = new_expr.group(1)
+            if owner and target_type:
+                edges.append((owner, target_type))
+        return edges
+
+    def _find_enclosing_symbol_name(self, node, language: str) -> Optional[str]:
+        """Best-effort caller lookup by walking ancestors."""
+        fields = ENCLOSING_NAME_FIELDS.get(language, [])
+        current = node.parent
+        method_name: Optional[str] = None
+        class_name: Optional[str] = None
+        while current is not None:
+            for node_type, field_name in fields:
+                if current.type == node_type:
+                    field = current.child_by_field_name(field_name)
+                    if not field:
+                        continue
+                    text = field.text.decode("utf-8", errors="ignore")
+                    if node_type in ("class_declaration", "interface_declaration"):
+                        class_name = class_name or text
+                    else:
+                        method_name = method_name or text
+            current = current.parent
+        if method_name:
+            if class_name:
+                return f"{class_name}.{method_name}"
+            return method_name
+        return class_name
+
+    def _extract_calls_with_tree_sitter(
+        self, file_path: Path, language: str
+    ) -> List[tuple[str, str]]:
+        """Extract caller->callee pairs using tree-sitter (non-Python)."""
+        query_src = CALL_QUERIES.get(language)
+        if not query_src:
+            return []
+        try:
+            from victor.codebase.tree_sitter_manager import get_parser
+        except Exception:
+            return []
+        try:
+            parser = get_parser(language)
+        except Exception:
+            return []
+        if parser is None:
+            return []
+
+        content = file_path.read_bytes()
+        tree = parser.parse(content)
+        try:
+            query = Query(parser.language, query_src)
+        except Exception:
+            return []
+
+        call_edges: List[tuple[str, str]] = []
+        try:
+            captures = query.captures(tree.root_node)
+            for node, _ in captures:
+                callee = node.text.decode("utf-8", errors="ignore")
+                caller = self._find_enclosing_symbol_name(node, language)
+                if caller and callee:
+                    call_edges.append((caller, callee))
+        except Exception:
+            call_edges = []
+
+        if call_edges:
+            return call_edges
+
+        # Regex fallback when tree-sitter capture fails
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return []
+        pattern = re.compile(r"(\w+)\s*\(")
+        caller = None
+        for line in text.splitlines():
+            func_decl = re.search(r"function\s+(\w+)", line)
+            if func_decl:
+                caller = func_decl.group(1)
+            method_decl = re.search(r"(\w+)\s*\([^)]*\)\s*\{", line)
+            if method_decl:
+                caller = method_decl.group(1)
+            for callee in pattern.findall(line):
+                if caller and callee and callee not in {"function", caller}:
+                    call_edges.append((caller, callee))
+        return call_edges
 
     @property
     def is_stale(self) -> bool:
@@ -740,17 +1480,44 @@ class CodebaseIndex:
 
         print(f"🔍 Indexing codebase at {self.root}")
 
-        # Find all Python files
-        python_files = [
-            f for f in self.root.rglob("*.py") if f.is_file() and not self.should_ignore(f)
-        ]
+        # Reset graph buffers and clear existing graph store for this repo
+        self._reset_graph_buffers()
+        self._pending_call_edges = []
+        if self.graph_store:
+            await self.graph_store.delete_by_repo()
 
-        print(f"Found {len(python_files)} Python files")
+        # Collect files by language (extension driven)
+        language_files: Dict[str, List[Path]] = {}
+        for ext, lang in EXTENSION_TO_LANGUAGE.items():
+            for file_path in self.root.rglob(f"*{ext}"):
+                if file_path.is_file() and not self.should_ignore(file_path):
+                    language_files.setdefault(lang, []).append(file_path)
+
+        python_files = language_files.pop("python", [])
+
+        print(
+            f"Found {len(python_files)} Python files and "
+            f"{sum(len(v) for v in language_files.values())} non-Python files"
+        )
 
         # Index files using parallel processing for CPU-bound AST parsing
         start_time = time.perf_counter()
         await self._parallel_index_files(python_files)
+
+        # Index non-Python files sequentially (tree-sitter powered, lightweight)
+        for language, files in language_files.items():
+            for file_path in files:
+                if self._is_config_language(language):
+                    await self._index_config_file(file_path, language)
+                else:
+                    await self._index_tree_sitter_file(file_path, language)
+
         parse_time = time.perf_counter() - start_time
+
+        # Persist graph nodes/edges if configured
+        if self.graph_store:
+            self._resolve_cross_file_calls()
+        await self._persist_graph_store()
 
         # Build dependency graph
         self._build_dependency_graph()
@@ -879,12 +1646,7 @@ class CodebaseIndex:
         # Store in index
         self.files[metadata.path] = metadata
 
-        # Index symbols
-        for symbol in metadata.symbols:
-            self.symbols[f"{metadata.path}:{symbol.name}"] = symbol
-            if metadata.path not in self.symbol_index:
-                self.symbol_index[metadata.path] = []
-            self.symbol_index[metadata.path].append(symbol.name)
+        self._record_symbols(metadata)
 
     async def reindex(self) -> Dict[str, Any]:
         """Force a full reindex of the codebase.
@@ -900,6 +1662,8 @@ class CodebaseIndex:
         self.files.clear()
         self.symbols.clear()
         self.symbol_index.clear()
+        self._reset_graph_buffers()
+        self._pending_call_edges = []
 
         # Force reindex
         await self.index_codebase(force=True)
@@ -917,6 +1681,18 @@ class CodebaseIndex:
             "embeddings_enabled": self.use_embeddings,
         }
 
+    async def _persist_graph_store(self) -> None:
+        """Flush buffered nodes/edges to the graph store."""
+        if not self.graph_store:
+            self._reset_graph_buffers()
+            return
+
+        if self._graph_nodes:
+            await self.graph_store.upsert_nodes(self._graph_nodes)
+        if self._graph_edges:
+            await self.graph_store.upsert_edges(self._graph_edges)
+        self._reset_graph_buffers()
+
     async def incremental_reindex(self) -> Dict[str, Any]:
         """Incrementally reindex only changed files.
 
@@ -926,6 +1702,10 @@ class CodebaseIndex:
         Returns:
             Dictionary with reindex statistics
         """
+        # Graph store currently rebuilt via full reindex to keep consistency
+        if self.graph_store:
+            return await self.reindex()
+
         with self._staleness_lock:
             changed = list(self._changed_files)
             changed_set = set(changed)
@@ -1175,18 +1955,355 @@ class CodebaseIndex:
             # Extract symbols and imports
             visitor = SymbolVisitor(metadata)
             visitor.visit(tree)
+            metadata.call_edges = visitor.call_edges
+            metadata.compose_edges = visitor.composition_edges
+            # Map base classes into inheritance edges
+            metadata.inherit_edges = []
+            for sym in metadata.symbols:
+                if sym.type == "class" and sym.base_classes:
+                    for base in sym.base_classes:
+                        metadata.inherit_edges.append((sym.name, base))
+                if sym.type == "class":
+                    sym.composition = [
+                        edge for edge in visitor.composition_edges if edge[0] == sym.name
+                    ]
+            metadata.references = self._extract_references(
+                file_path,
+                self._detect_language(file_path, metadata.language),
+                [callee for _, callee in metadata.call_edges],
+                metadata.imports,
+            )
 
             self.files[metadata.path] = metadata
+            self._record_symbols(metadata)
 
-            # Index symbols
-            for symbol in metadata.symbols:
-                self.symbols[f"{metadata.path}:{symbol.name}"] = symbol
-                if metadata.path not in self.symbol_index:
-                    self.symbol_index[metadata.path] = []
-                self.symbol_index[metadata.path].append(symbol.name)
+            # Graph capture for sequential indexing
+            self._record_symbols(metadata)
 
         except Exception as e:
             print(f"Error indexing {file_path}: {e}")
+
+    async def _index_config_file(self, file_path: Path, language: str) -> None:
+        """Lightweight indexing for config/metadata files."""
+        try:
+            stat = file_path.stat()
+            content = file_path.read_text(encoding="utf-8")
+        except Exception as exc:
+            logger.debug(f"Skipping config file {file_path}: {exc}")
+            return
+
+        keys_with_line = self._extract_config_keys(content, language)
+        symbols: List[Symbol] = []
+        for key, line_no in keys_with_line:
+            symbols.append(
+                Symbol(
+                    name=key,
+                    type="config_key",
+                    file_path=str(file_path.relative_to(self.root)),
+                    line_number=line_no,
+                )
+            )
+
+        metadata = FileMetadata(
+            path=str(file_path.relative_to(self.root)),
+            language=language,
+            symbols=symbols,
+            imports=[],
+            last_modified=stat.st_mtime,
+            indexed_at=time.time(),
+            size=stat.st_size,
+            lines=content.count("\n") + 1,
+            content_hash=self._compute_file_hash(file_path),
+        )
+        metadata.references = [name for name, _ in keys_with_line]
+        self.files[metadata.path] = metadata
+        self._record_symbols(metadata)
+
+    async def _index_tree_sitter_file(self, file_path: Path, language: str) -> None:
+        """Index a non-Python file using tree-sitter for symbols/references."""
+        try:
+            stat = file_path.stat()
+            content = file_path.read_text(encoding="utf-8")
+        except Exception as exc:
+            logger.debug(f"Skipping {file_path} due to read error: {exc}")
+            return
+
+        symbols = self._extract_symbols_with_tree_sitter(file_path, language)
+        call_edges = self._extract_calls_with_tree_sitter(file_path, language)
+
+        metadata = FileMetadata(
+            path=str(file_path.relative_to(self.root)),
+            language=language,
+            symbols=symbols,
+            imports=[],  # TODO: add richer import extraction per language
+            last_modified=stat.st_mtime,
+            indexed_at=time.time(),
+            size=stat.st_size,
+            lines=content.count("\n") + 1,
+            call_edges=call_edges,
+        )
+
+        metadata.inherit_edges = self._extract_inheritance(file_path, language, symbols)
+        metadata.implements_edges = self._extract_implements(file_path, language, symbols)
+        metadata.compose_edges = self._extract_composition(file_path, language, symbols)
+
+        metadata.references = self._extract_references(
+            file_path,
+            language,
+            [callee for _, callee in call_edges],
+            metadata.imports,
+        )
+
+        self.files[metadata.path] = metadata
+        self._record_symbols(metadata)
+
+    def _record_symbols(self, metadata: FileMetadata) -> None:
+        """Record symbol metadata and populate graph buffers."""
+        symbol_names = {s.name for s in metadata.symbols}
+
+        # Always create a file node so config/docs files without symbols still appear in the graph.
+        file_node_id: Optional[str] = None
+        if self.graph_store:
+            file_node_id = f"file:{metadata.path}"
+            self._graph_nodes.append(
+                GraphNode(
+                    node_id=file_node_id,
+                    type="file",
+                    name=Path(metadata.path).name,
+                    file=metadata.path,
+                    line=None,
+                    lang=metadata.language,
+                    metadata={"lines": metadata.lines, "size": metadata.size},
+                )
+            )
+
+        for symbol in metadata.symbols:
+            # Symbol registry
+            self.symbols[f"{metadata.path}:{symbol.name}"] = symbol
+            if metadata.path not in self.symbol_index:
+                self.symbol_index[metadata.path] = []
+            self.symbol_index[metadata.path].append(symbol.name)
+
+            if self.graph_store:
+                symbol_id = f"symbol:{metadata.path}:{symbol.name}"
+
+                self._graph_nodes.append(
+                    GraphNode(
+                        node_id=symbol_id,
+                        type=symbol.type,
+                        name=symbol.name,
+                        file=metadata.path,
+                        line=symbol.line_number,
+                        lang=metadata.language,
+                        metadata={
+                            "signature": symbol.signature,
+                            "docstring": symbol.docstring,
+                        },
+                    )
+                )
+                self._graph_edges.append(
+                    GraphEdge(
+                        src=file_node_id or f"file:{metadata.path}",
+                        dst=symbol_id,
+                        type="CONTAINS",
+                        metadata={"path": metadata.path},
+                    )
+                )
+
+        # Add simple intra-file CALLS edges when both endpoints are known symbols
+        if self.graph_store and metadata.call_edges:
+            for caller, callee in metadata.call_edges:
+                if caller not in symbol_names or callee not in symbol_names:
+                    # Track for potential cross-file resolution
+                    caller_id = f"symbol:{metadata.path}:{caller}"
+                    self._pending_call_edges.append((caller_id, callee, metadata.path))
+                    continue
+                caller_id = f"symbol:{metadata.path}:{caller}"
+                callee_id = f"symbol:{metadata.path}:{callee}"
+                self._graph_edges.append(
+                    GraphEdge(
+                        src=caller_id,
+                        dst=callee_id,
+                        type="CALLS",
+                        metadata={"path": metadata.path},
+                    )
+                )
+
+        # Inheritance edges (child -> base)
+        if self.graph_store and metadata.inherit_edges:
+            for child, base in metadata.inherit_edges:
+                child_id = f"symbol:{metadata.path}:{child}"
+                if child not in symbol_names:
+                    continue
+                # if base is in current file, link directly, else resolve later
+                if base in symbol_names:
+                    base_id = f"symbol:{metadata.path}:{base}"
+                    self._graph_edges.append(
+                        GraphEdge(
+                            src=child_id,
+                            dst=base_id,
+                            type="INHERITS",
+                            metadata={"path": metadata.path},
+                        )
+                    )
+                else:
+                    self._pending_inherit_edges.append((child_id, base, metadata.path))
+
+        # Implements edges (child -> interface/abstract)
+        if self.graph_store and metadata.implements_edges:
+            for child, base in metadata.implements_edges:
+                child_id = f"symbol:{metadata.path}:{child}"
+                if child not in symbol_names:
+                    continue
+                if base in symbol_names:
+                    base_id = f"symbol:{metadata.path}:{base}"
+                    self._graph_edges.append(
+                        GraphEdge(
+                            src=child_id,
+                            dst=base_id,
+                            type="IMPLEMENTS",
+                            metadata={"path": metadata.path},
+                        )
+                    )
+                else:
+                    self._pending_implements_edges.append((child_id, base, metadata.path))
+
+        # Composition edges (owner -> member type)
+        if self.graph_store and metadata.compose_edges:
+            for owner, member in metadata.compose_edges:
+                owner_id = f"symbol:{metadata.path}:{owner}"
+                if owner not in symbol_names:
+                    continue
+                if member in symbol_names:
+                    member_id = f"symbol:{metadata.path}:{member}"
+                    self._graph_edges.append(
+                        GraphEdge(
+                            src=owner_id,
+                            dst=member_id,
+                            type="COMPOSES",
+                            metadata={"path": metadata.path},
+                        )
+                    )
+                else:
+                    self._pending_compose_edges.append((owner_id, member, metadata.path))
+
+        # Add IMPORTS edges from file to imported module names (cross-file reference scaffold)
+        if self.graph_store and metadata.imports:
+            for imp in metadata.imports:
+                module_node_id = f"module:{imp}"
+                self._graph_nodes.append(
+                    GraphNode(
+                        node_id=module_node_id,
+                        type="module",
+                        name=imp,
+                        file=metadata.path,
+                        lang=metadata.language,
+                    )
+                )
+                self._graph_edges.append(
+                    GraphEdge(
+                        src=f"file:{metadata.path}",
+                        dst=module_node_id,
+                        type="IMPORTS",
+                        metadata={"path": metadata.path},
+                    )
+                )
+
+    def _resolve_cross_file_calls(self) -> None:
+        """Resolve pending CALLS edges across files by matching symbol names globally."""
+        if not self._pending_call_edges:
+            return
+
+        # Build resolver index from graph nodes
+        node_ids = []
+        for sym_key in self.symbols.keys():
+            node_ids.append(f"symbol:{sym_key}")
+        self._symbol_resolver.ingest(node_ids)
+
+        # Cross-file CALLS resolution
+        for caller_id, callee_name, file_path in self._pending_call_edges:
+            target_id = self._symbol_resolver.resolve(callee_name, preferred_file=file_path)
+            if not target_id:
+                # Try short name heuristic (after ingest it exists already)
+                target_id = self._symbol_resolver.resolve(callee_name.split(".")[-1], preferred_file=file_path)
+            if not target_id:
+                continue
+            self._graph_edges.append(
+                GraphEdge(
+                    src=caller_id,
+                    dst=target_id,
+                    type="CALLS",
+                    metadata={"path": file_path, "resolved": True},
+                )
+            )
+
+        # INHERITS resolution
+        for child_id, base_name, file_path in self._pending_inherit_edges:
+            target_id = self._symbol_resolver.resolve(base_name, preferred_file=file_path)
+            if not target_id:
+                target_id = self._symbol_resolver.resolve(base_name.split(".")[-1], preferred_file=file_path)
+            if not target_id:
+                continue
+            self._graph_edges.append(
+                GraphEdge(
+                    src=child_id,
+                    dst=target_id,
+                    type="INHERITS",
+                    metadata={"path": file_path, "resolved": True},
+                )
+            )
+
+        # IMPLEMENTS resolution (interfaces/abstract types)
+        for child_id, base_name, file_path in self._pending_implements_edges:
+            target_id = self._symbol_resolver.resolve(base_name, preferred_file=file_path)
+            if not target_id:
+                target_id = self._symbol_resolver.resolve(base_name.split(".")[-1], preferred_file=file_path)
+            if not target_id:
+                continue
+            self._graph_edges.append(
+                GraphEdge(
+                    src=child_id,
+                    dst=target_id,
+                    type="IMPLEMENTS",
+                    metadata={"path": file_path, "resolved": True},
+                )
+            )
+
+        # COMPOSES/has-a relationships resolution
+        for owner_id, member_name, file_path in self._pending_compose_edges:
+            target_id = self._symbol_resolver.resolve(member_name, preferred_file=file_path)
+            if not target_id:
+                target_id = self._symbol_resolver.resolve(member_name.split(".")[-1], preferred_file=file_path)
+            if not target_id:
+                continue
+            self._graph_edges.append(
+                GraphEdge(
+                    src=owner_id,
+                    dst=target_id,
+                    type="COMPOSES",
+                    metadata={"path": file_path, "resolved": True},
+                )
+            )
+
+        # REFERENCES edges (file -> symbol) for any referenced identifier
+        for metadata in self.files.values():
+            if not metadata.references:
+                continue
+            file_node = f"file:{metadata.path}"
+            for ref in metadata.references:
+                target_id = self._symbol_resolver.resolve(ref, preferred_file=metadata.path)
+                if not target_id:
+                    target_id = self._symbol_resolver.resolve(ref.split(".")[-1], preferred_file=metadata.path)
+                if not target_id:
+                    continue
+                self._graph_edges.append(
+                    GraphEdge(
+                        src=file_node,
+                        dst=target_id,
+                        type="REFERENCES",
+                        metadata={"path": metadata.path, "resolved": True},
+                    )
+                )
 
     def _build_dependency_graph(self) -> None:
         """Build dependency graph between files."""
@@ -1462,15 +2579,27 @@ class SymbolVisitor(ast.NodeVisitor):
     def __init__(self, metadata: FileMetadata):
         self.metadata = metadata
         self.current_class: Optional[str] = None
+        self.current_function: Optional[str] = None
+        self.call_edges: List[tuple[str, str]] = []
+        self.composition_edges: List[tuple[str, str]] = []
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Visit class definition."""
+        bases: List[str] = []
+        for base in node.bases:
+            if isinstance(base, ast.Name):
+                bases.append(base.id)
+            elif isinstance(base, ast.Attribute):
+                bases.append(base.attr)
+            elif isinstance(base, ast.Subscript) and isinstance(base.value, ast.Name):
+                bases.append(base.value.id)
         symbol = Symbol(
             name=node.name,
             type="class",
             file_path=self.metadata.path,
             line_number=node.lineno,
             docstring=ast.get_docstring(node),
+            base_classes=bases,
         )
         self.metadata.symbols.append(symbol)
 
@@ -1499,6 +2628,10 @@ class SymbolVisitor(ast.NodeVisitor):
             signature=signature,
         )
         self.metadata.symbols.append(symbol)
+        old_function = self.current_function
+        self.current_function = name
+        self.generic_visit(node)
+        self.current_function = old_function
 
     def visit_Import(self, node: ast.Import) -> None:
         """Visit import statement."""
@@ -1509,6 +2642,48 @@ class SymbolVisitor(ast.NodeVisitor):
         """Visit from...import statement."""
         if node.module:
             self.metadata.imports.append(node.module)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        """Capture simple call relationships for intra-file graph edges."""
+        if self.current_function:
+            callee = None
+            if isinstance(node.func, ast.Name):
+                callee = node.func.id
+            elif isinstance(node.func, ast.Attribute):
+                callee = node.func.attr
+
+            if callee:
+                self.call_edges.append((self.current_function, callee))
+
+        self.generic_visit(node)
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        """Detect has-a relationships for class attributes."""
+        if self.current_class:
+            target_type: Optional[str] = None
+            if isinstance(node.value, ast.Call):
+                func = node.value.func
+                if isinstance(func, ast.Name):
+                    target_type = func.id
+                elif isinstance(func, ast.Attribute):
+                    target_type = func.attr
+            elif isinstance(node.value, ast.Name):
+                target_type = node.value.id
+            if target_type:
+                self.composition_edges.append((self.current_class, target_type))
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        """Capture annotated attributes inside classes for composition edges."""
+        if self.current_class:
+            target_type: Optional[str] = None
+            if isinstance(node.annotation, ast.Name):
+                target_type = node.annotation.id
+            elif isinstance(node.annotation, ast.Attribute):
+                target_type = node.annotation.attr
+            if target_type:
+                self.composition_edges.append((self.current_class, target_type))
+        self.generic_visit(node)
 
 
 # TODO: Future enhancements

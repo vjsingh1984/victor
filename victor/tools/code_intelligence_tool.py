@@ -18,7 +18,7 @@ from pathlib import Path
 
 from tree_sitter import QueryCursor
 from victor.codebase.tree_sitter_manager import get_parser
-from victor.tools.base import AccessMode, DangerLevel, Priority
+from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 
 
@@ -155,6 +155,8 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
         "find usages",
         "list references",
     ],
+    stages=["analysis", "reading"],
+    execution_category=ExecutionCategory.READ_ONLY,
 )
 async def refs(symbol_name: str, search_path: str = ".") -> List[Dict[str, Any]]:
     """[AST-AWARE] Find all references to a symbol using tree-sitter parsing.

@@ -96,6 +96,7 @@ dependencies = [
     "tree-sitter-html>=0.23",
     "tree-sitter-json>=0.23",
     "tree-sitter-yaml>=0.6",
+    "tree-sitter-cpp>=0.23",
 
     # Caching
     "cachetools>=5.3",

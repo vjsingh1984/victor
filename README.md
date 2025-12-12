@@ -270,7 +270,17 @@ See [Installation Guide](docs/guides/INSTALLATION.md) for details.
 | [Tool Catalog](docs/TOOL_CATALOG.md) | All 45 tools |
 | [Air-Gapped Mode](docs/embeddings/AIRGAPPED.md) | Offline operation |
 | [Provider Setup](docs/guides/PROVIDER_SETUP.md) | Configure providers |
+| [Graph Backends](docs/guides/GRAPH_BACKENDS.md) | Configure/extend code graph storage |
 | [Developer Guide](docs/DEVELOPER_GUIDE.md) | Contributing |
+
+---
+
+## Graph Store
+
+- Default: embedded SQLite per project at `.victor/graph/graph.db`.
+- Configure via settings (`codebase_graph_store`, `codebase_graph_path`) or `VICTOR_GRAPH_STORE`.
+- Optional DuckDB backend (`codebase_graph_store=duckdb`, requires `duckdb` installed); in-memory backend available for testing.
+- Registry is ready for LanceDB/Neo4j placeholders; extend `victor/codebase/graph/registry.py` to plug additional backends.
 
 ---
 

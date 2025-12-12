@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import logging
 
-from victor.tools.base import AccessMode, DangerLevel, Priority
+from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 from victor.tools.common import gather_files_by_pattern
 
@@ -597,6 +597,8 @@ async def docs(
     access_mode=AccessMode.READONLY,  # Only reads files for analysis
     danger_level=DangerLevel.SAFE,  # No side effects
     keywords=["documentation", "coverage", "analyze", "quality", "docstring"],
+    stages=["analysis", "reading"],
+    execution_category=ExecutionCategory.READ_ONLY,
 )
 async def docs_coverage(
     path: str,

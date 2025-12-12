@@ -141,6 +141,11 @@ class ProjectPaths:
         return self.project_victor_dir / "embeddings"
 
     @property
+    def graph_dir(self) -> Path:
+        """Get project-local graph directory."""
+        return self.project_victor_dir / "graph"
+
+    @property
     def index_metadata(self) -> Path:
         """Get codebase index metadata file path."""
         return self.project_victor_dir / "index_metadata.json"
@@ -217,6 +222,7 @@ class ProjectPaths:
         """Create project-local directories if they don't exist."""
         self.project_victor_dir.mkdir(parents=True, exist_ok=True)
         self.embeddings_dir.mkdir(parents=True, exist_ok=True)
+        self.graph_dir.mkdir(parents=True, exist_ok=True)
         self.backups_dir.mkdir(parents=True, exist_ok=True)
         self.changes_dir.mkdir(parents=True, exist_ok=True)
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
@@ -477,6 +483,9 @@ class Settings(BaseSettings):
     codebase_persist_directory: Optional[str] = None  # Default: ~/.victor/embeddings/codebase
     codebase_dimension: int = 384  # Embedding dimension
     codebase_batch_size: int = 32  # Batch size for embedding generation
+    codebase_graph_store: str = "sqlite"  # Graph backend (sqlite default)
+    codebase_graph_path: Optional[str] = None  # Optional explicit graph db path
+    core_readonly_tools: Optional[List[str]] = None  # Override/extend curated read-only tool set
 
     # UI
     theme: str = "monokai"

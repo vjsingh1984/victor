@@ -226,6 +226,10 @@ class ConversationStateMachine:
         """
         return self.state.stage
 
+    def get_current_stage(self) -> ConversationStage:
+        """Backward-compatible alias for orchestrator integrations."""
+        return self.get_stage()
+
     def get_stage_tools(self) -> Set[str]:
         """Get tools relevant to the current stage.
 

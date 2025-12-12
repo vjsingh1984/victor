@@ -497,6 +497,56 @@ class ToolMetadataRegistry:
         for tool in tools:
             self.register(tool)
 
+    def get_core_readonly_tools(self) -> List[str]:
+        """Get core tools that are explicitly read-only.
+
+        Uses decorator metadata (category + access/exec hints) so the list
+        stays current as new tools are added.
+        """
+        # Always-include read-only set for analysis/exploration safety
+        default_readonly = {
+            "read",
+            "ls",
+            "search",
+            "overview",
+            "docs_coverage",
+            "scan",
+            "metrics",
+            "symbol",
+            "refs",
+        }
+
+        core_readonly: List[str] = list(default_readonly)
+
+        # Simple env override (comma-separated) to avoid pydantic parsing errors
+        import os
+
+        env_raw = os.getenv("CORE_READONLY_TOOLS")
+        if env_raw:
+            core_readonly.extend([item.strip() for item in env_raw.split(",") if item.strip()])
+
+        # Runtime override/extension via settings (env: CORE_READONLY_TOOLS)
+        try:
+            from victor.config.settings import load_settings
+
+            configured = load_settings().core_readonly_tools
+            if configured:
+                core_readonly.extend(configured)
+        except Exception:
+            # Settings import failure should not block tool filtering
+            pass
+
+        for name, entry in self._entries.items():
+            if entry.category != "core":
+                # Allow explicitly curated defaults even if not tagged core
+                if name not in default_readonly:
+                    continue
+            access_mode = entry.access_mode.value
+            exec_cat = entry.execution_category.value
+            if access_mode == "readonly" or exec_cat == "read_only":
+                core_readonly.append(name)
+        return core_readonly
+
     def get(self, name: str) -> Optional[ToolMetadataEntry]:
         """Get metadata entry by name (canonical or alias).
 
@@ -1688,3 +1738,8 @@ def is_tool_available(tool_name: str) -> bool:
     if entry is None:
         return False
     return entry.is_available()
+
+
+def get_core_readonly_tools() -> List[str]:
+    """Get names of core tools that are explicitly read-only."""
+    return get_global_registry().get_core_readonly_tools()
