@@ -16,6 +16,7 @@
 
 This package provides foundational infrastructure:
 - Dependency injection container (ServiceContainer)
+- Lazy initialization utilities (avoiding circular imports)
 - Error handling utilities
 - Retry mechanisms
 """
@@ -29,11 +30,56 @@ from victor.core.container import (
     reset_container,
 )
 
+from victor.core.lazy import (
+    LazyProperty,
+    deferred_import,
+    SingletonFactory,
+    CircularImportInfo,
+    KNOWN_CIRCULAR_IMPORTS,
+    get_circular_import_info,
+    list_circular_imports,
+)
+
+from victor.core.protocols import (
+    OrchestratorProtocol,
+    TaskClassifierProtocol,
+    IntentClassifierProtocol,
+    EmbeddingServiceProtocol,
+    ToolCallingAdapterProtocol,
+    IntelligentPipelineProtocol,
+    ProviderProtocol,
+    CacheProtocol,
+    TaskClassificationResultProtocol,
+    IntentClassificationResultProtocol,
+    ServiceFactory,
+)
+
 __all__ = [
+    # Container
     "ServiceContainer",
     "ServiceScope",
     "ServiceLifetime",
     "get_container",
     "set_container",
     "reset_container",
+    # Lazy initialization
+    "LazyProperty",
+    "deferred_import",
+    "SingletonFactory",
+    "CircularImportInfo",
+    "KNOWN_CIRCULAR_IMPORTS",
+    "get_circular_import_info",
+    "list_circular_imports",
+    # Protocols (for interface-based decoupling)
+    "OrchestratorProtocol",
+    "TaskClassifierProtocol",
+    "IntentClassifierProtocol",
+    "EmbeddingServiceProtocol",
+    "ToolCallingAdapterProtocol",
+    "IntelligentPipelineProtocol",
+    "ProviderProtocol",
+    "CacheProtocol",
+    "TaskClassificationResultProtocol",
+    "IntentClassificationResultProtocol",
+    "ServiceFactory",
 ]

@@ -117,10 +117,19 @@ class CerebrasProvider(BaseProvider):
             timeout: Request timeout
             **kwargs: Additional configuration
         """
+        # Try provided key, then env var, then keyring/api_keys.yaml
         self._api_key = api_key or os.environ.get("CEREBRAS_API_KEY", "")
         if not self._api_key:
+            try:
+                from victor.config.api_keys import get_api_key
+
+                self._api_key = get_api_key("cerebras") or ""
+            except ImportError:
+                pass
+        if not self._api_key:
             logger.warning(
-                "Cerebras API key not provided. Set CEREBRAS_API_KEY environment variable."
+                "Cerebras API key not provided. Set CEREBRAS_API_KEY environment variable "
+                "or add to keyring with: victor keys set cerebras"
             )
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)

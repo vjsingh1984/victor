@@ -42,10 +42,10 @@ class TestConfigValidateCommand:
             )
         }
 
-        with patch("victor.ui.cli.load_settings", return_value=mock_settings):
+        with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
             with patch("builtins.open", MagicMock()):
                 with patch("yaml.safe_load", return_value={"profiles": {"default": {}}}):
-                    result = runner.invoke(app, ["config-validate"])
+                    result = runner.invoke(app, ["config", "validate"])
                     # Should pass or fail gracefully
                     assert result.exit_code in [0, 1]
 
@@ -62,10 +62,10 @@ class TestConfigValidateCommand:
             )
         }
 
-        with patch("victor.ui.cli.load_settings", return_value=mock_settings):
+        with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
             with patch("builtins.open", MagicMock()):
                 with patch("yaml.safe_load", return_value={"profiles": {"default": {}}}):
-                    result = runner.invoke(app, ["config-validate", "--verbose"])
+                    result = runner.invoke(app, ["config", "validate", "--verbose"])
                     assert result.exit_code in [0, 1]
 
     def test_config_validate_missing_config_dir(self):
@@ -74,8 +74,8 @@ class TestConfigValidateCommand:
         # Return a non-existent directory
         mock_settings.get_config_dir.return_value = Path("/nonexistent/path/.victor")
 
-        with patch("victor.ui.cli.load_settings", return_value=mock_settings):
-            result = runner.invoke(app, ["config-validate"])
+        with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
+            result = runner.invoke(app, ["config", "validate"])
             assert result.exit_code == 1
             assert "not found" in result.output.lower() or "init" in result.output.lower()
 
@@ -86,10 +86,10 @@ class TestConfigValidateCommand:
         mock_settings = MagicMock()
         mock_settings.get_config_dir.return_value = Path.home() / ".victor"
 
-        with patch("victor.ui.cli.load_settings", return_value=mock_settings):
+        with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
             with patch("builtins.open", MagicMock()):
                 with patch("yaml.safe_load", side_effect=yaml.YAMLError("Invalid YAML")):
-                    result = runner.invoke(app, ["config-validate"])
+                    result = runner.invoke(app, ["config", "validate"])
                     assert result.exit_code == 1
                     assert "yaml" in result.output.lower() or "invalid" in result.output.lower()
 
@@ -98,10 +98,10 @@ class TestConfigValidateCommand:
         mock_settings = MagicMock()
         mock_settings.get_config_dir.return_value = Path.home() / ".victor"
 
-        with patch("victor.ui.cli.load_settings", return_value=mock_settings):
+        with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
             with patch("builtins.open", MagicMock()):
                 with patch("yaml.safe_load", return_value={"other_key": "value"}):
-                    result = runner.invoke(app, ["config-validate"])
+                    result = runner.invoke(app, ["config", "validate"])
                     assert result.exit_code == 1
                     assert "profiles" in result.output.lower()
 
@@ -119,10 +119,10 @@ class TestConfigValidateCommand:
         }
         mock_settings.get_provider_settings.return_value = {}
 
-        with patch("victor.ui.cli.load_settings", return_value=mock_settings):
+        with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
             with patch("builtins.open", MagicMock()):
                 with patch("yaml.safe_load", return_value={"profiles": {"invalid": {}}}):
-                    result = runner.invoke(app, ["config-validate", "--verbose"])
+                    result = runner.invoke(app, ["config", "validate", "--verbose"])
                     assert result.exit_code == 1
                     assert "temperature" in result.output.lower()
 
@@ -140,10 +140,10 @@ class TestConfigValidateCommand:
         }
         mock_settings.get_provider_settings.return_value = {}
 
-        with patch("victor.ui.cli.load_settings", return_value=mock_settings):
+        with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
             with patch("builtins.open", MagicMock()):
                 with patch("yaml.safe_load", return_value={"profiles": {"invalid": {}}}):
-                    result = runner.invoke(app, ["config-validate", "--verbose"])
+                    result = runner.invoke(app, ["config", "validate", "--verbose"])
                     assert result.exit_code == 1
                     assert (
                         "max_tokens" in result.output.lower() or "invalid" in result.output.lower()
@@ -163,10 +163,10 @@ class TestConfigValidateCommand:
         }
         mock_settings.get_provider_settings.return_value = {}
 
-        with patch("victor.ui.cli.load_settings", return_value=mock_settings):
+        with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
             with patch("builtins.open", MagicMock()):
                 with patch("yaml.safe_load", return_value={"profiles": {"unknown": {}}}):
-                    result = runner.invoke(app, ["config-validate", "--verbose"])
+                    result = runner.invoke(app, ["config", "validate", "--verbose"])
                     assert result.exit_code == 1
                     assert "unknown" in result.output.lower() or "provider" in result.output.lower()
 
@@ -184,10 +184,10 @@ class TestConfigValidateCommand:
         }
         mock_settings.get_provider_settings.return_value = {"api_key": None}  # No API key
 
-        with patch("victor.ui.cli.load_settings", return_value=mock_settings):
+        with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
             with patch("builtins.open", MagicMock()):
                 with patch("yaml.safe_load", return_value={"profiles": {"cloud": {}}}):
-                    result = runner.invoke(app, ["config-validate", "--verbose"])
+                    result = runner.invoke(app, ["config", "validate", "--verbose"])
                     # Should pass with warning (exit code 0)
                     assert result.exit_code == 0
                     assert "api key" in result.output.lower() or "warning" in result.output.lower()
@@ -206,10 +206,10 @@ class TestConfigValidateCommand:
         }
         mock_settings.get_provider_settings.return_value = {"api_key": "sk-test-key"}
 
-        with patch("victor.ui.cli.load_settings", return_value=mock_settings):
+        with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
             with patch("builtins.open", MagicMock()):
                 with patch("yaml.safe_load", return_value={"profiles": {"cloud": {}}}):
-                    result = runner.invoke(app, ["config-validate", "--verbose"])
+                    result = runner.invoke(app, ["config", "validate", "--verbose"])
                     assert result.exit_code == 0
                     assert "api key configured" in result.output.lower()
 
@@ -233,13 +233,13 @@ class TestConfigValidateCommand:
         }
         mock_settings.get_provider_settings.return_value = {"api_key": "sk-test"}
 
-        with patch("victor.ui.cli.load_settings", return_value=mock_settings):
+        with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
             with patch("builtins.open", MagicMock()):
                 with patch(
                     "yaml.safe_load",
                     return_value={"profiles": {"local": {}, "cloud": {}}},
                 ):
-                    result = runner.invoke(app, ["config-validate", "--verbose"])
+                    result = runner.invoke(app, ["config", "validate", "--verbose"])
                     assert result.exit_code == 0
                     assert "2 profile" in result.output.lower()
 
@@ -249,7 +249,7 @@ class TestConfigValidateHelp:
 
     def test_config_validate_help(self):
         """Test that help text is displayed correctly."""
-        result = runner.invoke(app, ["config-validate", "--help"])
+        result = runner.invoke(app, ["config", "validate", "--help"])
         assert result.exit_code == 0
         assert "validate" in result.output.lower()
         assert "--verbose" in result.output

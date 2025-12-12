@@ -123,10 +123,9 @@ async def agent_with_tools(ollama_coding_provider):
         temperature=0.3,  # Lower temperature for more consistent code
     )
 
-    # Register additional tools (orchestrator already has default tools)
-    agent.tools.register(read_file.Tool)
-    agent.tools.register(write_file.Tool)
-    agent.tools.register(execute_bash.Tool)
+    # Tools are already registered by orchestrator via imports
+    # read, write from filesystem and shell from bash are available
+    _ = read, write, shell  # noqa: F841 - Tools imported and available
 
     yield agent
 
@@ -426,9 +425,8 @@ if __name__ == "__main__":
         temperature=0.3,
     )
 
-    # Register tools
-    agent.tools.register(read_file.Tool)
-    agent.tools.register(write_file.Tool)
+    # Tools are already registered by orchestrator via imports
+    _ = read, write, shell  # noqa: F841 - Tools imported and available
 
     print("\n" + "=" * 70)
     print("TESTING AGENT ENHANCEMENT")

@@ -265,6 +265,11 @@ export class ServerManager {
      * Tries: victor in PATH, python -m victor.ui.cli, bundled binary
      */
     private async findVictorCommand(): Promise<string | null> {
+        // Prefer configured or detected pythonPath first
+        if (this.config.pythonPath) {
+            return `${this.config.pythonPath} -m victor.ui.cli`;
+        }
+
         // 1. Check if victor is in PATH
         if (await this.commandExists('victor')) {
             return 'victor';
@@ -377,11 +382,37 @@ export class ServerManager {
 export function createServerManager(): ServerManager {
     const config = vscode.workspace.getConfiguration('victor');
 
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const detectedPython = detectWorkspacePython(workspacePath);
+    const configuredPython = config.get<string>('pythonPath') || undefined;
+    const pythonPath = configuredPython || detectedPython;
+
     return new ServerManager({
         host: '127.0.0.1',
-        port: config.get('serverPort', 8765),
-        autoStart: config.get('autoStart', true),
-        pythonPath: config.get('pythonPath'),
+        port: config.get('serverPort', 8000),
+        autoStart: config.get('autoStart', false),
+        pythonPath,
         victorPath: config.get('victorPath')
     });
+}
+
+/**
+ * Detect a workspace-local Python (common venv layouts)
+ */
+function detectWorkspacePython(workspacePath?: string): string | undefined {
+    if (!workspacePath) return undefined;
+
+    const candidates = [
+        path.join(workspacePath, 'venv', 'bin', 'python'),
+        path.join(workspacePath, '.venv', 'bin', 'python'),
+        path.join(workspacePath, 'venv', 'Scripts', 'python.exe'),
+        path.join(workspacePath, '.venv', 'Scripts', 'python.exe'),
+    ];
+
+    for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+            return candidate;
+        }
+    }
+    return undefined;
 }

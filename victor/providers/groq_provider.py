@@ -52,6 +52,10 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.payload_limiter import (
+    ProviderPayloadLimiter,
+    TruncationStrategy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +173,14 @@ class GroqProvider(BaseProvider):
             },
         )
 
+        # Initialize payload limiter for Groq's strict ~4MB limit
+        # Groq uses LPU hardware which has strict payload constraints
+        self._payload_limiter = ProviderPayloadLimiter(
+            provider_name="groq",
+            max_payload_bytes=4 * 1024 * 1024,  # 4MB
+            default_strategy=TruncationStrategy.TRUNCATE_TOOL_RESULTS,
+        )
+
     @property
     def name(self) -> str:
         """Provider name."""
@@ -209,6 +221,24 @@ class GroqProvider(BaseProvider):
             ProviderError: If request fails
         """
         try:
+            # Check payload size before building request
+            ok, warning = self._payload_limiter.check_limit(messages, tools)
+            if warning:
+                logger.warning(warning)
+
+            # Truncate if payload exceeds Groq's limit
+            if not ok:
+                truncation_result = self._payload_limiter.truncate_if_needed(messages, tools)
+                messages = truncation_result.messages
+                tools = truncation_result.tools
+                if truncation_result.warning:
+                    logger.warning(truncation_result.warning)
+                if truncation_result.truncated:
+                    logger.info(
+                        f"Truncated payload: removed {truncation_result.messages_removed} messages, "
+                        f"saved {truncation_result.bytes_saved:,} bytes"
+                    )
+
             payload = self._build_request_payload(
                 messages=messages,
                 model=model,
@@ -278,6 +308,24 @@ class GroqProvider(BaseProvider):
             ProviderError: If request fails
         """
         try:
+            # Check payload size before building request
+            ok, warning = self._payload_limiter.check_limit(messages, tools)
+            if warning:
+                logger.warning(warning)
+
+            # Truncate if payload exceeds Groq's limit
+            if not ok:
+                truncation_result = self._payload_limiter.truncate_if_needed(messages, tools)
+                messages = truncation_result.messages
+                tools = truncation_result.tools
+                if truncation_result.warning:
+                    logger.warning(truncation_result.warning)
+                if truncation_result.truncated:
+                    logger.info(
+                        f"Truncated payload: removed {truncation_result.messages_removed} messages, "
+                        f"saved {truncation_result.bytes_saved:,} bytes"
+                    )
+
             payload = self._build_request_payload(
                 messages=messages,
                 model=model,

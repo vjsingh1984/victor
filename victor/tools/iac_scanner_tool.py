@@ -38,6 +38,7 @@ from victor.tools.base import (
     ToolMetadata,
     ToolResult,
 )
+from victor.tools.tool_names import ToolNames
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ logger = logging.getLogger(__name__)
 class IaCScannerTool(BaseTool):
     """Tool for scanning Infrastructure-as-Code for security issues."""
 
-    name = "iac_scanner"
+    name = ToolNames.IAC
     description = """Scan IaC files (Terraform, Docker, K8s) for security issues.
 
     Actions: scan, scan_file, summary, detect.

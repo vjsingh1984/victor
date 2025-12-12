@@ -75,9 +75,7 @@ class TestHttpRequest:
             mock_client.return_value = mock_instance
 
             headers = {"X-Custom-Header": "value"}
-            result = await http(
-                method="GET", url="https://api.example.com", headers=headers
-            )
+            result = await http(method="GET", url="https://api.example.com", headers=headers)
 
             assert result["success"] is True
             assert result["body"] == "Plain text response"
@@ -99,9 +97,7 @@ class TestHttpRequest:
             mock_instance.request = AsyncMock(return_value=mock_response)
             mock_client.return_value = mock_instance
 
-            result = await http(
-                method="GET", url="https://api.example.com", auth="Bearer token123"
-            )
+            result = await http(method="GET", url="https://api.example.com", auth="Bearer token123")
 
             assert result["success"] is True
             mock_instance.request.assert_called_once()
@@ -158,9 +154,7 @@ class TestHttpRequest:
             mock_client.return_value = mock_instance
 
             json_data = {"name": "test item"}
-            result = await http(
-                method="POST", url="https://api.example.com/items", json=json_data
-            )
+            result = await http(method="POST", url="https://api.example.com/items", json=json_data)
 
             assert result["success"] is True
             assert result["status_code"] == 201
@@ -238,9 +232,7 @@ class TestHttpTest:
             mock_instance.request = AsyncMock(return_value=mock_response)
             mock_client.return_value = mock_instance
 
-            result = await http(
-                method="GET", url="https://api.example.com", auth="Bearer token123"
-            )
+            result = await http(method="GET", url="https://api.example.com", auth="Bearer token123")
 
             assert result["success"] is True
             mock_instance.request.assert_called_once()

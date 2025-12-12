@@ -109,9 +109,13 @@ def _scan_file_for_config_issues(file_path: Path) -> List[Dict[str, Any]]:
     access_mode=AccessMode.READONLY,  # Only reads files for scanning
     danger_level=DangerLevel.SAFE,  # No side effects
     keywords=["security", "scan", "vulnerability", "secret", "audit"],
-    mandatory_keywords=["security scan", "scan for vulnerabilities", "check security"],  # Force inclusion
+    mandatory_keywords=[
+        "security scan",
+        "scan for vulnerabilities",
+        "check security",
+    ],  # Force inclusion
     task_types=["security", "analysis"],  # Classification-aware selection
-    stages=["analysis", "security"],  # Conversation stages where relevant
+    stages=["analysis"],  # Conversation stages where relevant
 )
 async def scan(
     path: str,
@@ -396,5 +400,3 @@ async def scan(
         "findings": filtered_findings,
         "formatted_report": "\n".join(report),
     }
-
-

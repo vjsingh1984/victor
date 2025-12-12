@@ -25,7 +25,7 @@ falling back to hardcoded defaults for robustness.
 import json
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from victor.agent.tool_calling.base import (
     BaseToolCallingAdapter,
@@ -40,16 +40,22 @@ from victor.providers.base import ToolDefinition
 
 logger = logging.getLogger(__name__)
 
-# Singleton capability loader
-_capability_loader: Optional[ModelCapabilityLoader] = None
+# Capability loader instance (lazy-initialized)
+class _CapabilityLoaderHolder:
+    """Holder for capability loader singleton."""
+    _instance: Optional[ModelCapabilityLoader] = None
+
+    @classmethod
+    def get(cls) -> ModelCapabilityLoader:
+        """Get or create the capability loader singleton."""
+        if cls._instance is None:
+            cls._instance = ModelCapabilityLoader()
+        return cls._instance
 
 
 def _get_capability_loader() -> ModelCapabilityLoader:
     """Get or create the capability loader singleton."""
-    global _capability_loader
-    if _capability_loader is None:
-        _capability_loader = ModelCapabilityLoader()
-    return _capability_loader
+    return _CapabilityLoaderHolder.get()
 
 
 class AnthropicToolCallingAdapter(BaseToolCallingAdapter):
@@ -228,53 +234,199 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
     Uses FallbackParsingMixin for common parsing logic shared across adapters.
 
+    IMPORTANT: Tool support is now detected dynamically by checking the model's
+    template via Ollama's /api/show endpoint. This is more accurate than static
+    lists because:
+    1. Model templates can be customized to add/remove tool support
+    2. Different quantizations of the same model may have different templates
+    3. Custom models may have tool support not in our static list
+
     References:
     - https://docs.ollama.com/capabilities/tool-calling
-    - https://ollama.com/blog/tool-support
+    - https://ollama.com/search?c=tools
     """
 
-    # Models with known good native tool calling support
+    # Models with known good native tool calling support (fallback when dynamic detection fails)
+    # Full list from https://ollama.com/search?c=tools (December 2025)
     NATIVE_TOOL_MODELS = frozenset(
         [
+            # Llama family
             "llama3.1",
             "llama-3.1",
             "llama3.2",
             "llama-3.2",
             "llama3.3",
             "llama-3.3",
+            "llama4",
+            "llama-4",
+            "llama3-groq-tool-use",
+            # Qwen family
+            "qwen2",
+            "qwen-2",
             "qwen2.5",
             "qwen-2.5",
             "qwen3",
             "qwen-3",
+            "qwq",
+            # Mistral family
             "mistral",
             "mixtral",
+            "mistral-small",
+            "mistral-nemo",
+            "mistral-large",
+            "devstral",
+            "magistral",
+            # Command-R family
             "command-r",
+            "command-r-plus",
+            "command-r7b",
+            "command-a",
+            # Tool-specialized models
             "firefunction",
             "hermes",
+            "hermes3",
             "functionary",
+            "athene-v2",
+            # DeepSeek (when using -tools variant)
+            "deepseek",
+            # Granite family (IBM)
+            "granite3",
+            "granite3.1",
+            "granite3.2",
+            "granite3.3",
+            "granite4",
+            # Other tool-capable models
+            "gpt-oss",
+            "nemotron",
+            "nemotron-mini",
+            "smollm2",
+            "aya-expanse",
+            "cogito",
+            "phi4",
         ]
     )
+
+    # Parameter aliases: maps model-specific parameter names to standard names
+    # Format: {tool_name: {model_param: standard_param}}
+    PARAMETER_ALIASES = {
+        "read": {
+            "line_start": "offset",  # gpt-oss uses line_start/line_end
+            "line_end": "_line_end",  # Special handling needed
+            "loc": "offset",  # browser.open style
+            "num_lines": "limit",
+        },
+        "list_directory": {
+            "dir": "path",
+            "directory": "path",
+        },
+        "write": {
+            "file": "path",
+            "file_path": "path",
+            "text": "content",
+        },
+        "edit": {
+            "file": "path",
+            "file_path": "path",
+        },
+        "shell": {
+            "cmd": "command",
+        },
+        "search": {
+            "q": "query",
+            "term": "query",
+        },
+    }
+
+    # Cache for dynamic tool support detection results
+    _tool_support_cache: Dict[str, bool] = {}
 
     @property
     def provider_name(self) -> str:
         return "ollama"
 
     def _has_native_support(self) -> bool:
-        """Check if current model has native tool calling."""
-        return any(pattern in self.model_lower for pattern in self.NATIVE_TOOL_MODELS)
+        """Check if current model has native tool calling.
+
+        Uses dynamic detection via Ollama's /api/show endpoint first,
+        falling back to static model list if detection fails.
+
+        The detection result is cached per model to avoid repeated API calls.
+        """
+        # Check class-level cache first
+        if self.model in OllamaToolCallingAdapter._tool_support_cache:
+            return OllamaToolCallingAdapter._tool_support_cache[self.model]
+
+        # Try dynamic detection via Ollama /api/show
+        base_url = self.config.get("base_url", "http://localhost:11434") if self.config else "http://localhost:11434"
+
+        try:
+            from victor.providers.ollama_capability_detector import OllamaCapabilityDetector
+
+            detector = OllamaCapabilityDetector(base_url, timeout=5)
+            support = detector.get_tool_support(self.model)
+
+            if support.error is None:
+                # Successfully detected from template
+                logger.debug(
+                    f"Dynamic tool support detection for {self.model}: "
+                    f"supports_tools={support.supports_tools}, "
+                    f"format={support.tool_response_format}"
+                )
+                OllamaToolCallingAdapter._tool_support_cache[self.model] = support.supports_tools
+                return support.supports_tools
+            else:
+                logger.debug(f"Dynamic detection failed for {self.model}: {support.error}")
+        except Exception as e:
+            logger.debug(f"Failed to dynamically detect tool support for {self.model}: {e}")
+
+        # Fallback to static list
+        has_static_support = any(pattern in self.model_lower for pattern in self.NATIVE_TOOL_MODELS)
+        OllamaToolCallingAdapter._tool_support_cache[self.model] = has_static_support
+        return has_static_support
 
     def _has_thinking_mode(self) -> bool:
         """Check if model supports Qwen3 thinking mode."""
         return "qwen3" in self.model_lower or "qwen-3" in self.model_lower
 
     def get_capabilities(self) -> ToolCallingCapabilities:
-        # Determine format based on model detection
+        """Get tool calling capabilities for the current model.
+
+        This method uses dynamic detection via Ollama's /api/show endpoint
+        to determine if the model's template supports tools. The dynamic
+        detection result takes precedence over YAML config because:
+        1. Templates can be customized to add/remove tool support
+        2. Different quantizations may have different templates
+        3. Custom models may have tool support not in YAML config
+        """
+        # Determine format based on model detection (uses dynamic detection first)
         has_native = self._has_native_support()
         format_hint = ToolCallFormat.OLLAMA_NATIVE if has_native else ToolCallFormat.OLLAMA_JSON
 
         # Load from YAML config with model pattern matching
         loader = _get_capability_loader()
         caps = loader.get_capabilities("ollama", self.model, format_hint)
+
+        # IMPORTANT: Override YAML native_tool_calls with dynamic detection result
+        # Dynamic detection checks the actual template, which is more accurate
+        if caps.native_tool_calls != has_native:
+            logger.debug(
+                f"Overriding YAML native_tool_calls={caps.native_tool_calls} "
+                f"with dynamic detection result={has_native} for {self.model}"
+            )
+            caps = ToolCallingCapabilities(
+                native_tool_calls=has_native,
+                streaming_tool_calls=caps.streaming_tool_calls if has_native else False,
+                parallel_tool_calls=caps.parallel_tool_calls if has_native else False,
+                tool_choice_param=caps.tool_choice_param if has_native else False,
+                json_fallback_parsing=True,  # Always enable fallback parsing
+                xml_fallback_parsing=True,
+                thinking_mode=caps.thinking_mode,
+                requires_strict_prompting=not has_native,  # Strict prompting when no native support
+                tool_call_format=format_hint,
+                argument_format=caps.argument_format,
+                recommended_max_tools=caps.recommended_max_tools if has_native else 10,
+                recommended_tool_budget=caps.recommended_tool_budget if has_native else 5,
+            )
 
         # Apply model-specific overrides that YAML can't detect
         if self._has_thinking_mode() and not caps.thinking_mode:
@@ -310,6 +462,68 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             for tool in tools
         ]
 
+    def _parse_hybrid_xml_format(
+        self,
+        content: str,
+        validate_name_fn: Optional[Callable[[str], bool]] = None,
+    ) -> ToolCallParseResult:
+        """Parse Ollama-specific hybrid XML format.
+
+        Handles malformed patterns like <function=X>...</tool_call> that some
+        Ollama models (especially Qwen3-coder) produce. This is specific to Ollama
+        and not added to the base class to avoid regressions for other adapters.
+
+        Args:
+            content: Response content to parse
+            validate_name_fn: Optional function to validate tool names
+
+        Returns:
+            ToolCallParseResult with parsed tool calls
+        """
+        import re
+        import json
+
+        # Hybrid pattern: <function=name> with </tool_call> closing
+        # This is a common malformed pattern from Qwen3 models on Ollama
+        hybrid_pattern = r"<function=([^>]+)>(.*?)</tool_call>"
+        hybrid_matches = re.findall(hybrid_pattern, content, re.DOTALL | re.IGNORECASE)
+
+        if not hybrid_matches:
+            return ToolCallParseResult(remaining_content=content)
+
+        tool_calls: List[ToolCall] = []
+        warnings: List[str] = ["Used hybrid XML pattern recovery (Ollama-specific)"]
+
+        for name, params_content in hybrid_matches:
+            name = name.strip()
+
+            # Validate name if validator provided
+            if validate_name_fn and not validate_name_fn(name):
+                warnings.append(f"Skipped invalid tool name: {name}")
+                continue
+
+            # Parse <parameter=X>value</parameter> tags
+            param_pattern = r"<parameter=([^>]+)>\s*(.*?)\s*</parameter>"
+            param_matches = re.findall(param_pattern, params_content, re.DOTALL)
+            args = {p.strip(): v.strip() for p, v in param_matches}
+
+            tool_calls.append(ToolCall(name=name, arguments=args))
+
+        if not tool_calls:
+            return ToolCallParseResult(remaining_content=content)
+
+        # Remove matched content
+        remaining = re.sub(hybrid_pattern, "", content, flags=re.DOTALL | re.IGNORECASE)
+        remaining = remaining.strip()
+
+        return ToolCallParseResult(
+            tool_calls=tool_calls,
+            remaining_content=remaining,
+            parse_method="ollama_hybrid_xml",
+            confidence=0.65,  # Slightly lower confidence for recovered format
+            warnings=warnings,
+        )
+
     def parse_tool_calls(
         self,
         content: str,
@@ -318,6 +532,7 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         """Parse Ollama tool calls with fallback support.
 
         Uses FallbackParsingMixin methods for common parsing logic.
+        Includes Ollama-specific hybrid XML pattern recovery.
         """
         # Try native tool calls first (using mixin method)
         if raw_tool_calls:
@@ -337,6 +552,12 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             result = self.parse_from_content(content, self.is_valid_tool_name)
             if result.tool_calls:
                 return result
+
+            # Ollama-specific: Try hybrid XML pattern recovery
+            # This handles <function=X>...</tool_call> malformed patterns
+            hybrid_result = self._parse_hybrid_xml_format(content, self.is_valid_tool_name)
+            if hybrid_result.tool_calls:
+                return hybrid_result
 
         return ToolCallParseResult(remaining_content=content)
 

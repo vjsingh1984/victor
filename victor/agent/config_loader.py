@@ -31,6 +31,7 @@ def _get_critical_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
     Critical tools are those with priority=Priority.CRITICAL in their @tool decorator.
     """
     from victor.agent.tool_selection import get_critical_tools
+
     return get_critical_tools(registry)
 
 
@@ -245,3 +246,270 @@ class ConfigLoader:
                 resolved.append(resolved_ep.strip())
 
         return resolved
+
+
+# =============================================================================
+# PROFILE VALIDATOR
+# =============================================================================
+# Validates profile configurations at startup to catch common issues early:
+# - Model name normalization (qwen25 → qwen2.5)
+# - Tool capability detection
+# - Ollama model availability (optional)
+# =============================================================================
+
+
+class ProfileValidationResult:
+    """Result of profile validation."""
+
+    def __init__(
+        self,
+        profile_name: str,
+        is_valid: bool = True,
+        warnings: Optional[List[str]] = None,
+        errors: Optional[List[str]] = None,
+        suggestions: Optional[List[str]] = None,
+    ):
+        self.profile_name = profile_name
+        self.is_valid = is_valid
+        self.warnings = warnings or []
+        self.errors = errors or []
+        self.suggestions = suggestions or []
+
+    def __str__(self) -> str:
+        lines = [f"Profile '{self.profile_name}': {'VALID' if self.is_valid else 'INVALID'}"]
+        if self.errors:
+            lines.append(f"  Errors: {', '.join(self.errors)}")
+        if self.warnings:
+            lines.append(f"  Warnings: {', '.join(self.warnings)}")
+        if self.suggestions:
+            lines.append(f"  Suggestions: {', '.join(self.suggestions)}")
+        return "\n".join(lines)
+
+
+class ProfileValidator:
+    """Validates profile configurations at startup.
+
+    Performs the following checks:
+    1. Model name normalization - applies aliases (qwen25 → qwen2.5)
+    2. Tool capability detection - checks if model supports native tool calls
+    3. Ollama model availability - verifies model is available (optional async check)
+
+    Usage:
+        validator = ProfileValidator(settings)
+        results = validator.validate_profiles()
+        for result in results:
+            if not result.is_valid:
+                print(result)
+    """
+
+    def __init__(self, settings: Settings):
+        """Initialize profile validator.
+
+        Args:
+            settings: Application settings with profile configurations
+        """
+        self.settings = settings
+        self._capability_loader = None
+
+    def _get_capability_loader(self):
+        """Lazy-load the ModelCapabilityLoader to avoid circular imports."""
+        if self._capability_loader is None:
+            from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
+
+            self._capability_loader = ModelCapabilityLoader()
+        return self._capability_loader
+
+    def validate_profile(
+        self,
+        profile_name: str,
+        provider: str,
+        model: str,
+        check_ollama_availability: bool = False,
+    ) -> ProfileValidationResult:
+        """Validate a single profile configuration.
+
+        Args:
+            profile_name: Name of the profile
+            provider: Provider name (ollama, anthropic, openai, etc.)
+            model: Model identifier
+            check_ollama_availability: If True, check Ollama model availability
+
+        Returns:
+            ProfileValidationResult with validation status and messages
+        """
+        from victor.agent.tool_calling.capabilities import (
+            normalize_model_name,
+            get_model_name_variants,
+        )
+
+        warnings: List[str] = []
+        errors: List[str] = []
+        suggestions: List[str] = []
+
+        # Step 1: Check model name normalization
+        normalized = normalize_model_name(model)
+        if normalized != model.lower():
+            suggestions.append(
+                f"Model name normalized: '{model}' → '{normalized}'. "
+                f"Consider using '{normalized}' in your profile for consistency."
+            )
+
+        # Step 2: Check tool capability detection
+        loader = self._get_capability_loader()
+        variants = get_model_name_variants(model)
+
+        # Try to get capabilities with any variant
+        capabilities = None
+        matched_variant = None
+        for variant in variants:
+            caps = loader.get_capabilities(provider, variant)
+            if caps is not None:
+                capabilities = caps
+                matched_variant = variant
+                break
+
+        if capabilities is None:
+            warnings.append(
+                f"Model '{model}' not found in capability patterns for provider '{provider}'. "
+                f"Tool calling may be disabled."
+            )
+            suggestions.append(
+                f"Add a pattern for '{normalized}*' to model_capabilities.yaml, or use "
+                f"--provider ollama --model with a known tool-capable model."
+            )
+        elif not capabilities.native_tool_calls:
+            warnings.append(
+                f"Model '{matched_variant or model}' matched but does not support native tool calls. "
+                f"Using fallback text parsing."
+            )
+        else:
+            logger.debug(
+                f"Profile '{profile_name}': Model '{matched_variant or model}' supports native tool calls"
+            )
+
+        # Step 3: Check Ollama availability (optional, async)
+        if check_ollama_availability and provider == "ollama":
+            ollama_warning = self._check_ollama_model(model)
+            if ollama_warning:
+                warnings.append(ollama_warning)
+
+        is_valid = len(errors) == 0
+        return ProfileValidationResult(
+            profile_name=profile_name,
+            is_valid=is_valid,
+            warnings=warnings,
+            errors=errors,
+            suggestions=suggestions,
+        )
+
+    def _check_ollama_model(self, model: str) -> Optional[str]:
+        """Check if Ollama model is available (sync check).
+
+        This is a lightweight check using environment-configured OLLAMA_HOST.
+
+        Args:
+            model: Model name to check
+
+        Returns:
+            Warning message if model not available, None otherwise
+        """
+        import urllib.request
+        import urllib.error
+        import json
+
+        ollama_host = os.environ.get("OLLAMA_HOST", self.settings.ollama_base_url)
+
+        try:
+            url = f"{ollama_host}/api/tags"
+            with urllib.request.urlopen(url, timeout=5) as response:
+                data = json.loads(response.read().decode())
+                models = data.get("models", [])
+                model_names = [m.get("name", "").lower() for m in models]
+
+                # Check exact match or prefix match
+                model_lower = model.lower()
+                for name in model_names:
+                    if name == model_lower or name.startswith(f"{model_lower}:"):
+                        return None
+
+                # Model not found
+                return (
+                    f"Model '{model}' not found on Ollama server at {ollama_host}. "
+                    f"Available models: {', '.join(sorted(set(m.split(':')[0] for m in model_names))[:5])}..."
+                )
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
+            logger.debug(f"Could not check Ollama availability: {e}")
+            return None  # Don't warn if we can't connect
+
+    def validate_all_ollama_profiles(
+        self, check_availability: bool = False
+    ) -> List[ProfileValidationResult]:
+        """Validate all Ollama profiles in settings.
+
+        Args:
+            check_availability: If True, check if models are available on Ollama server
+
+        Returns:
+            List of ProfileValidationResult for each Ollama profile
+        """
+        results: List[ProfileValidationResult] = []
+
+        # Get profiles from settings if available
+        profiles_yaml = getattr(self.settings, "_profiles_yaml", None)
+        if not profiles_yaml or "profiles" not in profiles_yaml:
+            return results
+
+        for profile_name, profile_config in profiles_yaml.get("profiles", {}).items():
+            if not isinstance(profile_config, dict):
+                continue
+
+            provider = profile_config.get("provider", "").lower()
+            model = profile_config.get("model", "")
+
+            if provider == "ollama" and model:
+                result = self.validate_profile(
+                    profile_name=profile_name,
+                    provider=provider,
+                    model=model,
+                    check_ollama_availability=check_availability,
+                )
+                results.append(result)
+
+        return results
+
+    def log_validation_summary(self, results: List[ProfileValidationResult]) -> None:
+        """Log a summary of validation results.
+
+        Args:
+            results: List of validation results to summarize
+        """
+        if not results:
+            return
+
+        warnings_count = sum(len(r.warnings) for r in results)
+        errors_count = sum(len(r.errors) for r in results)
+
+        if errors_count > 0:
+            logger.error(f"Profile validation found {errors_count} errors, {warnings_count} warnings")
+            for result in results:
+                if result.errors:
+                    logger.error(str(result))
+        elif warnings_count > 0:
+            logger.warning(f"Profile validation found {warnings_count} warnings")
+            for result in results:
+                if result.warnings:
+                    logger.warning(str(result))
+
+
+def validate_profiles_on_startup(settings: Settings, check_availability: bool = False) -> None:
+    """Convenience function to validate profiles at startup.
+
+    Call this from the CLI entrypoint to catch configuration issues early.
+
+    Args:
+        settings: Application settings
+        check_availability: If True, also check Ollama model availability
+    """
+    validator = ProfileValidator(settings)
+    results = validator.validate_all_ollama_profiles(check_availability=check_availability)
+    validator.log_validation_summary(results)

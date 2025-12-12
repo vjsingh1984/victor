@@ -10,7 +10,7 @@ Comprehensive documentation for Victor - Enterprise-Ready AI Coding Assistant.
 | [Quick Start](guides/QUICKSTART.md) | First steps with Victor |
 | [Provider Setup](guides/PROVIDER_SETUP.md) | Configure 25+ LLM providers |
 | [User Guide](USER_GUIDE.md) | Complete usage guide |
-| [Tool Catalog](TOOL_CATALOG.md) | All 46 available tools |
+| [Tool Catalog](TOOL_CATALOG.md) | All 45 available tools |
 | [Releasing](RELEASING.md) | Release process for maintainers |
 
 ## Documentation Structure
@@ -18,7 +18,7 @@ Comprehensive documentation for Victor - Enterprise-Ready AI Coding Assistant.
 ```
 docs/
 ├── USER_GUIDE.md              # Comprehensive user guide
-├── TOOL_CATALOG.md            # All 46 tools with descriptions
+├── TOOL_CATALOG.md            # All 45 tools with descriptions
 ├── MODEL_COMPARISON.md        # Ollama model benchmarks
 ├── DEVELOPER_GUIDE.md         # Contributing and development
 ├── RELEASING.md               # Release process
@@ -80,7 +80,7 @@ docs/
 ### Using Victor
 - [Interactive Mode](USER_GUIDE.md#interactive-mode)
 - [One-shot Commands](USER_GUIDE.md#one-shot-mode)
-- [Tool Catalog](TOOL_CATALOG.md) - 46 tools across 8 categories
+- [Tool Catalog](TOOL_CATALOG.md) - 45 tools across 8 categories
 
 ### Air-gapped & Offline
 - [Air-gapped Setup](embeddings/AIRGAPPED.md)

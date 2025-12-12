@@ -16,9 +16,9 @@
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 
-from tree_sitter import QueryCursor
+from tree_sitter import Query, QueryCursor
 from victor.codebase.tree_sitter_manager import get_parser
-from victor.tools.base import AccessMode, DangerLevel, Priority
+from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 
 
@@ -43,7 +43,27 @@ PYTHON_QUERIES = {
     priority=Priority.HIGH,  # Important for code navigation
     access_mode=AccessMode.READONLY,  # Only reads files for analysis
     danger_level=DangerLevel.SAFE,  # No side effects
-    keywords=["symbol", "find", "definition", "function", "class", "locate", "ast"],
+    keywords=[
+        "symbol",
+        "find",
+        "definition",
+        "function",
+        "class",
+        "locate",
+        "ast",
+        # Natural language patterns for symbol lookup (semantic matching)
+        "method",
+        "where is",
+        "show me",
+        "look up",
+        "go to definition",
+        "find the",
+        "locate the",
+        "get definition",
+        "code for",
+        "implementation",
+    ],
+    stages=["analysis"],  # Conversation stages where relevant
 )
 async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
     """[AST-AWARE] Find function/class definition using tree-sitter parsing.
@@ -79,7 +99,7 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
         root_node = tree.root_node
 
         for symbol_type in ["function", "class"]:
-            query = parser.language.query(PYTHON_QUERIES[symbol_type])
+            query = Query(parser.language, PYTHON_QUERIES[symbol_type])
             cursor = QueryCursor(query)
             captures_dict = cursor.captures(root_node)
 
@@ -115,7 +135,28 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
     priority=Priority.HIGH,  # Important for code navigation
     access_mode=AccessMode.READONLY,  # Only reads files for analysis
     danger_level=DangerLevel.SAFE,  # No side effects
-    keywords=["refs", "references", "find", "usage", "occurrences", "symbol", "ast"],
+    keywords=[
+        "refs",
+        "references",
+        "find",
+        "usage",
+        "occurrences",
+        "symbol",
+        "ast",
+        # Natural language patterns for usage lookup (semantic matching)
+        "where is",
+        "used",
+        "called",
+        "invoked",
+        "callers",
+        "who calls",
+        "find all",
+        "all usages",
+        "find usages",
+        "list references",
+    ],
+    stages=["analysis", "reading"],
+    execution_category=ExecutionCategory.READ_ONLY,
 )
 async def refs(symbol_name: str, search_path: str = ".") -> List[Dict[str, Any]]:
     """[AST-AWARE] Find all references to a symbol using tree-sitter parsing.
@@ -143,7 +184,7 @@ async def refs(symbol_name: str, search_path: str = ".") -> List[Dict[str, Any]]
     """
     references = []
     parser = get_parser("python")
-    query = parser.language.query(PYTHON_QUERIES["identifier"])
+    query = Query(parser.language, PYTHON_QUERIES["identifier"])
 
     root_path = Path(search_path)
     if not root_path.is_dir():
@@ -180,7 +221,6 @@ async def refs(symbol_name: str, search_path: str = ".") -> List[Dict[str, Any]]
             continue
 
     return references
-
 
 
 # Note: For project-wide symbol renaming, use the consolidated `rename` tool

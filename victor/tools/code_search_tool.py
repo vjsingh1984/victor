@@ -207,18 +207,23 @@ async def _get_or_build_index(
         "extra_config": {},
     }
 
+    graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
+    graph_path = getattr(settings, "codebase_graph_path", None)
+
     # Create new index - it will load from disk if available
     index = CodebaseIndex(
         root_path=str(root),
         use_embeddings=True,
         embedding_config=embedding_config,
+        graph_store_name=graph_store_name,
+        graph_path=Path(graph_path) if graph_path else None,
     )
 
     # Only do full index if forced or no persistent data exists
     persist_path = Path(default_persist_dir)
     if force_reindex or not persist_path.exists() or not any(persist_path.iterdir()):
         # First time or forced - full index
-        await index.index_codebase(force=force_reindex)
+        await index.index_codebase()
         rebuilt = True
     else:
         # Persistent data exists - just ensure indexed (incremental)
@@ -274,10 +279,20 @@ async def _literal_search(
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["query", "path", "mode"],  # Different queries/paths = exploration not loop
-    stages=["initial", "reading", "analysis"],  # Relevant for exploration stages
+    stages=["initial", "planning", "reading", "analysis"],  # Relevant for exploration stages
     task_types=["search", "analysis"],  # Classification-aware selection
     execution_category="read_only",  # Safe for parallel execution
-    keywords=["search", "semantic", "embedding", "concept", "pattern", "similar", "find", "grep", "literal"],
+    keywords=[
+        "search",
+        "semantic",
+        "embedding",
+        "concept",
+        "pattern",
+        "similar",
+        "find",
+        "grep",
+        "literal",
+    ],
     mandatory_keywords=["search code", "find in code", "search for"],  # Force inclusion
 )
 async def search(
@@ -409,5 +424,3 @@ async def search(
         }
     except Exception as exc:
         return {"success": False, "error": str(exc)}
-
-

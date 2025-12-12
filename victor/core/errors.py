@@ -27,7 +27,7 @@ import logging
 import traceback
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, TypeVar
@@ -118,7 +118,7 @@ class VictorError(Exception):
         self.recovery_hint = recovery_hint
         self.correlation_id = correlation_id or str(uuid.uuid4())[:8]
         self.cause = cause
-        self.timestamp = datetime.utcnow()
+        self.timestamp = datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""

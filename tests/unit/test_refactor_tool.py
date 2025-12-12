@@ -379,9 +379,7 @@ class TestExtract:
     @pytest.mark.asyncio
     async def test_extract_missing_file(self):
         """Test handling of missing file parameter."""
-        result = await extract(
-            file="", start_line=1, end_line=5, function_name="extracted"
-        )
+        result = await extract(file="", start_line=1, end_line=5, function_name="extracted")
 
         assert result["success"] is False
         assert "Missing" in result["error"]
@@ -389,9 +387,7 @@ class TestExtract:
     @pytest.mark.asyncio
     async def test_extract_missing_function_name(self):
         """Test handling of missing function_name."""
-        result = await extract(
-            file="test.py", start_line=1, end_line=5, function_name=""
-        )
+        result = await extract(file="test.py", start_line=1, end_line=5, function_name="")
 
         assert result["success"] is False
         assert "Missing" in result["error"]
@@ -499,9 +495,7 @@ def calculate():
 """
         )
 
-        result = await inline(
-            file=str(test_file), variable_name="result", preview=True
-        )
+        result = await inline(file=str(test_file), variable_name="result", preview=True)
 
         assert result["success"] is True
         assert result["changes_count"] > 0
@@ -519,9 +513,7 @@ def process():
 """
         test_file.write_text(original_content)
 
-        result = await inline(
-            file=str(test_file), variable_name="value", preview=False
-        )
+        result = await inline(file=str(test_file), variable_name="value", preview=False)
 
         assert result["success"] is True
         assert result["changes_count"] > 0
@@ -958,9 +950,7 @@ class TestInlineEdgeCases:
         lines = ["value = 10"] + [f"x{i} = value" for i in range(15)]
         test_file.write_text("\n".join(lines))
 
-        result = await inline(
-            file=str(test_file), variable_name="value", preview=True
-        )
+        result = await inline(file=str(test_file), variable_name="value", preview=True)
 
         assert result["success"] is True
         assert "more" in result["formatted_report"]
@@ -978,9 +968,7 @@ def func():
 """
         )
 
-        result = await inline(
-            file=str(test_file), variable_name="computed", preview=False
-        )
+        result = await inline(file=str(test_file), variable_name="computed", preview=False)
 
         assert result["success"] is True
         content = test_file.read_text()

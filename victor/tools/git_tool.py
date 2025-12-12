@@ -105,7 +105,7 @@ def _run_git(*args: str, env_overrides: Optional[Dict[str, str]] = None) -> Tupl
     access_mode=AccessMode.MIXED,  # Reads repo state and writes commits
     danger_level=DangerLevel.MEDIUM,  # Repository modifications
     # Registry-driven metadata for tool selection and cache management
-    stages=["executing", "verification"],  # Conversation stages where relevant
+    stages=["execution", "verification", "completion"],  # Conversation stages where relevant
     task_types=["action", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.MIXED,  # Can both read and write
     progress_params=["operation", "files", "branch"],  # Params indicating different operations
@@ -655,5 +655,3 @@ async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     analysis.append("4. Continue: git merge --continue or git rebase --continue")
 
     return {"success": True, "output": "\n".join(analysis), "error": ""}
-
-

@@ -260,6 +260,7 @@ async def test_stream_basic(ollama_provider):
     mock_response = MagicMock()
     mock_response.aiter_lines = mock_aiter_lines
     mock_response.raise_for_status = MagicMock()
+    mock_response.status_code = 200  # Must set status_code for new stream logic
     mock_response.__aenter__ = AsyncMock(return_value=mock_response)
     mock_response.__aexit__ = AsyncMock()
 
@@ -636,3 +637,110 @@ class TestEndpointDiscovery:
         )
         # Should fall back to default
         assert provider is not None
+
+
+class TestStreamRetryWithoutTools:
+    """Test stream retry-without-tools functionality."""
+
+    @pytest.mark.asyncio
+    async def test_stream_retry_on_tools_not_supported(self, ollama_provider):
+        """Test that stream retries without tools when model doesn't support them."""
+        call_count = 0
+
+        async def mock_aiter_lines():
+            yield '{"message":{"content":"Hello"},"done":false}'
+            yield '{"message":{"content":" world"},"done":true,"done_reason":"stop"}'
+
+        def create_mock_response(status_code, error_body=None):
+            mock_response = MagicMock()
+            mock_response.status_code = status_code
+            mock_response.raise_for_status = MagicMock()
+            if status_code == 200:
+                mock_response.aiter_lines = mock_aiter_lines
+            if error_body:
+                mock_response.aread = AsyncMock(return_value=error_body.encode())
+            mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_response.__aexit__ = AsyncMock()
+            return mock_response
+
+        original_stream = ollama_provider.client.stream
+
+        def mock_stream(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            payload = kwargs.get("json", {})
+
+            # First call with tools should fail
+            if call_count == 1 and "tools" in payload and payload["tools"]:
+                return create_mock_response(
+                    400, '{"error":"model does not support tools"}'
+                )
+            # Second call without tools should succeed
+            return create_mock_response(200)
+
+        with patch.object(ollama_provider.client, "stream", side_effect=mock_stream):
+            messages = [Message(role="user", content="Hello")]
+            tools = [
+                ToolDefinition(
+                    name="test_tool",
+                    description="A test tool",
+                    parameters={"type": "object"},
+                )
+            ]
+            chunks = []
+
+            async for chunk in ollama_provider.stream(
+                messages=messages, model="test-model", tools=tools
+            ):
+                chunks.append(chunk)
+
+            # Should have retried and succeeded
+            assert call_count == 2
+            assert len(chunks) == 2
+            assert chunks[0].content == "Hello"
+            # Model should be cached as not supporting tools
+            assert "test-model" in ollama_provider._models_without_tools
+
+    @pytest.mark.asyncio
+    async def test_stream_uses_cached_no_tools_flag(self, ollama_provider):
+        """Test that stream skips tools for models cached as not supporting them."""
+        # Pre-populate cache
+        ollama_provider._models_without_tools.add("cached-model")
+
+        async def mock_aiter_lines():
+            yield '{"message":{"content":"OK"},"done":true,"done_reason":"stop"}'
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.aiter_lines = mock_aiter_lines
+        mock_response.raise_for_status = MagicMock()
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock()
+
+        payloads_sent = []
+
+        original_stream = ollama_provider.client.stream
+
+        def capture_stream(*args, **kwargs):
+            payloads_sent.append(kwargs.get("json", {}))
+            return mock_response
+
+        with patch.object(ollama_provider.client, "stream", side_effect=capture_stream):
+            messages = [Message(role="user", content="Hello")]
+            tools = [
+                ToolDefinition(
+                    name="test_tool",
+                    description="A test tool",
+                    parameters={"type": "object"},
+                )
+            ]
+            chunks = []
+
+            async for chunk in ollama_provider.stream(
+                messages=messages, model="cached-model", tools=tools
+            ):
+                chunks.append(chunk)
+
+            # Should have sent only one request without tools
+            assert len(payloads_sent) == 1
+            assert "tools" not in payloads_sent[0] or not payloads_sent[0].get("tools")

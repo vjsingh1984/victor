@@ -63,9 +63,7 @@ class TestEditFiles:
     async def test_edit_files_modify_nonexistent_file(self):
         """Test modifying nonexistent file."""
         result = await edit(
-            ops=[
-                {"type": "modify", "path": "/nonexistent/file.txt", "content": "new content"}
-            ]
+            ops=[{"type": "modify", "path": "/nonexistent/file.txt", "content": "new content"}]
         )
         assert result["success"] is False
 
@@ -214,9 +212,7 @@ class TestReplaceOperation:
 
         try:
             result = await edit(
-                ops=[
-                    {"type": "replace", "path": temp_path, "old_str": "foo", "new_str": "baz"}
-                ]
+                ops=[{"type": "replace", "path": temp_path, "old_str": "foo", "new_str": "baz"}]
             )
             # Should fail because "foo" is ambiguous
             assert result["success"] is False

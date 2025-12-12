@@ -18,6 +18,7 @@ A tool for executing Python code in a secure, stateful Docker container.
 
 import io
 import tarfile
+import os
 from pathlib import Path
 from typing import List
 
@@ -44,12 +45,29 @@ class CodeSandbox:
     Note: Previously named `CodeExecutionManager`. Alias kept for backward compatibility.
     """
 
-    def __init__(self, docker_image: str = "python:3.11-slim", require_docker: bool = False):
+    def __init__(
+        self,
+        docker_image: str = "python:3.11-slim",
+        require_docker: bool = False,
+        network_disabled: bool = True,
+        memory_limit: str | None = os.getenv("VICTOR_CODE_EXECUTOR_MEM", "512m"),
+        cpu_shares: int | None = None,
+    ):
         self.docker_image = docker_image
         self.container: Container | None = None
         self.working_dir = "/app"
         self.docker_available = False
         self.docker_client = None
+        self.network_disabled = network_disabled
+        self.memory_limit = memory_limit
+        try:
+            self.cpu_shares = (
+                int(os.getenv("VICTOR_CODE_EXECUTOR_CPU_SHARES", "256"))
+                if cpu_shares is None
+                else cpu_shares
+            )
+        except ValueError:
+            self.cpu_shares = None
 
         if not DOCKER_AVAILABLE:
             if require_docker:
@@ -88,7 +106,9 @@ class CodeSandbox:
                 command="sleep infinity",  # Keep the container running
                 detach=True,
                 working_dir=self.working_dir,
-                # No volume mounting needed - we execute code directly
+                network_disabled=self.network_disabled,
+                mem_limit=self.memory_limit,
+                cpu_shares=self.cpu_shares,
             )
         except Exception as e:
             # Log the error but don't crash Victor
@@ -258,5 +278,3 @@ async def sandbox(
 
     else:
         return f"Error: Unknown operation '{operation}'. Use 'execute' or 'upload'."
-
-

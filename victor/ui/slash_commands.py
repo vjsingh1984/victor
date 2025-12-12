@@ -462,6 +462,28 @@ class SlashCommandHandler:
             )
         )
 
+        # Q-learning/Intelligent Pipeline visibility command
+        self.register(
+            SlashCommand(
+                name="learning",
+                description="Show Q-learning stats, adjust exploration, or reset session",
+                handler=self._cmd_learning,
+                aliases=["qlearn", "rl"],
+                usage="/learning [stats|explore <rate>|reset]",
+            )
+        )
+
+        # ML/RL training data aggregation command
+        self.register(
+            SlashCommand(
+                name="mlstats",
+                description="Show ML-friendly aggregated session statistics for RL training",
+                handler=self._cmd_mlstats,
+                aliases=["ml", "analytics"],
+                usage="/mlstats [providers|families|sizes|export]",
+            )
+        )
+
     def register(self, command: SlashCommand) -> None:
         """Register a slash command."""
         self._commands[command.name] = command
@@ -869,20 +891,48 @@ class SlashCommandHandler:
         current_provider = self.agent.provider_name if self.agent else None
         current_model = self.agent.model if self.agent else None
 
+        # Get RL Q-values for provider ranking
+        rl_rankings = {}
+        rl_best_provider = None
+        try:
+            from victor.agent.rl_model_selector import get_model_selector
+
+            selector = get_model_selector()
+            if selector:
+                rankings = selector.get_provider_rankings()
+                rl_rankings = {p.lower(): q for p, q in rankings}
+                if rankings:
+                    rl_best_provider = rankings[0][0].lower()
+        except Exception:
+            pass
+
         table = Table(title="Configured Profiles", show_header=True)
         table.add_column("Profile", style="cyan")
         table.add_column("Provider", style="green")
         table.add_column("Model", style="yellow")
+        table.add_column("Q-Value", style="magenta", justify="right")
         table.add_column("Status", style="dim")
 
         for name, config in profiles.items():
             # Check if this is the current active profile
             is_current = config.provider == current_provider and config.model == current_model
             status = "← current" if is_current else ""
-            table.add_row(name, config.provider, config.model, status)
+
+            # Add RL recommendation indicator
+            provider_lower = config.provider.lower()
+            if provider_lower == rl_best_provider and not is_current:
+                status = "★ RL best" if not status else f"{status}, ★ RL best"
+
+            # Show Q-value if available
+            q_val = rl_rankings.get(provider_lower)
+            q_str = f"{q_val:.2f}" if q_val is not None else "-"
+
+            table.add_row(name, config.provider, config.model, q_str, status)
 
         self.console.print(table)
         self.console.print("\n[dim]Switch profile: /profile <name>[/]")
+        if rl_rankings:
+            self.console.print("[dim]★ = RL recommends based on historical performance[/]")
 
     def _cmd_provider(self, args: List[str]) -> None:
         """Show current provider info or switch provider.
@@ -920,15 +970,37 @@ class SlashCommandHandler:
                 )
             )
 
-            # Show available providers
+            # Get RL Q-values for provider ranking
+            rl_rankings = {}
+            rl_best_provider = None
+            try:
+                from victor.agent.rl_model_selector import get_model_selector
+
+                selector = get_model_selector()
+                if selector:
+                    rankings = selector.get_provider_rankings()
+                    rl_rankings = {p.lower(): q for p, q in rankings}
+                    if rankings:
+                        rl_best_provider = rankings[0][0].lower()
+            except Exception:
+                pass
+
+            # Show available providers with RL Q-values
             self.console.print("\n[bold]Available Providers:[/]")
             for p in sorted(available_providers):
-                marker = "→ " if p == info.get("provider") else "  "
-                self.console.print(f"  {marker}[cyan]{p}[/]")
+                is_current = p == info.get("provider")
+                is_rl_best = p.lower() == rl_best_provider
+                marker = "→ " if is_current else "  "
+                q_val = rl_rankings.get(p.lower())
+                q_str = f" (Q={q_val:.2f})" if q_val is not None else ""
+                rl_marker = " ★" if is_rl_best and not is_current else ""
+                self.console.print(f"  {marker}[cyan]{p}[/]{q_str}[magenta]{rl_marker}[/]")
 
             self.console.print(
                 "\n[dim]Switch provider: /provider <name> or /provider <name:model>[/]"
             )
+            if rl_rankings:
+                self.console.print("[dim]★ = RL recommends based on historical performance[/]")
             return
 
         # Switch provider
@@ -1188,20 +1260,36 @@ class SlashCommandHandler:
             self.console.print("[yellow]No active session[/]")
             return
 
-        self.console.print(
-            Panel(
-                f"[bold]Provider:[/] {self.agent.provider.__class__.__name__}\n"
-                f"[bold]Model:[/] {self.agent.model}\n"
-                f"[bold]Temperature:[/] {self.agent.temperature}\n"
-                f"[bold]Max Tokens:[/] {self.agent.max_tokens}\n"
-                f"[bold]Tool Budget:[/] {self.agent.tool_calls_used}/{self.agent.tool_budget}\n"
-                f"[bold]Messages:[/] {len(self.agent.messages)}\n"
-                f"[bold]Thinking Mode:[/] {'enabled' if self.agent.thinking else 'disabled'}\n"
-                f"[bold]Project Context:[/] {'loaded' if self.agent.project_context.content else 'none'}",
-                title="Session Status",
-                border_style="blue",
-            )
+        # Build base status content
+        content = (
+            f"[bold]Provider:[/] {self.agent.provider.__class__.__name__}\n"
+            f"[bold]Model:[/] {self.agent.model}\n"
+            f"[bold]Temperature:[/] {self.agent.temperature}\n"
+            f"[bold]Max Tokens:[/] {self.agent.max_tokens}\n"
+            f"[bold]Tool Budget:[/] {self.agent.tool_calls_used}/{self.agent.tool_budget}\n"
+            f"[bold]Messages:[/] {len(self.agent.messages)}\n"
+            f"[bold]Thinking Mode:[/] {'enabled' if self.agent.thinking else 'disabled'}\n"
+            f"[bold]Project Context:[/] {'loaded' if self.agent.project_context.content else 'none'}"
         )
+
+        # Add RL recommendation if available
+        try:
+            from victor.agent.rl_model_selector import get_model_selector
+
+            selector = get_model_selector()
+            if selector:
+                rec = selector.recommend()
+                if rec and rec.confidence > 0.3:
+                    current_provider = self.agent.provider.__class__.__name__.lower()
+                    if rec.provider != current_provider:
+                        content += f"\n\n[dim]RL Suggestion: Consider [cyan]{rec.provider}[/] "
+                        content += f"(Q={rec.q_value:.2f}, {rec.reason})[/]"
+                    else:
+                        content += f"\n\n[dim]RL: Using optimal provider (Q={rec.q_value:.2f})[/]"
+        except Exception:
+            pass
+
+        self.console.print(Panel(content, title="Session Status", border_style="blue"))
 
     def _cmd_config(self, args: List[str]) -> None:
         """Show current configuration."""
@@ -2052,6 +2140,30 @@ Provide a 2-3 sentence summary:"""
                 content += f"  [cyan]{provider}[/]: {get_attr(stats, 'requests')} requests, "
                 content += f"{get_attr(stats, 'avg_tokens_per_second'):.1f} tok/s avg\n"
 
+        # Add RL model selection stats
+        try:
+            from victor.agent.rl_model_selector import get_model_selector
+
+            selector = get_model_selector()
+            if selector:
+                stats = selector.get_stats()
+                rankings = selector.get_provider_rankings()
+
+                content += "\n[bold]RL Model Selection:[/]\n"
+                content += f"  Strategy: {stats.get('strategy', 'epsilon_greedy')}\n"
+                content += f"  Epsilon:  {stats.get('epsilon', 0):.2f} (exploration rate)\n"
+                content += f"  Sessions: {stats.get('total_sessions', 0)}\n"
+
+                if rankings:
+                    content += "\n[bold]Provider Q-Value Rankings:[/]\n"
+                    for i, (provider, q_val) in enumerate(rankings[:5], 1):
+                        bar = "*" * int(q_val * 20)
+                        content += f"  {i}. {provider}: {q_val:.3f} {bar}\n"
+
+                content += "\n[dim]Use /learning for detailed RL stats and control[/]"
+        except Exception:
+            pass  # RL module not available
+
         content += "\n[dim]Use /metrics history for detailed request history[/]"
         content += "\n[dim]Use /metrics --json or --csv to export data[/]"
 
@@ -2224,6 +2336,105 @@ Provide a 2-3 sentence summary:"""
         content += "\n[dim]Use /serialization clear to reset metrics[/]"
 
         self.console.print(Panel(content, title="Serialization Statistics", border_style="green"))
+
+    def _cmd_learning(self, args: List[str]) -> None:
+        """Show Q-learning stats, adjust exploration rate, or reset session.
+
+        Subcommands:
+            stats   - Show Q-learning statistics (default)
+            explore <rate> - Set exploration rate (0.0-1.0)
+            reset   - Reset Q-learning session
+        """
+        if not self.agent:
+            self.console.print("[yellow]No active session[/]")
+            return
+
+        # Access intelligent integration through orchestrator
+        integration = getattr(self.agent, "intelligent_integration", None)
+        if not integration:
+            self.console.print(
+                Panel(
+                    "[yellow]Intelligent pipeline not enabled[/]\n\n"
+                    "[dim]Enable with intelligent_pipeline_enabled=true in settings[/]",
+                    title="Q-Learning",
+                    border_style="yellow",
+                )
+            )
+            return
+
+        pipeline = getattr(integration, "_pipeline", None)
+        if not pipeline:
+            self.console.print("[yellow]Pipeline not initialized yet[/]")
+            return
+
+        mode_controller = getattr(pipeline, "_mode_controller", None)
+
+        subcommand = args[0].lower() if args else "stats"
+
+        if subcommand == "explore":
+            # Set exploration rate
+            if len(args) < 2:
+                self.console.print("[yellow]Usage: /learning explore <rate>[/]")
+                self.console.print("[dim]Example: /learning explore 0.2[/]")
+                return
+
+            try:
+                rate = float(args[1])
+                if not 0.0 <= rate <= 1.0:
+                    self.console.print("[red]Rate must be between 0.0 and 1.0[/]")
+                    return
+
+                if mode_controller:
+                    mode_controller.adjust_exploration_rate(rate)
+                    self.console.print(f"[green]Exploration rate set to:[/] {rate:.2f}")
+                else:
+                    self.console.print("[yellow]Mode controller not available[/]")
+            except ValueError:
+                self.console.print(f"[red]Invalid rate:[/] {args[1]}")
+            return
+
+        if subcommand == "reset":
+            # Reset Q-learning session
+            pipeline.reset_session()
+            self.console.print("[green]Q-learning session reset[/]")
+            return
+
+        # Default: show stats
+        stats = pipeline.get_stats()
+
+        content = "[bold]Q-Learning Pipeline Statistics[/]\n\n"
+
+        # Session info
+        content += f"[bold]Session Duration:[/] {stats.session_duration:.1f}s\n"
+        content += f"[bold]Total Requests:[/] {stats.total_requests}\n"
+        content += f"[bold]Enhanced Requests:[/] {stats.enhanced_requests}\n"
+        content += f"[bold]Quality Validations:[/] {stats.quality_validations}\n\n"
+
+        # Quality metrics
+        if stats.avg_quality_score > 0:
+            content += "[bold]Quality Metrics:[/]\n"
+            content += f"  Avg Quality Score: {stats.avg_quality_score:.2f}\n"
+            content += f"  Avg Grounding Score: {stats.avg_grounding_score:.2f}\n\n"
+
+        # Mode controller session stats
+        if mode_controller:
+            session_stats = mode_controller.get_session_stats()
+            content += "[bold]Mode Learning:[/]\n"
+            content += f"  Profile: {session_stats.get('profile_name', 'unknown')}\n"
+            content += f"  Total Reward: {session_stats.get('total_reward', 0):.2f}\n"
+            content += f"  Mode Transitions: {session_stats.get('mode_transitions', 0)}\n"
+            content += (
+                f"  Exploration Rate (epsilon): {session_stats.get('exploration_rate', 0):.2f}\n"
+            )
+
+            modes_visited = session_stats.get("modes_visited", [])
+            if modes_visited:
+                content += f"  Modes Visited: {' -> '.join(modes_visited)}\n"
+
+        content += "\n[dim]Use /learning explore <rate> to adjust exploration[/]"
+        content += "\n[dim]Use /learning reset to reset session[/]"
+
+        self.console.print(Panel(content, title="Q-Learning Stats", border_style="magenta"))
 
     def _cmd_approvals(self, args: List[str]) -> None:
         """Configure what actions require user approval."""
@@ -2898,3 +3109,309 @@ Please think through this carefully and provide a detailed plan:"""
         except Exception as e:
             self.console.print(f"[red]Reindex failed:[/] {e}")
             logger.exception("Error during reindex")
+
+    def _cmd_mlstats(self, args: List[str]) -> None:
+        """Show ML-friendly aggregated session statistics for RL training.
+
+        Usage:
+            /mlstats              - Show summary of all ML statistics
+            /mlstats providers    - Stats aggregated by provider
+            /mlstats families     - Stats aggregated by model family
+            /mlstats sizes        - Stats aggregated by model size
+            /mlstats export       - Export RL training data as JSON
+        """
+        if not self.agent:
+            self.console.print("[yellow]No active session[/]")
+            return
+
+        if not hasattr(self.agent, "memory_manager") or not self.agent.memory_manager:
+            self.console.print("[yellow]Conversation memory not enabled[/]")
+            return
+
+        store = self.agent.memory_manager
+        subcommand = args[0].lower() if args else "summary"
+
+        if subcommand == "providers":
+            # Provider-aggregated stats
+            stats = store.get_provider_stats()
+            if not stats:
+                self.console.print("[yellow]No provider statistics available[/]")
+                return
+
+            table = Table(title="Provider Statistics (ML Aggregation)", show_header=True)
+            table.add_column("Provider", style="cyan")
+            table.add_column("Sessions", justify="right")
+            table.add_column("Messages", justify="right")
+            table.add_column("Avg Msgs/Session", justify="right")
+            table.add_column("Tool Capable %", justify="right")
+
+            for row in stats:
+                table.add_row(
+                    row["provider"] or "unknown",
+                    str(row["session_count"]),
+                    str(row["total_messages"]),
+                    f"{row['avg_messages_per_session'] or 0:.1f}",
+                    f"{row['tool_capable_pct'] or 0:.1f}%",
+                )
+
+            self.console.print(table)
+
+        elif subcommand == "families":
+            # Model family aggregated stats
+            stats = store.get_model_family_stats()
+            if not stats:
+                self.console.print("[yellow]No model family statistics available[/]")
+                return
+
+            table = Table(title="Model Family Statistics (ML Aggregation)", show_header=True)
+            table.add_column("Family", style="cyan")
+            table.add_column("Sessions", justify="right")
+            table.add_column("Messages", justify="right")
+            table.add_column("Avg Params (B)", justify="right")
+            table.add_column("Tool %", justify="right")
+            table.add_column("MoE %", justify="right")
+            table.add_column("Reasoning %", justify="right")
+
+            for row in stats:
+                table.add_row(
+                    row["model_family"] or "unknown",
+                    str(row["session_count"]),
+                    str(row["total_messages"]),
+                    f"{row['avg_params_b'] or 0:.1f}",
+                    f"{row['tool_capable_pct'] or 0:.1f}%",
+                    f"{row['moe_pct'] or 0:.1f}%",
+                    f"{row['reasoning_pct'] or 0:.1f}%",
+                )
+
+            self.console.print(table)
+
+        elif subcommand == "sizes":
+            # Model size aggregated stats
+            stats = store.get_model_size_stats()
+            if not stats:
+                self.console.print("[yellow]No model size statistics available[/]")
+                return
+
+            table = Table(title="Model Size Statistics (ML Aggregation)", show_header=True)
+            table.add_column("Size", style="cyan")
+            table.add_column("Sessions", justify="right")
+            table.add_column("Messages", justify="right")
+            table.add_column("Avg Context Tokens", justify="right")
+            table.add_column("Tool Capable %", justify="right")
+
+            for row in stats:
+                table.add_row(
+                    row["model_size"] or "unknown",
+                    str(row["session_count"]),
+                    str(row["total_messages"]),
+                    f"{row['avg_context_tokens'] or 0:.0f}",
+                    f"{row['tool_capable_pct'] or 0:.1f}%",
+                )
+
+            self.console.print(table)
+
+        elif subcommand == "export":
+            # Export RL training data as JSON
+            import json
+            from pathlib import Path
+
+            rl_data = store.get_rl_training_data()
+            if not rl_data:
+                self.console.print("[yellow]No RL training data available[/]")
+                return
+
+            export_path = Path.cwd() / "rl_training_data.json"
+            export_path.write_text(json.dumps(rl_data, indent=2, default=str))
+            self.console.print(f"[green]RL training data exported to:[/] {export_path}")
+            self.console.print(f"[dim]{len(rl_data)} sessions exported[/]")
+
+        else:
+            # Summary view - show all stats
+            self.console.print(
+                Panel(
+                    "[bold]ML Statistics Commands[/]\n\n"
+                    "[cyan]/mlstats providers[/]\n"
+                    "  Session stats aggregated by provider (groq, ollama, etc.)\n\n"
+                    "[cyan]/mlstats families[/]\n"
+                    "  Session stats aggregated by model family (llama, qwen, etc.)\n\n"
+                    "[cyan]/mlstats sizes[/]\n"
+                    "  Session stats aggregated by model size (7B, 32B, 70B, etc.)\n\n"
+                    "[cyan]/mlstats export[/]\n"
+                    "  Export session data as JSON for RL training\n\n"
+                    "[dim]These aggregations use INTEGER FK lookups for efficient queries.\n"
+                    "Data is stored in normalized schema optimized for ML/RL training.[/]",
+                    title="ML Statistics",
+                    border_style="blue",
+                )
+            )
+
+            # Show quick summary
+            try:
+                provider_stats = store.get_provider_stats()
+                family_stats = store.get_model_family_stats()
+                total_sessions = (
+                    sum(s["session_count"] for s in provider_stats) if provider_stats else 0
+                )
+                total_providers = len(provider_stats) if provider_stats else 0
+                total_families = len(family_stats) if family_stats else 0
+
+                self.console.print(
+                    f"\n[bold]Quick Summary:[/] {total_sessions} sessions across "
+                    f"{total_providers} providers and {total_families} model families"
+                )
+            except Exception as e:
+                self.console.print(f"[dim]Could not fetch summary: {e}[/]")
+
+    def _cmd_learning(self, args: List[str]) -> None:
+        """Show RL model selector stats and control exploration rate.
+
+        Usage:
+            /learning               - Show Q-learning stats and provider rankings
+            /learning stats         - Show detailed RL selector statistics
+            /learning explore <rate> - Set exploration rate (0.0-1.0)
+            /learning recommend     - Get model recommendation based on Q-values
+            /learning reset         - Reset Q-values to initial state
+            /learning strategy <name> - Set selection strategy (epsilon_greedy|ucb|exploit)
+        """
+        from victor.agent.rl_model_selector import (
+            RLModelSelector,
+            SelectionStrategy,
+            get_model_selector,
+        )
+
+        selector = get_model_selector()
+        subcommand = args[0].lower() if args else "stats"
+
+        if subcommand == "stats":
+            # Show RL statistics
+            stats = selector.get_stats()
+            rankings = selector.get_provider_rankings()
+
+            # Provider rankings table
+            table = Table(title="Provider Q-Value Rankings", show_header=True)
+            table.add_column("Provider", style="cyan")
+            table.add_column("Q-Value", justify="right")
+            table.add_column("Sessions", justify="right")
+            table.add_column("UCB Score", justify="right")
+            table.add_column("Confidence", justify="right")
+
+            for r in rankings[:10]:
+                ucb_str = f"{r.ucb_score:.3f}" if r.ucb_score != float("inf") else "inf"
+                table.add_row(
+                    r.provider,
+                    f"{r.q_value:.3f}",
+                    str(r.session_count),
+                    ucb_str,
+                    f"{r.confidence:.1%}",
+                )
+
+            self.console.print(table)
+
+            # Summary panel
+            self.console.print(
+                Panel(
+                    f"[bold]Strategy:[/] {stats['strategy']}\n"
+                    f"[bold]Epsilon:[/] {stats['epsilon']:.3f}\n"
+                    f"[bold]Total Selections:[/] {stats['total_selections']}\n"
+                    f"[bold]Providers Tracked:[/] {stats['num_providers']}\n"
+                    f"[bold]Learning Rate:[/] {stats['learning_rate']}\n"
+                    f"[bold]UCB-c:[/] {stats['ucb_c']}",
+                    title="RL Model Selector",
+                    border_style="blue",
+                )
+            )
+
+        elif subcommand == "explore":
+            # Set exploration rate
+            if len(args) < 2:
+                self.console.print(f"[bold]Current epsilon:[/] {selector.epsilon:.3f}")
+                self.console.print("[dim]Usage: /learning explore <rate>[/]")
+                return
+
+            try:
+                rate = float(args[1])
+                if not 0.0 <= rate <= 1.0:
+                    self.console.print("[red]Exploration rate must be between 0.0 and 1.0[/]")
+                    return
+
+                old_rate = selector.epsilon
+                selector.epsilon = rate
+                self.console.print(
+                    f"[green]Exploration rate updated:[/] {old_rate:.3f} -> {rate:.3f}"
+                )
+            except ValueError:
+                self.console.print("[red]Invalid rate. Use a number between 0.0 and 1.0[/]")
+
+        elif subcommand == "recommend":
+            # Get model recommendation with optional task_type
+            # Usage: /learning recommend [task_type]
+            # task_type: simple, complex, action, generation, analysis
+            task_type = args[1] if len(args) > 1 else None
+
+            available = list(selector._q_table.keys()) if selector._q_table else ["ollama"]
+            recommendation = selector.select_provider(available, task_type=task_type)
+
+            task_info = f" for task type '[cyan]{task_type}[/]'" if task_type else ""
+            self.console.print(
+                Panel(
+                    f"[bold]Recommended Provider{task_info}:[/] [cyan]{recommendation.provider}[/]\n"
+                    f"[bold]Q-Value:[/] {recommendation.q_value:.3f}\n"
+                    f"[bold]Confidence:[/] {recommendation.confidence:.1%}\n"
+                    f"[bold]Reason:[/] {recommendation.reason}\n\n"
+                    f"[bold]Alternatives:[/]\n"
+                    + "\n".join(f"  - {p}: {q:.3f}" for p, q in recommendation.alternatives)
+                    + (
+                        "\n\n[dim]Task types: simple, complex, action, generation, analysis[/]"
+                        if not task_type
+                        else ""
+                    ),
+                    title="Model Recommendation",
+                    border_style="green",
+                )
+            )
+
+        elif subcommand == "reset":
+            # Reset Q-values
+            selector.reset()
+            self.console.print("[green]RL model selector reset to initial state[/]")
+
+        elif subcommand == "strategy":
+            # Set selection strategy
+            if len(args) < 2:
+                self.console.print(f"[bold]Current strategy:[/] {selector.strategy.value}")
+                self.console.print("[dim]Available: epsilon_greedy, ucb, exploit, thompson[/]")
+                return
+
+            strategy_name = args[1].lower()
+            try:
+                strategy = SelectionStrategy(strategy_name)
+                selector.strategy = strategy
+                self.console.print(f"[green]Strategy set to:[/] {strategy.value}")
+            except ValueError:
+                self.console.print(
+                    f"[red]Unknown strategy:[/] {strategy_name}\n"
+                    "[dim]Available: epsilon_greedy, ucb, exploit, thompson[/]"
+                )
+
+        else:
+            # Show help
+            self.console.print(
+                Panel(
+                    "[bold]RL Model Selector Commands[/]\n\n"
+                    "[cyan]/learning stats[/]\n"
+                    "  Show Q-value rankings and selector statistics\n\n"
+                    "[cyan]/learning explore <rate>[/]\n"
+                    "  Set exploration rate (0.0-1.0, default 0.3)\n\n"
+                    "[cyan]/learning recommend [task_type][/]\n"
+                    "  Get model recommendation (task_type: simple, complex, action, generation, analysis)\n\n"
+                    "[cyan]/learning strategy <name>[/]\n"
+                    "  Set strategy: epsilon_greedy, ucb, exploit\n\n"
+                    "[cyan]/learning reset[/]\n"
+                    "  Reset Q-values to initial state\n\n"
+                    "[dim]The RL selector learns from session performance to optimize\n"
+                    "model selection. Q-values are computed from ConversationStore\n"
+                    "normalized aggregation data.[/]",
+                    title="RL Learning Commands",
+                    border_style="blue",
+                )
+            )

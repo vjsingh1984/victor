@@ -14,6 +14,9 @@ export interface FileChange {
     newContent: string;
     changeType: 'create' | 'modify' | 'delete';
     description?: string;
+    linesAdded?: number;
+    linesRemoved?: number;
+    selected?: boolean;  // For selective application
 }
 
 export interface DiffSession {
@@ -21,6 +24,7 @@ export interface DiffSession {
     changes: FileChange[];
     timestamp: Date;
     description: string;
+    isDryRun?: boolean;
 }
 
 /**
@@ -95,6 +99,390 @@ export class DiffViewProvider {
             title,
             { preview: true }
         );
+    }
+
+    /**
+     * Show multi-file diff preview panel with selective application
+     */
+    async showMultiFileDiffPanel(sessionId: string, context: vscode.ExtensionContext): Promise<void> {
+        const session = this._pendingSessions.get(sessionId);
+        if (!session) {
+            vscode.window.showErrorMessage('Session not found');
+            return;
+        }
+
+        // Create webview panel
+        const panel = vscode.window.createWebviewPanel(
+            'victorDiffPreview',
+            `Review Changes: ${session.description}`,
+            vscode.ViewColumn.One,
+            { enableScripts: true }
+        );
+
+        // Calculate line stats for each change
+        for (const change of session.changes) {
+            if (change.originalContent && change.newContent) {
+                const origLines = change.originalContent.split('\n').length;
+                const newLines = change.newContent.split('\n').length;
+                change.linesAdded = Math.max(0, newLines - origLines);
+                change.linesRemoved = Math.max(0, origLines - newLines);
+            } else if (change.changeType === 'create') {
+                change.linesAdded = change.newContent.split('\n').length;
+                change.linesRemoved = 0;
+            } else if (change.changeType === 'delete') {
+                change.linesAdded = 0;
+                change.linesRemoved = change.originalContent.split('\n').length;
+            }
+            change.selected = true; // Default selected
+        }
+
+        panel.webview.html = this._getMultiFileDiffHtml(session);
+
+        // Handle messages from webview
+        panel.webview.onDidReceiveMessage(async (message) => {
+            switch (message.type) {
+                case 'toggleFile':
+                    const change = session.changes.find(c => c.filePath === message.filePath);
+                    if (change) {
+                        change.selected = message.selected;
+                    }
+                    break;
+
+                case 'toggleAll':
+                    session.changes.forEach(c => c.selected = message.selected);
+                    break;
+
+                case 'showFileDiff':
+                    const fileChange = session.changes.find(c => c.filePath === message.filePath);
+                    if (fileChange) {
+                        await this.showDiff(fileChange);
+                    }
+                    break;
+
+                case 'applySelected':
+                    const selectedChanges = session.changes.filter(c => c.selected);
+                    if (selectedChanges.length === 0) {
+                        vscode.window.showWarningMessage('No files selected');
+                        return;
+                    }
+
+                    const confirm = await vscode.window.showWarningMessage(
+                        `Apply ${selectedChanges.length} selected change(s)?`,
+                        { modal: true },
+                        'Apply',
+                        'Cancel'
+                    );
+
+                    if (confirm === 'Apply') {
+                        let successCount = 0;
+                        for (const change of selectedChanges) {
+                            if (await this.applyChange(change)) {
+                                successCount++;
+                            }
+                        }
+                        vscode.window.showInformationMessage(`Applied ${successCount}/${selectedChanges.length} changes`);
+
+                        // Remove applied changes from session
+                        session.changes = session.changes.filter(c => !c.selected);
+                        if (session.changes.length === 0) {
+                            this._pendingSessions.delete(sessionId);
+                            panel.dispose();
+                        } else {
+                            panel.webview.html = this._getMultiFileDiffHtml(session);
+                        }
+                        this._updateStatusBar();
+                    }
+                    break;
+
+                case 'rejectAll':
+                    this.rejectSession(sessionId);
+                    panel.dispose();
+                    break;
+            }
+        });
+    }
+
+    private _getMultiFileDiffHtml(session: DiffSession): string {
+        const totalAdded = session.changes.reduce((sum, c) => sum + (c.linesAdded || 0), 0);
+        const totalRemoved = session.changes.reduce((sum, c) => sum + (c.linesRemoved || 0), 0);
+        const selectedCount = session.changes.filter(c => c.selected).length;
+
+        const fileRows = session.changes.map(change => {
+            const icon = this._getChangeIcon(change.changeType);
+            const stats = change.changeType === 'delete'
+                ? `<span class="stat removed">-${change.linesRemoved || 0}</span>`
+                : change.changeType === 'create'
+                    ? `<span class="stat added">+${change.linesAdded || 0}</span>`
+                    : `<span class="stat added">+${change.linesAdded || 0}</span> <span class="stat removed">-${change.linesRemoved || 0}</span>`;
+
+            return `
+                <tr class="file-row ${change.changeType}">
+                    <td class="checkbox-cell">
+                        <input type="checkbox" ${change.selected ? 'checked' : ''} onchange="toggleFile('${change.filePath}', this.checked)">
+                    </td>
+                    <td class="file-cell" onclick="showFileDiff('${change.filePath}')">
+                        <span class="icon">${icon}</span>
+                        <span class="filename">${path.basename(change.filePath)}</span>
+                        <span class="filepath">${path.dirname(change.filePath)}</span>
+                    </td>
+                    <td class="stats-cell">${stats}</td>
+                    <td class="action-cell">
+                        <button onclick="showFileDiff('${change.filePath}')" title="View diff">View</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Changes</title>
+    <style>
+        body {
+            font-family: var(--vscode-font-family);
+            font-size: var(--vscode-font-size);
+            color: var(--vscode-foreground);
+            background: var(--vscode-editor-background);
+            padding: 20px;
+            margin: 0;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+
+        .title {
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+
+        .summary {
+            display: flex;
+            gap: 20px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .summary-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .stat.added {
+            background: var(--vscode-gitDecoration-addedResourceForeground);
+            color: #000;
+        }
+
+        .stat.removed {
+            background: var(--vscode-gitDecoration-deletedResourceForeground);
+            color: #fff;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .controls label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 8px;
+            background: var(--vscode-editor-inactiveSelectionBackground);
+            font-weight: 500;
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+
+        .file-row {
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+
+        .file-row:hover {
+            background: var(--vscode-list-hoverBackground);
+        }
+
+        .file-row.create {
+            background: rgba(0, 200, 83, 0.1);
+        }
+
+        .file-row.delete {
+            background: rgba(255, 82, 82, 0.1);
+        }
+
+        td {
+            padding: 10px 8px;
+            vertical-align: middle;
+        }
+
+        .checkbox-cell {
+            width: 30px;
+            text-align: center;
+        }
+
+        .file-cell {
+            cursor: pointer;
+        }
+
+        .file-cell:hover .filename {
+            text-decoration: underline;
+        }
+
+        .icon {
+            margin-right: 8px;
+        }
+
+        .filename {
+            font-weight: 500;
+        }
+
+        .filepath {
+            color: var(--vscode-descriptionForeground);
+            margin-left: 8px;
+            font-size: 0.9em;
+        }
+
+        .stats-cell {
+            width: 120px;
+            text-align: center;
+        }
+
+        .action-cell {
+            width: 80px;
+        }
+
+        button {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        button:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
+
+        button.secondary {
+            background: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+        }
+
+        button.danger {
+            background: var(--vscode-inputValidation-errorBackground);
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid var(--vscode-panel-border);
+        }
+
+        .actions button {
+            padding: 8px 16px;
+        }
+
+        .spacer {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">${session.description}</div>
+        <div class="summary">
+            <div class="summary-item">
+                <span>${session.changes.length} files</span>
+            </div>
+            <div class="summary-item">
+                <span class="stat added">+${totalAdded}</span>
+            </div>
+            <div class="summary-item">
+                <span class="stat removed">-${totalRemoved}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <label>
+            <input type="checkbox" ${selectedCount === session.changes.length ? 'checked' : ''} onchange="toggleAll(this.checked)">
+            Select All (${selectedCount}/${session.changes.length})
+        </label>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th></th>
+                <th>File</th>
+                <th>Changes</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${fileRows}
+        </tbody>
+    </table>
+
+    <div class="actions">
+        <button onclick="applySelected()">Apply Selected (${selectedCount})</button>
+        <div class="spacer"></div>
+        <button class="secondary danger" onclick="rejectAll()">Discard All</button>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+
+        function toggleFile(filePath, selected) {
+            vscode.postMessage({ type: 'toggleFile', filePath, selected });
+        }
+
+        function toggleAll(selected) {
+            vscode.postMessage({ type: 'toggleAll', selected });
+        }
+
+        function showFileDiff(filePath) {
+            vscode.postMessage({ type: 'showFileDiff', filePath });
+        }
+
+        function applySelected() {
+            vscode.postMessage({ type: 'applySelected' });
+        }
+
+        function rejectAll() {
+            vscode.postMessage({ type: 'rejectAll' });
+        }
+    </script>
+</body>
+</html>`;
     }
 
     /**
@@ -373,10 +761,41 @@ export function registerDiffCommands(
     context: vscode.ExtensionContext,
     diffProvider: DiffViewProvider
 ): void {
-    // Show pending changes
+    // Show pending changes (quick pick)
     context.subscriptions.push(
         vscode.commands.registerCommand('victor.showPendingChanges', () => {
             diffProvider.showPendingChanges();
+        })
+    );
+
+    // Review changes in panel (multi-file preview)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('victor.reviewChanges', async () => {
+            const sessions = diffProvider.getPendingSessions();
+            if (sessions.length === 0) {
+                vscode.window.showInformationMessage('No pending changes to review');
+                return;
+            }
+
+            // Show the most recent session or let user pick
+            if (sessions.length === 1) {
+                await diffProvider.showMultiFileDiffPanel(sessions[0].id, context);
+            } else {
+                const items = sessions.map(s => ({
+                    label: s.description,
+                    description: `${s.changes.length} file(s)`,
+                    detail: s.timestamp.toLocaleString(),
+                    sessionId: s.id,
+                }));
+
+                const selected = await vscode.window.showQuickPick(items, {
+                    placeHolder: 'Select a change set to review',
+                });
+
+                if (selected) {
+                    await diffProvider.showMultiFileDiffPanel(selected.sessionId, context);
+                }
+            }
         })
     );
 

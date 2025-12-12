@@ -38,7 +38,9 @@ class TestEditBasicOperations:
         test_file.write_text("hello world")
 
         # Pass ops as JSON string (common from LLM output)
-        ops_json = f'[{{"type": "replace", "path": "{test_file}", "old_str": "hello", "new_str": "hi"}}]'
+        ops_json = (
+            f'[{{"type": "replace", "path": "{test_file}", "old_str": "hello", "new_str": "hi"}}]'
+        )
         result = await edit(ops=ops_json)
 
         assert result["success"] is True
@@ -159,9 +161,7 @@ class TestEditModifyOperation:
         test_file = tmp_path / "test.txt"
         test_file.write_text("original")
 
-        result = await edit(
-            ops=[{"type": "modify", "path": str(test_file), "new_content": "new"}]
-        )
+        result = await edit(ops=[{"type": "modify", "path": str(test_file), "new_content": "new"}])
 
         assert result["success"] is True
         assert test_file.read_text() == "new"
@@ -247,9 +247,7 @@ class TestEditReplaceOperation:
         test_file = tmp_path / "test.txt"
         test_file.write_text("content")
 
-        result = await edit(
-            ops=[{"type": "replace", "path": str(test_file), "new_str": "new"}]
-        )
+        result = await edit(ops=[{"type": "replace", "path": str(test_file), "new_str": "new"}])
 
         assert result["success"] is False
         assert "missing required field: old_str" in result["error"]
@@ -260,9 +258,7 @@ class TestEditReplaceOperation:
         test_file = tmp_path / "test.txt"
         test_file.write_text("content")
 
-        result = await edit(
-            ops=[{"type": "replace", "path": str(test_file), "old_str": "old"}]
-        )
+        result = await edit(ops=[{"type": "replace", "path": str(test_file), "old_str": "old"}])
 
         assert result["success"] is False
         assert "missing required field: new_str" in result["error"]
@@ -466,17 +462,13 @@ class TestEditErrorHandling:
         test_file = tmp_path / "test.txt"
         test_file.write_text("content")
 
-        with patch(
-            "victor.tools.file_editor_tool.FileEditor"
-        ) as mock_editor_class:
+        with patch("victor.tools.file_editor_tool.FileEditor") as mock_editor_class:
             mock_editor = MagicMock()
             mock_editor.start_transaction.return_value = "txn123"
             mock_editor.add_modify.side_effect = Exception("Queue failed")
             mock_editor_class.return_value = mock_editor
 
-            result = await edit(
-                ops=[{"type": "modify", "path": str(test_file), "content": "new"}]
-            )
+            result = await edit(ops=[{"type": "modify", "path": str(test_file), "content": "new"}])
 
             assert result["success"] is False
             assert "Failed to queue operations" in result["error"]

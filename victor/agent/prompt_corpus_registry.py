@@ -32,13 +32,18 @@ Features:
 import hashlib
 import logging
 import pickle
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
-import numpy as np
+if TYPE_CHECKING:
+    import numpy as np
+else:
+    try:
+        import numpy as np
+    except ImportError:
+        np = None
 
 logger = logging.getLogger(__name__)
 
@@ -597,39 +602,10 @@ FULL_CORPUS: List[CorpusEntry] = _build_extended_corpus()
 # PROMPT BUILDERS - Category-specific prompt builders
 # =============================================================================
 
-
-class BasePromptBuilder(ABC):
-    """Base class for category-specific prompt builders."""
-
-    @property
-    @abstractmethod
-    def category(self) -> PromptCategory:
-        """Return the category this builder handles."""
-        pass
-
-    @abstractmethod
-    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
-        """Build an enriched prompt for the given user input.
-
-        Args:
-            user_prompt: The original user prompt
-            match: The corpus match result
-
-        Returns:
-            EnrichedPrompt with system and user prompts
-        """
-        pass
-
-
-class FunctionCompletionBuilder(BasePromptBuilder):
-    """Builder for function completion prompts (HumanEval-style)."""
-
-    @property
-    def category(self) -> PromptCategory:
-        return PromptCategory.FUNCTION_COMPLETION
-
-    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
-        system_prompt = """You are an expert programmer completing Python functions.
+# Simplified builder system using a mapping approach
+PROMPT_TEMPLATES: Dict[PromptCategory, Dict[str, Any]] = {
+    PromptCategory.FUNCTION_COMPLETION: {
+        "system": """You are an expert programmer completing Python functions.
 
 TASK: Complete the function implementation based on the signature and docstring.
 
@@ -643,25 +619,11 @@ RULES:
 OUTPUT FORMAT:
 - Return ONLY the Python code for the function.
 - Include proper indentation.
-- Do not wrap in markdown code blocks unless explicitly asked."""
-
-        return EnrichedPrompt(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            category=self.category,
-            hints=["complete_function", "no_exploration_needed"],
-        )
-
-
-class AlgorithmImplementationBuilder(BasePromptBuilder):
-    """Builder for algorithm implementation prompts."""
-
-    @property
-    def category(self) -> PromptCategory:
-        return PromptCategory.ALGORITHM_IMPLEMENTATION
-
-    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
-        system_prompt = """You are an algorithm expert implementing efficient solutions.
+- Do not wrap in markdown code blocks unless explicitly asked.""",
+        "hints": ["complete_function", "no_exploration_needed"]
+    },
+    PromptCategory.ALGORITHM_IMPLEMENTATION: {
+        "system": """You are an algorithm expert implementing efficient solutions.
 
 TASK: Implement the requested algorithm in Python.
 
@@ -674,25 +636,11 @@ APPROACH:
 OUTPUT FORMAT:
 - Return the complete Python function implementation.
 - Include type hints for parameters and return type.
-- Add a brief complexity comment (# O(n) time, O(1) space)."""
-
-        return EnrichedPrompt(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            category=self.category,
-            hints=["algorithm", "complexity_aware"],
-        )
-
-
-class DataStructureBuilder(BasePromptBuilder):
-    """Builder for data structure operation prompts."""
-
-    @property
-    def category(self) -> PromptCategory:
-        return PromptCategory.DATA_STRUCTURE
-
-    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
-        system_prompt = """You are a data structure specialist.
+- Add a brief complexity comment (# O(n) time, O(1) space).""",
+        "hints": ["algorithm", "complexity_aware"]
+    },
+    PromptCategory.DATA_STRUCTURE: {
+        "system": """You are a data structure specialist.
 
 TASK: Implement the requested data structure operation.
 
@@ -705,25 +653,11 @@ GUIDELINES:
 OUTPUT FORMAT:
 - Return the complete function implementation.
 - Use clear parameter names that indicate expected types.
-- Include handling for edge cases."""
-
-        return EnrichedPrompt(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            category=self.category,
-            hints=["data_structure", "edge_cases"],
-        )
-
-
-class StringManipulationBuilder(BasePromptBuilder):
-    """Builder for string manipulation prompts."""
-
-    @property
-    def category(self) -> PromptCategory:
-        return PromptCategory.STRING_MANIPULATION
-
-    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
-        system_prompt = """You are a string processing expert.
+- Include handling for edge cases.""",
+        "hints": ["data_structure", "edge_cases"]
+    },
+    PromptCategory.STRING_MANIPULATION: {
+        "system": """You are a string processing expert.
 
 TASK: Implement the requested string manipulation.
 
@@ -736,25 +670,11 @@ GUIDELINES:
 OUTPUT FORMAT:
 - Return the complete function implementation.
 - Handle edge cases (empty string, single character, etc.).
-- Use efficient string operations (avoid += in loops)."""
-
-        return EnrichedPrompt(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            category=self.category,
-            hints=["string_ops", "unicode_aware"],
-        )
-
-
-class MathematicalBuilder(BasePromptBuilder):
-    """Builder for mathematical computation prompts."""
-
-    @property
-    def category(self) -> PromptCategory:
-        return PromptCategory.MATHEMATICAL
-
-    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
-        system_prompt = """You are a mathematical computing expert.
+- Use efficient string operations (avoid += in loops).""",
+        "hints": ["string_ops", "unicode_aware"]
+    },
+    PromptCategory.MATHEMATICAL: {
+        "system": """You are a mathematical computing expert.
 
 TASK: Implement the requested mathematical operation.
 
@@ -767,25 +687,11 @@ GUIDELINES:
 OUTPUT FORMAT:
 - Return the complete function implementation.
 - Include type hints (int, float, List[int], etc.).
-- Handle division by zero and other mathematical edge cases."""
-
-        return EnrichedPrompt(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            category=self.category,
-            hints=["numerical", "precision_aware"],
-        )
-
-
-class FileIOBuilder(BasePromptBuilder):
-    """Builder for file I/O operation prompts."""
-
-    @property
-    def category(self) -> PromptCategory:
-        return PromptCategory.FILE_IO
-
-    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
-        system_prompt = """You are a file handling expert.
+- Handle division by zero and other mathematical edge cases.""",
+        "hints": ["numerical", "precision_aware"]
+    },
+    PromptCategory.FILE_IO: {
+        "system": """You are a file handling expert.
 
 TASK: Implement the requested file I/O operation.
 
@@ -798,25 +704,11 @@ GUIDELINES:
 OUTPUT FORMAT:
 - Return the complete function implementation.
 - Include proper error handling with try/except.
-- Close resources properly (or use context managers)."""
-
-        return EnrichedPrompt(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            category=self.category,
-            hints=["file_io", "resource_management"],
-        )
-
-
-class CodeDebuggingBuilder(BasePromptBuilder):
-    """Builder for code debugging prompts."""
-
-    @property
-    def category(self) -> PromptCategory:
-        return PromptCategory.CODE_DEBUGGING
-
-    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
-        system_prompt = """You are a debugging expert.
+- Close resources properly (or use context managers).""",
+        "hints": ["file_io", "resource_management"]
+    },
+    PromptCategory.CODE_DEBUGGING: {
+        "system": """You are a debugging expert.
 
 TASK: Identify and fix the bug in the provided code.
 
@@ -829,25 +721,11 @@ APPROACH:
 OUTPUT FORMAT:
 - First, briefly explain the bug.
 - Then provide the corrected code.
-- Highlight the specific lines that changed."""
-
-        return EnrichedPrompt(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            category=self.category,
-            hints=["debugging", "explanation_needed"],
-        )
-
-
-class CodeExplanationBuilder(BasePromptBuilder):
-    """Builder for code explanation prompts."""
-
-    @property
-    def category(self) -> PromptCategory:
-        return PromptCategory.CODE_EXPLANATION
-
-    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
-        system_prompt = """You are a code explanation expert.
+- Highlight the specific lines that changed.""",
+        "hints": ["debugging", "explanation_needed"]
+    },
+    PromptCategory.CODE_EXPLANATION: {
+        "system": """You are a code explanation expert.
 
 TASK: Explain the provided code clearly and thoroughly.
 
@@ -860,25 +738,11 @@ APPROACH:
 OUTPUT FORMAT:
 - Provide a clear, structured explanation.
 - Use examples to illustrate key points.
-- Mention time/space complexity if relevant."""
-
-        return EnrichedPrompt(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            category=self.category,
-            hints=["explanation", "educational"],
-        )
-
-
-class CodeRefactoringBuilder(BasePromptBuilder):
-    """Builder for code refactoring prompts."""
-
-    @property
-    def category(self) -> PromptCategory:
-        return PromptCategory.CODE_REFACTORING
-
-    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
-        system_prompt = """You are a code refactoring expert.
+- Mention time/space complexity if relevant.""",
+        "hints": ["explanation", "educational"]
+    },
+    PromptCategory.CODE_REFACTORING: {
+        "system": """You are a code refactoring expert.
 
 TASK: Refactor the provided code to improve its quality.
 
@@ -891,25 +755,11 @@ PRINCIPLES:
 OUTPUT FORMAT:
 - Provide the refactored code.
 - Briefly explain the improvements made.
-- Ensure tests would still pass (same behavior)."""
-
-        return EnrichedPrompt(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            category=self.category,
-            hints=["refactoring", "preserve_behavior"],
-        )
-
-
-class APIIntegrationBuilder(BasePromptBuilder):
-    """Builder for API/integration prompts."""
-
-    @property
-    def category(self) -> PromptCategory:
-        return PromptCategory.API_INTEGRATION
-
-    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
-        system_prompt = """You are an API integration expert.
+- Ensure tests would still pass (same behavior).""",
+        "hints": ["refactoring", "preserve_behavior"]
+    },
+    PromptCategory.API_INTEGRATION: {
+        "system": """You are an API integration expert.
 
 TASK: Implement the requested API or integration code.
 
@@ -922,25 +772,11 @@ GUIDELINES:
 OUTPUT FORMAT:
 - Provide complete, runnable code.
 - Include error handling for network issues.
-- Use async if the context requires it."""
-
-        return EnrichedPrompt(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            category=self.category,
-            hints=["api", "error_handling"],
-        )
-
-
-class TestingBuilder(BasePromptBuilder):
-    """Builder for testing-related prompts."""
-
-    @property
-    def category(self) -> PromptCategory:
-        return PromptCategory.TESTING
-
-    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
-        system_prompt = """You are a testing expert.
+- Use async if the context requires it.""",
+        "hints": ["api", "error_handling"]
+    },
+    PromptCategory.TESTING: {
+        "system": """You are a testing expert.
 
 TASK: Write tests for the specified code or functionality.
 
@@ -953,25 +789,11 @@ GUIDELINES:
 OUTPUT FORMAT:
 - Provide complete, runnable test code.
 - Include necessary imports.
-- Organize tests logically."""
-
-        return EnrichedPrompt(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            category=self.category,
-            hints=["testing", "pytest"],
-        )
-
-
-class GeneralCodingBuilder(BasePromptBuilder):
-    """Builder for general coding prompts (fallback)."""
-
-    @property
-    def category(self) -> PromptCategory:
-        return PromptCategory.GENERAL_CODING
-
-    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
-        system_prompt = """You are an expert programmer.
+- Organize tests logically.""",
+        "hints": ["testing", "pytest"]
+    },
+    PromptCategory.GENERAL_CODING: {
+        "system": """You are an expert programmer.
 
 TASK: Implement the requested functionality.
 
@@ -984,14 +806,100 @@ GUIDELINES:
 OUTPUT FORMAT:
 - Provide complete, working code.
 - Include necessary imports.
-- Add brief comments for complex logic."""
+- Add brief comments for complex logic.""",
+        "hints": ["general"]
+    }
+}
 
+
+# =============================================================================
+# PROMPT BUILDER CLASSES
+# =============================================================================
+
+
+class PromptBuilder:
+    """Base class for category-specific prompt builders."""
+
+    category: PromptCategory = PromptCategory.GENERAL_CODING
+
+    def build(self, user_prompt: str, match: PromptMatch) -> EnrichedPrompt:
+        """Build an enriched prompt.
+
+        Args:
+            user_prompt: The user's prompt
+            match: The match result from corpus
+
+        Returns:
+            EnrichedPrompt with system and user prompts
+        """
+        template = PROMPT_TEMPLATES.get(self.category, PROMPT_TEMPLATES[PromptCategory.GENERAL_CODING])
         return EnrichedPrompt(
-            system_prompt=system_prompt,
+            system_prompt=template["system"],
             user_prompt=user_prompt,
             category=self.category,
-            hints=["general"],
+            hints=template["hints"],
         )
+
+
+class FunctionCompletionBuilder(PromptBuilder):
+    """Builder for function completion prompts."""
+    category = PromptCategory.FUNCTION_COMPLETION
+
+
+class AlgorithmImplementationBuilder(PromptBuilder):
+    """Builder for algorithm implementation prompts."""
+    category = PromptCategory.ALGORITHM_IMPLEMENTATION
+
+
+class DataStructureBuilder(PromptBuilder):
+    """Builder for data structure prompts."""
+    category = PromptCategory.DATA_STRUCTURE
+
+
+class StringManipulationBuilder(PromptBuilder):
+    """Builder for string manipulation prompts."""
+    category = PromptCategory.STRING_MANIPULATION
+
+
+class MathematicalBuilder(PromptBuilder):
+    """Builder for mathematical prompts."""
+    category = PromptCategory.MATHEMATICAL
+
+
+class FileIOBuilder(PromptBuilder):
+    """Builder for file I/O prompts."""
+    category = PromptCategory.FILE_IO
+
+
+class CodeDebuggingBuilder(PromptBuilder):
+    """Builder for code debugging prompts."""
+    category = PromptCategory.CODE_DEBUGGING
+
+
+class CodeExplanationBuilder(PromptBuilder):
+    """Builder for code explanation prompts."""
+    category = PromptCategory.CODE_EXPLANATION
+
+
+class CodeRefactoringBuilder(PromptBuilder):
+    """Builder for code refactoring prompts."""
+    category = PromptCategory.CODE_REFACTORING
+
+
+class APIIntegrationBuilder(PromptBuilder):
+    """Builder for API integration prompts."""
+    category = PromptCategory.API_INTEGRATION
+
+
+class TestingBuilder(PromptBuilder):
+    """Builder for testing prompts."""
+    category = PromptCategory.TESTING
+
+
+class GeneralCodingBuilder(PromptBuilder):
+    """Builder for general coding prompts."""
+    category = PromptCategory.GENERAL_CODING
+
 
 
 # =============================================================================
@@ -1028,20 +936,17 @@ class PromptCorpusRegistry:
         """
         self._embedding_model = embedding_model
         self._corpus = corpus or FULL_CORPUS.copy()
-        self._corpus_embeddings: Optional[np.ndarray] = None
-        self._builders: Dict[PromptCategory, BasePromptBuilder] = {}
+        self._corpus_embeddings: Optional[Any] = None  # np.ndarray when available
         self._cache_embeddings = cache_embeddings
 
         # Cache directory and file path
         if cache_dir is None:
             try:
                 from victor.config.settings import get_project_paths
-
                 cache_dir = get_project_paths().global_embeddings_dir
             except ImportError:
                 try:
                     from victor.config.secure_paths import get_victor_dir
-
                     cache_dir = get_victor_dir() / "embeddings"
                 except ImportError:
                     cache_dir = Path.home() / ".victor" / "embeddings"
@@ -1052,33 +957,27 @@ class PromptCorpusRegistry:
         # Hash of corpus for change detection
         self._corpus_hash: Optional[str] = None
 
-        # Register default builders
-        self._register_default_builders()
+        # Initialize default builders
+        self._builders: Dict[PromptCategory, PromptBuilder] = {
+            PromptCategory.FUNCTION_COMPLETION: FunctionCompletionBuilder(),
+            PromptCategory.ALGORITHM_IMPLEMENTATION: AlgorithmImplementationBuilder(),
+            PromptCategory.DATA_STRUCTURE: DataStructureBuilder(),
+            PromptCategory.STRING_MANIPULATION: StringManipulationBuilder(),
+            PromptCategory.MATHEMATICAL: MathematicalBuilder(),
+            PromptCategory.FILE_IO: FileIOBuilder(),
+            PromptCategory.CODE_DEBUGGING: CodeDebuggingBuilder(),
+            PromptCategory.CODE_EXPLANATION: CodeExplanationBuilder(),
+            PromptCategory.CODE_REFACTORING: CodeRefactoringBuilder(),
+            PromptCategory.API_INTEGRATION: APIIntegrationBuilder(),
+            PromptCategory.TESTING: TestingBuilder(),
+            PromptCategory.GENERAL_CODING: GeneralCodingBuilder(),
+        }
 
-    def _register_default_builders(self) -> None:
-        """Register the default prompt builders."""
-        builders = [
-            FunctionCompletionBuilder(),
-            AlgorithmImplementationBuilder(),
-            DataStructureBuilder(),
-            StringManipulationBuilder(),
-            MathematicalBuilder(),
-            FileIOBuilder(),
-            CodeDebuggingBuilder(),
-            CodeExplanationBuilder(),
-            CodeRefactoringBuilder(),
-            APIIntegrationBuilder(),
-            TestingBuilder(),
-            GeneralCodingBuilder(),
-        ]
-        for builder in builders:
-            self._builders[builder.category] = builder
-
-    def register_builder(self, builder: BasePromptBuilder) -> None:
-        """Register a custom prompt builder.
+    def register_builder(self, builder: PromptBuilder) -> None:
+        """Register a custom builder for a category.
 
         Args:
-            builder: The prompt builder to register
+            builder: The builder to register
         """
         self._builders[builder.category] = builder
 
@@ -1213,7 +1112,7 @@ class PromptCorpusRegistry:
                 return None
         return self._embedding_model
 
-    def _compute_corpus_embeddings(self) -> Optional[np.ndarray]:
+    def _compute_corpus_embeddings(self) -> Optional[Any]:
         """Compute embeddings for all corpus entries.
 
         Uses hash-based change detection and disk caching for fast startup:
@@ -1224,46 +1123,28 @@ class PromptCorpusRegistry:
         Uses the centralized EmbeddingService for consistent embeddings
         across all Victor components.
         """
-        # Return cached embeddings if already computed
         if self._corpus_embeddings is not None:
             return self._corpus_embeddings
 
-        # Calculate corpus hash for change detection
         corpus_hash = self._calculate_corpus_hash()
 
-        # Try to load from disk cache
         if self._cache_embeddings and self._load_from_cache(corpus_hash):
             logger.info(f"Loaded corpus embeddings from cache for {len(self._corpus)} entries")
             return self._corpus_embeddings
 
-        # Cache miss - compute embeddings
         service = self._get_embedding_service()
         if service is None:
             return None
 
-        logger.info(
-            f"Computing corpus embeddings for {len(self._corpus)} entries "
-            f"(cache miss, model: {service.model_name})"
-        )
-
+        logger.info(f"Computing corpus embeddings for {len(self._corpus)} entries")
         prompts = [entry.prompt for entry in self._corpus]
-
-        # Use sync batch method from EmbeddingService
         self._corpus_embeddings = service.embed_batch_sync(prompts)
         self._corpus_hash = corpus_hash
 
-        # Store embeddings in entries
         for i, entry in enumerate(self._corpus):
             entry.embedding = self._corpus_embeddings[i]
 
-        logger.info(
-            f"Computed corpus embeddings for {len(prompts)} entries "
-            f"using EmbeddingService (dimension={service.dimension})"
-        )
-
-        # Save to disk cache for next startup
         self._save_to_cache(corpus_hash)
-
         return self._corpus_embeddings
 
     def match(self, user_prompt: str) -> PromptMatch:
@@ -1283,32 +1164,15 @@ class PromptCorpusRegistry:
         # Fall back to keyword matching
         return self._keyword_match(user_prompt)
 
-    def _embedding_match(self, user_prompt: str, corpus_embeddings: np.ndarray) -> PromptMatch:
-        """Match using sentence embeddings.
-
-        Uses the centralized EmbeddingService and its cosine_similarity_matrix
-        method for efficient similarity computation.
-
-        Args:
-            user_prompt: The user's prompt
-            corpus_embeddings: Pre-computed corpus embeddings
-
-        Returns:
-            PromptMatch result
-        """
+    def _embedding_match(self, user_prompt: str, corpus_embeddings: Any) -> PromptMatch:
+        """Match using sentence embeddings."""
         service = self._get_embedding_service()
         query_embedding = service.embed_text_sync(user_prompt)
-
-        # Use EmbeddingService's optimized similarity computation
         similarities = service.cosine_similarity_matrix(query_embedding, corpus_embeddings)
-
-        # Find best match
+        
         best_idx = int(np.argmax(similarities))
         best_similarity = float(similarities[best_idx])
         best_entry = self._corpus[best_idx]
-
-        # Convert similarity to confidence (adjust threshold as needed)
-        # similarity of 0.3+ is generally a decent match
         confidence = min(1.0, max(0.0, (best_similarity - 0.2) / 0.6))
 
         return PromptMatch(
@@ -1437,13 +1301,14 @@ class PromptCorpusRegistry:
             EnrichedPrompt with system and user prompts
         """
         match = self.match(user_prompt)
-
-        # Get the appropriate builder
-        builder = self._builders.get(match.category)
-        if builder is None:
-            builder = self._builders[PromptCategory.GENERAL_CODING]
-
-        return builder.build(user_prompt, match)
+        template = PROMPT_TEMPLATES.get(match.category, PROMPT_TEMPLATES[PromptCategory.GENERAL_CODING])
+        
+        return EnrichedPrompt(
+            system_prompt=template["system"],
+            user_prompt=user_prompt,
+            category=match.category,
+            hints=template["hints"],
+        )
 
     def get_category_for_prompt(self, user_prompt: str) -> Tuple[PromptCategory, float]:
         """Get the category for a prompt (convenience method).

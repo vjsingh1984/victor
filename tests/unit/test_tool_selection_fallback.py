@@ -62,7 +62,8 @@ def orchestrator() -> AgentOrchestrator:
     try:
         yield orch
     finally:
-        orch.shutdown()
+        import asyncio
+        asyncio.run(orch.shutdown())
 
 
 def test_prioritize_tools_stage_minimizes_broadcast(orchestrator: AgentOrchestrator) -> None:

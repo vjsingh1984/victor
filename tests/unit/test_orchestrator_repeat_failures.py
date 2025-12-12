@@ -48,7 +48,7 @@ class AlwaysFailTool(BaseTool):
         super().__init__()
         self.attempts = 0
 
-    async def execute(self, context, **kwargs):
+    async def execute(self, _exec_ctx=None, **kwargs):
         self.attempts += 1
         return ToolResult(success=False, output=None, error="boom")
 

@@ -160,7 +160,7 @@ class TaskConfig:
     max_exploration_iterations: int = 8
     force_action_after_target_read: bool = False
     tool_budget: int = 50
-    loop_repeat_threshold: int = 3
+    loop_repeat_threshold: int = 4  # Warning at 3, block at 4
     needs_tools: bool = True
     required_tools: List[str] = field(default_factory=list)
     stage_tools: Dict[str, List[str]] = field(default_factory=dict)
@@ -238,7 +238,7 @@ class UnifiedTaskConfigLoader:
                 "max_exploration_iterations": 10,
                 "force_action_after_target_read": True,
                 "tool_budget": 25,
-                "loop_repeat_threshold": 4,
+                "loop_repeat_threshold": 8,
                 "required_tools": ["edit_files", "read_file"],
                 "stage_tools": {
                     "initial": ["list_directory", "code_search"],
@@ -255,7 +255,7 @@ class UnifiedTaskConfigLoader:
                 "max_exploration_iterations": 10,
                 "force_action_after_target_read": False,
                 "tool_budget": 25,
-                "loop_repeat_threshold": 4,
+                "loop_repeat_threshold": 8,
                 "required_tools": ["write_file"],
                 "stage_tools": {
                     "initial": ["list_directory", "read_file"],
@@ -271,7 +271,7 @@ class UnifiedTaskConfigLoader:
                 "max_exploration_iterations": 10,
                 "force_action_after_target_read": False,
                 "tool_budget": 20,
-                "loop_repeat_threshold": 3,
+                "loop_repeat_threshold": 6,
                 "required_tools": ["write_file"],
                 "stage_tools": {
                     "initial": ["write_file"],
@@ -287,7 +287,7 @@ class UnifiedTaskConfigLoader:
                 "max_exploration_iterations": 10,
                 "force_action_after_target_read": False,
                 "tool_budget": 25,
-                "loop_repeat_threshold": 3,
+                "loop_repeat_threshold": 6,
                 "required_tools": ["code_search", "read_file"],
                 "stage_tools": {
                     "initial": ["list_directory", "code_search"],
@@ -303,7 +303,7 @@ class UnifiedTaskConfigLoader:
                 "max_exploration_iterations": 20,
                 "force_action_after_target_read": False,
                 "tool_budget": 40,
-                "loop_repeat_threshold": 5,
+                "loop_repeat_threshold": 10,
                 "required_tools": ["read_file", "execute_bash"],
                 "stage_tools": {
                     "initial": ["list_directory", "code_search"],
@@ -319,7 +319,7 @@ class UnifiedTaskConfigLoader:
                 "max_exploration_iterations": 10,
                 "force_action_after_target_read": False,
                 "tool_budget": 20,
-                "loop_repeat_threshold": 3,
+                "loop_repeat_threshold": 6,
                 "required_tools": ["web_search", "web_fetch"],
                 "stage_tools": {
                     "initial": ["web_search"],
@@ -338,7 +338,7 @@ class UnifiedTaskConfigLoader:
                 "max_exploration_iterations": 20,
                 "force_action_after_target_read": False,
                 "tool_budget": 40,
-                "loop_repeat_threshold": 5,
+                "loop_repeat_threshold": 10,
                 "needs_tools": True,
                 "required_tools": ["read_file", "list_directory", "code_search"],
                 "stage_tools": {
@@ -355,7 +355,7 @@ class UnifiedTaskConfigLoader:
                 "max_exploration_iterations": 15,
                 "force_action_after_target_read": False,
                 "tool_budget": 35,
-                "loop_repeat_threshold": 4,
+                "loop_repeat_threshold": 8,
                 "required_tools": ["read_file", "list_directory"],
                 "stage_tools": {
                     "initial": ["list_directory", "code_search", "read_file"],
@@ -371,11 +371,11 @@ class UnifiedTaskConfigLoader:
         "model_overrides": {
             "deepseek*": {
                 "exploration_multiplier": 1.5,
-                "continuation_patience": 5,
+                "continuation_patience": 10,
             },
             "qwen*": {
                 "exploration_multiplier": 1.3,
-                "continuation_patience": 4,
+                "continuation_patience": 8,
             },
         },
         "global": {
@@ -450,7 +450,7 @@ class UnifiedTaskConfigLoader:
             max_exploration_iterations=task_data.get("max_exploration_iterations", 8),
             force_action_after_target_read=task_data.get("force_action_after_target_read", False),
             tool_budget=task_data.get("tool_budget", 50),
-            loop_repeat_threshold=task_data.get("loop_repeat_threshold", 3),
+            loop_repeat_threshold=task_data.get("loop_repeat_threshold", 4),  # Warning at 3, block at 4
             needs_tools=task_data.get("needs_tools", True),
             required_tools=task_data.get("required_tools", []),
             stage_tools=task_data.get("stage_tools", {}),
@@ -512,10 +512,14 @@ class UnifiedTaskTracker:
         self._config_loader = UnifiedTaskConfigLoader()
         self._progress = UnifiedTaskProgress()
         self._task_config: Optional[TaskConfig] = None
+        self._sticky_user_budget: bool = False
+        self._allow_budget_override: bool = False
+        self._sticky_user_iterations: bool = False
+        self._allow_iteration_override: bool = False
 
         # Model-specific settings
         self._exploration_multiplier: float = 1.0
-        self._continuation_patience: int = 3
+        self._continuation_patience: int = 10
 
         # Global settings
         global_config = self._config_loader.get_global_config()
@@ -571,7 +575,10 @@ class UnifiedTaskTracker:
         """Set the task type and load corresponding configuration."""
         self._progress.task_type = task_type
         self._task_config = self._config_loader.get_task_config(task_type)
-        self._progress.tool_budget = self._task_config.tool_budget
+
+        # Respect sticky user budget - only update if not user-set
+        if not self._sticky_user_budget:
+            self._progress.tool_budget = self._task_config.tool_budget
 
         logger.info(
             f"UnifiedTaskTracker: task_type={task_type.value}, "
@@ -582,7 +589,7 @@ class UnifiedTaskTracker:
     def set_model_capabilities(
         self,
         exploration_multiplier: float = 1.0,
-        continuation_patience: int = 3,
+        continuation_patience: int = 10,
     ) -> None:
         """Set model-specific exploration settings."""
         self._exploration_multiplier = exploration_multiplier
@@ -597,14 +604,43 @@ class UnifiedTaskTracker:
         """Set target files for the task."""
         self._progress.target_files = files
 
-    def set_tool_budget(self, budget: int) -> None:
+    def set_tool_budget(self, budget: int, user_override: bool = False) -> None:
         """Set the tool budget for this task.
 
         Args:
             budget: Maximum number of tool calls allowed
+            user_override: Mark this budget as sticky (prevents auto-adjustment)
         """
+        if self._sticky_user_budget and not user_override and not self._allow_budget_override:
+            logger.debug("UnifiedTaskTracker: sticky user budget set; skipping auto-adjustment")
+            return
+
+        if user_override:
+            self._allow_budget_override = True
+            self._sticky_user_budget = True
+
         self._progress.tool_budget = budget
         logger.debug(f"UnifiedTaskTracker: tool_budget set to {budget}")
+        self._allow_budget_override = False
+
+    def set_max_iterations(self, iterations: int, user_override: bool = False) -> None:
+        """Set the maximum total iterations allowed.
+
+        Args:
+            iterations: Maximum iterations
+            user_override: Mark this limit as sticky (prevents auto-adjustment)
+        """
+        if self._sticky_user_iterations and not user_override and not self._allow_iteration_override:
+            logger.debug("UnifiedTaskTracker: sticky user max iterations set; skipping auto-adjustment")
+            return
+
+        if user_override:
+            self._allow_iteration_override = True
+            self._sticky_user_iterations = True
+
+        self._max_total_iterations = iterations
+        logger.debug(f"UnifiedTaskTracker: max_total_iterations set to {iterations}")
+        self._allow_iteration_override = False
 
     def set_target_entities(self, entities: Set[str]) -> None:
         """Set target entities (functions, classes) for the task."""
@@ -670,9 +706,23 @@ class UnifiedTaskTracker:
         self._progress.forced_stop = reason
 
     def reset(self) -> None:
-        """Reset all state for a new conversation."""
+        """Reset all state for a new conversation.
+
+        Preserves user-overridden sticky values (budget, max_iterations) to
+        honor explicit user settings across conversation turns.
+        """
+        # Preserve sticky values before reset
+        sticky_budget = self._progress.tool_budget if self._sticky_user_budget else None
+        sticky_max_iter = self._max_total_iterations if self._sticky_user_iterations else None
+
         self._progress = UnifiedTaskProgress()
         self._task_config = None
+
+        # Restore sticky values after reset
+        if sticky_budget is not None:
+            self._progress.tool_budget = sticky_budget
+        if sticky_max_iter is not None:
+            self._max_total_iterations = sticky_max_iter
 
     # =========================================================================
     # Stop Decision
@@ -756,9 +806,15 @@ class UnifiedTaskTracker:
         return StopDecision(should_stop=False, details=details)
 
     def check_loop_warning(self) -> Optional[str]:
-        """Check if approaching loop threshold (warning before hard stop)."""
-        if self._progress.loop_warning_given:
-            return None
+        """Check if approaching loop threshold (warning before hard stop).
+
+        When a signature is warned, it's immediately added to the permanent block list
+        so it will be blocked on any future attempt, even if the model tries other
+        operations in between.
+        """
+        # Initialize permanently blocked set if needed
+        if not hasattr(self._progress, 'permanently_blocked'):
+            self._progress.permanently_blocked = set()
 
         if len(self._progress.signature_history) < 3:
             return None
@@ -771,23 +827,52 @@ class UnifiedTaskTracker:
         if recent:
             sig_counts = Counter(recent)
             for sig, count in sig_counts.items():
+                # Skip if already permanently blocked
+                if sig in self._progress.permanently_blocked:
+                    continue
                 if count == threshold - 1:
                     self._progress.loop_warning_given = True
                     self._progress.warned_signature = sig
+                    # Add to permanent block list IMMEDIATELY when warning is given
+                    # This ensures it stays blocked even if model tries other operations
+                    self._progress.permanently_blocked.add(sig)
                     return f"Approaching loop ({count}/{threshold}): {sig[:80]}"
 
         return None
 
     def is_blocked_after_warning(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
-        """Check if a tool call is blocked due to matching warned signature."""
-        if not self._progress.loop_warning_given or not self._progress.warned_signature:
-            return None
+        """Check if a tool call is blocked due to being in the permanent block list.
+
+        Once a signature is warned (in check_loop_warning), it's permanently blocked
+        for the entire conversation. This prevents the model from cycling between
+        different tools and returning to the blocked operation.
+        """
+        # Initialize permanently blocked set if needed
+        if not hasattr(self._progress, 'permanently_blocked'):
+            self._progress.permanently_blocked = set()
 
         proposed_sig = self._get_signature(tool_name, arguments)
-        if proposed_sig == self._progress.warned_signature:
+
+        # Check if this signature is permanently blocked
+        if proposed_sig in self._progress.permanently_blocked:
             return f"Blocked: same operation after warning ({proposed_sig[:50]})"
 
         return None
+
+    def get_loop_patience_limits(self) -> tuple[int, int]:
+        """Get the patience limits for forced completion after blocked attempts.
+
+        Returns:
+            Tuple of (consecutive_limit, total_limit):
+            - consecutive_limit: Force completion after N consecutive blocked attempts
+            - total_limit: Force completion after N total blocked attempts (across conversation)
+        """
+        threshold = self._get_loop_threshold()
+        # Consecutive: same as threshold (4 by default)
+        # Total: 1.5x threshold (6 by default when threshold is 4)
+        consecutive_limit = threshold
+        total_limit = int(threshold * 1.5)
+        return consecutive_limit, total_limit
 
     # =========================================================================
     # Metrics
@@ -955,15 +1040,20 @@ class UnifiedTaskTracker:
 
         return None
 
-    def check_response_loop(self, content: str, similarity_threshold: float = 0.7) -> bool:
+    def check_response_loop(self, content: str, similarity_threshold: float = 0.9) -> bool:
         """Check if response content is a repeat of the previous response.
 
         This detects when the model keeps responding with similar text but makes
         no tool calls - a different type of loop than tool call loops.
 
+        NOTE: Threshold raised from 0.7 to 0.9 to reduce false positives.
+        When exploring directories, responses like "Let me examine dir1" and
+        "Let me examine dir2" have high word overlap (~80%) but represent progress.
+        A 0.9 threshold catches near-verbatim repeats while allowing variation.
+
         Args:
             content: The current response content to check
-            similarity_threshold: Word overlap ratio to consider as repeated (default 0.7)
+            similarity_threshold: Word overlap ratio to consider as repeated (default 0.9)
 
         Returns:
             True if a response loop is detected, False otherwise
@@ -1047,10 +1137,14 @@ class UnifiedTaskTracker:
         return 8
 
     def _get_loop_threshold(self) -> int:
-        """Get loop repeat threshold from task config."""
+        """Get loop repeat threshold from task config.
+
+        Warning triggers at threshold - 1, block at threshold.
+        Default is 4 (warning at 3, block at 4).
+        """
         if self._task_config:
             return self._task_config.loop_repeat_threshold
-        return 3
+        return 4
 
     def _get_completion_hint(self) -> str:
         """Get appropriate completion hint based on task type."""
@@ -1376,6 +1470,12 @@ class CompatConfig:
 
     @max_total_iterations.setter
     def max_total_iterations(self, value: int) -> None:
+        if (
+            self._tracker._sticky_user_iterations
+            and not self._tracker._allow_iteration_override
+        ):
+            logger.debug("UnifiedTaskTracker: sticky user max iterations set; skipping auto-adjustment")
+            return
         self._tracker._max_total_iterations = value
 
     @property
@@ -1384,6 +1484,12 @@ class CompatConfig:
 
     @tool_budget.setter
     def tool_budget(self, value: int) -> None:
+        if (
+            self._tracker._sticky_user_budget
+            and not self._tracker._allow_budget_override
+        ):
+            logger.debug("UnifiedTaskTracker: sticky user budget set; skipping auto-adjustment")
+            return
         self._tracker._progress.tool_budget = value
 
 

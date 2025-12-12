@@ -21,6 +21,9 @@ Provides language support for:
 - Rust (cargo test, rustfmt, clippy)
 - Go (go test, gofmt, golint)
 - Java (junit, google-java-format, checkstyle)
+- C/C++ (gtest, clang-format, clang-tidy)
+- Config files (JSON, YAML, TOML, INI, HOCON)
+- Additional: Kotlin, C#, Ruby, PHP, Swift, Scala, Bash, SQL, HTML, CSS, Lua, Elixir, Haskell, R, Markdown, XML
 """
 
 from victor.languages.plugins.python import PythonPlugin
@@ -29,12 +32,65 @@ from victor.languages.plugins.typescript import TypeScriptPlugin
 from victor.languages.plugins.rust import RustPlugin
 from victor.languages.plugins.go import GoPlugin
 from victor.languages.plugins.java import JavaPlugin
+from victor.languages.plugins.cpp import CppPlugin
+from victor.languages.plugins.config import (
+    JsonPlugin,
+    YamlPlugin,
+    TomlPlugin,
+    IniPlugin,
+    HoconPlugin,
+)
+from victor.languages.plugins.additional import (
+    CPlugin,
+    KotlinPlugin,
+    CSharpPlugin,
+    RubyPlugin,
+    PhpPlugin,
+    SwiftPlugin,
+    ScalaPlugin,
+    BashPlugin,
+    SqlPlugin,
+    HtmlPlugin,
+    CssPlugin,
+    LuaPlugin,
+    ElixirPlugin,
+    HaskellPlugin,
+    RPlugin,
+    MarkdownPlugin,
+    XmlPlugin,
+)
 
 __all__ = [
+    # Core languages
     "PythonPlugin",
     "JavaScriptPlugin",
     "TypeScriptPlugin",
     "RustPlugin",
     "GoPlugin",
     "JavaPlugin",
+    "CppPlugin",
+    # Config files
+    "JsonPlugin",
+    "YamlPlugin",
+    "TomlPlugin",
+    "IniPlugin",
+    "HoconPlugin",
+    # Additional languages
+    "CPlugin",
+    "KotlinPlugin",
+    "CSharpPlugin",
+    "RubyPlugin",
+    "PhpPlugin",
+    "SwiftPlugin",
+    "ScalaPlugin",
+    "BashPlugin",
+    "SqlPlugin",
+    "HtmlPlugin",
+    "CssPlugin",
+    "LuaPlugin",
+    "ElixirPlugin",
+    "HaskellPlugin",
+    "RPlugin",
+    "MarkdownPlugin",
+    "XmlPlugin",
 ]

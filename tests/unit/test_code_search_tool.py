@@ -266,9 +266,7 @@ class TestSemanticCodeSearch:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("victor.tools.code_search_tool._get_or_build_index") as mock_index:
                 mock_index.side_effect = ImportError("lancedb not installed")
-                result = await search(
-                    "query", path=tmpdir, context={"settings": MagicMock()}
-                )
+                result = await search("query", path=tmpdir, context={"settings": MagicMock()})
                 assert result["success"] is False
                 assert "dependencies" in result["error"].lower()
 
@@ -278,9 +276,7 @@ class TestSemanticCodeSearch:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("victor.tools.code_search_tool._get_or_build_index") as mock_index:
                 mock_index.side_effect = Exception("Some error")
-                result = await search(
-                    "query", path=tmpdir, context={"settings": MagicMock()}
-                )
+                result = await search("query", path=tmpdir, context={"settings": MagicMock()})
                 assert result["success"] is False
 
     @pytest.mark.asyncio
@@ -300,9 +296,7 @@ class TestSemanticCodeSearch:
                 # Set up cache entry
                 _INDEX_CACHE[root_key] = {"indexed_at": 123456}
                 try:
-                    result = await search(
-                        "hello", path=tmpdir, context={"settings": MagicMock()}
-                    )
+                    result = await search("hello", path=tmpdir, context={"settings": MagicMock()})
                     assert result["success"] is True
                     assert result["count"] == 1
                 finally:

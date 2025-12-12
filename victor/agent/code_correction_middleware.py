@@ -56,44 +56,21 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CodeCorrectionConfig:
     """Configuration for code correction middleware."""
-
-    # Enable/disable the middleware
     enabled: bool = True
-
-    # Auto-fix common issues (imports, markdown cleanup)
     auto_fix: bool = True
-
-    # Tools to validate code arguments for
-    code_tools: Set[str] = field(
-        default_factory=lambda: {
-            "code_executor",
-            "execute_code",
-            "run_code",
-            "write_file",
-            "file_editor",
-            "edit_file",
-            "create_file",
-        }
-    )
-
-    # Argument names that contain code
-    code_argument_names: Set[str] = field(
-        default_factory=lambda: {
-            "code",
-            "python_code",
-            "content",
-            "source",
-            "script",
-            "new_content",
-            "file_content",
-        }
-    )
-
-    # Maximum correction iterations per call
     max_iterations: int = 1
-
-    # Collect metrics
     collect_metrics: bool = True
+    
+    # Use frozensets for better performance
+    code_tools: Set[str] = field(default_factory=lambda: frozenset({
+        "code_executor", "execute_code", "run_code", "write_file", 
+        "file_editor", "edit_file", "create_file"
+    }))
+    
+    code_argument_names: Set[str] = field(default_factory=lambda: frozenset({
+        "code", "python_code", "content", "source", "script", 
+        "new_content", "file_content"
+    }))
 
 
 @dataclass
@@ -170,23 +147,11 @@ class CodeCorrectionMiddleware:
             return False
         return tool_name in self.config.code_tools
 
-    def find_code_argument(
-        self,
-        arguments: Dict[str, Any],
-    ) -> Optional[Tuple[str, str]]:
-        """Find the code argument in tool arguments.
-
-        Args:
-            arguments: Tool arguments dictionary
-
-        Returns:
-            Tuple of (argument_name, code_value) or None
-        """
+    def find_code_argument(self, arguments: Dict[str, Any]) -> Optional[Tuple[str, str]]:
+        """Find the code argument in tool arguments."""
         for arg_name in self.config.code_argument_names:
-            if arg_name in arguments:
-                value = arguments[arg_name]
-                if isinstance(value, str) and value.strip():
-                    return (arg_name, value)
+            if (value := arguments.get(arg_name)) and isinstance(value, str) and value.strip():
+                return (arg_name, value)
         return None
 
     def validate_and_fix(
@@ -208,142 +173,69 @@ class CodeCorrectionMiddleware:
         # Find the code argument
         code_arg = self.find_code_argument(arguments)
 
-        if code_arg is None:
-            # No code to validate
+        if not code_arg:
             return CorrectionResult(
-                original_code="",
-                corrected_code="",
-                validation=ValidationResult(
-                    valid=True,
-                    language=Language.UNKNOWN,
-                    syntax_valid=True,
-                    imports_valid=True,
-                    errors=(),
-                    warnings=(),
-                ),
-                was_corrected=False,
+                "", "", 
+                ValidationResult(True, Language.UNKNOWN, True, True, (), ()),
+                False
             )
 
         arg_name, code = code_arg
 
         # Detect language
-        if language_hint:
-            # Use hint to create filename for detection
-            lang = detect_language(code, filename=f"code.{language_hint}")
-        else:
-            # Infer from tool name
-            if tool_name in {"code_executor", "execute_code", "run_code"}:
-                lang = Language.PYTHON
-            else:
-                lang = detect_language(code)
+        lang = (detect_language(code, filename=f"code.{language_hint}") if language_hint
+                else Language.PYTHON if tool_name in {"code_executor", "execute_code", "run_code"}
+                else detect_language(code))
 
         # Validate and fix
         fixed_code, validation = self.corrector.validate_and_fix(code, language=lang)
-
-        # Track metrics
+        
         if self.metrics_collector:
             self.metrics_collector.record_validation(lang, validation)
-
-        was_corrected = fixed_code != code
-
-        # Generate feedback if not valid
-        feedback = None
-        if not validation.valid:
-            feedback = self.corrector.generate_feedback(
-                code=code,
-                validation=validation,
-            )
-
+        
         return CorrectionResult(
-            original_code=code,
-            corrected_code=fixed_code,
-            validation=validation,
-            was_corrected=was_corrected,
-            feedback=feedback,
+            code, fixed_code, validation, fixed_code != code,
+            self.corrector.generate_feedback(code=code, validation=validation) if not validation.valid else None
         )
 
-    def apply_correction(
-        self,
-        arguments: Dict[str, Any],
-        result: CorrectionResult,
-    ) -> Dict[str, Any]:
-        """Apply correction to tool arguments.
-
-        Args:
-            arguments: Original tool arguments
-            result: Correction result
-
-        Returns:
-            Updated arguments with corrected code
-        """
-        if not result.was_corrected:
+    def apply_correction(self, arguments: Dict[str, Any], result: CorrectionResult) -> Dict[str, Any]:
+        """Apply correction to tool arguments."""
+        if not result.was_corrected or not (code_arg := self.find_code_argument(arguments)):
             return arguments
-
-        # Find and update the code argument
-        code_arg = self.find_code_argument(arguments)
-        if code_arg:
-            arg_name, _ = code_arg
-            arguments = dict(arguments)  # Don't mutate original
-            arguments[arg_name] = result.corrected_code
-
-        return arguments
+        
+        updated = arguments.copy()
+        updated[code_arg[0]] = result.corrected_code
+        return updated
 
     def format_validation_error(self, result: CorrectionResult) -> str:
-        """Format validation errors for display.
-
-        Args:
-            result: Correction result
-
-        Returns:
-            Formatted error message
-        """
+        """Format validation errors for display."""
         if result.validation.valid:
             return ""
-
+        
         lines = ["Code validation failed:"]
-
+        
         if not result.validation.syntax_valid:
             lines.append("  - Syntax errors detected")
-
+        
         if not result.validation.imports_valid:
             lines.append("  - Import issues detected")
-            if result.validation.missing_imports:
-                for imp in result.validation.missing_imports[:5]:
-                    lines.append(f"    - Missing: {imp}")
-
-        for error in result.validation.errors[:5]:
-            lines.append(f"  - {error}")
-
+            if hasattr(result.validation, 'missing_imports') and result.validation.missing_imports:
+                lines.extend(f"    - Missing: {imp}" for imp in result.validation.missing_imports[:5])
+        
+        lines.extend(f"  - {error}" for error in result.validation.errors[:5])
+        
         if result.feedback and result.feedback.suggestions:
             lines.append("\nSuggestions:")
-            for suggestion in result.feedback.suggestions[:3]:
-                lines.append(f"  - {suggestion}")
-
+            lines.extend(f"  - {suggestion}" for suggestion in result.feedback.suggestions[:3])
+        
         return "\n".join(lines)
 
-    def get_retry_prompt(
-        self,
-        result: CorrectionResult,
-        original_prompt: Optional[str] = None,
-    ) -> str:
-        """Generate a retry prompt for the LLM.
-
-        Args:
-            result: Correction result with validation info
-            original_prompt: Optional original user prompt
-
-        Returns:
-            Prompt for LLM to retry code generation
-        """
-        if result.feedback is None:
-            return self.format_validation_error(result)
-
-        return self.corrector.build_retry_prompt(
-            original_prompt=original_prompt or "",
-            previous_code=result.original_code,
-            feedback=result.feedback,
-            iteration=1,
-        )
+    def get_retry_prompt(self, result: CorrectionResult, original_prompt: Optional[str] = None) -> str:
+        """Generate a retry prompt for the LLM."""
+        return (self.format_validation_error(result) if not result.feedback
+                else self.corrector.build_retry_prompt(
+                    original_prompt or "", result.original_code, result.feedback, 1
+                ))
 
 
 # Singleton instance for shared use

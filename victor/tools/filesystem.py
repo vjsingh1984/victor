@@ -630,7 +630,7 @@ TEXT_EXTENSIONS = {
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["path", "offset", "limit"],  # Params indicating exploration progress
-    stages=["reading", "initial", "analysis"],  # Conversation stages where relevant
+    stages=["reading", "initial", "analysis", "verification"],  # Conversation stages where relevant
     task_types=["analysis", "search"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
@@ -662,12 +662,19 @@ TEXT_EXTENSIONS = {
         "search for 'def calculate' in utils.py",
         "show first 50 lines of main.py",
     ],
-    mandatory_keywords=["read file", "show file", "explain this code", "what does this"],  # Force inclusion
+    mandatory_keywords=[
+        "read file",
+        "show file",
+        "explain this code",
+        "what does this",
+    ],  # Force inclusion
     priority_hints=[
+        "TRUNCATION: Output limited to ~15,000 chars. Use offset/limit for large files.",
+        "PAGINATION: For files >100KB, use limit=200-500 and increment offset to read in chunks.",
         "Use for TEXT and CODE files only (.py, .js, .json, .yaml, .md, etc.)",
         "NOT for binary files (.pdf, .docx, .db, .pyc, images, archives)",
         "Use search parameter for efficient grep-like targeted lookups",
-        "Use ls first if unsure what files exist",
+        "Use ls first to check file sizes before reading",
     ],
 )
 async def read(
@@ -677,20 +684,39 @@ async def read(
     search: str = "",
     ctx: int = 2,
     regex: bool = False,
+    # Parameter aliases for models that use different names (e.g., gpt-oss)
+    line_start: int = None,
+    line_end: int = None,
 ) -> str:
     """Read text/code file. Binary files rejected.
 
+    IMPORTANT: Output is truncated to ~15,000 chars (~500 lines). For large files:
+    - Use offset/limit for paginated reads: read(path, offset=0, limit=200), then offset=200, etc.
+    - Use search param to find specific content without reading entire file
+
     Args:
         path: File path
-        offset: Start line (0=beginning)
-        limit: Max lines (0=all)
-        search: Grep pattern
+        offset: Start line (0=beginning). Use for pagination of large files.
+        limit: Max lines to read (0=all, but truncated at ~500 lines).
+               Recommended: Use limit=200-500 for large files and paginate.
+        search: Grep pattern - efficient for finding specific content
         ctx: Context lines around matches
         regex: Pattern is regex
+        line_start: Alias for offset (some models use this name)
+        line_end: Alias for limit (some models use this name)
 
     Returns:
-        File content or matching lines.
+        File content (truncated if >15,000 chars). Use offset to continue reading.
     """
+    # Handle parameter aliases from models that use different names
+    if line_start is not None and offset == 0:
+        offset = line_start
+    if line_end is not None and limit == 0:
+        # Convert line_end to limit (line_end is absolute, limit is count)
+        if line_start is not None:
+            limit = max(0, line_end - line_start)
+        else:
+            limit = line_end
     file_path = Path(path).expanduser().resolve()
 
     if not file_path.exists():
@@ -954,7 +980,7 @@ async def read(
     danger_level=DangerLevel.LOW,  # Minor risk, easily undoable
     # Registry-driven metadata for tool selection and cache invalidation
     progress_params=["path"],  # Same file = loop, regardless of content
-    stages=["executing"],  # Conversation stages where relevant
+    stages=["execution"],  # Conversation stages where relevant
     task_types=["edit", "generation", "action"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.WRITE,  # Cannot run in parallel with conflicting ops
     keywords=[
@@ -1045,7 +1071,7 @@ async def write(path: str, content: str) -> str:
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["path", "depth", "pattern"],  # Params indicating exploration progress
-    stages=["initial", "reading"],  # Conversation stages where relevant
+    stages=["initial", "planning", "reading", "analysis"],  # Conversation stages where relevant
     task_types=["search", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
@@ -1074,7 +1100,12 @@ async def write(path: str, content: str) -> str:
         "find all test files",
         "list directories only",
     ],
-    mandatory_keywords=["list files", "show files", "how many files", "count files"],  # Force inclusion
+    mandatory_keywords=[
+        "list files",
+        "show files",
+        "how many files",
+        "count files",
+    ],  # Force inclusion
     priority_hints=[
         "Use for browsing directory contents",
         "Use pattern parameter for filtering (e.g., '*.py', 'test_*')",
@@ -1087,7 +1118,7 @@ async def ls(
     pattern: str = "",
     limit: int = 1000,
 ) -> List[Dict[str, Any]]:
-    """List directory contents.
+    """List directory contents with file sizes.
 
     Args:
         path: Directory path
@@ -1097,7 +1128,9 @@ async def ls(
         limit: Max entries
 
     Returns:
-        List of {name/path, type, depth}.
+        List of {name/path, type, depth, size, hint}.
+        - size: File size in bytes (files only)
+        - hint: For large files (>100KB), pagination instruction
     """
     import fnmatch
 
@@ -1175,13 +1208,32 @@ async def ls(
             if pattern and not fnmatch.fnmatch(name, pattern):
                 continue
 
-            items.append(
-                {
-                    "path" if use_relative_paths else "name": name,
-                    "type": "directory" if is_dir else "file",
-                    "depth": entry_depth,
-                }
-            )
+            # Compute full path relative to cwd for use in subsequent tool calls
+            try:
+                full_path = str(p.relative_to(Path.cwd()))
+            except ValueError:
+                # If path is not relative to cwd, use absolute
+                full_path = str(p)
+
+            item = {
+                "path" if use_relative_paths else "name": name,
+                "full_path": full_path,  # Full path for model to use in subsequent calls
+                "type": "directory" if is_dir else "file",
+                "depth": entry_depth,
+            }
+
+            # Add file size for files (helps LLM plan read operations)
+            if not is_dir:
+                try:
+                    size = p.stat().st_size
+                    item["size"] = size
+                    # Direct hint for large files - tell LLM exactly what to do
+                    if size > 100_000:
+                        item["hint"] = "USE read(offset=0,limit=500) to paginate"
+                except OSError:
+                    pass  # Skip size on permission errors
+
+            items.append(item)
             count += 1
 
         # Add metadata if filtered or truncated
@@ -1197,6 +1249,125 @@ async def ls(
 
     except Exception as e:
         # Let the decorator handle the exception and format it
+        raise e
+
+
+@tool(
+    category="filesystem",
+    priority=Priority.HIGH,  # Very useful for file discovery
+    access_mode=AccessMode.READONLY,  # Only searches files
+    danger_level=DangerLevel.SAFE,  # No side effects
+    keywords=[
+        "find",
+        "search",
+        "locate",
+        "where",
+        "which",
+        "discover",
+        "lookup",
+    ],
+    use_cases=[
+        "finding files by name pattern",
+        "locating a specific file",
+        "discovering where a file exists",
+        "searching for files recursively",
+    ],
+    examples=[
+        "find tool_executor.py",
+        "where is the config file",
+        "locate all test files",
+        "find files named *_tool.py",
+    ],
+)
+async def find(
+    name: str,
+    path: str = ".",
+    type: str = "all",
+    limit: int = 50,
+) -> List[Dict[str, Any]]:
+    """Find files by name pattern (like Unix find -name).
+
+    Searches recursively through the directory tree to locate files
+    matching the given name pattern. Supports glob patterns.
+
+    Args:
+        name: File name pattern to find (supports glob: *.py, *test*, tool_*.py)
+        path: Root directory to search from (default: current directory)
+        type: Filter by type: 'file', 'dir', or 'all' (default: all)
+        limit: Maximum results to return (default: 50)
+
+    Returns:
+        List of matching files with path, type, and size.
+
+    Examples:
+        find("tool_executor.py")  # Find exact filename anywhere
+        find("*_tool.py")         # Find files ending in _tool.py
+        find("test*", type="dir") # Find directories starting with 'test'
+    """
+    import fnmatch
+
+    try:
+        base_path = Path(path).expanduser().resolve()
+
+        if not base_path.exists():
+            raise FileNotFoundError(f"Path not found: {path}")
+
+        results = []
+        count = 0
+
+        # Walk the directory tree
+        for root, dirs, files in base_path.walk():
+            # Skip hidden and common excluded directories
+            dirs[:] = [
+                d for d in dirs
+                if not d.startswith(".")
+                and d not in {"node_modules", "__pycache__", "venv", ".venv", "build", "dist"}
+            ]
+
+            # Check directories if type allows
+            if type in ("all", "dir"):
+                for d in dirs:
+                    if fnmatch.fnmatch(d, name) or fnmatch.fnmatch(d.lower(), name.lower()):
+                        dir_path = root / d
+                        results.append({
+                            "path": str(dir_path.relative_to(base_path)),
+                            "type": "directory",
+                            "size": 0,
+                        })
+                        count += 1
+                        if count >= limit:
+                            break
+
+            # Check files if type allows
+            if type in ("all", "file") and count < limit:
+                for f in files:
+                    if fnmatch.fnmatch(f, name) or fnmatch.fnmatch(f.lower(), name.lower()):
+                        file_path = root / f
+                        try:
+                            size = file_path.stat().st_size
+                        except OSError:
+                            size = 0
+                        results.append({
+                            "path": str(file_path.relative_to(base_path)),
+                            "type": "file",
+                            "size": size,
+                        })
+                        count += 1
+                        if count >= limit:
+                            break
+
+            if count >= limit:
+                break
+
+        if not results:
+            return [{
+                "message": f"No files matching '{name}' found in {path}",
+                "suggestion": "Try a broader pattern like '*{name}*' or search from project root with path='.'",
+            }]
+
+        return results
+
+    except Exception as e:
         raise e
 
 
@@ -1224,7 +1395,7 @@ IMPORTANT_DOC_PATTERNS = [
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["path", "max_depth"],  # Params indicating exploration progress
-    stages=["initial"],  # Best used at start of conversation
+    stages=["initial", "planning", "reading", "analysis"],  # Best used at start of conversation
     task_types=["analysis", "search"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
@@ -1409,5 +1580,3 @@ async def overview(
 
     except Exception as e:
         raise e
-
-

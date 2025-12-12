@@ -175,10 +175,19 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
     danger_level=DangerLevel.SAFE,  # No local side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["query"],  # Different queries indicate progress, not loops
-    stages=["research"],  # Conversation stages where relevant
+    stages=["planning", "initial"],  # Conversation stages where relevant
     task_types=["research", "analysis"],  # Task types for classification-aware selection
     execution_category="network",  # Can run in parallel with read-only ops
-    keywords=["search", "web", "internet", "lookup", "find online", "google", "duckduckgo", "summarize"],
+    keywords=[
+        "search",
+        "web",
+        "internet",
+        "lookup",
+        "find online",
+        "google",
+        "duckduckgo",
+        "summarize",
+    ],
     mandatory_keywords=["search web", "search online", "look up online"],  # Force inclusion
 )
 async def web(
@@ -279,7 +288,7 @@ async def web(
     danger_level=DangerLevel.SAFE,  # No local side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["url"],  # Different URLs indicate progress, not loops
-    stages=["research"],  # Conversation stages where relevant
+    stages=["planning", "initial"],  # Conversation stages where relevant
     task_types=["research", "analysis"],  # Task types for classification-aware selection
     execution_category="network",  # Can run in parallel with read-only ops
     keywords=["fetch", "url", "webpage", "download", "http", "content"],

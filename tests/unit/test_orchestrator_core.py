@@ -278,16 +278,18 @@ class TestResponseSanitization:
 
 
 class TestProviderChecks:
-    """Tests for provider type checks."""
+    """Tests for provider type checks via prompt_builder."""
 
     def test_is_cloud_provider(self, orchestrator):
-        """Test _is_cloud_provider check (covers line 532)."""
-        result = orchestrator._is_cloud_provider()
+        """Test is_cloud_provider via prompt_builder (dead code removed from orchestrator)."""
+        # Provider checks now delegated to prompt_builder
+        result = orchestrator.prompt_builder.is_cloud_provider()
         assert isinstance(result, bool)
 
     def test_is_local_provider(self, orchestrator):
-        """Test _is_local_provider check (covers line 536)."""
-        result = orchestrator._is_local_provider()
+        """Test is_local_provider via prompt_builder (dead code removed from orchestrator)."""
+        # Provider checks now delegated to prompt_builder
+        result = orchestrator.prompt_builder.is_local_provider()
         assert isinstance(result, bool)
 
 
@@ -301,8 +303,9 @@ class TestSystemPrompt:
         assert len(result) > 0
 
     def test_build_system_prompt_for_provider(self, orchestrator):
-        """Test _build_system_prompt_for_provider (covers line 544)."""
-        result = orchestrator._build_system_prompt_for_provider()
+        """Test prompt building via prompt_builder (dead code removed from orchestrator)."""
+        # _build_system_prompt_for_provider was dead code - use prompt_builder.build() instead
+        result = orchestrator.prompt_builder.build()
         assert isinstance(result, str)
 
 
@@ -1021,9 +1024,7 @@ class TestHandleToolCalls:
                 return_value=MagicMock(success=True, result="File contents", error=None)
             )
 
-            await orch._handle_tool_calls(
-                [{"name": "read", "arguments": {"path": "/test.py"}}]
-            )
+            await orch._handle_tool_calls([{"name": "read", "arguments": {"path": "/test.py"}}])
 
             assert "/test.py" in orch.observed_files
 
@@ -1267,20 +1268,28 @@ class TestClassifyTaskKeywords:
             assert result["is_analysis_task"] is False
             assert result["coarse_task_type"] == "default"
 
-    def test_analysis_takes_precedence(self, mock_provider, orchestrator_settings):
-        """Test that analysis classification takes precedence over action."""
+    def test_position_based_precedence(self, mock_provider, orchestrator_settings):
+        """Test that position-based priority determines task type when both present."""
         with patch("victor.agent.orchestrator.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
                 model="test-model",
             )
-            # Message with both action and analysis keywords
+            # Message with action keyword ("create") AFTER analysis keyword ("analyze")
+            # Action should take precedence since it appears last (it's the end goal)
             result = orch._classify_task_keywords("Analyze and create a report")
-            # Both should be true but coarse type should be analysis
+            # Both should be true
             assert result["is_action_task"] is True
             assert result["is_analysis_task"] is True
-            assert result["coarse_task_type"] == "analysis"
+            # But action-related type (generation) should win since "create" appears last
+            assert result["coarse_task_type"] in ("action", "generation")
+
+            # When analysis appears last, it should win
+            result2 = orch._classify_task_keywords("Create a summary and analyze it")
+            assert result2["is_action_task"] is True
+            assert result2["is_analysis_task"] is True
+            assert result2["coarse_task_type"] == "analysis"
 
     def test_case_insensitive(self, mock_provider, orchestrator_settings):
         """Test that keyword detection is case insensitive."""
@@ -1391,7 +1400,8 @@ class TestDetermineContinuationAction:
                 one_shot_mode=True,
             )
             assert result["action"] == "prompt_tool_call"
-            assert "list_directory" in result["message"]
+            # Tool names are short canonical names (ls, read) not aliases
+            assert "ls(path=" in result["message"]
             assert result["updates"]["continuation_prompts"] == 1
 
     def test_max_continuation_prompts_requests_summary(

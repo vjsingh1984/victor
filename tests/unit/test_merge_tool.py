@@ -125,8 +125,11 @@ class TestMergeConflictToolProperties:
     """Tests for tool properties and metadata."""
 
     def test_tool_name(self, tool):
-        """Test tool name."""
-        assert tool.name == "merge_conflicts"
+        """Test tool name uses canonical name from ToolNames."""
+        from victor.tools.tool_names import ToolNames
+
+        assert tool.name == ToolNames.MERGE
+        assert tool.name == "merge"  # Canonical short name
 
     def test_tool_description_contains_strategies(self, tool):
         """Test description mentions resolution strategies."""

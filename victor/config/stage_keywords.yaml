@@ -1,0 +1,161 @@
+# Stage Keywords Configuration
+#
+# This file defines keywords used to classify conversation stages.
+# Edit this file to customize stage detection for your workflow.
+#
+# Stages represent the current phase of a coding conversation:
+# - INITIAL: Starting a new task
+# - EXPLORING: Investigating the codebase
+# - ANALYZING: Understanding problems/requirements
+# - IMPLEMENTING: Writing/modifying code
+# - REVIEWING: Reviewing changes/code quality
+#
+# Keywords are matched case-insensitively against user messages.
+# Score is accumulated for each matching keyword.
+
+stages:
+  INITIAL:
+    keywords:
+      - "help me"
+      - "i need"
+      - "can you"
+      - "could you"
+      - "please"
+      - "want to"
+      - "how do i"
+      - "what is"
+      - "tell me"
+      - "show me"
+      - "start"
+      - "begin"
+      - "new"
+    weight: 1.0
+    min_score: 2
+
+  EXPLORING:
+    keywords:
+      - "where"
+      - "find"
+      - "search"
+      - "look for"
+      - "locate"
+      - "which file"
+      - "what files"
+      - "show me the"
+      - "read"
+      - "list"
+      - "directory"
+      - "structure"
+      - "codebase"
+      - "explore"
+      - "navigate"
+      - "understand"
+    weight: 1.2
+    min_score: 2
+
+  ANALYZING:
+    keywords:
+      - "why"
+      - "explain"
+      - "understand"
+      - "analyze"
+      - "review"
+      - "check"
+      - "debug"
+      - "issue"
+      - "problem"
+      - "error"
+      - "bug"
+      - "trace"
+      - "investigate"
+      - "diagnose"
+      - "root cause"
+      - "what's wrong"
+      - "doesn't work"
+      - "failing"
+      - "broken"
+    weight: 1.3
+    min_score: 2
+
+  IMPLEMENTING:
+    keywords:
+      - "create"
+      - "write"
+      - "implement"
+      - "add"
+      - "build"
+      - "make"
+      - "code"
+      - "function"
+      - "class"
+      - "method"
+      - "fix"
+      - "update"
+      - "change"
+      - "modify"
+      - "refactor"
+      - "generate"
+      - "develop"
+      - "edit"
+      - "patch"
+    weight: 1.5
+    min_score: 2
+
+  REVIEWING:
+    keywords:
+      - "review"
+      - "check"
+      - "test"
+      - "verify"
+      - "validate"
+      - "looks good"
+      - "correct"
+      - "commit"
+      - "push"
+      - "merge"
+      - "pr"
+      - "pull request"
+      - "done"
+      - "finish"
+      - "complete"
+      - "approve"
+      - "quality"
+    weight: 1.2
+    min_score: 2
+
+# Tool associations - which tools are preferred for each stage
+tool_preferences:
+  INITIAL:
+    - "read"
+    - "ls"
+    - "overview"
+    - "git"
+  EXPLORING:
+    - "semantic_code_search"
+    - "code_search"
+    - "glob"
+    - "grep"
+    - "read"
+    - "ls"
+    - "overview"
+  ANALYZING:
+    - "read"
+    - "code_review"
+    - "lsp_diagnostics"
+    - "git"
+    - "semantic_code_search"
+    - "metrics"
+  IMPLEMENTING:
+    - "write"
+    - "edit"
+    - "patch"
+    - "shell"
+    - "git"
+    - "test"
+    - "refactor"
+  REVIEWING:
+    - "code_review"
+    - "test"
+    - "git"
+    - "read"
+    - "shell"

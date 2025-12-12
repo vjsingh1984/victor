@@ -125,8 +125,11 @@ class TestIaCScannerToolProperties:
     """Tests for tool properties and metadata."""
 
     def test_tool_name(self, tool):
-        """Test tool name."""
-        assert tool.name == "iac_scanner"
+        """Test tool name uses canonical name from ToolNames."""
+        from victor.tools.tool_names import ToolNames
+
+        assert tool.name == ToolNames.IAC
+        assert tool.name == "iac"  # Canonical short name
 
     def test_tool_description_contains_platforms(self, tool):
         """Test description mentions supported platforms."""

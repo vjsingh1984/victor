@@ -36,9 +36,10 @@ Usage:
 import json
 import re
 import sys
+import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, TextIO
+from typing import Any, Dict, List, Optional, TextIO, Tuple
 
 from rich.console import Console
 from rich.live import Live
@@ -93,6 +94,8 @@ class OutputFormatter:
         # Live markdown rendering for streaming in RICH mode
         self._live: Optional[Live] = None
         self._stream_buffer: str = ""
+        # Tool timing tracking for compact output
+        self._pending_tool: Optional[Tuple[str, Dict[str, Any], float]] = None
 
     @property
     def mode(self) -> OutputMode:
@@ -114,6 +117,8 @@ class OutputFormatter:
             self._console.print(f"[dim]{message}[/]")
         elif self.config.mode == OutputMode.PLAIN:
             print(f"# {message}", file=self.config.stderr)
+            # Flush stderr immediately to ensure status appears before next content
+            self.config.stderr.flush()
         # JSON modes: skip status messages
 
     def error(self, message: str, details: Optional[str] = None) -> None:
@@ -141,14 +146,50 @@ class OutputFormatter:
             print(f"Error: {message}", file=self.config.stderr)
             if details:
                 print(details, file=self.config.stderr)
+            self.config.stderr.flush()
+
+    def _format_args(self, arguments: Dict[str, Any], max_width: int = 80) -> str:
+        """Format tool arguments for display.
+
+        Args:
+            arguments: Tool arguments
+            max_width: Maximum total width for args string (default 80 to use more line width)
+
+        Returns:
+            Formatted args string like "path='/file.py', limit=100"
+        """
+        parts = []
+        total_len = 0
+        for k, v in arguments.items():
+            if isinstance(v, str):
+                # Truncate long strings - allow up to 60 chars for strings
+                display = v if len(v) <= 60 else v[:57] + "..."
+                part = f"{k}='{display}'"
+            elif isinstance(v, (int, float, bool)):
+                part = f"{k}={v}"
+            elif v is None:
+                continue  # Skip None values
+            else:
+                part = f"{k}=..."
+            if total_len + len(part) > max_width and parts:
+                parts.append("...")
+                break
+            parts.append(part)
+            total_len += len(part) + 2  # +2 for ", "
+        return ", ".join(parts)
 
     def tool_start(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Indicate tool execution has started.
+
+        Stores timing info for compact output in tool_result.
 
         Args:
             tool_name: Name of the tool
             arguments: Tool arguments
         """
+        # Store timing info for later
+        self._pending_tool = (tool_name, arguments, time.time())
+
         if not self.config.show_tools:
             return
 
@@ -163,29 +204,7 @@ class OutputFormatter:
                 ),
                 file=self.config.stdout,
             )
-        elif self.config.mode == OutputMode.RICH:
-            # For shell commands, show the command prominently
-            # NOTE: Check both canonical (shell) and legacy (execute_bash) names
-            if tool_name in ("shell", "execute_bash") and "command" in arguments:
-                cmd = arguments["command"]
-                cmd_display = cmd[:80] + "..." if len(cmd) > 80 else cmd
-                self._console.print(
-                    f"[dim]Running [bold]{tool_name}[/]: [cyan]`{cmd_display}`[/][/]"
-                )
-            else:
-                args_str = ", ".join(f"{k}={v!r}" for k, v in list(arguments.items())[:3])
-                if len(arguments) > 3:
-                    args_str += ", ..."
-                self._console.print(f"[dim]Running [bold]{tool_name}[/]({args_str})[/]")
-        elif self.config.mode == OutputMode.PLAIN:
-            # For shell commands, show the command prominently
-            # NOTE: Check both canonical (shell) and legacy (execute_bash) names
-            if tool_name in ("shell", "execute_bash") and "command" in arguments:
-                cmd = arguments["command"]
-                cmd_display = cmd[:80] + "..." if len(cmd) > 80 else cmd
-                print(f"# Running: {tool_name}: `{cmd_display}`", file=self.config.stderr)
-            else:
-                print(f"# Running: {tool_name}", file=self.config.stderr)
+        # RICH and PLAIN modes defer output to tool_result for single-line format
 
     def tool_result(
         self,
@@ -194,7 +213,7 @@ class OutputFormatter:
         result: Optional[str] = None,
         error: Optional[str] = None,
     ) -> None:
-        """Record tool execution result.
+        """Record tool execution result and output compact single-line format.
 
         Args:
             tool_name: Name of the tool
@@ -213,6 +232,16 @@ class OutputFormatter:
 
         self._tool_calls.append(tool_record)
 
+        # Calculate duration from pending tool
+        duration_str = ""
+        args_str = ""
+        if self._pending_tool and self._pending_tool[0] == tool_name:
+            _, arguments, start_time = self._pending_tool
+            duration = time.time() - start_time
+            duration_str = f"({duration:.1f}s)"
+            args_str = self._format_args(arguments)
+            self._pending_tool = None
+
         if not self.config.show_tools:
             return
 
@@ -227,11 +256,32 @@ class OutputFormatter:
                 file=self.config.stdout,
             )
         elif self.config.mode == OutputMode.RICH:
-            status = "[green]" if success else "[red]"
-            self._console.print(f"  {status}{'completed' if success else 'failed'}[/]")
+            # Compact single-line format: ✓ tool_name(args) (X.XXs)
+            # Use full 90 chars width, 6 chars for elapsed time at end
+            if success:
+                status_icon = "[green]✓[/]"
+            else:
+                status_icon = "[red]✗[/]"
+            # Format: ✓ name(args) (X.XXs) - target ~90 chars
+            base = f"{tool_name}({args_str})" if args_str else tool_name
+            # Elapsed time format: (X.XXs) = 8 chars
+            time_display = f"({duration_str.strip('()')})" if duration_str else ""
+            error_display = f" [red]{error[:30]}[/]" if error else ""
+            self._console.print(
+                f"{status_icon} [bold]{base}[/] {time_display}{error_display}"
+            )
         elif self.config.mode == OutputMode.PLAIN:
-            status = "OK" if success else "FAILED"
-            print(f"# {tool_name}: {status}", file=self.config.stderr)
+            # Compact single-line format: ✓ tool_name(args) (X.XXs)
+            status_icon = "✓" if success else "✗"
+            base = f"{tool_name}({args_str})" if args_str else tool_name
+            time_display = f" ({duration_str.strip('()')})" if duration_str else ""
+            error_display = f" {error[:40]}" if error else ""
+            print(
+                f"{status_icon} {base}{time_display}{error_display}",
+                file=self.config.stderr,
+            )
+            # Flush stderr immediately to ensure tool output appears before next content
+            self.config.stderr.flush()
 
     def thinking(self, content: str) -> None:
         """Output thinking/reasoning content.
@@ -262,27 +312,37 @@ class OutputFormatter:
             )
         elif self.config.mode == OutputMode.PLAIN:
             print(f"# Thinking: {content[:200]}...", file=self.config.stderr)
+            self.config.stderr.flush()
 
-    def start_streaming(self) -> None:
+    def start_streaming(self, preserve_buffer: bool = False) -> None:
         """Start streaming mode with live markdown rendering (RICH mode only).
 
         Call this before the first stream_chunk() to enable live markdown rendering.
+
+        Args:
+            preserve_buffer: If True, don't reset the stream buffer (for resuming)
         """
         if self.config.mode == OutputMode.RICH and self.config.stream:
-            self._stream_buffer = ""
-            self._live = Live(
-                Markdown(""),
-                console=self._console,
-                refresh_per_second=10,
-            )
-            self._live.start()
+            if not preserve_buffer:
+                self._stream_buffer = ""
+            # Don't start a new Live if one is already active
+            if self._live is None:
+                self._live = Live(
+                    Markdown(self._stream_buffer),
+                    console=self._console,
+                    refresh_per_second=10,
+                )
+                self._live.start()
 
-    def end_streaming(self) -> None:
+    def end_streaming(self, finalize: bool = True) -> None:
         """End streaming mode and finalize live markdown rendering.
 
         Call this after the last stream_chunk() if start_streaming() was called.
+
+        Args:
+            finalize: If True, stop the Live and clear buffer. If False, just pause.
         """
-        if self._live is not None:
+        if self._live is not None and finalize:
             self._live.stop()
             self._live = None
             self._stream_buffer = ""

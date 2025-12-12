@@ -454,14 +454,14 @@ class TestJavaScriptAnalyzer:
 
     def test_check_security_eval(self):
         """Test detection of eval usage."""
-        code = 'eval(userInput)'
+        code = "eval(userInput)"
         issues = self.analyzer.check_security(code, Path("test.js"))
         assert len(issues) > 0
         assert any("eval" in i.issue.lower() for i in issues)
 
     def test_check_security_innerhtml(self):
         """Test detection of innerHTML XSS."""
-        code = 'element.innerHTML = userInput'
+        code = "element.innerHTML = userInput"
         issues = self.analyzer.check_security(code, Path("test.js"))
         assert len(issues) > 0
 
@@ -474,7 +474,7 @@ class TestJavaScriptAnalyzer:
 
     def test_check_code_smells_var(self):
         """Test detection of var usage."""
-        code = 'var x = 1'
+        code = "var x = 1"
         issues = self.analyzer.check_code_smells(code, Path("test.js"))
         assert len(issues) > 0
         assert any("var" in i.issue.lower() for i in issues)
@@ -498,14 +498,14 @@ class TestCAnalyzer:
 
     def test_check_security_buffer_overflow(self):
         """Test detection of buffer overflow vulnerabilities."""
-        code = 'strcpy(dest, src);'
+        code = "strcpy(dest, src);"
         issues = self.analyzer.check_security(code, Path("test.c"))
         assert len(issues) > 0
         assert any("buffer" in i.issue.lower() for i in issues)
 
     def test_check_security_system_call(self):
         """Test detection of system calls."""
-        code = 'system(user_command);'
+        code = "system(user_command);"
         issues = self.analyzer.check_security(code, Path("test.c"))
         assert len(issues) > 0
 
@@ -528,13 +528,13 @@ class TestCppAnalyzer:
 
     def test_inherits_c_patterns(self):
         """Test that C++ analyzer detects C vulnerabilities."""
-        code = 'strcpy(dest, src);'
+        code = "strcpy(dest, src);"
         issues = self.analyzer.check_security(code, Path("test.cpp"))
         assert len(issues) > 0
 
     def test_check_code_smells_using_namespace(self):
         """Test detection of using namespace std."""
-        code = 'using namespace std;'
+        code = "using namespace std;"
         issues = self.analyzer.check_code_smells(code, Path("test.cpp"))
         assert len(issues) > 0
 
@@ -652,7 +652,7 @@ class TestJavaAnalyzer:
 
     def test_check_security_xxe(self):
         """Test detection of XXE vulnerability."""
-        code = 'DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(input);'
+        code = "DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(input);"
         issues = self.analyzer.check_security(code, Path("Test.java"))
         assert len(issues) > 0
 
@@ -738,7 +738,7 @@ class TestRustAnalyzer:
 
     def test_check_security_unsafe(self):
         """Test detection of unsafe blocks."""
-        code = 'unsafe { ptr::read(addr) }'
+        code = "unsafe { ptr::read(addr) }"
         issues = self.analyzer.check_security(code, Path("main.rs"))
         assert len(issues) > 0
         assert any("unsafe" in i.issue.lower() for i in issues)
@@ -778,7 +778,7 @@ class TestRubyAnalyzer:
 
     def test_check_security_eval(self):
         """Test detection of eval usage."""
-        code = 'eval(user_input)'
+        code = "eval(user_input)"
         issues = self.analyzer.check_security(code, Path("script.rb"))
         assert len(issues) > 0
         assert any("eval" in i.issue.lower() for i in issues)
@@ -833,7 +833,7 @@ class TestPHPAnalyzer:
 
     def test_check_code_smells_var_dump(self):
         """Test detection of var_dump debug."""
-        code = 'var_dump($x);'
+        code = "var_dump($x);"
         issues = self.analyzer.check_code_smells(code, Path("index.php"))
         assert len(issues) > 0
 
@@ -899,7 +899,7 @@ class TestSwiftAnalyzer:
 
     def test_check_security_force_unwrap(self):
         """Test detection of force unwrap."""
-        code = 'let value = optional!'
+        code = "let value = optional!"
         issues = self.analyzer.check_security(code, Path("App.swift"))
         assert len(issues) > 0
 
@@ -962,6 +962,7 @@ class TestBashAnalyzer:
     def setup_method(self):
         """Set up test fixtures."""
         from victor.tools.language_analyzer import BashAnalyzer
+
         self.analyzer = BashAnalyzer(max_complexity=10)
 
     def test_language_property(self):
@@ -994,6 +995,7 @@ class TestSQLAnalyzer:
     def setup_method(self):
         """Set up test fixtures."""
         from victor.tools.language_analyzer import SQLAnalyzer
+
         self.analyzer = SQLAnalyzer(max_complexity=10)
 
     def test_language_property(self):
@@ -1006,7 +1008,7 @@ class TestSQLAnalyzer:
 
     def test_check_security_grant_all(self):
         """Test detection of GRANT ALL."""
-        code = 'GRANT ALL PRIVILEGES ON database.* TO user;'
+        code = "GRANT ALL PRIVILEGES ON database.* TO user;"
         issues = self.analyzer.check_security(code, Path("query.sql"))
         assert len(issues) > 0
 
@@ -1140,7 +1142,7 @@ class TestTypeScriptAnalyzer:
 
     def test_inherits_javascript_security(self):
         """Test that TypeScript inherits JavaScript security patterns."""
-        code = 'eval(userInput)'
+        code = "eval(userInput)"
         issues = self.analyzer.check_security(code, Path("test.ts"))
         assert len(issues) > 0
 
@@ -1347,6 +1349,7 @@ class TestLuaAnalyzer:
     def setup_method(self):
         """Set up test fixtures."""
         from victor.tools.language_analyzer import LuaAnalyzer
+
         self.analyzer = LuaAnalyzer(max_complexity=10)
 
     def test_language_property(self):
@@ -1375,6 +1378,7 @@ class TestElixirAnalyzer:
     def setup_method(self):
         """Set up test fixtures."""
         from victor.tools.language_analyzer import ElixirAnalyzer
+
         self.analyzer = ElixirAnalyzer(max_complexity=10)
 
     def test_language_property(self):
@@ -1406,6 +1410,7 @@ class TestHaskellAnalyzer:
     def setup_method(self):
         """Set up test fixtures."""
         from victor.tools.language_analyzer import HaskellAnalyzer
+
         self.analyzer = HaskellAnalyzer(max_complexity=10)
 
     def test_language_property(self):
@@ -1433,6 +1438,7 @@ class TestRAnalyzer:
     def setup_method(self):
         """Set up test fixtures."""
         from victor.tools.language_analyzer import RAnalyzer
+
         self.analyzer = RAnalyzer(max_complexity=10)
 
     def test_language_property(self):

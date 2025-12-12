@@ -27,7 +27,7 @@ import sqlite3
 import threading
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional
 
@@ -382,7 +382,7 @@ def record_serialization_metrics(
     # Import here to avoid circular imports
 
     record = SerializationMetricRecord(
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(timezone.utc).isoformat(),
         tool_name=context.tool_name if context else None,
         tool_operation=context.tool_operation if context else None,
         provider=context.provider if context else None,

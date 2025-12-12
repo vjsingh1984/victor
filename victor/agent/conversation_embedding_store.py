@@ -12,16 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""LanceDB-based conversation embedding store for semantic retrieval.
+"""Lazy LanceDB-based conversation embedding store for semantic retrieval.
 
-This module provides vector storage for conversation messages using LanceDB:
-- Embeddings are pre-computed and stored for efficient retrieval
-- Supports semantic search across conversation history
-- Syncs with SQLite ConversationStore for authoritative message data
+Architecture (Lean + FK design):
+- SQLite (ConversationStore): Authoritative source for messages, content, metadata
+- LanceDB (ConversationEmbeddingStore): Vector index with message_id FK only
 
-Architecture:
-- SQLite (ConversationStore): Authoritative source for messages, metadata, sessions
-- LanceDB (ConversationEmbeddingStore): Vector embeddings for fast semantic search
+Lazy Embedding Strategy:
+- Embeddings are NOT computed on message add (eager was wasteful)
+- Embeddings are computed on-demand when search_similar() is called
+- Un-embedded messages are batch-embedded from SQLite on first search
+- Auto-compact after batch operations to reduce file proliferation
+
+Schema (lean - no content duplication):
+    - message_id: str (FK -> SQLite messages.id)
+    - session_id: str (for filtering)
+    - vector: list[float] (384-dim embedding)
+    - timestamp: str (ISO format, for pruning)
 
 Storage location: {project}/.victor/embeddings/conversations/
 
@@ -30,31 +37,25 @@ Usage:
     from victor.embeddings.service import EmbeddingService
 
     embedding_service = EmbeddingService.get_instance()
-    store = ConversationEmbeddingStore(embedding_service)
+    store = ConversationEmbeddingStore(embedding_service, sqlite_db_path)
     await store.initialize()
 
-    # Add message embedding
-    await store.add_message_embedding(
-        message_id="msg_abc123",
-        session_id="session_xyz",
-        role="user",
-        content="How do I implement authentication?",
-    )
-
-    # Search for similar messages
+    # Search triggers lazy embedding of un-embedded messages
     results = await store.search_similar(
         query="auth login implementation",
         session_id="session_xyz",
         limit=10,
     )
+    # Returns [(message_id, similarity), ...] - fetch full content from SQLite
 """
 
 import logging
+import sqlite3
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 try:
     import lancedb
@@ -71,79 +72,72 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ConversationSearchResult:
-    """Result from semantic conversation search."""
+class EmbeddingSearchResult:
+    """Lean result from semantic search - just IDs and scores.
+
+    Full message content should be fetched from SQLite using message_id.
+    """
 
     message_id: str
     session_id: str
-    role: str
-    content_preview: str  # First 200 chars for reference
     similarity: float
     timestamp: Optional[datetime] = None
 
     def __repr__(self) -> str:
-        return (
-            f"ConversationSearchResult(id={self.message_id}, "
-            f"role={self.role}, sim={self.similarity:.3f})"
-        )
+        return f"EmbeddingSearchResult(id={self.message_id}, sim={self.similarity:.3f})"
 
 
 class ConversationEmbeddingStore:
-    """LanceDB-based vector store for conversation embeddings.
+    """Lazy LanceDB vector store for conversation embeddings.
 
-    Provides efficient semantic search over conversation history by:
-    - Pre-computing and storing message embeddings
-    - Using LanceDB's fast ANN search
-    - Supporting session-scoped queries
-    - Automatic pruning of old messages beyond MAX_MESSAGES
+    Key design principles:
+    - Lean schema: Only message_id (FK), session_id, vector, timestamp
+    - Lazy embedding: Compute on search, not on message add
+    - SQLite is source of truth: Content lives there, not duplicated
+    - Auto-compact: Reduce file proliferation after batch ops
 
-    Key benefits over on-the-fly embedding:
-    - O(1) embedding lookup instead of O(n) computation
-    - Sub-millisecond vector search via LanceDB indices
-    - Persistent storage survives process restarts
-    - Bounded storage via automatic pruning
-
-    Schema:
-        - id: str (message ID)
-        - session_id: str (session the message belongs to)
-        - role: str (user/assistant/system/tool)
-        - content_preview: str (first 500 chars for reference)
-        - vector: list[float] (384-dim embedding)
-        - timestamp: str (ISO format)
+    Benefits:
+    - No write overhead during conversations
+    - No content duplication (~50% smaller)
+    - Batch embedding is more efficient than one-by-one
+    - Compaction keeps LanceDB files manageable
     """
 
-    # LanceDB table name for conversation embeddings
-    TABLE_NAME = "conversation_embeddings"
+    # LanceDB table name
+    TABLE_NAME = "conversation_vectors"
 
-    # Maximum content length to store (for preview)
-    MAX_CONTENT_PREVIEW = 500
+    # Maximum embeddings to keep (prunes oldest when exceeded)
+    MAX_EMBEDDINGS = 10_000
 
-    # Maximum messages to keep in the store (prunes oldest when exceeded)
-    # 10,000 messages ≈ 15MB storage (384-dim embeddings)
-    MAX_MESSAGES = 10_000
-
-    # Prune when this many messages over limit (batch pruning for efficiency)
+    # Prune threshold (batch pruning for efficiency)
     PRUNE_BATCH_SIZE = 500
+
+    # Compact after this many new embeddings
+    COMPACT_THRESHOLD = 100
 
     def __init__(
         self,
         embedding_service: "EmbeddingService",
-        db_path: Optional[Path] = None,
+        sqlite_db_path: Optional[Path] = None,
+        lancedb_path: Optional[Path] = None,
     ):
         """Initialize the conversation embedding store.
 
         Args:
-            embedding_service: Shared EmbeddingService instance for generating embeddings
-            db_path: Path to LanceDB directory. Defaults to {project}/.victor/embeddings/conversations/
+            embedding_service: Shared EmbeddingService for generating embeddings
+            sqlite_db_path: Path to SQLite conversation.db (for lazy embedding)
+            lancedb_path: Path to LanceDB directory. Defaults to {project}/.victor/embeddings/conversations/
         """
         if not LANCEDB_AVAILABLE:
             raise ImportError("LanceDB not available. Install with: pip install lancedb pyarrow")
 
         self._embedding_service = embedding_service
-        self._db_path = db_path
+        self._sqlite_db_path = sqlite_db_path
+        self._lancedb_path = lancedb_path
         self._db: Optional[Any] = None  # LanceDB connection
         self._table: Optional[Any] = None  # LanceDB table
         self._initialized = False
+        self._embeddings_added_since_compact = 0
 
     @property
     def dimension(self) -> int:
@@ -156,152 +150,197 @@ class ConversationEmbeddingStore:
         return self._initialized
 
     async def initialize(self) -> None:
-        """Initialize LanceDB connection and table.
-
-        Creates the database directory and table if they don't exist.
-        """
+        """Initialize LanceDB connection and table."""
         if self._initialized:
             return
 
-        # Determine database path
-        if self._db_path is None:
+        # Determine paths
+        if self._lancedb_path is None or self._sqlite_db_path is None:
             from victor.config.settings import get_project_paths
 
             paths = get_project_paths()
-            self._db_path = paths.embeddings_dir / "conversations"
+            if self._lancedb_path is None:
+                self._lancedb_path = paths.embeddings_dir / "conversations"
+            if self._sqlite_db_path is None:
+                self._sqlite_db_path = paths.conversation_db
 
         # Ensure directory exists
-        self._db_path.mkdir(parents=True, exist_ok=True)
+        self._lancedb_path.mkdir(parents=True, exist_ok=True)
 
         # Connect to LanceDB
-        logger.info(f"[ConversationEmbeddingStore] Connecting to LanceDB at {self._db_path}")
-        self._db = lancedb.connect(str(self._db_path))
+        logger.info(f"[ConversationEmbeddingStore] Connecting to LanceDB at {self._lancedb_path}")
+        self._db = lancedb.connect(str(self._lancedb_path))
 
-        # Open or verify table exists
+        # Open or create table
         existing_tables = self._db.table_names()
         if self.TABLE_NAME in existing_tables:
             self._table = self._db.open_table(self.TABLE_NAME)
             logger.info(f"[ConversationEmbeddingStore] Opened existing table '{self.TABLE_NAME}'")
         else:
             logger.info(
-                f"[ConversationEmbeddingStore] Table '{self.TABLE_NAME}' will be created on first insert"
+                f"[ConversationEmbeddingStore] Table '{self.TABLE_NAME}' will be created on first search"
             )
 
         self._initialized = True
-        logger.info("[ConversationEmbeddingStore] Initialized successfully")
+        logger.info("[ConversationEmbeddingStore] Initialized (lazy embedding mode)")
 
     def _create_table_with_first_record(self, record: Dict[str, Any]) -> None:
-        """Create the table with the first record (LanceDB requires data to infer schema)."""
+        """Create the table with the first record."""
         self._table = self._db.create_table(self.TABLE_NAME, data=[record])
         logger.info(f"[ConversationEmbeddingStore] Created table '{self.TABLE_NAME}'")
 
-    async def add_message_embedding(
-        self,
-        message_id: str,
-        session_id: str,
-        role: str,
-        content: str,
-        timestamp: Optional[datetime] = None,
-    ) -> None:
-        """Add a message embedding to the store.
-
-        Computes the embedding and stores it with metadata.
-
-        Args:
-            message_id: Unique message identifier (from SQLite)
-            session_id: Session the message belongs to
-            role: Message role (user/assistant/system/tool)
-            content: Full message content (will be embedded)
-            timestamp: Message timestamp (defaults to now)
-        """
-        if not self._initialized:
-            await self.initialize()
-
-        # Skip very short messages (not useful for semantic search)
-        if len(content.strip()) < 10:
-            logger.debug(f"[ConversationEmbeddingStore] Skipping short message {message_id}")
-            return
-
-        start_time = time.perf_counter()
-
-        # Compute embedding
-        # Truncate very long content for embedding (model has token limits)
-        embed_content = content[:2000]
-        embedding = await self._embedding_service.embed_text(embed_content)
-
-        # Prepare record
-        record = {
-            "id": message_id,
-            "session_id": session_id,
-            "role": role,
-            "content_preview": content[: self.MAX_CONTENT_PREVIEW],
-            "vector": embedding.tolist(),
-            "timestamp": (timestamp or datetime.now()).isoformat(),
-        }
-
-        # Add to table (create if needed)
+    def _get_max_embedded_timestamp(self, session_id: Optional[str] = None) -> Optional[str]:
+        """Get the maximum timestamp of embedded messages."""
         if self._table is None:
-            self._create_table_with_first_record(record)
-        else:
-            self._table.add([record])
+            return None
 
-        elapsed = time.perf_counter() - start_time
-        logger.debug(
-            f"[ConversationEmbeddingStore] Added message {message_id}: "
-            f"role={role}, chars={len(content)}, time={elapsed*1000:.2f}ms"
-        )
+        try:
+            # Use LanceDB SQL for efficient aggregation without loading full dataset
+            if session_id:
+                query = f"SELECT MAX(timestamp) as max_ts FROM {self.TABLE_NAME} WHERE session_id = '{session_id}'"
+            else:
+                query = f"SELECT MAX(timestamp) as max_ts FROM {self.TABLE_NAME}"
+                
+            result = self._table.to_lance().to_table(filter=None).to_pandas().query(query) if session_id else None
+            
+            # Fallback to pandas for now (LanceDB SQL support varies)
+            df = self._table.to_pandas()
+            if df.empty:
+                return None
 
-    async def add_messages_batch(
+            if session_id:
+                df = df[df["session_id"] == session_id]
+                if df.empty:
+                    return None
+
+            max_ts = df["timestamp"].max()
+            return str(max_ts) if max_ts else None
+
+        except Exception as e:
+            logger.warning(f"[ConversationEmbeddingStore] Failed to get max timestamp: {e}")
+            return None
+
+    def _get_unembedded_messages_from_sqlite(
         self,
-        messages: List[Dict[str, Any]],
-    ) -> int:
-        """Add multiple message embeddings in batch.
+        session_id: Optional[str] = None,
+        after_timestamp: Optional[str] = None,
+        min_content_length: int = 20,
+        limit: int = 10_000,
+    ) -> List[Dict[str, Any]]:
+        """Fetch messages from SQLite newer than last embedded timestamp."""
+        if self._sqlite_db_path is None or not self._sqlite_db_path.exists():
+            return []
 
-        More efficient than adding one by one.
+        try:
+            with sqlite3.connect(self._sqlite_db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                
+                # Single parameterized query with conditional WHERE clauses
+                conditions = ["LENGTH(content) >= ?"]
+                params = [min_content_length]
+                
+                if session_id:
+                    conditions.append("session_id = ?")
+                    params.append(session_id)
+                    
+                if after_timestamp:
+                    conditions.append("timestamp > ?")
+                    params.append(after_timestamp)
+                    
+                params.append(limit)
+                
+                query = f"""
+                    SELECT id, session_id, content, timestamp
+                    FROM messages
+                    WHERE {' AND '.join(conditions)}
+                    ORDER BY timestamp ASC
+                    LIMIT ?
+                """
+                
+                rows = conn.execute(query, params).fetchall()
+                
+                return [
+                    {
+                        "message_id": row["id"],
+                        "session_id": row["session_id"],
+                        "content": row["content"],
+                        "timestamp": row["timestamp"],
+                    }
+                    for row in rows
+                ]
+
+        except Exception as e:
+            logger.warning(f"[ConversationEmbeddingStore] Failed to fetch from SQLite: {e}")
+            return []
+
+    async def _ensure_embeddings(self, session_id: Optional[str] = None) -> int:
+        """Lazily embed any un-embedded messages from SQLite.
+
+        Called automatically on search. Uses timestamp-based incremental sync:
+        1. Get MAX(timestamp) from LanceDB (columnar O(1))
+        2. Fetch messages from SQLite WHERE timestamp > max (O(log n) indexed)
+        3. Batch embed and add to LanceDB
 
         Args:
-            messages: List of dicts with keys: message_id, session_id, role, content, timestamp
+            session_id: Optional session filter
 
         Returns:
-            Number of messages successfully added
+            Number of new embeddings created
         """
         if not self._initialized:
             await self.initialize()
 
-        if not messages:
+        # Get max embedded timestamp (efficient columnar scan)
+        # Returns None if: (1) table doesn't exist, (2) table is empty
+        max_timestamp = self._get_max_embedded_timestamp(session_id)
+
+        # Edge case: LanceDB empty/uninitialized → full historical backfill
+        is_full_backfill = max_timestamp is None
+        if is_full_backfill:
+            logger.info(
+                "[ConversationEmbeddingStore] No existing embeddings found - "
+                "will embed all historical messages from SQLite"
+            )
+
+        # Get un-embedded messages from SQLite (timestamp-based, not ID-based)
+        # When max_timestamp=None, fetches ALL messages (full historical backfill)
+        unembedded = self._get_unembedded_messages_from_sqlite(
+            session_id=session_id,
+            after_timestamp=max_timestamp,
+        )
+
+        if not unembedded:
             return 0
 
-        # Filter out very short messages
-        valid_messages = [m for m in messages if len(m.get("content", "").strip()) >= 10]
-        if not valid_messages:
-            return 0
+        # Log with context about whether this is incremental or full backfill
+        if is_full_backfill and len(unembedded) > 100:
+            logger.warning(
+                f"[ConversationEmbeddingStore] Large historical backfill: "
+                f"{len(unembedded)} messages (this may take a moment)"
+            )
+        else:
+            logger.info(
+                f"[ConversationEmbeddingStore] Lazy embedding {len(unembedded)} messages..."
+            )
 
         start_time = time.perf_counter()
 
-        # Extract content for batch embedding
-        contents = [m["content"][:2000] for m in valid_messages]
-
-        # Batch embed
+        # Batch embed content (truncate once, process efficiently)
+        contents = [msg["content"][:2000] for msg in unembedded]
         embeddings = await self._embedding_service.embed_batch(contents)
 
-        # Prepare records
-        records = []
-        for msg, embedding in zip(valid_messages, embeddings, strict=False):
-            record = {
-                "id": msg["message_id"],
+        # Prepare lean records using list comprehension
+        records = [
+            {
+                "message_id": msg["message_id"],
                 "session_id": msg["session_id"],
-                "role": msg["role"],
-                "content_preview": msg["content"][: self.MAX_CONTENT_PREVIEW],
                 "vector": embedding.tolist(),
-                "timestamp": (
-                    (msg.get("timestamp") or datetime.now()).isoformat()
-                    if isinstance(msg.get("timestamp"), datetime)
-                    else msg.get("timestamp", datetime.now().isoformat())
-                ),
+                "timestamp": msg["timestamp"],
             }
-            records.append(record)
+            for msg, embedding in zip(unembedded, embeddings, strict=False)
+        ]
 
-        # Add to table
+        # Add to LanceDB
         if self._table is None:
             self._create_table_with_first_record(records[0])
             if len(records) > 1:
@@ -311,12 +350,19 @@ class ConversationEmbeddingStore:
 
         elapsed = time.perf_counter() - start_time
         logger.info(
-            f"[ConversationEmbeddingStore] Batch added {len(records)} messages "
-            f"in {elapsed*1000:.2f}ms ({elapsed*1000/len(records):.2f}ms/msg)"
+            f"[ConversationEmbeddingStore] Embedded {len(records)} messages "
+            f"in {elapsed:.2f}s ({elapsed*1000/len(records):.1f}ms/msg)"
         )
 
-        # Prune old messages if over limit
-        await self._prune_old_messages()
+        # Track for auto-compact
+        self._embeddings_added_since_compact += len(records)
+
+        # Auto-compact if threshold reached
+        if self._embeddings_added_since_compact >= self.COMPACT_THRESHOLD:
+            await self._auto_compact()
+
+        # Prune if over limit
+        await self._prune_old_embeddings()
 
         return len(records)
 
@@ -327,24 +373,30 @@ class ConversationEmbeddingStore:
         limit: int = 10,
         min_similarity: float = 0.3,
         exclude_message_ids: Optional[List[str]] = None,
-    ) -> List[ConversationSearchResult]:
-        """Search for messages semantically similar to a query.
+    ) -> List[EmbeddingSearchResult]:
+        """Search for semantically similar messages.
+
+        Triggers lazy embedding of any un-embedded messages first.
+        Returns message IDs + similarity - fetch full content from SQLite.
 
         Args:
             query: Query text to search for
-            session_id: Optional session to scope search (None = all sessions)
+            session_id: Optional session to scope search
             limit: Maximum number of results
             min_similarity: Minimum similarity threshold (0-1)
-            exclude_message_ids: Message IDs to exclude from results
+            exclude_message_ids: Message IDs to exclude
 
         Returns:
-            List of ConversationSearchResult sorted by similarity (descending)
+            List of EmbeddingSearchResult (message_id + similarity)
         """
         if not self._initialized:
             await self.initialize()
 
+        # Lazy-embed any missing messages
+        await self._ensure_embeddings(session_id)
+
         if self._table is None:
-            logger.debug("[ConversationEmbeddingStore] No table exists, returning empty results")
+            logger.debug("[ConversationEmbeddingStore] No embeddings yet")
             return []
 
         start_time = time.perf_counter()
@@ -353,53 +405,41 @@ class ConversationEmbeddingStore:
         query_embedding = await self._embedding_service.embed_text(query[:2000])
 
         # Search in LanceDB
-        search_query = self._table.search(query_embedding.tolist()).limit(
-            limit * 2
-        )  # Over-fetch for filtering
+        search_query = self._table.search(query_embedding.tolist()).limit(limit * 2)
 
-        # Apply session filter if provided
+        # Apply session filter
         if session_id:
             search_query = search_query.where(f"session_id = '{session_id}'")
 
         # Execute search
         results = search_query.to_list()
 
-        # Convert to result objects with filtering
-        search_results: List[ConversationSearchResult] = []
+        # Convert to result objects efficiently
         exclude_set = set(exclude_message_ids or [])
+        search_results = []
 
         for result in results:
-            message_id = result.get("id", "")
-
-            # Skip excluded messages
+            message_id = result.get("message_id", "")
             if message_id in exclude_set:
                 continue
 
-            # Convert distance to similarity (LanceDB returns L2 distance by default)
-            distance = result.get("_distance", 0.0)
-            # For cosine distance: similarity = 1 - distance
-            # For L2 distance: similarity = 1 / (1 + distance)
-            similarity = 1.0 / (1.0 + distance)
-
-            # Filter by minimum similarity
+            # Convert L2 distance to similarity
+            similarity = 1.0 / (1.0 + result.get("_distance", 0.0))
             if similarity < min_similarity:
                 continue
 
-            # Parse timestamp
-            timestamp_str = result.get("timestamp")
+            # Parse timestamp only if present
             timestamp = None
-            if timestamp_str:
+            if timestamp_str := result.get("timestamp"):
                 try:
                     timestamp = datetime.fromisoformat(timestamp_str)
                 except (ValueError, TypeError):
                     pass
 
             search_results.append(
-                ConversationSearchResult(
+                EmbeddingSearchResult(
                     message_id=message_id,
                     session_id=result.get("session_id", ""),
-                    role=result.get("role", ""),
-                    content_preview=result.get("content_preview", ""),
                     similarity=similarity,
                     timestamp=timestamp,
                 )
@@ -410,108 +450,20 @@ class ConversationEmbeddingStore:
 
         elapsed = time.perf_counter() - start_time
         logger.debug(
-            f"[ConversationEmbeddingStore] Search complete: "
-            f"query_len={len(query)}, results={len(search_results)}, "
-            f"time={elapsed*1000:.2f}ms"
+            f"[ConversationEmbeddingStore] Search: "
+            f"results={len(search_results)}, time={elapsed*1000:.1f}ms"
         )
 
         return search_results
-
-    async def search_by_role(
-        self,
-        query: str,
-        role: str,
-        session_id: Optional[str] = None,
-        limit: int = 10,
-    ) -> List[ConversationSearchResult]:
-        """Search for messages of a specific role similar to a query.
-
-        Useful for finding relevant tool results, user questions, etc.
-
-        Args:
-            query: Query text
-            role: Role to filter by (user/assistant/tool/system)
-            session_id: Optional session filter
-            limit: Maximum results
-
-        Returns:
-            List of matching results
-        """
-        if not self._initialized:
-            await self.initialize()
-
-        if self._table is None:
-            return []
-
-        # Embed query
-        query_embedding = await self._embedding_service.embed_text(query[:2000])
-
-        # Build search with role filter
-        where_clause = f"role = '{role}'"
-        if session_id:
-            where_clause += f" AND session_id = '{session_id}'"
-
-        results = (
-            self._table.search(query_embedding.tolist()).where(where_clause).limit(limit).to_list()
-        )
-
-        search_results: List[ConversationSearchResult] = []
-        for result in results:
-            distance = result.get("_distance", 0.0)
-            similarity = 1.0 / (1.0 + distance)
-
-            timestamp_str = result.get("timestamp")
-            timestamp = None
-            if timestamp_str:
-                try:
-                    timestamp = datetime.fromisoformat(timestamp_str)
-                except (ValueError, TypeError):
-                    pass
-
-            search_results.append(
-                ConversationSearchResult(
-                    message_id=result.get("id", ""),
-                    session_id=result.get("session_id", ""),
-                    role=result.get("role", ""),
-                    content_preview=result.get("content_preview", ""),
-                    similarity=similarity,
-                    timestamp=timestamp,
-                )
-            )
-
-        return search_results
-
-    async def delete_message(self, message_id: str) -> bool:
-        """Delete a message embedding by ID.
-
-        Args:
-            message_id: Message ID to delete
-
-        Returns:
-            True if deleted, False if not found or error
-        """
-        if not self._initialized:
-            await self.initialize()
-
-        if self._table is None:
-            return False
-
-        try:
-            self._table.delete(f"id = '{message_id}'")
-            logger.debug(f"[ConversationEmbeddingStore] Deleted message {message_id}")
-            return True
-        except Exception as e:
-            logger.warning(f"[ConversationEmbeddingStore] Failed to delete {message_id}: {e}")
-            return False
 
     async def delete_session(self, session_id: str) -> int:
-        """Delete all message embeddings for a session.
+        """Delete all embeddings for a session.
 
         Args:
             session_id: Session ID to delete
 
         Returns:
-            Number of messages deleted (estimated)
+            Number of embeddings deleted (estimated)
         """
         if not self._initialized:
             await self.initialize()
@@ -520,105 +472,92 @@ class ConversationEmbeddingStore:
             return 0
 
         try:
-            # Count before deletion
             count_before = self._table.count_rows()
-
-            # Delete
             self._table.delete(f"session_id = '{session_id}'")
-
-            # Count after
             count_after = self._table.count_rows()
             deleted = count_before - count_after
 
             logger.info(
-                f"[ConversationEmbeddingStore] Deleted {deleted} messages from session {session_id}"
+                f"[ConversationEmbeddingStore] Deleted {deleted} embeddings for session {session_id}"
             )
             return deleted
         except Exception as e:
-            logger.warning(
-                f"[ConversationEmbeddingStore] Failed to delete session {session_id}: {e}"
-            )
+            logger.warning(f"[ConversationEmbeddingStore] Delete failed: {e}")
             return 0
 
-    async def _prune_old_messages(self) -> int:
-        """Prune oldest messages if over MAX_MESSAGES limit.
-
-        Uses batch pruning for efficiency - only prunes when PRUNE_BATCH_SIZE
-        over the limit to avoid frequent small deletions.
-
-        Returns:
-            Number of messages pruned
-        """
+    async def _prune_old_embeddings(self) -> int:
+        """Prune oldest embeddings if over MAX_EMBEDDINGS limit."""
         if self._table is None:
             return 0
 
         try:
             count = self._table.count_rows()
-
-            # Only prune if we're significantly over limit
-            if count <= self.MAX_MESSAGES + self.PRUNE_BATCH_SIZE:
+            if count <= self.MAX_EMBEDDINGS + self.PRUNE_BATCH_SIZE:
                 return 0
 
-            # Calculate how many to delete
-            delete_count = count - self.MAX_MESSAGES
+            delete_count = count - self.MAX_EMBEDDINGS
 
-            # Get oldest message IDs by timestamp
-            # LanceDB doesn't have direct "ORDER BY ... LIMIT" so we query all and sort
-            df = self._table.to_pandas()
-            if len(df) == 0:
-                return 0
-
-            # Sort by timestamp ascending and take oldest
-            df = df.sort_values("timestamp", ascending=True)
-            oldest_ids = df.head(delete_count)["id"].tolist()
+            # Get oldest timestamps only (minimal memory usage)
+            df = self._table.to_pandas()[["message_id", "timestamp"]]
+            oldest_ids = df.nsmallest(delete_count, "timestamp")["message_id"].tolist()
 
             if not oldest_ids:
                 return 0
 
-            # Delete in batches to avoid huge SQL strings
+            # Delete in optimized batches
             deleted = 0
-            batch_size = 100
-            for i in range(0, len(oldest_ids), batch_size):
-                batch_ids = oldest_ids[i : i + batch_size]
-                # Build delete condition
+            for i in range(0, len(oldest_ids), 100):
+                batch_ids = oldest_ids[i:i + 100]
                 id_list = ", ".join(f"'{id}'" for id in batch_ids)
-                self._table.delete(f"id IN ({id_list})")
+                self._table.delete(f"message_id IN ({id_list})")
                 deleted += len(batch_ids)
 
-            logger.info(
-                f"[ConversationEmbeddingStore] Pruned {deleted} old messages "
-                f"(was {count}, now {count - deleted}, limit {self.MAX_MESSAGES})"
-            )
+            logger.info(f"[ConversationEmbeddingStore] Pruned {deleted} old embeddings")
             return deleted
 
         except Exception as e:
             logger.warning(f"[ConversationEmbeddingStore] Pruning failed: {e}")
             return 0
 
-    async def compact(self) -> bool:
-        """Compact the LanceDB table to reclaim space after deletions.
-
-        Returns:
-            True if compaction succeeded
-        """
+    async def _auto_compact(self) -> bool:
+        """Auto-compact LanceDB to reduce file proliferation."""
         if self._table is None:
             return False
 
         try:
+            logger.info("[ConversationEmbeddingStore] Auto-compacting...")
             self._table.compact_files()
             self._table.cleanup_old_versions(older_than=None, delete_unverified=True)
+            self._embeddings_added_since_compact = 0
             logger.info("[ConversationEmbeddingStore] Compaction complete")
             return True
         except Exception as e:
             logger.warning(f"[ConversationEmbeddingStore] Compaction failed: {e}")
             return False
 
-    async def get_stats(self) -> Dict[str, Any]:
-        """Get store statistics.
+    async def compact(self) -> bool:
+        """Manually trigger compaction."""
+        return await self._auto_compact()
+
+    async def rebuild(self, session_id: Optional[str] = None) -> int:
+        """Eagerly rebuild embeddings for all un-embedded messages.
+
+        This is used by CLI `victor embeddings --rebuild --conversation` to
+        immediately generate embeddings rather than waiting for next search.
+
+        Args:
+            session_id: Optional session filter
 
         Returns:
-            Dictionary with stats
+            Number of embeddings created
         """
+        logger.info("[ConversationEmbeddingStore] Starting eager rebuild...")
+        count = await self._ensure_embeddings(session_id)
+        logger.info(f"[ConversationEmbeddingStore] Rebuild complete: {count} embeddings created")
+        return count
+
+    async def get_stats(self) -> Dict[str, Any]:
+        """Get store statistics."""
         if not self._initialized:
             await self.initialize()
 
@@ -632,17 +571,23 @@ class ConversationEmbeddingStore:
         return {
             "store": "conversation_embedding_store",
             "backend": "lancedb",
-            "total_messages": count,
-            "max_messages": self.MAX_MESSAGES,
-            "usage_pct": (count / self.MAX_MESSAGES * 100) if self.MAX_MESSAGES > 0 else 0,
+            "mode": "lazy",
+            "total_embeddings": count,
+            "max_embeddings": self.MAX_EMBEDDINGS,
+            "usage_pct": (count / self.MAX_EMBEDDINGS * 100) if self.MAX_EMBEDDINGS > 0 else 0,
             "embedding_dimension": self.dimension,
             "embedding_model": self._embedding_service.model_name,
-            "db_path": str(self._db_path),
-            "table_name": self.TABLE_NAME,
+            "lancedb_path": str(self._lancedb_path),
+            "sqlite_path": str(self._sqlite_db_path),
+            "pending_compact": self._embeddings_added_since_compact,
         }
 
     async def close(self) -> None:
         """Clean up resources."""
+        # Compact before closing if we have pending changes
+        if self._embeddings_added_since_compact > 0:
+            await self._auto_compact()
+
         self._table = None
         self._db = None
         self._initialized = False

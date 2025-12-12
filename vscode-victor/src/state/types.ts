@@ -132,6 +132,7 @@ export interface SettingsState {
     semanticSearchEnabled: boolean;
     semanticSearchMaxResults: number;
     serverPort: number;
+    serverApiKey?: string;
 }
 
 /**

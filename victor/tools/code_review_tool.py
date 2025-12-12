@@ -157,7 +157,9 @@ def _build_report(
     report.append("")
     report.append(f"Path: {path}")
     report.append(f"Files reviewed: {files_reviewed}")
-    report.append(f"Languages found: {', '.join(sorted(languages_found)) if languages_found else 'None'}")
+    report.append(
+        f"Languages found: {', '.join(sorted(languages_found)) if languages_found else 'None'}"
+    )
     report.append(f"Aspects checked: {', '.join(aspects)}")
     report.append("")
     report.append(f"Total issues: {len(filtered_issues)}")
@@ -239,10 +241,18 @@ def _build_report(
 @tool(
     cost_tier=CostTier.LOW,
     category="analysis",
-    keywords=["review", "code", "quality", "security", "complexity", "best practices", "documentation"],
+    keywords=[
+        "review",
+        "code",
+        "quality",
+        "security",
+        "complexity",
+        "best practices",
+        "documentation",
+    ],
     mandatory_keywords=["review code", "code review", "analyze code"],  # Force inclusion
     task_types=["analysis", "review"],  # Classification-aware selection
-    stages=["analysis", "reviewing"],  # Conversation stages where relevant
+    stages=["analysis", "verification"],  # Conversation stages where relevant
     priority=Priority.MEDIUM,  # Task-specific analysis tool
     access_mode=AccessMode.READONLY,  # Only reads files
     danger_level=DangerLevel.SAFE,  # No side effects
@@ -376,7 +386,7 @@ async def code_review(
             "files_reviewed": 0,
             "total_issues": 0,
             "languages_found": [],
-            "message": f"No files found matching patterns",
+            "message": "No files found matching patterns",
         }
 
     # Initialize results
@@ -393,7 +403,7 @@ async def code_review(
             continue
 
         # Filter by language if specified
-        if languages and lang not in [l.lower() for l in languages]:
+        if languages and lang not in [lang_item.lower() for lang_item in languages]:
             continue
 
         languages_found.add(lang)

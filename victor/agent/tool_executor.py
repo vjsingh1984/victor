@@ -49,7 +49,15 @@ from victor.core.retry import (
     RetryStrategy,
     tool_retry_strategy,
 )
-from victor.tools.base import BaseTool, Hook, HookError, ToolRegistry, ToolResult, ValidationResult
+from victor.tools.base import (
+    AccessMode,
+    BaseTool,
+    Hook,
+    HookError,
+    ToolRegistry,
+    ToolResult,
+    ValidationResult,
+)
 from victor.tools.metadata_registry import (
     get_idempotent_tools as registry_get_idempotent_tools,
     get_cache_invalidating_tools as registry_get_cache_invalidating_tools,
@@ -75,6 +83,7 @@ class ValidationMode(Enum):
 
 if TYPE_CHECKING:
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
+    from victor.auth.rbac import RBACManager
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +209,8 @@ class ToolExecutor:
         enable_code_correction: bool = False,
         validation_mode: ValidationMode = ValidationMode.LENIENT,
         error_handler: Optional[ErrorHandler] = None,
+        rbac_manager: Optional["RBACManager"] = None,
+        current_user: Optional[str] = None,
     ):
         """Initialize tool executor.
 
@@ -216,6 +227,8 @@ class ToolExecutor:
             enable_code_correction: Enable code correction for code-generating tools
             validation_mode: Pre-execution validation strictness (STRICT, LENIENT, OFF)
             error_handler: Centralized error handler for structured logging (uses global if None)
+            rbac_manager: Optional RBAC manager for permission checks (disabled if None)
+            current_user: Current user for RBAC checks (defaults to 'default_user')
         """
         self.tools = tool_registry
         self.normalizer = argument_normalizer or ArgumentNormalizer()
@@ -233,6 +246,8 @@ class ToolExecutor:
         self.enable_code_correction = enable_code_correction
         self.validation_mode = validation_mode
         self.error_handler = error_handler or get_error_handler()
+        self.rbac_manager = rbac_manager
+        self.current_user = current_user or "default_user"
 
         # Execution statistics
         self._stats: Dict[str, Dict[str, Any]] = {}
@@ -251,7 +266,62 @@ class ToolExecutor:
             mode: New validation mode to use
         """
         self.validation_mode = mode
-        logger.info(f"Validation mode changed to: {mode.value}")
+        logger.info("Validation mode changed to: %s", mode.value)
+
+    def set_current_user(self, username: str) -> None:
+        """Change the current user for RBAC checks.
+
+        Args:
+            username: New username for permission checks
+        """
+        self.current_user = username
+        logger.info("Current user changed to: %s", username)
+
+    def _check_rbac(
+        self,
+        tool: BaseTool,
+        tool_name: str,
+    ) -> Tuple[bool, Optional[str]]:
+        """Check RBAC permissions for tool execution.
+
+        Uses the tool's declared access_mode and category to determine
+        if the current user has permission to execute it.
+
+        Args:
+            tool: The tool to check permissions for
+            tool_name: Name of the tool
+
+        Returns:
+            Tuple of (allowed, denial_reason)
+            - allowed: True if execution should proceed
+            - denial_reason: Explanation if denied, None if allowed
+        """
+        # Skip RBAC if no manager configured (disabled by default)
+        if self.rbac_manager is None:
+            return True, None
+
+        # Get tool metadata for permission check
+        access_mode = getattr(tool, "access_mode", AccessMode.READONLY)
+        category = getattr(tool, "category", "general")
+
+        # Check access via RBAC manager
+        if self.rbac_manager.check_tool_access(
+            username=self.current_user,
+            tool_name=tool_name,
+            category=category,
+            access_mode=access_mode,
+        ):
+            return True, None
+        else:
+            # Build informative denial message
+            from victor.auth.rbac import Permission
+
+            required_permission = Permission.from_access_mode(access_mode)
+            return (
+                False,
+                f"RBAC denied: User '{self.current_user}' lacks '{required_permission.value}' "
+                f"permission for tool '{tool_name}' (category: {category})",
+            )
 
     def _validate_arguments(
         self,
@@ -287,18 +357,19 @@ class ToolExecutor:
                     error_summary += f" (+{len(validation.errors) - 3} more)"
 
                 if self.validation_mode == ValidationMode.STRICT:
-                    logger.error(f"STRICT validation failed for '{tool.name}': {error_summary}")
+                    logger.error("STRICT validation failed for '%s': %s", tool.name, error_summary)
                     return False, validation
                 else:  # LENIENT
                     logger.warning(
-                        f"Validation issues for '{tool.name}' (proceeding anyway): {error_summary}"
+                        "Validation issues for '%s' (proceeding anyway): %s", tool.name, error_summary
                     )
                     return True, validation
 
             return True, validation
 
         except Exception as e:
-            logger.warning(f"Validation error for '{tool.name}': {e}")
+            # Catch any exception during validation (RuntimeError, ValueError, etc)
+            logger.warning("Validation error for '%s': %s", tool.name, str(e))
             # On validation system error, proceed in lenient mode, block in strict
             if self.validation_mode == ValidationMode.STRICT:
                 return False, ValidationResult.failure([f"Validation system error: {e}"])
@@ -367,25 +438,27 @@ class ToolExecutor:
                         normalized_args, correction_result
                     )
                     logger.info(
-                        f"Code auto-corrected for tool '{tool_name}': "
-                        f"{len(correction_result.validation.errors)} issues fixed"
+                        "Code auto-corrected for tool '%s': %d issues fixed",
+                        tool_name,
+                        len(correction_result.validation.errors)
                     )
 
                 if not correction_result.validation.valid:
                     # Log validation errors but proceed - tool may still work
                     logger.warning(
-                        f"Code validation errors for tool '{tool_name}': "
-                        f"{list(correction_result.validation.errors)}"
+                        "Code validation errors for tool '%s': %s",
+                        tool_name,
+                        list(correction_result.validation.errors)
                     )
-            except Exception as e:
-                logger.warning(f"Code correction middleware failed: {e}")
+            except (AttributeError, TypeError, ValueError, RuntimeError) as e:
+                logger.warning("Code correction middleware failed: %s", str(e))
 
         # Check cache first
         if not skip_cache and self.cache:
             cached_result = self.cache.get(tool_name, normalized_args)
             if cached_result is not None:
                 self._stats[tool_name]["cache_hits"] += 1
-                logger.log(TRACE, f"Cache hit for {tool_name}")
+                logger.log(TRACE, "Cache hit for %s", tool_name)
                 return ToolExecutionResult(
                     tool_name=tool_name,
                     success=True,
@@ -431,12 +504,25 @@ class ToolExecutor:
             tool_name, normalized_args
         )
         if not should_proceed:
-            logger.info(f"Tool execution blocked by safety check: {tool_name}")
+            logger.info("Tool execution blocked by safety check: %s", tool_name)
             return ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,
                 result=None,
                 error=rejection_reason or "Operation cancelled by safety check",
+            )
+
+        # RBAC permission check (runs after safety check)
+        rbac_allowed, rbac_denial = self._check_rbac(tool, tool_name)
+        if not rbac_allowed:
+            logger.warning(
+                "Tool execution blocked by RBAC: %s for user %s", tool_name, self.current_user
+            )
+            return ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                result=None,
+                error=rbac_denial or "Permission denied by RBAC",
             )
 
         # Execute with retry
@@ -489,7 +575,8 @@ class ToolExecutor:
         Raises:
             HookError: If a critical hook fails
         """
-        for before_hook in self.tools._before_hooks:
+        hooks = getattr(self.tools, "_before_hooks", [])
+        for before_hook in hooks:
             hook_obj = before_hook if isinstance(before_hook, Hook) else None
             hook_name = hook_obj.name if hook_obj else getattr(before_hook, "__name__", "hook")
             is_critical = hook_obj.critical if hook_obj else False
@@ -497,10 +584,10 @@ class ToolExecutor:
                 before_hook(tool_name, arguments)
             except Exception as e:
                 if is_critical:
-                    logger.error(f"Critical before hook '{hook_name}' failed: {e}")
-                    raise HookError(hook_name, e, tool_name)
+                    logger.error("Critical before hook '%s' failed: %s", hook_name, str(e))
+                    raise HookError(hook_name, e, tool_name) from e
                 else:
-                    logger.warning(f"Before hook '{hook_name}' failed (non-critical): {e}")
+                    logger.warning("Before hook '%s' failed (non-critical): %s", hook_name, str(e))
 
     def _run_after_hooks(self, tool_name: str, result: Any) -> None:
         """Run after hooks for a tool execution.
@@ -512,7 +599,8 @@ class ToolExecutor:
         Raises:
             HookError: If a critical hook fails
         """
-        for after_hook in self.tools._after_hooks:
+        hooks = getattr(self.tools, "_after_hooks", [])
+        for after_hook in hooks:
             hook_obj = after_hook if isinstance(after_hook, Hook) else None
             hook_name = hook_obj.name if hook_obj else getattr(after_hook, "__name__", "hook")
             is_critical = hook_obj.critical if hook_obj else False
@@ -520,10 +608,10 @@ class ToolExecutor:
                 after_hook(result)
             except Exception as e:
                 if is_critical:
-                    logger.error(f"Critical after hook '{hook_name}' failed: {e}")
-                    raise HookError(hook_name, e, tool_name)
+                    logger.error("Critical after hook '%s' failed: %s", hook_name, str(e))
+                    raise HookError(hook_name, e, tool_name) from e
                 else:
-                    logger.warning(f"After hook '{hook_name}' failed (non-critical): {e}")
+                    logger.warning("After hook '%s' failed (non-critical): %s", hook_name, str(e))
 
     async def _execute_with_retry(
         self,
@@ -559,7 +647,7 @@ class ToolExecutor:
                 self._run_before_hooks(tool.name, arguments)
 
                 # Execute the tool
-                result = await tool.execute(context, **arguments)
+                result = await tool.execute(_exec_ctx=context, **arguments)
 
                 # Run after hooks - critical hooks can raise errors
                 self._run_after_hooks(tool.name, result)
@@ -618,7 +706,46 @@ class ToolExecutor:
                         last_error_info,
                     )
 
-            except Exception as e:
+            except (TimeoutError, asyncio.TimeoutError) as timeout_error:
+                retry_context.record_exception(timeout_error)
+
+                # Use centralized error handler for structured logging
+                last_error_info = self.error_handler.handle(
+                    timeout_error,
+                    context={
+                        "tool": tool.name,
+                        "attempt": retry_context.attempt,
+                        "max_attempts": retry_context.max_attempts,
+                        "arguments": arguments,
+                    },
+                )
+                self._track_error_category(last_error_info.category)
+
+                if self.retry_strategy.should_retry(retry_context):
+                    self.retry_strategy.on_retry(retry_context)
+                    delay = self.retry_strategy.get_delay(retry_context)
+                    logger.warning(
+                        "[%s] Tool %s timeout - retrying in %.2fs "
+                        "(attempt %d/%d): %s",
+                        last_error_info.correlation_id,
+                        tool.name,
+                        delay,
+                        retry_context.attempt,
+                        retry_context.max_attempts,
+                        str(timeout_error),
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+
+                return (
+                    None,
+                    False,
+                    str(timeout_error),
+                    retry_context.attempt - 1,
+                    last_error_info,
+                )
+
+            except (ToolExecutionError, ValueError, TypeError, KeyError, FileNotFoundError, OSError) as e:
                 retry_context.record_exception(e)
 
                 # Use centralized error handler for structured logging
@@ -634,8 +761,12 @@ class ToolExecutor:
                 self._track_error_category(last_error_info.category)
 
                 logger.warning(
-                    f"[{last_error_info.correlation_id}] Tool {tool.name} failed "
-                    f"(attempt {retry_context.attempt}/{retry_context.max_attempts}): {e}"
+                    "[%s] Tool %s failed (attempt %d/%d): %s",
+                    last_error_info.correlation_id,
+                    tool.name,
+                    retry_context.attempt,
+                    retry_context.max_attempts,
+                    str(e)
                 )
 
                 if self.retry_strategy.should_retry(retry_context):

@@ -440,17 +440,21 @@ class TestScoredKeywordMatching:
         """Test that results are sorted by total score."""
         registry = ToolMetadataRegistry()
         # low_score_tool has many keywords but only 1 matches -> lower base score
-        registry.register(MockTool(
-            name="low_score_tool",
-            keywords=["security", "vulnerability", "audit", "compliance", "scan"],
-            priority=Priority.LOW,
-        ))
+        registry.register(
+            MockTool(
+                name="low_score_tool",
+                keywords=["security", "vulnerability", "audit", "compliance", "scan"],
+                priority=Priority.LOW,
+            )
+        )
         # high_score_tool has matching keyword + CRITICAL priority
-        registry.register(MockTool(
-            name="high_score_tool",
-            keywords=["security"],
-            priority=Priority.CRITICAL,
-        ))
+        registry.register(
+            MockTool(
+                name="high_score_tool",
+                keywords=["security"],
+                priority=Priority.CRITICAL,
+            )
+        )
 
         results = registry.get_tools_matching_text_scored("security check")
 
@@ -461,10 +465,12 @@ class TestScoredKeywordMatching:
         """Test that min_score filters low-scoring results."""
         registry = ToolMetadataRegistry()
         # Use distinct keywords that won't accidentally match substrings
-        registry.register(MockTool(
-            name="scan",
-            keywords=["vulnerability", "exploit", "penetration", "assessment", "audit"],
-        ))
+        registry.register(
+            MockTool(
+                name="scan",
+                keywords=["vulnerability", "exploit", "penetration", "assessment", "audit"],
+            )
+        )
 
         # Only matching 0 out of 5 keywords = 0.0 base score
         # With use_fallback=False, should return empty
@@ -745,7 +751,7 @@ class TestStageBasedToolSelection:
         )
 
         # Clear and setup global registry
-        registry = get_global_registry()
+        _ = get_global_registry()  # noqa: F841 - Test function exists
         # Note: We can't easily clear the global registry, so we just test the function exists
         # and returns a set
         result = get_tools_by_stage("reading")
@@ -802,16 +808,12 @@ class TestSemanticSelectionRegistry:
         )
 
         # Match in text
-        matches = registry.get_tools_matching_mandatory_keywords(
-            "Please show diff between files"
-        )
+        matches = registry.get_tools_matching_mandatory_keywords("Please show diff between files")
         assert "diff" in matches
         assert "test_runner" not in matches
 
         # Multiple matches
-        matches = registry.get_tools_matching_mandatory_keywords(
-            "show diff and run tests"
-        )
+        matches = registry.get_tools_matching_mandatory_keywords("show diff and run tests")
         assert "diff" in matches
         assert "test_runner" in matches
 
@@ -840,12 +842,8 @@ class TestSemanticSelectionRegistry:
     def test_task_type_tool_mapping(self):
         """Test getting complete task type to tools mapping."""
         registry = ToolMetadataRegistry()
-        registry.register(
-            MockTool(name="analyzer", task_types=["analysis"])
-        )
-        registry.register(
-            MockTool(name="writer", task_types=["action"])
-        )
+        registry.register(MockTool(name="analyzer", task_types=["analysis"]))
+        registry.register(MockTool(name="writer", task_types=["action"]))
 
         mapping = registry.get_task_type_tool_mapping()
 
@@ -877,15 +875,9 @@ class TestSemanticSelectionRegistry:
         )
 
         # Lookup by execution category
-        assert "reader" in registry.get_tools_by_execution_category(
-            ExecutionCategory.READ_ONLY
-        )
-        assert "writer" in registry.get_tools_by_execution_category(
-            ExecutionCategory.WRITE
-        )
-        assert "fetcher" in registry.get_tools_by_execution_category(
-            ExecutionCategory.NETWORK
-        )
+        assert "reader" in registry.get_tools_by_execution_category(ExecutionCategory.READ_ONLY)
+        assert "writer" in registry.get_tools_by_execution_category(ExecutionCategory.WRITE)
+        assert "fetcher" in registry.get_tools_by_execution_category(ExecutionCategory.NETWORK)
 
     def test_parallelizable_tools(self):
         """Test getting parallelizable tools."""
@@ -1089,9 +1081,7 @@ class TestSemanticSelectionRegistry:
         assert isinstance(get_tools_matching_mandatory_keywords("test"), set)
         assert isinstance(get_tools_by_task_type("analysis"), set)
         assert isinstance(get_task_type_tool_mapping(), dict)
-        assert isinstance(
-            get_tools_by_execution_category(ExecutionCategory.READ_ONLY), set
-        )
+        assert isinstance(get_tools_by_execution_category(ExecutionCategory.READ_ONLY), set)
         assert isinstance(get_parallelizable_tools(), set)
         assert isinstance(get_progress_params("any_tool"), set)
         assert isinstance(get_execution_category_mapping(), dict)
@@ -1134,21 +1124,27 @@ class TestCategoryKeywordsDiscovery:
     def test_get_category_keywords(self):
         """Test getting aggregated keywords from tools in a category."""
         registry = ToolMetadataRegistry()
-        registry.register(MockTool(
-            name="git_commit",
-            category="git",
-            keywords=["commit", "save", "changes"],
-        ))
-        registry.register(MockTool(
-            name="git_push",
-            category="git",
-            keywords=["push", "remote", "upload"],
-        ))
-        registry.register(MockTool(
-            name="pytest",
-            category="testing",
-            keywords=["test", "unit"],
-        ))
+        registry.register(
+            MockTool(
+                name="git_commit",
+                category="git",
+                keywords=["commit", "save", "changes"],
+            )
+        )
+        registry.register(
+            MockTool(
+                name="git_push",
+                category="git",
+                keywords=["push", "remote", "upload"],
+            )
+        )
+        registry.register(
+            MockTool(
+                name="pytest",
+                category="testing",
+                keywords=["test", "unit"],
+            )
+        )
 
         git_keywords = registry.get_category_keywords("git")
 
@@ -1171,16 +1167,20 @@ class TestCategoryKeywordsDiscovery:
     def test_get_all_category_keywords(self):
         """Test getting complete category to keywords mapping."""
         registry = ToolMetadataRegistry()
-        registry.register(MockTool(
-            name="git_commit",
-            category="git",
-            keywords=["commit", "changes"],
-        ))
-        registry.register(MockTool(
-            name="pytest",
-            category="testing",
-            keywords=["test", "unit"],
-        ))
+        registry.register(
+            MockTool(
+                name="git_commit",
+                category="git",
+                keywords=["commit", "changes"],
+            )
+        )
+        registry.register(
+            MockTool(
+                name="pytest",
+                category="testing",
+                keywords=["test", "unit"],
+            )
+        )
 
         all_keywords = registry.get_all_category_keywords()
 
@@ -1192,16 +1192,20 @@ class TestCategoryKeywordsDiscovery:
     def test_detect_categories_from_text(self):
         """Test detecting categories from keyword matches in text."""
         registry = ToolMetadataRegistry()
-        registry.register(MockTool(
-            name="git",
-            category="git",
-            keywords=["commit", "push", "branch"],
-        ))
-        registry.register(MockTool(
-            name="test",
-            category="testing",
-            keywords=["test", "pytest", "unittest"],
-        ))
+        registry.register(
+            MockTool(
+                name="git",
+                category="git",
+                keywords=["commit", "push", "branch"],
+            )
+        )
+        registry.register(
+            MockTool(
+                name="test",
+                category="testing",
+                keywords=["test", "pytest", "unittest"],
+            )
+        )
 
         # Detect git category
         detected = registry.detect_categories_from_text("I want to commit and push my changes")
@@ -1219,11 +1223,13 @@ class TestCategoryKeywordsDiscovery:
     def test_detect_categories_from_text_case_insensitive(self):
         """Test that category detection is case insensitive."""
         registry = ToolMetadataRegistry()
-        registry.register(MockTool(
-            name="git",
-            category="git",
-            keywords=["commit"],
-        ))
+        registry.register(
+            MockTool(
+                name="git",
+                category="git",
+                keywords=["commit"],
+            )
+        )
 
         detected = registry.detect_categories_from_text("COMMIT the changes")
         assert "git" in detected
@@ -1231,11 +1237,13 @@ class TestCategoryKeywordsDiscovery:
     def test_detect_categories_from_text_no_match(self):
         """Test that no match returns empty set."""
         registry = ToolMetadataRegistry()
-        registry.register(MockTool(
-            name="git",
-            category="git",
-            keywords=["commit"],
-        ))
+        registry.register(
+            MockTool(
+                name="git",
+                category="git",
+                keywords=["commit"],
+            )
+        )
 
         detected = registry.detect_categories_from_text("hello world")
         assert detected == set()
@@ -1354,14 +1362,18 @@ class TestAdvancedToolQueries:
     def test_get_tools_for_task_classification(self):
         """Test getting tool entries for task classification."""
         registry = ToolMetadataRegistry()
-        registry.register(MockTool(
-            name="analyzer",
-            task_types=["analysis"],
-        ))
-        registry.register(MockTool(
-            name="searcher",
-            task_types=["analysis", "search"],
-        ))
+        registry.register(
+            MockTool(
+                name="analyzer",
+                task_types=["analysis"],
+            )
+        )
+        registry.register(
+            MockTool(
+                name="searcher",
+                task_types=["analysis", "search"],
+            )
+        )
 
         entries = registry.get_tools_for_task_classification("analysis")
 
@@ -1385,14 +1397,18 @@ class TestAdvancedToolQueries:
     def test_get_all_mandatory_keywords(self):
         """Test getting all registered mandatory keywords."""
         registry = ToolMetadataRegistry()
-        registry.register(MockTool(
-            name="git",
-            mandatory_keywords=["show diff", "git status"],
-        ))
-        registry.register(MockTool(
-            name="test",
-            mandatory_keywords=["run tests"],
-        ))
+        registry.register(
+            MockTool(
+                name="git",
+                mandatory_keywords=["show diff", "git status"],
+            )
+        )
+        registry.register(
+            MockTool(
+                name="test",
+                mandatory_keywords=["run tests"],
+            )
+        )
 
         keywords = registry.get_all_mandatory_keywords()
 

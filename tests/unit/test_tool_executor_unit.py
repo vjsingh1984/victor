@@ -223,9 +223,9 @@ class TestToolExecutorExecute:
             context={"call_ctx": "specific"},
         )
 
-        # Verify tool was called with merged context
+        # Verify tool was called with merged context (passed as _exec_ctx kwarg)
         mock_tool.execute.assert_called_once()
-        call_context = mock_tool.execute.call_args[0][0]
+        call_context = mock_tool.execute.call_args.kwargs.get("_exec_ctx")
         assert call_context["default_ctx"] == "value"
         assert call_context["call_ctx"] == "specific"
 
@@ -330,7 +330,7 @@ class TestToolExecutorRetry:
         call_count = [0]
 
         def make_execute_func():
-            async def execute_func(context, **kwargs):
+            async def execute_func(_exec_ctx=None, **kwargs):
                 nonlocal call_count
                 call_count[0] += 1
                 if call_count[0] < 3:
@@ -1063,6 +1063,7 @@ class TestToolExecutorHooks:
         registry, _ = registry_with_hooks
 
         called = []
+
         def before_hook(tool_name, arguments):
             called.append((tool_name, arguments))
 
@@ -1112,6 +1113,7 @@ class TestToolExecutorHooks:
         registry, _ = registry_with_hooks
 
         called = []
+
         def after_hook(result):
             called.append(result)
 
@@ -1558,7 +1560,7 @@ class TestToolExecutorTimeoutHandling:
 
         call_count = [0]
 
-        async def sometimes_timeout(context, **kwargs):
+        async def sometimes_timeout(_exec_ctx=None, **kwargs):
             nonlocal call_count
             call_count[0] += 1
             if call_count[0] < 2:

@@ -52,7 +52,16 @@ defaults:
     # This multiplies the max_exploration_iterations limit
     exploration_multiplier: 1.0
     # Continuation patience: how many empty turns to allow before forcing completion
-    continuation_patience: 3
+    continuation_patience: 10
+    # Payload size limits (bytes) - prevents HTTP 413 errors
+    # Default is generous; providers with strict limits override this
+    max_request_payload_bytes: 10485760  # 10MB default
+    # Truncation strategy when payload exceeds limit:
+    # - truncate_oldest: Remove oldest messages first
+    # - truncate_tool_results: Truncate large tool results
+    # - reduce_tools: Reduce number of tools sent
+    # - fail: Fail with informative error
+    payload_truncation_strategy: truncate_oldest
 
   # Token-optimized serialization settings
   # Controls how tool outputs are formatted to minimize token usage
@@ -189,7 +198,7 @@ provider_defaults:
     recommended_tool_budget: 20
     # DeepSeek models need more "thinking" turns, give them higher exploration limit
     exploration_multiplier: 1.5
-    continuation_patience: 5
+    continuation_patience: 10
 
   # Groq Cloud - Ultra-fast inference with free tier
   # NOTE: Groq has strict payload size limits (413 errors) due to LPU architecture
@@ -202,6 +211,9 @@ provider_defaults:
     requires_strict_prompting: false
     recommended_max_tools: 12
     recommended_tool_budget: 15
+    # Payload size limit (bytes) - Groq LPU constraint
+    max_request_payload_bytes: 4194304  # 4MB - strict Groq limit
+    payload_truncation_strategy: truncate_tool_results  # Prefer truncating tool results
     # Aggressive compression to stay within payload limits
     serialization:
       preferred_format: null  # auto-select most compact
@@ -212,6 +224,113 @@ provider_defaults:
         - toon
         - json_minified
         - json
+
+  # Cerebras Cloud - Ultra-fast inference via Wafer Scale Engine
+  # Free tier: 30 req/min, 60K-150K tokens/min
+  # https://inference-docs.cerebras.ai/
+  cerebras:
+    native_tool_calls: true
+    streaming_tool_calls: true
+    parallel_tool_calls: true
+    tool_choice_param: true
+    requires_strict_prompting: false
+    recommended_max_tools: 30
+    recommended_tool_budget: 20
+
+  # Mistral AI API - Native tool calling support
+  # https://docs.mistral.ai/capabilities/function_calling/
+  mistral:
+    native_tool_calls: true
+    streaming_tool_calls: true
+    parallel_tool_calls: true
+    tool_choice_param: true
+    requires_strict_prompting: false
+    recommended_max_tools: 30
+    recommended_tool_budget: 15
+
+  # Together AI - OpenAI-compatible with native tool support
+  # https://docs.together.ai/docs/function-calling
+  together:
+    native_tool_calls: true
+    streaming_tool_calls: true
+    parallel_tool_calls: true
+    tool_choice_param: true
+    requires_strict_prompting: false
+    recommended_max_tools: 30
+    recommended_tool_budget: 15
+
+  # OpenRouter - Routes to multiple providers, tool support varies by model
+  # https://openrouter.ai/docs#tool-use
+  openrouter:
+    native_tool_calls: true
+    streaming_tool_calls: true
+    parallel_tool_calls: true
+    tool_choice_param: true
+    requires_strict_prompting: false
+    recommended_max_tools: 25
+    recommended_tool_budget: 15
+
+  # Fireworks AI - Fast inference with tool calling
+  # https://docs.fireworks.ai/guides/function-calling
+  fireworks:
+    native_tool_calls: true
+    streaming_tool_calls: true
+    parallel_tool_calls: true
+    tool_choice_param: true
+    requires_strict_prompting: false
+    recommended_max_tools: 30
+    recommended_tool_budget: 15
+
+  # Azure OpenAI - Same capabilities as OpenAI
+  azure:
+    native_tool_calls: true
+    streaming_tool_calls: true
+    parallel_tool_calls: true
+    tool_choice_param: true
+    requires_strict_prompting: false
+    recommended_max_tools: 50
+    recommended_tool_budget: 20
+
+  # AWS Bedrock - Tool support for Claude, Llama, Mistral models
+  # https://docs.aws.amazon.com/bedrock/latest/userguide/tool-use.html
+  bedrock:
+    native_tool_calls: true
+    streaming_tool_calls: true
+    parallel_tool_calls: true
+    tool_choice_param: true
+    requires_strict_prompting: false
+    recommended_max_tools: 40
+    recommended_tool_budget: 20
+
+  # Google Vertex AI - Same as Google AI but enterprise
+  vertex:
+    native_tool_calls: true
+    streaming_tool_calls: true
+    parallel_tool_calls: true
+    tool_choice_param: true
+    requires_strict_prompting: false
+    recommended_max_tools: 30
+    recommended_tool_budget: 15
+
+  # HuggingFace Inference API - Model-dependent tool support
+  huggingface:
+    native_tool_calls: false  # Varies by model, default to false
+    streaming_tool_calls: false
+    parallel_tool_calls: false
+    tool_choice_param: false
+    requires_strict_prompting: true
+    recommended_max_tools: 15
+    recommended_tool_budget: 10
+
+  # Replicate - Model-dependent, mostly for image/audio models
+  replicate:
+    native_tool_calls: false  # Most models don't support tools
+    streaming_tool_calls: false
+    parallel_tool_calls: false
+    tool_choice_param: false
+    requires_strict_prompting: true
+    recommended_max_tools: 10
+    recommended_tool_budget: 8
 
 # =============================================================================
 # MODEL CONFIGURATIONS
@@ -258,7 +377,10 @@ models:
       ollama:
         native_tool_calls: true   # Custom Modelfile enables it
         parallel_tool_calls: true
-        requires_strict_prompting: false
+        # Set to true for stricter prompts to prevent continuation without action
+        requires_strict_prompting: true
+        # How many empty responses before forcing continuation prompt
+        continuation_patience: 6
       lmstudio:
         native_tool_calls: true
       vllm:
@@ -267,6 +389,8 @@ models:
     settings:
       recommended_tool_budget: 15
       argument_format: xml
+      # Stricter thresholds for this model
+      stage_transition_confidence: 0.75
 
   "qwen3:*":
     # Base Qwen3 (non-coder) - HAS Ollama tool support
@@ -304,6 +428,10 @@ models:
         native_tool_calls: true
       vllm:
         native_tool_calls: true
+      cerebras:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
 
     settings:
       recommended_tool_budget: 15
@@ -372,6 +500,26 @@ models:
       recommended_tool_budget: 15
       argument_format: xml
 
+  # Shorthand naming (qwen25 instead of qwen2.5) - matches user-created models
+  "qwen25-coder-tools*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      ollama:
+        native_tool_calls: true   # Custom Modelfile enables it
+        parallel_tool_calls: true
+        requires_strict_prompting: false
+      lmstudio:
+        native_tool_calls: true
+      vllm:
+        native_tool_calls: true
+
+    settings:
+      recommended_tool_budget: 15
+      argument_format: xml
+
   # ---------------------------------------------------------------------------
   # LLAMA FAMILY
   # ---------------------------------------------------------------------------
@@ -390,6 +538,10 @@ models:
         native_tool_calls: true
       vllm:
         native_tool_calls: true
+      cerebras:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
 
     settings:
       recommended_tool_budget: 15
@@ -428,6 +580,10 @@ models:
         native_tool_calls: true
       vllm:
         native_tool_calls: true
+      cerebras:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
 
     settings:
       recommended_tool_budget: 15
@@ -1113,6 +1269,245 @@ models:
         streaming_tool_calls: true
         parallel_tool_calls: true
         requires_strict_prompting: false
+
+    settings:
+      recommended_max_tools: 40
+      recommended_tool_budget: 20
+      argument_format: json
+
+  # ---------------------------------------------------------------------------
+  # MISTRAL API MODELS
+  # ---------------------------------------------------------------------------
+  # Mistral AI direct API models (not Ollama)
+
+  "mistral-large*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      mistral:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 40
+      recommended_tool_budget: 20
+      argument_format: json
+
+  "mistral-small*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      mistral:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 30
+      recommended_tool_budget: 15
+      argument_format: json
+
+  "codestral*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      mistral:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 35
+      recommended_tool_budget: 18
+      argument_format: json
+
+  # ---------------------------------------------------------------------------
+  # TOGETHER AI MODELS
+  # ---------------------------------------------------------------------------
+
+  "meta-llama/Meta-Llama*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      together:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 35
+      recommended_tool_budget: 18
+      argument_format: json
+
+  "mistralai/*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      together:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 30
+      recommended_tool_budget: 15
+      argument_format: json
+
+  # ---------------------------------------------------------------------------
+  # FIREWORKS AI MODELS
+  # ---------------------------------------------------------------------------
+
+  "accounts/fireworks/models/llama*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      fireworks:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 35
+      recommended_tool_budget: 18
+      argument_format: json
+
+  "accounts/fireworks/models/qwen*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      fireworks:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 35
+      recommended_tool_budget: 18
+      argument_format: json
+
+  # ---------------------------------------------------------------------------
+  # AZURE OPENAI MODELS
+  # ---------------------------------------------------------------------------
+  # Azure uses deployment names, which can be anything
+  # Provider defaults apply for all Azure models
+
+  "gpt-4*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      azure:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+      openai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 25
+      argument_format: json
+
+  "gpt-3.5*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      azure:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+      openai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 30
+      recommended_tool_budget: 15
+      argument_format: json
+
+  # ---------------------------------------------------------------------------
+  # ANTHROPIC CLAUDE MODELS
+  # ---------------------------------------------------------------------------
+
+  "claude-*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      anthropic:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+      bedrock:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 25
+      argument_format: json
+
+  # ---------------------------------------------------------------------------
+  # GOOGLE GEMINI MODELS
+  # ---------------------------------------------------------------------------
+
+  "gemini-*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      google:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+      vertex:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 40
+      recommended_tool_budget: 20
+      argument_format: json
+
+  # ---------------------------------------------------------------------------
+  # XAI GROK MODELS
+  # ---------------------------------------------------------------------------
+
+  "grok-*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      xai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
 
     settings:
       recommended_max_tools: 40

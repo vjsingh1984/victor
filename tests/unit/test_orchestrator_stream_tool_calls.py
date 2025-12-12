@@ -71,7 +71,7 @@ class DummyTool(BaseTool):
         super().__init__()
         self.calls: list[Dict[str, Any]] = []
 
-    async def execute(self, context: Dict[str, Any], **kwargs: Any):
+    async def execute(self, _exec_ctx: Dict[str, Any] = None, **kwargs: Any):
         self.calls.append(kwargs)
         return SimpleNamespace(success=True, output="ok", error=None)
 

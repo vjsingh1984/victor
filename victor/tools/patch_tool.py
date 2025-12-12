@@ -334,7 +334,10 @@ async def patch(
 
     # Apply patch operation (default)
     if op != "apply":
-        return {"success": False, "error": f"Unknown operation '{operation}'. Use 'apply' or 'create'."}
+        return {
+            "success": False,
+            "error": f"Unknown operation '{operation}'. Use 'apply' or 'create'.",
+        }
 
     if not patch_content:
         return {"success": False, "error": "patch_content required for 'apply' operation"}
@@ -565,5 +568,3 @@ async def _create_diff(
             "success": False,
             "error": f"Failed to create patch: {e}",
         }
-
-

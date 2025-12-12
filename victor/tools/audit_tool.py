@@ -35,6 +35,7 @@ from victor.tools.base import (
     ToolMetadata,
     ToolResult,
 )
+from victor.tools.tool_names import ToolNames
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ logger = logging.getLogger(__name__)
 class AuditTool(BaseTool):
     """Tool for audit logging and compliance checking."""
 
-    name = "audit"
+    name = ToolNames.AUDIT
     description = """Access audit logs and compliance reports.
 
 Supported frameworks:

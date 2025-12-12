@@ -69,7 +69,7 @@ def _is_dangerous(command: str) -> bool:
     danger_level=DangerLevel.HIGH,  # Arbitrary command execution is risky
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["cmd"],  # Different commands indicate progress, not loops
-    stages=["executing", "verification"],  # Conversation stages where relevant
+    stages=["execution", "verification"],  # Conversation stages where relevant
     task_types=["action", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.EXECUTE,  # Cannot run safely in parallel
     mandatory_keywords=["run command", "execute", "shell"],  # Force inclusion
@@ -199,5 +199,3 @@ async def shell(
             "stderr": "",
             "return_code": -1,
         }
-
-

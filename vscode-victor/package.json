@@ -5,9 +5,10 @@
   "version": "0.1.0",
   "publisher": "victor-ai",
   "license": "Apache-2.0",
+  "icon": "resources/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/victor-ai/vscode-victor"
+    "url": "https://github.com/vjsingh1984/victor"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -183,9 +184,188 @@
       {
         "command": "victor.openSettings",
         "title": "Victor: Open Settings"
+      },
+      {
+        "command": "victor.refreshWorkspaceInsights",
+        "title": "Victor: Refresh Workspace Insights",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "victor.runSecurityScan",
+        "title": "Victor: Run Security Scan",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "victor.showGitDiff",
+        "title": "Victor: Show Git Diff"
+      },
+      {
+        "command": "victor.refreshMcp",
+        "title": "Victor: Refresh MCP Servers",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "victor.addMcpServer",
+        "title": "Victor: Add MCP Server",
+        "icon": "$(add)"
+      },
+      {
+        "command": "victor.connectMcpServer",
+        "title": "Victor: Connect MCP Server",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "victor.disconnectMcpServer",
+        "title": "Victor: Disconnect MCP Server",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "victor.showMcpServerInfo",
+        "title": "Victor: Show MCP Server Info"
+      },
+      {
+        "command": "victor.exportConversation",
+        "title": "Victor: Export Conversation",
+        "icon": "$(export)"
+      },
+      {
+        "command": "victor.viewPendingApprovals",
+        "title": "Victor: View Pending Tool Approvals",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "victor.manageAutoApprovals",
+        "title": "Victor: Manage Auto-Approval Rules",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "victor.viewApprovalHistory",
+        "title": "Victor: View Tool Approval History",
+        "icon": "$(history)"
+      },
+      {
+        "command": "victor.configureProviderKey",
+        "title": "Victor: Configure Provider API Key",
+        "icon": "$(key)"
+      },
+      {
+        "command": "victor.testProviderConnection",
+        "title": "Victor: Test Provider Connection",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "victor.configureProviderParams",
+        "title": "Victor: Configure Provider Parameters",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "victor.viewProviderStatus",
+        "title": "Victor: View Provider Status",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "victor.toggleCodeLens",
+        "title": "Victor: Toggle CodeLens Suggestions"
+      },
+      {
+        "command": "victor.askAboutSymbol",
+        "title": "Victor: Ask About Symbol"
+      },
+      {
+        "command": "victor.explainSymbol",
+        "title": "Victor: Explain Symbol"
+      },
+      {
+        "command": "victor.generateTestsForSymbol",
+        "title": "Victor: Generate Tests for Symbol"
+      },
+      {
+        "command": "victor.documentSymbol",
+        "title": "Victor: Document Symbol"
+      },
+      {
+        "command": "victor.optimizeSymbol",
+        "title": "Victor: Optimize Symbol"
+      },
+      {
+        "command": "victor.refactorSymbol",
+        "title": "Victor: Refactor Symbol"
+      },
+      {
+        "command": "victor.reviewSymbol",
+        "title": "Victor: Review Symbol"
+      },
+      {
+        "command": "victor.toggleCodeActions",
+        "title": "Victor: Toggle Code Actions (Lightbulb)"
+      },
+      {
+        "command": "victor.fixWithAI",
+        "title": "Victor: Fix with AI",
+        "icon": "$(lightbulb-autofix)"
+      },
+      {
+        "command": "victor.explainWithAI",
+        "title": "Victor: Explain with AI",
+        "icon": "$(question)"
+      },
+      {
+        "command": "victor.refactorWithAI",
+        "title": "Victor: Refactor with AI",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "victor.generateTestsWithAI",
+        "title": "Victor: Generate Tests with AI",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "victor.documentWithAI",
+        "title": "Victor: Add Documentation with AI",
+        "icon": "$(book)"
+      },
+      {
+        "command": "victor.optimizeWithAI",
+        "title": "Victor: Optimize with AI",
+        "icon": "$(zap)"
+      },
+      {
+        "command": "victor.reviewWithAI",
+        "title": "Victor: Review with AI",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "victor.toggleHover",
+        "title": "Victor: Toggle Hover Tooltips"
+      },
+      {
+        "command": "victor.setHoverVerbosity",
+        "title": "Victor: Set Hover Verbosity Level"
+      },
+      {
+        "command": "victor.showToolExecutions",
+        "title": "Victor: Show Tool Executions",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "victor.cancelAllToolExecutions",
+        "title": "Victor: Cancel All Tool Executions",
+        "icon": "$(close-all)"
+      },
+      {
+        "command": "victor.clearToolExecutionHistory",
+        "title": "Victor: Clear Tool Execution History",
+        "icon": "$(trash)"
       }
     ],
     "menus": {
+      "editor/title": [
+        {
+          "command": "victor.chat",
+          "when": "resourceScheme == file",
+          "group": "navigation@1"
+        }
+      ],
       "editor/context": [
         {
           "submenu": "victor.submenu",
@@ -229,6 +409,26 @@
           "command": "victor.refreshDiagnostics",
           "when": "view == victor.diagnosticsView",
           "group": "navigation"
+        },
+        {
+          "command": "victor.refreshWorkspaceInsights",
+          "when": "view == victor.workspaceInsightsView",
+          "group": "navigation"
+        },
+        {
+          "command": "victor.runSecurityScan",
+          "when": "view == victor.workspaceInsightsView",
+          "group": "navigation"
+        },
+        {
+          "command": "victor.refreshMcp",
+          "when": "view == victor.mcpView",
+          "group": "navigation"
+        },
+        {
+          "command": "victor.addMcpServer",
+          "when": "view == victor.mcpView",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
@@ -245,6 +445,16 @@
         {
           "command": "victor.fixAllInFile",
           "when": "view == victor.diagnosticsView && viewItem == diagnosticFile",
+          "group": "inline"
+        },
+        {
+          "command": "victor.connectMcpServer",
+          "when": "view == victor.mcpView && viewItem == disconnectedServer",
+          "group": "inline"
+        },
+        {
+          "command": "victor.disconnectMcpServer",
+          "when": "view == victor.mcpView && viewItem == connectedServer",
           "group": "inline"
         }
       ]
@@ -278,13 +488,18 @@
       "properties": {
         "victor.serverUrl": {
           "type": "string",
-          "default": "http://localhost:8765",
+          "default": "http://127.0.0.1:8000",
           "description": "URL of the Victor server (deprecated, use serverPort instead)"
         },
         "victor.serverPort": {
           "type": "number",
-          "default": 8765,
+          "default": 8000,
           "description": "Port for the Victor server"
+        },
+        "victor.serverApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for authenticating with the Victor server (Authorization: Bearer <token>)"
         },
         "victor.pythonPath": {
           "type": "string",
@@ -327,7 +542,7 @@
         },
         "victor.autoStart": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Automatically start Victor server on activation"
         },
         "victor.showInlineCompletions": {
@@ -344,6 +559,86 @@
           "type": "number",
           "default": 10,
           "description": "Maximum number of semantic search results"
+        },
+        "victor.codeLens.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable CodeLens for AI suggestions above functions and classes"
+        },
+        "victor.codeLens.actions": {
+          "type": "array",
+          "default": ["ask", "explain", "test"],
+          "items": {
+            "type": "string",
+            "enum": ["ask", "explain", "test", "document", "optimize", "refactor", "review"]
+          },
+          "description": "Actions to show in CodeLens"
+        },
+        "victor.codeLens.showOnFunctions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show CodeLens on functions"
+        },
+        "victor.codeLens.showOnClasses": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show CodeLens on classes"
+        },
+        "victor.codeLens.showOnMethods": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show CodeLens on methods"
+        },
+        "victor.codeLens.showOnInterfaces": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show CodeLens on interfaces"
+        },
+        "victor.codeLens.maxSymbolsPerFile": {
+          "type": "number",
+          "default": 100,
+          "description": "Maximum number of symbols to show CodeLens for per file"
+        },
+        "victor.codeLens.debounceMs": {
+          "type": "number",
+          "default": 500,
+          "description": "Debounce time for CodeLens updates in milliseconds"
+        },
+        "victor.codeActions.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Victor AI code actions in the lightbulb menu"
+        },
+        "victor.hover.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Victor AI hover tooltips"
+        },
+        "victor.hover.verbosity": {
+          "type": "string",
+          "enum": ["minimal", "standard", "detailed"],
+          "default": "standard",
+          "description": "Verbosity level for hover tooltips"
+        },
+        "victor.hover.showAIExplanation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show AI-powered explanations in hover"
+        },
+        "victor.hover.showQuickActions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show quick action links in hover"
+        },
+        "victor.hover.cacheTimeoutMs": {
+          "type": "number",
+          "default": 300000,
+          "description": "Cache timeout for hover results in milliseconds (default: 5 minutes)"
+        },
+        "victor.hover.debounceMs": {
+          "type": "number",
+          "default": 150,
+          "description": "Debounce time for hover requests in milliseconds"
         }
       }
     },
@@ -380,12 +675,69 @@
           "name": "Diagnostics"
         },
         {
+          "id": "victor.workspaceInsightsView",
+          "name": "Workspace Insights"
+        },
+        {
+          "id": "victor.mcpView",
+          "name": "MCP Servers"
+        },
+        {
           "type": "webview",
           "id": "victor.settingsView",
           "name": "Settings"
         }
       ]
-    }
+    },
+    "walkthroughs": [
+      {
+        "id": "victor.welcome",
+        "title": "Get Started with Victor AI",
+        "description": "AI-powered coding assistant with multi-provider support",
+        "steps": [
+          {
+            "id": "openChat",
+            "title": "Open Chat Panel",
+            "description": "Start a conversation with Victor AI to get coding assistance.\n\n[Open Chat](command:victor.chat)",
+            "media": {
+              "image": "resources/icon.png",
+              "altText": "Victor AI Chat"
+            },
+            "completionEvents": ["onCommand:victor.chat"]
+          },
+          {
+            "id": "configureProvider",
+            "title": "Configure AI Provider",
+            "description": "Choose your preferred AI provider (Anthropic, OpenAI, Ollama, etc.).\n\n[Open Settings](command:victor.openSettings)",
+            "media": {
+              "image": "resources/icon.png",
+              "altText": "Victor AI Settings"
+            },
+            "completionEvents": ["onCommand:victor.openSettings"]
+          },
+          {
+            "id": "explainCode",
+            "title": "Explain Code",
+            "description": "Select code and ask Victor to explain it.\n\n[Explain Selection](command:victor.explain)",
+            "media": {
+              "image": "resources/icon.png",
+              "altText": "Explain Code"
+            },
+            "completionEvents": ["onCommand:victor.explain"]
+          },
+          {
+            "id": "semanticSearch",
+            "title": "Semantic Code Search",
+            "description": "Find code by describing what it does in natural language.\n\n[Search Code](command:victor.search)",
+            "media": {
+              "image": "resources/icon.png",
+              "altText": "Semantic Search"
+            },
+            "completionEvents": ["onCommand:victor.search"]
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -413,6 +765,7 @@
   },
   "dependencies": {
     "axios": "^1.6.0",
+    "form-data": "^4.0.0",
     "ws": "^8.14.0"
   }
 }

@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Modern TUI** - Rich terminal interface powered by Textual with markdown rendering, syntax highlighting, and status bar showing provider/model/tokens
 - **Stream Cancellation** - Press Ctrl+C to cancel streaming responses mid-generation
-- **Debug CLI Mode** - Use `--no-tui` or `--cli` flag for console output with visible debug logs
+- **Debug CLI Mode** - Use `--renderer text` with `--log-level DEBUG` for plain console output with visible debug logs
 - **Conceptual Query Detection** - Semantic tool selector now detects inheritance/pattern queries and automatically routes to `semantic_code_search` instead of keyword-based `code_search`
 - **AST-Aware Code Chunking** - Semantic search chunker uses AST parsing for more intelligent code segmentation
 - **Conversation State Machine** - Session restoration with `ConversationStateMachine` tracking conversation stages (INITIAL, EXPLORING, ANALYZING, IMPLEMENTING, REVIEWING)
