@@ -26,7 +26,6 @@ from victor.tools.refactor_tool import rename
 class TestSymbol:
     """Tests for symbol function."""
 
-    @pytest.mark.skip(reason="Tree-sitter query format issues - needs investigation")
     @pytest.mark.asyncio
     async def test_find_function(self, tmp_path):
         """Test finding a function definition."""
@@ -106,7 +105,6 @@ def existing_function():
 
         assert result is None
 
-    @pytest.mark.skip(reason="Tree-sitter query format issues - needs investigation")
     @pytest.mark.asyncio
     async def test_find_nested_function(self, tmp_path):
         """Test finding nested function."""
@@ -126,7 +124,6 @@ def outer_function():
         assert result["symbol_name"] == "inner_function"
         assert result["type"] == "function"
 
-    @pytest.mark.skip(reason="Tree-sitter query format issues - needs investigation")
     @pytest.mark.asyncio
     async def test_find_method_in_class(self, tmp_path):
         """Test finding a method inside a class."""

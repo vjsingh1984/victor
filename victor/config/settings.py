@@ -581,6 +581,26 @@ class Settings(BaseSettings):
     max_research_iterations: int = 6  # Force synthesis after N consecutive web searches
 
     # ==========================================================================
+    # Recovery & Loop Detection Thresholds
+    # ==========================================================================
+    # These control when Victor forces completion after detecting stuck behavior.
+    # Lower values = faster recovery but may cut off legitimate long operations.
+    # Higher values = more patience but may waste tokens on stuck loops.
+
+    # Empty response recovery: Force after N consecutive empty responses from model
+    recovery_empty_response_threshold: int = 5  # Default: force after 5 empty responses (3 * 1.5 = 4.5 → 5)
+
+    # Loop detection patience: How many consecutive blocked attempts before forcing completion
+    # This is separate from the per-task loop_repeat_threshold (which controls when to warn/block)
+    recovery_blocked_consecutive_threshold: int = 6  # Default: force after 6 consecutive blocks (4 * 1.5 = 6)
+    recovery_blocked_total_threshold: int = 9  # Default: force after 9 total blocked attempts (6 * 1.5 = 9)
+
+    # Continuation prompts: How many times to prompt model to continue before forcing
+    max_continuation_prompts_analysis: int = 6  # For analysis tasks (4 * 1.5 = 6)
+    max_continuation_prompts_action: int = 5  # For action tasks (3 * 1.5 = 4.5 → 5)
+    max_continuation_prompts_default: int = 3  # For other tasks (2 * 1.5 = 3)
+
+    # ==========================================================================
     # Conversation Memory (Multi-turn Context Retention)
     # ==========================================================================
     conversation_memory_enabled: bool = True  # Enable SQLite-backed conversation persistence

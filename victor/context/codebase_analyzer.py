@@ -1460,11 +1460,14 @@ async def generate_victor_md_from_index(
         for domain, impls in sorted(named_impls.items()):
             if impls:
                 sections.append(f"### {domain}\n")
-                sections.append("| Name | Path | Description |")
-                sections.append("|------|------|-------------|")
+                sections.append("| Name | Location | Description |")
+                sections.append("|------|----------|-------------|")
                 for impl in sorted(impls, key=lambda x: x["name"]):
                     desc = impl.get("description", "") or impl.get("primary_symbol", "")
-                    sections.append(f"| **{impl['name']}** | `{impl['path']}` | {desc} |")
+                    # Format: SymbolName (file.py:line) for LLM navigation
+                    line_ref = f":{impl['line']}" if impl.get('line') else ""
+                    location = f"`{impl['path']}{line_ref}`"
+                    sections.append(f"| **{impl['name']}** | {location} | {desc} |")
                 sections.append("")
 
     # Performance Hints (extracted from docstrings)
@@ -1686,6 +1689,125 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
     return insights
 
 
+async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, Any]:
+    """Extract insights from the code graph for init.md enrichment.
+
+    Analyzes the code graph to detect:
+    - Design patterns (Provider, Factory, Facade, etc.)
+    - Most important symbols (PageRank)
+    - Hub classes (high centrality)
+    - File dependencies
+    - Graph statistics
+
+    Args:
+        root_path: Root directory containing .victor/graph
+
+    Returns:
+        Dictionary with graph insights
+    """
+    from pathlib import Path
+    from victor.tools.graph_tool import GraphAnalyzer, _load_graph
+    from victor.codebase.graph.registry import create_graph_store
+
+    root = Path(root_path) if root_path else Path.cwd()
+    graph_dir = root / ".victor" / "graph"
+    graph_db_path = graph_dir / "graph.db"
+
+    insights: Dict[str, Any] = {
+        "has_graph": False,
+        "patterns": [],
+        "important_symbols": [],
+        "hub_classes": [],
+        "stats": {},
+    }
+
+    if not graph_db_path.exists():
+        return insights
+
+    try:
+        # Use direct SQL queries for fast stats instead of loading entire graph
+        import sqlite3
+        import json
+
+        conn = sqlite3.connect(graph_db_path)
+        try:
+            # Get basic stats
+            cur = conn.execute("SELECT COUNT(*) FROM nodes")
+            total_nodes = cur.fetchone()[0]
+
+            if total_nodes == 0:
+                return insights
+
+            cur = conn.execute("SELECT COUNT(*) FROM edges")
+            total_edges = cur.fetchone()[0]
+
+            # Get node type distribution
+            cur = conn.execute("SELECT type, COUNT(*) FROM nodes GROUP BY type")
+            node_types = dict(cur.fetchall())
+
+            # Get edge type distribution
+            cur = conn.execute("SELECT type, COUNT(*) FROM edges GROUP BY type")
+            edge_types = dict(cur.fetchall())
+
+            insights["has_graph"] = True
+            insights["stats"] = {
+                "total_nodes": total_nodes,
+                "total_edges": total_edges,
+                "node_types": node_types,
+                "edge_types": edge_types,
+            }
+
+            # Get high-connectivity nodes (hub classes) via SQL
+            cur = conn.execute("""
+                SELECT n.name, n.type, n.file, n.line,
+                       (SELECT COUNT(*) FROM edges WHERE src = n.node_id) +
+                       (SELECT COUNT(*) FROM edges WHERE dst = n.node_id) as degree
+                FROM nodes n
+                WHERE n.type IN ('class', 'struct', 'interface')
+                ORDER BY degree DESC
+                LIMIT 5
+            """)
+            hub_results = cur.fetchall()
+            insights["hub_classes"] = [
+                {"name": r[0], "type": r[1], "file": r[2], "line": r[3], "degree": r[4]}
+                for r in hub_results
+                if r[4] >= 5
+            ][:3]
+
+            # Get most-called symbols (important functions)
+            cur = conn.execute("""
+                SELECT n.name, n.type, n.file, n.line,
+                       (SELECT COUNT(*) FROM edges WHERE dst = n.node_id AND type = 'CALLS') as in_calls,
+                       (SELECT COUNT(*) FROM edges WHERE src = n.node_id AND type = 'CALLS') as out_calls
+                FROM nodes n
+                WHERE n.type IN ('function', 'method', 'class')
+                ORDER BY in_calls DESC
+                LIMIT 8
+            """)
+            important_results = cur.fetchall()
+            insights["important_symbols"] = [
+                {
+                    "name": r[0],
+                    "type": r[1],
+                    "file": r[2],
+                    "line": r[3],
+                    "in_degree": r[4],
+                    "out_degree": r[5],
+                    "score": r[4] / max(total_edges, 1),  # Simplified score
+                }
+                for r in important_results
+                if r[4] > 0
+            ]
+
+        finally:
+            conn.close()
+
+    except Exception as e:
+        logger.warning(f"Failed to extract graph insights: {e}")
+
+    return insights
+
+
 async def generate_enhanced_init_md(
     root_path: Optional[str] = None,
     use_llm: bool = False,
@@ -1776,6 +1898,66 @@ async def generate_enhanced_init_md(
                 )
             else:
                 base_content += "\n" + "\n".join(enhancements)
+
+    # Step 2.5: Graph - Add graph-based insights (design patterns, important symbols)
+    progress("graph", "Analyzing code graph...")
+    graph_insights = await extract_graph_insights(root_path)
+    if graph_insights.get("has_graph"):
+        progress("graph", f"Graph analyzed ({graph_insights['stats'].get('total_nodes', 0)} nodes)", complete=True)
+
+        graph_section = ["\n## Code Graph Insights\n"]
+        graph_section.append(f"*{graph_insights['stats'].get('total_nodes', 0)} symbols, {graph_insights['stats'].get('total_edges', 0)} relationships*\n")
+
+        # Design patterns detected
+        if graph_insights.get("patterns"):
+            graph_section.append("### Detected Design Patterns\n")
+            for p in graph_insights["patterns"][:5]:
+                details = p.get("details", {})
+                if p["pattern"] == "provider_strategy":
+                    impls = details.get("implementations", [])
+                    graph_section.append(f"- **{p['name']}**: `{details.get('base_class', '')}` with {len(impls)} implementations")
+                elif p["pattern"] == "facade":
+                    graph_section.append(f"- **{p['name']}**: `{details.get('class', '')}` ({details.get('incoming_calls', 0)} callers → {details.get('outgoing_calls', 0)} delegates)")
+                elif p["pattern"] == "composition":
+                    composed = details.get("composed_of", [])
+                    graph_section.append(f"- **{p['name']}**: `{details.get('class', '')}` composed of {len(composed)} components")
+                elif p["pattern"] == "factory":
+                    graph_section.append(f"- **{p['name']}**: `{details.get('class', '')}` creates {details.get('creates', 0)} types")
+                else:
+                    graph_section.append(f"- **{p['name']}**: `{details.get('class', details.get('base_class', ''))}`")
+            graph_section.append("")
+
+        # Most important symbols (PageRank)
+        if graph_insights.get("important_symbols"):
+            graph_section.append("### Most Important Symbols (PageRank)\n")
+            graph_section.append("| Symbol | Type | Connections |")
+            graph_section.append("|--------|------|-------------|")
+            for sym in graph_insights["important_symbols"][:6]:
+                conns = f"↓{sym['in_degree']} ↑{sym['out_degree']}"
+                # Format: SymbolName (file.py:line) for LLM navigation
+                line_ref = f":{sym['line']}" if sym.get('line') else ""
+                location = f"({sym['file']}{line_ref})"
+                graph_section.append(f"| `{sym['name']}` {location} | {sym['type']} | {conns} |")
+            graph_section.append("")
+
+        # Hub classes
+        if graph_insights.get("hub_classes"):
+            graph_section.append("### Hub Classes (High Connectivity)\n")
+            for hub in graph_insights["hub_classes"]:
+                # Format: ClassName (file.py:line) for LLM navigation
+                line_ref = f":{hub['line']}" if hub.get('line') else ""
+                location = f"({hub['file']}{line_ref})"
+                graph_section.append(f"- `{hub['name']}` {location} - {hub['degree']} connections")
+            graph_section.append("")
+
+        # Insert before Important Notes
+        if "## Important Notes" in base_content:
+            parts = base_content.split("## Important Notes")
+            base_content = parts[0] + "\n".join(graph_section) + "\n## Important Notes" + parts[1]
+        else:
+            base_content += "\n" + "\n".join(graph_section)
+    else:
+        progress("graph", "No graph data (run 'victor index' first)", complete=True)
 
     # Step 3: Deep - Use LLM to enhance content
     if not use_llm:

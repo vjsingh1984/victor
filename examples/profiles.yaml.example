@@ -229,8 +229,7 @@ providers:
 # TOOLS - Enable/disable specific tools
 # =============================================================================
 tools:
-  disabled:
-    - code_review  # Has aspect validation issues
+  disabled: []  # Add tool names here to disable specific tools
 
   # Individual tool configuration (optional)
   # web_search:

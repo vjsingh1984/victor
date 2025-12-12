@@ -223,7 +223,7 @@ async def _get_or_build_index(
     persist_path = Path(default_persist_dir)
     if force_reindex or not persist_path.exists() or not any(persist_path.iterdir()):
         # First time or forced - full index
-        await index.index_codebase(force=force_reindex)
+        await index.index_codebase()
         rebuilt = True
     else:
         # Persistent data exists - just ensure indexed (incremental)

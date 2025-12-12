@@ -224,9 +224,11 @@ class OrchestratorIntegration:
             )
 
         # Get mode from conversation state if not provided
+        # Note: ConversationStage uses auto() which returns int values,
+        # so we use stage.name.lower() to get a string mode name
         if current_mode is None:
             stage = self._orchestrator.conversation_state.get_current_stage()
-            current_mode = stage.value if stage else "explore"
+            current_mode = stage.name.lower() if stage else "explore"
 
         # Prepare context using pipeline
         context = await self._pipeline.prepare_request(

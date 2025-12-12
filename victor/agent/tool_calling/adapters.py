@@ -234,12 +234,19 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
     Uses FallbackParsingMixin for common parsing logic shared across adapters.
 
+    IMPORTANT: Tool support is now detected dynamically by checking the model's
+    template via Ollama's /api/show endpoint. This is more accurate than static
+    lists because:
+    1. Model templates can be customized to add/remove tool support
+    2. Different quantizations of the same model may have different templates
+    3. Custom models may have tool support not in our static list
+
     References:
     - https://docs.ollama.com/capabilities/tool-calling
     - https://ollama.com/search?c=tools
     """
 
-    # Models with known good native tool calling support
+    # Models with known good native tool calling support (fallback when dynamic detection fails)
     # Full list from https://ollama.com/search?c=tools (December 2025)
     NATIVE_TOOL_MODELS = frozenset(
         [
@@ -330,26 +337,96 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         },
     }
 
+    # Cache for dynamic tool support detection results
+    _tool_support_cache: Dict[str, bool] = {}
+
     @property
     def provider_name(self) -> str:
         return "ollama"
 
     def _has_native_support(self) -> bool:
-        """Check if current model has native tool calling."""
-        return any(pattern in self.model_lower for pattern in self.NATIVE_TOOL_MODELS)
+        """Check if current model has native tool calling.
+
+        Uses dynamic detection via Ollama's /api/show endpoint first,
+        falling back to static model list if detection fails.
+
+        The detection result is cached per model to avoid repeated API calls.
+        """
+        # Check class-level cache first
+        if self.model in OllamaToolCallingAdapter._tool_support_cache:
+            return OllamaToolCallingAdapter._tool_support_cache[self.model]
+
+        # Try dynamic detection via Ollama /api/show
+        base_url = self.config.get("base_url", "http://localhost:11434") if self.config else "http://localhost:11434"
+
+        try:
+            from victor.providers.ollama_capability_detector import OllamaCapabilityDetector
+
+            detector = OllamaCapabilityDetector(base_url, timeout=5)
+            support = detector.get_tool_support(self.model)
+
+            if support.error is None:
+                # Successfully detected from template
+                logger.debug(
+                    f"Dynamic tool support detection for {self.model}: "
+                    f"supports_tools={support.supports_tools}, "
+                    f"format={support.tool_response_format}"
+                )
+                OllamaToolCallingAdapter._tool_support_cache[self.model] = support.supports_tools
+                return support.supports_tools
+            else:
+                logger.debug(f"Dynamic detection failed for {self.model}: {support.error}")
+        except Exception as e:
+            logger.debug(f"Failed to dynamically detect tool support for {self.model}: {e}")
+
+        # Fallback to static list
+        has_static_support = any(pattern in self.model_lower for pattern in self.NATIVE_TOOL_MODELS)
+        OllamaToolCallingAdapter._tool_support_cache[self.model] = has_static_support
+        return has_static_support
 
     def _has_thinking_mode(self) -> bool:
         """Check if model supports Qwen3 thinking mode."""
         return "qwen3" in self.model_lower or "qwen-3" in self.model_lower
 
     def get_capabilities(self) -> ToolCallingCapabilities:
-        # Determine format based on model detection
+        """Get tool calling capabilities for the current model.
+
+        This method uses dynamic detection via Ollama's /api/show endpoint
+        to determine if the model's template supports tools. The dynamic
+        detection result takes precedence over YAML config because:
+        1. Templates can be customized to add/remove tool support
+        2. Different quantizations may have different templates
+        3. Custom models may have tool support not in YAML config
+        """
+        # Determine format based on model detection (uses dynamic detection first)
         has_native = self._has_native_support()
         format_hint = ToolCallFormat.OLLAMA_NATIVE if has_native else ToolCallFormat.OLLAMA_JSON
 
         # Load from YAML config with model pattern matching
         loader = _get_capability_loader()
         caps = loader.get_capabilities("ollama", self.model, format_hint)
+
+        # IMPORTANT: Override YAML native_tool_calls with dynamic detection result
+        # Dynamic detection checks the actual template, which is more accurate
+        if caps.native_tool_calls != has_native:
+            logger.debug(
+                f"Overriding YAML native_tool_calls={caps.native_tool_calls} "
+                f"with dynamic detection result={has_native} for {self.model}"
+            )
+            caps = ToolCallingCapabilities(
+                native_tool_calls=has_native,
+                streaming_tool_calls=caps.streaming_tool_calls if has_native else False,
+                parallel_tool_calls=caps.parallel_tool_calls if has_native else False,
+                tool_choice_param=caps.tool_choice_param if has_native else False,
+                json_fallback_parsing=True,  # Always enable fallback parsing
+                xml_fallback_parsing=True,
+                thinking_mode=caps.thinking_mode,
+                requires_strict_prompting=not has_native,  # Strict prompting when no native support
+                tool_call_format=format_hint,
+                argument_format=caps.argument_format,
+                recommended_max_tools=caps.recommended_max_tools if has_native else 10,
+                recommended_tool_budget=caps.recommended_tool_budget if has_native else 5,
+            )
 
         # Apply model-specific overrides that YAML can't detect
         if self._has_thinking_mode() and not caps.thinking_mode:

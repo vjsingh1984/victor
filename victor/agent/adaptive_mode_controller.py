@@ -556,8 +556,10 @@ class AdaptiveModeController:
             Recommended ModeAction
         """
         # Build current state
+        # Ensure current_mode is a string (could be int from ConversationStage.value)
         try:
-            mode_enum = AgentMode(current_mode.lower())
+            mode_str = str(current_mode).lower() if current_mode else "explore"
+            mode_enum = AgentMode(mode_str)
         except ValueError:
             mode_enum = AgentMode.EXPLORE
 

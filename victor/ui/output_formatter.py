@@ -148,12 +148,12 @@ class OutputFormatter:
                 print(details, file=self.config.stderr)
             self.config.stderr.flush()
 
-    def _format_args(self, arguments: Dict[str, Any], max_width: int = 60) -> str:
+    def _format_args(self, arguments: Dict[str, Any], max_width: int = 80) -> str:
         """Format tool arguments for display.
 
         Args:
             arguments: Tool arguments
-            max_width: Maximum total width for args string
+            max_width: Maximum total width for args string (default 80 to use more line width)
 
         Returns:
             Formatted args string like "path='/file.py', limit=100"
@@ -162,8 +162,8 @@ class OutputFormatter:
         total_len = 0
         for k, v in arguments.items():
             if isinstance(v, str):
-                # Truncate long strings
-                display = v if len(v) <= 40 else v[:37] + "..."
+                # Truncate long strings - allow up to 60 chars for strings
+                display = v if len(v) <= 60 else v[:57] + "..."
                 part = f"{k}='{display}'"
             elif isinstance(v, (int, float, bool)):
                 part = f"{k}={v}"
@@ -256,25 +256,28 @@ class OutputFormatter:
                 file=self.config.stdout,
             )
         elif self.config.mode == OutputMode.RICH:
-            # Compact single-line format: ✓ tool_name(args) (0.1s)
+            # Compact single-line format: ✓ tool_name(args) (X.XXs)
+            # Use full 90 chars width, 6 chars for elapsed time at end
             if success:
                 status_icon = "[green]✓[/]"
             else:
                 status_icon = "[red]✗[/]"
-            args_display = f"([dim]{args_str}[/])" if args_str else ""
-            time_display = f" [dim]{duration_str}[/]" if duration_str else ""
-            error_display = f" [red]{error}[/]" if error else ""
+            # Format: ✓ name(args) (X.XXs) - target ~90 chars
+            base = f"{tool_name}({args_str})" if args_str else tool_name
+            # Elapsed time format: (X.XXs) = 8 chars
+            time_display = f"({duration_str.strip('()')})" if duration_str else ""
+            error_display = f" [red]{error[:30]}[/]" if error else ""
             self._console.print(
-                f"{status_icon} [bold]{tool_name}[/]{args_display}{time_display}{error_display}"
+                f"{status_icon} [bold]{base}[/] {time_display}{error_display}"
             )
         elif self.config.mode == OutputMode.PLAIN:
-            # Compact single-line format: # ✓ tool_name(args) (0.1s)
+            # Compact single-line format: ✓ tool_name(args) (X.XXs)
             status_icon = "✓" if success else "✗"
-            args_display = f"({args_str})" if args_str else ""
-            time_display = f" {duration_str}" if duration_str else ""
-            error_display = f" - {error}" if error else ""
+            base = f"{tool_name}({args_str})" if args_str else tool_name
+            time_display = f" ({duration_str.strip('()')})" if duration_str else ""
+            error_display = f" {error[:40]}" if error else ""
             print(
-                f"# {status_icon} {tool_name}{args_display}{time_display}{error_display}",
+                f"{status_icon} {base}{time_display}{error_display}",
                 file=self.config.stderr,
             )
             # Flush stderr immediately to ensure tool output appears before next content
@@ -311,26 +314,35 @@ class OutputFormatter:
             print(f"# Thinking: {content[:200]}...", file=self.config.stderr)
             self.config.stderr.flush()
 
-    def start_streaming(self) -> None:
+    def start_streaming(self, preserve_buffer: bool = False) -> None:
         """Start streaming mode with live markdown rendering (RICH mode only).
 
         Call this before the first stream_chunk() to enable live markdown rendering.
+
+        Args:
+            preserve_buffer: If True, don't reset the stream buffer (for resuming)
         """
         if self.config.mode == OutputMode.RICH and self.config.stream:
-            self._stream_buffer = ""
-            self._live = Live(
-                Markdown(""),
-                console=self._console,
-                refresh_per_second=10,
-            )
-            self._live.start()
+            if not preserve_buffer:
+                self._stream_buffer = ""
+            # Don't start a new Live if one is already active
+            if self._live is None:
+                self._live = Live(
+                    Markdown(self._stream_buffer),
+                    console=self._console,
+                    refresh_per_second=10,
+                )
+                self._live.start()
 
-    def end_streaming(self) -> None:
+    def end_streaming(self, finalize: bool = True) -> None:
         """End streaming mode and finalize live markdown rendering.
 
         Call this after the last stream_chunk() if start_streaming() was called.
+
+        Args:
+            finalize: If True, stop the Live and clear buffer. If False, just pause.
         """
-        if self._live is not None:
+        if self._live is not None and finalize:
             self._live.stop()
             self._live = None
             self._stream_buffer = ""

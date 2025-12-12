@@ -202,11 +202,21 @@ class IntelligentAgentPipeline:
         """Lazy initialize prompt builder."""
         if self._prompt_builder is None:
             try:
+                import traceback
+                logger.debug(
+                    f"[IntelligentPipeline] Creating prompt builder with: "
+                    f"provider_name={self.provider_name!r} (type={type(self.provider_name).__name__}), "
+                    f"model={self.model!r} (type={type(self.model).__name__}), "
+                    f"profile_name={self.profile_name!r} (type={type(self.profile_name).__name__})"
+                )
                 from victor.agent.intelligent_prompt_builder import IntelligentPromptBuilder
                 self._prompt_builder = await IntelligentPromptBuilder.create(
                     self.provider_name, self.model, self.profile_name)
             except Exception as e:
-                logger.warning(f"[IntelligentPipeline] Prompt builder init failed: {e}")
+                logger.warning(
+                    f"[IntelligentPipeline] Prompt builder init failed: {e}\n"
+                    f"Traceback:\n{traceback.format_exc()}"
+                )
         return self._prompt_builder
 
     def _get_mode_controller(self):

@@ -1172,8 +1172,10 @@ class AgentOrchestrator:
 
         try:
             # Get current mode from conversation state
+            # Note: ConversationStage uses auto() which returns int values,
+            # so we use stage.name.lower() to get a string mode name
             stage = self.conversation_state.get_current_stage()
-            current_mode = stage.value if stage else "explore"
+            current_mode = stage.name.lower() if stage else "explore"
 
             # Prepare request context (async call to pipeline)
             context = await integration.prepare_request(
@@ -2520,10 +2522,14 @@ class AgentOrchestrator:
         is_completion = intent_result.intent == IntentType.COMPLETION
         is_asking_input = intent_result.intent == IntentType.ASKING_INPUT
 
-        # Configuration
+        # Configuration - use configurable thresholds from settings
         max_asking_input_prompts = 3
         requires_continuation_support = is_analysis_task or is_action_task or intends_to_continue
-        max_continuation_prompts = 10 if is_analysis_task else (5 if is_action_task else 3)
+        # Get continuation prompt limits from settings (default: 4 for analysis, 3 for action, 2 for others)
+        max_cont_analysis = getattr(self.settings, "max_continuation_prompts_analysis", 4)
+        max_cont_action = getattr(self.settings, "max_continuation_prompts_action", 3)
+        max_cont_default = getattr(self.settings, "max_continuation_prompts_default", 2)
+        max_continuation_prompts = max_cont_analysis if is_analysis_task else (max_cont_action if is_action_task else max_cont_default)
 
         # Budget/iteration thresholds
         budget_threshold = (
@@ -2586,10 +2592,10 @@ class AgentOrchestrator:
                 "message": (
                     "You said you would examine more files but did not call any tool. "
                     "Either:\n"
-                    "1. Call list_directory to explore a directory, OR\n"
-                    "2. Call read_file to read a specific file, OR\n"
+                    "1. Call ls(path='...') to explore a directory, OR\n"
+                    "2. Call read(path='...') to read a specific file, OR\n"
                     "3. Provide your analysis NOW if you have enough information.\n\n"
-                    "Make a tool call or provide your summary."
+                    "Make a tool call or provide your final response."
                 ),
                 "reason": f"Prompting for tool call ({continuation_prompts + 1}/{max_continuation_prompts})",
                 "updates": updates,
@@ -3602,6 +3608,83 @@ class AgentOrchestrator:
         tools = self._filter_tools_by_intent(tools)
         return tools
 
+    def _parse_and_validate_tool_calls(
+        self,
+        tool_calls: Optional[List[Dict[str, Any]]],
+        full_content: str,
+    ) -> tuple[Optional[List[Dict[str, Any]]], str]:
+        """Parse, validate, and normalize tool calls from provider response.
+
+        Handles:
+        1. Fallback parsing from content if no native tool calls
+        2. Normalization to ensure tool_calls are dicts
+        3. Filtering out disabled/invalid tool names
+        4. Coercing arguments to dicts (some providers send JSON strings)
+
+        Args:
+            tool_calls: Native tool calls from provider (may be None)
+            full_content: Full response content for fallback parsing
+
+        Returns:
+            Tuple of (validated_tool_calls, remaining_content)
+            - validated_tool_calls: List of valid tool call dicts, or None
+            - remaining_content: Content after extracting any embedded tool calls
+        """
+        # Use unified adapter-based tool call parsing with fallbacks
+        if not tool_calls and full_content:
+            logger.debug(f"No native tool_calls, attempting fallback parsing on content len={len(full_content)}")
+            parse_result = self._parse_tool_calls_with_adapter(full_content, tool_calls)
+            if parse_result.tool_calls:
+                # Convert ToolCall objects to dicts for compatibility
+                tool_calls = [tc.to_dict() for tc in parse_result.tool_calls]
+                logger.debug(f"Fallback parser found {len(tool_calls)} tool calls: {[tc.get('name') for tc in tool_calls]}")
+                full_content = parse_result.remaining_content
+            else:
+                logger.debug("Fallback parser found no tool calls")
+
+        # Ensure tool_calls is a list of dicts to avoid type errors from malformed provider output
+        if tool_calls:
+            normalized_tool_calls = [tc for tc in tool_calls if isinstance(tc, dict)]
+            if len(normalized_tool_calls) != len(tool_calls):
+                logger.warning(f"Dropped non-dict tool_calls: {tool_calls}")
+            tool_calls = normalized_tool_calls or None
+            logger.debug(f"After normalization: {len(tool_calls) if tool_calls else 0} tool_calls")
+
+        # Filter out invalid/hallucinated tool names early (adapter already validates, but double-check for enabled)
+        if tool_calls:
+            valid_tool_calls = []
+            for tc in tool_calls:
+                name = tc.get("name", "")
+                is_enabled = self.tools.is_tool_enabled(name)
+                logger.debug(f"Tool '{name}' enabled={is_enabled}")
+                if is_enabled:
+                    valid_tool_calls.append(tc)
+                else:
+                    logger.debug(f"Filtered out disabled tool: {name}")
+            if len(valid_tool_calls) != len(tool_calls):
+                logger.warning(
+                    f"Filtered {len(tool_calls) - len(valid_tool_calls)} invalid tool calls"
+                )
+            tool_calls = valid_tool_calls or None
+            logger.debug(f"After filtering: {len(tool_calls) if tool_calls else 0} valid tool_calls")
+
+        # Coerce arguments to dicts early (providers may stream JSON strings)
+        if tool_calls:
+            for tc in tool_calls:
+                args = tc.get("arguments")
+                if isinstance(args, str):
+                    try:
+                        tc["arguments"] = json.loads(args)
+                    except Exception:
+                        try:
+                            tc["arguments"] = ast.literal_eval(args)
+                        except Exception:
+                            tc["arguments"] = {"value": args}
+                elif args is None:
+                    tc["arguments"] = {}
+
+        return tool_calls, full_content
+
     async def _stream_provider_response(
         self,
         tools: Any,
@@ -3880,589 +3963,752 @@ class AgentOrchestrator:
                 cumulative_usage=cumulative_usage,
             )
 
+            # Debug: Log response details
+            content_preview = full_content[:200] if full_content else "(empty)"
+            logger.debug(
+                f"_stream_provider_response returned: content_len={len(full_content) if full_content else 0}, "
+                f"native_tool_calls={len(tool_calls) if tool_calls else 0}, tokens={total_tokens}, "
+                f"garbage={garbage_detected}, content_preview={content_preview!r}"
+            )
+
             # If garbage was detected, force completion on next iteration
             if garbage_detected and not tool_calls:
                 force_completion = True
                 logger.info("Setting force_completion due to garbage detection")
 
-            # Use unified adapter-based tool call parsing with fallbacks
-            if not tool_calls and full_content:
-                parse_result = self._parse_tool_calls_with_adapter(full_content, tool_calls)
-                if parse_result.tool_calls:
-                    # Convert ToolCall objects to dicts for compatibility
-                    tool_calls = [tc.to_dict() for tc in parse_result.tool_calls]
-                    full_content = parse_result.remaining_content
+            # Parse, validate, and normalize tool calls (fallback parsing, filtering, arg coercion)
+            tool_calls, full_content = self._parse_and_validate_tool_calls(tool_calls, full_content)
 
-            # Ensure tool_calls is a list of dicts to avoid type errors from malformed provider output
+            # DEBUG: Log complete tool calls from LLM for diagnosis
             if tool_calls:
-                normalized_tool_calls = [tc for tc in tool_calls if isinstance(tc, dict)]
-                if len(normalized_tool_calls) != len(tool_calls):
-                    logger.warning(f"Dropped non-dict tool_calls: {tool_calls}")
-                tool_calls = normalized_tool_calls or None
+                logger.debug(f"LLM tool calls ({len(tool_calls)} total):")
+                for i, tc in enumerate(tool_calls):
+                    tc_name = tc.get("name", "unknown")
+                    tc_args = tc.get("arguments", {})
+                    # Truncate large args for readability
+                    args_str = str(tc_args)
+                    if len(args_str) > 500:
+                        args_str = args_str[:500] + "...(truncated)"
+                    logger.debug(f"  [{i+1}] {tc_name}: {args_str}")
 
-            # Filter out invalid/hallucinated tool names early (adapter already validates, but double-check for enabled)
-            if tool_calls:
-                valid_tool_calls = []
-                for tc in tool_calls:
-                    name = tc.get("name", "")
-                    if self.tools.is_tool_enabled(name):
-                        valid_tool_calls.append(tc)
-                    else:
-                        logger.debug(f"Filtered out disabled tool: {name}")
-                if len(valid_tool_calls) != len(tool_calls):
-                    logger.warning(
-                        f"Filtered {len(tool_calls) - len(valid_tool_calls)} invalid tool calls"
-                    )
-                tool_calls = valid_tool_calls or None
-
-            # Coerce arguments to dicts early (providers may stream JSON strings)
-            if tool_calls:
-                for tc in tool_calls:
-                    args = tc.get("arguments")
-                    if isinstance(args, str):
-                        try:
-                            tc["arguments"] = json.loads(args)
-                        except Exception:
-                            try:
-                                tc["arguments"] = ast.literal_eval(args)
-                            except Exception:
-                                tc["arguments"] = {"value": args}
-                    elif args is None:
-                        tc["arguments"] = {}
-
-        if full_content:
-            # Sanitize response to remove malformed patterns from local models
-            sanitized = self._sanitize_response(full_content)
-            if sanitized:
-                self.add_message("assistant", sanitized)
-            else:
-                # If sanitization removed everything, use stripped markup as fallback
-                plain_text = self._strip_markup(full_content)
-                if plain_text:
-                    self.add_message("assistant", plain_text)
-        elif not tool_calls:
-            # No content and no tool calls; attempt aggressive recovery
-            logger.warning("Model returned empty response - attempting aggressive recovery")
-
-            # Check if model has thinking disable prefix (e.g., Qwen3 /no_think)
-            thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
-            if thinking_prefix:
-                logger.debug(f"Using thinking disable prefix '{thinking_prefix}' for recovery")
-
-            # Build recovery prompts - _get_thinking_disabled_prompt adds prefix if available
-            # Use simpler prompts and lower temps for models with thinking mode
-            has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
-            if has_thinking_mode:
-                # Simpler prompts and lower temps for thinking models
-                recovery_prompts = [
-                    (
-                        self._get_thinking_disabled_prompt(
-                            "Respond in 2-3 sentences: What files did you read and what did you find?"
-                        ),
-                        min(self.temperature + 0.1, 0.7),
-                    ),
-                    (
-                        self._get_thinking_disabled_prompt(
-                            "List 3 bullet points about the code you examined."
-                        ),
-                        min(self.temperature + 0.2, 0.8),
-                    ),
-                    (
-                        self._get_thinking_disabled_prompt(
-                            "One sentence answer: What is the main thing you learned?"
-                        ),
-                        min(self.temperature + 0.3, 0.9),
-                    ),
-                ]
-            else:
-                # Standard recovery prompts
-                recovery_prompts = [
-                    (
-                        "Summarize your findings so far. What files did you examine? "
-                        "What patterns or issues did you notice? Keep it brief.",
-                        min(self.temperature + 0.2, 1.0),
-                    ),
-                    (
-                        "Based on the code you've seen, list 3-5 observations or suggestions.",
-                        min(self.temperature + 0.3, 1.0),
-                    ),
-                    (
-                        "What did you learn from the files? One paragraph summary.",
-                        min(self.temperature + 0.4, 1.0),
-                    ),
-                ]
-
-            recovery_success = False
-            for attempt, (prompt, temp) in enumerate(recovery_prompts, 1):
-                logger.info(f"Recovery attempt {attempt}/3 with temp={temp:.1f}")
-
-                # Create temporary message list to avoid polluting conversation history
-                # Include only recent context (last 5 exchanges) to reduce token load
-                recent_messages = (
-                    self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
-                )
-                recovery_messages = recent_messages + [Message(role="user", content=prompt)]
-
-                try:
-                    response = await self.provider.chat(
-                        messages=recovery_messages,
-                        model=self.model,
-                        temperature=temp,
-                        max_tokens=min(self.max_tokens, 1024),  # Limit output for recovery
-                        tools=None,  # Force text response
-                    )
-                    if response and response.content:
-                        logger.debug(
-                            f"Recovery attempt {attempt}: got {len(response.content)} chars"
-                        )
-                        sanitized = self._sanitize_response(response.content)
-                        if sanitized and len(sanitized) > 20:
-                            self.add_message("assistant", sanitized)
-                            yield StreamChunk(content=sanitized, is_final=True)
-                            recovery_success = True
-                            break
-                        elif response.content and len(response.content) > 20:
-                            # Use raw if sanitization failed but content exists
-                            self.add_message("assistant", response.content)
-                            yield StreamChunk(content=response.content, is_final=True)
-                            recovery_success = True
-                            break
-                    else:
-                        logger.debug(f"Recovery attempt {attempt}: empty response")
-                except Exception as exc:
-                    exc_str = str(exc)
-                    logger.warning(f"Recovery attempt {attempt} failed: {exc}")
-
-                    # Check for rate limit errors and extract wait time
-                    if "rate_limit" in exc_str.lower() or "429" in exc_str:
-                        import re
-
-                        # Try to extract "try again in X.XXs" or similar patterns
-                        wait_match = re.search(
-                            r"try again in (\d+(?:\.\d+)?)\s*s", exc_str, re.I
-                        )
-                        if wait_match:
-                            wait_time = float(wait_match.group(1))
-                            logger.info(
-                                f"Rate limited. Waiting {wait_time:.1f}s before retry..."
-                            )
-                            await asyncio.sleep(
-                                min(wait_time + 0.5, 30.0)
-                            )  # Add 0.5s buffer, cap at 30s
-                        else:
-                            # Default exponential backoff for rate limits
-                            backoff = min(2**attempt, 15)  # 2, 4, 8 seconds
-                            logger.info(f"Rate limited. Waiting {backoff}s before retry...")
-                            await asyncio.sleep(backoff)
-
-            if recovery_success:
-                return
-
-            # All recovery attempts failed - provide helpful error
-            if is_analysis_task and self.tool_calls_used > 0:
-                # Generate a minimal summary from what we know
-                unique_resources = self.unified_tracker.unique_resources
-                files_examined = list(unique_resources)[:10]
-                fallback_msg = (
-                    f"\n\n**Analysis Summary** (auto-generated)\n\n"
-                    f"Examined {len(unique_resources)} files including:\n"
-                    + "\n".join(f"- {f}" for f in files_examined)
-                    + "\n\nThe model was unable to provide detailed analysis. "
-                    "Try with a simpler query like 'analyze victor/agent/' or use a different model."
-                )
-            else:
-                fallback_msg = "No tool calls were returned and the model provided no content. Please retry or simplify the request."
-            # Record outcome for Q-learning (fallback = partial failure)
-            self._record_intelligent_outcome(
-                success=False,
-                quality_score=0.3,  # Low quality since model didn't provide useful content
-                user_satisfied=False,
-                completed=False,
-            )
-            yield StreamChunk(content=fallback_msg, is_final=True)
-            return
-
-        # Record tool calls in progress tracker for loop detection
-        # Progress tracker handles unique resource tracking internally
-        for tc in tool_calls or []:
-            tool_name = tc.get("name", "")
-            tool_args = tc.get("arguments", {})
-
-            # Record tool call in unified tracker (single source of truth)
-            self.unified_tracker.record_tool_call(tool_name, tool_args)
-
-        content_length = len(full_content.strip())
-
-        # Record iteration in unified tracker (single source of truth)
-        self.unified_tracker.record_iteration(content_length)
-
-        # Intelligent pipeline post-iteration hook: validate response quality
-        # This enables quality scoring, hallucination detection, and Q-learning feedback
-        if full_content and len(full_content.strip()) > 50:
-            quality_result = await self._validate_intelligent_response(
-                response=full_content,
-                query=user_message,
-                tool_calls=self.tool_calls_used,
-                task_type=unified_task_type.value,
-            )
-            if quality_result and not quality_result.get("is_grounded", True):
-                # Log grounding issues for debugging
-                issues = quality_result.get("grounding_issues", [])
-                if issues:
-                    logger.warning(
-                        f"IntelligentPipeline detected grounding issues: {issues[:3]}"
-                    )
-            # Update quality score for Q-learning outcome recording
-            if quality_result:
-                last_quality_score = quality_result.get("quality_score", last_quality_score)
-
-        # Check for loop warning using UnifiedTaskTracker (primary)
-        # This gives the model a chance to correct behavior before we force stop
-        unified_loop_warning = self.unified_tracker.check_loop_warning()
-        if unified_loop_warning and not force_completion:
-            logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
-            yield StreamChunk(
-                content=f"\n[loop] ⚠ Warning: Approaching loop limit - {unified_loop_warning}\n"
-            )
-            # Inject system message to warn the model
-            self.add_message(
-                "system",
-                "WARNING: You are about to hit loop detection. You have been performing "
-                "the same operation repeatedly (e.g., writing the same file, making the same call). "
-                "Please do something DIFFERENT now:\n"
-                "- If you're writing a file repeatedly, STOP and move to a different task\n"
-                "- If you're stuck, provide your current progress and ask for clarification\n"
-                "- If you've completed the task, provide a summary and finish\n\n"
-                "Continuing the same operation will force the conversation to end.",
-            )
-        else:
-            # PRIMARY: Check UnifiedTaskTracker for stop decision (single source of truth)
-            unified_should_force, unified_hint = self.unified_tracker.should_force_action()
-            if unified_should_force and not force_completion:
-                force_completion = True
-                logger.info(
-                    f"UnifiedTaskTracker forcing action: {unified_hint}, "
-                    f"metrics={self.unified_tracker.get_metrics()}"
-                )
-
-            logger.debug(f"After streaming pass, tool_calls = {tool_calls}")
-
-            if not tool_calls:
-                # Check if model intended to continue but didn't make a tool call
-                # Use semantic intent classification to determine continuation action
-                # NOTE: Use the LAST portion of the response for intent classification
-                # because asking_input patterns like "Would you like me to..." typically
-                # appear at the END of a long response
-                intent_text = full_content or ""
-                if len(intent_text) > 500:
-                    intent_text = intent_text[-500:]
-                intent_result = self.intent_classifier.classify_intent_sync(intent_text)
-
-                logger.debug(
-                    f"Intent classification: {intent_result.intent.name} "
-                    f"(confidence={intent_result.confidence:.3f}, "
-                    f"text_len={len(intent_text)}, "
-                    f"top_matches={intent_result.top_matches[:3]})"
-                )
-
-                # Initialize tracking variables
-                if not hasattr(self, "_continuation_prompts"):
-                    self._continuation_prompts = 0
-                if not hasattr(self, "_asking_input_prompts"):
-                    self._asking_input_prompts = 0
-
-                # Check for response loop using UnifiedTaskTracker
-                # (detects when model keeps responding with similar text without tool calls)
-                is_repeated_response = self.unified_tracker.check_response_loop(full_content or "")
-
-                # Use helper to determine what action to take
-                one_shot_mode = getattr(self.settings, "one_shot_mode", False)
-                action_result = self._determine_continuation_action(
-                    intent_result=intent_result,
-                    is_analysis_task=is_analysis_task,
-                    is_action_task=is_action_task,
-                    content_length=content_length,
-                    full_content=full_content,
-                    continuation_prompts=self._continuation_prompts,
-                    asking_input_prompts=self._asking_input_prompts,
-                    one_shot_mode=one_shot_mode,
-                )
-
-                # Apply state updates from action result
-                if "continuation_prompts" in action_result.get("updates", {}):
-                    self._continuation_prompts = action_result["updates"]["continuation_prompts"]
-                if "asking_input_prompts" in action_result.get("updates", {}):
-                    self._asking_input_prompts = action_result["updates"]["asking_input_prompts"]
-                if action_result.get("set_final_summary_requested"):
-                    self._final_summary_requested = True
-
-                action = action_result["action"]
-
-                # Override: If repeated response detected, force completion to prevent loop
-                if is_repeated_response and action in ("prompt_tool_call", "request_summary"):
-                    action = "finish"
-                    logger.info(
-                        f"Continuation action: {action} - "
-                        "Overriding to finish due to repeated response"
-                    )
+            if full_content:
+                # Sanitize response to remove malformed patterns from local models
+                sanitized = self._sanitize_response(full_content)
+                if sanitized:
+                    self.add_message("assistant", sanitized)
                 else:
-                    logger.info(f"Continuation action: {action} - {action_result['reason']}")
+                    # If sanitization removed everything, use stripped markup as fallback
+                    plain_text = self._strip_markup(full_content)
+                    if plain_text:
+                        self.add_message("assistant", plain_text)
+            elif not tool_calls:
+                # No content and no tool calls; attempt aggressive recovery
+                logger.warning("Model returned empty response - attempting aggressive recovery")
 
-                skip_rest = False
+                # Track empty responses as they may indicate model is stuck after blocking
+                if not hasattr(self, "_consecutive_empty_responses"):
+                    self._consecutive_empty_responses = 0
+                self._consecutive_empty_responses += 1
 
-                # Handle action: continue_asking_input
-                if action == "continue_asking_input":
-                    self.add_message("user", action_result["message"])
-                    skip_rest = True
+                # If model keeps returning empty responses, force a summary
+                # Use configurable threshold from settings
+                empty_response_threshold = getattr(self.settings, "recovery_empty_response_threshold", 3)
+                if self._consecutive_empty_responses >= empty_response_threshold:
+                    logger.warning(f"Model stuck with {self._consecutive_empty_responses} consecutive empty responses - forcing summary")
+                    yield StreamChunk(content="\n[recovery] Forcing summary after repeated empty responses\n")
+                    # Add strong instruction to summarize
+                    self.add_message(
+                        "user",
+                        "You seem to be stuck. Please provide a summary of what you have found so far. "
+                        "DO NOT call any more tools - just summarize the information you have already gathered."
+                    )
+                    self._consecutive_empty_responses = 0
+                    # CRITICAL: Set force_completion to prevent model from making more tool calls
+                    force_completion = True
+                    continue
 
-                # Handle action: return_to_user
-                elif action == "return_to_user":
+                # Check if model has thinking disable prefix (e.g., Qwen3 /no_think)
+                thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
+                if thinking_prefix:
+                    logger.debug(f"Using thinking disable prefix '{thinking_prefix}' for recovery")
+
+                # Build recovery prompts - _get_thinking_disabled_prompt adds prefix if available
+                # Use simpler prompts and lower temps for models with thinking mode
+                has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
+
+                # Check if we should continue the task vs summarize
+                # If we're in analysis/action mode with budget remaining, first try to continue
+                has_budget_remaining = self.tool_calls_used < self.tool_budget * 0.8
+                should_continue_task = (is_analysis_task or is_action_task) and has_budget_remaining
+
+                if should_continue_task:
+                    # Task-aware recovery: first attempt to continue, then fall back to summary
+                    if has_thinking_mode:
+                        recovery_prompts = [
+                            (
+                                self._get_thinking_disabled_prompt(
+                                    "The previous action did not complete. "
+                                    "Use ls(path='...') to list a directory or read(path='...') to read a file. "
+                                    "Continue exploring the codebase."
+                                ),
+                                min(self.temperature + 0.1, 0.7),
+                            ),
+                            (
+                                self._get_thinking_disabled_prompt(
+                                    "Call a tool to continue: ls(path='.') or read(path='filename'). "
+                                    "Pick a file or directory to examine."
+                                ),
+                                min(self.temperature + 0.2, 0.8),
+                            ),
+                            (
+                                self._get_thinking_disabled_prompt(
+                                    "Respond in 2-3 sentences: What files did you read and what did you find?"
+                                ),
+                                min(self.temperature + 0.3, 0.9),
+                            ),
+                        ]
+                    else:
+                        recovery_prompts = [
+                            (
+                                "The previous action did not complete. Continue by calling a tool:\n"
+                                "- Use ls(path='...') to list a directory\n"
+                                "- Use read(path='...') to read a file\n"
+                                "- Use search(query='...') to find code\n"
+                                "Make a tool call to continue exploring.",
+                                min(self.temperature + 0.2, 1.0),
+                            ),
+                            (
+                                "Call ls(path='.') to see what's in the current directory, "
+                                "or read(path='filename') to examine a specific file. "
+                                "Continue your analysis.",
+                                min(self.temperature + 0.3, 1.0),
+                            ),
+                            (
+                                "Summarize your findings so far. What files did you examine? "
+                                "What patterns or issues did you notice? Keep it brief.",
+                                min(self.temperature + 0.4, 1.0),
+                            ),
+                        ]
+                elif has_thinking_mode:
+                    # Simpler prompts and lower temps for thinking models (summary mode)
+                    recovery_prompts = [
+                        (
+                            self._get_thinking_disabled_prompt(
+                                "Respond in 2-3 sentences: What files did you read and what did you find?"
+                            ),
+                            min(self.temperature + 0.1, 0.7),
+                        ),
+                        (
+                            self._get_thinking_disabled_prompt(
+                                "List 3 bullet points about the code you examined."
+                            ),
+                            min(self.temperature + 0.2, 0.8),
+                        ),
+                        (
+                            self._get_thinking_disabled_prompt(
+                                "One sentence answer: What is the main thing you learned?"
+                            ),
+                            min(self.temperature + 0.3, 0.9),
+                        ),
+                    ]
+                else:
+                    # Standard recovery prompts (summary mode)
+                    recovery_prompts = [
+                        (
+                            "Summarize your findings so far. What files did you examine? "
+                            "What patterns or issues did you notice? Keep it brief.",
+                            min(self.temperature + 0.2, 1.0),
+                        ),
+                        (
+                            "Based on the code you've seen, list 3-5 observations or suggestions.",
+                            min(self.temperature + 0.3, 1.0),
+                        ),
+                        (
+                            "What did you learn from the files? One paragraph summary.",
+                            min(self.temperature + 0.4, 1.0),
+                        ),
+                    ]
+
+                recovery_success = False
+                for attempt, (prompt, temp) in enumerate(recovery_prompts, 1):
+                    logger.info(f"Recovery attempt {attempt}/3 with temp={temp:.1f}")
+
+                    # Create temporary message list to avoid polluting conversation history
+                    # Include only recent context (last 5 exchanges) to reduce token load
+                    recent_messages = (
+                        self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
+                    )
+                    recovery_messages = recent_messages + [Message(role="user", content=prompt)]
+
+                    # For task-continuation mode, enable tools on first 2 attempts so model can
+                    # actually make tool calls. Fall back to text-only on last attempt.
+                    use_tools = should_continue_task and attempt <= 2
+                    recovery_tools = tools if use_tools else None
+
+                    try:
+                        response = await self.provider.chat(
+                            messages=recovery_messages,
+                            model=self.model,
+                            temperature=temp,
+                            max_tokens=min(self.max_tokens, 1024),  # Limit output for recovery
+                            tools=recovery_tools,
+                        )
+
+                        # Check for tool calls in recovery response
+                        if use_tools and response and response.tool_calls:
+                            logger.info(f"Recovery attempt {attempt}: model made {len(response.tool_calls)} tool call(s)")
+                            # Re-inject the recovery prompt into conversation and let main loop handle
+                            self.add_message("user", prompt)
+                            if response.content:
+                                self.add_message("assistant", response.content)
+                            # Set tool_calls for main loop to process
+                            tool_calls = response.tool_calls
+                            recovery_success = True
+                            # Don't yield final chunk - let main loop continue with tool execution
+                            break
+
+                        if response and response.content:
+                            logger.debug(
+                                f"Recovery attempt {attempt}: got {len(response.content)} chars"
+                            )
+                            sanitized = self._sanitize_response(response.content)
+                            if sanitized and len(sanitized) > 20:
+                                self.add_message("assistant", sanitized)
+                                yield StreamChunk(content=sanitized, is_final=True)
+                                recovery_success = True
+                                break
+                            elif response.content and len(response.content) > 20:
+                                # Use raw if sanitization failed but content exists
+                                self.add_message("assistant", response.content)
+                                yield StreamChunk(content=response.content, is_final=True)
+                                recovery_success = True
+                                break
+                        else:
+                            logger.debug(f"Recovery attempt {attempt}: empty response")
+                    except Exception as exc:
+                        exc_str = str(exc)
+                        logger.warning(f"Recovery attempt {attempt} failed: {exc}")
+
+                        # Check for rate limit errors and extract wait time
+                        if "rate_limit" in exc_str.lower() or "429" in exc_str:
+                            import re
+
+                            # Try to extract "try again in X.XXs" or similar patterns
+                            wait_match = re.search(
+                                r"try again in (\d+(?:\.\d+)?)\s*s", exc_str, re.I
+                            )
+                            if wait_match:
+                                wait_time = float(wait_match.group(1))
+                                logger.info(
+                                    f"Rate limited. Waiting {wait_time:.1f}s before retry..."
+                                )
+                                await asyncio.sleep(
+                                    min(wait_time + 0.5, 30.0)
+                                )  # Add 0.5s buffer, cap at 30s
+                            else:
+                                # Default exponential backoff for rate limits
+                                backoff = min(2**attempt, 15)  # 2, 4, 8 seconds
+                                logger.info(f"Rate limited. Waiting {backoff}s before retry...")
+                                await asyncio.sleep(backoff)
+
+                if recovery_success:
+                    # If recovery produced tool_calls, continue the main loop to execute them
+                    # Otherwise, we've already yielded the text response, so return
+                    if not tool_calls:
+                        return
+                    # Fall through to tool execution with recovered tool_calls
+                    logger.info(f"Recovery produced {len(tool_calls)} tool call(s) - continuing main loop")
+                else:
+                    # All recovery attempts failed - provide helpful error
+                    if is_analysis_task and self.tool_calls_used > 0:
+                        # Generate a minimal summary from what we know
+                        unique_resources = self.unified_tracker.unique_resources
+                        files_examined = list(unique_resources)[:10]
+                        fallback_msg = (
+                            f"\n\n**Analysis Summary** (auto-generated)\n\n"
+                            f"Examined {len(unique_resources)} files including:\n"
+                            + "\n".join(f"- {f}" for f in files_examined)
+                            + "\n\nThe model was unable to provide detailed analysis. "
+                            "Try with a simpler query like 'analyze victor/agent/' or use a different model."
+                        )
+                    else:
+                        fallback_msg = "No tool calls were returned and the model provided no content. Please retry or simplify the request."
+                    # Record outcome for Q-learning (fallback = partial failure)
+                    self._record_intelligent_outcome(
+                        success=False,
+                        quality_score=0.3,  # Low quality since model didn't provide useful content
+                        user_satisfied=False,
+                        completed=False,
+                    )
+                    yield StreamChunk(content=fallback_msg, is_final=True)
                     return
 
-                # Handle action: prompt_tool_call
-                elif action == "prompt_tool_call":
-                    self.add_message("system", action_result["message"])
-                    self.unified_tracker.increment_turn()
-                    skip_rest = True
+            # Record tool calls in progress tracker for loop detection
+            # Progress tracker handles unique resource tracking internally
+            for tc in tool_calls or []:
+                tool_name = tc.get("name", "")
+                tool_args = tc.get("arguments", {})
 
-                # Handle action: request_summary
-                elif action == "request_summary":
-                    self.add_message("system", action_result["message"])
-                    skip_rest = True
+                # Record tool call in unified tracker (single source of truth)
+                self.unified_tracker.record_tool_call(tool_name, tool_args)
 
-                # Handle action: request_completion
-                elif action == "request_completion":
-                    self.add_message("system", action_result["message"])
-                    skip_rest = True
+            content_length = len(full_content.strip())
 
-                if skip_rest:
-                    pass
-                else:
-                    # Handle action: finish - No more tool calls requested
-                    # Display performance metrics
-                    elapsed_time = time.time() - start_time
+            # Record iteration in unified tracker (single source of truth)
+            self.unified_tracker.record_iteration(content_length)
 
-                    # Build token usage summary
-                    # Use actual provider-reported usage if available, else use estimate
-                    if cumulative_usage["total_tokens"] > 0:
-                        # Provider-reported tokens (accurate)
-                        input_tokens = cumulative_usage["prompt_tokens"]
-                        output_tokens = cumulative_usage["completion_tokens"]
-                        _display_tokens = cumulative_usage["total_tokens"]
-                        cache_read = cumulative_usage.get("cache_read_input_tokens", 0)
-                        cache_create = cumulative_usage.get("cache_creation_input_tokens", 0)
-
-                        # Build metrics line
-                        tokens_per_second = output_tokens / elapsed_time if elapsed_time > 0 else 0
-                        metrics_parts = [
-                            f"📊 in={input_tokens:,}",
-                            f"out={output_tokens:,}",
-                        ]
-                        if cache_read > 0:
-                            metrics_parts.append(f"cached={cache_read:,}")
-                        if cache_create > 0:
-                            metrics_parts.append(f"cache_new={cache_create:,}")
-                        metrics_parts.extend(
-                            [
-                                f"| {elapsed_time:.1f}s",
-                                f"| {tokens_per_second:.1f} tok/s",
-                            ]
+            # Intelligent pipeline post-iteration hook: validate response quality
+            # This enables quality scoring, hallucination detection, and Q-learning feedback
+            if full_content and len(full_content.strip()) > 50:
+                quality_result = await self._validate_intelligent_response(
+                    response=full_content,
+                    query=user_message,
+                    tool_calls=self.tool_calls_used,
+                    task_type=unified_task_type.value,
+                )
+                if quality_result and not quality_result.get("is_grounded", True):
+                    # Log grounding issues for debugging
+                    issues = quality_result.get("grounding_issues", [])
+                    if issues:
+                        logger.warning(
+                            f"IntelligentPipeline detected grounding issues: {issues[:3]}"
                         )
-                        metrics_line = " ".join(metrics_parts)
+                # Update quality score for Q-learning outcome recording
+                if quality_result:
+                    last_quality_score = quality_result.get("quality_score", last_quality_score)
+
+            # Check for loop warning using UnifiedTaskTracker (primary)
+            # This gives the model a chance to correct behavior before we force stop
+            unified_loop_warning = self.unified_tracker.check_loop_warning()
+            if unified_loop_warning and not force_completion:
+                logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
+                yield StreamChunk(
+                    content=f"\n[loop] ⚠ Warning: Approaching loop limit - {unified_loop_warning}\n"
+                )
+                # Inject system message to warn the model
+                self.add_message(
+                    "system",
+                    "WARNING: You are about to hit loop detection. You have been performing "
+                    "the same operation repeatedly (e.g., writing the same file, making the same call). "
+                    "Please do something DIFFERENT now:\n"
+                    "- If you're writing a file repeatedly, STOP and move to a different task\n"
+                    "- If you're stuck, provide your current progress and ask for clarification\n"
+                    "- If you've completed the task, provide a summary and finish\n\n"
+                    "Continuing the same operation will force the conversation to end.",
+                )
+            else:
+                # PRIMARY: Check UnifiedTaskTracker for stop decision (single source of truth)
+                unified_should_force, unified_hint = self.unified_tracker.should_force_action()
+                if unified_should_force and not force_completion:
+                    force_completion = True
+                    logger.info(
+                        f"UnifiedTaskTracker forcing action: {unified_hint}, "
+                        f"metrics={self.unified_tracker.get_metrics()}"
+                    )
+
+                logger.debug(f"After streaming pass, tool_calls = {tool_calls}")
+
+                if not tool_calls:
+                    # CRITICAL FIX: Yield content to UI immediately when there are no tool calls
+                    # This ensures the user sees the model's response even if the loop continues
+                    # for intent classification and action decisions
+                    # Save content for intent classification before yielding
+                    content_for_intent = full_content or ""
+                    if full_content:
+                        sanitized = self._sanitize_response(full_content)
+                        if sanitized:
+                            logger.debug(f"Yielding content to UI: {len(sanitized)} chars")
+                            yield StreamChunk(content=sanitized)
+                            # Clear full_content to prevent duplicate output later
+                            full_content = ""
+
+                    # Check if model intended to continue but didn't make a tool call
+                    # Use semantic intent classification to determine continuation action
+                    # NOTE: Use the LAST portion of the response for intent classification
+                    # because asking_input patterns like "Would you like me to..." typically
+                    # appear at the END of a long response
+                    intent_text = content_for_intent
+                    if len(intent_text) > 500:
+                        intent_text = intent_text[-500:]
+                    intent_result = self.intent_classifier.classify_intent_sync(intent_text)
+
+                    logger.debug(
+                        f"Intent classification: {intent_result.intent.name} "
+                        f"(confidence={intent_result.confidence:.3f}, "
+                        f"text_len={len(intent_text)}, "
+                        f"top_matches={intent_result.top_matches[:3]})"
+                    )
+
+                    # Initialize tracking variables
+                    if not hasattr(self, "_continuation_prompts"):
+                        self._continuation_prompts = 0
+                    if not hasattr(self, "_asking_input_prompts"):
+                        self._asking_input_prompts = 0
+                    if not hasattr(self, "_consecutive_blocked_attempts"):
+                        self._consecutive_blocked_attempts = 0
+
+                    # Check for response loop using UnifiedTaskTracker
+                    # (detects when model keeps responding with similar text without tool calls)
+                    is_repeated_response = self.unified_tracker.check_response_loop(full_content or "")
+
+                    # Use helper to determine what action to take
+                    one_shot_mode = getattr(self.settings, "one_shot_mode", False)
+                    action_result = self._determine_continuation_action(
+                        intent_result=intent_result,
+                        is_analysis_task=is_analysis_task,
+                        is_action_task=is_action_task,
+                        content_length=content_length,
+                        full_content=full_content,
+                        continuation_prompts=self._continuation_prompts,
+                        asking_input_prompts=self._asking_input_prompts,
+                        one_shot_mode=one_shot_mode,
+                    )
+
+                    # Apply state updates from action result
+                    if "continuation_prompts" in action_result.get("updates", {}):
+                        self._continuation_prompts = action_result["updates"]["continuation_prompts"]
+                    if "asking_input_prompts" in action_result.get("updates", {}):
+                        self._asking_input_prompts = action_result["updates"]["asking_input_prompts"]
+                    if action_result.get("set_final_summary_requested"):
+                        self._final_summary_requested = True
+
+                    action = action_result["action"]
+
+                    # Override: If repeated response detected, force completion to prevent loop
+                    if is_repeated_response and action in ("prompt_tool_call", "request_summary"):
+                        action = "finish"
+                        logger.info(
+                            f"Continuation action: {action} - "
+                            "Overriding to finish due to repeated response"
+                        )
                     else:
-                        # Fallback to estimate
-                        tokens_per_second = total_tokens / elapsed_time if elapsed_time > 0 else 0
-                        metrics_line = (
-                            f"📊 ~{total_tokens:.0f} tokens (est.) | "
-                            f"{elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s"
-                        )
+                        logger.info(f"Continuation action: {action} - {action_result['reason']}")
 
-                    yield StreamChunk(content=f"\n\n{metrics_line}\n")
-                    # Record outcome for Q-learning (normal completion = success)
+                    skip_rest = False
+
+                    # Handle action: continue_asking_input
+                    if action == "continue_asking_input":
+                        self.add_message("user", action_result["message"])
+                        skip_rest = True
+
+                    # Handle action: return_to_user
+                    elif action == "return_to_user":
+                        # Yield the accumulated content before returning
+                        if full_content:
+                            sanitized = self._sanitize_response(full_content)
+                            if sanitized:
+                                yield StreamChunk(content=sanitized)
+                        yield StreamChunk(content="", is_final=True)
+                        return
+
+                    # Handle action: prompt_tool_call
+                    elif action == "prompt_tool_call":
+                        self.add_message("system", action_result["message"])
+                        self.unified_tracker.increment_turn()
+                        skip_rest = True
+
+                    # Handle action: request_summary
+                    elif action == "request_summary":
+                        self.add_message("system", action_result["message"])
+                        skip_rest = True
+
+                    # Handle action: request_completion
+                    elif action == "request_completion":
+                        self.add_message("system", action_result["message"])
+                        skip_rest = True
+
+                    if skip_rest:
+                        pass
+                    else:
+                        # Handle action: finish - No more tool calls requested
+                        # Yield the accumulated content to the UI (was missing!)
+                        if full_content:
+                            sanitized = self._sanitize_response(full_content)
+                            if sanitized:
+                                yield StreamChunk(content=sanitized)
+
+                        # Display performance metrics
+                        elapsed_time = time.time() - start_time
+
+                        # Build token usage summary
+                        # Use actual provider-reported usage if available, else use estimate
+                        if cumulative_usage["total_tokens"] > 0:
+                            # Provider-reported tokens (accurate)
+                            input_tokens = cumulative_usage["prompt_tokens"]
+                            output_tokens = cumulative_usage["completion_tokens"]
+                            _display_tokens = cumulative_usage["total_tokens"]
+                            cache_read = cumulative_usage.get("cache_read_input_tokens", 0)
+                            cache_create = cumulative_usage.get("cache_creation_input_tokens", 0)
+
+                            # Build metrics line
+                            tokens_per_second = output_tokens / elapsed_time if elapsed_time > 0 else 0
+                            metrics_parts = [
+                                f"📊 in={input_tokens:,}",
+                                f"out={output_tokens:,}",
+                            ]
+                            if cache_read > 0:
+                                metrics_parts.append(f"cached={cache_read:,}")
+                            if cache_create > 0:
+                                metrics_parts.append(f"cache_new={cache_create:,}")
+                            metrics_parts.extend(
+                                [
+                                    f"| {elapsed_time:.1f}s",
+                                    f"| {tokens_per_second:.1f} tok/s",
+                                ]
+                            )
+                            metrics_line = " ".join(metrics_parts)
+                        else:
+                            # Fallback to estimate
+                            tokens_per_second = total_tokens / elapsed_time if elapsed_time > 0 else 0
+                            metrics_line = (
+                                f"📊 ~{total_tokens:.0f} tokens (est.) | "
+                                f"{elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s"
+                            )
+
+                        yield StreamChunk(content=f"\n\n{metrics_line}\n")
+                        # Record outcome for Q-learning (normal completion = success)
+                        self._record_intelligent_outcome(
+                            success=True,
+                            quality_score=last_quality_score,
+                            user_satisfied=True,
+                            completed=True,
+                        )
+                        yield StreamChunk(content="", is_final=True)
+                        return
+
+                # Tool execution section - runs regardless of loop warning
+                logger.debug(
+                    f"Entering tool execution: tool_calls={len(tool_calls) if tool_calls else 0}, "
+                    f"tool_calls_used={self.tool_calls_used}/{self.tool_budget}"
+                )
+
+                remaining = max(0, self.tool_budget - self.tool_calls_used)
+
+                # Warn when approaching budget limit
+                warning_threshold = getattr(self.settings, "tool_call_budget_warning_threshold", 250)
+                if self.tool_calls_used >= warning_threshold and remaining > 0:
+                    yield StreamChunk(
+                        content=f"[tool] ⚠ Approaching tool budget limit: {self.tool_calls_used}/{self.tool_budget} calls used\n"
+                    )
+
+                if remaining <= 0:
+                    yield StreamChunk(
+                        content=f"[tool] ⚠ Tool budget reached ({self.tool_budget}); skipping tool calls.\n"
+                    )
+                    # Try to generate a final summary before exiting
+                    yield StreamChunk(content="Generating final summary...\n")
+                    try:
+                        self.add_message(
+                            "system",
+                            "Tool budget reached. Provide a brief summary of what you found based on "
+                            "the information gathered. Do NOT attempt any more tool calls.",
+                        )
+                        response = await self.provider.chat(
+                            messages=self.messages,
+                            model=self.model,
+                            temperature=self.temperature,
+                            max_tokens=self.max_tokens,
+                            tools=None,
+                        )
+                        if response and response.content:
+                            sanitized = self._sanitize_response(response.content)
+                            if sanitized:
+                                yield StreamChunk(content=sanitized + "\n")
+                    except Exception as e:
+                        logger.warning(f"Failed to generate final summary: {e}")
+                        yield StreamChunk(content="Unable to generate summary due to budget limit.\n")
+
+                    # Finalize and display performance metrics
+                    final_metrics = self._finalize_stream_metrics()
+                    elapsed_time = (
+                        final_metrics.total_duration if final_metrics else time.time() - start_time
+                    )
+                    tokens_per_second = total_tokens / elapsed_time if elapsed_time > 0 else 0
+                    ttft_info = ""
+                    if final_metrics and final_metrics.time_to_first_token:
+                        ttft_info = f" | TTFT: {final_metrics.time_to_first_token:.2f}s"
+                    # Record outcome for Q-learning (budget reached = partial success)
                     self._record_intelligent_outcome(
-                        success=True,
+                        success=True,  # We provided a summary
                         quality_score=last_quality_score,
                         user_satisfied=True,
                         completed=True,
                     )
-                    yield StreamChunk(content="", is_final=True)
+                    yield StreamChunk(
+                        content=f"\n📊 {total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}\n",
+                        is_final=True,
+                    )
                     return
 
-            remaining = max(0, self.tool_budget - self.tool_calls_used)
-
-            # Warn when approaching budget limit
-            warning_threshold = getattr(self.settings, "tool_call_budget_warning_threshold", 250)
-            if self.tool_calls_used >= warning_threshold and remaining > 0:
-                yield StreamChunk(
-                    content=f"[tool] ⚠ Approaching tool budget limit: {self.tool_calls_used}/{self.tool_budget} calls used\n"
+                # Force final response after too many consecutive tool calls without output
+                # This prevents endless tool call loops
+                # For analysis/action tasks, allow significantly more tool calls
+                base_max_consecutive = 8
+                if is_analysis_task:
+                    base_max_consecutive = 50  # Analysis needs many tool calls to explore codebase
+                elif is_action_task:
+                    base_max_consecutive = 30  # Action tasks (web search, multi-step) need flexibility
+                max_consecutive_tool_calls = getattr(
+                    self.settings, "max_consecutive_tool_calls", base_max_consecutive
                 )
+                if self.tool_calls_used >= max_consecutive_tool_calls and not force_completion:
+                    # Check if we've been making progress (reading new files)
+                    # For analysis/action tasks, use a more lenient progress threshold
+                    # Action tasks may do web searches, directory listings, bash commands - not just file reads
+                    requires_lenient_progress = is_analysis_task or is_action_task
+                    progress_threshold = (
+                        self.tool_calls_used // 4
+                        if requires_lenient_progress
+                        else self.tool_calls_used // 2
+                    )
+                    if len(unique_resources) < progress_threshold:
+                        # Not making good progress - force completion
+                        logger.warning(
+                            f"Forcing completion: {self.tool_calls_used} tool calls but only "
+                            f"{len(unique_resources)} unique resources (threshold: {progress_threshold})"
+                        )
+                        force_completion = True
 
-            if remaining <= 0:
-                yield StreamChunk(
-                    content=f"[tool] ⚠ Tool budget reached ({self.tool_budget}); skipping tool calls.\n"
-                )
-                # Try to generate a final summary before exiting
-                yield StreamChunk(content="Generating final summary...\n")
-                try:
+                # Force completion if too many low-output iterations or research calls
+                if force_completion:
+                    # Check stop reason from unified tracker to determine message type
+                    stop_decision = self.unified_tracker.should_stop()
+                    is_research_loop = (
+                        stop_decision.reason.value == "loop_detected"
+                        and "research" in stop_decision.hint.lower()
+                    )
+
+                    if is_research_loop:
+                        yield StreamChunk(
+                            content="[tool] ⚠ Research loop detected - forcing synthesis\n"
+                        )
+                        self.add_message(
+                            "system",
+                            "You have performed multiple consecutive research/web searches. "
+                            "STOP searching now. Instead, SYNTHESIZE and ANALYZE the information you've already gathered. "
+                            "Provide your FINAL ANSWER based on the search results you have collected. "
+                            "Answer all parts of the user's question comprehensively.",
+                        )
+                    else:
+                        yield StreamChunk(
+                            content="⚠️ Reached exploration limit - summarizing findings...\n"
+                        )
+                        self.add_message(
+                            "system",
+                            "You have made multiple tool calls without providing substantial analysis. "
+                            "STOP using tools now. Instead, provide your FINAL COMPREHENSIVE ANSWER based on "
+                            "the information you have already gathered. Answer all parts of the user's question.",
+                        )
+
+                    # Force a final response by calling provider WITHOUT tools
+                    try:
+                        response = await self.provider.chat(
+                            messages=self.messages,
+                            model=self.model,
+                            temperature=self.temperature,
+                            max_tokens=self.max_tokens,
+                            tools=None,  # No tools - force text response
+                        )
+                        if response and response.content:
+                            sanitized = self._sanitize_response(response.content)
+                            if sanitized:
+                                self.add_message("assistant", sanitized)
+                                yield StreamChunk(content=sanitized)
+                    except Exception as e:
+                        logger.warning(f"Error forcing final response: {e}")
+                        yield StreamChunk(
+                            content="Unable to generate final summary. Please try a simpler query."
+                        )
+                    return  # Exit the loop after forcing final response
+
+                # Guard against None tool_calls (can happen when model response has no tool calls
+                # but continuation logic decided to continue the loop)
+                if not tool_calls:
+                    tool_calls = []
+                else:
+                    tool_calls = tool_calls[:remaining]
+
+                # Filter out tool calls that are blocked after loop warning
+                # After warning, the same signature cannot be attempted again
+                filtered_tool_calls = []
+                blocked_tool_calls = []
+                for tc in tool_calls:
+                    tc_name = tc.get("name", "")
+                    tc_args = tc.get("arguments", {})
+                    block_reason = self.unified_tracker.is_blocked_after_warning(tc_name, tc_args)
+                    if block_reason:
+                        yield StreamChunk(content=f"\n[loop] ⛔ {block_reason}\n")
+                        blocked_tool_calls.append((tc_name, tc_args, block_reason))
+                    else:
+                        filtered_tool_calls.append(tc)
+
+                # Initialize variables that may not be set if no tool calls
+                tool_name = None
+                tool_results = []
+
+                # Track total blocked attempts across the conversation (not just consecutive)
+                if not hasattr(self, "_total_blocked_attempts"):
+                    self._total_blocked_attempts = 0
+
+                # Add feedback for each blocked tool call
+                for tc_name, tc_args, block_reason in blocked_tool_calls:
+                    self._total_blocked_attempts += 1
+                    logger.debug(f"BLOCKED tool call: {tc_name}({tc_args}) - {block_reason}")
+                    # Add tool result feedback (as "user" role to match normal tool results)
                     self.add_message(
-                        "system",
-                        "Tool budget reached. Provide a brief summary of what you found based on "
-                        "the information gathered. Do NOT attempt any more tool calls.",
+                        "user",
+                        f"⛔ TOOL BLOCKED: {tc_name}({', '.join(f'{k}={repr(v)[:30]}' for k, v in tc_args.items())})\n\n"
+                        f"Reason: {block_reason}\n\n"
+                        "This operation was permanently blocked because you already tried it multiple times. "
+                        "You MUST use a DIFFERENT approach - this exact operation will NEVER work again."
                     )
-                    response = await self.provider.chat(
-                        messages=self.messages,
-                        model=self.model,
-                        temperature=self.temperature,
-                        max_tokens=self.max_tokens,
-                        tools=None,
-                    )
-                    if response and response.content:
-                        sanitized = self._sanitize_response(response.content)
-                        if sanitized:
-                            yield StreamChunk(content=sanitized + "\n")
-                except Exception as e:
-                    logger.warning(f"Failed to generate final summary: {e}")
-                    yield StreamChunk(content="Unable to generate summary due to budget limit.\n")
 
-                # Finalize and display performance metrics
-                final_metrics = self._finalize_stream_metrics()
-                elapsed_time = (
-                    final_metrics.total_duration if final_metrics else time.time() - start_time
-                )
-                tokens_per_second = total_tokens / elapsed_time if elapsed_time > 0 else 0
-                ttft_info = ""
-                if final_metrics and final_metrics.time_to_first_token:
-                    ttft_info = f" | TTFT: {final_metrics.time_to_first_token:.2f}s"
-                # Record outcome for Q-learning (budget reached = partial success)
-                self._record_intelligent_outcome(
-                    success=True,  # We provided a summary
-                    quality_score=last_quality_score,
-                    user_satisfied=True,
-                    completed=True,
-                )
-                yield StreamChunk(
-                    content=f"\n📊 {total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}\n",
-                    is_final=True,
-                )
-                return
+                # Check if we should force completion due to excessive blocking
+                # Use configurable recovery thresholds from settings (overrides unified tracker defaults)
+                consecutive_limit = getattr(self.settings, "recovery_blocked_consecutive_threshold", 4)
+                total_limit = getattr(self.settings, "recovery_blocked_total_threshold", 6)
 
-            # Force final response after too many consecutive tool calls without output
-            # This prevents endless tool call loops
-            # For analysis/action tasks, allow significantly more tool calls
-            base_max_consecutive = 8
-            if is_analysis_task:
-                base_max_consecutive = 50  # Analysis needs many tool calls to explore codebase
-            elif is_action_task:
-                base_max_consecutive = 30  # Action tasks (web search, multi-step) need flexibility
-            max_consecutive_tool_calls = getattr(
-                self.settings, "max_consecutive_tool_calls", base_max_consecutive
-            )
-            if self.tool_calls_used >= max_consecutive_tool_calls and not force_completion:
-                # Check if we've been making progress (reading new files)
-                # For analysis/action tasks, use a more lenient progress threshold
-                # Action tasks may do web searches, directory listings, bash commands - not just file reads
-                requires_lenient_progress = is_analysis_task or is_action_task
-                progress_threshold = (
-                    self.tool_calls_used // 4
-                    if requires_lenient_progress
-                    else self.tool_calls_used // 2
-                )
-                if len(unique_resources) < progress_threshold:
-                    # Not making good progress - force completion
+                force_completion_triggered = False
+                if not filtered_tool_calls and tool_calls:
+                    # All tool calls were blocked - track consecutive blocks
+                    if not hasattr(self, "_consecutive_blocked_attempts"):
+                        self._consecutive_blocked_attempts = 0
+                    self._consecutive_blocked_attempts += 1
+
+                    # After N consecutive blocked attempts, force completion
+                    if self._consecutive_blocked_attempts >= consecutive_limit:
+                        force_completion_triggered = True
+                        logger.warning(
+                            f"Model stuck in loop after {self._consecutive_blocked_attempts} consecutive blocked attempts (limit: {consecutive_limit}) - forcing completion"
+                        )
+                else:
+                    # Reset consecutive counter when we have valid tool calls
+                    if hasattr(self, "_consecutive_blocked_attempts"):
+                        self._consecutive_blocked_attempts = 0
+
+                # Also check total blocked attempts (even if some valid calls exist)
+                if not force_completion_triggered and self._total_blocked_attempts >= total_limit:
+                    force_completion_triggered = True
                     logger.warning(
-                        f"Forcing completion: {self.tool_calls_used} tool calls but only "
-                        f"{len(unique_resources)} unique resources (threshold: {progress_threshold})"
+                        f"Model stuck in loop after {self._total_blocked_attempts} total blocked attempts (limit: {total_limit}) - forcing completion"
                     )
-                    force_completion = True
 
-            # Force completion if too many low-output iterations or research calls
-            if force_completion:
-                # Check stop reason from unified tracker to determine message type
-                stop_decision = self.unified_tracker.should_stop()
-                is_research_loop = (
-                    stop_decision.reason.value == "loop_detected"
-                    and "research" in stop_decision.hint.lower()
-                )
-
-                if is_research_loop:
+                if force_completion_triggered:
                     yield StreamChunk(
-                        content="[tool] ⚠ Research loop detected - forcing synthesis\n"
+                        content="\n[loop] ⚠️ Multiple blocked attempts - forcing completion\n"
                     )
+                    # Add strong instruction to stop tool use
                     self.add_message(
-                        "system",
-                        "You have performed multiple consecutive research/web searches. "
-                        "STOP searching now. Instead, SYNTHESIZE and ANALYZE the information you've already gathered. "
-                        "Provide your FINAL ANSWER based on the search results you have collected. "
-                        "Answer all parts of the user's question comprehensively.",
+                        "user",
+                        "⚠️ STOP: You have attempted blocked operations too many times. "
+                        "You MUST now provide your final response WITHOUT any tool calls. "
+                        "Summarize what you found and answer the user's question based on "
+                        "the information you have already gathered. DO NOT call any more tools."
                     )
-                else:
-                    yield StreamChunk(
-                        content="⚠️ Reached exploration limit - summarizing findings...\n"
-                    )
-                    self.add_message(
-                        "system",
-                        "You have made multiple tool calls without providing substantial analysis. "
-                        "STOP using tools now. Instead, provide your FINAL COMPREHENSIVE ANSWER based on "
-                        "the information you have already gathered. Answer all parts of the user's question.",
-                    )
+                    self._consecutive_blocked_attempts = 0
+                    # Clear filtered_tool_calls to prevent any more tool execution
+                    filtered_tool_calls = []
 
-                # Force a final response by calling provider WITHOUT tools
-                try:
-                    response = await self.provider.chat(
-                        messages=self.messages,
-                        model=self.model,
-                        temperature=self.temperature,
-                        max_tokens=self.max_tokens,
-                        tools=None,  # No tools - force text response
-                    )
-                    if response and response.content:
-                        sanitized = self._sanitize_response(response.content)
-                        if sanitized:
-                            self.add_message("assistant", sanitized)
-                            yield StreamChunk(content=sanitized)
-                except Exception as e:
-                    logger.warning(f"Error forcing final response: {e}")
-                    yield StreamChunk(
-                        content="Unable to generate final summary. Please try a simpler query."
-                    )
-                return  # Exit the loop after forcing final response
-
-            # Guard against None tool_calls (can happen when model response has no tool calls
-            # but continuation logic decided to continue the loop)
-            if not tool_calls:
-                tool_calls = []
-            else:
-                tool_calls = tool_calls[:remaining]
-
-            # Filter out tool calls that are blocked after loop warning
-            # After warning, the same signature cannot be attempted again
-            filtered_tool_calls = []
-            for tc in tool_calls:
-                tc_name = tc.get("name", "")
-                tc_args = tc.get("arguments", {})
-                block_reason = self.unified_tracker.is_blocked_after_warning(tc_name, tc_args)
-                if block_reason:
-                    yield StreamChunk(content=f"\n[loop] ⛔ {block_reason}\n")
-                    # Inject message to guide model to different approach
-                    self.add_message(
-                        # amazonq-ignore-next-line
-                        "system",
-                        f"BLOCKED: {block_reason}\n"
-                        "You MUST try a different approach. Do NOT repeat the same operation.\n"
-                        "Either: 1) Use a different tool, 2) Use different parameters, or "
-                        "3) Provide your final response without further tool calls.",
-                    )
-                else:
-                    filtered_tool_calls.append(tc)
-
-            # Initialize variables that may not be set if no tool calls
-            tool_name = None
-            tool_results = []
-
-            if not filtered_tool_calls and tool_calls:
-                # All tool calls were blocked - continue loop for model to respond
-                pass
-            else:
                 tool_calls = filtered_tool_calls
 
                 for tool_call in tool_calls:
@@ -4485,87 +4731,87 @@ class AgentOrchestrator:
                 tool_results = await self._handle_tool_calls(tool_calls)
                 # CRITICAL FIX: Increment tool_calls_used counter to prevent infinite loops
                 self.tool_calls_used += len(tool_calls)
-            for result in tool_results:
-                tool_name = result.get("name", "tool")
-                elapsed = result.get("elapsed", 0.0)
-                tool_args = result.get("args", {})
-                if result.get("success"):
-                    # Emit structured tool_result event for CLI to format with arguments
-                    yield StreamChunk(
-                        content="",
-                        metadata={
-                            "tool_result": {
-                                "name": tool_name,
-                                "success": True,
-                                "elapsed": elapsed,
-                                "arguments": tool_args,
-                            }
-                        },
-                    )
-                    # Show content preview for write/edit operations (like Claude Code)
+                for result in tool_results:
+                    tool_name = result.get("name", "tool")
+                    elapsed = result.get("elapsed", 0.0)
                     tool_args = result.get("args", {})
-                    if tool_name == "write_file" and tool_args.get("content"):
-                        content = tool_args["content"]
-                        lines = content.split("\n")
-                        preview_lines = 8  # Show first N lines
-                        if len(lines) > preview_lines:
-                            preview = "\n".join(lines[:preview_lines])
-                            preview += f"\n... ({len(lines) - preview_lines} more lines)"
-                        else:
-                            preview = content
-                        # Format as a code block preview
+                    if result.get("success"):
+                        # Emit structured tool_result event for CLI to format with arguments
                         yield StreamChunk(
                             content="",
-                            metadata={"file_preview": preview, "path": tool_args.get("path", "")},
+                            metadata={
+                                "tool_result": {
+                                    "name": tool_name,
+                                    "success": True,
+                                    "elapsed": elapsed,
+                                    "arguments": tool_args,
+                                }
+                            },
                         )
-                    elif tool_name == "edit_files" and tool_args.get("files"):
-                        # Show edit operations summary
-                        files = tool_args.get("files", [])
-                        for file_edit in files[:3]:  # Show first 3 files
-                            path = file_edit.get("path", "")
-                            edits = file_edit.get("edits", [])
-                            for edit in edits[:2]:  # Show first 2 edits per file
-                                old_str = edit.get("old_string", "")[:50]
-                                new_str = edit.get("new_string", "")[:50]
-                                if old_str and new_str:
-                                    yield StreamChunk(
-                                        content="",
-                                        metadata={
-                                            "edit_preview": f"- {old_str}...\n+ {new_str}...",
-                                            "path": path,
-                                        },
-                                    )
-                else:
-                    error_msg = result.get("error", "failed")
-                    yield StreamChunk(
-                        content="",
-                        metadata={
-                            "tool_result": {
-                                "name": tool_name,
-                                "success": False,
-                                "elapsed": elapsed,
-                                "arguments": tool_args,
-                                "error": error_msg,
-                            }
-                        },
-                    )
+                        # Show content preview for write/edit operations (like Claude Code)
+                        tool_args = result.get("args", {})
+                        if tool_name == "write_file" and tool_args.get("content"):
+                            content = tool_args["content"]
+                            lines = content.split("\n")
+                            preview_lines = 8  # Show first N lines
+                            if len(lines) > preview_lines:
+                                preview = "\n".join(lines[:preview_lines])
+                                preview += f"\n... ({len(lines) - preview_lines} more lines)"
+                            else:
+                                preview = content
+                            # Format as a code block preview
+                            yield StreamChunk(
+                                content="",
+                                metadata={"file_preview": preview, "path": tool_args.get("path", "")},
+                            )
+                        elif tool_name == "edit_files" and tool_args.get("files"):
+                            # Show edit operations summary
+                            files = tool_args.get("files", [])
+                            for file_edit in files[:3]:  # Show first 3 files
+                                path = file_edit.get("path", "")
+                                edits = file_edit.get("edits", [])
+                                for edit in edits[:2]:  # Show first 2 edits per file
+                                    old_str = edit.get("old_string", "")[:50]
+                                    new_str = edit.get("new_string", "")[:50]
+                                    if old_str and new_str:
+                                        yield StreamChunk(
+                                            content="",
+                                            metadata={
+                                                "edit_preview": f"- {old_str}...\n+ {new_str}...",
+                                                "path": path,
+                                            },
+                                        )
+                    else:
+                        error_msg = result.get("error", "failed")
+                        yield StreamChunk(
+                            content="",
+                            metadata={
+                                "tool_result": {
+                                    "name": tool_name,
+                                    "success": False,
+                                    "elapsed": elapsed,
+                                    "arguments": tool_args,
+                                    "error": error_msg,
+                                }
+                            },
+                        )
 
-            yield StreamChunk(content="", metadata={"status": "💭 Thinking..."})
+                yield StreamChunk(content="", metadata={"status": "💭 Thinking..."})
 
-            # Update reminder manager state and inject consolidated reminder if needed
-            # This replaces the previous per-tool-call evidence injection with smart throttling
-            self.reminder_manager.update_state(
-                observed_files=set(self.observed_files) if self.observed_files else set(),
-                executed_tool=tool_name,
-                tool_calls=self.tool_calls_used,
-            )
+                # Update reminder manager state and inject consolidated reminder if needed
+                # This replaces the previous per-tool-call evidence injection with smart throttling
+                self.reminder_manager.update_state(
+                    observed_files=set(self.observed_files) if self.observed_files else set(),
+                    executed_tool=tool_name,
+                    tool_calls=self.tool_calls_used,
+                )
 
-            # Get consolidated reminder (only returns content when injection is due)
-            reminder = self.reminder_manager.get_consolidated_reminder()
-            if reminder:
-                self.add_message("system", reminder)
+                # Get consolidated reminder (only returns content when injection is due)
+                reminder = self.reminder_manager.get_consolidated_reminder()
+                if reminder:
+                    self.add_message("system", reminder)
 
-            context_msg = full_content or user_message
+                context_msg = full_content or user_message
 
     async def _execute_tool_with_retry(
         self, tool_name: str, tool_args: Dict[str, Any], context: Dict[str, Any]
@@ -4897,15 +5143,16 @@ class AgentOrchestrator:
                     f"[red]✗ Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
                 )
 
-                # For semantic failures (tool ran but returned success=False), pass the
-                # error details back to the model so it can understand and retry
-                if success and not semantic_success:
-                    # Tool executed but had semantic failure - give model actionable feedback
-                    error_output = output if isinstance(output, dict) else {"error": error_display}
-                    formatted_error = self._format_tool_output(
-                        tool_name, normalized_args, error_output
-                    )
-                    self.add_message("user", formatted_error)
+                # ALWAYS pass error details back to the model so it can understand and continue
+                # This handles both:
+                # 1. Execution failures (success=False): tool raised exception
+                # 2. Semantic failures (success=True, semantic_success=False): tool returned error
+                error_output = output if isinstance(output, dict) else {"error": error_display}
+                formatted_error = self._format_tool_output(
+                    tool_name, normalized_args, error_output
+                )
+                self.add_message("user", formatted_error)
+                logger.debug(f"Sent error feedback to model for {tool_name}: {error_display}")
 
                 results.append(
                     {
@@ -4941,6 +5188,8 @@ class AgentOrchestrator:
         self.failed_tool_signatures.clear()
         self.observed_files.clear()
         self.executed_tools.clear()
+        self._consecutive_blocked_attempts = 0
+        self._total_blocked_attempts = 0
 
         # Reset conversation state machine
         if hasattr(self, "conversation_state"):

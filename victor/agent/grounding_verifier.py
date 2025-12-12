@@ -178,8 +178,10 @@ class GroundingVerifier:
     )
 
     # Pattern for Python function/class definitions
+    # Only match actual code definitions, not natural language phrases like "let me"
+    # Require either code block context or CamelCase/snake_case naming conventions
     SYMBOL_PATTERN = re.compile(
-        r"(?:class|def|function|const|let|var|type|interface)\s+(\w+)",
+        r"(?:class|def|function|const|var|type|interface)\s+([A-Z_][A-Za-z0-9_]*|[a-z][a-z0-9_]*[A-Z_][A-Za-z0-9_]*|[a-z_][a-z0-9_]+)",
         re.MULTILINE,
     )
 
@@ -328,22 +330,32 @@ class GroundingVerifier:
                 result.verified_references.append(path)
                 continue
 
-            # Check partial match (filename only)
+            # Check partial match (filename only or path suffix)
             filename = os.path.basename(path)
-            partial_matches = [f for f in existing_files if f.endswith(filename)]
+            # Match files ending with the exact filename (separated by /)
+            partial_matches = [
+                f for f in existing_files
+                if f.endswith(filename) and (f == filename or f.endswith("/" + filename))
+            ]
 
             if partial_matches:
-                # File exists but path may be wrong
-                result.add_issue(
-                    GroundingIssue(
-                        issue_type=IssueType.PATH_INVALID,
-                        severity=IssueSeverity.LOW,
-                        description=f"Path '{path}' may be incorrect",
-                        reference=path,
-                        suggestion=f"Did you mean one of: {', '.join(partial_matches[:3])}?",
+                # File exists - if it's just a filename without path, count as verified
+                # (model may have abbreviated the path which is fine)
+                if "/" not in path or len(partial_matches) == 1:
+                    # Exact filename or only one match - count as verified
+                    result.verified_references.append(path)
+                else:
+                    # Multiple matches and a partial path was given - ambiguous
+                    result.add_issue(
+                        GroundingIssue(
+                            issue_type=IssueType.PATH_INVALID,
+                            severity=IssueSeverity.LOW,
+                            description=f"Path '{path}' is ambiguous",
+                            reference=path,
+                            suggestion=f"Could be: {', '.join(partial_matches[:3])}",
+                        )
                     )
-                )
-                result.unverified_references.append(path)
+                    result.unverified_references.append(path)
             else:
                 # File doesn't exist at all
                 result.add_issue(

@@ -1,4 +1,4 @@
-"""Tests for stream_renderer module.
+"""Tests for rendering module.
 
 Tests cover:
 - FormatterRenderer class methods
@@ -12,11 +12,12 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock, patch, call
 from rich.console import Console
 
-from victor.ui.stream_renderer import (
+from victor.ui.rendering import (
     StreamRenderer,
     FormatterRenderer,
     LiveDisplayRenderer,
     stream_response,
+    format_tool_args,
 )
 from victor.providers.base import StreamChunk
 
@@ -206,30 +207,30 @@ class TestLiveDisplayRenderer:
         """Create a LiveDisplayRenderer instance."""
         return LiveDisplayRenderer(mock_console)
 
-    def test_format_args_empty(self, renderer):
-        """Test _format_args() with empty dict."""
-        result = renderer._format_args({})
+    def test_format_args_empty(self):
+        """Test format_tool_args() with empty dict."""
+        result = format_tool_args({})
         assert result == ""
 
-    def test_format_args_single(self, renderer):
-        """Test _format_args() with single argument."""
-        result = renderer._format_args({"path": "/test.py"})
+    def test_format_args_single(self):
+        """Test format_tool_args() with single argument."""
+        result = format_tool_args({"path": "/test.py"})
         assert "path=" in result
         assert "/test.py" in result
 
-    def test_format_args_multiple(self, renderer):
-        """Test _format_args() with multiple arguments."""
-        result = renderer._format_args({"a": 1, "b": "test"})
+    def test_format_args_multiple(self):
+        """Test format_tool_args() with multiple arguments."""
+        result = format_tool_args({"a": 1, "b": "test"})
         assert "a=" in result
         assert "b=" in result
 
-    def test_format_args_truncates_long_values(self, renderer):
-        """Test _format_args() truncates values longer than 30 chars."""
+    def test_format_args_truncates_long_values(self):
+        """Test format_tool_args() truncates values longer than 60 chars."""
         long_value = "x" * 100
-        result = renderer._format_args({"long": long_value})
+        result = format_tool_args({"long": long_value})
         assert len(result) < len(long_value) + 20  # Much shorter than original
 
-    @patch("victor.ui.stream_renderer.Live")
+    @patch("victor.ui.rendering.live_renderer.Live")
     def test_start_creates_live_display(self, mock_live_class, renderer, mock_console):
         """Test start() creates and starts a Live display."""
         mock_live = MagicMock()
@@ -240,7 +241,7 @@ class TestLiveDisplayRenderer:
         mock_live_class.assert_called_once()
         mock_live.start.assert_called_once()
 
-    @patch("victor.ui.stream_renderer.Live")
+    @patch("victor.ui.rendering.live_renderer.Live")
     def test_pause_stops_live_display(self, mock_live_class, renderer, mock_console):
         """Test pause() stops the Live display."""
         mock_live = MagicMock()
@@ -251,7 +252,7 @@ class TestLiveDisplayRenderer:
 
         mock_live.stop.assert_called_once()
 
-    @patch("victor.ui.stream_renderer.Live")
+    @patch("victor.ui.rendering.live_renderer.Live")
     def test_resume_creates_new_live_display(self, mock_live_class, renderer, mock_console):
         """Test resume() creates a new Live display with current content."""
         mock_live = MagicMock()
@@ -263,7 +264,7 @@ class TestLiveDisplayRenderer:
         assert mock_live_class.call_count == 1
         mock_live.start.assert_called_once()
 
-    @patch("victor.ui.stream_renderer.Live")
+    @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_start_prints_status(self, mock_live_class, renderer, mock_console):
         """Test on_tool_start() prints tool invocation status."""
         mock_live = MagicMock()
@@ -277,7 +278,7 @@ class TestLiveDisplayRenderer:
         call_str = str(mock_console.print.call_args)
         assert "read" in call_str
 
-    @patch("victor.ui.stream_renderer.Live")
+    @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_success_prints_checkmark(self, mock_live_class, renderer, mock_console):
         """Test on_tool_result() prints green checkmark for success."""
         mock_live = MagicMock()
@@ -296,7 +297,7 @@ class TestLiveDisplayRenderer:
         assert "green" in call_str
         assert "✓" in call_str
 
-    @patch("victor.ui.stream_renderer.Live")
+    @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_failure_prints_x(self, mock_live_class, renderer, mock_console):
         """Test on_tool_result() prints red X for failure."""
         mock_live = MagicMock()
@@ -316,7 +317,7 @@ class TestLiveDisplayRenderer:
         assert "red" in call_str
         assert "✗" in call_str
 
-    @patch("victor.ui.stream_renderer.Live")
+    @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_status_prints_dim(self, mock_live_class, renderer, mock_console):
         """Test on_status() prints message with dim styling."""
         mock_live = MagicMock()
@@ -330,7 +331,7 @@ class TestLiveDisplayRenderer:
         assert "dim" in call_str
         assert "Thinking" in call_str
 
-    @patch("victor.ui.stream_renderer.Live")
+    @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_content_updates_live_display(self, mock_live_class, renderer, mock_console):
         """Test on_content() updates the Live display."""
         mock_live = MagicMock()
@@ -343,7 +344,7 @@ class TestLiveDisplayRenderer:
         assert mock_live.update.call_count == 2
         assert renderer._content_buffer == "Hello World"
 
-    @patch("victor.ui.stream_renderer.Live")
+    @patch("victor.ui.rendering.live_renderer.Live")
     def test_finalize_returns_content_and_cleans_up(self, mock_live_class, renderer, mock_console):
         """Test finalize() returns content and stops Live display."""
         mock_live = MagicMock()
@@ -356,7 +357,7 @@ class TestLiveDisplayRenderer:
         assert result == "Final content"
         mock_live.stop.assert_called()
 
-    @patch("victor.ui.stream_renderer.Live")
+    @patch("victor.ui.rendering.live_renderer.Live")
     def test_cleanup_stops_live_if_running(self, mock_live_class, renderer, mock_console):
         """Test cleanup() stops Live display if it exists."""
         mock_live = MagicMock()
@@ -372,7 +373,7 @@ class TestLiveDisplayRenderer:
         """Test cleanup() handles case when Live was never started."""
         renderer.cleanup()  # Should not raise
 
-    @patch("victor.ui.stream_renderer.Live")
+    @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_thinking_content_prints_styled(self, mock_live_class, renderer, mock_console):
         """Test on_thinking_content() prints dimmed/italic styled text."""
         mock_live = MagicMock()
@@ -386,7 +387,7 @@ class TestLiveDisplayRenderer:
         last_call = mock_console.print.call_args
         assert last_call[1].get("end") == ""
 
-    @patch("victor.ui.stream_renderer.Live")
+    @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_thinking_start_shows_indicator(self, mock_live_class, renderer, mock_console):
         """Test on_thinking_start() shows thinking indicator."""
         mock_live = MagicMock()
@@ -400,7 +401,7 @@ class TestLiveDisplayRenderer:
         call_text = str(mock_console.print.call_args[0][0])
         assert "Thinking" in call_text
 
-    @patch("victor.ui.stream_renderer.Live")
+    @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_thinking_end_resumes(self, mock_live_class, renderer, mock_console):
         """Test on_thinking_end() resumes live display."""
         mock_live = MagicMock()

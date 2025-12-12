@@ -1130,14 +1130,14 @@ class SymbolStore:
         with sqlite3.connect(str(self._db_path)) as conn:
             # Get all struct/class symbols with their paths
             cursor = conn.execute(
-                """SELECT DISTINCT file_path, name, symbol_type, docstring
+                """SELECT DISTINCT file_path, name, symbol_type, docstring, line_number
                    FROM symbols
                    WHERE symbol_type IN ('struct', 'class', 'trait', 'interface')
                    ORDER BY file_path"""
             )
 
             for row in cursor:
-                file_path, name, sym_type, docstring = row
+                file_path, name, sym_type, docstring, line_number = row
                 path_lower = file_path.lower()
                 parts = file_path.split("/")
 
@@ -1240,6 +1240,7 @@ class SymbolStore:
                         {
                             "name": impl_name,
                             "path": file_path,
+                            "line": line_number,
                             "description": (docstring or "")[:60] if docstring else "",
                             "primary_symbol": name,
                         }

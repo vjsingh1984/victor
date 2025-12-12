@@ -396,6 +396,34 @@ class OllamaProvider(BaseProvider):
         Raises:
             ProviderError: If request fails
         """
+        # Check if we've already learned this model doesn't support tools
+        effective_tools = tools
+        if model in self._models_without_tools and tools:
+            logger.debug(f"Model {model} cached as not supporting tools, skipping tools")
+            effective_tools = None
+
+        async for chunk in self._stream_impl(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=effective_tools,
+            retry_without_tools=(tools is not None and effective_tools is not None),
+            **kwargs,
+        ):
+            yield chunk
+
+    async def _stream_impl(
+        self,
+        messages: List[Message],
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        tools: Optional[List[ToolDefinition]],
+        retry_without_tools: bool = False,
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamChunk]:
+        """Internal stream implementation with retry logic."""
         try:
             payload = self._build_request_payload(
                 messages=messages,
@@ -410,8 +438,40 @@ class OllamaProvider(BaseProvider):
             logger.debug(
                 f"Streaming request: model={model}, msgs={len(messages)}, tools={num_tools}"
             )
+            # Debug: log first tool for inspection if tools are provided
+            if tools and num_tools > 0:
+                logger.debug(f"First tool schema sample: {payload.get('tools', [{}])[0]}")
 
             async with self.client.stream("POST", "/api/chat", json=payload) as response:
+                # Check for HTTP 400 "does not support tools" error
+                if response.status_code == 400 and tools and retry_without_tools:
+                    error_body = await response.aread()
+                    error_text = error_body.decode()
+                    logger.debug(f"Ollama error response (400): {error_text}")
+
+                    if "does not support tools" in error_text.lower():
+                        logger.warning(
+                            f"Model {model} doesn't support tools via Ollama API. "
+                            "Retrying stream without tools (will use fallback parsing)."
+                        )
+                        # Cache that this model doesn't support tools
+                        self._models_without_tools.add(model)
+                        # Retry without tools - use recursive call
+                        async for chunk in self._stream_impl(
+                            messages=messages,
+                            model=model,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            tools=None,  # No tools
+                            retry_without_tools=False,  # Don't retry again
+                            **kwargs,
+                        ):
+                            yield chunk
+                        return
+
+                if response.status_code >= 400:
+                    error_body = await response.aread()
+                    logger.error(f"Ollama error response ({response.status_code}): {error_body.decode()}")
                 response.raise_for_status()
 
                 line_count = 0

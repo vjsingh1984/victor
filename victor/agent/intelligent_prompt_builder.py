@@ -556,8 +556,8 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
             embedding_service: Optional embedding service
             learning_store: Optional profile learning store
         """
-        self.provider_name = (provider_name or "").lower()
-        self.model = model or ""
+        self.provider_name = (str(provider_name) if provider_name else "").lower()
+        self.model = str(model) if model else ""
         self.model_lower = self.model.lower()
         self.profile_name = profile_name or f"{self.provider_name}:{self.model}"
 
@@ -833,7 +833,9 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
             "analyze": "[ANALYZE] Examine code carefully. Read related files. Structured findings.",
             "general": "[GENERAL] Moderate exploration. 3-6 tool calls. Answer concisely.",
         }
-        return hints.get(task_type.lower(), "")
+        # Defensive: ensure task_type is a string before calling .lower()
+        task_type_str = str(task_type).lower() if task_type else "general"
+        return hints.get(task_type_str, "")
 
     def _get_mode_hint(self, mode: str, iteration_budget: int) -> str:
         """Get mode-specific hint."""
@@ -842,7 +844,9 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
             "build": f"MODE: Build - Focus on implementation. Budget: {iteration_budget} iterations.",
             "plan": f"MODE: Plan - Create detailed plan before implementing. Budget: {iteration_budget} iterations.",
         }
-        return mode_hints.get(mode.lower(), "")
+        # Defensive: ensure mode is a string before calling .lower()
+        mode_str = str(mode).lower() if mode else "explore"
+        return mode_hints.get(mode_str, "")
 
     def _get_tool_guidance(
         self,

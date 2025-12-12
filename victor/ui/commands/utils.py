@@ -131,7 +131,7 @@ async def check_codebase_index(cwd: str, console_obj: Console, silent: bool = Fa
         logger.debug(f"Codebase index check failed: {e}")
 
 async def preload_semantic_index(cwd: str, settings: Any, console_obj: Console, force: bool = False) -> bool:
-    """Preload semantic codebase index with embeddings upfront."""
+    """Preload semantic codebase index with embeddings and graph upfront."""
     try:
         root_path = Path(cwd).resolve()
         cache_entry = _INDEX_CACHE.get(str(root_path))
@@ -142,10 +142,23 @@ async def preload_semantic_index(cwd: str, settings: Any, console_obj: Console, 
         start_time = time.time()
         index, rebuilt = await _get_or_build_index(root_path, settings, force_reindex=force)
         elapsed = time.time() - start_time
+
+        # Get graph stats if available
+        graph_stats = ""
+        if index.graph_store:
+            try:
+                stats = await index.graph_store.stats()
+                node_count = stats.get("nodes", 0)
+                edge_count = stats.get("edges", 0)
+                if node_count or edge_count:
+                    graph_stats = f" | Graph: {node_count} symbols, {edge_count} edges"
+            except Exception:
+                pass
+
         if rebuilt:
-            console_obj.print(f"[green]✓ Semantic index built in {elapsed:.1f}s[/]")
+            console_obj.print(f"[green]✓ Semantic index built in {elapsed:.1f}s{graph_stats}[/]")
         else:
-            console_obj.print(f"[green]✓ Semantic index loaded in {elapsed:.1f}s[/]")
+            console_obj.print(f"[green]✓ Semantic index loaded in {elapsed:.1f}s{graph_stats}[/]")
         return True
     except ImportError as e:
         logger.warning(f"Semantic indexing dependencies not available: {e}")

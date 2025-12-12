@@ -333,7 +333,7 @@ async def run_oneshot(
         model_name = None
 
         if stream and agent.provider.supports_streaming():
-            from victor.ui.stream_renderer import FormatterRenderer, LiveDisplayRenderer, stream_response
+            from victor.ui.rendering import FormatterRenderer, LiveDisplayRenderer, stream_response
             use_live = renderer_choice in {"rich", "auto"}
             if renderer_choice in {"rich-text", "text"}:
                 use_live = False
@@ -481,7 +481,7 @@ async def _run_cli_repl(
 
             if stream:
                 from victor.agent.response_sanitizer import sanitize_response
-                from victor.ui.stream_renderer import LiveDisplayRenderer, FormatterRenderer, stream_response
+                from victor.ui.rendering import LiveDisplayRenderer, FormatterRenderer, stream_response
 
                 use_live = renderer_choice in {"rich", "auto"}
                 renderer = LiveDisplayRenderer(console) if use_live else FormatterRenderer(create_formatter(), console)

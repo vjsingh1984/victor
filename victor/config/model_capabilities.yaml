@@ -52,7 +52,7 @@ defaults:
     # This multiplies the max_exploration_iterations limit
     exploration_multiplier: 1.0
     # Continuation patience: how many empty turns to allow before forcing completion
-    continuation_patience: 3
+    continuation_patience: 10
     # Payload size limits (bytes) - prevents HTTP 413 errors
     # Default is generous; providers with strict limits override this
     max_request_payload_bytes: 10485760  # 10MB default
@@ -198,7 +198,7 @@ provider_defaults:
     recommended_tool_budget: 20
     # DeepSeek models need more "thinking" turns, give them higher exploration limit
     exploration_multiplier: 1.5
-    continuation_patience: 5
+    continuation_patience: 10
 
   # Groq Cloud - Ultra-fast inference with free tier
   # NOTE: Groq has strict payload size limits (413 errors) due to LPU architecture
@@ -380,7 +380,7 @@ models:
         # Set to true for stricter prompts to prevent continuation without action
         requires_strict_prompting: true
         # How many empty responses before forcing continuation prompt
-        continuation_patience: 3
+        continuation_patience: 6
       lmstudio:
         native_tool_calls: true
       vllm:

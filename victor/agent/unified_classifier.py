@@ -144,6 +144,7 @@ class ClassificationResult:
 # Action keywords with weights (higher = stronger signal)
 ACTION_KEYWORDS: List[Tuple[str, float]] = [
     ("execute", 1.0),
+    ("apply", 1.0),  # Strong action signal - "apply the fix", "apply changes"
     ("run", 0.9),
     ("deploy", 1.0),
     ("build", 0.8),
@@ -594,12 +595,34 @@ class UnifiedTaskClassifier:
         else:
             confidence = 0.3  # Low confidence for default
 
-        # Special case: analysis takes precedence if both analysis and action detected
-        # (e.g., "analyze and create a report" - analysis is primary)
-        if analysis_count > 0 and action_count > 0:
-            if analysis_score >= action_score * 0.7:  # Analysis strong enough
-                best_type = TaskType.ANALYSIS
-                confidence = min(confidence + 0.1, 0.95)
+        # Special case: when both analysis AND action/edit/gen detected, use position heuristic
+        # If action keywords appear AFTER analysis keywords, action is the end goal
+        # (e.g., "analyze the codebase and apply the fix" → ACTION)
+        # (e.g., "analyze the logs" → ANALYSIS)
+        action_positions = [m.position for m in action_matches + gen_matches + edit_matches if not m.negated]
+        analysis_positions = [m.position for m in analysis_matches if not m.negated]
+
+        if analysis_positions and action_positions:
+            max_analysis_pos = max(analysis_positions)
+            max_action_pos = max(action_positions)
+
+            # If action keywords appear after analysis keywords, action is the goal
+            if max_action_pos > max_analysis_pos:
+                # Action/edit/generation takes precedence - it's the end goal
+                combined_action_score = action_score + gen_score + edit_score
+                if combined_action_score >= analysis_score * 0.5:  # Action strong enough
+                    if gen_score >= action_score and gen_score >= edit_score:
+                        best_type = TaskType.GENERATION
+                    elif edit_score >= action_score:
+                        best_type = TaskType.EDIT
+                    else:
+                        best_type = TaskType.ACTION
+                    confidence = min(confidence + 0.15, 0.95)
+            else:
+                # Analysis appears last - it's the primary task
+                if analysis_score >= (action_score + gen_score + edit_score) * 0.5:
+                    best_type = TaskType.ANALYSIS
+                    confidence = min(confidence + 0.1, 0.95)
 
         # Determine tool budget based on type
         budget_map = {

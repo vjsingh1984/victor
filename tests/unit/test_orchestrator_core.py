@@ -1268,20 +1268,28 @@ class TestClassifyTaskKeywords:
             assert result["is_analysis_task"] is False
             assert result["coarse_task_type"] == "default"
 
-    def test_analysis_takes_precedence(self, mock_provider, orchestrator_settings):
-        """Test that analysis classification takes precedence over action."""
+    def test_position_based_precedence(self, mock_provider, orchestrator_settings):
+        """Test that position-based priority determines task type when both present."""
         with patch("victor.agent.orchestrator.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
                 model="test-model",
             )
-            # Message with both action and analysis keywords
+            # Message with action keyword ("create") AFTER analysis keyword ("analyze")
+            # Action should take precedence since it appears last (it's the end goal)
             result = orch._classify_task_keywords("Analyze and create a report")
-            # Both should be true but coarse type should be analysis
+            # Both should be true
             assert result["is_action_task"] is True
             assert result["is_analysis_task"] is True
-            assert result["coarse_task_type"] == "analysis"
+            # But action-related type (generation) should win since "create" appears last
+            assert result["coarse_task_type"] in ("action", "generation")
+
+            # When analysis appears last, it should win
+            result2 = orch._classify_task_keywords("Create a summary and analyze it")
+            assert result2["is_action_task"] is True
+            assert result2["is_analysis_task"] is True
+            assert result2["coarse_task_type"] == "analysis"
 
     def test_case_insensitive(self, mock_provider, orchestrator_settings):
         """Test that keyword detection is case insensitive."""
@@ -1392,7 +1400,8 @@ class TestDetermineContinuationAction:
                 one_shot_mode=True,
             )
             assert result["action"] == "prompt_tool_call"
-            assert "list_directory" in result["message"]
+            # Tool names are short canonical names (ls, read) not aliases
+            assert "ls(path=" in result["message"]
             assert result["updates"]["continuation_prompts"] == 1
 
     def test_max_continuation_prompts_requests_summary(

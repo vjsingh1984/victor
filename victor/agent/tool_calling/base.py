@@ -129,7 +129,7 @@ class ToolCallingCapabilities:
     # Model-specific exploration behavior
     # Models that need more "thinking" turns get higher exploration_multiplier
     exploration_multiplier: float = 1.0  # Multiplies max_exploration_iterations
-    continuation_patience: int = 3  # Empty turns to allow before forcing completion
+    continuation_patience: int = 10  # Empty turns to allow before forcing completion
 
 
 @dataclass
@@ -289,6 +289,7 @@ class FallbackParsingMixin:
         """Parse JSON tool calls from content (fallback).
 
         Looks for JSON objects with 'name' and 'arguments' or 'parameters'.
+        Handles JSON in markdown code fences (```json ... ```) as well as raw JSON.
 
         Args:
             content: Response content to parse
@@ -301,26 +302,38 @@ class FallbackParsingMixin:
         if not content:
             return ToolCallParseResult()
 
-        try:
-            data = json.loads(content)
-            if isinstance(data, dict) and "name" in data:
-                name = data.get("name", "")
+        # Try to extract JSON from markdown code fences first
+        # Pattern matches ```json ... ``` or ``` ... ```
+        code_fence_pattern = r"```(?:json)?\s*\n?(.*?)\n?```"
+        code_fence_match = re.search(code_fence_pattern, content, re.DOTALL)
 
-                # Validate name if validator provided
-                if validate_name_fn and not validate_name_fn(name):
-                    return ToolCallParseResult(remaining_content=content)
+        json_candidates = []
+        if code_fence_match:
+            json_candidates.append(code_fence_match.group(1).strip())
+        # Also try the raw content (might be pure JSON without fences)
+        json_candidates.append(content)
 
-                args = data.get("arguments") or data.get("parameters", {})
-                parsed_args, _ = self.parse_json_arguments(args)
+        for json_str in json_candidates:
+            try:
+                data = json.loads(json_str)
+                if isinstance(data, dict) and "name" in data:
+                    name = data.get("name", "")
 
-                return ToolCallParseResult(
-                    tool_calls=[ToolCall(name=name, arguments=parsed_args)],
-                    remaining_content="",
-                    parse_method="json_fallback",
-                    confidence=0.9,
-                )
-        except json.JSONDecodeError:
-            pass
+                    # Validate name if validator provided
+                    if validate_name_fn and not validate_name_fn(name):
+                        continue  # Try next candidate
+
+                    args = data.get("arguments") or data.get("parameters", {})
+                    parsed_args, _ = self.parse_json_arguments(args)
+
+                    return ToolCallParseResult(
+                        tool_calls=[ToolCall(name=name, arguments=parsed_args)],
+                        remaining_content="",
+                        parse_method="json_fallback",
+                        confidence=0.9,
+                    )
+            except json.JSONDecodeError:
+                continue  # Try next candidate
 
         return ToolCallParseResult(remaining_content=content)
 

@@ -534,14 +534,20 @@ from pydantic import BaseModel, Field
 
 
 class Symbol(BaseModel):
-    """Represents a code symbol (function, class, variable)."""
+    """Represents a code symbol (function, class, variable).
+
+    Note: Body content is NOT stored here - read from file via line_number/end_line.
+    This keeps the index lightweight while allowing full body retrieval on demand.
+    """
 
     name: str
     type: str  # function, class, variable, import
     file_path: str
     line_number: int
+    end_line: Optional[int] = None  # end line - use with line_number to read body from file
     docstring: Optional[str] = None
     signature: Optional[str] = None
+    parent_symbol: Optional[str] = None  # parent symbol name (for methods in classes)
     references: List[str] = Field(default_factory=list)  # Files that reference this symbol
     base_classes: List[str] = Field(default_factory=list)  # inheritance targets
     composition: List[tuple[str, str]] = Field(default_factory=list)  # (owner, member) for has-a
@@ -773,6 +779,24 @@ class CodebaseIndex:
         self._is_stale = False
         self._last_indexed = time.time()
         logger.info(f"Indexed {len(self.files)} files with {len(self.symbols)} symbols")
+
+    async def ensure_indexed(self, auto_reindex: bool = True) -> None:
+        """Ensure the index is ready for querying.
+
+        If the index hasn't been built yet, builds it. If auto_reindex is True
+        and the index is stale, rebuilds it.
+
+        Args:
+            auto_reindex: If True, automatically reindex when stale (default True)
+        """
+        if not self._is_indexed:
+            # Never indexed - do a full index
+            logger.debug("Index not built, building initial index")
+            await self.index_codebase()
+        elif auto_reindex and self._is_stale:
+            # Index exists but is stale - rebuild
+            logger.debug("Index is stale, rebuilding")
+            await self.index_codebase()
 
     def _detect_language(self, file_path: Path, default: str = "python") -> str:
         """Detect language from extension for tree-sitter queries.
@@ -1285,6 +1309,10 @@ class CodebaseIndex:
 
             if self.graph_store:
                 symbol_id = f"symbol:{metadata.path}:{symbol.name}"
+                # Determine parent_id for nested symbols (methods in classes)
+                parent_id = None
+                if symbol.parent_symbol:
+                    parent_id = f"symbol:{metadata.path}:{symbol.parent_symbol}"
 
                 self._graph_nodes.append(
                     GraphNode(
@@ -1293,11 +1321,12 @@ class CodebaseIndex:
                         name=symbol.name,
                         file=metadata.path,
                         line=symbol.line_number,
+                        end_line=symbol.end_line,  # Use with line to read body from file
                         lang=metadata.language,
-                        metadata={
-                            "signature": symbol.signature,
-                            "docstring": symbol.docstring,
-                        },
+                        signature=symbol.signature,
+                        docstring=symbol.docstring,
+                        parent_id=parent_id,
+                        metadata={},
                     )
                 )
                 self._graph_edges.append(

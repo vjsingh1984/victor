@@ -322,6 +322,11 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "unit: marks tests as unit tests",
 ]
+filterwarnings = [
+    # Ignore PytestCollectionWarning for non-test classes in victor module
+    # These are data classes/enums that happen to start with "Test" (e.g., TestResult, TestRunner)
+    "ignore:cannot collect test class.*because it has a __init__ constructor:pytest.PytestCollectionWarning",
+]
 
 [tool.ruff]
 line-length = 100
