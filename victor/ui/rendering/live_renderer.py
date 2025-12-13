@@ -45,6 +45,9 @@ class LiveDisplayRenderer:
         self._content_buffer = ""
         self._is_paused = False  # Track pause state to avoid redundant operations
         self._thinking_buffer = ""  # Accumulate thinking text for clean display
+        self._pending_tool: dict | None = None  # Track tool waiting for result
+        self._last_thinking_rendered = ""  # Track last rendered thinking to avoid dupes
+        self._thinking_indicator_shown = False  # Track if we've shown the indicator
 
     def start(self) -> None:
         """Start the Live display."""
@@ -70,17 +73,14 @@ class LiveDisplayRenderer:
             self._is_paused = False
 
     def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
-        """Handle tool execution start.
+        """Handle tool execution start - store for later consolidation.
 
         Args:
             name: Tool name
             arguments: Tool arguments
         """
-        self.pause()
-        args_display = format_tool_args(arguments)
-        args_str = f"({args_display})" if args_display else ""
-        self.console.print(f"[dim]🔧 {name}{args_str}...[/]")
-        self.resume()
+        # Store pending tool info - will print consolidated output on result
+        self._pending_tool = {"name": name, "arguments": arguments}
 
     def on_tool_result(
         self,
@@ -90,7 +90,7 @@ class LiveDisplayRenderer:
         arguments: dict[str, Any],
         error: str | None = None,
     ) -> None:
-        """Handle tool execution result.
+        """Handle tool execution result - print consolidated single line.
 
         Args:
             name: Tool name
@@ -104,7 +104,9 @@ class LiveDisplayRenderer:
         args_str = f"({args_display})" if args_display else ""
         icon = "✓" if success else "✗"
         color = "green" if success else "red"
+        # Single consolidated line: icon + name + args + time
         self.console.print(f"[{color}]{icon}[/] {name}{args_str} [dim]({elapsed:.1f}s)[/]")
+        self._pending_tool = None
         self.resume()
 
     def on_status(self, message: str) -> None:
@@ -162,15 +164,27 @@ class LiveDisplayRenderer:
         """Show thinking indicator and pause Live display."""
         self.pause()
         self._thinking_buffer = ""  # Reset thinking buffer
-        render_thinking_indicator(self.console)
+        # Only show indicator once per thinking session
+        if not self._thinking_indicator_shown:
+            render_thinking_indicator(self.console)
+            self._thinking_indicator_shown = True
 
     def on_thinking_end(self) -> None:
         """End thinking - render accumulated content and resume Live display."""
-        # Render the complete accumulated thinking content once
+        # Render only the NEW content (not already rendered) to avoid duplication
         if self._thinking_buffer:
-            render_thinking_text(self.console, self._thinking_buffer)
+            # Only render the portion we haven't already shown
+            if self._thinking_buffer.startswith(self._last_thinking_rendered):
+                new_content = self._thinking_buffer[len(self._last_thinking_rendered) :]
+            else:
+                new_content = self._thinking_buffer
+
+            if new_content.strip():
+                render_thinking_text(self.console, new_content)
+                self.console.print()  # Newline after thinking content
+
+            self._last_thinking_rendered = self._thinking_buffer
             self._thinking_buffer = ""
-        self.console.print()  # Newline after thinking content
         self.resume()
 
     def finalize(self) -> str:
@@ -194,3 +208,6 @@ class LiveDisplayRenderer:
             self._live = None
         self._is_paused = False
         self._thinking_buffer = ""
+        self._last_thinking_rendered = ""
+        self._pending_tool = None
+        self._thinking_indicator_shown = False

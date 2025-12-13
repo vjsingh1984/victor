@@ -198,6 +198,7 @@ from victor.tools.dependency_graph import ToolDependencyGraph
 from victor.tools.mcp_bridge_tool import configure_mcp_client, get_mcp_tool_definitions
 from victor.tools.plugin_registry import ToolPluginRegistry
 from victor.tools.semantic_selector import SemanticToolSelector
+from victor.tools.tool_names import ToolNames, TOOL_ALIASES
 from victor.embeddings.intent_classifier import IntentClassifier, IntentType
 from victor.workflows.base import WorkflowRegistry
 from victor.workflows.new_feature_workflow import NewFeatureWorkflow
@@ -230,6 +231,55 @@ PROGRESSIVE_TOOLS = {
     "web_summarize": ["query"],
     "web_fetch": ["url"],
 }
+
+# Build set of all known tool names (canonical + aliases) for detection
+_ALL_TOOL_NAMES: Set[str] = set()
+for attr in dir(ToolNames):
+    if not attr.startswith("_"):
+        val = getattr(ToolNames, attr)
+        if isinstance(val, str):
+            _ALL_TOOL_NAMES.add(val)
+_ALL_TOOL_NAMES.update(TOOL_ALIASES.keys())
+
+
+def _detect_mentioned_tools(text: str) -> List[str]:
+    """Detect tool names mentioned in text that model said it would call.
+
+    Looks for patterns like:
+    - "let me call read()"
+    - "I'll use web_search to"
+    - "calling the ls tool"
+    - "execute grep"
+
+    Args:
+        text: Model response text
+
+    Returns:
+        List of mentioned tool names (canonical form)
+    """
+    import re
+
+    mentioned: List[str] = []
+    text_lower = text.lower()
+
+    # Look for tool names followed by common patterns
+    for tool_name in _ALL_TOOL_NAMES:
+        # Match patterns like: call read, use read, execute read, run read
+        # Also: read() or read( with args
+        patterns = [
+            rf"\b(?:call|use|execute|run|invoke|perform)\s+{re.escape(tool_name)}\b",
+            rf"\b{re.escape(tool_name)}\s*\(",  # tool_name( or tool_name (
+            rf"\bthe\s+{re.escape(tool_name)}\s+tool\b",  # "the read tool"
+        ]
+        for pattern in patterns:
+            if re.search(pattern, text_lower):
+                # Resolve to canonical name
+                canonical = TOOL_ALIASES.get(tool_name, tool_name)
+                if canonical not in mentioned:
+                    mentioned.append(canonical)
+                break
+
+    return mentioned
 
 
 class AgentOrchestrator:
@@ -4086,6 +4136,16 @@ class AgentOrchestrator:
                     plain_text = self._strip_markup(full_content)
                     if plain_text:
                         self.add_message("assistant", plain_text)
+
+                # Check if model mentioned tools but didn't execute them
+                if not tool_calls:
+                    mentioned_tools = _detect_mentioned_tools(full_content)
+                    if mentioned_tools:
+                        tools_str = ", ".join(mentioned_tools)
+                        logger.warning(
+                            f"Model mentioned tool(s) [{tools_str}] but did not execute them. "
+                            "This may indicate the model is hallucinating tool calls."
+                        )
             elif not tool_calls:
                 # No content and no tool calls; attempt aggressive recovery
                 logger.warning("Model returned empty response - attempting aggressive recovery")
