@@ -187,7 +187,7 @@ class RLModelSelector:
         # Task-type aware Q-tables (provider -> task_type -> Q-value)
         self._q_table_by_task: Dict[str, Dict[str, float]] = {}
         self._task_selection_counts: Dict[str, Dict[str, int]] = {}
-        
+
         # Cache for expensive computations
         self._confidence_cache: Dict[str, float] = {}
         self._ucb_cache: Dict[str, float] = {}
@@ -214,11 +214,21 @@ class RLModelSelector:
                 "version": 1,
                 "epsilon": self.epsilon,
                 "total_selections": self._total_selections,
-                "real_selections": sum(v for k, v in self._selection_counts.items() if k not in self.MOCK_PROVIDERS),
+                "real_selections": sum(
+                    v for k, v in self._selection_counts.items() if k not in self.MOCK_PROVIDERS
+                ),
                 "q_table": {k: v for k, v in self._q_table.items() if k not in self.MOCK_PROVIDERS},
-                "selection_counts": {k: v for k, v in self._selection_counts.items() if k not in self.MOCK_PROVIDERS},
-                "q_table_by_task": {k: v for k, v in self._q_table_by_task.items() if k not in self.MOCK_PROVIDERS},
-                "task_selection_counts": {k: v for k, v in self._task_selection_counts.items() if k not in self.MOCK_PROVIDERS},
+                "selection_counts": {
+                    k: v for k, v in self._selection_counts.items() if k not in self.MOCK_PROVIDERS
+                },
+                "q_table_by_task": {
+                    k: v for k, v in self._q_table_by_task.items() if k not in self.MOCK_PROVIDERS
+                },
+                "task_selection_counts": {
+                    k: v
+                    for k, v in self._task_selection_counts.items()
+                    if k not in self.MOCK_PROVIDERS
+                },
             }
 
             with open(self._q_table_path, "w") as f:
@@ -351,7 +361,9 @@ class RLModelSelector:
         except Exception as e:
             logger.warning(f"Failed to load Q-values from DB: {e}")
 
-    def _compute_initial_q(self, session_count: int, avg_messages: float, tool_capable_pct: float) -> float:
+    def _compute_initial_q(
+        self, session_count: int, avg_messages: float, tool_capable_pct: float
+    ) -> float:
         """Compute initial Q-value from historical statistics."""
         session_score = 1 - math.exp(-session_count / 10)
         message_score = min(avg_messages / 20, 1.0)
@@ -361,10 +373,10 @@ class RLModelSelector:
     def _get_q_value(self, provider: str, task_type: Optional[str] = None) -> float:
         """Get Q-value for a provider, optionally task-specific."""
         global_q = self._q_table.get(provider, 0.5)
-        
+
         if not task_type or provider not in self._q_table_by_task:
             return global_q
-            
+
         task_q = self._q_table_by_task[provider].get(task_type)
         return 0.7 * task_q + 0.3 * global_q if task_q is not None else global_q
 
@@ -462,22 +474,30 @@ class RLModelSelector:
             alternatives=self._get_alternatives(providers, best_provider, task_type),
         )
 
-    def _select_ucb(self, providers: List[str], task_type: Optional[str] = None) -> ModelRecommendation:
+    def _select_ucb(
+        self, providers: List[str], task_type: Optional[str] = None
+    ) -> ModelRecommendation:
         """Select using Upper Confidence Bound (UCB) strategy."""
         if self._total_selections == 0:
             selected = random.choice(providers)
             return ModelRecommendation(
-                provider=selected, model=None, confidence=0.3, q_value=0.5,
-                reason="No history available, random selection", alternatives=[]
+                provider=selected,
+                model=None,
+                confidence=0.3,
+                q_value=0.5,
+                reason="No history available, random selection",
+                alternatives=[],
             )
 
         log_total = math.log(self._total_selections + 1)
         ucb_scores = {}
-        
+
         for provider in providers:
             q_value = self._get_q_value(provider, task_type)
             count = self._selection_counts.get(provider, 0)
-            ucb_scores[provider] = float("inf") if count == 0 else q_value + self.ucb_c * math.sqrt(log_total / count)
+            ucb_scores[provider] = (
+                float("inf") if count == 0 else q_value + self.ucb_c * math.sqrt(log_total / count)
+            )
 
         best_provider = max(providers, key=lambda p: ucb_scores[p])
         q_value = self._get_q_value(best_provider, task_type)
@@ -495,8 +515,12 @@ class RLModelSelector:
             reason += f" [task={task_type}]"
 
         return ModelRecommendation(
-            provider=best_provider, model=None, confidence=confidence, q_value=q_value,
-            reason=reason, alternatives=self._get_alternatives(providers, best_provider, task_type)
+            provider=best_provider,
+            model=None,
+            confidence=confidence,
+            q_value=q_value,
+            reason=reason,
+            alternatives=self._get_alternatives(providers, best_provider, task_type),
         )
 
     def _get_alternatives(
@@ -511,10 +535,16 @@ class RLModelSelector:
 
     def _get_effective_learning_rate(self, provider: str) -> float:
         """Get effective learning rate based on warm-up phase."""
-        real_selections = sum(v for k, v in self._selection_counts.items() if k not in self.MOCK_PROVIDERS)
+        real_selections = sum(
+            v for k, v in self._selection_counts.items() if k not in self.MOCK_PROVIDERS
+        )
         provider_count = self._selection_counts.get(provider, 0)
-        
-        return min(0.5, self.learning_rate * 3) if real_selections < self.WARMUP_THRESHOLD or provider_count < 10 else self.learning_rate
+
+        return (
+            min(0.5, self.learning_rate * 3)
+            if real_selections < self.WARMUP_THRESHOLD or provider_count < 10
+            else self.learning_rate
+        )
 
     def update_q_value(self, reward: SessionReward) -> float:
         """Update Q-value based on session reward."""
@@ -546,11 +576,17 @@ class RLModelSelector:
             new_task_q = max(0.0, min(1.0, old_task_q + effective_lr * (r - old_task_q)))
 
             self._q_table_by_task[provider][task_type] = new_task_q
-            self._task_selection_counts[provider][task_type] = self._task_selection_counts[provider].get(task_type, 0) + 1
+            self._task_selection_counts[provider][task_type] = (
+                self._task_selection_counts[provider].get(task_type, 0) + 1
+            )
 
-            logger.debug(f"Updated Q({provider}, {task_type}): {old_task_q:.3f} -> {new_task_q:.3f}")
+            logger.debug(
+                f"Updated Q({provider}, {task_type}): {old_task_q:.3f} -> {new_task_q:.3f}"
+            )
 
-        logger.debug(f"Updated Q({provider}): {old_q:.3f} -> {new_q:.3f} (reward={r:.3f}, count={self._selection_counts[provider]})")
+        logger.debug(
+            f"Updated Q({provider}): {old_q:.3f} -> {new_q:.3f} (reward={r:.3f}, count={self._selection_counts[provider]})"
+        )
         self.save_q_values()
         return new_q
 

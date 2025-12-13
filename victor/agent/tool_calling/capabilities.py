@@ -200,7 +200,7 @@ class ModelCapabilityLoader:
 
         config_dict = self._config or {}
         provider_lower = provider.lower()
-        
+
         # Start building resolved config
         resolved = {}
 

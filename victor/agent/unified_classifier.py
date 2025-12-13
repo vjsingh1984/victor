@@ -599,7 +599,9 @@ class UnifiedTaskClassifier:
         # If action keywords appear AFTER analysis keywords, action is the end goal
         # (e.g., "analyze the codebase and apply the fix" → ACTION)
         # (e.g., "analyze the logs" → ANALYSIS)
-        action_positions = [m.position for m in action_matches + gen_matches + edit_matches if not m.negated]
+        action_positions = [
+            m.position for m in action_matches + gen_matches + edit_matches if not m.negated
+        ]
         analysis_positions = [m.position for m in analysis_matches if not m.negated]
 
         if analysis_positions and action_positions:

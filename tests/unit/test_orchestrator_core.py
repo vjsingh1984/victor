@@ -1416,7 +1416,11 @@ class TestDetermineContinuationAction:
                 provider=mock_provider,
                 model="test-model",
             )
-            orch.tool_calls_used = 5
+            # Set tool budget and calls such that budget_threshold is exceeded
+            # budget_threshold = tool_budget // 4, so 20 // 4 = 5
+            # We need tool_calls_used >= budget_threshold to skip prompt_tool_call
+            orch.tool_budget = 20
+            orch.tool_calls_used = 5  # >= 5 (budget_threshold), skips prompt_tool_call
             intent = mock_intent_result(IntentType.CONTINUATION)
             result = orch._determine_continuation_action(
                 intent_result=intent,
@@ -1424,7 +1428,7 @@ class TestDetermineContinuationAction:
                 is_action_task=False,
                 content_length=100,
                 full_content="Let me check more...",
-                continuation_prompts=10,  # At max for analysis
+                continuation_prompts=6,  # At max for analysis (default max_continuation_prompts_analysis=6)
                 asking_input_prompts=0,
                 one_shot_mode=True,
             )
@@ -1458,7 +1462,7 @@ class TestDetermineContinuationAction:
                 is_action_task=False,
                 content_length=100,  # Short - looks incomplete
                 full_content="Brief text",
-                continuation_prompts=8,  # Below max (10 for analysis), skips request_summary
+                continuation_prompts=5,  # Below max (6 for analysis), skips request_summary
                 asking_input_prompts=0,
                 one_shot_mode=True,
             )

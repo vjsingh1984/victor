@@ -112,9 +112,7 @@ class TreeSitterExtractor:
             logger.debug(f"Could not get parser for {language}: {e}")
             return None
 
-    def _run_query(
-        self, tree: "Tree", query_src: str, parser: "Parser"
-    ) -> Dict[str, List["Node"]]:
+    def _run_query(self, tree: "Tree", query_src: str, parser: "Parser") -> Dict[str, List["Node"]]:
         """Run a tree-sitter query using the new QueryCursor API.
 
         Args:
@@ -249,9 +247,7 @@ class TreeSitterExtractor:
                 for node in nodes:
                     callee = node.text.decode("utf-8", errors="ignore")
                     if callee:
-                        caller = self._find_enclosing_symbol(
-                            node, queries.enclosing_scopes
-                        )
+                        caller = self._find_enclosing_symbol(node, queries.enclosing_scopes)
                         if caller:
                             edges.append(
                                 ExtractedEdge(
@@ -503,9 +499,7 @@ class TreeSitterExtractor:
                 for node in nodes:
                     name = node.text.decode("utf-8", errors="ignore")
                     if name:
-                        enclosing = self._find_enclosing_symbol(
-                            node, queries.enclosing_scopes
-                        )
+                        enclosing = self._find_enclosing_symbol(node, queries.enclosing_scopes)
                         references.append(
                             ExtractedReference(
                                 name=name,

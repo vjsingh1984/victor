@@ -44,9 +44,11 @@ from victor.tools.graph_tool import (
 # Test Fixtures - Create mock graph data
 # =============================================================================
 
+
 @dataclass
 class MockGraphNode:
     """Mock graph node for testing."""
+
     node_id: str
     type: str
     name: str
@@ -57,6 +59,7 @@ class MockGraphNode:
 @dataclass
 class MockGraphEdge:
     """Mock graph edge for testing."""
+
     src: str
     dst: str
     type: str
@@ -72,13 +75,19 @@ def sample_analyzer():
     nodes = [
         MockGraphNode("base_provider", "class", "BaseProvider", "providers/base.py", 10),
         MockGraphNode("openai_provider", "class", "OpenAIProvider", "providers/openai.py", 15),
-        MockGraphNode("anthropic_provider", "class", "AnthropicProvider", "providers/anthropic.py", 20),
+        MockGraphNode(
+            "anthropic_provider", "class", "AnthropicProvider", "providers/anthropic.py", 20
+        ),
         MockGraphNode("ollama_provider", "class", "OllamaProvider", "providers/ollama.py", 25),
         MockGraphNode("orchestrator", "class", "AgentOrchestrator", "agent/orchestrator.py", 50),
         MockGraphNode("tool_executor", "class", "ToolExecutor", "agent/tool_executor.py", 100),
-        MockGraphNode("process_request", "function", "process_request", "agent/orchestrator.py", 200),
+        MockGraphNode(
+            "process_request", "function", "process_request", "agent/orchestrator.py", 200
+        ),
         MockGraphNode("call_provider", "function", "call_provider", "agent/orchestrator.py", 250),
-        MockGraphNode("provider_factory", "function", "create_provider", "providers/factory.py", 10),
+        MockGraphNode(
+            "provider_factory", "function", "create_provider", "providers/factory.py", 10
+        ),
         MockGraphNode("settings", "class", "Settings", "config/settings.py", 5),
         MockGraphNode("registry", "class", "ProviderRegistry", "providers/registry.py", 30),
         MockGraphNode("message", "class", "Message", "providers/base.py", 50),
@@ -148,6 +157,7 @@ def empty_analyzer():
 # =============================================================================
 # GraphAnalyzer Unit Tests
 # =============================================================================
+
 
 class TestGraphAnalyzerNeighbors:
     """Tests for get_neighbors method."""
@@ -539,6 +549,7 @@ class TestGraphAnalyzerPatterns:
 # Integration Tests for the graph() Tool Function
 # =============================================================================
 
+
 class TestGraphToolFunction:
     """Integration tests for the main graph() tool function."""
 
@@ -550,6 +561,7 @@ class TestGraphToolFunction:
         # Make find_nodes return our sample nodes
         async def mock_find_nodes(*args, **kwargs):
             return list(sample_analyzer.nodes.values())
+
         store.find_nodes = mock_find_nodes
 
         # Make get_neighbors return edges from our analyzer
@@ -560,7 +572,24 @@ class TestGraphToolFunction:
             for source, edge_type, weight in sample_analyzer.incoming.get(node_id, []):
                 edges.append(MockGraphEdge(source, node_id, edge_type, weight))
             return edges
+
         store.get_neighbors = mock_get_neighbors
+
+        # Make get_all_nodes return all nodes
+        async def mock_get_all_nodes():
+            return list(sample_analyzer.nodes.values())
+
+        store.get_all_nodes = mock_get_all_nodes
+
+        # Make get_all_edges return all edges
+        async def mock_get_all_edges():
+            edges = []
+            for src, targets in sample_analyzer.outgoing.items():
+                for target, edge_type, weight in targets:
+                    edges.append(MockGraphEdge(src, target, edge_type, weight))
+            return edges
+
+        store.get_all_edges = mock_get_all_edges
 
         return store
 
@@ -610,7 +639,10 @@ class TestGraphToolFunction:
             result = await graph(mode="find")
 
             if "error" in result:
-                assert "query parameter required" in result["error"] or "empty" in result.get("error", "").lower()
+                assert (
+                    "query parameter required" in result["error"]
+                    or "empty" in result.get("error", "").lower()
+                )
 
     @pytest.mark.asyncio
     async def test_graph_path_mode_requires_both_nodes(self, mock_graph_store):
@@ -632,7 +664,10 @@ class TestGraphToolFunction:
             result = await graph(mode="file_deps")
 
             if "error" in result:
-                assert "file parameter required" in result["error"] or "empty" in result["error"].lower()
+                assert (
+                    "file parameter required" in result["error"]
+                    or "empty" in result["error"].lower()
+                )
 
     @pytest.mark.asyncio
     async def test_graph_patterns_mode(self, mock_graph_store):
@@ -660,6 +695,7 @@ class TestGraphToolFunction:
 # =============================================================================
 # Edge Case Tests
 # =============================================================================
+
 
 class TestGraphToolEdgeCases:
     """Edge case and boundary condition tests."""
@@ -728,6 +764,7 @@ class TestGraphToolEdgeCases:
 # Tests for Edge Type Filtering
 # =============================================================================
 
+
 class TestEdgeTypeFiltering:
     """Tests for edge type filtering across different modes."""
 
@@ -741,7 +778,9 @@ class TestEdgeTypeFiltering:
             analyzer.add_node(MockGraphNode(f"n{i}", "class", f"Node{i}", f"file{i}.py"))
 
         # Add one edge of each type
-        for i, edge_type in enumerate(["CALLS", "REFERENCES", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]):
+        for i, edge_type in enumerate(
+            ["CALLS", "REFERENCES", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
+        ):
             if i < 4:
                 analyzer.add_edge(MockGraphEdge(f"n{i}", f"n{i+1}", edge_type))
 
@@ -759,18 +798,14 @@ class TestEdgeTypeFiltering:
 
     def test_pagerank_with_multiple_edge_types(self, analyzer_with_all_edge_types):
         """Test PageRank with multiple edge type filters."""
-        result = analyzer_with_all_edge_types.pagerank(
-            edge_types=["CALLS", "REFERENCES"]
-        )
+        result = analyzer_with_all_edge_types.pagerank(edge_types=["CALLS", "REFERENCES"])
 
         # Should still return results
         assert isinstance(result, list)
 
     def test_centrality_with_edge_filter(self, analyzer_with_all_edge_types):
         """Test centrality with edge type filter."""
-        result = analyzer_with_all_edge_types.degree_centrality(
-            edge_types=["INHERITS"]
-        )
+        result = analyzer_with_all_edge_types.degree_centrality(edge_types=["INHERITS"])
 
         assert isinstance(result, list)
 
@@ -778,6 +813,7 @@ class TestEdgeTypeFiltering:
 # =============================================================================
 # Performance/Stress Tests (lightweight)
 # =============================================================================
+
 
 class TestGraphPerformance:
     """Lightweight performance tests."""

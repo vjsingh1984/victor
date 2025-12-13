@@ -254,15 +254,19 @@ class TestLiveDisplayRenderer:
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_resume_creates_new_live_display(self, mock_live_class, renderer, mock_console):
-        """Test resume() creates a new Live display with current content."""
+        """Test resume() creates a new Live display with current content when paused."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
 
+        # Must start and pause first to enable resume
+        renderer.start()  # Creates first Live
+        renderer.pause()  # Pauses it
         renderer._content_buffer = "Previous content"
-        renderer.resume()
+        renderer.resume()  # Should create new Live
 
-        assert mock_live_class.call_count == 1
-        mock_live.start.assert_called_once()
+        # Should have created two Live instances (start + resume)
+        assert mock_live_class.call_count == 2
+        assert mock_live.start.call_count == 2
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_start_prints_status(self, mock_live_class, renderer, mock_console):
@@ -374,18 +378,23 @@ class TestLiveDisplayRenderer:
         renderer.cleanup()  # Should not raise
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_thinking_content_prints_styled(self, mock_live_class, renderer, mock_console):
-        """Test on_thinking_content() prints dimmed/italic styled text."""
+    def test_on_thinking_content_buffers_text(self, mock_live_class, renderer, mock_console):
+        """Test on_thinking_content() accumulates text to buffer for later rendering."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
 
         renderer.start()
+        renderer.on_thinking_start()  # Start thinking mode
         renderer.on_thinking_content("Reasoning about the problem...")
+        renderer.on_thinking_content(" More reasoning...")
 
-        # Should print styled text with end="" (no newline)
-        assert mock_console.print.call_count >= 1
-        last_call = mock_console.print.call_args
-        assert last_call[1].get("end") == ""
+        # Should accumulate to buffer, not print each chunk
+        assert renderer._thinking_buffer == "Reasoning about the problem... More reasoning..."
+
+        # Content prints on thinking_end
+        renderer.on_thinking_end()
+        # Now the complete thinking text should have been printed
+        assert mock_console.print.call_count >= 2  # At least indicator + content
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_thinking_start_shows_indicator(self, mock_live_class, renderer, mock_console):

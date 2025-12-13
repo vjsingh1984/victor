@@ -450,7 +450,9 @@ class UnifiedTaskConfigLoader:
             max_exploration_iterations=task_data.get("max_exploration_iterations", 8),
             force_action_after_target_read=task_data.get("force_action_after_target_read", False),
             tool_budget=task_data.get("tool_budget", 50),
-            loop_repeat_threshold=task_data.get("loop_repeat_threshold", 4),  # Warning at 3, block at 4
+            loop_repeat_threshold=task_data.get(
+                "loop_repeat_threshold", 4
+            ),  # Warning at 3, block at 4
             needs_tools=task_data.get("needs_tools", True),
             required_tools=task_data.get("required_tools", []),
             stage_tools=task_data.get("stage_tools", {}),
@@ -630,8 +632,14 @@ class UnifiedTaskTracker:
             iterations: Maximum iterations
             user_override: Mark this limit as sticky (prevents auto-adjustment)
         """
-        if self._sticky_user_iterations and not user_override and not self._allow_iteration_override:
-            logger.debug("UnifiedTaskTracker: sticky user max iterations set; skipping auto-adjustment")
+        if (
+            self._sticky_user_iterations
+            and not user_override
+            and not self._allow_iteration_override
+        ):
+            logger.debug(
+                "UnifiedTaskTracker: sticky user max iterations set; skipping auto-adjustment"
+            )
             return
 
         if user_override:
@@ -813,7 +821,7 @@ class UnifiedTaskTracker:
         operations in between.
         """
         # Initialize permanently blocked set if needed
-        if not hasattr(self._progress, 'permanently_blocked'):
+        if not hasattr(self._progress, "permanently_blocked"):
             self._progress.permanently_blocked = set()
 
         if len(self._progress.signature_history) < 3:
@@ -848,7 +856,7 @@ class UnifiedTaskTracker:
         different tools and returning to the blocked operation.
         """
         # Initialize permanently blocked set if needed
-        if not hasattr(self._progress, 'permanently_blocked'):
+        if not hasattr(self._progress, "permanently_blocked"):
             self._progress.permanently_blocked = set()
 
         proposed_sig = self._get_signature(tool_name, arguments)
@@ -1470,11 +1478,10 @@ class CompatConfig:
 
     @max_total_iterations.setter
     def max_total_iterations(self, value: int) -> None:
-        if (
-            self._tracker._sticky_user_iterations
-            and not self._tracker._allow_iteration_override
-        ):
-            logger.debug("UnifiedTaskTracker: sticky user max iterations set; skipping auto-adjustment")
+        if self._tracker._sticky_user_iterations and not self._tracker._allow_iteration_override:
+            logger.debug(
+                "UnifiedTaskTracker: sticky user max iterations set; skipping auto-adjustment"
+            )
             return
         self._tracker._max_total_iterations = value
 
@@ -1484,10 +1491,7 @@ class CompatConfig:
 
     @tool_budget.setter
     def tool_budget(self, value: int) -> None:
-        if (
-            self._tracker._sticky_user_budget
-            and not self._tracker._allow_budget_override
-        ):
+        if self._tracker._sticky_user_budget and not self._tracker._allow_budget_override:
             logger.debug("UnifiedTaskTracker: sticky user budget set; skipping auto-adjustment")
             return
         self._tracker._progress.tool_budget = value

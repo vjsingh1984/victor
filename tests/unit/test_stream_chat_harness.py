@@ -104,7 +104,9 @@ def _make_orchestrator(provider: FakeProvider) -> AgentOrchestrator:
 
 @pytest.mark.asyncio
 async def test_streaming_basic_passes_through_chunks():
-    provider = FakeProvider(stream_chunks=[FakeStreamChunk(content="hello"), FakeStreamChunk(content=" world")])
+    provider = FakeProvider(
+        stream_chunks=[FakeStreamChunk(content="hello"), FakeStreamChunk(content=" world")]
+    )
     orchestrator = _make_orchestrator(provider)
 
     out = []
@@ -200,4 +202,3 @@ async def test_streaming_yields_content_for_sanitization():
     # Ensure some content was yielded (may be sanitized or raw)
     # The exact format depends on internal sanitization policy
     assert len(out) > 0
-

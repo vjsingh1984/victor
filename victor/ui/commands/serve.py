@@ -7,6 +7,7 @@ from rich.panel import Panel
 serve_app = typer.Typer(name="serve", help="Start the Victor API server for IDE integrations.")
 console = Console()
 
+
 @serve_app.callback(invoke_without_command=True)
 def serve(
     ctx: typer.Context,
@@ -37,6 +38,7 @@ def serve(
     """Start the Victor API server for IDE integrations."""
     if ctx.invoked_subcommand is None:
         _serve(host, port, log_level, profile)
+
 
 def _serve(host: str, port: int, log_level: str, profile: str):
     # Configure logging

@@ -738,7 +738,10 @@ class ToolSelector:
             entry = get_global_registry().get(tool_name)
             if not entry:
                 return False
-            return entry.access_mode == AccessMode.READONLY or entry.execution_category == ExecutionCategory.READ_ONLY
+            return (
+                entry.access_mode == AccessMode.READONLY
+                or entry.execution_category == ExecutionCategory.READ_ONLY
+            )
         except Exception:
             return False
 

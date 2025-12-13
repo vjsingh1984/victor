@@ -254,7 +254,7 @@ To see specific sections, use read_file with offset/limit parameters or code_sea
         footer = f"═══ END OF FILE: {file_path} ═══"
         if truncated:
             # Calculate approximate line count for offset guidance
-            lines_shown = output_str.count('\n')
+            lines_shown = output_str.count("\n")
             footer = (
                 f"═══ TRUNCATED: {self.config.max_output_chars:,}/{original_len:,} chars (~{lines_shown} lines) ═══\n"
                 f"To continue: read(path='{file_path}', offset={lines_shown}, limit=500)"

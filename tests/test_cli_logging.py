@@ -25,7 +25,9 @@ def test_default_logging_level():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+    with patch(
+        "victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings
+    ):
         with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "test message"])
 
@@ -46,7 +48,9 @@ def test_log_level_debug():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+    with patch(
+        "victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings
+    ):
         with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "--log-level", "DEBUG", "test message"])
 
@@ -67,7 +71,9 @@ def test_log_level_info():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+    with patch(
+        "victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings
+    ):
         with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "--log-level", "INFO", "test message"])
 
@@ -88,7 +94,9 @@ def test_log_level_warn_maps_to_warning():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+    with patch(
+        "victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings
+    ):
         with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "--log-level", "WARN", "test message"])
 
@@ -109,7 +117,9 @@ def test_log_level_error():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+    with patch(
+        "victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings
+    ):
         with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "--log-level", "ERROR", "test message"])
 
@@ -130,7 +140,9 @@ def test_log_level_critical():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+    with patch(
+        "victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings
+    ):
         with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "--log-level", "CRITICAL", "test message"])
 
@@ -165,7 +177,10 @@ def test_environment_variable_fallback():
         return mock_agent
 
     with patch.dict(os.environ, {"VICTOR_LOG_LEVEL": "DEBUG"}):
-        with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+        with patch(
+            "victor.ui.commands.chat.AgentOrchestrator.from_settings",
+            side_effect=mock_from_settings,
+        ):
             with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
                 runner.invoke(app, ["chat", "test message"])
 
@@ -187,7 +202,10 @@ def test_cli_argument_overrides_environment_variable():
         return mock_agent
 
     with patch.dict(os.environ, {"VICTOR_LOG_LEVEL": "DEBUG"}):
-        with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+        with patch(
+            "victor.ui.commands.chat.AgentOrchestrator.from_settings",
+            side_effect=mock_from_settings,
+        ):
             with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
                 # Pass ERROR as CLI argument, should override DEBUG from env var
                 runner.invoke(app, ["chat", "--log-level", "ERROR", "test message"])
@@ -209,7 +227,9 @@ def test_log_level_case_insensitive():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+    with patch(
+        "victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings
+    ):
         with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             # Test lowercase
             runner.invoke(app, ["chat", "--log-level", "debug", "test message"])
@@ -231,7 +251,9 @@ def test_logging_format_is_configured():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+    with patch(
+        "victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings
+    ):
         with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "--log-level", "INFO", "test message"])
 
@@ -252,7 +274,9 @@ def test_logging_force_override():
         mock_agent.chat = AsyncMock(return_value=MagicMock(content="Test response"))
         return mock_agent
 
-    with patch("victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings):
+    with patch(
+        "victor.ui.commands.chat.AgentOrchestrator.from_settings", side_effect=mock_from_settings
+    ):
         with patch("victor.ui.commands.chat.configure_logging") as mock_logging:
             runner.invoke(app, ["chat", "--log-level", "DEBUG", "test message"])
 

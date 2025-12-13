@@ -90,7 +90,9 @@ class GoPlugin(BaseLanguagePlugin):
             symbols=[
                 QueryPattern("function", "(function_declaration name: (identifier) @name)"),
                 QueryPattern("function", "(method_declaration name: (field_identifier) @name)"),
-                QueryPattern("class", "(type_declaration (type_spec name: (type_identifier) @name))"),
+                QueryPattern(
+                    "class", "(type_declaration (type_spec name: (type_identifier) @name))"
+                ),
             ],
             calls="""
                 (call_expression function: (identifier) @callee)

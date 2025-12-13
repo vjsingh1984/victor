@@ -58,11 +58,13 @@ app.add_typer(tools_app)
 
 console = Console()
 
+
 def version_callback(value: bool) -> None:
     """Show version and exit."""
     if value:
         console.print(f"Victor v{__version__}")
         raise typer.Exit()
+
 
 @app.callback(invoke_without_command=True)
 def callback(
@@ -79,6 +81,7 @@ def callback(
     """Victor - Enterprise-Ready AI Coding Assistant."""
     if ctx.invoked_subcommand is None:
         _run_default_interactive()
+
 
 if __name__ == "__main__":
     app()

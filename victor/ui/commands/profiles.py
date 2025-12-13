@@ -7,6 +7,7 @@ from victor.config.settings import load_settings
 profiles_app = typer.Typer(name="profiles", help="List configured profiles.")
 console = Console()
 
+
 @profiles_app.command("list")
 def list_profiles() -> None:
     """List configured profiles."""

@@ -74,7 +74,9 @@ def test_create_graph_store_duckdb(tmp_path: Path):
     assert isinstance(store, DuckDBGraphStore)
 
 
-@pytest.mark.skipif(LanceDBGraphStore is None or not LANCEDB_AVAILABLE, reason="lancedb not installed")
+@pytest.mark.skipif(
+    LanceDBGraphStore is None or not LANCEDB_AVAILABLE, reason="lancedb not installed"
+)
 def test_create_graph_store_lancedb(tmp_path: Path):
     db_path = tmp_path / "graph.db"
     with pytest.raises(NotImplementedError):

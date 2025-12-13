@@ -98,7 +98,10 @@ class CPlugin(BaseLanguagePlugin):
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
         return TreeSitterQueries(
             symbols=[
-                QueryPattern("function", "(function_definition declarator: (function_declarator declarator: (identifier) @name))"),
+                QueryPattern(
+                    "function",
+                    "(function_definition declarator: (function_declarator declarator: (identifier) @name))",
+                ),
                 QueryPattern("class", "(struct_specifier name: (type_identifier) @name)"),
                 QueryPattern("class", "(enum_specifier name: (type_identifier) @name)"),
             ],
@@ -962,8 +965,14 @@ class ElixirPlugin(BaseLanguagePlugin):
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
         return TreeSitterQueries(
             symbols=[
-                QueryPattern("class", "(call target: (identifier) @_defmodule (#eq? @_defmodule \"defmodule\") (arguments (alias) @name))"),
-                QueryPattern("function", "(call target: (identifier) @_def (#match? @_def \"^def\") (arguments (call target: (identifier) @name)))"),
+                QueryPattern(
+                    "class",
+                    '(call target: (identifier) @_defmodule (#eq? @_defmodule "defmodule") (arguments (alias) @name))',
+                ),
+                QueryPattern(
+                    "function",
+                    '(call target: (identifier) @_def (#match? @_def "^def") (arguments (call target: (identifier) @name)))',
+                ),
             ],
             calls="""
                 (call target: (identifier) @callee)
@@ -1092,7 +1101,10 @@ class RPlugin(BaseLanguagePlugin):
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
         return TreeSitterQueries(
             symbols=[
-                QueryPattern("function", "(binary_operator lhs: (identifier) @name rhs: (function_definition))"),
+                QueryPattern(
+                    "function",
+                    "(binary_operator lhs: (identifier) @name rhs: (function_definition))",
+                ),
             ],
             calls="""
                 (call function: (identifier) @callee)

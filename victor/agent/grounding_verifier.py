@@ -334,16 +334,32 @@ class GroundingVerifier:
             filename = os.path.basename(path)
             # Match files ending with the exact filename (separated by /)
             partial_matches = [
-                f for f in existing_files
+                f
+                for f in existing_files
                 if f.endswith(filename) and (f == filename or f.endswith("/" + filename))
             ]
 
             if partial_matches:
                 # File exists - if it's just a filename without path, count as verified
                 # (model may have abbreviated the path which is fine)
-                if "/" not in path or len(partial_matches) == 1:
-                    # Exact filename or only one match - count as verified
+                if "/" not in path:
+                    # Just a filename - count as verified
                     result.verified_references.append(path)
+                elif len(partial_matches) == 1 and partial_matches[0] == clean_path:
+                    # Single match and path is correct - count as verified
+                    result.verified_references.append(path)
+                elif len(partial_matches) == 1:
+                    # Single match but wrong directory path - flag it but low severity
+                    result.add_issue(
+                        GroundingIssue(
+                            issue_type=IssueType.PATH_INVALID,
+                            severity=IssueSeverity.LOW,
+                            description=f"Path '{path}' has incorrect directory",
+                            reference=path,
+                            suggestion=f"Correct path is: {partial_matches[0]}",
+                        )
+                    )
+                    result.unverified_references.append(path)
                 else:
                     # Multiple matches and a partial path was given - ambiguous
                     result.add_issue(

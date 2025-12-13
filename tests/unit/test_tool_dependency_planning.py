@@ -64,6 +64,7 @@ def test_core_tools_always_selected():
         assert "ls" in names
     finally:
         import asyncio
+
         asyncio.run(orch.shutdown())
 
 

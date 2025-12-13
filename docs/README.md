@@ -11,6 +11,8 @@ Comprehensive documentation for Victor - Enterprise-Ready AI Coding Assistant.
 | [Provider Setup](guides/PROVIDER_SETUP.md) | Configure 25+ LLM providers |
 | [User Guide](USER_GUIDE.md) | Complete usage guide |
 | [Tool Catalog](TOOL_CATALOG.md) | All 45 available tools |
+| [Verticals](VERTICALS.md) | Domain-specific assistant templates |
+| [Framework Migration](FRAMEWORK_MIGRATION.md) | Migrating to Framework API |
 | [Releasing](RELEASING.md) | Release process for maintainers |
 
 ## Documentation Structure
@@ -23,6 +25,10 @@ docs/
 ├── DEVELOPER_GUIDE.md         # Contributing and development
 ├── RELEASING.md               # Release process
 ├── ENTERPRISE.md              # Enterprise deployment
+├── VERTICALS.md               # Domain-specific assistants
+├── STATE_MACHINE.md           # Conversation state tracking
+├── FRAMEWORK_MIGRATION.md     # Framework API migration guide
+├── CORE_PATTERNS.md           # Design patterns used
 │
 ├── guides/                    # How-to guides
 │   ├── INSTALLATION.md        # Installation methods
@@ -94,6 +100,10 @@ docs/
 
 ### Architecture
 - [Architecture Deep Dive](ARCHITECTURE_DEEP_DIVE.md)
+- [State Machine](STATE_MACHINE.md) - Conversation state tracking
+- [Verticals](VERTICALS.md) - Domain-specific assistants
+- [Framework Migration](FRAMEWORK_MIGRATION.md) - Framework API guide
+- [Core Patterns](CORE_PATTERNS.md) - Design patterns used
 - [Embedding System](embeddings/ARCHITECTURE.md)
 - [Codebase Analysis](CODEBASE_ANALYSIS_REPORT.md)
 

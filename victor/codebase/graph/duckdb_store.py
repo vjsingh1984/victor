@@ -206,6 +206,11 @@ class DuckDBGraphStore(GraphStoreProtocol):
             try:
                 node_count = conn.execute("SELECT COUNT(*) FROM nodes").fetchone()[0]
                 edge_count = conn.execute("SELECT COUNT(*) FROM edges").fetchone()[0]
-                return {"nodes": node_count, "edges": edge_count, "path": str(self.db_path), "backend": "duckdb"}
+                return {
+                    "nodes": node_count,
+                    "edges": edge_count,
+                    "path": str(self.db_path),
+                    "backend": "duckdb",
+                }
             finally:
                 conn.close()

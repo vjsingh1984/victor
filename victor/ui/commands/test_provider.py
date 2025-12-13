@@ -5,8 +5,11 @@ from rich.console import Console
 from victor.config.settings import load_settings
 from victor.providers.registry import ProviderRegistry
 
-test_provider_app = typer.Typer(name="test-provider", help="Test if a provider is working correctly.")
+test_provider_app = typer.Typer(
+    name="test-provider", help="Test if a provider is working correctly."
+)
 console = Console()
+
 
 @test_provider_app.callback(invoke_without_command=True)
 def test_provider(

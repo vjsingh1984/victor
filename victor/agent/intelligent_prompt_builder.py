@@ -157,7 +157,9 @@ class ProfileMetrics:
         self.tool_call_success_rate = beta * self.tool_call_success_rate + alpha * current_rate
         self.avg_quality_score = beta * self.avg_quality_score + alpha * quality_score
         self.avg_response_time_ms = beta * self.avg_response_time_ms + alpha * response_time_ms
-        self.avg_tool_calls_per_request = beta * self.avg_tool_calls_per_request + alpha * tool_calls
+        self.avg_tool_calls_per_request = (
+            beta * self.avg_tool_calls_per_request + alpha * tool_calls
+        )
         self.tool_budget_adherence = beta * self.tool_budget_adherence + alpha * adherence
         self.grounding_accuracy = beta * self.grounding_accuracy + alpha * grounding_score
 
@@ -295,16 +297,24 @@ class ProfileLearningStore:
         self._ensure_initialized()
 
         # Use __dict__ and filter out non-serializable fields for efficiency
-        metrics_dict = {k: v for k, v in metrics.__dict__.items() 
-                       if k not in ('profile_name', 'provider', 'model', 'last_updated')}
-        
+        metrics_dict = {
+            k: v
+            for k, v in metrics.__dict__.items()
+            if k not in ("profile_name", "provider", "model", "last_updated")
+        }
+
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO profile_metrics "
                 "(profile_name, provider, model, metrics_json, updated_at) "
                 "VALUES (?, ?, ?, ?, ?)",
-                (metrics.profile_name, metrics.provider, metrics.model,
-                 json.dumps(metrics_dict, default=str), datetime.now().isoformat())
+                (
+                    metrics.profile_name,
+                    metrics.provider,
+                    metrics.model,
+                    json.dumps(metrics_dict, default=str),
+                    datetime.now().isoformat(),
+                ),
             )
 
     def load_metrics(self, profile_name: str, provider: str, model: str) -> ProfileMetrics:
@@ -437,8 +447,11 @@ class EmbeddingScheduler:
     @property
     def state(self) -> CacheState:
         """Get current cache state."""
-        if (self._state == CacheState.WARM and self._last_refresh and 
-            datetime.now() - self._last_refresh > self._cache_ttl):
+        if (
+            self._state == CacheState.WARM
+            and self._last_refresh
+            and datetime.now() - self._last_refresh > self._cache_ttl
+        ):
             return CacheState.STALE
         return self._state
 
@@ -776,9 +789,23 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
         """Check if model has native tool calling support."""
         # Use set for O(1) lookup instead of list iteration
         patterns = {
-            "qwen2.5", "qwen-2.5", "qwen3", "qwen-3", "llama-3.1", "llama3.1",
-            "llama-3.2", "llama3.2", "llama-3.3", "llama3.3", "ministral",
-            "mistral", "mixtral", "command-r", "firefunction", "hermes", "functionary"
+            "qwen2.5",
+            "qwen-2.5",
+            "qwen3",
+            "qwen-3",
+            "llama-3.1",
+            "llama3.1",
+            "llama-3.2",
+            "llama3.2",
+            "llama-3.3",
+            "llama3.3",
+            "ministral",
+            "mistral",
+            "mixtral",
+            "command-r",
+            "firefunction",
+            "hermes",
+            "functionary",
         }
         return any(pattern in self.model_lower for pattern in patterns)
 
@@ -786,19 +813,27 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
         """Generate the system prompt based on strategy."""
         # Build parts list efficiently
         parts = [self._get_base_identity(strategy)]
-        
+
         # Add optional parts only if they exist
         optional_parts = [
             self._get_task_hint(context.task_type),
             self._get_mode_hint(context.current_mode, context.iteration_budget),
             self._get_tool_guidance(context, strategy),
-            f"\nCONTINUATION CONTEXT:\n{context.continuation_context}" if context.continuation_context else None,
-            self._format_context_fragments(context.relevant_fragments) if context.relevant_fragments else None
+            (
+                f"\nCONTINUATION CONTEXT:\n{context.continuation_context}"
+                if context.continuation_context
+                else None
+            ),
+            (
+                self._format_context_fragments(context.relevant_fragments)
+                if context.relevant_fragments
+                else None
+            ),
         ]
-        
+
         parts.extend(part for part in optional_parts if part)
         parts.append(self._get_grounding_rules(strategy, context.profile_metrics))
-        
+
         return "\n\n".join(parts)
 
     def _get_base_identity(self, strategy: PromptStrategy) -> str:

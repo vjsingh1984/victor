@@ -2,6 +2,8 @@ import typer
 import asyncio
 import os
 import sys
+import time
+import uuid
 from typing import Optional, Any
 
 from rich.console import Console
@@ -11,6 +13,8 @@ from rich.prompt import Confirm, Prompt
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import load_settings, ProfileConfig
+from victor.framework.shim import FrameworkShim
+from victor.verticals import get_vertical, list_verticals
 from victor.ui.output_formatter import InputReader, create_formatter
 from victor.ui.commands.utils import (
     preload_semantic_index,
@@ -18,11 +22,12 @@ from victor.ui.commands.utils import (
     get_rl_profile_suggestion,
     setup_safety_confirmation,
     configure_logging,
-    graceful_shutdown
+    graceful_shutdown,
 )
 
 chat_app = typer.Typer(name="chat", help="Start interactive chat or send a one-shot message.")
 console = Console()
+
 
 @chat_app.callback(invoke_without_command=True)
 def chat(
@@ -130,12 +135,32 @@ def chat(
         "--preindex",
         help="Preload semantic code index at startup (avoids 20-30s delay on first search).",
     ),
+    vertical: Optional[str] = typer.Option(
+        None,
+        "--vertical",
+        "-V",
+        help=f"Vertical template to use ({', '.join(list_verticals()) or 'coding, research, devops'}). "
+        "By default, no vertical is applied (uses standard CodingAssistant behavior with framework features).",
+    ),
+    legacy_mode: bool = typer.Option(
+        False,
+        "--legacy",
+        help="Use legacy orchestrator creation path (bypasses FrameworkShim). "
+        "For backward compatibility and troubleshooting.",
+    ),
+    enable_observability: bool = typer.Option(
+        True,
+        "--observability/--no-observability",
+        help="Enable observability integration for event tracking.",
+    ),
 ):
     """Start interactive chat or send a one-shot message."""
     if ctx.invoked_subcommand is None:
         renderer = renderer.lower()
         if renderer not in {"auto", "rich", "rich-text", "text"}:
-            console.print("[bold red]Error:[/] Invalid renderer. Choose from auto, rich, rich-text, text.")
+            console.print(
+                "[bold red]Error:[/] Invalid renderer. Choose from auto, rich, rich-text, text."
+            )
             raise typer.Exit(1)
 
         if mode:
@@ -166,8 +191,9 @@ def chat(
             renderer = "text"
 
         configure_logging(log_level, stream=sys.stderr)
-        
+
         from victor.agent.debug_logger import configure_logging_levels
+
         configure_logging_levels(log_level)
 
         formatter = create_formatter(
@@ -190,7 +216,9 @@ def chat(
         # Apply provider/model/endpoint overrides by creating a synthetic profile
         if provider or model or endpoint:
             if not provider or not model:
-                console.print("[bold red]Error:[/] --provider and --model must be provided together when overriding profiles.")
+                console.print(
+                    "[bold red]Error:[/] --provider and --model must be provided together when overriding profiles."
+                )
                 raise typer.Exit(1)
             provider = provider.lower()
 
@@ -205,7 +233,9 @@ def chat(
                     elif provider == "vllm":
                         settings.vllm_base_url = endpoint
                 else:
-                    console.print("[bold yellow]Warning:[/] --endpoint is ignored for this provider.")
+                    console.print(
+                        "[bold yellow]Warning:[/] --endpoint is ignored for this provider."
+                    )
 
             override_profile = ProfileConfig(
                 provider=provider,
@@ -234,6 +264,9 @@ def chat(
                     mode=mode,
                     tool_budget=tool_budget,
                     max_iterations=max_iterations,
+                    vertical=vertical,
+                    enable_observability=enable_observability,
+                    legacy_mode=legacy_mode,
                 )
             )
         elif stdin or input_file:
@@ -251,8 +284,12 @@ def chat(
                     mode=mode,
                     tool_budget=tool_budget,
                     max_iterations=max_iterations,
+                    vertical=vertical,
+                    enable_observability=enable_observability,
+                    legacy_mode=legacy_mode,
                 )
             )
+
 
 def _run_default_interactive() -> None:
     """Run the default interactive CLI mode with default options."""
@@ -264,6 +301,7 @@ def _run_default_interactive() -> None:
     settings = load_settings()
     setup_safety_confirmation()
     asyncio.run(run_interactive(settings, "default", True, False))
+
 
 async def run_oneshot(
     message: str,
@@ -277,18 +315,24 @@ async def run_oneshot(
     mode: Optional[str] = None,
     tool_budget: Optional[int] = None,
     max_iterations: Optional[int] = None,
+    vertical: Optional[str] = None,
+    enable_observability: bool = True,
+    legacy_mode: bool = False,
 ) -> None:
-    """Run a single message and exit."""
-    import time
-    import uuid
+    """Run a single message and exit.
+
+    By default, uses FrameworkShim to bridge CLI with framework features
+    like observability and vertical configuration. Use legacy_mode=True
+    to bypass the framework and use direct orchestrator creation.
+    """
     from victor.ui.output_formatter import create_formatter
-    
+
     if formatter is None:
         formatter = create_formatter()
 
     settings.one_shot_mode = True
     start_time = time.time()
-    session_id = str(uuid.uuid4())[:8]
+    session_id = str(uuid.uuid4())
     success = False
     token_count = 0
     tool_calls_made = 0
@@ -296,19 +340,46 @@ async def run_oneshot(
 
     try:
         from victor.agent.complexity_classifier import ComplexityClassifier
+
         classifier = ComplexityClassifier(use_semantic=False)
         classification = classifier.classify(message)
         task_type = classification.complexity.value
-    except Exception as e:
+    except Exception:
         pass
 
     agent = None
+    shim: Optional[FrameworkShim] = None
     try:
         if tool_budget is not None:
             settings.tool_call_budget = tool_budget
 
-        agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
-        
+        if legacy_mode:
+            # Legacy path: direct orchestrator creation (no framework features)
+            agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
+        else:
+            # Framework path: use FrameworkShim with observability and verticals
+            vertical_class = get_vertical(vertical) if vertical else None
+
+            shim = FrameworkShim(
+                settings,
+                profile_name=profile,
+                thinking=thinking,
+                vertical=vertical_class,
+                enable_observability=enable_observability,
+                session_id=session_id,
+            )
+            agent = await shim.create_orchestrator()
+
+            # Emit session start event if observability is enabled
+            shim.emit_session_start(
+                {
+                    "mode": "oneshot",
+                    "task_type": task_type,
+                    "vertical": vertical,
+                    "thinking": thinking,
+                }
+            )
+
         if tool_budget is not None:
             agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
         if max_iterations is not None:
@@ -316,16 +387,17 @@ async def run_oneshot(
 
         if mode:
             from victor.agent.mode_controller import AgentMode, get_mode_controller
+
             controller = get_mode_controller()
             try:
                 controller.switch_mode(AgentMode(mode))
             except Exception:
                 # Fallback: ignore invalid mode silently (validated earlier)
                 pass
-        
+
         if preindex:
             await preload_semantic_index(os.getcwd(), settings, console)
-        
+
         agent.start_embedding_preload()
 
         content_buffer = ""
@@ -334,10 +406,13 @@ async def run_oneshot(
 
         if stream and agent.provider.supports_streaming():
             from victor.ui.rendering import FormatterRenderer, LiveDisplayRenderer, stream_response
+
             use_live = renderer_choice in {"rich", "auto"}
             if renderer_choice in {"rich-text", "text"}:
                 use_live = False
-            renderer = LiveDisplayRenderer(console) if use_live else FormatterRenderer(formatter, console)
+            renderer = (
+                LiveDisplayRenderer(console) if use_live else FormatterRenderer(formatter, console)
+            )
             content_buffer = await stream_response(agent, message, renderer)
         else:
             response = await agent.chat(message)
@@ -360,8 +435,17 @@ async def run_oneshot(
         formatter.error(str(e))
         raise typer.Exit(1)
     finally:
+        # Emit session end event
+        duration = time.time() - start_time
+        if shim:
+            shim.emit_session_end(
+                tool_calls=tool_calls_made,
+                duration_seconds=duration,
+                success=success,
+            )
         if agent:
             await graceful_shutdown(agent)
+
 
 async def run_interactive(
     settings: Any,
@@ -373,9 +457,23 @@ async def run_interactive(
     mode: Optional[str] = None,
     tool_budget: Optional[int] = None,
     max_iterations: Optional[int] = None,
+    vertical: Optional[str] = None,
+    enable_observability: bool = True,
+    legacy_mode: bool = False,
 ) -> None:
-    """Run interactive CLI mode."""
+    """Run interactive CLI mode.
+
+    By default, uses FrameworkShim to bridge CLI with framework features
+    like observability and vertical configuration. Use legacy_mode=True
+    to bypass the framework and use direct orchestrator creation.
+    """
     agent = None
+    shim: Optional[FrameworkShim] = None
+    start_time = time.time()
+    session_id = str(uuid.uuid4())
+    success = False
+    tool_calls_made = 0
+
     try:
         profiles = settings.load_profiles()
         profile_config = profiles.get(profile)
@@ -387,8 +485,34 @@ async def run_interactive(
         if tool_budget is not None:
             settings.tool_call_budget = tool_budget
 
-        agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
-        
+        if legacy_mode:
+            # Legacy path: direct orchestrator creation (no framework features)
+            agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
+        else:
+            # Framework path: use FrameworkShim with observability and verticals
+            vertical_class = get_vertical(vertical) if vertical else None
+
+            shim = FrameworkShim(
+                settings,
+                profile_name=profile,
+                thinking=thinking,
+                vertical=vertical_class,
+                enable_observability=enable_observability,
+                session_id=session_id,
+            )
+            agent = await shim.create_orchestrator()
+
+            # Emit session start event if observability is enabled
+            shim.emit_session_start(
+                {
+                    "mode": "interactive",
+                    "vertical": vertical,
+                    "thinking": thinking,
+                    "provider": profile_config.provider,
+                    "model": profile_config.model,
+                }
+            )
+
         if tool_budget is not None:
             agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
         if max_iterations is not None:
@@ -396,15 +520,17 @@ async def run_interactive(
 
         if mode:
             from victor.agent.mode_controller import AgentMode, get_mode_controller
+
             controller = get_mode_controller()
             try:
                 controller.switch_mode(AgentMode(mode))
             except Exception:
                 pass
-        
+
         from victor.ui.commands import SlashCommandHandler
+
         cmd_handler = SlashCommandHandler(console, settings, agent)
-        
+
         rl_suggestion = get_rl_profile_suggestion(profile_config.provider, profiles)
         await _run_cli_repl(
             agent,
@@ -414,16 +540,32 @@ async def run_interactive(
             stream,
             rl_suggestion,
             renderer_choice=renderer_choice,
+            vertical_name=vertical,
         )
+
+        success = True
+        if hasattr(agent, "get_session_metrics"):
+            metrics = agent.get_session_metrics()
+            tool_calls_made = metrics.get("tool_calls", 0) if metrics else 0
 
     except Exception as e:
         console.print(f"[bold red]Error:[/ ] {str(e)}")
         import traceback
+
         console.print(traceback.format_exc())
         raise typer.Exit(1)
     finally:
+        # Emit session end event
+        duration = time.time() - start_time
+        if shim:
+            shim.emit_session_end(
+                tool_calls=tool_calls_made,
+                duration_seconds=duration,
+                success=success,
+            )
         if agent:
             await graceful_shutdown(agent)
+
 
 async def _run_cli_repl(
     agent: AgentOrchestrator,
@@ -433,12 +575,14 @@ async def _run_cli_repl(
     stream: bool,
     rl_suggestion: Optional[tuple[str, str, float]] = None,
     renderer_choice: str = "auto",
+    vertical_name: Optional[str] = None,
 ) -> None:
     """Run the CLI-based REPL (fallback for unsupported terminals)."""
+    vertical_display = f"  [bold]Vertical:[/ ] [magenta]{vertical_name}[/]" if vertical_name else ""
     panel_content = (
         f"[bold blue]Victor[/] - Enterprise-Ready AI Coding Assistant\n\n"
         f"[bold]Provider:[/ ] [cyan]{profile_config.provider}[/]  "
-        f"[bold]Model:[/ ] [cyan]{profile_config.model}[/]\n\n"
+        f"[bold]Model:[/ ] [cyan]{profile_config.model}[/]{vertical_display}\n\n"
         f"Type [bold]/help[/] for commands, [bold]/exit[/] or [bold]Ctrl+D[/] to quit."
     )
 
@@ -481,10 +625,18 @@ async def _run_cli_repl(
 
             if stream:
                 from victor.agent.response_sanitizer import sanitize_response
-                from victor.ui.rendering import LiveDisplayRenderer, FormatterRenderer, stream_response
+                from victor.ui.rendering import (
+                    LiveDisplayRenderer,
+                    FormatterRenderer,
+                    stream_response,
+                )
 
                 use_live = renderer_choice in {"rich", "auto"}
-                renderer = LiveDisplayRenderer(console) if use_live else FormatterRenderer(create_formatter(), console)
+                renderer = (
+                    LiveDisplayRenderer(console)
+                    if use_live
+                    else FormatterRenderer(create_formatter(), console)
+                )
                 content_buffer = await stream_response(agent, user_input, renderer)
                 content_buffer = sanitize_response(content_buffer)
             else:
@@ -500,4 +652,5 @@ async def _run_cli_repl(
         except Exception as e:
             console.print(f"[red]Error:[/ ] {e}")
             import traceback
+
             console.print(traceback.format_exc())

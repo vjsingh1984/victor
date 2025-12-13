@@ -10,6 +10,7 @@ from victor.config.settings import get_project_paths, VICTOR_CONTEXT_FILE, VICTO
 init_app = typer.Typer(name="init", help="Initialize project context and configuration.")
 console = Console()
 
+
 @init_app.callback(invoke_without_command=True)
 def init(
     ctx: typer.Context,
@@ -84,7 +85,9 @@ providers:
             existing_content = target_path.read_text(encoding="utf-8")
 
             if not force and not update and interactive:
-                 if not Confirm.ask(f"[yellow]{VICTOR_CONTEXT_FILE} already exists. Do you want to overwrite it with new analysis options?[/]"): # default=False
+                if not Confirm.ask(
+                    f"[yellow]{VICTOR_CONTEXT_FILE} already exists. Do you want to overwrite it with new analysis options?[/]"
+                ):  # default=False
                     console.print("[dim]Aborted.[/dim]")
                     return
             elif not force and not update:
@@ -113,11 +116,13 @@ providers:
 
         if interactive and not quick:
             console.print("\n[bold]Interactive Project Scoping[/]")
-            
-            all_dirs = [d.name for d in Path(".").iterdir() if d.is_dir() and not d.name.startswith('.')] # noqa
-            common_src_dirs = ['src', 'app', 'lib', 'victor', 'server', 'client']
+
+            all_dirs = [
+                d.name for d in Path(".").iterdir() if d.is_dir() and not d.name.startswith(".")
+            ]  # noqa
+            common_src_dirs = ["src", "app", "lib", "victor", "server", "client"]
             suggested_src = [d for d in common_src_dirs if d in all_dirs]
-            
+
             if not suggested_src and all_dirs:
                 project_dir = Path(".").resolve().name
                 if project_dir in all_dirs:
@@ -127,21 +132,33 @@ providers:
 
             include_str = Prompt.ask(
                 f"[cyan]Enter comma-separated source directories to include[/]",
-                default=", ".join(suggested_src)
+                default=", ".join(suggested_src),
             )
-            include_dirs = [d.strip() for d in include_str.split(',')]
+            include_dirs = [d.strip() for d in include_str.split(",")]
 
             default_exclude = [
-                "__pycache__", ".git", ".pytest_cache", "venv", "env", ".venv", 
-                "node_modules", ".tox", "build", "dist", "egg-info", "htmlcov", 
-                "htmlcov_lang", ".mypy_cache", ".ruff_cache"
+                "__pycache__",
+                ".git",
+                ".pytest_cache",
+                "venv",
+                "env",
+                ".venv",
+                "node_modules",
+                ".tox",
+                "build",
+                "dist",
+                "egg-info",
+                "htmlcov",
+                "htmlcov_lang",
+                ".mypy_cache",
+                ".ruff_cache",
             ]
-            
+
             exclude_str = Prompt.ask(
                 f"[cyan]Enter comma-separated directories to exclude[/]",
-                default=", ".join(default_exclude)
+                default=", ".join(default_exclude),
             )
-            exclude_dirs = [d.strip() for d in exclude_str.split(',')]
+            exclude_dirs = [d.strip() for d in exclude_str.split(",")]
 
         # Determine analysis mode and print status
         if deep and learn:
@@ -156,6 +173,7 @@ providers:
             console.print("[dim]Quick regex analysis (no indexing)...[/]")
 
         try:
+
             def on_progress(stage: str, msg: str):
                 console.print(f"[dim]  {msg}[/]")
 
@@ -176,11 +194,19 @@ providers:
                 from victor.context.codebase_analyzer import generate_victor_md_from_index
 
                 console.print("[dim]  Building symbol index...[/]")
-                new_content = asyncio.run(generate_victor_md_from_index(force=force, include_dirs=include_dirs or None, exclude_dirs=exclude_dirs or None))
+                new_content = asyncio.run(
+                    generate_victor_md_from_index(
+                        force=force,
+                        include_dirs=include_dirs or None,
+                        exclude_dirs=exclude_dirs or None,
+                    )
+                )
             else:
                 from victor.context.codebase_analyzer import generate_smart_victor_md
 
-                new_content = generate_smart_victor_md(include_dirs=include_dirs or None, exclude_dirs=exclude_dirs or None)
+                new_content = generate_smart_victor_md(
+                    include_dirs=include_dirs or None, exclude_dirs=exclude_dirs or None
+                )
 
             if update and existing_content:
                 from victor.ui.slash_commands import SlashCommandHandler
@@ -224,4 +250,5 @@ providers:
         except Exception as e:
             console.print(f"[red]Failed to create {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}:[/] {e}")
             import traceback
+
             traceback.print_exc()

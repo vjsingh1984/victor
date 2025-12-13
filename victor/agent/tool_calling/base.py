@@ -649,9 +649,7 @@ class BaseToolCallingAdapter(ABC):
                 filtered[key] = value
 
         if filtered_out:
-            logger.debug(
-                f"Filtered hallucinated arguments for {tool_name}: {filtered_out}"
-            )
+            logger.debug(f"Filtered hallucinated arguments for {tool_name}: {filtered_out}")
 
         # Step 2: Apply defaults for missing required parameters
         defaults = self.TOOL_ARGUMENT_DEFAULTS.get(tool_name, {})

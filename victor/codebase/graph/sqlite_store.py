@@ -301,7 +301,9 @@ class SqliteGraphStore(GraphStoreProtocol):
                 cur = conn.execute("SELECT COUNT(*) FROM edges")
                 edge_count = cur.fetchone()[0]
                 # Count symbols with body text
-                cur = conn.execute("SELECT COUNT(*) FROM nodes WHERE body IS NOT NULL AND body != ''")
+                cur = conn.execute(
+                    "SELECT COUNT(*) FROM nodes WHERE body IS NOT NULL AND body != ''"
+                )
                 body_count = cur.fetchone()[0]
                 # Count indexed files
                 cur = conn.execute("SELECT COUNT(*) FROM file_mtimes")
@@ -382,7 +384,9 @@ class SqliteGraphStore(GraphStoreProtocol):
         async with self._lock:
             conn = self._connect()
             try:
-                cur = conn.execute(f"SELECT {self._NODE_COLS} FROM nodes WHERE node_id = ?", (node_id,))
+                cur = conn.execute(
+                    f"SELECT {self._NODE_COLS} FROM nodes WHERE node_id = ?", (node_id,)
+                )
                 row = cur.fetchone()
                 return self._row_to_node(row) if row else None
             finally:
@@ -394,8 +398,7 @@ class SqliteGraphStore(GraphStoreProtocol):
             conn = self._connect()
             try:
                 cur = conn.execute(
-                    f"SELECT {self._NODE_COLS} FROM nodes WHERE file = ? ORDER BY line",
-                    (file,)
+                    f"SELECT {self._NODE_COLS} FROM nodes WHERE file = ? ORDER BY line", (file,)
                 )
                 return [self._row_to_node(row) for row in cur.fetchall()]
             finally:
@@ -404,6 +407,7 @@ class SqliteGraphStore(GraphStoreProtocol):
     async def update_file_mtime(self, file: str, mtime: float) -> None:
         """Record file modification time for staleness tracking."""
         import time
+
         async with self._lock:
             conn = self._connect()
             try:
@@ -415,7 +419,7 @@ class SqliteGraphStore(GraphStoreProtocol):
                         mtime=excluded.mtime,
                         indexed_at=excluded.indexed_at
                     """,
-                    (file, mtime, time.time())
+                    (file, mtime, time.time()),
                 )
                 conn.commit()
             finally:
@@ -428,10 +432,7 @@ class SqliteGraphStore(GraphStoreProtocol):
             conn = self._connect()
             try:
                 for file, current_mtime in file_mtimes.items():
-                    cur = conn.execute(
-                        "SELECT mtime FROM file_mtimes WHERE file = ?",
-                        (file,)
-                    )
+                    cur = conn.execute("SELECT mtime FROM file_mtimes WHERE file = ?", (file,))
                     row = cur.fetchone()
                     if row is None or row[0] < current_mtime:
                         stale.append(file)

@@ -471,7 +471,9 @@ class OllamaProvider(BaseProvider):
 
                 if response.status_code >= 400:
                     error_body = await response.aread()
-                    logger.error(f"Ollama error response ({response.status_code}): {error_body.decode()}")
+                    logger.error(
+                        f"Ollama error response ({response.status_code}): {error_body.decode()}"
+                    )
                 response.raise_for_status()
 
                 line_count = 0

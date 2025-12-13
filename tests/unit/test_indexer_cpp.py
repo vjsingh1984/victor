@@ -16,6 +16,7 @@ import pytest
 from pathlib import Path
 from victor.codebase.indexer import CodebaseIndex
 
+
 @pytest.mark.asyncio
 async def test_cpp_indexing(tmp_path: Path):
     """Test indexing of a simple C++ file."""

@@ -22,6 +22,7 @@ from victor.config.api_keys import (
 keys_app = typer.Typer(name="keys", help="Manage API keys for cloud providers.")
 console = Console()
 
+
 @keys_app.callback(invoke_without_command=True)
 def keys(
     ctx: typer.Context,
@@ -49,6 +50,7 @@ def keys(
         else:
             _list_keys()
 
+
 def _setup():
     # Create template file
     if DEFAULT_KEYS_FILE.exists():
@@ -72,6 +74,7 @@ def _setup():
     console.print("[dim]Or use keyring for more secure storage:[/]")
     console.print("  victor keys --set anthropic --keyring")
 
+
 def _delete_keyring(provider_name: str):
     # Delete key from keyring
     provider_name = provider_name.lower()
@@ -83,6 +86,7 @@ def _delete_keyring(provider_name: str):
         console.print(f"[green]✓[/] Deleted [cyan]{provider_name}[/] from keyring")
     else:
         console.print(f"[yellow]Key for {provider_name} not found in keyring")
+
 
 def _migrate():
     # Migrate keys from file to keyring
@@ -132,6 +136,7 @@ def _migrate():
         console.print(f"  Delete the file: rm {DEFAULT_KEYS_FILE}")
         console.print("  Keys are now stored securely in system keyring")
 
+
 def _set_key(provider: str, keyring: bool):
     # Set API key for a provider
     provider = provider.lower()
@@ -155,7 +160,7 @@ def _set_key(provider: str, keyring: bool):
     if not key.strip():
         console.print("[red]No key provided. Cancelled.[/]")
         raise typer.Exit(1)
-    
+
     manager = APIKeyManager()
     if manager.set_key(provider, key.strip(), use_keyring=keyring):
         location = "system keyring" if keyring else str(DEFAULT_KEYS_FILE)
@@ -163,6 +168,7 @@ def _set_key(provider: str, keyring: bool):
     else:
         console.print("[red]Failed to save API key")
         raise typer.Exit(1)
+
 
 def _list_keys():
     # Default: list configured providers with source info
@@ -206,6 +212,7 @@ def _list_keys():
         console.print("[yellow]No API keys configured.[/]")
         console.print("  [cyan]victor keys --setup[/]          Create template file")
         console.print("  [cyan]victor keys --set anthropic --keyring[/]  Store in keyring (secure)")
+
 
 def _get_keyring_info() -> tuple[str, str]:
     """Get keyring backend and platform info."""

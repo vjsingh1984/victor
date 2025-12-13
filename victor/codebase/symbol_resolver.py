@@ -27,9 +27,7 @@ class SymbolResolver:
                 short = sym_name.split(".")[-1]
                 self._index.setdefault(short, []).append(node_id)
 
-    def resolve(
-        self, symbol_name: str, preferred_file: Optional[str] = None
-    ) -> Optional[str]:
+    def resolve(self, symbol_name: str, preferred_file: Optional[str] = None) -> Optional[str]:
         """Resolve a symbol to a node id, preferring matches outside preferred_file."""
         matches = self._index.get(symbol_name)
         if not matches:

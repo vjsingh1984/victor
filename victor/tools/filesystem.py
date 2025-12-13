@@ -1319,7 +1319,8 @@ async def find(
         for root, dirs, files in base_path.walk():
             # Skip hidden and common excluded directories
             dirs[:] = [
-                d for d in dirs
+                d
+                for d in dirs
                 if not d.startswith(".")
                 and d not in {"node_modules", "__pycache__", "venv", ".venv", "build", "dist"}
             ]
@@ -1329,11 +1330,13 @@ async def find(
                 for d in dirs:
                     if fnmatch.fnmatch(d, name) or fnmatch.fnmatch(d.lower(), name.lower()):
                         dir_path = root / d
-                        results.append({
-                            "path": str(dir_path.relative_to(base_path)),
-                            "type": "directory",
-                            "size": 0,
-                        })
+                        results.append(
+                            {
+                                "path": str(dir_path.relative_to(base_path)),
+                                "type": "directory",
+                                "size": 0,
+                            }
+                        )
                         count += 1
                         if count >= limit:
                             break
@@ -1347,11 +1350,13 @@ async def find(
                             size = file_path.stat().st_size
                         except OSError:
                             size = 0
-                        results.append({
-                            "path": str(file_path.relative_to(base_path)),
-                            "type": "file",
-                            "size": size,
-                        })
+                        results.append(
+                            {
+                                "path": str(file_path.relative_to(base_path)),
+                                "type": "file",
+                                "size": size,
+                            }
+                        )
                         count += 1
                         if count >= limit:
                             break
@@ -1360,10 +1365,12 @@ async def find(
                 break
 
         if not results:
-            return [{
-                "message": f"No files matching '{name}' found in {path}",
-                "suggestion": "Try a broader pattern like '*{name}*' or search from project root with path='.'",
-            }]
+            return [
+                {
+                    "message": f"No files matching '{name}' found in {path}",
+                    "suggestion": "Try a broader pattern like '*{name}*' or search from project root with path='.'",
+                }
+            ]
 
         return results
 

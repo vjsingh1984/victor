@@ -141,8 +141,14 @@ SYMBOL_QUERIES: Dict[str, List[tuple[str, str]]] = {
         ("class", "(class_declaration name: (identifier) @name)"),
         ("function", "(function_declaration name: (identifier) @name)"),
         ("function", "(method_definition name: (property_identifier) @name)"),
-        ("function", "(lexical_declaration (variable_declarator name: (identifier) @name value: (arrow_function)))"),
-        ("function", "(lexical_declaration (variable_declarator name: (identifier) @name value: (function_expression)))"),
+        (
+            "function",
+            "(lexical_declaration (variable_declarator name: (identifier) @name value: (arrow_function)))",
+        ),
+        (
+            "function",
+            "(lexical_declaration (variable_declarator name: (identifier) @name value: (function_expression)))",
+        ),
         ("function", "(assignment_expression left: (identifier) @name right: (arrow_function))"),
     ],
     "typescript": [
@@ -150,8 +156,14 @@ SYMBOL_QUERIES: Dict[str, List[tuple[str, str]]] = {
         ("function", "(function_declaration name: (identifier) @name)"),
         ("function", "(method_signature name: (property_identifier) @name)"),
         ("function", "(method_definition name: (property_identifier) @name)"),
-        ("function", "(lexical_declaration (variable_declarator name: (identifier) @name value: (arrow_function)))"),
-        ("function", "(lexical_declaration (variable_declarator name: (identifier) @name value: (function_expression)))"),
+        (
+            "function",
+            "(lexical_declaration (variable_declarator name: (identifier) @name value: (arrow_function)))",
+        ),
+        (
+            "function",
+            "(lexical_declaration (variable_declarator name: (identifier) @name value: (function_expression)))",
+        ),
         ("function", "(assignment_expression left: (identifier) @name right: (arrow_function))"),
     ],
     "go": [
@@ -166,8 +178,14 @@ SYMBOL_QUERIES: Dict[str, List[tuple[str, str]]] = {
     ],
     "cpp": [
         ("class", "(class_specifier name: (type_identifier) @name)"),
-        ("function", "(function_definition declarator: (function_declarator declarator: (identifier) @name))"),
-        ("function", "(function_definition declarator: (function_declarator declarator: (field_identifier) @name))"),
+        (
+            "function",
+            "(function_definition declarator: (function_declarator declarator: (identifier) @name))",
+        ),
+        (
+            "function",
+            "(function_definition declarator: (function_declarator declarator: (field_identifier) @name))",
+        ),
     ],
 }
 
@@ -729,6 +747,7 @@ class CodebaseIndex:
             elif "*" in pattern:
                 # Glob pattern
                 import fnmatch
+
                 if fnmatch.fnmatch(path.name, pattern):
                     return True
             else:
@@ -901,8 +920,7 @@ class CodebaseIndex:
                 line_no = content.count("\n", 0, match.start()) + 1
                 keys.setdefault(key, line_no)
 
-        return [(k, v) for k, v in keys.items()]
-
+        return list(keys.items())
 
     # ========================================================================
     # ARCHIVED: First duplicate block of tree-sitter extraction methods
@@ -935,10 +953,11 @@ class CodebaseIndex:
                 for sym_type, query_src in query_defs:
                     try:
                         from tree_sitter import QueryCursor
+
                         query = Query(parser.language, query_src)
                         cursor = QueryCursor(query)
                         captures_dict = cursor.captures(tree.root_node)
-                        for capture_name, nodes in captures_dict.items():
+                        for _capture_name, nodes in captures_dict.items():
                             for node in nodes:
                                 text = node.text.decode("utf-8", errors="ignore")
                                 if not text:
@@ -994,6 +1013,7 @@ class CodebaseIndex:
                     )
                 )
         return symbols
+
     def _extract_inheritance(
         self, file_path: Path, language: str, symbols: List[Symbol]
     ) -> List[tuple[str, str]]:
@@ -1099,7 +1119,7 @@ class CodebaseIndex:
         if language == "python":
             for sym in symbols:
                 if sym.type == "class" and hasattr(sym, "composition"):
-                    edges.extend(getattr(sym, "composition"))
+                    edges.extend(sym.composition)
             return edges
 
         query_src = COMPOSITION_QUERIES.get(language)
@@ -1173,7 +1193,11 @@ class CodebaseIndex:
                     if not field:
                         continue
                     text = field.text.decode("utf-8", errors="ignore")
-                    if node_type in ("class_declaration", "interface_declaration", "class_specifier"):
+                    if node_type in (
+                        "class_declaration",
+                        "interface_declaration",
+                        "class_specifier",
+                    ):
                         class_name = class_name or text
                     else:
                         method_name = method_name or text
@@ -1453,7 +1477,9 @@ class CodebaseIndex:
             target_id = self._symbol_resolver.resolve(callee_name, preferred_file=file_path)
             if not target_id:
                 # Try short name heuristic (after ingest it exists already)
-                target_id = self._symbol_resolver.resolve(callee_name.split(".")[-1], preferred_file=file_path)
+                target_id = self._symbol_resolver.resolve(
+                    callee_name.split(".")[-1], preferred_file=file_path
+                )
             if not target_id:
                 continue
             self._graph_edges.append(
@@ -1469,7 +1495,9 @@ class CodebaseIndex:
         for child_id, base_name, file_path in self._pending_inherit_edges:
             target_id = self._symbol_resolver.resolve(base_name, preferred_file=file_path)
             if not target_id:
-                target_id = self._symbol_resolver.resolve(base_name.split(".")[-1], preferred_file=file_path)
+                target_id = self._symbol_resolver.resolve(
+                    base_name.split(".")[-1], preferred_file=file_path
+                )
             if not target_id:
                 continue
             self._graph_edges.append(
@@ -1485,7 +1513,9 @@ class CodebaseIndex:
         for child_id, base_name, file_path in self._pending_implements_edges:
             target_id = self._symbol_resolver.resolve(base_name, preferred_file=file_path)
             if not target_id:
-                target_id = self._symbol_resolver.resolve(base_name.split(".")[-1], preferred_file=file_path)
+                target_id = self._symbol_resolver.resolve(
+                    base_name.split(".")[-1], preferred_file=file_path
+                )
             if not target_id:
                 continue
             self._graph_edges.append(
@@ -1501,7 +1531,9 @@ class CodebaseIndex:
         for owner_id, member_name, file_path in self._pending_compose_edges:
             target_id = self._symbol_resolver.resolve(member_name, preferred_file=file_path)
             if not target_id:
-                target_id = self._symbol_resolver.resolve(member_name.split(".")[-1], preferred_file=file_path)
+                target_id = self._symbol_resolver.resolve(
+                    member_name.split(".")[-1], preferred_file=file_path
+                )
             if not target_id:
                 continue
             self._graph_edges.append(
@@ -1521,7 +1553,9 @@ class CodebaseIndex:
             for ref in metadata.references:
                 target_id = self._symbol_resolver.resolve(ref, preferred_file=metadata.path)
                 if not target_id:
-                    target_id = self._symbol_resolver.resolve(ref.split(".")[-1], preferred_file=metadata.path)
+                    target_id = self._symbol_resolver.resolve(
+                        ref.split(".")[-1], preferred_file=metadata.path
+                    )
                 if not target_id:
                     continue
                 self._graph_edges.append(

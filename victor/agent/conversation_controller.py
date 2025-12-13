@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-
 from __future__ import annotations
 
 import logging
@@ -138,15 +137,23 @@ class ConversationController:
         message = self._history.add_user_message(content)
         if self.config.enable_stage_tracking:
             self._state_machine.record_message(content, is_user=True)
-        if self.config.enable_context_monitoring and (metrics := self.get_context_metrics()).is_overflow_risk:
+        if (
+            self.config.enable_context_monitoring
+            and (metrics := self.get_context_metrics()).is_overflow_risk
+        ):
             self._notify_context_callbacks(metrics)
         return message
 
-    def add_assistant_message(self, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None) -> Message:
+    def add_assistant_message(
+        self, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None
+    ) -> Message:
         message = self._history.add_assistant_message(content, tool_calls=tool_calls)
         if self.config.enable_stage_tracking:
             self._state_machine.record_message(content, is_user=False)
-        if self.config.enable_context_monitoring and (metrics := self.get_context_metrics()).is_overflow_risk:
+        if (
+            self.config.enable_context_monitoring
+            and (metrics := self.get_context_metrics()).is_overflow_risk
+        ):
             self._notify_context_callbacks(metrics)
         return message
 
@@ -224,7 +231,7 @@ class ConversationController:
                 "Context overflow risk: %d chars (~%d tokens). Max: %d chars",
                 metrics.char_count,
                 metrics.estimated_tokens,
-                metrics.max_context_chars
+                metrics.max_context_chars,
             )
         return metrics.is_overflow_risk
 

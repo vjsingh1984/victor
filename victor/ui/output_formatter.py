@@ -267,9 +267,7 @@ class OutputFormatter:
             # Elapsed time format: (X.XXs) = 8 chars
             time_display = f"({duration_str.strip('()')})" if duration_str else ""
             error_display = f" [red]{error[:30]}[/]" if error else ""
-            self._console.print(
-                f"{status_icon} [bold]{base}[/] {time_display}{error_display}"
-            )
+            self._console.print(f"{status_icon} [bold]{base}[/] {time_display}{error_display}")
         elif self.config.mode == OutputMode.PLAIN:
             # Compact single-line format: ✓ tool_name(args) (X.XXs)
             status_icon = "✓" if success else "✗"

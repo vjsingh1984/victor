@@ -83,9 +83,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         super().__init__(config)
 
         if not HTTPX_AVAILABLE:
-            raise ImportError(
-                "httpx not available. Install with: pip install httpx"
-            )
+            raise ImportError("httpx not available. Install with: pip install httpx")
 
         self._db = None
         self._collection = None
@@ -369,11 +367,13 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             # Merge content into metadata for retrieval
             full_metadata = {"content": doc["content"], **doc.get("metadata", {})}
 
-            vectors.append({
-                "id": doc["id"],
-                "vector": embedding,
-                "metadata": self._convert_metadata(full_metadata),
-            })
+            vectors.append(
+                {
+                    "id": doc["id"],
+                    "vector": embedding,
+                    "metadata": self._convert_metadata(full_metadata),
+                }
+            )
 
         # Batch insert
         response = await self._client.post(

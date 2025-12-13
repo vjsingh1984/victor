@@ -435,7 +435,7 @@ class ProfileValidator:
                 # Model not found
                 return (
                     f"Model '{model}' not found on Ollama server at {ollama_host}. "
-                    f"Available models: {', '.join(sorted(set(m.split(':')[0] for m in model_names))[:5])}..."
+                    f"Available models: {', '.join(sorted({m.split(':')[0] for m in model_names})[:5])}..."
                 )
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
             logger.debug(f"Could not check Ollama availability: {e}")
@@ -490,7 +490,9 @@ class ProfileValidator:
         errors_count = sum(len(r.errors) for r in results)
 
         if errors_count > 0:
-            logger.error(f"Profile validation found {errors_count} errors, {warnings_count} warnings")
+            logger.error(
+                f"Profile validation found {errors_count} errors, {warnings_count} warnings"
+            )
             for result in results:
                 if result.errors:
                     logger.error(str(result))

@@ -140,7 +140,12 @@ class CodebaseAnalyzer:
         ".cache",
     }
 
-    def __init__(self, root_path: Optional[str] = None, include_dirs: Optional[List[str]] = None, exclude_dirs: Optional[List[str]] = None):
+    def __init__(
+        self,
+        root_path: Optional[str] = None,
+        include_dirs: Optional[List[str]] = None,
+        exclude_dirs: Optional[List[str]] = None,
+    ):
         """Initialize analyzer.
 
         Args:
@@ -151,7 +156,7 @@ class CodebaseAnalyzer:
         self.root = Path(root_path) if root_path else Path.cwd()
         self.analysis = CodebaseAnalysis(project_name=self.root.name, root_path=self.root)
         self.include_dirs = include_dirs
-        
+
         # Combine default and user-provided exclude dirs
         self.effective_skip_dirs = self.SKIP_DIRS.copy()
         if exclude_dirs:
@@ -248,7 +253,7 @@ class CodebaseAnalyzer:
                 path = self.root / d
                 if path.exists() and path.is_dir():
                     search_paths.append(path)
-        
+
         if not search_paths:
             # Fallback to original logic if no include_dirs provided or none exist
             if self.analysis.main_package:
@@ -611,7 +616,11 @@ class CodebaseAnalyzer:
                     self.analysis.config_files.append((pattern, description))
 
 
-def generate_smart_victor_md(root_path: Optional[str] = None, include_dirs: Optional[List[str]] = None, exclude_dirs: Optional[List[str]] = None) -> str:
+def generate_smart_victor_md(
+    root_path: Optional[str] = None,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
+) -> str:
     """Generate comprehensive project context using codebase analysis.
 
     Works with Python projects (AST-based analysis) and falls back to
@@ -630,7 +639,9 @@ def generate_smart_victor_md(root_path: Optional[str] = None, include_dirs: Opti
 
     # If no Python package found, use language-agnostic analysis
     if not analysis.main_package and not analysis.key_components:
-        return _generate_generic_victor_md(root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs)
+        return _generate_generic_victor_md(
+            root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs
+        )
 
     sections = []
 
@@ -744,7 +755,11 @@ def generate_smart_victor_md(root_path: Optional[str] = None, include_dirs: Opti
     return "\n".join(sections)
 
 
-def _generate_generic_victor_md(root_path: Optional[str] = None, include_dirs: Optional[List[str]] = None, exclude_dirs: Optional[List[str]] = None) -> str:
+def _generate_generic_victor_md(
+    root_path: Optional[str] = None,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
+) -> str:
     """Generate init.md for non-Python projects using language-agnostic analysis.
 
     Args:
@@ -755,7 +770,9 @@ def _generate_generic_victor_md(root_path: Optional[str] = None, include_dirs: O
     Returns:
         Generated markdown content.
     """
-    context = gather_project_context(root_path, max_files=100, include_dirs=include_dirs, exclude_dirs=exclude_dirs)
+    context = gather_project_context(
+        root_path, max_files=100, include_dirs=include_dirs, exclude_dirs=exclude_dirs
+    )
     _root = Path(root_path) if root_path else Path.cwd()
 
     sections = []
@@ -1021,7 +1038,12 @@ def _extract_readme_description(root: Path) -> str:
 # =============================================================================
 
 
-def gather_project_context(root_path: Optional[str] = None, max_files: int = 50, include_dirs: Optional[List[str]] = None, exclude_dirs: Optional[List[str]] = None) -> Dict[str, any]:
+def gather_project_context(
+    root_path: Optional[str] = None,
+    max_files: int = 50,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
+) -> Dict[str, any]:
     """Gather project context for LLM analysis (works with any language).
 
     This function collects structural information about any project type
@@ -1157,7 +1179,7 @@ def gather_project_context(root_path: Optional[str] = None, max_files: int = 50,
         except PermissionError:
             pass
         return dirs
-    
+
     if include_dirs:
         # Walk only included directories
         all_found_dirs = []
@@ -1172,9 +1194,9 @@ def gather_project_context(root_path: Optional[str] = None, max_files: int = 50,
     # Collect source files with extensions
     file_count = 0
     lang_counts: Dict[str, int] = {}
-    
+
     search_paths = [root / d for d in include_dirs] if include_dirs else [root]
-    
+
     for search_path in search_paths:
         if not search_path.is_dir():
             continue
@@ -1199,24 +1221,30 @@ def gather_project_context(root_path: Optional[str] = None, max_files: int = 50,
 
     # Add content of key files
     context["key_files_content"] = {}
-    
+
     # Prioritize key files
     key_file_candidates = []
-    main_files = [f for f in context["source_files"] if "main" in f or "app" in f or "server" in f or "index" in f]
+    main_files = [
+        f
+        for f in context["source_files"]
+        if "main" in f or "app" in f or "server" in f or "index" in f
+    ]
     key_file_candidates.extend(main_files)
-    
+
     # Add some of the largest files
-    large_files = sorted(context["source_files"], key=lambda f: (root / f).stat().st_size, reverse=True)
+    large_files = sorted(
+        context["source_files"], key=lambda f: (root / f).stat().st_size, reverse=True
+    )
     for f in large_files:
         if f not in key_file_candidates:
             key_file_candidates.append(f)
 
-    key_files_to_read = key_file_candidates[:5] # Read up to 5 key files
+    key_files_to_read = key_file_candidates[:5]  # Read up to 5 key files
 
     for file_path in key_files_to_read:
         try:
             content = (root / file_path).read_text(encoding="utf-8")
-            context["key_files_content"][file_path] = content[:8000] # Limit content size
+            context["key_files_content"][file_path] = content[:8000]  # Limit content size
         except Exception:
             pass
 
@@ -1232,10 +1260,10 @@ def build_llm_prompt_for_victor_md(context: Dict[str, any]) -> str:
     Returns:
         Prompt string for the LLM.
     """
-    
+
     # Static part of the prompt (the "80%")
-    prompt_header = f"""You are an expert software architect tasked with creating a high-level "user manual" for an AI coding assistant named Victor. 
-This manual, named {VICTOR_CONTEXT_FILE}, will help Victor understand the project's structure, purpose, and conventions. 
+    prompt_header = f"""You are an expert software architect tasked with creating a high-level "user manual" for an AI coding assistant named Victor.
+This manual, named {VICTOR_CONTEXT_FILE}, will help Victor understand the project's structure, purpose, and conventions.
 Your analysis must be comprehensive, distilling the provided information into a clear and actionable guide.
 
 Analyze the following project data and generate the {VICTOR_CONTEXT_FILE} file.
@@ -1337,7 +1365,9 @@ async def generate_victor_md_with_llm(
     from victor.providers.base import Message
 
     # Gather project context
-    context = gather_project_context(root_path, max_files, include_dirs=include_dirs, exclude_dirs=exclude_dirs)
+    context = gather_project_context(
+        root_path, max_files, include_dirs=include_dirs, exclude_dirs=exclude_dirs
+    )
 
     # Build prompt
     prompt = build_llm_prompt_for_victor_md(context)
@@ -1359,11 +1389,16 @@ async def generate_victor_md_with_llm(
     except Exception as e:
         logger.error(f"LLM generation failed: {e}")
         # Fall back to basic generation
-        return generate_smart_victor_md(root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs)
+        return generate_smart_victor_md(
+            root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs
+        )
 
 
 async def generate_victor_md_from_index(
-    root_path: Optional[str] = None, force: bool = False, include_dirs: Optional[List[str]] = None, exclude_dirs: Optional[List[str]] = None
+    root_path: Optional[str] = None,
+    force: bool = False,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
 ) -> str:
     """Generate init.md from the SymbolStore (pre-indexed symbols).
 
@@ -1465,7 +1500,7 @@ async def generate_victor_md_from_index(
                 for impl in sorted(impls, key=lambda x: x["name"]):
                     desc = impl.get("description", "") or impl.get("primary_symbol", "")
                     # Format: SymbolName (file.py:line) for LLM navigation
-                    line_ref = f":{impl['line']}" if impl.get('line') else ""
+                    line_ref = f":{impl['line']}" if impl.get("line") else ""
                     location = f"`{impl['path']}{line_ref}`"
                     sections.append(f"| **{impl['name']}** | {location} | {desc} |")
                 sections.append("")
@@ -1758,7 +1793,8 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             }
 
             # Get high-connectivity nodes (hub classes) via SQL
-            cur = conn.execute("""
+            cur = conn.execute(
+                """
                 SELECT n.name, n.type, n.file, n.line,
                        (SELECT COUNT(*) FROM edges WHERE src = n.node_id) +
                        (SELECT COUNT(*) FROM edges WHERE dst = n.node_id) as degree
@@ -1766,7 +1802,8 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                 WHERE n.type IN ('class', 'struct', 'interface')
                 ORDER BY degree DESC
                 LIMIT 5
-            """)
+            """
+            )
             hub_results = cur.fetchall()
             insights["hub_classes"] = [
                 {"name": r[0], "type": r[1], "file": r[2], "line": r[3], "degree": r[4]}
@@ -1775,7 +1812,8 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             ][:3]
 
             # Get most-called symbols (important functions)
-            cur = conn.execute("""
+            cur = conn.execute(
+                """
                 SELECT n.name, n.type, n.file, n.line,
                        (SELECT COUNT(*) FROM edges WHERE dst = n.node_id AND type = 'CALLS') as in_calls,
                        (SELECT COUNT(*) FROM edges WHERE src = n.node_id AND type = 'CALLS') as out_calls
@@ -1783,7 +1821,8 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                 WHERE n.type IN ('function', 'method', 'class')
                 ORDER BY in_calls DESC
                 LIMIT 8
-            """)
+            """
+            )
             important_results = cur.fetchall()
             insights["important_symbols"] = [
                 {
@@ -1852,7 +1891,9 @@ async def generate_enhanced_init_md(
 
     # Step 1: Index - Use SymbolStore for base content
     progress("index", "Building symbol index...")
-    base_content = await generate_victor_md_from_index(root_path, force=force, include_dirs=include_dirs, exclude_dirs=exclude_dirs)
+    base_content = await generate_victor_md_from_index(
+        root_path, force=force, include_dirs=include_dirs, exclude_dirs=exclude_dirs
+    )
     progress("index", "Symbol index built", complete=True)
 
     # Step 2: Learn - Add conversation insights
@@ -1903,10 +1944,16 @@ async def generate_enhanced_init_md(
     progress("graph", "Analyzing code graph...")
     graph_insights = await extract_graph_insights(root_path)
     if graph_insights.get("has_graph"):
-        progress("graph", f"Graph analyzed ({graph_insights['stats'].get('total_nodes', 0)} nodes)", complete=True)
+        progress(
+            "graph",
+            f"Graph analyzed ({graph_insights['stats'].get('total_nodes', 0)} nodes)",
+            complete=True,
+        )
 
         graph_section = ["\n## Code Graph Insights\n"]
-        graph_section.append(f"*{graph_insights['stats'].get('total_nodes', 0)} symbols, {graph_insights['stats'].get('total_edges', 0)} relationships*\n")
+        graph_section.append(
+            f"*{graph_insights['stats'].get('total_nodes', 0)} symbols, {graph_insights['stats'].get('total_edges', 0)} relationships*\n"
+        )
 
         # Design patterns detected
         if graph_insights.get("patterns"):
@@ -1915,16 +1962,26 @@ async def generate_enhanced_init_md(
                 details = p.get("details", {})
                 if p["pattern"] == "provider_strategy":
                     impls = details.get("implementations", [])
-                    graph_section.append(f"- **{p['name']}**: `{details.get('base_class', '')}` with {len(impls)} implementations")
+                    graph_section.append(
+                        f"- **{p['name']}**: `{details.get('base_class', '')}` with {len(impls)} implementations"
+                    )
                 elif p["pattern"] == "facade":
-                    graph_section.append(f"- **{p['name']}**: `{details.get('class', '')}` ({details.get('incoming_calls', 0)} callers → {details.get('outgoing_calls', 0)} delegates)")
+                    graph_section.append(
+                        f"- **{p['name']}**: `{details.get('class', '')}` ({details.get('incoming_calls', 0)} callers → {details.get('outgoing_calls', 0)} delegates)"
+                    )
                 elif p["pattern"] == "composition":
                     composed = details.get("composed_of", [])
-                    graph_section.append(f"- **{p['name']}**: `{details.get('class', '')}` composed of {len(composed)} components")
+                    graph_section.append(
+                        f"- **{p['name']}**: `{details.get('class', '')}` composed of {len(composed)} components"
+                    )
                 elif p["pattern"] == "factory":
-                    graph_section.append(f"- **{p['name']}**: `{details.get('class', '')}` creates {details.get('creates', 0)} types")
+                    graph_section.append(
+                        f"- **{p['name']}**: `{details.get('class', '')}` creates {details.get('creates', 0)} types"
+                    )
                 else:
-                    graph_section.append(f"- **{p['name']}**: `{details.get('class', details.get('base_class', ''))}`")
+                    graph_section.append(
+                        f"- **{p['name']}**: `{details.get('class', details.get('base_class', ''))}`"
+                    )
             graph_section.append("")
 
         # Most important symbols (PageRank)
@@ -1935,7 +1992,7 @@ async def generate_enhanced_init_md(
             for sym in graph_insights["important_symbols"][:6]:
                 conns = f"↓{sym['in_degree']} ↑{sym['out_degree']}"
                 # Format: SymbolName (file.py:line) for LLM navigation
-                line_ref = f":{sym['line']}" if sym.get('line') else ""
+                line_ref = f":{sym['line']}" if sym.get("line") else ""
                 location = f"({sym['file']}{line_ref})"
                 graph_section.append(f"| `{sym['name']}` {location} | {sym['type']} | {conns} |")
             graph_section.append("")
@@ -1945,7 +2002,7 @@ async def generate_enhanced_init_md(
             graph_section.append("### Hub Classes (High Connectivity)\n")
             for hub in graph_insights["hub_classes"]:
                 # Format: ClassName (file.py:line) for LLM navigation
-                line_ref = f":{hub['line']}" if hub.get('line') else ""
+                line_ref = f":{hub['line']}" if hub.get("line") else ""
                 location = f"({hub['file']}{line_ref})"
                 graph_section.append(f"- `{hub['name']}` {location} - {hub['degree']} connections")
             graph_section.append("")

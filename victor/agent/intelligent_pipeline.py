@@ -196,13 +196,12 @@ class IntelligentAgentPipeline:
         # Skip eager initialization - use lazy loading instead
         return pipeline
 
-
-
     async def _get_prompt_builder(self):
         """Lazy initialize prompt builder."""
         if self._prompt_builder is None:
             try:
                 import traceback
+
                 logger.debug(
                     f"[IntelligentPipeline] Creating prompt builder with: "
                     f"provider_name={self.provider_name!r} (type={type(self.provider_name).__name__}), "
@@ -210,8 +209,10 @@ class IntelligentAgentPipeline:
                     f"profile_name={self.profile_name!r} (type={type(self.profile_name).__name__})"
                 )
                 from victor.agent.intelligent_prompt_builder import IntelligentPromptBuilder
+
                 self._prompt_builder = await IntelligentPromptBuilder.create(
-                    self.provider_name, self.model, self.profile_name)
+                    self.provider_name, self.model, self.profile_name
+                )
             except Exception as e:
                 logger.warning(
                     f"[IntelligentPipeline] Prompt builder init failed: {e}\n"
@@ -224,6 +225,7 @@ class IntelligentAgentPipeline:
         if self._mode_controller is None:
             try:
                 from victor.agent.adaptive_mode_controller import AdaptiveModeController
+
                 self._mode_controller = AdaptiveModeController(profile_name=self.profile_name)
             except Exception as e:
                 logger.warning(f"[IntelligentPipeline] Mode controller init failed: {e}")
@@ -234,6 +236,7 @@ class IntelligentAgentPipeline:
         if self._quality_scorer is None:
             try:
                 from victor.agent.response_quality import ResponseQualityScorer
+
                 self._quality_scorer = ResponseQualityScorer()
             except Exception as e:
                 logger.warning(f"[IntelligentPipeline] Quality scorer init failed: {e}")
@@ -244,6 +247,7 @@ class IntelligentAgentPipeline:
         if self._grounding_verifier is None and self.project_root:
             try:
                 from victor.agent.grounding_verifier import GroundingVerifier
+
                 self._grounding_verifier = GroundingVerifier(project_root=self.project_root)
             except Exception as e:
                 logger.warning(f"[IntelligentPipeline] Grounding verifier init failed: {e}")
@@ -254,6 +258,7 @@ class IntelligentAgentPipeline:
         if self._resilient_executor is None:
             try:
                 from victor.agent.resilience import ResilientExecutor
+
                 self._resilient_executor = ResilientExecutor()
             except Exception as e:
                 logger.warning(f"[IntelligentPipeline] Resilient executor init failed: {e}")
@@ -591,9 +596,13 @@ class IntelligentAgentPipeline:
         """Get pipeline statistics."""
         # Lazy update stats only when requested (sync access for existing components)
         if self._prompt_builder:
-            self._stats.cache_state = self._prompt_builder.get_profile_stats().get("cache_state", "unknown")
+            self._stats.cache_state = self._prompt_builder.get_profile_stats().get(
+                "cache_state", "unknown"
+            )
         if self._mode_controller:
-            self._stats.mode_transitions = self._mode_controller.get_session_stats().get("mode_transitions", 0)
+            self._stats.mode_transitions = self._mode_controller.get_session_stats().get(
+                "mode_transitions", 0
+            )
         return self._stats
 
     def reset_session(self) -> None:
@@ -642,7 +651,7 @@ async def get_pipeline(
     Returns:
         IntelligentAgentPipeline instance
     """
-    key = (provider_name, model, profile_name or 'default', project_root)
+    key = (provider_name, model, profile_name or "default", project_root)
 
     if key not in _pipeline_cache:
         _pipeline_cache[key] = await IntelligentAgentPipeline.create(

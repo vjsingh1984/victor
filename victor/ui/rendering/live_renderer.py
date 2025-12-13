@@ -43,25 +43,31 @@ class LiveDisplayRenderer:
         self.console = console
         self._live: Live | None = None
         self._content_buffer = ""
+        self._is_paused = False  # Track pause state to avoid redundant operations
+        self._thinking_buffer = ""  # Accumulate thinking text for clean display
 
     def start(self) -> None:
         """Start the Live display."""
         self._live = Live(Markdown(""), console=self.console, refresh_per_second=10)
         self._live.start()
+        self._is_paused = False
 
     def pause(self) -> None:
         """Pause the Live display to show status output."""
-        if self._live:
+        if self._live and not self._is_paused:
             self._live.stop()
+            self._is_paused = True
 
     def resume(self) -> None:
         """Resume the Live display with current content."""
-        self._live = Live(
-            Markdown(self._content_buffer),
-            console=self.console,
-            refresh_per_second=10,
-        )
-        self._live.start()
+        if self._is_paused:
+            self._live = Live(
+                Markdown(self._content_buffer),
+                console=self.console,
+                refresh_per_second=10,
+            )
+            self._live.start()
+            self._is_paused = False
 
     def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
         """Handle tool execution start.
@@ -144,21 +150,26 @@ class LiveDisplayRenderer:
             self._live.update(Markdown(self._content_buffer))
 
     def on_thinking_content(self, text: str) -> None:
-        """Render thinking content as dimmed/italic text.
+        """Accumulate thinking content - will render on thinking_end.
 
         Args:
-            text: Thinking text to display
+            text: Thinking text to accumulate
         """
-        self.pause()
-        render_thinking_text(self.console, text)
+        # Just accumulate - don't print each chunk to avoid duplication
+        self._thinking_buffer += text
 
     def on_thinking_start(self) -> None:
         """Show thinking indicator and pause Live display."""
         self.pause()
+        self._thinking_buffer = ""  # Reset thinking buffer
         render_thinking_indicator(self.console)
 
     def on_thinking_end(self) -> None:
-        """End thinking and resume Live display."""
+        """End thinking - render accumulated content and resume Live display."""
+        # Render the complete accumulated thinking content once
+        if self._thinking_buffer:
+            render_thinking_text(self.console, self._thinking_buffer)
+            self._thinking_buffer = ""
         self.console.print()  # Newline after thinking content
         self.resume()
 
@@ -168,6 +179,11 @@ class LiveDisplayRenderer:
         Returns:
             Accumulated response content
         """
+        # Render any remaining thinking content
+        if self._thinking_buffer:
+            render_thinking_text(self.console, self._thinking_buffer)
+            self._thinking_buffer = ""
+            self.console.print()
         self.cleanup()
         return self._content_buffer
 
@@ -176,3 +192,5 @@ class LiveDisplayRenderer:
         if self._live:
             self._live.stop()
             self._live = None
+        self._is_paused = False
+        self._thinking_buffer = ""

@@ -157,7 +157,12 @@ class SymbolStore:
         "vendor",
     }
 
-    def __init__(self, root_path: str, include_dirs: Optional[List[str]] = None, exclude_dirs: Optional[List[str]] = None):
+    def __init__(
+        self,
+        root_path: str,
+        include_dirs: Optional[List[str]] = None,
+        exclude_dirs: Optional[List[str]] = None,
+    ):
         """Initialize symbol store.
 
         Args:
@@ -167,11 +172,11 @@ class SymbolStore:
         """
         self.root = Path(root_path).resolve()
         self.include_dirs = include_dirs
-        
+
         self.effective_skip_dirs = self.SKIP_DIRS.copy()
         if exclude_dirs:
             self.effective_skip_dirs.update(exclude_dirs)
-            
+
         self._init_db()
 
     @property
@@ -306,8 +311,10 @@ class SymbolStore:
         # Collect all current source files
         current_files: Set[str] = set()
         source_files = []
-        search_paths = [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
-        
+        search_paths = (
+            [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
+        )
+
         for search_path in search_paths:
             if not search_path.is_dir():
                 continue
