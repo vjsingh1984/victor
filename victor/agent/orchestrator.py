@@ -72,6 +72,18 @@ from victor.core.container import (
     LoggerServiceProtocol,
 )
 
+# Service protocols for DI resolution (Phase 10)
+from victor.agent.protocols import (
+    ResponseSanitizerProtocol,
+    ComplexityClassifierProtocol,
+    ActionAuthorizerProtocol,
+    SearchRouterProtocol,
+    ProjectContextProtocol,
+    ArgumentNormalizerProtocol,
+    ConversationStateMachineProtocol,
+    TaskTrackerProtocol,
+)
+
 # Config loaders for externalized configuration
 from victor.config.config_loaders import get_provider_limits
 from victor.agent.conversation_embedding_store import (
@@ -404,8 +416,10 @@ class AgentOrchestrator:
             f"format={self.tool_calling_caps.tool_call_format.value}"
         )
 
-        # Response sanitizer for cleaning model output
-        self.sanitizer = ResponseSanitizer()
+        # Response sanitizer for cleaning model output (DI with fallback)
+        self.sanitizer = (
+            self._container.get_optional(ResponseSanitizerProtocol) or ResponseSanitizer()
+        )
 
         # System prompt builder for provider-specific prompts
         self.prompt_builder = SystemPromptBuilder(
@@ -415,9 +429,11 @@ class AgentOrchestrator:
             capabilities=self.tool_calling_caps,
         )
 
-        # Load project context from .victor/init.md (similar to Claude Code's CLAUDE.md)
-        self.project_context = ProjectContext()
-        self.project_context.load()
+        # Load project context from .victor/init.md (DI with fallback)
+        self.project_context = self._container.get_optional(ProjectContextProtocol)
+        if self.project_context is None:
+            self.project_context = ProjectContext()
+            self.project_context.load()
 
         # Build system prompt using adapter hints
         base_system_prompt = self._build_system_prompt_with_adapter()
@@ -440,10 +456,14 @@ class AgentOrchestrator:
         self.tool_budget = getattr(settings, "tool_call_budget", default_budget)
         self.tool_calls_used = 0
 
-        # Gap implementations: Complexity classifier, action authorizer, search router
-        self.task_classifier = ComplexityClassifier()
-        self.intent_detector = ActionAuthorizer()
-        self.search_router = SearchRouter()
+        # Gap implementations: Complexity classifier, action authorizer, search router (DI with fallback)
+        self.task_classifier = (
+            self._container.get_optional(ComplexityClassifierProtocol) or ComplexityClassifier()
+        )
+        self.intent_detector = (
+            self._container.get_optional(ActionAuthorizerProtocol) or ActionAuthorizer()
+        )
+        self.search_router = self._container.get_optional(SearchRouterProtocol) or SearchRouter()
 
         self.observed_files: List[str] = []
         self.executed_tools: List[str] = []
@@ -597,8 +617,11 @@ class AgentOrchestrator:
                 logger.warning(f"Failed to initialize ConversationStore: {e}")
                 self.memory_manager = None
 
-        # Conversation state machine for intelligent stage detection
-        self.conversation_state = ConversationStateMachine()
+        # Conversation state machine for intelligent stage detection (DI with fallback)
+        self.conversation_state = (
+            self._container.get_optional(ConversationStateMachineProtocol)
+            or ConversationStateMachine()
+        )
 
         # Intent classifier for semantic continuation/completion detection
         # Uses embeddings instead of hardcoded phrase matching
@@ -654,9 +677,11 @@ class AgentOrchestrator:
         if getattr(settings, "plugin_enabled", True):
             self._initialize_plugins()
 
-        # Argument normalizer for handling malformed tool arguments (e.g., Python vs JSON syntax)
-        provider_name = provider.__class__.__name__ if provider else "unknown"
-        self.argument_normalizer = ArgumentNormalizer(provider_name=provider_name)
+        # Argument normalizer for handling malformed tool arguments (DI with fallback)
+        self.argument_normalizer = self._container.get_optional(ArgumentNormalizerProtocol)
+        if self.argument_normalizer is None:
+            provider_name = provider.__class__.__name__ if provider else "unknown"
+            self.argument_normalizer = ArgumentNormalizer(provider_name=provider_name)
 
         # Tool executor for centralized tool execution with retry, caching, and metrics
         # Parse validation mode from settings
@@ -771,9 +796,11 @@ class AgentOrchestrator:
         # Background embedding preload task (ToolSelector owns the _embeddings_initialized state)
         self._embedding_preload_task: Optional[asyncio.Task[None]] = None
 
-        # Initialize UnifiedTaskTracker (single source of truth for task tracking)
+        # Initialize UnifiedTaskTracker (DI with fallback)
         # This is the single source of truth for task progress, milestones, and loop detection
-        self.unified_tracker = UnifiedTaskTracker()
+        self.unified_tracker = (
+            self._container.get_optional(TaskTrackerProtocol) or UnifiedTaskTracker()
+        )
         # Apply model-specific exploration settings
         self.unified_tracker.set_model_exploration_settings(
             exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
