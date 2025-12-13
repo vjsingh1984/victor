@@ -205,6 +205,9 @@ def bootstrap_container(
     # Register signature store
     _register_signature_store(container, settings)
 
+    # Register orchestrator services (Phase 10 DI Migration)
+    _register_orchestrator_services(container, settings)
+
     # Apply overrides for testing
     if override_services:
         for service_type, instance in override_services.items():
@@ -323,6 +326,30 @@ class NullSignatureStore:
 
     def clear_signature(self, tool_name: str, args: Dict[str, Any]) -> bool:
         return False
+
+
+def _register_orchestrator_services(container: ServiceContainer, settings: Settings) -> None:
+    """Register orchestrator-related services.
+
+    Part of Phase 10 DI Migration - registers services used by AgentOrchestrator.
+    This enables:
+    - Type-safe dependency injection for orchestrator components
+    - Easy testing via mock substitution
+    - Proper lifecycle management (singleton vs scoped)
+
+    Args:
+        container: DI container to register services in
+        settings: Application settings
+    """
+    try:
+        from victor.agent.service_provider import configure_orchestrator_services
+
+        configure_orchestrator_services(container, settings)
+        logger.debug("Registered orchestrator services")
+    except Exception as e:
+        # Don't fail bootstrap if orchestrator services can't be registered
+        # The orchestrator will fall back to direct instantiation
+        logger.warning(f"Failed to register orchestrator services: {e}")
 
 
 # =============================================================================
