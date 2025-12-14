@@ -4470,12 +4470,15 @@ class AgentOrchestrator:
         self,
         tools: Any,
         provider_kwargs: Dict[str, Any],
-        start_time: float,
-        stream_metrics: Any,
-        cumulative_usage: Dict[str, int],
+        stream_ctx: "StreamingChatContext",
     ) -> tuple[str, Any, float, bool]:
         """
         Stream response from provider and return the full content, tool_calls, total tokens, and garbage detection flag.
+
+        Args:
+            tools: Available tools for the provider
+            provider_kwargs: Additional kwargs for the provider
+            stream_ctx: The streaming context containing metrics and usage tracking
 
         Returns:
             tuple:
@@ -4507,20 +4510,20 @@ class AgentOrchestrator:
                 continue
 
             full_content += chunk.content
-            stream_metrics.total_chunks += 1
+            stream_ctx.stream_metrics.total_chunks += 1
             if chunk.content:
                 self._record_first_token()
                 total_tokens += len(chunk.content) / 4
-                stream_metrics.total_content_length += len(chunk.content)
+                stream_ctx.stream_metrics.total_content_length += len(chunk.content)
 
             if chunk.tool_calls:
                 logger.debug(f"Received tool_calls in chunk: {chunk.tool_calls}")
                 tool_calls = chunk.tool_calls
-                stream_metrics.tool_calls_count += len(chunk.tool_calls)
+                stream_ctx.stream_metrics.tool_calls_count += len(chunk.tool_calls)
 
             if chunk.usage:
-                for key in cumulative_usage:
-                    cumulative_usage[key] += chunk.usage.get(key, 0)
+                for key in stream_ctx.cumulative_usage:
+                    stream_ctx.cumulative_usage[key] += chunk.usage.get(key, 0)
                 logger.debug(
                     f"Chunk usage: in={chunk.usage.get('prompt_tokens', 0)} "
                     f"out={chunk.usage.get('completion_tokens', 0)} "
@@ -4533,6 +4536,9 @@ class AgentOrchestrator:
         if garbage_detected and not tool_calls:
             logger.info("Setting force_completion due to garbage detection")
             # Caller will set force_completion on return
+
+        # Store total_tokens back to context for later use
+        stream_ctx.total_tokens = total_tokens
 
         return full_content, tool_calls, total_tokens, garbage_detected
 
@@ -4596,16 +4602,12 @@ class AgentOrchestrator:
         # Store context reference for handler delegation methods
         self._current_stream_context = stream_ctx
 
-        # Create local aliases from context for backward compatibility
-        # These will be gradually removed as we migrate to context-based access
-        stream_metrics = stream_ctx.stream_metrics
-        start_time = stream_ctx.start_time
-        total_tokens = stream_ctx.total_tokens
-        cumulative_usage = stream_ctx.cumulative_usage
         # Iteration limits - kept as read-only local references for readability
         # (These are configuration values that don't change during the loop)
         max_total_iterations = stream_ctx.max_total_iterations
         max_exploration_iterations = stream_ctx.max_exploration_iterations
+        # Metrics aliases removed - use stream_ctx.stream_metrics, stream_ctx.start_time,
+        # stream_ctx.total_tokens, stream_ctx.cumulative_usage directly
         # total_iterations removed - use stream_ctx.total_iterations directly
         # force_completion already moved to context-only access (stream_ctx.force_completion)
         unified_task_type = stream_ctx.unified_task_type
@@ -4757,13 +4759,11 @@ class AgentOrchestrator:
                 # Anthropic extended thinking format
                 provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
 
-            full_content, tool_calls, total_tokens, garbage_detected = (
+            full_content, tool_calls, _, garbage_detected = (
                 await self._stream_provider_response(
                     tools=tools,
                     provider_kwargs=provider_kwargs,
-                    start_time=start_time,
-                    stream_metrics=stream_metrics,
-                    cumulative_usage=cumulative_usage,
+                    stream_ctx=stream_ctx,
                 )
             )
 
@@ -4771,7 +4771,7 @@ class AgentOrchestrator:
             content_preview = full_content[:200] if full_content else "(empty)"
             logger.debug(
                 f"_stream_provider_response returned: content_len={len(full_content) if full_content else 0}, "
-                f"native_tool_calls={len(tool_calls) if tool_calls else 0}, tokens={total_tokens}, "
+                f"native_tool_calls={len(tool_calls) if tool_calls else 0}, tokens={stream_ctx.total_tokens}, "
                 f"garbage={garbage_detected}, content_preview={content_preview!r}"
             )
 
@@ -5274,17 +5274,17 @@ class AgentOrchestrator:
                                 yield StreamChunk(content=sanitized)
 
                         # Display performance metrics
-                        elapsed_time = time.time() - start_time
+                        elapsed_time = time.time() - stream_ctx.start_time
 
                         # Build token usage summary
                         # Use actual provider-reported usage if available, else use estimate
-                        if cumulative_usage["total_tokens"] > 0:
+                        if stream_ctx.cumulative_usage["total_tokens"] > 0:
                             # Provider-reported tokens (accurate)
-                            input_tokens = cumulative_usage["prompt_tokens"]
-                            output_tokens = cumulative_usage["completion_tokens"]
-                            _display_tokens = cumulative_usage["total_tokens"]
-                            cache_read = cumulative_usage.get("cache_read_input_tokens", 0)
-                            cache_create = cumulative_usage.get("cache_creation_input_tokens", 0)
+                            input_tokens = stream_ctx.cumulative_usage["prompt_tokens"]
+                            output_tokens = stream_ctx.cumulative_usage["completion_tokens"]
+                            _display_tokens = stream_ctx.cumulative_usage["total_tokens"]
+                            cache_read = stream_ctx.cumulative_usage.get("cache_read_input_tokens", 0)
+                            cache_create = stream_ctx.cumulative_usage.get("cache_creation_input_tokens", 0)
 
                             # Build metrics line
                             tokens_per_second = (
@@ -5308,10 +5308,10 @@ class AgentOrchestrator:
                         else:
                             # Fallback to estimate
                             tokens_per_second = (
-                                total_tokens / elapsed_time if elapsed_time > 0 else 0
+                                stream_ctx.total_tokens / elapsed_time if elapsed_time > 0 else 0
                             )
                             metrics_line = (
-                                f"📊 ~{total_tokens:.0f} tokens (est.) | "
+                                f"📊 ~{stream_ctx.total_tokens:.0f} tokens (est.) | "
                                 f"{elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s"
                             )
 
@@ -5375,9 +5375,9 @@ class AgentOrchestrator:
                     # Finalize and display performance metrics
                     final_metrics = self._finalize_stream_metrics()
                     elapsed_time = (
-                        final_metrics.total_duration if final_metrics else time.time() - start_time
+                        final_metrics.total_duration if final_metrics else time.time() - stream_ctx.start_time
                     )
-                    tokens_per_second = total_tokens / elapsed_time if elapsed_time > 0 else 0
+                    tokens_per_second = stream_ctx.total_tokens / elapsed_time if elapsed_time > 0 else 0
                     ttft_info = ""
                     if final_metrics and final_metrics.time_to_first_token:
                         ttft_info = f" | TTFT: {final_metrics.time_to_first_token:.2f}s"
@@ -5389,7 +5389,7 @@ class AgentOrchestrator:
                         completed=True,
                     )
                     yield StreamChunk(
-                        content=f"\n📊 {total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}\n",
+                        content=f"\n📊 {stream_ctx.total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}\n",
                         is_final=True,
                     )
                     return

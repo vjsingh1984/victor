@@ -132,8 +132,19 @@ _stream_chat_impl (main loop)
 - Removed 20 lines of inline budget/progress logic
 - All 418 tests pass (368 orchestrator + 50 streaming)
 
+### Metrics Aliases Removal (Session 3)
+- Removed `stream_metrics`, `start_time`, `total_tokens`, `cumulative_usage` aliases
+- Modified `_stream_provider_response()` signature to take `stream_ctx` instead of individual values
+- Updated method to use `stream_ctx.stream_metrics`, `stream_ctx.cumulative_usage` directly
+- Updated all usages in `_stream_chat_impl`:
+  - Token display in completion section uses `stream_ctx.cumulative_usage`, `stream_ctx.total_tokens`
+  - Token display in budget-exhausted section uses `stream_ctx.start_time`, `stream_ctx.total_tokens`
+  - Debug log uses `stream_ctx.total_tokens`
+- Net reduction: ~10 lines (removed 4 alias definitions, simplified method signature)
+- All 418 tests pass
+
 ## Next Steps (Future Work)
 
 1. **Increase coverage** - orchestrator.py 55% -> 70%
-2. **Remove remaining aliases** - stream_metrics, start_time, total_tokens, cumulative_usage, etc.
-3. **Extract more logic** - force completion messages, research loop detection
+2. **Extract more logic** - force completion messages, research loop detection
+3. **Remove more aliases** - unified_task_type, task_classification, complexity_tool_budget, coarse_task_type, context_msg, etc.
