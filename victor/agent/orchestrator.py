@@ -4715,16 +4715,13 @@ class AgentOrchestrator:
         # Reset debug logger for new conversation turn
         self.debug_logger.reset()
 
-        # Track quality score for Q-learning outcome recording
-        # (also stored in stream_ctx.last_quality_score)
-        last_quality_score = stream_ctx.last_quality_score
-
-        # Track accumulated content - context-only access
+        # Quality score and content threshold - accessed directly from stream_ctx
+        # Quality updates use stream_ctx.update_quality_score()
         # Content accumulation is handled by stream_ctx.accumulate_content()
-        substantial_content_threshold = stream_ctx.substantial_content_threshold
+        # Aliases removed: last_quality_score, substantial_content_threshold
 
         while True:
-            cancellation_chunk = self._handle_cancellation(last_quality_score)
+            cancellation_chunk = self._handle_cancellation(stream_ctx.last_quality_score)
             if cancellation_chunk:
                 yield cancellation_chunk
                 return
@@ -4773,7 +4770,7 @@ class AgentOrchestrator:
                 max_total_iterations,
                 max_context,
                 stream_ctx.total_iterations,
-                last_quality_score,
+                stream_ctx.last_quality_score,
             )
             if iter_chunk:
                 yield iter_chunk
@@ -5124,7 +5121,8 @@ class AgentOrchestrator:
                         )
                 # Update quality score for Q-learning outcome recording
                 if quality_result:
-                    last_quality_score = quality_result.get("quality_score", last_quality_score)
+                    new_score = quality_result.get("quality_score", stream_ctx.last_quality_score)
+                    stream_ctx.update_quality_score(new_score)
 
             # Check for loop warning using UnifiedTaskTracker (primary)
             # This gives the model a chance to correct behavior before we force stop
@@ -5348,7 +5346,7 @@ class AgentOrchestrator:
                         # Record outcome for Q-learning (normal completion = success)
                         self._record_intelligent_outcome(
                             success=True,
-                            quality_score=last_quality_score,
+                            quality_score=stream_ctx.last_quality_score,
                             user_satisfied=True,
                             completed=True,
                         )
@@ -5413,7 +5411,7 @@ class AgentOrchestrator:
                     # Record outcome for Q-learning (budget reached = partial success)
                     self._record_intelligent_outcome(
                         success=True,  # We provided a summary
-                        quality_score=last_quality_score,
+                        quality_score=stream_ctx.last_quality_score,
                         user_satisfied=True,
                         completed=True,
                     )

@@ -216,6 +216,10 @@ class StreamingChatContext:
         threshold = self.tool_calls_used // 4 if requires_lenient else self.tool_calls_used // 2
         return len(self.unique_resources) >= threshold
 
+    def update_quality_score(self, score: float) -> None:
+        """Update the last quality score."""
+        self.last_quality_score = score
+
 
 @dataclass
 class PreparedStreamContext:
