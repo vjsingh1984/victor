@@ -346,3 +346,171 @@ class TestShouldContinueLoop:
         # Implementation may vary, but typically we let tool calls complete
         # This test documents expected behavior
         assert handler.should_continue_loop(result, ctx) is True
+
+
+class TestCheckNaturalCompletion:
+    """Tests for check_natural_completion method."""
+
+    def test_returns_none_with_tool_calls(self, handler):
+        """Returns None when there are tool calls."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            total_accumulated_chars=1000,
+            substantial_content_threshold=500,
+        )
+        result = handler.check_natural_completion(ctx, has_tool_calls=True, content_length=0)
+        assert result is None
+
+    def test_returns_none_without_substantial_content(self, handler):
+        """Returns None when content below threshold."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            total_accumulated_chars=100,
+            substantial_content_threshold=500,
+        )
+        result = handler.check_natural_completion(ctx, has_tool_calls=False, content_length=0)
+        assert result is None
+
+    def test_returns_break_with_substantial_content(self, handler):
+        """Returns break result when substantial content and no tools."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            total_accumulated_chars=600,
+            substantial_content_threshold=500,
+        )
+        result = handler.check_natural_completion(ctx, has_tool_calls=False, content_length=0)
+        assert result is not None
+        assert result.action == IterationAction.BREAK
+
+
+class TestHandleEmptyResponse:
+    """Tests for handle_empty_response method."""
+
+    def test_returns_none_below_threshold(self, handler):
+        """Returns None when empty responses below threshold."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            consecutive_empty_responses=1,
+        )
+        result = handler.handle_empty_response(ctx)
+        assert result is None
+        assert ctx.consecutive_empty_responses == 2
+
+    def test_returns_result_at_threshold(self, handler, mock_message_adder):
+        """Returns result and forces completion at threshold."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            consecutive_empty_responses=2,  # Will become 3 which is threshold
+        )
+        result = handler.handle_empty_response(ctx)
+        assert result is not None
+        assert result.action == IterationAction.YIELD_AND_CONTINUE
+        assert ctx.force_completion is True
+        assert ctx.consecutive_empty_responses == 0
+        mock_message_adder.add_message.assert_called_once()
+
+
+class TestHandleBlockedToolCall:
+    """Tests for handle_blocked_tool_call method."""
+
+    def test_records_blocked_and_returns_chunk(self, handler, mock_message_adder):
+        """Records blocked attempt and returns notification chunk."""
+        ctx = StreamingChatContext(user_message="test")
+        initial_blocked = ctx.total_blocked_attempts
+
+        chunk = handler.handle_blocked_tool_call(
+            ctx,
+            tool_name="read_file",
+            tool_args={"path": "/blocked"},
+            block_reason="Already tried this 3 times",
+        )
+
+        assert ctx.total_blocked_attempts == initial_blocked + 1
+        assert "⛔" in chunk.content
+        mock_message_adder.add_message.assert_called_once()
+        assert "TOOL BLOCKED" in mock_message_adder.add_message.call_args[0][1]
+
+
+class TestCheckBlockedThreshold:
+    """Tests for check_blocked_threshold method."""
+
+    def test_returns_none_below_threshold(self, handler):
+        """Returns None when below thresholds."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            consecutive_blocked_attempts=1,
+            total_blocked_attempts=2,
+        )
+        result = handler.check_blocked_threshold(
+            ctx, all_blocked=False, consecutive_limit=4, total_limit=6
+        )
+        assert result is None
+
+    def test_returns_result_at_consecutive_threshold(self, handler, mock_message_adder):
+        """Returns result when consecutive blocked reaches limit."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            consecutive_blocked_attempts=3,
+            total_blocked_attempts=3,
+        )
+        result = handler.check_blocked_threshold(
+            ctx, all_blocked=True, consecutive_limit=4, total_limit=10
+        )
+        assert result is not None
+        assert result.clear_tool_calls is True
+        mock_message_adder.add_message.assert_called()
+
+    def test_returns_result_at_total_threshold(self, handler, mock_message_adder):
+        """Returns result when total blocked reaches limit."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            consecutive_blocked_attempts=0,
+            total_blocked_attempts=6,
+        )
+        result = handler.check_blocked_threshold(
+            ctx, all_blocked=False, consecutive_limit=4, total_limit=6
+        )
+        assert result is not None
+        assert result.clear_tool_calls is True
+
+    def test_resets_consecutive_when_not_all_blocked(self, handler):
+        """Resets consecutive counter when some calls succeed."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            consecutive_blocked_attempts=2,
+            total_blocked_attempts=2,
+        )
+        result = handler.check_blocked_threshold(
+            ctx, all_blocked=False, consecutive_limit=4, total_limit=10
+        )
+        assert result is None
+        assert ctx.consecutive_blocked_attempts == 0
+
+
+class TestHandleForceToolExecution:
+    """Tests for handle_force_tool_execution method."""
+
+    def test_first_attempt_prompts_tool_call(self, handler, mock_message_adder):
+        """First attempt prompts for actual tool call."""
+        ctx = StreamingChatContext(user_message="test")
+        result = handler.handle_force_tool_execution(ctx, mentioned_tools=["read_file"])
+
+        assert result is not None
+        assert ctx.force_tool_execution_attempts == 1
+        mock_message_adder.add_message.assert_called_once()
+        call_content = mock_message_adder.add_message.call_args[0][1]
+        assert "read_file" in call_content
+
+    def test_third_attempt_gives_up(self, handler, mock_message_adder):
+        """After 3 attempts, gives up and requests summary."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            force_tool_execution_attempts=2,  # Will become 3
+        )
+        result = handler.handle_force_tool_execution(ctx, mentioned_tools=["search"])
+
+        assert result is not None
+        assert ctx.force_tool_execution_attempts == 0  # Reset
+        # Should have called add_message for "unable to make tool calls"
+        call_content = mock_message_adder.add_message.call_args[0][1]
+        assert "unable to make tool calls" in call_content

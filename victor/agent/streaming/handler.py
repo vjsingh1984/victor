@@ -325,6 +325,202 @@ class StreamingChatHandler:
             return False
         return True
 
+    def check_natural_completion(
+        self, ctx: StreamingChatContext, has_tool_calls: bool, content_length: int
+    ) -> Optional[IterationResult]:
+        """Check if the response represents natural completion (substantial content, no tools).
+
+        When the model has provided substantial content without tool calls after
+        an empty response, treat it as natural completion rather than continuing
+        to attempt recovery.
+
+        Args:
+            ctx: The streaming context
+            has_tool_calls: Whether there are pending tool calls
+            content_length: Length of current response content
+
+        Returns:
+            IterationResult to break if natural completion, None otherwise
+        """
+        if not has_tool_calls and ctx.has_substantial_content():
+            logger.info(
+                f"Model returned empty after {ctx.total_accumulated_chars} chars of content - "
+                "treating as natural completion (skipping recovery)"
+            )
+            return create_break_result("")
+        return None
+
+    def handle_empty_response(
+        self, ctx: StreamingChatContext
+    ) -> Optional[IterationResult]:
+        """Handle an empty response from the model.
+
+        Tracks consecutive empty responses and forces summary if threshold exceeded.
+
+        Args:
+            ctx: The streaming context
+
+        Returns:
+            IterationResult if threshold exceeded and summary forced, None otherwise
+        """
+        threshold_exceeded = ctx.record_empty_response()
+        if threshold_exceeded:
+            logger.warning(
+                f"Model stuck with {ctx.consecutive_empty_responses} consecutive "
+                "empty responses - forcing summary"
+            )
+            result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
+            result.add_chunk(
+                StreamChunk(
+                    content="\n[recovery] Forcing summary after repeated empty responses\n"
+                )
+            )
+            # Add strong instruction to summarize
+            self.message_adder.add_message(
+                "user",
+                "You seem to be stuck. Please provide a summary of what you have found so far. "
+                "DO NOT call any more tools - just summarize the information you have already gathered.",
+            )
+            ctx.reset_empty_responses()
+            ctx.force_completion = True
+            return result
+        return None
+
+    def handle_blocked_tool_call(
+        self,
+        ctx: StreamingChatContext,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        block_reason: str,
+    ) -> StreamChunk:
+        """Handle a blocked tool call by recording it and generating feedback.
+
+        Args:
+            ctx: The streaming context
+            tool_name: Name of the blocked tool
+            tool_args: Arguments that were passed
+            block_reason: Reason the tool was blocked
+
+        Returns:
+            StreamChunk with block notification
+        """
+        ctx.record_tool_blocked()
+        logger.debug(f"BLOCKED tool call: {tool_name}({tool_args}) - {block_reason}")
+
+        # Add tool result feedback
+        args_summary = ", ".join(f"{k}={repr(v)[:30]}" for k, v in tool_args.items())
+        self.message_adder.add_message(
+            "user",
+            f"⛔ TOOL BLOCKED: {tool_name}({args_summary})\n\n"
+            f"Reason: {block_reason}\n\n"
+            "This operation was permanently blocked because you already tried it multiple times. "
+            "You MUST use a DIFFERENT approach - this exact operation will NEVER work again.",
+        )
+
+        return StreamChunk(content=f"\n[loop] ⛔ {block_reason}\n")
+
+    def check_blocked_threshold(
+        self,
+        ctx: StreamingChatContext,
+        all_blocked: bool,
+        consecutive_limit: int = 4,
+        total_limit: int = 6,
+    ) -> Optional[IterationResult]:
+        """Check if blocked tool attempts have exceeded thresholds.
+
+        Args:
+            ctx: The streaming context
+            all_blocked: Whether all tool calls in this iteration were blocked
+            consecutive_limit: Threshold for consecutive blocked attempts
+            total_limit: Threshold for total blocked attempts
+
+        Returns:
+            IterationResult if force completion triggered, None otherwise
+        """
+        if all_blocked:
+            ctx.consecutive_blocked_attempts += 1
+            if ctx.consecutive_blocked_attempts >= consecutive_limit:
+                logger.warning(
+                    f"Model stuck after {ctx.consecutive_blocked_attempts} consecutive "
+                    f"blocked attempts (limit: {consecutive_limit}) - forcing completion"
+                )
+                return self._create_blocked_force_result(ctx)
+        else:
+            ctx.reset_blocked_attempts()
+
+        if ctx.total_blocked_attempts >= total_limit:
+            logger.warning(
+                f"Model stuck after {ctx.total_blocked_attempts} total blocked attempts "
+                f"(limit: {total_limit}) - forcing completion"
+            )
+            return self._create_blocked_force_result(ctx)
+
+        return None
+
+    def _create_blocked_force_result(
+        self, ctx: StreamingChatContext
+    ) -> IterationResult:
+        """Create a force completion result due to blocked attempts.
+
+        Args:
+            ctx: The streaming context
+
+        Returns:
+            IterationResult with force completion
+        """
+        result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
+        result.add_chunk(
+            StreamChunk(
+                content="\n[loop] ⚠️ Multiple blocked attempts - forcing completion\n"
+            )
+        )
+        self.message_adder.add_message(
+            "user",
+            "⚠️ STOP: You have attempted blocked operations too many times. "
+            "You MUST now provide your final response WITHOUT any tool calls. "
+            "Summarize what you found and answer the user's question based on "
+            "the information you have already gathered. DO NOT call any more tools.",
+        )
+        ctx.reset_blocked_attempts()
+        # Signal that tool_calls should be cleared
+        result.clear_tool_calls = True
+        return result
+
+    def handle_force_tool_execution(
+        self, ctx: StreamingChatContext, mentioned_tools: List[str]
+    ) -> Optional[IterationResult]:
+        """Handle forcing tool execution when model mentions tools without calling them.
+
+        Args:
+            ctx: The streaming context
+            mentioned_tools: Tools that were mentioned but not executed
+
+        Returns:
+            IterationResult with appropriate action, None if not applicable
+        """
+        attempt_count = ctx.record_force_tool_attempt()
+
+        if attempt_count >= 3:
+            logger.warning(
+                "Giving up on forced tool execution after 3 attempts - requesting summary"
+            )
+            self.message_adder.add_message(
+                "user",
+                "You are unable to make tool calls. Please provide your response "
+                "NOW based on what you know. Do not mention any tools.",
+            )
+            ctx.reset_force_tool_attempts()
+            return create_continue_result()
+
+        tools_str = ", ".join(mentioned_tools)
+        self.message_adder.add_message(
+            "user",
+            f"You mentioned using {tools_str} but did not actually call the tool(s). "
+            "Please make the actual tool call now, or provide your final answer without "
+            "mentioning tools you cannot use.",
+        )
+        return create_continue_result()
+
 
 def create_streaming_handler(
     settings: "Settings",

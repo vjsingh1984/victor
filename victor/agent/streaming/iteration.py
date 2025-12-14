@@ -51,6 +51,7 @@ class IterationResult:
     error: Optional[str] = None
     quality_score: float = 0.5
     tokens_used: float = 0.0
+    clear_tool_calls: bool = False  # Signal to clear pending tool calls
 
     @property
     def should_break(self) -> bool:

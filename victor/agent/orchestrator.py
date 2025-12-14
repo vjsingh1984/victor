@@ -51,7 +51,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, AsyncIterator, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 from rich.console import Console
 
@@ -4212,6 +4212,97 @@ class AgentOrchestrator:
         result = self._streaming_handler.check_iteration_limit(stream_ctx)
         if result and result.chunks:
             return result.chunks[0]
+        return None
+
+    def _check_natural_completion_with_handler(
+        self,
+        stream_ctx: StreamingChatContext,
+        has_tool_calls: bool,
+        content_length: int,
+    ) -> Optional[StreamChunk]:
+        """Check for natural completion using the streaming handler.
+
+        Args:
+            stream_ctx: The streaming context
+            has_tool_calls: Whether there are tool calls
+            content_length: Length of current content
+
+        Returns:
+            StreamChunk if natural completion detected, None otherwise
+        """
+        result = self._streaming_handler.check_natural_completion(
+            stream_ctx, has_tool_calls, content_length
+        )
+        if result:
+            return StreamChunk(content="", is_final=True)
+        return None
+
+    def _handle_empty_response_with_handler(
+        self,
+        stream_ctx: StreamingChatContext,
+    ) -> Optional[StreamChunk]:
+        """Handle empty response using the streaming handler.
+
+        Args:
+            stream_ctx: The streaming context
+
+        Returns:
+            StreamChunk if threshold exceeded and recovery triggered, None otherwise
+        """
+        result = self._streaming_handler.handle_empty_response(stream_ctx)
+        if result and result.chunks:
+            return result.chunks[0]
+        return None
+
+    def _handle_blocked_tool_with_handler(
+        self,
+        stream_ctx: StreamingChatContext,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        block_reason: str,
+    ) -> StreamChunk:
+        """Handle blocked tool call using the streaming handler.
+
+        Args:
+            stream_ctx: The streaming context
+            tool_name: Name of blocked tool
+            tool_args: Arguments that were passed
+            block_reason: Reason for blocking
+
+        Returns:
+            StreamChunk with block notification
+        """
+        return self._streaming_handler.handle_blocked_tool_call(
+            stream_ctx, tool_name, tool_args, block_reason
+        )
+
+    def _check_blocked_threshold_with_handler(
+        self,
+        stream_ctx: StreamingChatContext,
+        all_blocked: bool,
+    ) -> Optional[Tuple[StreamChunk, bool]]:
+        """Check blocked threshold using the streaming handler.
+
+        Args:
+            stream_ctx: The streaming context
+            all_blocked: Whether all tool calls were blocked
+
+        Returns:
+            Tuple of (chunk, should_clear_tools) if threshold exceeded, None otherwise
+        """
+        consecutive_limit = getattr(
+            self.settings, "recovery_blocked_consecutive_threshold", 4
+        )
+        total_limit = getattr(self.settings, "recovery_blocked_total_threshold", 6)
+
+        result = self._streaming_handler.check_blocked_threshold(
+            stream_ctx, all_blocked, consecutive_limit, total_limit
+        )
+        if result:
+            chunk = result.chunks[0] if result.chunks else StreamChunk(
+                content="\n[loop] ⚠️ Multiple blocked attempts - forcing completion\n"
+            )
+            return (chunk, result.clear_tool_calls)
         return None
 
     def _parse_and_validate_tool_calls(

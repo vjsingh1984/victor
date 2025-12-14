@@ -4975,3 +4975,130 @@ class TestStreamingHandlerProperty:
         """Test that handler has settings configured."""
         handler = orchestrator.streaming_handler
         assert handler.settings is not None
+
+
+class TestCheckNaturalCompletionWithHandler:
+    """Tests for _check_natural_completion_with_handler method."""
+
+    def test_returns_none_with_tool_calls(self, orchestrator):
+        """Returns None when there are tool calls."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.total_accumulated_chars = 1000
+        ctx.substantial_content_threshold = 500
+
+        result = orchestrator._check_natural_completion_with_handler(
+            ctx, has_tool_calls=True, content_length=0
+        )
+        assert result is None
+
+    def test_returns_none_below_threshold(self, orchestrator):
+        """Returns None when below content threshold."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.total_accumulated_chars = 100
+        ctx.substantial_content_threshold = 500
+
+        result = orchestrator._check_natural_completion_with_handler(
+            ctx, has_tool_calls=False, content_length=0
+        )
+        assert result is None
+
+    def test_returns_chunk_for_natural_completion(self, orchestrator):
+        """Returns final chunk when natural completion detected."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.total_accumulated_chars = 600
+        ctx.substantial_content_threshold = 500
+
+        result = orchestrator._check_natural_completion_with_handler(
+            ctx, has_tool_calls=False, content_length=0
+        )
+        assert result is not None
+        assert result.is_final is True
+
+
+class TestHandleEmptyResponseWithHandler:
+    """Tests for _handle_empty_response_with_handler method."""
+
+    def test_returns_none_below_threshold(self, orchestrator):
+        """Returns None when empty responses below threshold."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.consecutive_empty_responses = 1
+
+        result = orchestrator._handle_empty_response_with_handler(ctx)
+        assert result is None
+        assert ctx.consecutive_empty_responses == 2
+
+    def test_returns_chunk_at_threshold(self, orchestrator):
+        """Returns recovery chunk at threshold."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.consecutive_empty_responses = 2  # Will become 3 at threshold
+
+        result = orchestrator._handle_empty_response_with_handler(ctx)
+        assert result is not None
+        assert ctx.force_completion is True
+
+
+class TestHandleBlockedToolWithHandler:
+    """Tests for _handle_blocked_tool_with_handler method."""
+
+    def test_returns_block_notification_chunk(self, orchestrator):
+        """Returns chunk with block notification."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        initial_blocked = ctx.total_blocked_attempts
+
+        chunk = orchestrator._handle_blocked_tool_with_handler(
+            ctx,
+            tool_name="read_file",
+            tool_args={"path": "/blocked"},
+            block_reason="Already tried 3 times",
+        )
+
+        assert ctx.total_blocked_attempts == initial_blocked + 1
+        assert "⛔" in chunk.content
+
+
+class TestCheckBlockedThresholdWithHandler:
+    """Tests for _check_blocked_threshold_with_handler method."""
+
+    def test_returns_none_below_threshold(self, orchestrator):
+        """Returns None when below thresholds."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.consecutive_blocked_attempts = 1
+        ctx.total_blocked_attempts = 2
+
+        result = orchestrator._check_blocked_threshold_with_handler(
+            ctx, all_blocked=False
+        )
+        assert result is None
+
+    def test_returns_tuple_at_threshold(self, orchestrator):
+        """Returns tuple of chunk and clear flag at threshold."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.consecutive_blocked_attempts = 3
+        ctx.total_blocked_attempts = 3
+
+        # Override settings thresholds for test
+        orchestrator.settings.recovery_blocked_consecutive_threshold = 4
+        orchestrator.settings.recovery_blocked_total_threshold = 10
+
+        result = orchestrator._check_blocked_threshold_with_handler(
+            ctx, all_blocked=True
+        )
+        assert result is not None
+        chunk, should_clear = result
+        assert should_clear is True
