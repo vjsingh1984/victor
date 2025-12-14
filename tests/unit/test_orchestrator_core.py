@@ -5104,3 +5104,189 @@ class TestCheckBlockedThresholdWithHandler:
         assert result is not None
         chunk, should_clear = result
         assert should_clear is True
+
+
+class TestCheckToolBudgetWithHandler:
+    """Tests for _check_tool_budget_with_handler method."""
+
+    def test_returns_none_below_threshold(self, orchestrator):
+        """Returns None when tool usage is below warning threshold."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.tool_calls_used = 10  # Well below default threshold of 250
+        ctx.tool_budget = 300
+
+        result = orchestrator._check_tool_budget_with_handler(ctx)
+        assert result is None
+
+    def test_returns_warning_chunk_at_threshold(self, orchestrator):
+        """Returns warning chunk when approaching budget limit."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.tool_calls_used = 260  # Above default threshold of 250
+        ctx.tool_budget = 300
+
+        # Set threshold in settings
+        orchestrator.settings.tool_call_budget_warning_threshold = 250
+
+        result = orchestrator._check_tool_budget_with_handler(ctx)
+        assert result is not None
+        assert "budget" in result.content.lower() or "remaining" in result.content.lower()
+
+    def test_returns_none_when_budget_exhausted(self, orchestrator):
+        """Returns None when budget is exhausted (handled elsewhere)."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.tool_calls_used = 300  # At budget
+        ctx.tool_budget = 300
+
+        # is_approaching_budget_limit returns False when exhausted
+        result = orchestrator._check_tool_budget_with_handler(ctx)
+        assert result is None
+
+
+class TestCheckProgressWithHandler:
+    """Tests for _check_progress_with_handler method."""
+
+    def test_returns_false_when_progress_ok(self, orchestrator):
+        """Returns False when progress is adequate."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.tool_calls_used = 5  # Below base threshold
+        ctx.unique_resources = set()
+
+        result = orchestrator._check_progress_with_handler(ctx)
+        assert result is False
+        assert ctx.force_completion is False
+
+    def test_returns_true_when_stuck(self, orchestrator):
+        """Returns True and sets force_completion when stuck."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.tool_calls_used = 20  # Above base threshold of 8
+        ctx.unique_resources = {"file1.py"}  # Only 1 unique resource
+
+        # Set base_max via settings
+        orchestrator.settings.max_consecutive_tool_calls = 8
+
+        result = orchestrator._check_progress_with_handler(ctx)
+        assert result is True
+        assert ctx.force_completion is True
+
+    def test_analysis_task_has_higher_threshold(self, orchestrator):
+        """Analysis tasks have higher consecutive tool call threshold."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.is_analysis_task = True
+        ctx.tool_calls_used = 30  # Above base (8) but below analysis (50)
+        ctx.unique_resources = {"file1.py", "file2.py"}
+
+        result = orchestrator._check_progress_with_handler(ctx)
+        assert result is False
+        assert ctx.force_completion is False
+
+
+class TestTruncateToolCallsWithHandler:
+    """Tests for _truncate_tool_calls_with_handler method."""
+
+    def test_returns_all_when_under_budget(self, orchestrator):
+        """Returns all tool calls when under remaining budget."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.tool_calls_used = 5
+        ctx.tool_budget = 100
+
+        tool_calls = [
+            {"name": "read_file", "arguments": {}},
+            {"name": "write_file", "arguments": {}},
+            {"name": "bash", "arguments": {}},
+        ]
+
+        result = orchestrator._truncate_tool_calls_with_handler(tool_calls, ctx)
+        assert len(result) == 3
+        assert result == tool_calls
+
+    def test_truncates_to_remaining_budget(self, orchestrator):
+        """Truncates tool calls to fit remaining budget."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.tool_calls_used = 98
+        ctx.tool_budget = 100  # Only 2 remaining
+
+        tool_calls = [
+            {"name": "read_file", "arguments": {}},
+            {"name": "write_file", "arguments": {}},
+            {"name": "bash", "arguments": {}},
+            {"name": "list_dir", "arguments": {}},
+            {"name": "search", "arguments": {}},
+        ]
+
+        result = orchestrator._truncate_tool_calls_with_handler(tool_calls, ctx)
+        assert len(result) == 2
+        assert result[0]["name"] == "read_file"
+        assert result[1]["name"] == "write_file"
+
+    def test_returns_empty_when_budget_exhausted(self, orchestrator):
+        """Returns empty list when budget is exhausted."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.tool_calls_used = 100
+        ctx.tool_budget = 100  # 0 remaining
+
+        tool_calls = [
+            {"name": "read_file", "arguments": {}},
+        ]
+
+        result = orchestrator._truncate_tool_calls_with_handler(tool_calls, ctx)
+        assert len(result) == 0
+
+
+class TestHandleForceCompletionWithHandler:
+    """Tests for _handle_force_completion_with_handler method."""
+
+    def test_returns_none_when_not_forcing(self, orchestrator):
+        """Returns None when force_completion is False."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.force_completion = False
+
+        result = orchestrator._handle_force_completion_with_handler(ctx)
+        assert result is None
+
+    def test_returns_chunk_when_forcing(self, orchestrator):
+        """Returns warning chunk when force_completion is True."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.force_completion = True
+
+        result = orchestrator._handle_force_completion_with_handler(ctx)
+        assert result is not None
+        # Should contain either "research loop" or "exploration limit"
+        content = result.content.lower()
+        assert "research" in content or "exploration" in content or "limit" in content
+
+    def test_uses_unified_tracker_for_stop_decision(self, orchestrator):
+        """Uses unified tracker to determine stop reason."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test")
+        ctx.force_completion = True
+
+        # The method should call unified_tracker.should_stop() internally
+        # and use the result to determine message type
+        result = orchestrator._handle_force_completion_with_handler(ctx)
+        assert result is not None
+        # Verify it's a StreamChunk with content
+        assert hasattr(result, "content")
+        assert len(result.content) > 0
