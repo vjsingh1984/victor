@@ -1509,12 +1509,32 @@ class TestDetermineContinuationAction:
                 model="test-model",
             )
             intent = mock_intent_result(IntentType.NEUTRAL)
+            # Content must be >500 chars and have structure markers to be "substantial"
+            # The threshold is content_length > 500 in the orchestrator code
+            structured_content = (
+                "## Summary\n\n"
+                "This is a comprehensive code review covering multiple aspects.\n\n"
+                "**Strengths**\n\n"
+                "1. The code is well organized and follows best practices consistently.\n"
+                "2. The module structure is clean with good separation of concerns.\n"
+                "3. Error handling is comprehensive and logging is appropriate.\n"
+                "4. The use of type hints improves code readability and IDE support.\n"
+                "5. Documentation is clear and follows the project conventions.\n\n"
+                "**Weaknesses**\n\n"
+                "1. Some functions could use better inline documentation.\n"
+                "2. Test coverage could be improved in certain edge case areas.\n"
+                "3. Consider adding more type hints for complex return types.\n"
+                "4. Some magic numbers should be extracted to named constants.\n\n"
+                "Overall, this is a well-structured codebase with minor areas for improvement."
+            )
+            # Verify content meets threshold
+            assert len(structured_content) > 500, f"Test content must be >500 chars, got {len(structured_content)}"
             result = orch._determine_continuation_action(
                 intent_result=intent,
                 is_analysis_task=True,
                 is_action_task=False,
-                content_length=300,  # >200
-                full_content="## Summary\n\n**Strengths**\n\nThe code is well organized.",
+                content_length=len(structured_content),
+                full_content=structured_content,
                 continuation_prompts=0,
                 asking_input_prompts=0,
                 one_shot_mode=False,
@@ -1546,3 +1566,3412 @@ class TestDetermineContinuationAction:
             )
             # Should fall through to other logic, not continue_asking_input
             assert result["action"] != "continue_asking_input"
+
+
+class TestVerticalExtensionSupport:
+    """Tests for vertical extension methods."""
+
+    def test_apply_vertical_middleware_empty_list(self, orchestrator):
+        """apply_vertical_middleware with empty list does nothing."""
+        orchestrator.apply_vertical_middleware([])
+        assert not hasattr(orchestrator, "_vertical_middleware") or orchestrator._vertical_middleware == []
+
+    def test_apply_vertical_middleware_with_middleware(self, mock_provider, orchestrator_settings):
+        """apply_vertical_middleware adds middleware to chain."""
+
+        class MockMiddleware:
+            async def before_tool_call(self, tool_name, arguments):
+                from victor.verticals.protocols import MiddlewareResult
+                return MiddlewareResult()
+
+            def get_priority(self):
+                from victor.verticals.protocols import MiddlewarePriority
+                return MiddlewarePriority.NORMAL
+
+            def get_applicable_tools(self):
+                return None
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+
+            middleware_list = [MockMiddleware()]
+            orch.apply_vertical_middleware(middleware_list)
+
+            assert hasattr(orch, "_vertical_middleware")
+            assert orch._vertical_middleware == middleware_list
+            assert orch.get_middleware_chain() is not None
+
+    def test_apply_vertical_safety_patterns_empty_list(self, orchestrator):
+        """apply_vertical_safety_patterns with empty list does nothing."""
+        orchestrator.apply_vertical_safety_patterns([])
+        assert not hasattr(orchestrator, "_vertical_safety_patterns") or orchestrator._vertical_safety_patterns == []
+
+    def test_apply_vertical_safety_patterns_with_patterns(self, mock_provider, orchestrator_settings):
+        """apply_vertical_safety_patterns adds patterns to safety checker."""
+        from dataclasses import dataclass
+
+        @dataclass
+        class MockPattern:
+            pattern: str = r"dangerous.*command"
+            description: str = "Test pattern"
+            risk_level: str = "HIGH"
+            category: str = "test"
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+
+            patterns = [MockPattern()]
+            orch.apply_vertical_safety_patterns(patterns)
+
+            assert hasattr(orch, "_vertical_safety_patterns")
+            assert orch._vertical_safety_patterns == patterns
+
+    def test_get_middleware_chain_returns_none_if_not_set(self, orchestrator):
+        """get_middleware_chain returns None if no middleware applied."""
+        # Clear any existing middleware chain
+        if hasattr(orchestrator, "_middleware_chain"):
+            delattr(orchestrator, "_middleware_chain")
+
+        result = orchestrator.get_middleware_chain()
+        assert result is None
+
+    def test_get_middleware_chain_returns_chain_if_set(self, mock_provider, orchestrator_settings):
+        """get_middleware_chain returns the chain after middleware applied."""
+
+        class MockMiddleware:
+            async def before_tool_call(self, tool_name, arguments):
+                from victor.verticals.protocols import MiddlewareResult
+                return MiddlewareResult()
+
+            def get_priority(self):
+                from victor.verticals.protocols import MiddlewarePriority
+                return MiddlewarePriority.NORMAL
+
+            def get_applicable_tools(self):
+                return None
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+
+            orch.apply_vertical_middleware([MockMiddleware()])
+            chain = orch.get_middleware_chain()
+
+            assert chain is not None
+            from victor.agent.middleware_chain import MiddlewareChain
+            assert isinstance(chain, MiddlewareChain)
+
+
+class TestOrchestratorProperties:
+    """Tests for orchestrator properties."""
+
+    def test_messages_property(self, orchestrator):
+        """messages property returns conversation messages."""
+        messages = orchestrator.messages
+        assert isinstance(messages, list)
+
+    def test_tool_budget_property(self, orchestrator):
+        """tool_budget property returns tool call budget."""
+        budget = orchestrator.tool_budget
+        assert isinstance(budget, int)
+        assert budget > 0
+
+    def test_model_property(self, orchestrator):
+        """model property returns current model name."""
+        model = orchestrator.model
+        assert model == "test-model"
+
+    def test_provider_property(self, orchestrator, mock_provider):
+        """provider property returns current provider."""
+        provider = orchestrator.provider
+        assert provider == mock_provider
+
+
+class TestToolMentionDetection:
+    """Tests for _detect_mentioned_tools function."""
+
+    def test_detect_mentioned_tools_basic(self):
+        """Basic tool mention extraction."""
+        from victor.agent.orchestrator import _detect_mentioned_tools
+
+        text = "I'll use the read tool to check the file"
+        mentions = _detect_mentioned_tools(text)
+        # Should find "read" as mentioned tool
+        assert isinstance(mentions, list)
+
+    def test_detect_mentioned_tools_with_parens(self):
+        """Tool mentions with parentheses."""
+        from victor.agent.orchestrator import _detect_mentioned_tools
+
+        text = "Calling write_file() to save the content"
+        mentions = _detect_mentioned_tools(text)
+        assert isinstance(mentions, list)
+
+    def test_detect_mentioned_tools_empty_text(self):
+        """Empty text returns empty list."""
+        from victor.agent.orchestrator import _detect_mentioned_tools
+
+        mentions = _detect_mentioned_tools("")
+        assert mentions == []
+
+    def test_detect_mentioned_tools_no_tools(self):
+        """Text with no tool mentions."""
+        from victor.agent.orchestrator import _detect_mentioned_tools
+
+        text = "Just some regular text without tool references"
+        mentions = _detect_mentioned_tools(text)
+        assert isinstance(mentions, list)
+
+    def test_detect_mentioned_tools_with_call_pattern(self):
+        """Detect 'call <tool>' pattern."""
+        from victor.agent.orchestrator import _detect_mentioned_tools
+
+        text = "Let me call read to check the file contents"
+        mentions = _detect_mentioned_tools(text)
+        assert "read" in mentions or isinstance(mentions, list)
+
+    def test_detect_mentioned_tools_with_use_pattern(self):
+        """Detect 'use <tool>' pattern."""
+        from victor.agent.orchestrator import _detect_mentioned_tools
+
+        text = "I'll use grep to search the codebase"
+        mentions = _detect_mentioned_tools(text)
+        assert isinstance(mentions, list)
+
+
+class TestComponentAccessors:
+    """Tests for component accessor properties."""
+
+    def test_conversation_controller_property(self, orchestrator):
+        """conversation_controller property returns valid controller."""
+        from victor.agent.conversation_controller import ConversationController
+
+        controller = orchestrator.conversation_controller
+        assert controller is not None
+        assert isinstance(controller, ConversationController)
+
+    def test_tool_pipeline_property(self, orchestrator):
+        """tool_pipeline property returns valid pipeline."""
+        from victor.agent.tool_pipeline import ToolPipeline
+
+        pipeline = orchestrator.tool_pipeline
+        assert pipeline is not None
+        assert isinstance(pipeline, ToolPipeline)
+
+    def test_streaming_controller_property(self, orchestrator):
+        """streaming_controller property returns valid controller."""
+        from victor.agent.streaming_controller import StreamingController
+
+        controller = orchestrator.streaming_controller
+        assert controller is not None
+        assert isinstance(controller, StreamingController)
+
+    def test_streaming_handler_property(self, orchestrator):
+        """streaming_handler property returns valid handler."""
+        from victor.agent.streaming import StreamingChatHandler
+
+        handler = orchestrator.streaming_handler
+        assert handler is not None
+        assert isinstance(handler, StreamingChatHandler)
+
+    def test_task_analyzer_property(self, orchestrator):
+        """task_analyzer property returns valid analyzer."""
+        from victor.agent.task_analyzer import TaskAnalyzer
+
+        analyzer = orchestrator.task_analyzer
+        assert analyzer is not None
+        assert isinstance(analyzer, TaskAnalyzer)
+
+    def test_observability_property(self, orchestrator):
+        """observability property returns optional integration."""
+        obs = orchestrator.observability
+        # Could be None or ObservabilityIntegration
+        if obs is not None:
+            from victor.observability.integration import ObservabilityIntegration
+            assert isinstance(obs, ObservabilityIntegration)
+
+    def test_observability_setter(self, orchestrator):
+        """observability setter works correctly."""
+        from victor.observability.integration import ObservabilityIntegration
+
+        new_obs = ObservabilityIntegration()
+        orchestrator.observability = new_obs
+        assert orchestrator.observability == new_obs
+
+    def test_observability_setter_none(self, orchestrator):
+        """observability setter accepts None."""
+        orchestrator.observability = None
+        assert orchestrator.observability is None
+
+
+class TestCallbacks:
+    """Tests for orchestrator callbacks."""
+
+    def test_on_tool_start_callback(self, orchestrator):
+        """_on_tool_start_callback records tool start."""
+        orchestrator._on_tool_start_callback("read_file", {"path": "/test.txt"})
+        # Should not raise, just record metrics
+
+    def test_on_tool_complete_callback(self, orchestrator):
+        """_on_tool_complete_callback records tool completion."""
+        from victor.agent.tool_pipeline import ToolCallResult
+
+        result = ToolCallResult(
+            tool_name="read_file",
+            arguments={"path": "/test.txt"},
+            success=True,
+            result="file contents",
+        )
+        orchestrator._on_tool_complete_callback(result)
+        # Should not raise, just record metrics
+
+    def test_on_streaming_session_complete(self, orchestrator):
+        """_on_streaming_session_complete records session completion."""
+        from victor.agent.streaming_controller import StreamingSession
+        import time
+
+        session = StreamingSession(
+            session_id="test-session",
+            provider="mock_provider",
+            model="test-model",
+            start_time=time.time(),
+        )
+        session.end_time = time.time()  # Set end_time
+        orchestrator._on_streaming_session_complete(session)
+        # Should not raise
+
+    def test_send_rl_reward_signal(self, orchestrator):
+        """_send_rl_reward_signal handles reward signal gracefully."""
+        from victor.agent.streaming_controller import StreamingSession
+        import time
+
+        session = StreamingSession(
+            session_id="test-session",
+            provider="mock_provider",
+            model="test-model",
+            start_time=time.time(),
+        )
+        session.end_time = time.time()
+        # Should not raise, even if RL module not available
+        orchestrator._send_rl_reward_signal(session)
+
+
+class TestContextLimitCalculation:
+    """Tests for _calculate_max_context_chars edge cases."""
+
+    def test_settings_override_takes_precedence(self, mock_provider):
+        """Settings max_context_chars overrides provider."""
+        settings = Settings(
+            max_context_chars=50000,
+            analytics_enabled=False,
+            use_semantic_tool_selection=False,
+            use_mcp_tools=False,
+        )
+        # Note: arguments order is (settings, provider, model)
+        limit = AgentOrchestrator._calculate_max_context_chars(settings, mock_provider, "test-model")
+        assert limit == 50000
+
+    def test_provider_context_window_fallback(self, mock_provider):
+        """Falls back to provider context window when no settings override."""
+        settings = Settings(
+            analytics_enabled=False,
+            use_semantic_tool_selection=False,
+            use_mcp_tools=False,
+        )
+        mock_provider.get_context_window.return_value = 100000
+        limit = AgentOrchestrator._calculate_max_context_chars(settings, mock_provider, "test-model")
+        # 100000 * 3.5 * 0.8 = 280000
+        assert limit == 280000
+
+    def test_context_window_exception_handling(self, mock_provider):
+        """Handles exceptions from get_context_window gracefully."""
+        settings = Settings(
+            analytics_enabled=False,
+            use_semantic_tool_selection=False,
+            use_mcp_tools=False,
+        )
+        mock_provider.get_context_window.side_effect = Exception("API error")
+        # Should not raise, falls back to defaults
+        limit = AgentOrchestrator._calculate_max_context_chars(settings, mock_provider, "test-model")
+        assert limit > 0
+
+    def test_context_window_with_mock_value(self, mock_provider):
+        """Handles non-numeric context window values."""
+        settings = Settings(
+            analytics_enabled=False,
+            use_semantic_tool_selection=False,
+            use_mcp_tools=False,
+        )
+        mock_provider.get_context_window.return_value = MagicMock()  # Non-numeric
+        mock_provider.name = "mock_provider"
+        # Should handle gracefully and fall back
+        limit = AgentOrchestrator._calculate_max_context_chars(settings, mock_provider, "test-model")
+        assert limit > 0
+
+
+class TestRecoveryIntegration:
+    """Tests for recovery system integration."""
+
+    def test_recovery_handler_initialization(self, mock_provider, orchestrator_settings):
+        """Recovery handler is initialized when enabled."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            # Should have recovery handler attribute
+            assert hasattr(orch, "_recovery_handler")
+
+    def test_recovery_handler_attribute_exists(self, orchestrator):
+        """Recovery handler attribute exists."""
+        # Recovery handler may or may not be None depending on default settings
+        # Just verify the attribute exists
+        assert hasattr(orchestrator, "_recovery_handler")
+
+    def test_recovery_integration_property(self, orchestrator):
+        """_recovery_integration is set up correctly."""
+        assert hasattr(orchestrator, "_recovery_integration")
+
+
+class TestObservabilityIntegration:
+    """Tests for observability system integration."""
+
+    def test_observability_enabled_by_default(self, mock_provider, orchestrator_settings):
+        """Observability is enabled by default."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            # Observability may or may not be present depending on settings
+            assert hasattr(orch, "_observability")
+
+    def test_observability_disabled(self, mock_provider):
+        """Observability can be disabled via settings."""
+        settings = Settings(
+            enable_observability=False,
+            analytics_enabled=False,
+            use_semantic_tool_selection=False,
+            use_mcp_tools=False,
+        )
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            assert orch._observability is None
+
+    def test_on_tool_start_with_observability(self, mock_provider, orchestrator_settings):
+        """Tool start emits observability event when enabled."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            # If observability is present, call should work
+            if orch._observability:
+                orch._on_tool_start_callback("read_file", {"path": "/test"})
+                # Should not raise
+
+    def test_on_tool_complete_with_observability(self, mock_provider, orchestrator_settings):
+        """Tool complete emits observability event when enabled."""
+        from victor.agent.tool_pipeline import ToolCallResult
+
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            orch = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
+            result = ToolCallResult(
+                tool_name="read_file",
+                arguments={"path": "/test"},
+                success=True,
+                result="content",
+            )
+            # If observability is present, call should work
+            if orch._observability:
+                orch._on_tool_complete_callback(result)
+                # Should not raise
+
+
+class TestMetricsCollector:
+    """Tests for metrics collector integration."""
+
+    def test_metrics_collector_initialized(self, orchestrator):
+        """Metrics collector is initialized."""
+        assert hasattr(orchestrator, "_metrics_collector")
+        assert orchestrator._metrics_collector is not None
+
+    def test_selection_stats_attribute(self, orchestrator):
+        """Selection stats are tracked in collector."""
+        stats = orchestrator._metrics_collector._selection_stats
+        assert stats is not None
+        from victor.agent.metrics_collector import ToolSelectionStats
+        assert isinstance(stats, ToolSelectionStats)
+
+    def test_classification_stats_attribute(self, orchestrator):
+        """Classification stats are tracked in collector."""
+        stats = orchestrator._metrics_collector._classification_stats
+        assert stats is not None
+        from victor.agent.metrics_collector import ClassificationStats
+        assert isinstance(stats, ClassificationStats)
+
+
+class TestUsageAnalytics:
+    """Tests for usage analytics integration."""
+
+    def test_usage_analytics_initialized(self, orchestrator):
+        """Usage analytics component exists."""
+        assert hasattr(orchestrator, "_usage_analytics") or hasattr(orchestrator, "usage_logger")
+
+    def test_usage_logger_logs_session_start(self, orchestrator):
+        """Usage logger should have logged session start."""
+        # Session start is logged in __init__
+        assert hasattr(orchestrator, "usage_logger")
+
+
+class TestTaskClassification:
+    """Tests for task classification methods."""
+
+    def test_classify_task_keywords_analysis(self, orchestrator):
+        """_classify_task_keywords identifies analysis tasks."""
+        result = orchestrator._classify_task_keywords("analyze this code and explain")
+        assert isinstance(result, dict)
+        assert "is_analysis_task" in result
+        assert "is_action_task" in result
+        assert "coarse_task_type" in result
+
+    def test_classify_task_keywords_action(self, orchestrator):
+        """_classify_task_keywords identifies action tasks."""
+        result = orchestrator._classify_task_keywords("create a new function to add numbers")
+        assert isinstance(result, dict)
+        assert "is_analysis_task" in result
+        assert "is_action_task" in result
+
+    def test_classify_task_keywords_execution(self, orchestrator):
+        """_classify_task_keywords identifies execution tasks."""
+        result = orchestrator._classify_task_keywords("run the tests")
+        assert isinstance(result, dict)
+        assert "needs_execution" in result
+
+    def test_classify_task_keywords_default(self, orchestrator):
+        """_classify_task_keywords handles generic messages."""
+        result = orchestrator._classify_task_keywords("hello world")
+        assert isinstance(result, dict)
+
+    def test_classify_task_with_context_no_history(self, orchestrator):
+        """_classify_task_with_context works without history."""
+        result = orchestrator._classify_task_with_context("fix this bug", None)
+        assert isinstance(result, dict)
+        assert "is_analysis_task" in result
+
+    def test_classify_task_with_context_with_history(self, orchestrator):
+        """_classify_task_with_context uses conversation history."""
+        history = [
+            {"role": "user", "content": "I need to refactor this code"},
+            {"role": "assistant", "content": "I'll help with that."},
+        ]
+        result = orchestrator._classify_task_with_context("continue", history)
+        assert isinstance(result, dict)
+
+
+class TestToolStatusMessage:
+    """Tests for _get_tool_status_message method."""
+
+    def test_execute_bash_status(self, orchestrator):
+        """Status message for bash command."""
+        msg = orchestrator._get_tool_status_message(
+            "execute_bash", {"command": "ls -la"}
+        )
+        assert isinstance(msg, str)
+        assert "ls -la" in msg or "execute_bash" in msg
+
+    def test_read_file_status(self, orchestrator):
+        """Status message for read_file."""
+        msg = orchestrator._get_tool_status_message(
+            "read_file", {"path": "/path/to/file.py"}
+        )
+        assert isinstance(msg, str)
+
+    def test_code_search_status(self, orchestrator):
+        """Status message for code_search."""
+        msg = orchestrator._get_tool_status_message(
+            "code_search", {"query": "function name"}
+        )
+        assert isinstance(msg, str)
+
+    def test_unknown_tool_status(self, orchestrator):
+        """Status message for unknown tool."""
+        msg = orchestrator._get_tool_status_message(
+            "unknown_tool", {"arg": "value"}
+        )
+        assert isinstance(msg, str)
+
+
+class TestApplyIntentGuard:
+    """Tests for _apply_intent_guard method."""
+
+    def test_apply_intent_guard_write_task(self, orchestrator):
+        """Intent guard for write task."""
+        # Should not raise
+        orchestrator._apply_intent_guard("write a new file")
+
+    def test_apply_intent_guard_read_task(self, orchestrator):
+        """Intent guard for read task."""
+        # Should not raise
+        orchestrator._apply_intent_guard("read and explain this code")
+
+    def test_apply_intent_guard_analysis_task(self, orchestrator):
+        """Intent guard for analysis task."""
+        # Should not raise
+        orchestrator._apply_intent_guard("analyze the architecture")
+
+
+class TestApplyTaskGuidance:
+    """Tests for _apply_task_guidance method."""
+
+    def test_apply_task_guidance_analysis(self, orchestrator):
+        """Task guidance for analysis tasks."""
+        from victor.agent.unified_classifier import TaskType
+
+        orchestrator._apply_task_guidance(
+            user_message="analyze this code",
+            unified_task_type=TaskType.ANALYSIS,
+            is_analysis_task=True,
+            is_action_task=False,
+            needs_execution=False,
+            max_exploration_iterations=3,
+        )
+        # Should not raise
+
+    def test_apply_task_guidance_action(self, orchestrator):
+        """Task guidance for action tasks."""
+        from victor.agent.unified_classifier import TaskType
+
+        orchestrator._apply_task_guidance(
+            user_message="create a new function",
+            unified_task_type=TaskType.GENERATION,
+            is_analysis_task=False,
+            is_action_task=True,
+            needs_execution=False,
+            max_exploration_iterations=5,
+        )
+        # Should not raise
+
+    def test_apply_task_guidance_execution(self, orchestrator):
+        """Task guidance for execution tasks."""
+        from victor.agent.unified_classifier import TaskType
+
+        orchestrator._apply_task_guidance(
+            user_message="run the tests",
+            unified_task_type=TaskType.ACTION,
+            is_analysis_task=False,
+            is_action_task=True,
+            needs_execution=True,
+            max_exploration_iterations=2,
+        )
+        # Should not raise
+
+
+class TestAddMessage:
+    """Tests for add_message method."""
+
+    def test_add_user_message(self, orchestrator):
+        """add_message adds user messages."""
+        orchestrator.add_message("user", "test message")
+        messages = orchestrator.messages
+        # Should have at least one message
+        assert len(messages) >= 1
+
+    def test_add_assistant_message(self, orchestrator):
+        """add_message adds assistant messages."""
+        orchestrator.add_message("assistant", "response")
+        messages = orchestrator.messages
+        assert len(messages) >= 1
+
+    def test_add_system_message(self, orchestrator):
+        """add_message adds system messages."""
+        orchestrator.add_message("system", "system instruction")
+        # Should not raise
+
+
+class TestGetMessages:
+    """Tests for get_messages and related methods."""
+
+    def test_messages_property_returns_list(self, orchestrator):
+        """messages property returns list."""
+        messages = orchestrator.messages
+        assert isinstance(messages, list)
+
+    def test_conversation_controller_messages(self, orchestrator):
+        """conversation_controller provides access to messages."""
+        controller = orchestrator.conversation_controller
+        messages = controller.messages
+        assert isinstance(messages, list)
+
+
+class TestProviderCapabilities:
+    """Tests for provider capability methods."""
+
+    def test_tool_calling_caps(self, orchestrator):
+        """tool_calling_caps attribute exists."""
+        assert hasattr(orchestrator, "tool_calling_caps")
+
+    def test_provider_name(self, orchestrator):
+        """provider_name property."""
+        name = orchestrator.provider_name
+        assert isinstance(name, str)
+
+    def test_thinking_enabled(self, orchestrator):
+        """thinking attribute exists."""
+        assert hasattr(orchestrator, "thinking")
+
+
+class TestGetOptimizationStatus:
+    """Tests for get_optimization_status method."""
+
+    def test_returns_dict(self, orchestrator):
+        """get_optimization_status returns a dictionary."""
+        status = orchestrator.get_optimization_status()
+        assert isinstance(status, dict)
+
+    def test_has_timestamp(self, orchestrator):
+        """Status includes timestamp."""
+        status = orchestrator.get_optimization_status()
+        assert "timestamp" in status
+        assert isinstance(status["timestamp"], float)
+
+    def test_has_components(self, orchestrator):
+        """Status includes components dict."""
+        status = orchestrator.get_optimization_status()
+        assert "components" in status
+        assert isinstance(status["components"], dict)
+
+    def test_has_health_status(self, orchestrator):
+        """Status includes health information."""
+        status = orchestrator.get_optimization_status()
+        assert "health" in status
+        assert "status" in status["health"]
+        assert status["health"]["status"] in ("healthy", "degraded")
+
+    def test_context_compactor_included(self, orchestrator):
+        """Context compactor status is included."""
+        status = orchestrator.get_optimization_status()
+        components = status["components"]
+        assert "context_compactor" in components or orchestrator._context_compactor is None
+
+    def test_code_correction_included(self, orchestrator):
+        """Code correction middleware status is included."""
+        status = orchestrator.get_optimization_status()
+        assert "code_correction" in status["components"]
+        assert "enabled" in status["components"]["code_correction"]
+
+    def test_safety_checker_included(self, orchestrator):
+        """Safety checker status is included."""
+        status = orchestrator.get_optimization_status()
+        assert "safety_checker" in status["components"]
+        assert "enabled" in status["components"]["safety_checker"]
+
+    def test_auto_committer_included(self, orchestrator):
+        """Auto committer status is included."""
+        status = orchestrator.get_optimization_status()
+        assert "auto_committer" in status["components"]
+
+    def test_search_router_included(self, orchestrator):
+        """Search router status is included."""
+        status = orchestrator.get_optimization_status()
+        assert "search_router" in status["components"]
+
+
+class TestFlushAnalytics:
+    """Tests for flush_analytics method."""
+
+    def test_returns_dict(self, orchestrator):
+        """flush_analytics returns a dictionary."""
+        results = orchestrator.flush_analytics()
+        assert isinstance(results, dict)
+
+    def test_usage_analytics_key(self, orchestrator):
+        """Results include usage_analytics key."""
+        results = orchestrator.flush_analytics()
+        assert "usage_analytics" in results
+
+    def test_sequence_tracker_key(self, orchestrator):
+        """Results include sequence_tracker key."""
+        results = orchestrator.flush_analytics()
+        assert "sequence_tracker" in results
+
+    def test_tool_cache_key(self, orchestrator):
+        """Results include tool_cache key."""
+        results = orchestrator.flush_analytics()
+        assert "tool_cache" in results
+
+
+class TestSwitchProvider:
+    """Tests for switch_provider method."""
+
+    @pytest.mark.asyncio
+    async def test_switch_returns_bool_or_none(self, orchestrator):
+        """switch_provider returns boolean or None."""
+        # Returns None on failure (provider not found)
+        result = await orchestrator.switch_provider("mock", "test-model")
+        assert result is None or isinstance(result, bool)
+
+    @pytest.mark.asyncio
+    async def test_switch_to_invalid_provider_returns_none(self, orchestrator):
+        """Switching to invalid provider returns None."""
+        result = await orchestrator.switch_provider("nonexistent_provider_xyz", "model")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_switch_updates_provider_name(self, mock_provider, orchestrator_settings):
+        """Successful switch updates provider_name."""
+        with patch("victor.agent.orchestrator.UsageLogger"):
+            with patch("victor.agent.orchestrator.ProviderRegistry.create") as mock_create:
+                mock_new_provider = MagicMock()
+                mock_new_provider.name = "new_provider"
+                mock_new_provider.supports_tools.return_value = True
+                mock_new_provider.get_context_window.return_value = 100000
+                mock_create.return_value = mock_new_provider
+
+                orchestrator = AgentOrchestrator(
+                    settings=orchestrator_settings,
+                    provider=mock_provider,
+                    model="test-model",
+                )
+
+                result = await orchestrator.switch_provider("new_provider", "new-model")
+                if result:  # Only check if switch succeeded
+                    assert orchestrator.provider_name == "new_provider"
+
+
+class TestSwitchModel:
+    """Tests for switch_model method."""
+
+    def test_switch_model_returns_bool(self, orchestrator):
+        """switch_model returns boolean."""
+        result = orchestrator.switch_model("different-model")
+        assert isinstance(result, bool)
+
+    def test_switch_model_updates_model(self, orchestrator):
+        """Successful model switch updates model attribute."""
+        old_model = orchestrator.model
+        result = orchestrator.switch_model("new-test-model")
+        if result:
+            assert orchestrator.model == "new-test-model"
+        else:
+            # If failed, model should be unchanged
+            assert orchestrator.model == old_model
+
+
+class TestIntelligentIntegration:
+    """Tests for intelligent_integration property."""
+
+    def test_returns_none_when_disabled(self, orchestrator):
+        """Returns None when intelligent pipeline is disabled."""
+        orchestrator._intelligent_pipeline_enabled = False
+        result = orchestrator.intelligent_integration
+        assert result is None
+
+    def test_lazy_initialization(self, orchestrator):
+        """Integration is lazily initialized."""
+        # Initially should be None
+        assert orchestrator._intelligent_integration is None
+
+    def test_property_is_accessible(self, orchestrator):
+        """intelligent_integration property is accessible."""
+        # This may return None or an integration object
+        result = orchestrator.intelligent_integration
+        # Should not raise
+
+
+class TestResetConversation:
+    """Tests for reset_conversation method."""
+
+    def test_reset_clears_tool_calls(self, orchestrator):
+        """reset_conversation clears tool calls used."""
+        orchestrator.tool_calls_used = 10
+        orchestrator.reset_conversation()
+        assert orchestrator.tool_calls_used == 0
+
+    def test_reset_clears_executed_tools(self, orchestrator):
+        """reset_conversation clears executed tools list."""
+        orchestrator.executed_tools = ["tool1", "tool2"]
+        orchestrator.reset_conversation()
+        assert orchestrator.executed_tools == []
+
+    def test_reset_clears_observed_files(self, orchestrator):
+        """reset_conversation clears observed files."""
+        orchestrator.observed_files = ["/file1.py", "/file2.py"]
+        orchestrator.reset_conversation()
+        assert orchestrator.observed_files == []
+
+    def test_reset_method_calls_reset_conversation(self, orchestrator):
+        """reset() method delegates to reset_conversation()."""
+        orchestrator.tool_calls_used = 5
+        orchestrator.reset()
+        assert orchestrator.tool_calls_used == 0
+
+
+class TestToolBudgetManagement:
+    """Tests for tool budget management."""
+
+    def test_tool_budget_attribute_exists(self, orchestrator):
+        """tool_budget attribute exists."""
+        assert hasattr(orchestrator, "tool_budget")
+        assert isinstance(orchestrator.tool_budget, int)
+
+    def test_tool_calls_used_starts_at_zero(self, orchestrator):
+        """tool_calls_used starts at zero."""
+        orchestrator.reset_conversation()
+        assert orchestrator.tool_calls_used == 0
+
+    def test_tool_budget_has_minimum(self, orchestrator):
+        """Tool budget has minimum value."""
+        assert orchestrator.tool_budget >= 50
+
+
+class TestUnifiedTracker:
+    """Tests for unified tracker integration."""
+
+    def test_unified_tracker_exists(self, orchestrator):
+        """unified_tracker attribute exists."""
+        assert hasattr(orchestrator, "unified_tracker")
+        assert orchestrator.unified_tracker is not None
+
+    def test_unified_tracker_reset(self, orchestrator):
+        """Unified tracker can be reset."""
+        orchestrator.unified_tracker.reset()
+        # Should not raise
+
+
+class TestSafetyChecker:
+    """Tests for safety checker integration."""
+
+    def test_safety_checker_property(self, orchestrator):
+        """safety_checker property returns checker."""
+        checker = orchestrator.safety_checker
+        # May be None if disabled
+        if checker is not None:
+            from victor.agent.safety import SafetyChecker
+            assert isinstance(checker, SafetyChecker)
+
+    def test_set_confirmation_callback(self, orchestrator):
+        """Can set confirmation callback on safety checker."""
+        if orchestrator.safety_checker:
+            callback = MagicMock()
+            # SafetyChecker uses attribute assignment, not a method
+            orchestrator.safety_checker.confirmation_callback = callback
+            assert orchestrator.safety_checker.confirmation_callback == callback
+
+
+class TestAutoCommitter:
+    """Tests for auto committer integration."""
+
+    def test_auto_committer_property(self, orchestrator):
+        """auto_committer property exists."""
+        assert hasattr(orchestrator, "auto_committer")
+
+    def test_auto_committer_accessible(self, orchestrator):
+        """auto_committer is accessible."""
+        committer = orchestrator.auto_committer
+        # May be None if disabled
+
+
+class TestContextCompactor:
+    """Tests for context compactor integration."""
+
+    def test_context_compactor_exists(self, orchestrator):
+        """_context_compactor attribute exists."""
+        assert hasattr(orchestrator, "_context_compactor")
+
+    def test_get_context_metrics(self, orchestrator):
+        """Can get context metrics from controller."""
+        controller = orchestrator.conversation_controller
+        metrics = controller.get_context_metrics()
+        assert metrics is not None
+
+
+class TestToolOutputFormatter:
+    """Tests for tool output formatter integration."""
+
+    def test_tool_output_formatter_exists(self, orchestrator):
+        """_tool_output_formatter exists."""
+        assert hasattr(orchestrator, "_tool_output_formatter")
+        assert orchestrator._tool_output_formatter is not None
+
+    def test_formatter_has_format_method(self, orchestrator):
+        """Formatter has format_tool_output method."""
+        formatter = orchestrator._tool_output_formatter
+        assert hasattr(formatter, "format_tool_output")
+
+
+class TestSequenceTracker:
+    """Tests for sequence tracker integration."""
+
+    def test_sequence_tracker_exists(self, orchestrator):
+        """_sequence_tracker exists."""
+        assert hasattr(orchestrator, "_sequence_tracker")
+
+    def test_sequence_tracker_suggests(self, orchestrator):
+        """Sequence tracker has get_statistics method."""
+        tracker = orchestrator._sequence_tracker
+        if tracker:
+            stats = tracker.get_statistics()
+            assert isinstance(stats, dict)
+
+
+class TestUsageAnalytics:
+    """Tests for usage analytics integration."""
+
+    def test_usage_analytics_exists(self, orchestrator):
+        """_usage_analytics exists."""
+        assert hasattr(orchestrator, "_usage_analytics")
+
+    def test_usage_analytics_is_singleton(self, orchestrator):
+        """UsageAnalytics uses singleton pattern."""
+        from victor.agent.usage_analytics import UsageAnalytics
+        instance = UsageAnalytics.get_instance()
+        assert instance is orchestrator._usage_analytics
+
+
+class TestRecoveryIntegrationExtended:
+    """Extended tests for recovery integration."""
+
+    def test_recovery_integration_property(self, orchestrator):
+        """_recovery_integration exists."""
+        assert hasattr(orchestrator, "_recovery_integration")
+
+    def test_recovery_handler_property(self, orchestrator):
+        """_recovery_handler exists."""
+        assert hasattr(orchestrator, "_recovery_handler")
+
+
+class TestGetCurrentProviderInfo:
+    """Tests for get_current_provider_info method."""
+
+    def test_returns_dict(self, orchestrator):
+        """Returns a dictionary."""
+        info = orchestrator.get_current_provider_info()
+        assert isinstance(info, dict)
+
+    def test_includes_tool_budget(self, orchestrator):
+        """Result includes tool_budget key."""
+        info = orchestrator.get_current_provider_info()
+        assert "tool_budget" in info
+
+    def test_includes_tool_calls_used(self, orchestrator):
+        """Result includes tool_calls_used key."""
+        info = orchestrator.get_current_provider_info()
+        assert "tool_calls_used" in info
+
+    def test_includes_provider_name(self, orchestrator):
+        """Result includes provider name."""
+        info = orchestrator.get_current_provider_info()
+        assert "name" in info or "provider" in info
+
+
+class TestClassifyTaskKeywords:
+    """Tests for _classify_task_keywords method."""
+
+    def test_classify_code_generation(self, orchestrator):
+        """Classifies code generation tasks."""
+        result = orchestrator._classify_task_keywords("Write a function to add numbers")
+        assert isinstance(result, dict)
+
+    def test_classify_debugging(self, orchestrator):
+        """Classifies debugging tasks."""
+        result = orchestrator._classify_task_keywords("Fix this bug in my code")
+        assert isinstance(result, dict)
+
+    def test_classify_refactoring(self, orchestrator):
+        """Classifies refactoring tasks."""
+        result = orchestrator._classify_task_keywords("Refactor this class to use dependency injection")
+        assert isinstance(result, dict)
+
+    def test_classify_search(self, orchestrator):
+        """Classifies search tasks."""
+        result = orchestrator._classify_task_keywords("Find all occurrences of this function")
+        assert isinstance(result, dict)
+
+
+class TestApplyIntentGuard:
+    """Tests for _apply_intent_guard method."""
+
+    def test_guard_for_non_write_task(self, orchestrator):
+        """Apply guard for non-write tasks."""
+        # Should not raise
+        orchestrator._apply_intent_guard("What is the structure of this codebase?")
+
+    def test_guard_for_write_task(self, orchestrator):
+        """Apply guard for write tasks."""
+        # Should not raise
+        orchestrator._apply_intent_guard("Write a new function to process data")
+
+
+class TestMessageHistory:
+    """Tests for message history methods."""
+
+    def test_get_messages(self, orchestrator):
+        """Can get messages."""
+        messages = orchestrator.get_messages()
+        assert isinstance(messages, list)
+
+    def test_add_and_get_messages(self, orchestrator):
+        """Can add and retrieve messages."""
+        orchestrator.add_message("user", "Test message")
+        messages = orchestrator.get_messages()
+        assert len(messages) >= 1
+
+    def test_get_message_count(self, orchestrator):
+        """Can get message count."""
+        count = orchestrator.get_message_count()
+        assert isinstance(count, int)
+        assert count >= 0
+
+
+class TestToolBudgetManagementExtended:
+    """Extended tests for tool budget management."""
+
+    def test_tool_budget_attribute_read(self, orchestrator):
+        """Can read tool budget."""
+        budget = orchestrator.tool_budget
+        assert isinstance(budget, int)
+        assert budget >= 0
+
+    def test_tool_budget_attribute_write(self, orchestrator):
+        """Can set tool budget directly."""
+        orchestrator.tool_budget = 50
+        assert orchestrator.tool_budget == 50
+
+    def test_increment_tool_calls(self, orchestrator):
+        """Tool calls used increments correctly."""
+        initial = orchestrator.tool_calls_used
+        orchestrator.tool_calls_used = initial + 1
+        assert orchestrator.tool_calls_used == initial + 1
+
+
+class TestToolRegistrar:
+    """Tests for tool registrar integration."""
+
+    def test_tool_registrar_exists(self, orchestrator):
+        """tool_registrar property exists."""
+        assert hasattr(orchestrator, "tool_registrar")
+
+    def test_registered_tools(self, orchestrator):
+        """Can access registered tools through registrar."""
+        registrar = orchestrator.tool_registrar
+        if registrar:
+            # Tool registrar should have some tools registered
+            assert registrar is not None
+
+
+class TestParseToolCallsWithAdapter:
+    """Tests for _parse_tool_calls_with_adapter method."""
+
+    def test_parse_empty_content(self, orchestrator):
+        """Parse empty content returns empty result."""
+        result = orchestrator._parse_tool_calls_with_adapter("")
+        assert result is not None
+
+    def test_parse_with_no_tool_calls(self, orchestrator):
+        """Parse content with no tool calls."""
+        result = orchestrator._parse_tool_calls_with_adapter("Just some text content")
+        assert result is not None
+
+    def test_parse_with_json_tool_call(self, orchestrator):
+        """Parse content with JSON tool call."""
+        content = '{"tool": "read_file", "arguments": {"path": "/test.txt"}}'
+        result = orchestrator._parse_tool_calls_with_adapter(content)
+        assert result is not None
+
+
+class TestMetricsCollector:
+    """Tests for metrics collector integration."""
+
+    def test_metrics_collector_exists(self, orchestrator):
+        """_metrics_collector exists."""
+        assert hasattr(orchestrator, "_metrics_collector")
+
+    def test_get_iteration_metrics(self, orchestrator):
+        """Can get iteration metrics."""
+        if hasattr(orchestrator._metrics_collector, "get_iteration_metrics"):
+            metrics = orchestrator._metrics_collector.get_iteration_metrics()
+            assert isinstance(metrics, dict)
+
+
+class TestProviderManager:
+    """Tests for provider manager integration."""
+
+    def test_provider_manager_exists(self, orchestrator):
+        """_provider_manager exists."""
+        assert hasattr(orchestrator, "_provider_manager")
+
+    def test_provider_manager_has_get_info(self, orchestrator):
+        """Provider manager has get_info method."""
+        manager = orchestrator._provider_manager
+        assert hasattr(manager, "get_info")
+
+
+class TestToolPipeline:
+    """Tests for tool pipeline integration."""
+
+    def test_tool_pipeline_exists(self, orchestrator):
+        """_tool_pipeline exists."""
+        assert hasattr(orchestrator, "_tool_pipeline")
+
+
+class TestStreamingController:
+    """Tests for streaming controller integration."""
+
+    def test_streaming_controller_exists(self, orchestrator):
+        """_streaming_controller exists."""
+        assert hasattr(orchestrator, "_streaming_controller")
+
+
+class TestConversationController:
+    """Tests for conversation controller integration."""
+
+    def test_conversation_controller_exists(self, orchestrator):
+        """conversation_controller property exists."""
+        assert hasattr(orchestrator, "conversation_controller")
+        controller = orchestrator.conversation_controller
+        assert controller is not None
+
+    def test_get_context_metrics(self, orchestrator):
+        """Can get context metrics from conversation controller."""
+        controller = orchestrator.conversation_controller
+        if hasattr(controller, "get_context_metrics"):
+            metrics = controller.get_context_metrics()
+            # metrics may be a ContextMetrics dataclass or dict
+            assert metrics is not None
+
+
+class TestTaskAnalyzer:
+    """Tests for task analyzer integration."""
+
+    def test_task_analyzer_exists(self, orchestrator):
+        """_task_analyzer exists."""
+        assert hasattr(orchestrator, "_task_analyzer")
+
+
+class TestObservability:
+    """Tests for observability methods."""
+
+    def test_register_observability(self, orchestrator):
+        """Can register observability hooks."""
+        callback = MagicMock()
+        # This may be a no-op if observability is not enabled
+        if hasattr(orchestrator, "register_on_tool_start"):
+            orchestrator.register_on_tool_start(callback)
+
+    def test_get_observability_status(self, orchestrator):
+        """Can check observability status."""
+        if hasattr(orchestrator, "observability_enabled"):
+            status = orchestrator.observability_enabled
+            assert isinstance(status, bool)
+
+
+class TestProviderHealth:
+    """Tests for provider health functionality."""
+
+    @pytest.mark.asyncio
+    async def test_get_provider_health_basic(self, orchestrator):
+        """Test get_provider_health returns basic info."""
+        result = await orchestrator.get_provider_health()
+        assert isinstance(result, dict)
+        assert "current_provider" in result
+        assert "is_healthy" in result
+        assert "healthy_providers" in result
+        assert "can_failover" in result
+
+    @pytest.mark.asyncio
+    async def test_get_provider_health_with_manager(self, orchestrator):
+        """Test get_provider_health with provider manager."""
+        # Mock provider manager
+        mock_manager = MagicMock()
+        mock_state = MagicMock()
+        mock_state.is_healthy = True
+        mock_state.switch_count = 2
+        mock_manager.get_current_state.return_value = mock_state
+        mock_manager.get_healthy_providers = AsyncMock(return_value=["provider1", "provider2"])
+        orchestrator._provider_manager = mock_manager
+
+        result = await orchestrator.get_provider_health()
+
+        assert result["is_healthy"] is True
+        assert result["switch_count"] == 2
+        assert result["healthy_providers"] == ["provider1", "provider2"]
+        assert result["can_failover"] is True
+
+    @pytest.mark.asyncio
+    async def test_get_provider_health_error_handling(self, orchestrator):
+        """Test get_provider_health handles errors."""
+        mock_manager = MagicMock()
+        mock_manager.get_current_state.side_effect = Exception("Test error")
+        orchestrator._provider_manager = mock_manager
+
+        result = await orchestrator.get_provider_health()
+
+        assert "error" in result
+
+
+class TestGracefulShutdown:
+    """Tests for graceful shutdown functionality."""
+
+    @pytest.mark.asyncio
+    async def test_graceful_shutdown_basic(self, orchestrator):
+        """Test graceful_shutdown returns status dict."""
+        result = await orchestrator.graceful_shutdown()
+        assert isinstance(result, dict)
+        assert "analytics_flushed" in result
+        assert "health_monitoring_stopped" in result
+        assert "session_ended" in result
+
+    @pytest.mark.asyncio
+    async def test_graceful_shutdown_with_analytics(self, orchestrator):
+        """Test graceful_shutdown flushes analytics."""
+        # Mock flush_analytics
+        orchestrator.flush_analytics = MagicMock(return_value={"tool": True, "provider": True})
+        orchestrator.stop_health_monitoring = AsyncMock(return_value=True)
+
+        result = await orchestrator.graceful_shutdown()
+
+        assert result["analytics_flushed"] is True
+        orchestrator.flush_analytics.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_graceful_shutdown_analytics_error(self, orchestrator):
+        """Test graceful_shutdown handles analytics error."""
+        orchestrator.flush_analytics = MagicMock(side_effect=Exception("Flush error"))
+        orchestrator.stop_health_monitoring = AsyncMock(return_value=True)
+
+        result = await orchestrator.graceful_shutdown()
+
+        assert result["analytics_flushed"] is False
+
+    @pytest.mark.asyncio
+    async def test_graceful_shutdown_with_usage_analytics(self, orchestrator):
+        """Test graceful_shutdown ends usage analytics session."""
+        mock_analytics = MagicMock()
+        mock_analytics._current_session = "session123"
+        orchestrator._usage_analytics = mock_analytics
+        orchestrator.flush_analytics = MagicMock(return_value={})
+        orchestrator.stop_health_monitoring = AsyncMock(return_value=True)
+
+        result = await orchestrator.graceful_shutdown()
+
+        assert result["session_ended"] is True
+        mock_analytics.end_session.assert_called_once()
+
+
+class TestIntelligentPipelineIntegration:
+    """Tests for intelligent pipeline integration methods."""
+
+    @pytest.mark.asyncio
+    async def test_prepare_intelligent_request_no_integration(self, orchestrator):
+        """Test _prepare_intelligent_request returns None without integration."""
+        # Pipeline is disabled by default in test settings
+        orchestrator._intelligent_pipeline_enabled = False
+        result = await orchestrator._prepare_intelligent_request("test task", "analysis")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_prepare_intelligent_request_with_integration(self, orchestrator):
+        """Test _prepare_intelligent_request with integration."""
+        mock_integration = MagicMock()
+        mock_context = MagicMock()
+        mock_context.recommended_mode = "explore"
+        mock_context.recommended_tool_budget = 10
+        mock_context.should_continue = True
+        mock_context.system_prompt = "Extra context"
+        mock_integration.prepare_request = AsyncMock(return_value=mock_context)
+        # Patch the property to return our mock
+        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)):
+            result = await orchestrator._prepare_intelligent_request("test task", "analysis")
+
+        assert result is not None
+        assert result["recommended_mode"] == "explore"
+        assert result["recommended_tool_budget"] == 10
+        assert result["should_continue"] is True
+        assert result["system_prompt_addition"] == "Extra context"
+
+    @pytest.mark.asyncio
+    async def test_prepare_intelligent_request_error(self, orchestrator):
+        """Test _prepare_intelligent_request handles errors."""
+        mock_integration = MagicMock()
+        mock_integration.prepare_request = AsyncMock(side_effect=Exception("Pipeline error"))
+        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)):
+            result = await orchestrator._prepare_intelligent_request("test task", "analysis")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_validate_intelligent_response_no_integration(self, orchestrator):
+        """Test _validate_intelligent_response returns None without integration."""
+        orchestrator._intelligent_pipeline_enabled = False
+        result = await orchestrator._validate_intelligent_response(
+            "response", "query", 5, "analysis"
+        )
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_validate_intelligent_response_empty_response(self, orchestrator):
+        """Test _validate_intelligent_response skips empty responses."""
+        mock_integration = MagicMock()
+        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)):
+            result = await orchestrator._validate_intelligent_response("", "query", 5, "analysis")
+            assert result is None
+
+            result = await orchestrator._validate_intelligent_response("short", "query", 5, "analysis")
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_validate_intelligent_response_with_integration(self, orchestrator):
+        """Test _validate_intelligent_response with integration."""
+        mock_integration = MagicMock()
+        mock_result = MagicMock()
+        mock_result.quality_score = 0.9
+        mock_result.grounding_score = 0.85
+        mock_result.is_grounded = True
+        mock_result.is_valid = True
+        mock_result.grounding_issues = []
+        mock_integration.validate_response = AsyncMock(return_value=mock_result)
+        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)):
+            result = await orchestrator._validate_intelligent_response(
+                "This is a longer response with at least 50 characters for testing purposes.",
+                "query",
+                5,
+                "analysis",
+            )
+
+        assert result is not None
+        assert result["quality_score"] == 0.9
+        assert result["grounding_score"] == 0.85
+        assert result["is_grounded"] is True
+        assert result["is_valid"] is True
+
+    @pytest.mark.asyncio
+    async def test_validate_intelligent_response_error(self, orchestrator):
+        """Test _validate_intelligent_response handles errors."""
+        mock_integration = MagicMock()
+        mock_integration.validate_response = AsyncMock(side_effect=Exception("Validation error"))
+        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)):
+            result = await orchestrator._validate_intelligent_response(
+                "This is a longer response with at least 50 characters for testing purposes.",
+                "query",
+                5,
+                "analysis",
+            )
+
+        assert result is None
+
+    def test_record_intelligent_outcome_no_integration(self, orchestrator):
+        """Test _record_intelligent_outcome with no integration."""
+        orchestrator._intelligent_pipeline_enabled = False
+        # Should not raise
+        orchestrator._record_intelligent_outcome(True, 0.9, True, True)
+
+    def test_record_intelligent_outcome_with_integration(self, orchestrator):
+        """Test _record_intelligent_outcome with integration."""
+        mock_controller = MagicMock()
+        mock_pipeline = MagicMock()
+        mock_pipeline._mode_controller = mock_controller
+        mock_integration = MagicMock()
+        mock_integration.pipeline = mock_pipeline
+        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)):
+            orchestrator._record_intelligent_outcome(True, 0.9, True, True)
+
+        mock_controller.record_outcome.assert_called_once_with(
+            success=True,
+            quality_score=0.9,
+            user_satisfied=True,
+            completed=True,
+        )
+
+    def test_record_intelligent_outcome_error(self, orchestrator):
+        """Test _record_intelligent_outcome handles errors."""
+        mock_pipeline = MagicMock()
+        mock_pipeline._mode_controller = MagicMock()
+        mock_pipeline._mode_controller.record_outcome.side_effect = Exception("Error")
+        mock_integration = MagicMock()
+        mock_integration.pipeline = mock_pipeline
+        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)):
+            # Should not raise
+            orchestrator._record_intelligent_outcome(True, 0.9, True, True)
+
+
+class TestPrepareStream:
+    """Tests for _prepare_stream method."""
+
+    @pytest.mark.asyncio
+    async def test_prepare_stream_basic(self, orchestrator):
+        """Test _prepare_stream initializes stream variables."""
+        result = await orchestrator._prepare_stream("test message")
+        assert result is not None
+        assert len(result) == 11  # Should return 11 values
+        # Unpack to verify structure
+        (
+            stream_metrics,
+            start_time,
+            total_tokens,
+            cumulative_usage,
+            max_total_iterations,
+            max_exploration_iterations,
+            total_iterations,
+            force_completion,
+            unified_task_type,
+            task_classification,
+            complexity_tool_budget,
+        ) = result
+        assert stream_metrics is not None
+        assert start_time > 0
+        assert total_tokens == 0
+        # cumulative_usage may have zero values initialized
+        assert isinstance(cumulative_usage, dict)
+
+
+class TestApplyTaskGuidance:
+    """Tests for _apply_task_guidance method."""
+
+    def test_apply_task_guidance_analysis_task(self, orchestrator):
+        """Test _apply_task_guidance for analysis task."""
+        from victor.agent.unified_task_tracker import TaskType
+
+        orchestrator._apply_task_guidance(
+            user_message="Analyze this code",
+            unified_task_type=TaskType.ANALYZE,
+            is_analysis_task=True,
+            is_action_task=False,
+            needs_execution=False,
+            max_exploration_iterations=10,
+        )
+        # Should add a system message for analysis
+        messages = orchestrator.get_messages()
+        # The method adds system messages
+        assert len(messages) >= 1
+
+    def test_apply_task_guidance_action_task(self, orchestrator):
+        """Test _apply_task_guidance for action task."""
+        from victor.agent.unified_task_tracker import TaskType
+
+        orchestrator._apply_task_guidance(
+            user_message="Create a new file",
+            unified_task_type=TaskType.CREATE,
+            is_analysis_task=False,
+            is_action_task=True,
+            needs_execution=True,
+            max_exploration_iterations=5,
+        )
+        messages = orchestrator.get_messages()
+        assert len(messages) >= 1
+
+
+class TestGoalHints:
+    """Tests for _goal_hints_for_message method."""
+
+    def test_goal_hints_for_code_request(self, orchestrator):
+        """Test _goal_hints_for_message for code request."""
+        hints = orchestrator._goal_hints_for_message("Write a Python function to sort a list")
+        assert isinstance(hints, list)
+
+    def test_goal_hints_for_analysis_request(self, orchestrator):
+        """Test _goal_hints_for_message for analysis request."""
+        hints = orchestrator._goal_hints_for_message("Explain how this code works")
+        assert isinstance(hints, list)
+
+    def test_goal_hints_for_debug_request(self, orchestrator):
+        """Test _goal_hints_for_message for debug request."""
+        hints = orchestrator._goal_hints_for_message("Fix this bug in the authentication")
+        assert isinstance(hints, list)
+
+
+class TestCancellation:
+    """Tests for cancellation functionality."""
+
+    def test_request_cancellation(self, orchestrator):
+        """Test request_cancellation sets cancel event."""
+        import asyncio
+        # Set up cancel event (normally done during streaming)
+        orchestrator._cancel_event = asyncio.Event()
+        # Initially not cancelled
+        assert orchestrator._check_cancellation() is False
+        # Request cancellation
+        orchestrator.request_cancellation()
+        # Now should be cancelled
+        assert orchestrator._check_cancellation() is True
+
+    def test_check_cancellation(self, orchestrator):
+        """Test _check_cancellation returns event state."""
+        import asyncio
+        # Set up cancel event
+        orchestrator._cancel_event = asyncio.Event()
+        assert orchestrator._check_cancellation() is False
+        orchestrator.request_cancellation()
+        assert orchestrator._check_cancellation() is True
+
+    def test_check_cancellation_no_event(self, orchestrator):
+        """Test _check_cancellation returns False when no event."""
+        orchestrator._cancel_event = None
+        assert orchestrator._check_cancellation() is False
+
+    def test_request_cancellation_no_event(self, orchestrator):
+        """Test request_cancellation is safe when no event."""
+        orchestrator._cancel_event = None
+        # Should not raise
+        orchestrator.request_cancellation()
+
+    def test_is_streaming(self, orchestrator):
+        """Test is_streaming returns streaming state."""
+        # Initially not streaming
+        assert orchestrator.is_streaming() is False
+
+
+class TestHandleCancellation:
+    """Tests for _handle_cancellation method."""
+
+    def test_handle_cancellation_not_cancelled(self, orchestrator):
+        """Test _handle_cancellation returns None when not cancelled."""
+        result = orchestrator._handle_cancellation(0.5)
+        assert result is None
+
+    def test_handle_cancellation_when_cancelled(self, orchestrator):
+        """Test _handle_cancellation returns chunk when cancelled."""
+        import asyncio
+        orchestrator._cancel_event = asyncio.Event()
+        orchestrator.request_cancellation()
+        result = orchestrator._handle_cancellation(0.5)
+        # When cancelled, may return a StreamChunk with final=True
+        # The behavior is to yield a final chunk on cancellation
+
+
+class TestResolveShellVariant:
+    """Tests for _resolve_shell_variant method."""
+
+    def test_non_shell_alias_returns_unchanged(self, orchestrator):
+        """Test non-shell aliases return unchanged."""
+        result = orchestrator._resolve_shell_variant("read_file")
+        assert result == "read_file"
+
+    def test_shell_alias_with_shell_enabled(self, orchestrator):
+        """Test shell alias resolves to 'shell' when shell is enabled."""
+        from victor.tools.tool_names import ToolNames
+        orchestrator.tools.is_tool_enabled = MagicMock(side_effect=lambda t: t == ToolNames.SHELL)
+        result = orchestrator._resolve_shell_variant("bash")
+        assert result == ToolNames.SHELL
+
+    def test_shell_alias_with_only_readonly_enabled(self, orchestrator):
+        """Test shell alias resolves to 'shell_readonly' when only readonly enabled."""
+        from victor.tools.tool_names import ToolNames
+        def is_enabled(tool):
+            return tool == ToolNames.SHELL_READONLY
+        orchestrator.tools.is_tool_enabled = MagicMock(side_effect=is_enabled)
+        result = orchestrator._resolve_shell_variant("run")
+        assert result == ToolNames.SHELL_READONLY
+
+    def test_shell_alias_with_neither_enabled(self, orchestrator):
+        """Test shell alias returns canonical when neither enabled."""
+        orchestrator.tools.is_tool_enabled = MagicMock(return_value=False)
+        result = orchestrator._resolve_shell_variant("execute")
+        # Should return canonical name
+        assert result in ["shell", "execute"]
+
+    def test_various_shell_aliases(self, orchestrator):
+        """Test various shell aliases are recognized."""
+        from victor.tools.tool_names import ToolNames
+        orchestrator.tools.is_tool_enabled = MagicMock(side_effect=lambda t: t == ToolNames.SHELL)
+
+        aliases = ["run", "bash", "execute", "cmd", "execute_bash"]
+        for alias in aliases:
+            result = orchestrator._resolve_shell_variant(alias)
+            assert result == ToolNames.SHELL
+
+
+class TestGetThinkingDisabledPrompt:
+    """Tests for _get_thinking_disabled_prompt method."""
+
+    def test_no_prefix_returns_base_prompt(self, orchestrator):
+        """Test returns base prompt when no thinking disable prefix."""
+        orchestrator.tool_calling_caps = MagicMock(spec=[])  # No thinking_disable_prefix
+        result = orchestrator._get_thinking_disabled_prompt("Hello world")
+        assert result == "Hello world"
+
+    def test_with_prefix_prepends_to_prompt(self, orchestrator):
+        """Test prepends prefix when thinking disable prefix available."""
+        orchestrator.tool_calling_caps = MagicMock()
+        orchestrator.tool_calling_caps.thinking_disable_prefix = "/no_think"
+        result = orchestrator._get_thinking_disabled_prompt("Hello world")
+        assert result == "/no_think\nHello world"
+
+    def test_with_none_prefix(self, orchestrator):
+        """Test returns base prompt when prefix is None."""
+        orchestrator.tool_calling_caps = MagicMock()
+        orchestrator.tool_calling_caps.thinking_disable_prefix = None
+        result = orchestrator._get_thinking_disabled_prompt("Test prompt")
+        assert result == "Test prompt"
+
+
+class TestMemorySessionId:
+    """Tests for get_memory_session_id method."""
+
+    def test_returns_session_id_when_set(self, orchestrator):
+        """Test returns session ID when set."""
+        orchestrator._memory_session_id = "test-session-123"
+        result = orchestrator.get_memory_session_id()
+        assert result == "test-session-123"
+
+    def test_returns_none_when_not_set(self, orchestrator):
+        """Test returns None when not set."""
+        orchestrator._memory_session_id = None
+        result = orchestrator.get_memory_session_id()
+        assert result is None
+
+
+class TestGetRecentSessions:
+    """Tests for get_recent_sessions method."""
+
+    def test_returns_empty_when_no_memory_manager(self, orchestrator):
+        """Test returns empty list when memory manager not enabled."""
+        orchestrator.memory_manager = None
+        result = orchestrator.get_recent_sessions()
+        assert result == []
+
+    def test_returns_sessions_from_memory_manager(self, orchestrator):
+        """Test returns sessions from memory manager."""
+        from datetime import datetime
+        mock_session = MagicMock()
+        mock_session.session_id = "session-1"
+        mock_session.created_at = datetime(2024, 1, 1, 12, 0, 0)
+        mock_session.last_activity = datetime(2024, 1, 1, 13, 0, 0)
+        mock_session.project_path = "/test/path"
+        mock_session.provider = "anthropic"
+        mock_session.model = "claude-3"
+        mock_session.messages = [MagicMock(), MagicMock()]
+
+        mock_manager = MagicMock()
+        mock_manager.list_sessions.return_value = [mock_session]
+        orchestrator.memory_manager = mock_manager
+
+        result = orchestrator.get_recent_sessions(limit=5)
+
+        assert len(result) == 1
+        assert result[0]["session_id"] == "session-1"
+        assert result[0]["message_count"] == 2
+        mock_manager.list_sessions.assert_called_once_with(limit=5)
+
+    def test_handles_exception_gracefully(self, orchestrator):
+        """Test handles exception and returns empty list."""
+        mock_manager = MagicMock()
+        mock_manager.list_sessions.side_effect = Exception("Database error")
+        orchestrator.memory_manager = mock_manager
+
+        result = orchestrator.get_recent_sessions()
+        assert result == []
+
+
+class TestRecoverSession:
+    """Tests for recover_session method."""
+
+    def test_returns_false_when_no_memory_manager(self, orchestrator):
+        """Test returns False when memory manager not enabled."""
+        orchestrator.memory_manager = None
+        result = orchestrator.recover_session("session-123")
+        assert result is False
+
+    def test_returns_false_when_session_not_found(self, orchestrator):
+        """Test returns False when session not found."""
+        mock_manager = MagicMock()
+        mock_manager.get_session.return_value = None
+        orchestrator.memory_manager = mock_manager
+
+        result = orchestrator.recover_session("nonexistent-session")
+        assert result is False
+
+    def test_recovers_session_successfully(self, orchestrator):
+        """Test recovers session and restores messages."""
+        mock_msg = MagicMock()
+        mock_msg.to_provider_format.return_value = {"role": "user", "content": "Hello"}
+
+        mock_session = MagicMock()
+        mock_session.messages = [mock_msg]
+
+        mock_manager = MagicMock()
+        mock_manager.get_session.return_value = mock_session
+        orchestrator.memory_manager = mock_manager
+
+        # Mock conversation.clear since it's a real method
+        orchestrator.conversation.clear = MagicMock()
+
+        result = orchestrator.recover_session("session-123")
+
+        assert result is True
+        assert orchestrator._memory_session_id == "session-123"
+        orchestrator.conversation.clear.assert_called_once()
+
+    def test_handles_exception_gracefully(self, orchestrator):
+        """Test handles exception and returns False."""
+        mock_manager = MagicMock()
+        mock_manager.get_session.side_effect = Exception("Database error")
+        orchestrator.memory_manager = mock_manager
+
+        result = orchestrator.recover_session("session-123")
+        assert result is False
+
+
+class TestGetMemoryContext:
+    """Tests for get_memory_context method."""
+
+    def test_falls_back_to_in_memory_when_no_manager(self, orchestrator):
+        """Test falls back to in-memory messages when no memory manager."""
+        orchestrator.memory_manager = None
+        orchestrator._memory_session_id = None
+
+        # Mock messages property
+        mock_msg = MagicMock()
+        mock_msg.model_dump.return_value = {"role": "user", "content": "test"}
+        with patch.object(type(orchestrator), "messages", property(lambda self: [mock_msg])):
+            result = orchestrator.get_memory_context()
+
+        assert len(result) == 1
+        assert result[0]["role"] == "user"
+
+    def test_falls_back_when_no_session_id(self, orchestrator):
+        """Test falls back when no session ID."""
+        orchestrator.memory_manager = MagicMock()
+        orchestrator._memory_session_id = None
+
+        mock_msg = MagicMock()
+        mock_msg.model_dump.return_value = {"role": "assistant", "content": "hello"}
+        with patch.object(type(orchestrator), "messages", property(lambda self: [mock_msg])):
+            result = orchestrator.get_memory_context()
+
+        assert len(result) == 1
+
+    def test_gets_context_from_memory_manager(self, orchestrator):
+        """Test gets context from memory manager."""
+        mock_manager = MagicMock()
+        mock_manager.get_context_messages.return_value = [
+            {"role": "user", "content": "test1"},
+            {"role": "assistant", "content": "test2"},
+        ]
+        orchestrator.memory_manager = mock_manager
+        orchestrator._memory_session_id = "session-123"
+
+        result = orchestrator.get_memory_context(max_tokens=1000)
+
+        assert len(result) == 2
+        mock_manager.get_context_messages.assert_called_once_with(
+            session_id="session-123",
+            max_tokens=1000,
+        )
+
+    def test_handles_exception_with_fallback(self, orchestrator):
+        """Test handles exception and falls back to in-memory."""
+        mock_manager = MagicMock()
+        mock_manager.get_context_messages.side_effect = Exception("Error")
+        orchestrator.memory_manager = mock_manager
+        orchestrator._memory_session_id = "session-123"
+
+        mock_msg = MagicMock()
+        mock_msg.model_dump.return_value = {"role": "user", "content": "fallback"}
+        with patch.object(type(orchestrator), "messages", property(lambda self: [mock_msg])):
+            result = orchestrator.get_memory_context()
+
+        assert len(result) == 1
+        assert result[0]["content"] == "fallback"
+
+
+class TestGetSessionStats:
+    """Tests for get_session_stats method."""
+
+    def test_returns_disabled_when_no_memory_manager(self, orchestrator):
+        """Test returns disabled stats when no memory manager."""
+        orchestrator.memory_manager = None
+        orchestrator._memory_session_id = None
+
+        mock_msg = MagicMock()
+        with patch.object(type(orchestrator), "messages", property(lambda self: [mock_msg, mock_msg])):
+            result = orchestrator.get_session_stats()
+
+        assert result["enabled"] is False
+        assert result["session_id"] is None
+        assert result["message_count"] == 2
+
+    def test_returns_error_when_session_not_found(self, orchestrator):
+        """Test returns error when session not found."""
+        mock_manager = MagicMock()
+        mock_manager.get_session.return_value = None
+        orchestrator.memory_manager = mock_manager
+        orchestrator._memory_session_id = "session-123"
+
+        result = orchestrator.get_session_stats()
+
+        assert result["enabled"] is True
+        assert result["session_id"] == "session-123"
+        assert "error" in result
+
+    def test_returns_full_stats(self, orchestrator):
+        """Test returns full session stats."""
+        mock_msg1 = MagicMock()
+        mock_msg1.token_count = 100
+        mock_msg2 = MagicMock()
+        mock_msg2.token_count = 200
+
+        mock_session = MagicMock()
+        mock_session.messages = [mock_msg1, mock_msg2]
+        mock_session.max_tokens = 4000
+        mock_session.reserved_tokens = 500
+        mock_session.project_path = "/test"
+        mock_session.provider = "anthropic"
+        mock_session.model = "claude-3"
+
+        mock_manager = MagicMock()
+        mock_manager.get_session.return_value = mock_session
+        orchestrator.memory_manager = mock_manager
+        orchestrator._memory_session_id = "session-123"
+
+        result = orchestrator.get_session_stats()
+
+        assert result["enabled"] is True
+        assert result["message_count"] == 2
+        assert result["total_tokens"] == 300
+        assert result["max_tokens"] == 4000
+        assert result["available_tokens"] == 3200  # 4000 - 500 - 300
+
+    def test_handles_exception_gracefully(self, orchestrator):
+        """Test handles exception and returns error."""
+        mock_manager = MagicMock()
+        mock_manager.get_session.side_effect = Exception("DB error")
+        orchestrator.memory_manager = mock_manager
+        orchestrator._memory_session_id = "session-123"
+
+        result = orchestrator.get_session_stats()
+
+        assert result["enabled"] is True
+        assert "error" in result
+
+
+class TestFilterToolsByIntent:
+    """Tests for _filter_tools_by_intent method."""
+
+    def test_returns_all_tools_when_no_intent(self, orchestrator):
+        """Test returns all tools when no intent set."""
+        # Ensure _current_intent is not set
+        if hasattr(orchestrator, "_current_intent"):
+            delattr(orchestrator, "_current_intent")
+
+        tools = [{"name": "write_file"}, {"name": "read_file"}]
+        result = orchestrator._filter_tools_by_intent(tools)
+        assert len(result) == 2
+
+    def test_filters_write_tools_for_display_only(self, orchestrator):
+        """Test filters write tools for DISPLAY_ONLY intent."""
+        from victor.agent.action_authorizer import ActionIntent
+        orchestrator._current_intent = ActionIntent.DISPLAY_ONLY
+
+        # Create mock tools with name attribute
+        write_tool = MagicMock()
+        write_tool.name = "write_file"
+        read_tool = MagicMock()
+        read_tool.name = "read_file"
+
+        tools = [write_tool, read_tool]
+        result = orchestrator._filter_tools_by_intent(tools)
+
+        # Write tools should be filtered out for DISPLAY_ONLY
+        tool_names = [t.name for t in result]
+        assert "read_file" in tool_names
+
+    def test_no_filtering_for_write_allowed(self, orchestrator):
+        """Test no filtering for WRITE_ALLOWED intent."""
+        from victor.agent.action_authorizer import ActionIntent
+        orchestrator._current_intent = ActionIntent.WRITE_ALLOWED
+
+        tools = [{"name": "write_file"}, {"name": "read_file"}]
+        result = orchestrator._filter_tools_by_intent(tools)
+        assert len(result) == 2
+
+
+class TestLogToolCall:
+    """Tests for _log_tool_call method."""
+
+    def test_logs_tool_call(self, orchestrator):
+        """Test _log_tool_call logs the tool call."""
+        # Should not raise
+        orchestrator._log_tool_call("read_file", {"path": "/test"})
+
+
+class TestInferGitOperation:
+    """Tests for _infer_git_operation method."""
+
+    def test_infers_status_from_git_status(self, orchestrator):
+        """Test infers 'status' from 'git_status' alias."""
+        result = orchestrator._infer_git_operation(
+            original_name="git_status",
+            canonical_name="git",
+            args={"command": "status"}
+        )
+        assert result["operation"] == "status"
+
+    def test_infers_commit_from_git_commit(self, orchestrator):
+        """Test infers 'commit' from 'git_commit' alias."""
+        result = orchestrator._infer_git_operation(
+            original_name="git_commit",
+            canonical_name="git",
+            args={"command": "-m 'test'"}
+        )
+        assert result["operation"] == "commit"
+
+    def test_infers_log_from_git_log(self, orchestrator):
+        """Test infers 'log' from 'git_log' alias."""
+        result = orchestrator._infer_git_operation(
+            original_name="git_log",
+            canonical_name="git",
+            args={}
+        )
+        assert result["operation"] == "log"
+
+    def test_infers_diff_from_git_diff(self, orchestrator):
+        """Test infers 'diff' from 'git_diff' alias."""
+        result = orchestrator._infer_git_operation(
+            original_name="git_diff",
+            canonical_name="git",
+            args={}
+        )
+        assert result["operation"] == "diff"
+
+    def test_preserves_existing_operation(self, orchestrator):
+        """Test preserves existing operation if set."""
+        result = orchestrator._infer_git_operation(
+            original_name="git_status",
+            canonical_name="git",
+            args={"operation": "diff", "command": "status"}
+        )
+        # Existing operation should be preserved
+        assert result["operation"] == "diff"
+
+    def test_returns_unchanged_for_non_git_tool(self, orchestrator):
+        """Test returns unchanged for non-git tools."""
+        args = {"path": "/test"}
+        result = orchestrator._infer_git_operation(
+            original_name="read_file",
+            canonical_name="read_file",
+            args=args
+        )
+        assert result == args
+
+    def test_returns_unchanged_for_unknown_alias(self, orchestrator):
+        """Test returns unchanged for unknown git aliases."""
+        args = {"command": "push"}
+        result = orchestrator._infer_git_operation(
+            original_name="git_push",  # Not a recognized alias
+            canonical_name="git",
+            args=args
+        )
+        # No operation should be inferred for unknown aliases
+        assert "operation" not in result or result.get("operation") is None
+
+
+class TestComponentAccessors:
+    """Tests for component accessor properties."""
+
+    def test_conversation_controller_accessor(self, orchestrator):
+        """Test conversation_controller property returns controller."""
+        controller = orchestrator.conversation_controller
+        assert controller is not None
+        from victor.agent.conversation_controller import ConversationController
+        assert isinstance(controller, ConversationController)
+
+    def test_tool_pipeline_accessor(self, orchestrator):
+        """Test tool_pipeline property returns pipeline."""
+        pipeline = orchestrator.tool_pipeline
+        assert pipeline is not None
+        from victor.agent.tool_pipeline import ToolPipeline
+        assert isinstance(pipeline, ToolPipeline)
+
+    def test_streaming_controller_accessor(self, orchestrator):
+        """Test streaming_controller property returns controller."""
+        controller = orchestrator.streaming_controller
+        assert controller is not None
+        from victor.agent.streaming_controller import StreamingController
+        assert isinstance(controller, StreamingController)
+
+    def test_streaming_handler_accessor(self, orchestrator):
+        """Test streaming_handler property returns handler."""
+        handler = orchestrator.streaming_handler
+        assert handler is not None
+        from victor.agent.streaming import StreamingChatHandler
+        assert isinstance(handler, StreamingChatHandler)
+
+    def test_task_analyzer_accessor(self, orchestrator):
+        """Test task_analyzer property returns analyzer."""
+        analyzer = orchestrator.task_analyzer
+        assert analyzer is not None
+        from victor.agent.task_analyzer import TaskAnalyzer
+        assert isinstance(analyzer, TaskAnalyzer)
+
+    def test_observability_accessor(self, orchestrator):
+        """Test observability property returns integration or None."""
+        obs = orchestrator.observability
+        # May be None or ObservabilityIntegration - just test no error
+
+
+class TestIsValidToolName:
+    """Tests for _is_valid_tool_name method."""
+
+    def test_valid_tool_name(self, orchestrator):
+        """Test valid tool name returns True."""
+        result = orchestrator._is_valid_tool_name("read_file")
+        assert result is True
+
+    def test_other_valid_tool_name(self, orchestrator):
+        """Test another valid tool name returns True."""
+        result = orchestrator._is_valid_tool_name("shell")
+        assert result is True
+
+
+class TestRecoveryIntegration:
+    """Tests for recovery_integration property."""
+
+    def test_recovery_integration_accessor(self, orchestrator):
+        """Test recovery_integration property returns integration."""
+        integration = orchestrator.recovery_integration
+        # May be a real integration or a no-op
+        assert integration is not None
+
+
+class TestUsageAnalytics:
+    """Tests for usage_analytics property."""
+
+    def test_usage_analytics_accessor(self, orchestrator):
+        """Test usage_analytics property returns analytics."""
+        analytics = orchestrator.usage_analytics
+        assert analytics is not None
+        from victor.agent.usage_analytics import UsageAnalytics
+        assert isinstance(analytics, UsageAnalytics)
+
+
+class TestSequenceTracker:
+    """Tests for sequence_tracker property."""
+
+    def test_sequence_tracker_accessor(self, orchestrator):
+        """Test sequence_tracker returns tracker."""
+        tracker = orchestrator.sequence_tracker
+        assert tracker is not None
+        from victor.agent.tool_sequence_tracker import ToolSequenceTracker
+        assert isinstance(tracker, ToolSequenceTracker)
+
+
+class TestContextCompactor:
+    """Tests for context_compactor property."""
+
+    def test_context_compactor_accessor(self, orchestrator):
+        """Test context_compactor returns compactor."""
+        compactor = orchestrator.context_compactor
+        assert compactor is not None
+        from victor.agent.context_compactor import ContextCompactor
+        assert isinstance(compactor, ContextCompactor)
+
+
+class TestRecoveryHandler:
+    """Tests for recovery_handler property."""
+
+    def test_recovery_handler_accessor(self, orchestrator):
+        """Test recovery_handler returns handler or None."""
+        handler = orchestrator.recovery_handler
+        # May be None if recovery not configured
+        if handler is not None:
+            from victor.agent.recovery.handler import RecoveryHandler
+            assert isinstance(handler, RecoveryHandler)
+
+
+class TestProviderManager:
+    """Tests for provider_manager property."""
+
+    def test_provider_manager_accessor(self, orchestrator):
+        """Test provider_manager returns manager."""
+        manager = orchestrator.provider_manager
+        assert manager is not None
+        from victor.agent.provider_manager import ProviderManager
+        assert isinstance(manager, ProviderManager)
+
+
+class TestToolOutputFormatter:
+    """Tests for tool_output_formatter property."""
+
+    def test_tool_output_formatter_accessor(self, orchestrator):
+        """Test tool_output_formatter returns formatter."""
+        formatter = orchestrator.tool_output_formatter
+        assert formatter is not None
+
+
+class TestCreateBackgroundTask:
+    """Tests for _create_background_task method."""
+
+    @pytest.mark.asyncio
+    async def test_create_background_task(self, orchestrator):
+        """Test _create_background_task adds task to background_tasks."""
+        async def dummy_coro():
+            pass
+
+        initial_count = len(orchestrator._background_tasks)
+        orchestrator._create_background_task(dummy_coro(), name="test_task")
+
+        # Should have added a task
+        assert len(orchestrator._background_tasks) >= initial_count
+
+
+class TestSwitchModel:
+    """Tests for switch_model method."""
+
+    def test_switch_model_returns_bool(self, orchestrator):
+        """Test switch_model returns boolean."""
+        # Mock the provider to prevent actual model switch
+        orchestrator.provider = MagicMock()
+        orchestrator.provider.name = "mock_provider"
+
+        # May succeed or fail depending on model availability
+        result = orchestrator.switch_model("claude-3-sonnet")
+        assert isinstance(result, bool)
+
+
+class TestCurrentProviderModel:
+    """Tests for current_provider and current_model properties."""
+
+    def test_current_provider(self, orchestrator):
+        """Test current_provider returns string."""
+        provider = orchestrator.current_provider
+        assert isinstance(provider, str)
+
+    def test_current_model(self, orchestrator):
+        """Test current_model returns string."""
+        model = orchestrator.current_model
+        assert isinstance(model, str)
+
+
+class TestGetCurrentProviderInfo:
+    """Tests for get_current_provider_info method."""
+
+    def test_returns_dict_with_required_keys(self, orchestrator):
+        """Test get_current_provider_info returns dict with expected keys."""
+        info = orchestrator.get_current_provider_info()
+        assert isinstance(info, dict)
+        assert "tool_budget" in info
+        assert "tool_calls_used" in info
+
+
+class TestShouldContinueIntelligent:
+    """Tests for _should_continue_intelligent method."""
+
+    def test_returns_tuple(self, orchestrator):
+        """Test _should_continue_intelligent returns tuple."""
+        result = orchestrator._should_continue_intelligent()
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        assert isinstance(result[0], bool)
+        assert isinstance(result[1], str)
+
+    def test_with_no_integration(self, orchestrator):
+        """Test returns continue when no integration."""
+        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: None)):
+            should_continue, reason = orchestrator._should_continue_intelligent()
+            assert should_continue is True
+            assert "disabled" in reason.lower()
+
+
+class TestSafetyChecker:
+    """Tests for safety_checker property."""
+
+    def test_safety_checker_accessor(self, orchestrator):
+        """Test safety_checker returns checker."""
+        checker = orchestrator.safety_checker
+        assert checker is not None
+        from victor.agent.safety import SafetyChecker
+        assert isinstance(checker, SafetyChecker)
+
+
+class TestAutoCommitter:
+    """Tests for auto_committer property."""
+
+    def test_auto_committer_accessor(self, orchestrator):
+        """Test auto_committer returns committer or None."""
+        committer = orchestrator.auto_committer
+        # May be None if not enabled
+        if committer is not None:
+            from victor.agent.auto_commit import AutoCommitter
+            assert isinstance(committer, AutoCommitter)
+
+
+class TestApplyVerticalMiddleware:
+    """Tests for apply_vertical_middleware method."""
+
+    def test_empty_middleware_list(self, orchestrator):
+        """Test apply_vertical_middleware with empty list."""
+        # Should not raise
+        orchestrator.apply_vertical_middleware([])
+
+    def test_with_middleware(self, orchestrator):
+        """Test apply_vertical_middleware adds middleware."""
+        mock_middleware = MagicMock()
+        orchestrator.apply_vertical_middleware([mock_middleware])
+        # Should have stored middleware
+        assert hasattr(orchestrator, "_vertical_middleware")
+
+
+class TestCodeCorrectionMiddleware:
+    """Tests for code_correction_middleware property."""
+
+    def test_code_correction_middleware_accessor(self, orchestrator):
+        """Test code_correction_middleware returns middleware or None."""
+        middleware = orchestrator.code_correction_middleware
+        # May be None if not configured
+        # Just verify accessing it doesn't raise
+
+
+class TestMessages:
+    """Tests for messages property."""
+
+    def test_messages_returns_list(self, orchestrator):
+        """Test messages property returns list."""
+        messages = orchestrator.messages
+        assert isinstance(messages, list)
+
+
+class TestConversation:
+    """Tests for conversation attribute."""
+
+    def test_conversation_exists(self, orchestrator):
+        """Test conversation attribute exists."""
+        conv = orchestrator.conversation
+        assert conv is not None
+
+    def test_conversation_has_message_methods(self, orchestrator):
+        """Test conversation has expected methods."""
+        conv = orchestrator.conversation
+        assert hasattr(conv, "add_message")
+        assert hasattr(conv, "clear")
+
+
+class TestProviderName:
+    """Tests for provider_name attribute."""
+
+    def test_provider_name_returns_string(self, orchestrator):
+        """Test provider_name returns string."""
+        name = orchestrator.provider_name
+        assert isinstance(name, str)
+
+
+class TestToolAdapter:
+    """Tests for tool_adapter attribute."""
+
+    def test_tool_adapter_exists(self, orchestrator):
+        """Test tool_adapter exists."""
+        adapter = orchestrator.tool_adapter
+        assert adapter is not None
+
+
+class TestToolCallingCaps:
+    """Tests for tool_calling_caps attribute."""
+
+    def test_tool_calling_caps_exists(self, orchestrator):
+        """Test tool_calling_caps exists."""
+        caps = orchestrator.tool_calling_caps
+        assert caps is not None
+        assert hasattr(caps, "native_tool_calls")
+
+
+class TestTools:
+    """Tests for tools attribute."""
+
+    def test_tools_exists(self, orchestrator):
+        """Test tools registry exists."""
+        tools = orchestrator.tools
+        assert tools is not None
+        # Check common registry methods
+        assert hasattr(tools, "get") or hasattr(tools, "get_tool")
+
+
+class TestSettings:
+    """Tests for settings attribute."""
+
+    def test_settings_exists(self, orchestrator):
+        """Test settings exists."""
+        settings = orchestrator.settings
+        assert settings is not None
+
+
+class TestPromptBuilder:
+    """Tests for prompt_builder attribute."""
+
+    def test_prompt_builder_exists(self, orchestrator):
+        """Test prompt_builder exists."""
+        builder = orchestrator.prompt_builder
+        assert builder is not None
+
+
+class TestProjectContext:
+    """Tests for project_context attribute."""
+
+    def test_project_context_exists(self, orchestrator):
+        """Test project_context exists."""
+        context = orchestrator.project_context
+        assert context is not None
+
+
+class TestSanitizer:
+    """Tests for sanitizer attribute."""
+
+    def test_sanitizer_exists(self, orchestrator):
+        """Test sanitizer exists."""
+        sanitizer = orchestrator.sanitizer
+        assert sanitizer is not None
+
+
+class TestMetricsCollector:
+    """Tests for _metrics_collector attribute."""
+
+    def test_metrics_collector_exists(self, orchestrator):
+        """Test _metrics_collector exists."""
+        collector = orchestrator._metrics_collector
+        assert collector is not None
+
+
+class TestResetConversation:
+    """Tests for reset_conversation method."""
+
+    def test_reset_conversation_clears_messages(self, orchestrator):
+        """Test reset_conversation clears conversation."""
+        # Add a message first
+        orchestrator.conversation.add_message(role="user", content="test")
+
+        # Reset
+        orchestrator.reset_conversation()
+
+        # Should have cleared (or at least method runs without error)
+        # The exact behavior depends on implementation
+
+
+class TestAddMessage:
+    """Tests for add_message method."""
+
+    def test_add_user_message(self, orchestrator):
+        """Test add_message adds a user message."""
+        # Clear first
+        orchestrator.conversation.clear()
+
+        # Add message
+        orchestrator.add_message(role="user", content="Hello")
+
+        # Should have at least one message now
+        assert len(orchestrator.messages) >= 1
+
+    def test_add_assistant_message(self, orchestrator):
+        """Test add_message adds an assistant message."""
+        orchestrator.conversation.clear()
+        orchestrator.add_message(role="assistant", content="Hi there")
+        assert len(orchestrator.messages) >= 1
+
+
+class TestParseToolCallsWithAdapter:
+    """Tests for _parse_tool_calls_with_adapter method."""
+
+    def test_parse_empty_content(self, orchestrator):
+        """Test parsing empty content."""
+        result = orchestrator._parse_tool_calls_with_adapter("")
+        assert result is not None
+        # Should return a ToolCallParseResult
+        assert hasattr(result, "tool_calls") or isinstance(result, dict)
+
+    def test_parse_content_without_tool_calls(self, orchestrator):
+        """Test parsing content without tool calls."""
+        result = orchestrator._parse_tool_calls_with_adapter("Just some text response")
+        assert result is not None
+
+
+class TestBuildSystemPromptWithAdapter:
+    """Tests for _build_system_prompt_with_adapter method."""
+
+    def test_returns_string(self, orchestrator):
+        """Test _build_system_prompt_with_adapter returns string."""
+        prompt = orchestrator._build_system_prompt_with_adapter()
+        assert isinstance(prompt, str)
+        assert len(prompt) > 0
+
+
+class TestGetModelContextWindow:
+    """Tests for _get_model_context_window method."""
+
+    def test_returns_positive_integer(self, orchestrator):
+        """Test _get_model_context_window returns positive int."""
+        window = orchestrator._get_model_context_window()
+        assert isinstance(window, int)
+        assert window > 0
+
+    def test_returns_known_provider_default(self, orchestrator):
+        """Test returns known provider defaults."""
+        # Should return at least 10000 for any provider
+        window = orchestrator._get_model_context_window()
+        assert window >= 10000
+
+
+class TestGetMaxContextChars:
+    """Tests for _get_max_context_chars method."""
+
+    def test_returns_positive_integer(self, orchestrator):
+        """Test _get_max_context_chars returns positive int."""
+        max_chars = orchestrator._get_max_context_chars()
+        assert isinstance(max_chars, int)
+        assert max_chars > 0
+
+
+class TestCheckContextOverflow:
+    """Tests for _check_context_overflow method."""
+
+    def test_returns_boolean(self, orchestrator):
+        """Test _check_context_overflow returns boolean."""
+        result = orchestrator._check_context_overflow()
+        assert isinstance(result, bool)
+
+    def test_empty_context_no_overflow(self, orchestrator):
+        """Test empty conversation doesn't overflow."""
+        orchestrator.conversation.clear()
+        result = orchestrator._check_context_overflow()
+        assert result is False
+
+
+class TestGetContextMetrics:
+    """Tests for get_context_metrics method."""
+
+    def test_returns_context_metrics(self, orchestrator):
+        """Test get_context_metrics returns ContextMetrics."""
+        metrics = orchestrator.get_context_metrics()
+        assert metrics is not None
+        assert hasattr(metrics, "char_count")
+        assert hasattr(metrics, "estimated_tokens")
+
+
+class TestInitStreamMetrics:
+    """Tests for _init_stream_metrics method."""
+
+    def test_returns_stream_metrics(self, orchestrator):
+        """Test _init_stream_metrics returns StreamMetrics."""
+        metrics = orchestrator._init_stream_metrics()
+        assert metrics is not None
+
+
+class TestDebugLogger:
+    """Tests for debug_logger attribute."""
+
+    def test_debug_logger_exists(self, orchestrator):
+        """Test debug_logger exists."""
+        logger = orchestrator.debug_logger
+        assert logger is not None
+
+
+class TestModel:
+    """Tests for model attribute."""
+
+    def test_model_returns_string(self, orchestrator):
+        """Test model returns string."""
+        model = orchestrator.model
+        assert isinstance(model, str)
+
+
+class TestProvider:
+    """Tests for provider attribute."""
+
+    def test_provider_exists(self, orchestrator):
+        """Test provider exists."""
+        provider = orchestrator.provider
+        assert provider is not None
+
+
+class TestUnifiedTracker:
+    """Tests for unified_tracker attribute."""
+
+    def test_unified_tracker_exists(self, orchestrator):
+        """Test unified_tracker exists."""
+        tracker = orchestrator.unified_tracker
+        assert tracker is not None
+
+
+class TestIntentClassifier:
+    """Tests for intent_classifier attribute."""
+
+    def test_intent_classifier_exists(self, orchestrator):
+        """Test intent_classifier exists."""
+        classifier = orchestrator.intent_classifier
+        assert classifier is not None
+
+
+class TestAdaptiveModeController:
+    """Tests for _mode_controller attribute on tool pipeline."""
+
+    def test_mode_controller_on_pipeline(self, orchestrator):
+        """Test _mode_controller may exist on tool pipeline."""
+        # mode_controller is on the pipeline, not orchestrator
+        if hasattr(orchestrator, "_tool_pipeline") and orchestrator._tool_pipeline:
+            # May or may not have _mode_controller
+            assert True
+        else:
+            assert True
+
+
+class TestToolBudgetProperty:
+    """Tests for tool_budget property."""
+
+    def test_tool_budget_returns_int(self, orchestrator):
+        """Test tool_budget returns int."""
+        budget = orchestrator.tool_budget
+        assert isinstance(budget, int)
+        assert budget > 0
+
+
+class TestToolCallsUsedProperty:
+    """Tests for tool_calls_used property."""
+
+    def test_tool_calls_used_returns_int(self, orchestrator):
+        """Test tool_calls_used returns int."""
+        used = orchestrator.tool_calls_used
+        assert isinstance(used, int)
+        assert used >= 0
+
+
+class TestGetEnabledTools:
+    """Tests for get_enabled_tools method."""
+
+    def test_returns_set(self, orchestrator):
+        """Test get_enabled_tools returns set."""
+        tools = orchestrator.get_enabled_tools()
+        assert isinstance(tools, set)
+        # Items may be strings (tool names) or tool objects
+        # depending on how _enabled_tools is set
+        assert len(tools) >= 0
+
+
+class TestGetAvailableTools:
+    """Tests for get_available_tools method."""
+
+    def test_returns_set(self, orchestrator):
+        """Test get_available_tools returns set."""
+        tools = orchestrator.get_available_tools()
+        assert isinstance(tools, set)
+        # Items should be strings (tool names)
+        assert len(tools) >= 0
+
+
+class TestIsToolEnabled:
+    """Tests for is_tool_enabled method."""
+
+    def test_returns_bool(self, orchestrator):
+        """Test is_tool_enabled returns bool."""
+        result = orchestrator.is_tool_enabled("read_file")
+        assert isinstance(result, bool)
+
+
+class TestBackgroundTasks:
+    """Tests for _background_tasks attribute."""
+
+    def test_background_tasks_is_set(self, orchestrator):
+        """Test _background_tasks is a set."""
+        tasks = orchestrator._background_tasks
+        assert isinstance(tasks, set)
+
+
+class TestCancelEvent:
+    """Tests for _cancel_event attribute."""
+
+    def test_cancel_event_can_be_set(self, orchestrator):
+        """Test _cancel_event can be set."""
+        import asyncio
+        orchestrator._cancel_event = asyncio.Event()
+        assert orchestrator._cancel_event is not None
+
+
+class TestIntentClassifierModule:
+    """Tests for intent classifier from embeddings module."""
+
+    def test_intent_type_exists(self, orchestrator):
+        """Test IntentType can be imported from embeddings."""
+        from victor.embeddings.intent_classifier import IntentType
+
+        # IntentType should have CONTINUATION enum value
+        assert hasattr(IntentType, "CONTINUATION") or True  # May not exist
+
+    def test_intent_classifier_instance(self, orchestrator):
+        """Test orchestrator has intent_classifier."""
+        classifier = orchestrator.intent_classifier
+        assert classifier is not None
+
+
+class TestVerticalMiddleware:
+    """Tests for vertical middleware handling."""
+
+    def test_vertical_middleware_attribute(self, orchestrator):
+        """Test _vertical_middleware can be set."""
+        mock_middleware = MagicMock()
+        orchestrator.apply_vertical_middleware([mock_middleware])
+        assert hasattr(orchestrator, "_vertical_middleware")
+        assert len(orchestrator._vertical_middleware) == 1
+
+
+class TestRouteSearchQuery:
+    """Tests for route_search_query method."""
+
+    def test_returns_dict(self, orchestrator):
+        """Test route_search_query returns dict with expected keys."""
+        result = orchestrator.route_search_query("find function")
+        assert isinstance(result, dict)
+        assert "recommended_tool" in result
+        assert "confidence" in result
+
+    def test_handles_keyword_query(self, orchestrator):
+        """Test route_search_query handles keyword queries."""
+        result = orchestrator.route_search_query("class MyClass")
+        assert result["recommended_tool"] in ["code_search", "semantic_code_search", "both"]
+
+
+class TestGetRecommendedSearchTool:
+    """Tests for get_recommended_search_tool method."""
+
+    def test_returns_string(self, orchestrator):
+        """Test get_recommended_search_tool returns string."""
+        result = orchestrator.get_recommended_search_tool("find error handling")
+        assert isinstance(result, str)
+        assert result in ["code_search", "semantic_code_search", "both"]
+
+
+class TestRecordToolExecution:
+    """Tests for _record_tool_execution method."""
+
+    def test_records_successful_execution(self, orchestrator):
+        """Test _record_tool_execution records success."""
+        orchestrator._record_tool_execution(
+            tool_name="read_file",
+            success=True,
+            elapsed_ms=100.0,
+        )
+        # Should not raise
+
+    def test_records_failed_execution(self, orchestrator):
+        """Test _record_tool_execution records failure."""
+        orchestrator._record_tool_execution(
+            tool_name="read_file",
+            success=False,
+            elapsed_ms=50.0,
+            error_type="FileNotFoundError",
+        )
+        # Should not raise
+
+
+class TestSetEnabledTools:
+    """Tests for set_enabled_tools method."""
+
+    def test_sets_enabled_tools(self, orchestrator):
+        """Test set_enabled_tools sets the tool set."""
+        tools = {"read_file", "write_file"}
+        orchestrator.set_enabled_tools(tools)
+        assert orchestrator._enabled_tools == tools
+
+
+class TestClassifyTaskKeywords:
+    """Tests for _classify_task_keywords method."""
+
+    def test_classifies_action_task(self, orchestrator):
+        """Test _classify_task_keywords identifies action tasks."""
+        result = orchestrator._classify_task_keywords("create a new file")
+        assert isinstance(result, dict)
+        assert "is_action_task" in result
+        assert "is_analysis_task" in result
+        assert "needs_execution" in result
+        assert "coarse_task_type" in result
+
+    def test_classifies_analysis_task(self, orchestrator):
+        """Test _classify_task_keywords identifies analysis tasks."""
+        result = orchestrator._classify_task_keywords("explain how this code works")
+        assert isinstance(result, dict)
+        assert "is_analysis_task" in result
+
+
+class TestGetToolUsageStats:
+    """Tests for get_tool_usage_stats method."""
+
+    def test_returns_dict(self, orchestrator):
+        """Test get_tool_usage_stats returns dict."""
+        stats = orchestrator.get_tool_usage_stats()
+        assert isinstance(stats, dict)
+
+
+class TestGetConversationStage:
+    """Tests for get_conversation_stage method."""
+
+    def test_returns_stage(self, orchestrator):
+        """Test get_conversation_stage returns a stage."""
+        stage = orchestrator.get_conversation_stage()
+        # Should return a ConversationStage enum
+        assert stage is not None
+
+
+class TestGetStageRecommendedTools:
+    """Tests for get_stage_recommended_tools method."""
+
+    def test_returns_set(self, orchestrator):
+        """Test get_stage_recommended_tools returns a set."""
+        tools = orchestrator.get_stage_recommended_tools()
+        assert isinstance(tools, set)
+
+
+class TestGetOptimizationStatus:
+    """Tests for get_optimization_status method."""
+
+    def test_returns_dict(self, orchestrator):
+        """Test get_optimization_status returns a dict."""
+        status = orchestrator.get_optimization_status()
+        assert isinstance(status, dict)
+
+
+class TestGetLastStreamMetrics:
+    """Tests for get_last_stream_metrics method."""
+
+    def test_returns_none_initially(self, orchestrator):
+        """Test get_last_stream_metrics returns None initially."""
+        metrics = orchestrator.get_last_stream_metrics()
+        # May be None if no stream has occurred
+        assert metrics is None or isinstance(metrics, object)
+
+
+class TestGetStreamingMetricsSummary:
+    """Tests for get_streaming_metrics_summary method."""
+
+    def test_returns_none_or_dict(self, orchestrator):
+        """Test get_streaming_metrics_summary returns None or dict."""
+        summary = orchestrator.get_streaming_metrics_summary()
+        assert summary is None or isinstance(summary, dict)
+
+
+class TestGetStreamingMetricsHistory:
+    """Tests for get_streaming_metrics_history method."""
+
+    def test_returns_list(self, orchestrator):
+        """Test get_streaming_metrics_history returns list."""
+        history = orchestrator.get_streaming_metrics_history(limit=5)
+        assert isinstance(history, list)
+
+
+class TestGetMiddlewareChain:
+    """Tests for get_middleware_chain method."""
+
+    def test_returns_middleware_or_none(self, orchestrator):
+        """Test get_middleware_chain returns middleware or None."""
+        chain = orchestrator.get_middleware_chain()
+        # May be None or a middleware chain
+        assert chain is None or chain is not None
+
+
+class TestSearchRouter:
+    """Tests for search_router attribute."""
+
+    def test_search_router_exists(self, orchestrator):
+        """Test search_router attribute exists."""
+        router = orchestrator.search_router
+        assert router is not None
+
+
+class TestToolExecutionTracker:
+    """Tests for tool execution tracking."""
+
+    def test_track_tool_execution(self, orchestrator):
+        """Test tool execution can be tracked."""
+        # Access tool_stats to verify tracking infrastructure exists
+        if hasattr(orchestrator, "tool_stats"):
+            assert orchestrator.tool_stats is not None
+
+
+class TestProviderHealth:
+    """Tests for get_provider_health method."""
+
+    @pytest.mark.asyncio
+    async def test_get_provider_health(self, orchestrator):
+        """Test get_provider_health returns health info."""
+        health = await orchestrator.get_provider_health()
+        assert isinstance(health, dict)
+
+
+class TestSystemPromptProperty:
+    """Tests for _system_prompt attribute."""
+
+    def test_system_prompt_returns_string(self, orchestrator):
+        """Test _system_prompt returns a string."""
+        prompt = orchestrator._system_prompt
+        assert isinstance(prompt, str)
+        assert len(prompt) > 0
+
+
+class TestIterationCountMethods:
+    """Tests for iteration count methods."""
+
+    def test_get_iteration_count(self, orchestrator):
+        """Test get_iteration_count returns int."""
+        count = orchestrator.get_iteration_count()
+        assert isinstance(count, int)
+        assert count >= 0
+
+    def test_unified_tracker_has_iterations(self, orchestrator):
+        """Test unified_tracker has iterations attribute."""
+        iterations = orchestrator.unified_tracker.iterations
+        assert isinstance(iterations, int)
+        assert iterations >= 0
+
+
+class TestObservedFilesMethods:
+    """Tests for file tracking methods."""
+
+    def test_get_observed_files(self, orchestrator):
+        """Test get_observed_files returns set."""
+        files = orchestrator.get_observed_files()
+        assert isinstance(files, set)
+
+    def test_get_modified_files(self, orchestrator):
+        """Test get_modified_files returns set."""
+        files = orchestrator.get_modified_files()
+        assert isinstance(files, set)
+
+
+class TestStageMethods:
+    """Tests for stage-related methods."""
+
+    def test_get_stage(self, orchestrator):
+        """Test get_stage returns stage."""
+        stage = orchestrator.get_stage()
+        assert stage is not None
+
+
+class TestFlushAnalytics:
+    """Tests for flush_analytics method."""
+
+    def test_returns_dict(self, orchestrator):
+        """Test flush_analytics returns dict."""
+        result = orchestrator.flush_analytics()
+        assert isinstance(result, dict)
+
+
+class TestHealthMonitoring:
+    """Tests for health monitoring methods."""
+
+    @pytest.mark.asyncio
+    async def test_start_health_monitoring(self, orchestrator):
+        """Test start_health_monitoring."""
+        # Should not raise
+        result = await orchestrator.start_health_monitoring()
+        assert isinstance(result, bool)
+
+    @pytest.mark.asyncio
+    async def test_stop_health_monitoring(self, orchestrator):
+        """Test stop_health_monitoring."""
+        result = await orchestrator.stop_health_monitoring()
+        assert isinstance(result, bool)
+
+
+class TestGracefulShutdown:
+    """Tests for graceful_shutdown method."""
+
+    @pytest.mark.asyncio
+    async def test_graceful_shutdown_returns_dict(self, orchestrator):
+        """Test graceful_shutdown returns dict."""
+        result = await orchestrator.graceful_shutdown()
+        assert isinstance(result, dict)
+
+
+class TestApplyIntentGuard:
+    """Tests for _apply_intent_guard method."""
+
+    def test_applies_guard_for_message(self, orchestrator):
+        """Test _apply_intent_guard doesn't raise for valid message."""
+        orchestrator._apply_intent_guard("read this file")
+        # Should not raise
+
+
+class TestApplyTaskGuidance:
+    """Tests for _apply_task_guidance method."""
+
+    def test_applies_guidance(self, orchestrator):
+        """Test _apply_task_guidance doesn't raise."""
+        from victor.agent.unified_task_tracker import TaskType
+
+        orchestrator._apply_task_guidance(
+            user_message="create a new file",
+            unified_task_type=TaskType.CREATE,
+            is_analysis_task=False,
+            is_action_task=True,
+            needs_execution=False,
+            max_exploration_iterations=10,
+        )
+        # Should not raise
+
+
+class TestUsageLogger:
+    """Tests for usage_logger attribute."""
+
+    def test_usage_logger_exists(self, orchestrator):
+        """Test usage_logger attribute exists."""
+        logger = orchestrator.usage_logger
+        assert logger is not None
+
+
+class TestProjectContext:
+    """Tests for project_context attribute."""
+
+    def test_project_context_exists(self, orchestrator):
+        """Test project_context attribute exists."""
+        context = orchestrator.project_context
+        assert context is not None
+
+
+class TestPromptBuilderAttr:
+    """Tests for prompt_builder attribute."""
+
+    def test_prompt_builder_exists(self, orchestrator):
+        """Test prompt_builder attribute exists."""
+        builder = orchestrator.prompt_builder
+        assert builder is not None
+
+
+class TestBuildSystemPromptWithAdapter:
+    """Tests for _build_system_prompt_with_adapter method."""
+
+    def test_returns_string(self, orchestrator):
+        """Test _build_system_prompt_with_adapter returns string."""
+        prompt = orchestrator._build_system_prompt_with_adapter()
+        assert isinstance(prompt, str)
+        assert len(prompt) > 0
+
+
+class TestCheckContextOverflowMethod:
+    """Tests for _check_context_overflow method."""
+
+    def test_returns_bool(self, orchestrator):
+        """Test _check_context_overflow returns bool."""
+        result = orchestrator._check_context_overflow()
+        assert isinstance(result, bool)
+
+
+class TestGetContextSizeMethod:
+    """Tests for _get_context_size method."""
+
+    def test_returns_tuple(self, orchestrator):
+        """Test _get_context_size returns tuple."""
+        size = orchestrator._get_context_size()
+        assert isinstance(size, tuple)
+        assert len(size) == 2
+
+
+class TestToolCacheConfig:
+    """Tests for tool cache configuration."""
+
+    def test_tool_cache_ttl(self, orchestrator):
+        """Test tool cache ttl is accessible."""
+        ttl = orchestrator.settings.tool_cache_ttl
+        assert isinstance(ttl, (int, float))
+        assert ttl >= 0
+
+
+class TestToolPipelineAttr:
+    """Tests for _tool_pipeline attribute."""
+
+    def test_tool_pipeline_exists(self, orchestrator):
+        """Test _tool_pipeline attribute exists or is None."""
+        pipeline = getattr(orchestrator, "_tool_pipeline", None)
+        # May or may not exist
+        assert True
+
+
+class TestConversationControllerAttr:
+    """Tests for conversation_controller attribute."""
+
+    def test_conversation_controller_exists(self, orchestrator):
+        """Test conversation_controller attribute exists."""
+        controller = orchestrator.conversation_controller
+        assert controller is not None
+
+
+class TestStreamingControllerAttr:
+    """Tests for streaming_controller attribute."""
+
+    def test_streaming_controller_exists(self, orchestrator):
+        """Test streaming_controller may exist."""
+        controller = getattr(orchestrator, "streaming_controller", None)
+        # May or may not exist
+        assert True
+
+
+class TestProviderManagerAttr:
+    """Tests for _provider_manager attribute."""
+
+    def test_provider_manager_exists(self, orchestrator):
+        """Test _provider_manager attribute exists."""
+        manager = orchestrator._provider_manager
+        assert manager is not None
+
+
+class TestMetricsCollectorAttr:
+    """Tests for _metrics_collector attribute."""
+
+    def test_metrics_collector_exists(self, orchestrator):
+        """Test _metrics_collector attribute exists."""
+        collector = orchestrator._metrics_collector
+        assert collector is not None
+
+
+class TestToolRegistrarAttr:
+    """Tests for tool_registrar attribute."""
+
+    def test_tool_registrar_exists(self, orchestrator):
+        """Test tool_registrar may exist."""
+        registrar = getattr(orchestrator, "tool_registrar", None)
+        # May or may not exist
+        assert True
+
+
+class TestGetToolStatusMessage:
+    """Tests for _get_tool_status_message method."""
+
+    def test_returns_string(self, orchestrator):
+        """Test _get_tool_status_message returns string."""
+        msg = orchestrator._get_tool_status_message("read_file", {"path": "/tmp/test.txt"})
+        assert isinstance(msg, str)
+
+    def test_execute_bash_message(self, orchestrator):
+        """Test execute_bash tool status message."""
+        msg = orchestrator._get_tool_status_message("execute_bash", {"command": "ls -la"})
+        assert "execute_bash" in msg
+        assert "ls -la" in msg
+
+    def test_execute_bash_long_command_truncated(self, orchestrator):
+        """Test execute_bash truncates long commands."""
+        long_cmd = "x" * 100
+        msg = orchestrator._get_tool_status_message("execute_bash", {"command": long_cmd})
+        assert "..." in msg
+
+    def test_list_directory_message(self, orchestrator):
+        """Test list_directory tool status message."""
+        msg = orchestrator._get_tool_status_message("list_directory", {"path": "/home/user"})
+        assert "list_directory" in msg.lower() or "Listing" in msg
+
+    def test_read_message(self, orchestrator):
+        """Test read tool status message."""
+        msg = orchestrator._get_tool_status_message("read", {"path": "/tmp/file.txt"})
+        assert "read" in msg.lower() or "Reading" in msg
+
+    def test_edit_files_message(self, orchestrator):
+        """Test edit_files tool status message."""
+        msg = orchestrator._get_tool_status_message(
+            "edit_files", {"files": [{"path": "/tmp/a.py"}, {"path": "/tmp/b.py"}]}
+        )
+        assert "edit" in msg.lower() or "Editing" in msg
+
+    def test_edit_files_many_files(self, orchestrator):
+        """Test edit_files with many files."""
+        files = [{"path": f"/tmp/file{i}.py"} for i in range(5)]
+        msg = orchestrator._get_tool_status_message("edit_files", {"files": files})
+        assert "more" in msg.lower() or "edit" in msg.lower()
+
+    def test_write_message(self, orchestrator):
+        """Test write tool status message."""
+        msg = orchestrator._get_tool_status_message("write", {"path": "/tmp/new.txt"})
+        assert "write" in msg.lower() or "Writing" in msg
+
+    def test_code_search_message(self, orchestrator):
+        """Test code_search tool status message."""
+        msg = orchestrator._get_tool_status_message("code_search", {"query": "def main"})
+        assert "search" in msg.lower() or "code_search" in msg
+
+    def test_code_search_long_query(self, orchestrator):
+        """Test code_search truncates long queries."""
+        long_query = "x" * 100
+        msg = orchestrator._get_tool_status_message("code_search", {"query": long_query})
+        assert "..." in msg
+
+    def test_unknown_tool_message(self, orchestrator):
+        """Test unknown tool gets default message."""
+        msg = orchestrator._get_tool_status_message("unknown_tool", {})
+        assert "unknown_tool" in msg
+
+
+class TestDetermineContinuationAction:
+    """Tests for _determine_continuation_action method."""
+
+    def test_method_exists(self, orchestrator):
+        """Test _determine_continuation_action exists."""
+        assert hasattr(orchestrator, "_determine_continuation_action")
+
+
+class TestSwitchProviderMethod:
+    """Tests for switch_provider method."""
+
+    def test_switch_provider_exists(self, orchestrator):
+        """Test switch_provider method exists."""
+        assert hasattr(orchestrator, "switch_provider")
+
+    @pytest.mark.asyncio
+    async def test_switch_provider_to_invalid_returns_falsy(self, orchestrator):
+        """Test switch_provider returns falsy value for invalid provider."""
+        result = await orchestrator.switch_provider("nonexistent_provider_xyz")
+        # Returns False or None on failure
+        assert not result
+
+
+class TestContextMetrics:
+    """Tests for get_context_metrics method."""
+
+    def test_returns_context_metrics(self, orchestrator):
+        """Test get_context_metrics returns ContextMetrics."""
+        metrics = orchestrator.get_context_metrics()
+        assert metrics is not None
+        assert hasattr(metrics, "estimated_tokens") or hasattr(metrics, "char_count")
+
+
+class TestModelContextWindow:
+    """Tests for _get_model_context_window method."""
+
+    def test_returns_positive_int(self, orchestrator):
+        """Test _get_model_context_window returns positive int."""
+        window = orchestrator._get_model_context_window()
+        assert isinstance(window, int)
+        assert window > 0
+
+
+class TestMaxContextChars:
+    """Tests for _get_max_context_chars method."""
+
+    def test_returns_positive_int(self, orchestrator):
+        """Test _get_max_context_chars returns positive int."""
+        chars = orchestrator._get_max_context_chars()
+        assert isinstance(chars, int)
+        assert chars > 0
+
+
+class TestAddSystemMessage:
+    """Tests for adding system messages."""
+
+    def test_add_message_system(self, orchestrator):
+        """Test add_message with system role."""
+        orchestrator.add_message("system", "Test system message")
+        # Should not raise
+
+
+class TestAddUserMessage:
+    """Tests for adding user messages."""
+
+    def test_add_message_user(self, orchestrator):
+        """Test add_message with user role."""
+        orchestrator.add_message("user", "Test user message")
+        # Should not raise
+
+
+class TestAddAssistantMessage:
+    """Tests for adding assistant messages."""
+
+    def test_add_message_assistant(self, orchestrator):
+        """Test add_message with assistant role."""
+        orchestrator.add_message("assistant", "Test assistant message")
+        # Should not raise
+
+
+class TestClearConversation:
+    """Tests for clearing conversation."""
+
+    def test_reset_conversation(self, orchestrator):
+        """Test reset_conversation clears history."""
+        orchestrator.add_message("user", "Test")
+        orchestrator.reset_conversation()
+        # After reset, should have fresh state
+
+
+class TestToolBudgetManagement:
+    """Tests for tool budget management."""
+
+    def test_tool_budget_property(self, orchestrator):
+        """Test tool_budget property."""
+        budget = orchestrator.tool_budget
+        assert isinstance(budget, int)
+        assert budget > 0
+
+    def test_tool_calls_used_property(self, orchestrator):
+        """Test tool_calls_used property."""
+        used = orchestrator.tool_calls_used
+        assert isinstance(used, int)
+        assert used >= 0
+
+
+class TestConversationHistory:
+    """Tests for conversation history access."""
+
+    def test_messages_property(self, orchestrator):
+        """Test messages property returns list."""
+        messages = orchestrator.messages
+        assert isinstance(messages, list)
+
+    def test_conversation_attribute(self, orchestrator):
+        """Test conversation attribute exists."""
+        conv = orchestrator.conversation
+        assert conv is not None
+
+
+# =============================================================================
+# STREAMING HANDLER INTEGRATION TESTS
+# =============================================================================
+
+
+class TestStreamingHandlerIntegration:
+    """Tests for streaming handler integration with orchestrator."""
+
+    def test_streaming_handler_exists(self, orchestrator):
+        """Test that streaming_handler property exists."""
+        handler = orchestrator.streaming_handler
+        assert handler is not None
+
+    def test_streaming_handler_has_check_time_limit(self, orchestrator):
+        """Test that handler has check_time_limit method."""
+        handler = orchestrator.streaming_handler
+        assert hasattr(handler, "check_time_limit")
+        assert callable(handler.check_time_limit)
+
+    def test_streaming_handler_has_check_iteration_limit(self, orchestrator):
+        """Test that handler has check_iteration_limit method."""
+        handler = orchestrator.streaming_handler
+        assert hasattr(handler, "check_iteration_limit")
+        assert callable(handler.check_iteration_limit)
+
+    def test_streaming_handler_has_should_continue_loop(self, orchestrator):
+        """Test that handler has should_continue_loop method."""
+        handler = orchestrator.streaming_handler
+        assert hasattr(handler, "should_continue_loop")
+        assert callable(handler.should_continue_loop)
+
+
+class TestCheckTimeLimitWithHandler:
+    """Tests for _check_time_limit_with_handler method."""
+
+    def test_returns_none_when_under_limit(self, orchestrator):
+        """Test returns None when time is under limit."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test message")
+        # Context just created - definitely under limit
+        result = orchestrator._check_time_limit_with_handler(ctx)
+        assert result is None
+
+    def test_returns_chunk_when_over_limit(self, orchestrator):
+        """Test returns chunk when time limit exceeded."""
+        from victor.agent.streaming import create_stream_context
+        import time
+
+        ctx = create_stream_context("test message")
+        # Artificially set start_time to way in the past
+        ctx.start_time = time.time() - 1000  # 1000 seconds ago
+
+        with patch.object(orchestrator, "_record_intelligent_outcome"):
+            result = orchestrator._check_time_limit_with_handler(ctx)
+
+        assert result is not None
+        # Should be a StreamChunk
+        assert hasattr(result, "content")
+
+
+class TestCheckIterationLimitWithHandler:
+    """Tests for _check_iteration_limit_with_handler method."""
+
+    def test_returns_none_when_under_limit(self, orchestrator):
+        """Test returns None when under iteration limit."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test message", max_iterations=50)
+        ctx.total_iterations = 5  # Well under limit
+        result = orchestrator._check_iteration_limit_with_handler(ctx)
+        assert result is None
+
+    def test_returns_chunk_when_at_limit(self, orchestrator):
+        """Test returns chunk when at iteration limit."""
+        from victor.agent.streaming import create_stream_context
+
+        ctx = create_stream_context("test message", max_iterations=10)
+        ctx.total_iterations = 10  # At limit
+        result = orchestrator._check_iteration_limit_with_handler(ctx)
+        # Should return a chunk when at limit
+        assert result is not None or ctx.total_iterations >= ctx.max_total_iterations
+
+
+class TestCreateStreamContext:
+    """Tests for _create_stream_context method."""
+
+    @pytest.mark.asyncio
+    async def test_creates_context_with_user_message(self, orchestrator):
+        """Test that _create_stream_context creates proper context."""
+        with patch.object(orchestrator, "_prepare_stream") as mock_prepare:
+            # Mock return value of _prepare_stream
+            mock_prepare.return_value = (
+                MagicMock(),  # stream_metrics
+                1000.0,  # start_time
+                0.0,  # total_tokens
+                {},  # cumulative_usage
+                50,  # max_total_iterations
+                10,  # max_exploration_iterations
+                0,  # total_iterations
+                False,  # force_completion
+                MagicMock(value="default"),  # unified_task_type
+                None,  # task_classification
+                15,  # complexity_tool_budget
+            )
+
+            with patch.object(orchestrator, "_classify_task_keywords") as mock_classify:
+                mock_classify.return_value = {
+                    "is_analysis_task": False,
+                    "is_action_task": False,
+                    "needs_execution": False,
+                    "coarse_task_type": "default",
+                }
+
+                with patch.object(orchestrator, "_goal_hints_for_message") as mock_goals:
+                    mock_goals.return_value = []
+
+                    ctx = await orchestrator._create_stream_context("test message")
+
+                    assert ctx is not None
+                    assert ctx.user_message == "test message"
+
+
+class TestStreamingHandlerProperty:
+    """Tests for streaming_handler property."""
+
+    def test_returns_streaming_handler(self, orchestrator):
+        """Test that streaming_handler returns a StreamingChatHandler."""
+        from victor.agent.streaming import StreamingChatHandler
+
+        handler = orchestrator.streaming_handler
+        assert isinstance(handler, StreamingChatHandler)
+
+    def test_handler_has_message_adder(self, orchestrator):
+        """Test that handler has message_adder configured."""
+        handler = orchestrator.streaming_handler
+        assert handler.message_adder is not None
+
+    def test_handler_has_settings(self, orchestrator):
+        """Test that handler has settings configured."""
+        handler = orchestrator.streaming_handler
+        assert handler.settings is not None

@@ -1,0 +1,348 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Unit tests for streaming handler module."""
+
+import time
+import pytest
+from unittest.mock import MagicMock
+
+from victor.agent.streaming.context import StreamingChatContext
+from victor.agent.streaming.handler import StreamingChatHandler
+from victor.agent.streaming.iteration import (
+    IterationAction,
+    IterationResult,
+    ProviderResponseResult,
+    ToolExecutionResult,
+)
+from victor.config.settings import Settings
+
+
+@pytest.fixture
+def mock_settings():
+    """Create mock settings."""
+    return Settings(
+        analytics_enabled=False,
+        use_semantic_tool_selection=False,
+    )
+
+
+@pytest.fixture
+def mock_message_adder():
+    """Create mock message adder."""
+    adder = MagicMock()
+    adder.add_message = MagicMock()
+    return adder
+
+
+@pytest.fixture
+def handler(mock_settings, mock_message_adder):
+    """Create a StreamingChatHandler for testing."""
+    return StreamingChatHandler(
+        settings=mock_settings,
+        message_adder=mock_message_adder,
+        session_time_limit=60.0,
+    )
+
+
+@pytest.fixture
+def basic_context():
+    """Create a basic StreamingChatContext."""
+    return StreamingChatContext(user_message="test message")
+
+
+class TestStreamingChatHandlerCreation:
+    """Tests for StreamingChatHandler creation."""
+
+    def test_handler_creation(self, mock_settings, mock_message_adder):
+        """Handler can be created with required args."""
+        handler = StreamingChatHandler(
+            settings=mock_settings,
+            message_adder=mock_message_adder,
+        )
+        assert handler.settings == mock_settings
+        assert handler.message_adder == mock_message_adder
+
+    def test_handler_custom_time_limit(self, mock_settings, mock_message_adder):
+        """Handler accepts custom time limit."""
+        handler = StreamingChatHandler(
+            settings=mock_settings,
+            message_adder=mock_message_adder,
+            session_time_limit=120.0,
+        )
+        assert handler.session_time_limit == 120.0
+
+
+class TestCheckTimeLimit:
+    """Tests for check_time_limit method."""
+
+    def test_within_limit_returns_none(self, handler, basic_context):
+        """Returns None when within time limit."""
+        result = handler.check_time_limit(basic_context)
+        assert result is None
+
+    def test_over_limit_returns_result(self, handler, mock_message_adder):
+        """Returns result when over time limit."""
+        ctx = StreamingChatContext(user_message="test")
+        ctx.start_time = time.time() - 120  # 2 minutes ago
+        handler.session_time_limit = 60.0  # 1 minute limit
+
+        result = handler.check_time_limit(ctx)
+
+        assert result is not None
+        assert result.action == IterationAction.FORCE_COMPLETION
+        assert ctx.force_completion is True
+        mock_message_adder.add_message.assert_called_once()
+
+
+class TestCheckIterationLimit:
+    """Tests for check_iteration_limit method."""
+
+    def test_within_limit_returns_none(self, handler):
+        """Returns None when within iteration limit."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            max_total_iterations=30,
+            total_iterations=10,
+        )
+        result = handler.check_iteration_limit(ctx)
+        assert result is None
+
+    def test_at_limit_returns_result(self, handler):
+        """Returns result when at iteration limit."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            max_total_iterations=30,
+            total_iterations=30,
+        )
+        result = handler.check_iteration_limit(ctx)
+        assert result is not None
+        assert result.action == IterationAction.BREAK
+
+
+class TestCheckForceCompletion:
+    """Tests for check_force_completion method."""
+
+    def test_not_forced_returns_none(self, handler, basic_context):
+        """Returns None when no force condition."""
+        result = handler.check_force_completion(basic_context)
+        assert result is None
+
+    def test_forced_returns_result(self, handler):
+        """Returns result when force_completion is True."""
+        ctx = StreamingChatContext(user_message="test", force_completion=True)
+        result = handler.check_force_completion(ctx)
+        assert result is not None
+        assert result.action == IterationAction.FORCE_COMPLETION
+
+    def test_blocked_attempts_triggers_force(self, handler):
+        """Returns result when blocked attempts exceed threshold."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            consecutive_blocked_attempts=3,
+            max_blocked_before_force=3,
+        )
+        result = handler.check_force_completion(ctx)
+        assert result is not None
+
+
+class TestHandleBlockedAttempts:
+    """Tests for handle_blocked_attempts method."""
+
+    def test_below_threshold_returns_none(self, handler):
+        """Returns None when below threshold."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            consecutive_blocked_attempts=1,
+            max_blocked_before_force=3,
+        )
+        result = handler.handle_blocked_attempts(ctx)
+        assert result is None
+        assert ctx.consecutive_blocked_attempts == 2
+
+    def test_at_threshold_returns_result(self, handler, mock_message_adder):
+        """Returns result and resets counter at threshold."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            consecutive_blocked_attempts=2,
+            max_blocked_before_force=3,
+        )
+        result = handler.handle_blocked_attempts(ctx)
+        assert result is not None
+        assert result.action == IterationAction.YIELD_AND_CONTINUE
+        assert ctx.consecutive_blocked_attempts == 0
+        mock_message_adder.add_message.assert_called_once()
+
+
+class TestProcessProviderResponse:
+    """Tests for process_provider_response method."""
+
+    def test_response_with_tool_calls(self, handler, basic_context):
+        """Processes response with tool calls."""
+        response = ProviderResponseResult(
+            content="Let me check that",
+            tool_calls=[{"name": "read_file", "arguments": {"path": "/test"}}],
+            tokens_used=50.0,
+        )
+        result = handler.process_provider_response(response, basic_context)
+
+        assert result.action == IterationAction.CONTINUE
+        assert result.has_tool_calls is True
+        assert basic_context.total_accumulated_chars > 0
+
+    def test_response_with_content_only(self, handler, basic_context):
+        """Processes response with content but no tool calls."""
+        response = ProviderResponseResult(
+            content="Here is the answer",
+            tokens_used=25.0,
+        )
+        result = handler.process_provider_response(response, basic_context)
+
+        assert result.action == IterationAction.YIELD_AND_CONTINUE
+        assert result.has_content is True
+        assert len(result.chunks) == 1
+
+    def test_response_with_garbage(self, handler, basic_context):
+        """Processes response with garbage detection."""
+        response = ProviderResponseResult(
+            content="some content",
+            garbage_detected=True,
+        )
+        result = handler.process_provider_response(response, basic_context)
+
+        assert basic_context.force_completion is True
+
+    def test_empty_response(self, handler, basic_context):
+        """Processes empty response."""
+        response = ProviderResponseResult()
+        result = handler.process_provider_response(response, basic_context)
+
+        assert result.action == IterationAction.CONTINUE
+
+
+class TestProcessToolResults:
+    """Tests for process_tool_results method."""
+
+    def test_successful_tool_results(self, handler, basic_context):
+        """Processes successful tool results."""
+        execution = ToolExecutionResult()
+        execution.add_result(
+            "read_file",
+            success=True,
+            args={"path": "/test.txt"},
+            elapsed=0.5,
+        )
+
+        chunks = handler.process_tool_results(execution, basic_context)
+
+        assert len(chunks) >= 1
+        # Find the tool result chunk
+        tool_result_chunks = [
+            c for c in chunks if c.metadata and "tool_result" in c.metadata
+        ]
+        assert len(tool_result_chunks) == 1
+        assert tool_result_chunks[0].metadata["tool_result"]["success"] is True
+
+    def test_failed_tool_results(self, handler, basic_context):
+        """Processes failed tool results."""
+        execution = ToolExecutionResult()
+        execution.add_result(
+            "read_file",
+            success=False,
+            error="file not found",
+            args={"path": "/missing.txt"},
+        )
+
+        chunks = handler.process_tool_results(execution, basic_context)
+
+        tool_result_chunks = [
+            c for c in chunks if c.metadata and "tool_result" in c.metadata
+        ]
+        assert len(tool_result_chunks) == 1
+        assert tool_result_chunks[0].metadata["tool_result"]["success"] is False
+        assert tool_result_chunks[0].metadata["tool_result"]["error"] == "file not found"
+
+    def test_includes_thinking_status(self, handler, basic_context):
+        """Includes thinking status chunk."""
+        execution = ToolExecutionResult()
+        execution.add_result("test_tool", success=True)
+
+        chunks = handler.process_tool_results(execution, basic_context)
+
+        status_chunks = [
+            c for c in chunks if c.metadata and c.metadata.get("status")
+        ]
+        assert len(status_chunks) == 1
+        assert "Thinking" in status_chunks[0].metadata["status"]
+
+
+class TestGenerateToolStartChunk:
+    """Tests for generate_tool_start_chunk method."""
+
+    def test_generates_correct_chunk(self, handler):
+        """Generates chunk with tool start metadata."""
+        chunk = handler.generate_tool_start_chunk(
+            tool_name="read_file",
+            tool_args={"path": "/test.txt"},
+            status_msg="Reading file...",
+        )
+
+        assert chunk.content == ""
+        assert chunk.metadata is not None
+        assert "tool_start" in chunk.metadata
+        assert chunk.metadata["tool_start"]["name"] == "read_file"
+        assert chunk.metadata["tool_start"]["arguments"]["path"] == "/test.txt"
+        assert chunk.metadata["tool_start"]["status_msg"] == "Reading file..."
+
+
+class TestShouldContinueLoop:
+    """Tests for should_continue_loop method."""
+
+    def test_continues_on_continue_action(self, handler, basic_context):
+        """Returns True for CONTINUE action."""
+        result = IterationResult(action=IterationAction.CONTINUE)
+        assert handler.should_continue_loop(result, basic_context) is True
+
+    def test_stops_on_break_action(self, handler, basic_context):
+        """Returns False for BREAK action."""
+        result = IterationResult(action=IterationAction.BREAK)
+        assert handler.should_continue_loop(result, basic_context) is False
+
+    def test_stops_on_iteration_limit(self, handler):
+        """Returns False when iteration limit reached."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            max_total_iterations=10,
+            total_iterations=10,
+        )
+        result = IterationResult(action=IterationAction.CONTINUE)
+        assert handler.should_continue_loop(result, ctx) is False
+
+    def test_stops_on_force_completion_without_tools(self, handler):
+        """Returns False when force completion and no tool calls."""
+        ctx = StreamingChatContext(user_message="test", force_completion=True)
+        result = IterationResult(action=IterationAction.CONTINUE)
+        assert handler.should_continue_loop(result, ctx) is False
+
+    def test_continues_on_force_completion_with_tools(self, handler):
+        """Returns True when force completion but has tool calls."""
+        ctx = StreamingChatContext(user_message="test", force_completion=True)
+        result = IterationResult(
+            action=IterationAction.CONTINUE,
+            tool_calls=[{"name": "test", "arguments": {}}],
+        )
+        # Force completion with tool calls should still process tools
+        # Implementation may vary, but typically we let tool calls complete
+        # This test documents expected behavior
+        assert handler.should_continue_loop(result, ctx) is True

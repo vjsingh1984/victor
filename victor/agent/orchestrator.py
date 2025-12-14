@@ -122,6 +122,7 @@ from victor.agent.context_compactor import (
     ContextCompactor,
     TruncationStrategy,
     create_context_compactor,
+    calculate_parallel_read_budget,
 )
 from victor.agent.usage_analytics import (
     UsageAnalytics,
@@ -130,6 +131,18 @@ from victor.agent.usage_analytics import (
 from victor.agent.tool_sequence_tracker import (
     ToolSequenceTracker,
     create_sequence_tracker,
+)
+from victor.agent.recovery import (
+    RecoveryHandler,
+    RecoveryOutcome,
+    FailureType,
+    RecoveryAction,
+)
+from victor.agent.protocols import RecoveryHandlerProtocol
+from victor.agent.orchestrator_recovery import (
+    OrchestratorRecoveryIntegration,
+    create_recovery_integration,
+    RecoveryAction as OrchestratorRecoveryAction,
 )
 from victor.agent.tool_output_formatter import (
     ToolOutputFormatter,
@@ -202,6 +215,13 @@ from victor.tools.tool_names import ToolNames, TOOL_ALIASES
 from victor.embeddings.intent_classifier import IntentClassifier, IntentType
 from victor.workflows.base import WorkflowRegistry
 from victor.workflows.new_feature_workflow import NewFeatureWorkflow
+
+# Streaming submodule - extracted for testability
+from victor.agent.streaming import (
+    StreamingChatContext,
+    StreamingChatHandler,
+    create_stream_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -940,6 +960,16 @@ class AgentOrchestrator:
             on_session_complete=self._on_streaming_session_complete,
         )
 
+        # StreamingChatHandler: Testable extraction of streaming loop logic
+        # This component encapsulates limit checking, response processing, and iteration control
+        # Uses orchestrator as message_adder since we implement add_message()
+        session_time_limit = getattr(settings, "session_time_limit", 240.0)
+        self._streaming_handler = StreamingChatHandler(
+            settings=settings,
+            message_adder=self,  # Orchestrator implements add_message()
+            session_time_limit=session_time_limit,
+        )
+
         # TaskAnalyzer: Unified task analysis facade
         self._task_analyzer = get_task_analyzer()
 
@@ -963,7 +993,7 @@ class AgentOrchestrator:
             controller=self._conversation_controller,
             proactive_threshold=getattr(settings, "context_proactive_threshold", 0.90),
             min_messages_after_compact=getattr(settings, "context_min_messages_after_compact", 8),
-            tool_result_max_chars=getattr(settings, "max_tool_output_chars", 8000),
+            tool_result_max_chars=getattr(settings, "max_tool_output_chars", 8192),
             tool_result_max_lines=getattr(settings, "max_tool_output_lines", 200),
             truncation_strategy=truncation_strategy,
             preserve_code_blocks=True,
@@ -1004,6 +1034,38 @@ class AgentOrchestrator:
             truncator=self._context_compactor,  # Use context compactor for smart truncation
         )
 
+        # Initialize RecoveryHandler for handling model failures and stuck states
+        # Uses DI container with fallback to direct instantiation
+        # Integrates with existing framework components:
+        # - QLearningStore from adaptive_mode_controller for recovery action learning
+        # - UsageAnalytics singleton for recording recovery metrics
+        # - ContextCompactor for proactive context management
+        self._recovery_handler = self._container.get_optional(RecoveryHandlerProtocol)
+        if self._recovery_handler is None:
+            # Fallback to direct instantiation if DI container not configured
+            enable_recovery = getattr(settings, "enable_recovery_system", True)
+            if enable_recovery:
+                try:
+                    self._recovery_handler = RecoveryHandler.create(settings=settings)
+                    logger.debug("RecoveryHandler created via fallback (direct instantiation)")
+                except Exception as e:
+                    logger.warning(f"RecoveryHandler creation failed: {e}")
+                    self._recovery_handler = None
+            else:
+                self._recovery_handler = None
+
+        # Wire context compactor if recovery handler exists
+        if self._recovery_handler and hasattr(self._recovery_handler, "set_context_compactor"):
+            self._recovery_handler.set_context_compactor(self._context_compactor)
+            logger.debug("RecoveryHandler wired with ContextCompactor")
+
+        # Create recovery integration submodule for clean delegation
+        # This encapsulates recovery logic, making stream_chat cleaner
+        self._recovery_integration = create_recovery_integration(
+            recovery_handler=self._recovery_handler,
+            settings=settings,
+        )
+
         # Initialize ObservabilityIntegration for unified event bus
         # This provides automatic event emission for tool execution, state changes, and errors
         enable_observability = getattr(settings, "enable_observability", True)
@@ -1018,9 +1080,9 @@ class AgentOrchestrator:
 
         logger.info(
             "Orchestrator initialized with decomposed components: "
-            "ConversationController, ToolPipeline, StreamingController, TaskAnalyzer, "
-            "ContextCompactor, UsageAnalytics, ToolSequenceTracker, ToolOutputFormatter, "
-            "ObservabilityIntegration"
+            "ConversationController, ToolPipeline, StreamingController, StreamingChatHandler, "
+            "TaskAnalyzer, ContextCompactor, UsageAnalytics, ToolSequenceTracker, "
+            "ToolOutputFormatter, RecoveryCoordinator, ObservabilityIntegration"
         )
 
     # =====================================================================
@@ -1154,6 +1216,15 @@ class AgentOrchestrator:
         return self._streaming_controller
 
     @property
+    def streaming_handler(self) -> StreamingChatHandler:
+        """Get the streaming chat handler component.
+
+        Returns:
+            StreamingChatHandler instance for testable streaming loop logic
+        """
+        return self._streaming_handler
+
+    @property
     def task_analyzer(self) -> TaskAnalyzer:
         """Get the task analyzer component.
 
@@ -1229,6 +1300,24 @@ class AgentOrchestrator:
         return self._sequence_tracker
 
     @property
+    def recovery_handler(self) -> Optional[RecoveryHandler]:
+        """Get the recovery handler for model failure recovery.
+
+        Returns:
+            RecoveryHandler instance or None if not enabled
+        """
+        return self._recovery_handler
+
+    @property
+    def recovery_integration(self) -> OrchestratorRecoveryIntegration:
+        """Get the recovery integration submodule.
+
+        Returns:
+            OrchestratorRecoveryIntegration for delegated recovery handling
+        """
+        return self._recovery_integration
+
+    @property
     def code_correction_middleware(self) -> Optional[Any]:
         """Get the code correction middleware for automatic code validation/fixing.
 
@@ -1260,15 +1349,30 @@ class AgentOrchestrator:
                 # Synchronous initialization (async version available via enhance_orchestrator)
                 from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
 
+                # Determine project root for grounding verification
+                # Context file is at .victor/init.md, so project root is grandparent
+                from victor.config.settings import get_project_paths
+                from victor.context.project_context import VICTOR_DIR_NAME
+
+                if self.project_context.context_file:
+                    # Context file: /project/.victor/init.md
+                    # Parent: /project/.victor/ (not what we want)
+                    # If parent is .victor dir, use grandparent as project root
+                    parent_dir = self.project_context.context_file.parent
+                    if parent_dir.name == VICTOR_DIR_NAME:
+                        intelligent_project_root = str(parent_dir.parent)
+                    else:
+                        # Legacy case: context file directly in project root
+                        intelligent_project_root = str(parent_dir)
+                else:
+                    # Fall back to project paths (which uses cwd)
+                    intelligent_project_root = str(get_project_paths().project_root)
+
                 pipeline = IntelligentAgentPipeline(
                     provider_name=self.provider_name,
                     model=self.model,
                     profile_name=f"{self.provider_name}:{self.model}",
-                    project_root=(
-                        str(self.project_context.context_file.parent)
-                        if self.project_context.context_file
-                        else None
-                    ),
+                    project_root=intelligent_project_root,
                 )
                 self._intelligent_integration = OrchestratorIntegration(
                     orchestrator=self,
@@ -1320,16 +1424,19 @@ class AgentOrchestrator:
             )
 
             # Apply recommended tool budget if available (skip if user made a sticky override)
+            # NOTE: We no longer reduce the budget based on pipeline recommendations.
+            # The pipeline may suggest a smaller budget based on Q-learning, but this
+            # caused premature stopping (e.g., 50 -> 5). The user's budget is authoritative.
+            # We only log the recommendation for debugging purposes.
             if context.recommended_tool_budget:
                 sticky_budget = getattr(self.unified_tracker, "_sticky_user_budget", False)
                 if not sticky_budget:
                     current_budget = self.unified_tracker.progress.tool_budget
-                    # Only adjust if recommendation differs significantly
-                    if abs(context.recommended_tool_budget - current_budget) > 5:
-                        new_budget = min(context.recommended_tool_budget, current_budget)
-                        self.unified_tracker.set_tool_budget(new_budget)
-                        logger.info(
-                            f"IntelligentPipeline adjusted tool budget: {current_budget} -> {new_budget}"
+                    # Only log significant differences, but don't reduce the budget
+                    if abs(context.recommended_tool_budget - current_budget) > 10:
+                        logger.debug(
+                            f"IntelligentPipeline recommended budget {context.recommended_tool_budget} "
+                            f"differs from current {current_budget}, keeping current budget"
                         )
 
             return {
@@ -1486,6 +1593,81 @@ class AgentOrchestrator:
             AutoCommitter instance or None if not enabled
         """
         return self._auto_committer
+
+    # =========================================================================
+    # Vertical Extension Support
+    # =========================================================================
+
+    def apply_vertical_middleware(self, middleware_list: List[Any]) -> None:
+        """Apply middleware from vertical extensions.
+
+        Called by FrameworkShim after orchestrator creation to inject
+        vertical-specific middleware. This enables the middleware chain
+        pattern for tool execution.
+
+        Args:
+            middleware_list: List of MiddlewareProtocol implementations.
+        """
+        if not middleware_list:
+            return
+
+        # Store middleware for use during tool execution
+        self._vertical_middleware = middleware_list
+
+        # Initialize middleware chain if not present
+        if not hasattr(self, "_middleware_chain") or self._middleware_chain is None:
+            try:
+                from victor.agent.middleware_chain import MiddlewareChain
+
+                self._middleware_chain = MiddlewareChain()
+            except ImportError:
+                logger.warning("MiddlewareChain not available")
+                return
+
+        # Add all middleware to chain
+        for middleware in middleware_list:
+            self._middleware_chain.add(middleware)
+
+        logger.debug(f"Applied {len(middleware_list)} vertical middleware")
+
+    def apply_vertical_safety_patterns(self, patterns: List[Any]) -> None:
+        """Apply safety patterns from vertical extensions.
+
+        Called by FrameworkShim to inject vertical-specific danger patterns
+        into the safety checker.
+
+        Args:
+            patterns: List of SafetyPattern objects.
+        """
+        if not patterns:
+            return
+
+        # Store patterns for reference
+        self._vertical_safety_patterns = patterns
+
+        # Add patterns to safety checker
+        if self._safety_checker is not None:
+            try:
+                # Convert SafetyPattern to the format SafetyChecker expects
+                for pattern in patterns:
+                    self._safety_checker.add_custom_pattern(
+                        pattern=pattern.pattern,
+                        description=pattern.description,
+                        risk_level=pattern.risk_level,
+                        category=pattern.category,
+                    )
+                logger.debug(f"Applied {len(patterns)} vertical safety patterns")
+            except AttributeError:
+                # SafetyChecker might not support add_custom_pattern
+                logger.debug("SafetyChecker does not support add_custom_pattern")
+
+    def get_middleware_chain(self) -> Optional[Any]:
+        """Get the middleware chain for tool execution.
+
+        Returns:
+            MiddlewareChain instance or None if not initialized.
+        """
+        return getattr(self, "_middleware_chain", None)
 
     @property
     def messages(self) -> List[Message]:
@@ -2405,8 +2587,23 @@ class AgentOrchestrator:
         return result
 
     def _build_system_prompt_with_adapter(self) -> str:
-        """Build system prompt using the tool calling adapter."""
-        return self.prompt_builder.build()
+        """Build system prompt using the tool calling adapter.
+
+        Includes dynamic parallel read budget based on model's context window.
+        """
+        base_prompt = self.prompt_builder.build()
+
+        # Calculate dynamic parallel read budget based on model context window
+        context_window = self._get_model_context_window()
+        budget = calculate_parallel_read_budget(context_window)
+
+        # Inject dynamic budget hint for models with reasonable context
+        # Only add for models with >= 32K context (smaller models benefit from sequential reads)
+        if context_window >= 32768:
+            budget_hint = budget.to_prompt_hint()
+            return f"{base_prompt}\n\n{budget_hint}"
+
+        return base_prompt
 
     def _strip_markup(self, text: str) -> str:
         """Remove simple XML/HTML-like tags to salvage plain text."""
@@ -2423,6 +2620,86 @@ class AgentOrchestrator:
     def _is_valid_tool_name(self, name: str) -> bool:
         """Check if a tool name is valid and not a hallucination."""
         return self.sanitizer.is_valid_tool_name(name)
+
+    def _infer_git_operation(
+        self, original_name: str, canonical_name: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Infer git operation from alias when not explicitly provided.
+
+        When the model calls 'git_log' instead of 'git' with operation='log',
+        we need to infer the operation from the alias.
+
+        Args:
+            original_name: Original tool name from model (e.g., 'git_log')
+            canonical_name: Resolved canonical name (e.g., 'git')
+            args: Tool arguments
+
+        Returns:
+            Updated args with inferred operation if applicable
+        """
+        # Only process git tool with operation-based aliases
+        if canonical_name != "git":
+            return args
+
+        # If operation already provided, no inference needed
+        if args.get("operation"):
+            return args
+
+        # Map alias suffixes to operation names
+        alias_to_operation = {
+            "git_status": "status",
+            "git_diff": "diff",
+            "git_log": "log",
+            "git_commit": "commit",
+            "git_branch": "branch",
+            "git_stage": "stage",
+        }
+
+        inferred_op = alias_to_operation.get(original_name)
+        if inferred_op:
+            logger.debug(
+                f"Inferred git operation '{inferred_op}' from alias '{original_name}'"
+            )
+            args = dict(args)  # Copy to avoid mutation
+            args["operation"] = inferred_op
+
+        return args
+
+    def _resolve_shell_variant(self, tool_name: str) -> str:
+        """Resolve shell aliases to the appropriate enabled shell variant.
+
+        LLMs often hallucinate shell tool names like 'run', 'bash', 'execute'.
+        These map to 'shell' canonically, but in INITIAL stage only 'shell_readonly'
+        may be enabled. This method resolves to whichever shell variant is available.
+
+        Args:
+            tool_name: Original tool name (may be alias like 'run')
+
+        Returns:
+            The appropriate enabled shell tool name, or original if not a shell alias
+        """
+        from victor.tools.tool_names import get_canonical_name, ToolNames
+
+        # Shell-related aliases that should resolve intelligently
+        shell_aliases = {"run", "bash", "execute", "cmd", "execute_bash"}
+
+        if tool_name not in shell_aliases:
+            return tool_name
+
+        # Check if full shell is enabled first
+        if self.tools.is_tool_enabled(ToolNames.SHELL):
+            logger.debug(f"Resolved '{tool_name}' to 'shell' (shell enabled)")
+            return ToolNames.SHELL
+
+        # Fall back to shell_readonly if enabled
+        if self.tools.is_tool_enabled(ToolNames.SHELL_READONLY):
+            logger.debug(f"Resolved '{tool_name}' to 'shell_readonly' (readonly mode)")
+            return ToolNames.SHELL_READONLY
+
+        # Neither enabled - return canonical name (will fail validation)
+        canonical = get_canonical_name(tool_name)
+        logger.debug(f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'")
+        return canonical
 
     def _get_thinking_disabled_prompt(self, base_prompt: str) -> str:
         """Prefix a prompt with the thinking disable prefix if supported.
@@ -2625,6 +2902,7 @@ class AgentOrchestrator:
         continuation_prompts: int,
         asking_input_prompts: int,
         one_shot_mode: bool,
+        mentioned_tools: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Determine what continuation action to take when model doesn't call tools.
 
@@ -2641,12 +2919,13 @@ class AgentOrchestrator:
             continuation_prompts: Current count of continuation prompts sent
             asking_input_prompts: Current count of asking-input auto-responses
             one_shot_mode: Whether running in non-interactive mode
+            mentioned_tools: Tools mentioned but not executed (hallucinated tool calls)
 
         Returns:
             Dictionary with:
             - action: str - One of: "continue_asking_input", "return_to_user",
                           "prompt_tool_call", "request_summary",
-                          "request_completion", "finish"
+                          "request_completion", "finish", "force_tool_execution"
             - message: Optional[str] - System message to inject (if any)
             - reason: str - Human-readable reason for the action
             - updates: Dict - State updates (continuation_prompts, asking_input_prompts)
@@ -2656,6 +2935,27 @@ class AgentOrchestrator:
         intends_to_continue = intent_result.intent == IntentType.CONTINUATION
         is_completion = intent_result.intent == IntentType.COMPLETION
         is_asking_input = intent_result.intent == IntentType.ASKING_INPUT
+        is_stuck_loop = intent_result.intent == IntentType.STUCK_LOOP
+
+        # CRITICAL FIX: Handle stuck loop immediately - model is planning but not executing
+        if is_stuck_loop:
+            logger.warning(
+                f"Detected STUCK_LOOP intent - model is planning but not executing. "
+                f"Forcing summary."
+            )
+            return {
+                "action": "request_summary",
+                "message": (
+                    "You appear to be stuck in a planning loop - you keep describing what "
+                    "you will do but are not making actual tool calls.\n\n"
+                    "Please either:\n"
+                    "1. Make an ACTUAL tool call NOW (not just describe it), OR\n"
+                    "2. Provide your response based on what you already know.\n\n"
+                    "Do not describe what you will do - just do it or provide your answer."
+                ),
+                "reason": "STUCK_LOOP detected - forcing summary",
+                "updates": {"continuation_prompts": 99},  # Prevent further prompting
+            }
 
         # Configuration - use configurable thresholds from settings
         max_asking_input_prompts = 3
@@ -2682,6 +2982,50 @@ class AgentOrchestrator:
         # State updates to apply
         updates: Dict[str, int] = {}
 
+        # CRITICAL FIX: Handle tool mention without execution (hallucinated tool calls)
+        # If model says "let me call search()" but didn't actually call it, force action
+        if mentioned_tools and len(mentioned_tools) > 0:
+            # Track consecutive hallucinated tool mentions
+            if not hasattr(self, "_hallucinated_tool_count"):
+                self._hallucinated_tool_count = 0
+            self._hallucinated_tool_count += 1
+
+            # After 2 consecutive hallucinations, force a more aggressive response
+            if self._hallucinated_tool_count >= 2:
+                self._hallucinated_tool_count = 0  # Reset counter
+                updates["continuation_prompts"] = continuation_prompts + 2  # Double increment
+                return {
+                    "action": "force_tool_execution",
+                    "message": (
+                        f"CRITICAL: You mentioned using {', '.join(mentioned_tools)} but did NOT "
+                        "actually execute any tool call. Your response contained TEXT describing "
+                        "what you would do, but no actual tool invocation.\n\n"
+                        "You MUST respond with an ACTUAL tool call in the proper format. "
+                        "Do NOT describe what you will do - just DO it.\n\n"
+                        "Example correct format:\n"
+                        '{"name": "read", "arguments": {"path": "some/file.py"}}\n\n'
+                        "If you cannot call tools, provide your final answer NOW."
+                    ),
+                    "reason": f"Forcing tool execution after {self._hallucinated_tool_count + 2} hallucinated tool mentions",
+                    "updates": updates,
+                }
+            else:
+                updates["continuation_prompts"] = continuation_prompts + 1
+                return {
+                    "action": "prompt_tool_call",
+                    "message": (
+                        f"You mentioned {', '.join(mentioned_tools)} but did not call any tool. "
+                        "Please ACTUALLY call the tool now, or provide your analysis.\n\n"
+                        "DO NOT just describe what you will do - make the actual tool call."
+                    ),
+                    "reason": f"Tool mentioned but not executed: {mentioned_tools}",
+                    "updates": updates,
+                }
+
+        # Reset hallucinated tool count on successful non-hallucination
+        if hasattr(self, "_hallucinated_tool_count"):
+            self._hallucinated_tool_count = 0
+
         # Handle model asking for user input
         if is_asking_input:
             if one_shot_mode and asking_input_prompts < max_asking_input_prompts:
@@ -2704,11 +3048,11 @@ class AgentOrchestrator:
                 }
 
         # Check for structured content that indicates completion
-        has_substantial_structured_content = content_length > 200 and any(
+        has_substantial_structured_content = content_length > 500 and any(
             marker in (full_content or "")
             for marker in ["## ", "**Summary", "**Strengths", "**Weaknesses"]
         )
-        content_looks_incomplete = content_length < 500 and not has_substantial_structured_content
+        content_looks_incomplete = content_length < 800 and not has_substantial_structured_content
 
         # Determine if we should prompt for continuation
         should_prompt_continuation = intends_to_continue or (
@@ -2716,6 +3060,31 @@ class AgentOrchestrator:
             and content_looks_incomplete
             and not is_completion
         )
+
+        # CRITICAL FIX: Detect stuck continuation loop pattern
+        # If model keeps saying "let me read" but never calls tools, after 2 prompts
+        # stop prompting and force a summary instead
+        if (
+            intends_to_continue
+            and continuation_prompts >= 2
+            and self.tool_calls_used == 0
+        ):
+            # Model is in a continuation loop without making any progress
+            logger.warning(
+                f"Detected stuck continuation loop: {continuation_prompts} prompts, "
+                f"0 tool calls, intent={intent_result.intent.name}"
+            )
+            updates["continuation_prompts"] = 99  # Prevent further prompting
+            return {
+                "action": "request_summary",
+                "message": (
+                    "You have been saying you will examine files but have not made any tool calls. "
+                    "Please provide your response NOW based on what you know, or explain "
+                    "specifically what is preventing you from making tool calls."
+                ),
+                "reason": "Stuck continuation loop - no tool calls after multiple prompts",
+                "updates": updates,
+            }
 
         # Prompt model to make tool call if appropriate
         if (
@@ -3586,6 +3955,66 @@ class AgentOrchestrator:
             complexity_tool_budget,
         )
 
+    async def _create_stream_context(self, user_message: str) -> StreamingChatContext:
+        """Create a StreamingChatContext with all prepared data.
+
+        This method encapsulates _prepare_stream results into a StreamingChatContext,
+        enabling use of the StreamingChatHandler for testable iteration logic.
+
+        Args:
+            user_message: The user's message
+
+        Returns:
+            Populated StreamingChatContext ready for the streaming loop
+        """
+        # Get all prepared data from _prepare_stream
+        (
+            stream_metrics,
+            start_time,
+            total_tokens,
+            cumulative_usage,
+            max_total_iterations,
+            max_exploration_iterations,
+            total_iterations,
+            force_completion,
+            unified_task_type,
+            task_classification,
+            complexity_tool_budget,
+        ) = await self._prepare_stream(user_message)
+
+        # Classify task type based on keywords
+        task_keywords = self._classify_task_keywords(user_message)
+
+        # Create and populate context
+        ctx = create_stream_context(
+            user_message=user_message,
+            max_iterations=max_total_iterations,
+            max_exploration=max_exploration_iterations,
+            tool_budget=complexity_tool_budget,
+        )
+
+        # Populate context with prepared data
+        ctx.stream_metrics = stream_metrics
+        ctx.start_time = start_time
+        ctx.total_tokens = total_tokens
+        ctx.cumulative_usage = cumulative_usage
+        ctx.total_iterations = total_iterations
+        ctx.force_completion = force_completion
+        ctx.unified_task_type = unified_task_type
+        ctx.task_classification = task_classification
+        ctx.complexity_tool_budget = complexity_tool_budget
+
+        # Add task keyword results
+        ctx.is_analysis_task = task_keywords["is_analysis_task"]
+        ctx.is_action_task = task_keywords["is_action_task"]
+        ctx.needs_execution = task_keywords["needs_execution"]
+        ctx.coarse_task_type = task_keywords["coarse_task_type"]
+
+        # Set goals for tool selection
+        ctx.goals = self._goal_hints_for_message(user_message)
+
+        return ctx
+
     def _prepare_task(self, user_message: str, unified_task_type: TaskType) -> tuple[Any, int]:
         """Prepare task-specific guidance and budget adjustments."""
         # Inject task-specific prompt hint for better guidance
@@ -3735,6 +4164,56 @@ class AgentOrchestrator:
         tools = self._filter_tools_by_intent(tools)
         return tools
 
+    def _check_time_limit_with_handler(
+        self,
+        stream_ctx: StreamingChatContext,
+    ) -> Optional[StreamChunk]:
+        """Check time limit using the streaming handler.
+
+        This delegates to the StreamingChatHandler for testable time limit logic.
+
+        Args:
+            stream_ctx: The streaming context
+
+        Returns:
+            StreamChunk if time limit reached, None otherwise
+        """
+        result = self._streaming_handler.check_time_limit(stream_ctx)
+        if result:
+            # Record Q-learning outcome
+            self._record_intelligent_outcome(
+                success=stream_ctx.total_accumulated_chars > 200,
+                quality_score=0.4 if stream_ctx.total_accumulated_chars > 200 else 0.2,
+                user_satisfied=False,
+                completed=False,
+            )
+            # Return the chunk from the result
+            if result.chunks:
+                return result.chunks[0]
+            return StreamChunk(
+                content=f"\n\n⏱️ Session time limit reached. "
+                "Providing summary of progress so far.\n",
+                is_final=False,
+            )
+        return None
+
+    def _check_iteration_limit_with_handler(
+        self,
+        stream_ctx: StreamingChatContext,
+    ) -> Optional[StreamChunk]:
+        """Check iteration limit using the streaming handler.
+
+        Args:
+            stream_ctx: The streaming context
+
+        Returns:
+            StreamChunk if iteration limit reached, None otherwise
+        """
+        result = self._streaming_handler.check_iteration_limit(stream_ctx)
+        if result and result.chunks:
+            return result.chunks[0]
+        return None
+
     def _parse_and_validate_tool_calls(
         self,
         tool_calls: Optional[List[Dict[str, Any]]],
@@ -3786,6 +4265,11 @@ class AgentOrchestrator:
             valid_tool_calls = []
             for tc in tool_calls:
                 name = tc.get("name", "")
+                # Resolve shell aliases to appropriate enabled variant (run → shell_readonly in INITIAL)
+                resolved_name = self._resolve_shell_variant(name)
+                if resolved_name != name:
+                    tc["name"] = resolved_name
+                    name = resolved_name
                 is_enabled = self.tools.is_tool_enabled(name)
                 logger.debug(f"Tool '{name}' enabled={is_enabled}")
                 if is_enabled:
@@ -3938,35 +4422,39 @@ class AgentOrchestrator:
 
         The stream can be cancelled by calling request_cancellation(). When cancelled,
         the stream will yield a final chunk indicating cancellation and stop.
+
+        This method now uses StreamingChatContext to centralize state management,
+        enabling testable iteration logic via StreamingChatHandler.
         """
-        # Initialize and prepare
-        (
-            stream_metrics,
-            start_time,
-            total_tokens,
-            cumulative_usage,
-            max_total_iterations,
-            max_exploration_iterations,
-            total_iterations,
-            force_completion,
-            unified_task_type,
-            task_classification,
-            complexity_tool_budget,
-        ) = await self._prepare_stream(user_message)
+        # Initialize and prepare using StreamingChatContext
+        stream_ctx = await self._create_stream_context(user_message)
+
+        # Store context reference for handler delegation methods
+        self._current_stream_context = stream_ctx
+
+        # Create local aliases from context for backward compatibility
+        # These will be gradually removed as we migrate to context-based access
+        stream_metrics = stream_ctx.stream_metrics
+        start_time = stream_ctx.start_time
+        total_tokens = stream_ctx.total_tokens
+        cumulative_usage = stream_ctx.cumulative_usage
+        max_total_iterations = stream_ctx.max_total_iterations
+        max_exploration_iterations = stream_ctx.max_exploration_iterations
+        total_iterations = stream_ctx.total_iterations
+        force_completion = stream_ctx.force_completion
+        unified_task_type = stream_ctx.unified_task_type
+        task_classification = stream_ctx.task_classification
+        complexity_tool_budget = stream_ctx.complexity_tool_budget
+
+        # Task classification from context
+        is_action_task = stream_ctx.is_action_task
+        is_analysis_task = stream_ctx.is_analysis_task
+        needs_execution = stream_ctx.needs_execution
+        coarse_task_type = stream_ctx.coarse_task_type
+        context_msg = stream_ctx.context_msg
 
         # Detect intent and inject prompt guard for non-write tasks
         self._apply_intent_guard(user_message)
-
-        # Get tool definitions
-        # Iteratively stream → run tools → stream follow-up until no tool calls or budget exhausted
-        context_msg = user_message
-
-        # Classify task type based on keywords
-        task_keywords = self._classify_task_keywords(user_message)
-        is_action_task = task_keywords["is_action_task"]
-        is_analysis_task = task_keywords["is_analysis_task"]
-        needs_execution = task_keywords["needs_execution"]
-        coarse_task_type = task_keywords["coarse_task_type"]
 
         # For compound analysis+edit tasks, unified_tracker handles exploration limits
         if is_analysis_task and unified_task_type.value in ("edit", "create"):
@@ -4031,7 +4519,13 @@ class AgentOrchestrator:
         self.debug_logger.reset()
 
         # Track quality score for Q-learning outcome recording
-        last_quality_score = 0.5
+        # (also stored in stream_ctx.last_quality_score)
+        last_quality_score = stream_ctx.last_quality_score
+
+        # Track accumulated content - use context for centralized state
+        # Local alias for backward compatibility
+        total_accumulated_chars = stream_ctx.total_accumulated_chars
+        substantial_content_threshold = stream_ctx.substantial_content_threshold
 
         while True:
             cancellation_chunk = self._handle_cancellation(last_quality_score)
@@ -4043,8 +4537,22 @@ class AgentOrchestrator:
             if compaction_chunk:
                 yield compaction_chunk
 
+            # Sync local state to context before handler checks
+            stream_ctx.total_accumulated_chars = total_accumulated_chars
+            stream_ctx.force_completion = force_completion
+
+            # Check session time limit using handler delegation (testable)
+            time_limit_chunk = self._check_time_limit_with_handler(stream_ctx)
+            if time_limit_chunk:
+                yield time_limit_chunk
+                # Sync context state back to local
+                force_completion = stream_ctx.force_completion
+                # Force the model to summarize (handler already added message)
+
             # Check hard iteration limit
             total_iterations += 1
+            # Sync iteration count to context
+            stream_ctx.total_iterations = total_iterations
             unique_resources = self.unified_tracker.unique_resources
             logger.debug(
                 f"Iteration {total_iterations}/{max_total_iterations}: "
@@ -4126,6 +4634,9 @@ class AgentOrchestrator:
                         args_str = args_str[:500] + "...(truncated)"
                     logger.debug(f"  [{i+1}] {tc_name}: {args_str}")
 
+            # Initialize mentioned_tools_detected for later use in continuation action
+            mentioned_tools_detected: List[str] = []
+
             if full_content:
                 # Sanitize response to remove malformed patterns from local models
                 sanitized = self._sanitize_response(full_content)
@@ -4138,16 +4649,28 @@ class AgentOrchestrator:
                         self.add_message("assistant", plain_text)
 
                 # Check if model mentioned tools but didn't execute them
+                # Store for use in continuation action decision
                 if not tool_calls:
-                    mentioned_tools = _detect_mentioned_tools(full_content)
-                    if mentioned_tools:
-                        tools_str = ", ".join(mentioned_tools)
+                    mentioned_tools_detected = _detect_mentioned_tools(full_content)
+                    if mentioned_tools_detected:
+                        tools_str = ", ".join(mentioned_tools_detected)
                         logger.warning(
                             f"Model mentioned tool(s) [{tools_str}] but did not execute them. "
                             "This may indicate the model is hallucinating tool calls."
                         )
             elif not tool_calls:
-                # No content and no tool calls; attempt aggressive recovery
+                # No content and no tool calls - but check if substantial content was already provided
+                # If we already gave the user a good response, treat this as natural completion
+                if total_accumulated_chars >= substantial_content_threshold:
+                    logger.info(
+                        f"Model returned empty after {total_accumulated_chars} chars of content - "
+                        "treating as natural completion (skipping recovery)"
+                    )
+                    # Yield final chunk and return - task is complete
+                    yield StreamChunk(content="", is_final=True)
+                    return
+
+                # No substantial content yet - attempt aggressive recovery
                 logger.warning("Model returned empty response - attempting aggressive recovery")
 
                 # Track empty responses as they may indicate model is stuck after blocking
@@ -4198,16 +4721,18 @@ class AgentOrchestrator:
                         recovery_prompts = [
                             (
                                 self._get_thinking_disabled_prompt(
-                                    "The previous action did not complete. "
-                                    "Use ls(path='...') to list a directory or read(path='...') to read a file. "
-                                    "Continue exploring the codebase."
+                                    "The previous action did not complete. Use discovery tools:\n"
+                                    "- graph(mode='pagerank', top_k=5) to find important symbols\n"
+                                    "- search(query='...') for semantic code search\n"
+                                    "- overview(path='.') for project structure\n"
+                                    "Pick ONE tool to continue."
                                 ),
                                 min(self.temperature + 0.1, 0.7),
                             ),
                             (
                                 self._get_thinking_disabled_prompt(
-                                    "Call a tool to continue: ls(path='.') or read(path='filename'). "
-                                    "Pick a file or directory to examine."
+                                    "Call a tool: search(query='main') or read(path='filename'). "
+                                    "Pick a file to examine."
                                 ),
                                 min(self.temperature + 0.2, 0.8),
                             ),
@@ -4221,16 +4746,16 @@ class AgentOrchestrator:
                     else:
                         recovery_prompts = [
                             (
-                                "The previous action did not complete. Continue by calling a tool:\n"
-                                "- Use ls(path='...') to list a directory\n"
-                                "- Use read(path='...') to read a file\n"
-                                "- Use search(query='...') to find code\n"
-                                "Make a tool call to continue exploring.",
+                                "The previous action did not complete. Use discovery tools:\n"
+                                "- graph(mode='pagerank', top_k=5) - find important symbols\n"
+                                "- search(query='...') - semantic code search\n"
+                                "- overview(path='.') - project structure\n"
+                                "- refs(symbol_name='...') - find usages\n"
+                                "Make ONE tool call to continue exploring.",
                                 min(self.temperature + 0.2, 1.0),
                             ),
                             (
-                                "Call ls(path='.') to see what's in the current directory, "
-                                "or read(path='filename') to examine a specific file. "
+                                "Call search(query='main') or read(path='filename') to examine code. "
                                 "Continue your analysis.",
                                 min(self.temperature + 0.3, 1.0),
                             ),
@@ -4474,6 +4999,12 @@ class AgentOrchestrator:
                         if sanitized:
                             logger.debug(f"Yielding content to UI: {len(sanitized)} chars")
                             yield StreamChunk(content=sanitized)
+                            # Track accumulated content - use context method for consistency
+                            stream_ctx.accumulate_content(sanitized)
+                            total_accumulated_chars = stream_ctx.total_accumulated_chars
+                            logger.debug(
+                                f"Total accumulated content: {total_accumulated_chars} chars"
+                            )
                             # Clear full_content to prevent duplicate output later
                             full_content = ""
 
@@ -4519,6 +5050,7 @@ class AgentOrchestrator:
                         continuation_prompts=self._continuation_prompts,
                         asking_input_prompts=self._asking_input_prompts,
                         one_shot_mode=one_shot_mode,
+                        mentioned_tools=mentioned_tools_detected,  # Pass hallucinated tool mentions
                     )
 
                     # Apply state updates from action result
@@ -4563,19 +5095,45 @@ class AgentOrchestrator:
                         return
 
                     # Handle action: prompt_tool_call
+                    # NOTE: Use "user" role instead of "system" because many models
+                    # (especially Qwen, Ollama local models) don't handle mid-conversation
+                    # system messages well - they expect system messages only at the start.
+                    # Using "user" role ensures the continuation prompt is processed correctly.
                     elif action == "prompt_tool_call":
-                        self.add_message("system", action_result["message"])
+                        self.add_message("user", action_result["message"])
                         self.unified_tracker.increment_turn()
                         skip_rest = True
 
                     # Handle action: request_summary
                     elif action == "request_summary":
-                        self.add_message("system", action_result["message"])
+                        self.add_message("user", action_result["message"])
                         skip_rest = True
 
                     # Handle action: request_completion
                     elif action == "request_completion":
-                        self.add_message("system", action_result["message"])
+                        self.add_message("user", action_result["message"])
+                        skip_rest = True
+
+                    # Handle action: force_tool_execution (for hallucinated tool mentions)
+                    elif action == "force_tool_execution":
+                        # Use stronger prompting and lower temperature on retry
+                        self.add_message("user", action_result["message"])
+                        self.unified_tracker.increment_turn()
+                        # Track that we're in forced tool execution mode
+                        if not hasattr(self, "_force_tool_execution_attempts"):
+                            self._force_tool_execution_attempts = 0
+                        self._force_tool_execution_attempts += 1
+                        # After 3 forced attempts, give up and request summary
+                        if self._force_tool_execution_attempts >= 3:
+                            logger.warning(
+                                "Giving up on forced tool execution after 3 attempts - requesting summary"
+                            )
+                            self.add_message(
+                                "user",
+                                "You are unable to make tool calls. Please provide your response "
+                                "NOW based on what you know. Do not mention any tools."
+                            )
+                            self._force_tool_execution_attempts = 0
                         skip_rest = True
 
                     if skip_rest:
@@ -5148,6 +5706,7 @@ class AgentOrchestrator:
                 break
 
             # Use the canonical name for execution and downstream bookkeeping
+            original_tool_name = tool_name  # Preserve for alias-based inference
             tool_name = canonical_tool_name
 
             tool_args = tool_call.get("arguments", {})
@@ -5172,6 +5731,11 @@ class AgentOrchestrator:
             # Apply adapter-based normalization for missing required parameters
             # This handles provider-specific quirks like Gemini omitting 'path' for list_directory
             normalized_args = self.tool_adapter.normalize_arguments(normalized_args, tool_name)
+
+            # Infer operation from alias for git tool (e.g., git_log → git with operation=log)
+            normalized_args = self._infer_git_operation(
+                original_tool_name, canonical_tool_name, normalized_args
+            )
 
             # Skip repeated failing calls with identical signature to avoid tight loops
             try:
