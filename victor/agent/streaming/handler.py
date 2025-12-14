@@ -530,6 +530,96 @@ class StreamingChatHandler:
         self.message_adder.add_message("user", message)
         return create_continue_result()
 
+    def check_tool_budget(
+        self, ctx: StreamingChatContext, warning_threshold: int = 250
+    ) -> Optional[IterationResult]:
+        """Check tool budget and generate warning if approaching limit.
+
+        Args:
+            ctx: The streaming context
+            warning_threshold: Number of tool calls before warning
+
+        Returns:
+            IterationResult with warning chunk if approaching limit, None otherwise
+        """
+        if ctx.is_approaching_budget_limit(warning_threshold):
+            result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
+            result.add_chunk(
+                StreamChunk(
+                    content=f"[tool] ⚠ Approaching tool budget limit: {ctx.tool_calls_used}/{ctx.tool_budget} calls used\n"
+                )
+            )
+            return result
+        return None
+
+    def check_budget_exhausted(self, ctx: StreamingChatContext) -> bool:
+        """Check if tool budget is exhausted.
+
+        Args:
+            ctx: The streaming context
+
+        Returns:
+            True if budget exhausted, False otherwise
+        """
+        return ctx.is_budget_exhausted()
+
+    def check_progress_and_force(
+        self, ctx: StreamingChatContext, base_max_consecutive: int = 8
+    ) -> bool:
+        """Check progress and set force_completion if stuck.
+
+        Args:
+            ctx: The streaming context
+            base_max_consecutive: Base limit for consecutive tool calls
+
+        Returns:
+            True if force_completion was set, False otherwise
+        """
+        if ctx.force_completion:
+            return False  # Already forcing
+
+        if not ctx.check_progress(base_max_consecutive):
+            logger.warning(
+                f"Forcing completion: {ctx.tool_calls_used} tool calls but only "
+                f"{len(ctx.unique_resources)} unique resources"
+            )
+            ctx.force_completion = True
+            return True
+        return False
+
+    def get_budget_exhausted_chunks(self, ctx: StreamingChatContext) -> List[StreamChunk]:
+        """Generate chunks for budget exhausted state.
+
+        Args:
+            ctx: The streaming context
+
+        Returns:
+            List of StreamChunks for budget exhausted warning
+        """
+        return [
+            StreamChunk(
+                content=f"[tool] ⚠ Tool budget reached ({ctx.tool_budget}); skipping tool calls.\n"
+            ),
+            StreamChunk(content="Generating final summary...\n"),
+        ]
+
+    def truncate_tool_calls(
+        self, tool_calls: List[Dict[str, Any]], ctx: StreamingChatContext
+    ) -> List[Dict[str, Any]]:
+        """Truncate tool calls to fit remaining budget.
+
+        Args:
+            tool_calls: List of tool calls to truncate
+            ctx: The streaming context
+
+        Returns:
+            Truncated list of tool calls
+        """
+        remaining = ctx.get_remaining_budget()
+        if not tool_calls:
+            return []
+        return tool_calls[:remaining]
+
 
 def create_streaming_handler(
     settings: "Settings",

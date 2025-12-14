@@ -4014,6 +4014,10 @@ class AgentOrchestrator:
         # Set goals for tool selection
         ctx.goals = self._goal_hints_for_message(user_message)
 
+        # Sync tool tracking from orchestrator to context
+        ctx.tool_budget = self.tool_budget
+        ctx.tool_calls_used = self.tool_calls_used
+
         return ctx
 
     def _prepare_task(self, user_message: str, unified_task_type: TaskType) -> tuple[Any, int]:
@@ -4324,6 +4328,55 @@ class AgentOrchestrator:
             stream_ctx, mentioned_tools, force_message
         )
         self.unified_tracker.increment_turn()
+
+    def _check_tool_budget_with_handler(
+        self, stream_ctx: StreamingChatContext
+    ) -> Optional[StreamChunk]:
+        """Check tool budget and return warning chunk if approaching limit.
+
+        Args:
+            stream_ctx: The streaming context
+
+        Returns:
+            StreamChunk with warning if approaching limit, None otherwise
+        """
+        warning_threshold = getattr(
+            self.settings, "tool_call_budget_warning_threshold", 250
+        )
+        result = self._streaming_handler.check_tool_budget(stream_ctx, warning_threshold)
+        if result and result.chunks:
+            return result.chunks[0]
+        return None
+
+    def _check_progress_with_handler(
+        self, stream_ctx: StreamingChatContext
+    ) -> bool:
+        """Check progress and set force_completion if stuck.
+
+        Args:
+            stream_ctx: The streaming context
+
+        Returns:
+            True if force_completion was set, False otherwise
+        """
+        base_max = getattr(self.settings, "max_consecutive_tool_calls", 8)
+        return self._streaming_handler.check_progress_and_force(stream_ctx, base_max)
+
+    def _truncate_tool_calls_with_handler(
+        self,
+        tool_calls: List[Dict[str, Any]],
+        stream_ctx: StreamingChatContext,
+    ) -> List[Dict[str, Any]]:
+        """Truncate tool calls to fit remaining budget.
+
+        Args:
+            tool_calls: List of tool calls
+            stream_ctx: The streaming context
+
+        Returns:
+            Truncated list of tool calls
+        """
+        return self._streaming_handler.truncate_tool_calls(tool_calls, stream_ctx)
 
     def _parse_and_validate_tool_calls(
         self,

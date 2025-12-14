@@ -514,3 +514,163 @@ class TestHandleForceToolExecution:
         # Should have called add_message for "unable to make tool calls"
         call_content = mock_message_adder.add_message.call_args[0][1]
         assert "unable to make tool calls" in call_content
+
+
+class TestToolBudgetMethods:
+    """Tests for tool budget and progress checking methods."""
+
+    def test_check_tool_budget_below_threshold(self, handler):
+        """No warning when below threshold."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_budget=300,
+            tool_calls_used=100,
+        )
+        result = handler.check_tool_budget(ctx, warning_threshold=250)
+        assert result is None
+
+    def test_check_tool_budget_at_threshold(self, handler):
+        """Warning when at threshold."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_budget=300,
+            tool_calls_used=250,
+        )
+        result = handler.check_tool_budget(ctx, warning_threshold=250)
+        assert result is not None
+        assert result.chunks
+        assert "Approaching tool budget limit" in result.chunks[0].content
+
+    def test_check_tool_budget_exhausted_no_warning(self, handler):
+        """No warning when budget exhausted (0 remaining)."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_budget=200,
+            tool_calls_used=200,
+        )
+        result = handler.check_tool_budget(ctx, warning_threshold=250)
+        assert result is None  # No warning because remaining is 0
+
+    def test_check_budget_exhausted_true(self, handler):
+        """Budget exhausted returns True when no budget left."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_budget=100,
+            tool_calls_used=100,
+        )
+        assert handler.check_budget_exhausted(ctx) is True
+
+    def test_check_budget_exhausted_false(self, handler):
+        """Budget exhausted returns False when budget remains."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_budget=100,
+            tool_calls_used=50,
+        )
+        assert handler.check_budget_exhausted(ctx) is False
+
+    def test_get_budget_exhausted_chunks(self, handler):
+        """Budget exhausted generates correct chunks."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_budget=200,
+        )
+        chunks = handler.get_budget_exhausted_chunks(ctx)
+        assert len(chunks) == 2
+        assert "Tool budget reached (200)" in chunks[0].content
+        assert "Generating final summary" in chunks[1].content
+
+    def test_truncate_tool_calls_within_budget(self, handler):
+        """Tool calls not truncated when within budget."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_budget=10,
+            tool_calls_used=5,
+        )
+        tool_calls = [{"name": "tool1"}, {"name": "tool2"}, {"name": "tool3"}]
+        result = handler.truncate_tool_calls(tool_calls, ctx)
+        assert len(result) == 3
+
+    def test_truncate_tool_calls_over_budget(self, handler):
+        """Tool calls truncated when over budget."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_budget=10,
+            tool_calls_used=8,  # Only 2 remaining
+        )
+        tool_calls = [{"name": "tool1"}, {"name": "tool2"}, {"name": "tool3"}]
+        result = handler.truncate_tool_calls(tool_calls, ctx)
+        assert len(result) == 2
+
+    def test_truncate_empty_tool_calls(self, handler):
+        """Empty tool calls returns empty."""
+        ctx = StreamingChatContext(user_message="test")
+        result = handler.truncate_tool_calls([], ctx)
+        assert result == []
+
+
+class TestProgressChecking:
+    """Tests for progress checking methods."""
+
+    def test_check_progress_below_limit(self, handler):
+        """No force when below consecutive limit."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_calls_used=5,  # Below default 8
+        )
+        result = handler.check_progress_and_force(ctx, base_max_consecutive=8)
+        assert result is False
+        assert ctx.force_completion is False
+
+    def test_check_progress_good_progress(self, handler):
+        """No force when making good progress."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_calls_used=10,
+        )
+        # Add enough unique resources (10/2 = 5 needed)
+        for i in range(5):
+            ctx.add_unique_resource(f"file{i}.py")
+
+        result = handler.check_progress_and_force(ctx, base_max_consecutive=8)
+        assert result is False
+        assert ctx.force_completion is False
+
+    def test_check_progress_not_enough_progress(self, handler):
+        """Force completion when not enough progress."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_calls_used=10,
+        )
+        # Only 2 resources (need 5 = 10/2)
+        ctx.add_unique_resource("file1.py")
+        ctx.add_unique_resource("file2.py")
+
+        result = handler.check_progress_and_force(ctx, base_max_consecutive=8)
+        assert result is True
+        assert ctx.force_completion is True
+
+    def test_check_progress_analysis_task_lenient(self, handler):
+        """Analysis tasks use lenient threshold (1/4 instead of 1/2)."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_calls_used=20,
+            is_analysis_task=True,
+        )
+        # Need 20/4 = 5 resources for analysis task
+        for i in range(5):
+            ctx.add_unique_resource(f"file{i}.py")
+
+        result = handler.check_progress_and_force(ctx, base_max_consecutive=8)
+        # Analysis task limit is 50, so 20 calls won't trigger
+        assert result is False
+
+    def test_check_progress_already_forcing(self, handler):
+        """No change when already forcing completion."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_calls_used=10,
+            force_completion=True,  # Already set
+        )
+        result = handler.check_progress_and_force(ctx, base_max_consecutive=8)
+        assert result is False  # Returns False because it didn't set it

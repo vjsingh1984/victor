@@ -105,6 +105,11 @@ class StreamingChatContext:
     # Substantial content threshold for recovery decisions
     substantial_content_threshold: int = 500
 
+    # Tool execution tracking (for budget and progress checks)
+    tool_budget: int = 200  # Default tool budget
+    tool_calls_used: int = 0
+    unique_resources: Set[str] = field(default_factory=set)
+
     def elapsed_time(self) -> float:
         """Get elapsed time since session start."""
         return time.time() - self.start_time
@@ -171,6 +176,45 @@ class StreamingChatContext:
     def reset_force_tool_attempts(self) -> None:
         """Reset the forced tool execution counter."""
         self.force_tool_execution_attempts = 0
+
+    def get_remaining_budget(self) -> int:
+        """Get remaining tool budget."""
+        return max(0, self.tool_budget - self.tool_calls_used)
+
+    def is_budget_exhausted(self) -> bool:
+        """Check if tool budget is exhausted."""
+        return self.get_remaining_budget() <= 0
+
+    def is_approaching_budget_limit(self, warning_threshold: int = 250) -> bool:
+        """Check if approaching budget limit."""
+        return self.tool_calls_used >= warning_threshold and self.get_remaining_budget() > 0
+
+    def record_tool_execution(self, count: int = 1) -> None:
+        """Record tool calls used."""
+        self.tool_calls_used += count
+
+    def add_unique_resource(self, resource: str) -> None:
+        """Track a unique resource accessed by tools."""
+        self.unique_resources.add(resource)
+
+    def check_progress(self, base_max_consecutive: int = 8) -> bool:
+        """Check if progress is being made relative to tool calls.
+
+        Returns True if progress is adequate, False if stuck.
+        """
+        max_consecutive = base_max_consecutive
+        if self.is_analysis_task:
+            max_consecutive = 50
+        elif self.is_action_task:
+            max_consecutive = 30
+
+        if self.tool_calls_used < max_consecutive:
+            return True  # Haven't hit limit yet
+
+        # Check unique resources accessed
+        requires_lenient = self.is_analysis_task or self.is_action_task
+        threshold = self.tool_calls_used // 4 if requires_lenient else self.tool_calls_used // 2
+        return len(self.unique_resources) >= threshold
 
 
 @dataclass

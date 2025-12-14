@@ -105,8 +105,27 @@ _stream_chat_impl (main loop)
 - All 368 orchestrator core tests pass
 - All 65 streaming tests pass
 
+### Tool Execution Phase Extraction (Session 2)
+- Added tool budget/progress tracking fields to `StreamingChatContext`:
+  - `tool_budget`, `tool_calls_used`, `unique_resources`
+- Added context helper methods:
+  - `get_remaining_budget()`, `is_budget_exhausted()`, `is_approaching_budget_limit()`
+  - `record_tool_execution()`, `add_unique_resource()`, `check_progress()`
+- Added handler methods for tool execution:
+  - `check_tool_budget()` - Returns warning chunk if approaching limit
+  - `check_budget_exhausted()` - Returns True if no budget left
+  - `check_progress_and_force()` - Forces completion if stuck
+  - `get_budget_exhausted_chunks()` - Generates budget exhausted chunks
+  - `truncate_tool_calls()` - Truncates to remaining budget
+- Added orchestrator delegation methods:
+  - `_check_tool_budget_with_handler()`
+  - `_check_progress_with_handler()`
+  - `_truncate_tool_calls_with_handler()`
+- Synced tool tracking from orchestrator to context in `_create_stream_context`
+- Added 14 new tests for budget/progress methods (79 streaming tests total)
+
 ## Next Steps (Future Work)
 
-1. **Increase coverage** - orchestrator.py 55% -> 70%
-2. **Extract tool execution phase** - Move to handler for testability
+1. **Wire budget/progress handlers** - Use delegation methods in _stream_chat_impl
+2. **Increase coverage** - orchestrator.py 55% -> 70%
 3. **Remove remaining aliases** - stream_metrics, start_time, total_tokens, cumulative_usage, etc.
