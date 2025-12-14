@@ -124,8 +124,16 @@ _stream_chat_impl (main loop)
 - Synced tool tracking from orchestrator to context in `_create_stream_context`
 - Added 14 new tests for budget/progress methods (79 streaming tests total)
 
+### Handler Wiring (Session 2 continued)
+- Wired `_check_tool_budget_with_handler()` for budget warning (line ~5342)
+- Wired `_check_progress_with_handler()` for progress/force completion (line ~5403)
+- Wired `_truncate_tool_calls_with_handler()` for tool call truncation (line ~5460)
+- Added sync of tool tracking to context before handler calls
+- Removed 20 lines of inline budget/progress logic
+- All 418 tests pass (368 orchestrator + 50 streaming)
+
 ## Next Steps (Future Work)
 
-1. **Wire budget/progress handlers** - Use delegation methods in _stream_chat_impl
-2. **Increase coverage** - orchestrator.py 55% -> 70%
-3. **Remove remaining aliases** - stream_metrics, start_time, total_tokens, cumulative_usage, etc.
+1. **Increase coverage** - orchestrator.py 55% -> 70%
+2. **Remove remaining aliases** - stream_metrics, start_time, total_tokens, cumulative_usage, etc.
+3. **Extract more logic** - force completion messages, research loop detection

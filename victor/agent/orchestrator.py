@@ -5332,16 +5332,16 @@ class AgentOrchestrator:
                     f"tool_calls_used={self.tool_calls_used}/{self.tool_budget}"
                 )
 
-                remaining = max(0, self.tool_budget - self.tool_calls_used)
+                # Sync tool tracking to context for handler methods
+                stream_ctx.tool_calls_used = self.tool_calls_used
+                stream_ctx.tool_budget = self.tool_budget
 
-                # Warn when approaching budget limit
-                warning_threshold = getattr(
-                    self.settings, "tool_call_budget_warning_threshold", 250
-                )
-                if self.tool_calls_used >= warning_threshold and remaining > 0:
-                    yield StreamChunk(
-                        content=f"[tool] ⚠ Approaching tool budget limit: {self.tool_calls_used}/{self.tool_budget} calls used\n"
-                    )
+                remaining = stream_ctx.get_remaining_budget()
+
+                # Warn when approaching budget limit - uses handler delegation
+                budget_warning = self._check_tool_budget_with_handler(stream_ctx)
+                if budget_warning:
+                    yield budget_warning
 
                 if remaining <= 0:
                     yield StreamChunk(
@@ -5396,34 +5396,11 @@ class AgentOrchestrator:
 
                 # Force final response after too many consecutive tool calls without output
                 # This prevents endless tool call loops
-                # For analysis/action tasks, allow significantly more tool calls
-                base_max_consecutive = 8
-                if stream_ctx.is_analysis_task:
-                    base_max_consecutive = 50  # Analysis needs many tool calls to explore codebase
-                elif stream_ctx.is_action_task:
-                    base_max_consecutive = (
-                        30  # Action tasks (web search, multi-step) need flexibility
-                    )
-                max_consecutive_tool_calls = getattr(
-                    self.settings, "max_consecutive_tool_calls", base_max_consecutive
-                )
-                if self.tool_calls_used >= max_consecutive_tool_calls and not stream_ctx.force_completion:
-                    # Check if we've been making progress (reading new files)
-                    # For analysis/action tasks, use a more lenient progress threshold
-                    # Action tasks may do web searches, directory listings, bash commands - not just file reads
-                    requires_lenient_progress = stream_ctx.is_analysis_task or stream_ctx.is_action_task
-                    progress_threshold = (
-                        self.tool_calls_used // 4
-                        if requires_lenient_progress
-                        else self.tool_calls_used // 2
-                    )
-                    if len(unique_resources) < progress_threshold:
-                        # Not making good progress - force completion
-                        logger.warning(
-                            f"Forcing completion: {self.tool_calls_used} tool calls but only "
-                            f"{len(unique_resources)} unique resources (threshold: {progress_threshold})"
-                        )
-                        stream_ctx.force_completion = True
+                # Sync unique_resources to context for progress check
+                stream_ctx.unique_resources = unique_resources
+
+                # Check progress using handler delegation - will set force_completion if stuck
+                self._check_progress_with_handler(stream_ctx)
 
                 # Force completion if too many low-output iterations or research calls
                 if stream_ctx.force_completion:
@@ -5479,10 +5456,8 @@ class AgentOrchestrator:
 
                 # Guard against None tool_calls (can happen when model response has no tool calls
                 # but continuation logic decided to continue the loop)
-                if not tool_calls:
-                    tool_calls = []
-                else:
-                    tool_calls = tool_calls[:remaining]
+                # Truncate to remaining budget using handler delegation
+                tool_calls = self._truncate_tool_calls_with_handler(tool_calls or [], stream_ctx)
 
                 # Filter out tool calls that are blocked after loop warning
                 # After warning, the same signature cannot be attempted again
