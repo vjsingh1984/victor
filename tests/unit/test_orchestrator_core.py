@@ -5025,25 +5025,27 @@ class TestHandleEmptyResponseWithHandler:
     """Tests for _handle_empty_response_with_handler method."""
 
     def test_returns_none_below_threshold(self, orchestrator):
-        """Returns None when empty responses below threshold."""
+        """Returns (None, False) when empty responses below threshold."""
         from victor.agent.streaming import create_stream_context
 
         ctx = create_stream_context("test")
         ctx.consecutive_empty_responses = 1
 
-        result = orchestrator._handle_empty_response_with_handler(ctx)
-        assert result is None
+        chunk, should_force = orchestrator._handle_empty_response_with_handler(ctx)
+        assert chunk is None
+        assert should_force is False
         assert ctx.consecutive_empty_responses == 2
 
     def test_returns_chunk_at_threshold(self, orchestrator):
-        """Returns recovery chunk at threshold."""
+        """Returns (recovery_chunk, True) at threshold."""
         from victor.agent.streaming import create_stream_context
 
         ctx = create_stream_context("test")
         ctx.consecutive_empty_responses = 2  # Will become 3 at threshold
 
-        result = orchestrator._handle_empty_response_with_handler(ctx)
-        assert result is not None
+        chunk, should_force = orchestrator._handle_empty_response_with_handler(ctx)
+        assert chunk is not None
+        assert should_force is True
         assert ctx.force_completion is True
 
 

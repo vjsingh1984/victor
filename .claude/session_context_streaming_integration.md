@@ -1,57 +1,100 @@
 # Session Context: Streaming Submodule Integration
 
-## Status: COMMITTED (fb7bf88)
+## Status: COMPLETED (Three Commits)
 
-## Completed Work
+### Commit 1: e39165f - Initial Integration
+- Created `victor/agent/streaming/` submodule
+- Added `StreamingChatContext` dataclass with 17 state fields
+- Added `StreamingChatHandler` with basic methods
+- Added `IterationResult`, `IterationAction` types
+- Integrated with orchestrator via `_create_stream_context()`
 
-### 1. Streaming Submodule Created (`victor/agent/streaming/`)
-- `context.py` - StreamingChatContext dataclass with all streaming state
-- `handler.py` - StreamingChatHandler with testable helper methods
-- `iteration.py` - IterationResult, IterationAction, ProviderResponseResult
-- `__init__.py` - Package exports
+### Commit 2: 29ebac2 - Full Loop Refactoring
+- Extended handler with full loop control methods:
+  - `check_natural_completion()` - Detect natural completion
+  - `handle_empty_response()` - Track empty responses
+  - `handle_blocked_tool_call()` - Record blocked attempts
+  - `check_blocked_threshold()` - Check consecutive/total limits
+  - `handle_force_tool_execution()` - Handle tool mentions without calls
+- Added `IterationResult.clear_tool_calls` flag
+- Added 4 orchestrator delegation methods
 
-### 2. Orchestrator Integration
-- Added `_create_stream_context()` method (lines 3958-4016)
-- Added `_check_time_limit_with_handler()` (lines 4167-4198)
-- Added `_check_iteration_limit_with_handler()` (lines 4200-4215)
-- Refactored `_stream_chat_impl` to use `stream_ctx` context
-- Syncs state to/from context at key points
+### Commit 3: 26f5881 - Wire Handler and Remove Aliases
+- Wired all handler methods into `_stream_chat_impl` main loop:
+  - `force_tool_execution` with `force_message` passthrough
+  - `empty response` handling with tuple return `(chunk, should_force)`
+  - `natural completion` check delegation
+  - `blocked tool` handler with count tracking
+  - `blocked threshold` handler for testable limit checking
+- Removed local aliases (direct context access):
+  - `force_completion` → `stream_ctx.force_completion`
+  - `total_accumulated_chars` → `stream_ctx.total_accumulated_chars`
+- Added `_handle_force_tool_execution_with_handler` delegation method
+- Updated `_handle_empty_response_with_handler` return type to `Tuple`
+- Net reduction: -36 lines (164 added, 200 removed)
 
-### 3. Test Results
-- 413 total tests passing (streaming + orchestrator)
-- 118 streaming tests passing
-- 12 new streaming integration tests added
+## Test Results
+- 7426 tests passing (1 unrelated flaky test in task_classifier)
+- 44 streaming handler tests
+- 360+ orchestrator core tests (including delegation tests)
 
-### 4. Review Verification (Completed)
-- [x] No duplicate code with existing framework (StreamHandler handles chunks, StreamingController handles sessions)
+## Architecture Overview
+
+```
+StreamingChatContext (state)
+    |
+    v
+StreamingChatHandler (logic)
+    |
+    v
+AgentOrchestrator (delegation)
+    |
+    v
+_stream_chat_impl (main loop)
+```
+
+## Key Design Decisions
+
+1. **Protocol-based DI** - Handler uses `MessageAdder`, `ToolExecutor` protocols
+2. **State centralization** - All streaming state in `StreamingChatContext`
+3. **Testable methods** - Handler methods are pure functions of context
+4. **Delegation pattern** - Orchestrator delegates to handler for testable logic
+5. **Direct context access** - No local aliases, use context properties directly
+
+## Review Verification (Completed)
+- [x] No duplicate code with existing framework
 - [x] Uses framework capabilities (DI protocols: MessageAdder, ToolExecutor)
 - [x] No coding-specific logic in framework core
 - [x] Proper separation of concerns
+- [x] All handler methods wired into main loop
+- [x] Local aliases removed, direct context access
 
-## Key Design Decisions
-1. **stream_ctx** naming for better semantics
-2. **Local aliases** for backward compatibility during migration
-3. **Sync points** before/after handler checks
-4. **Incremental refactoring** to minimize risk
-5. **Protocol-based DI** for testability (MessageAdder, ToolExecutor)
+## Files Modified
 
-## Next Steps (Resume From Here)
+### victor/agent/streaming/
+- `context.py` - StreamingChatContext with 17 fields and helper methods
+- `handler.py` - StreamingChatHandler with 11 methods + `force_message` param
+- `iteration.py` - IterationResult with clear_tool_calls flag
 
-### Phase 1: Coverage Improvement
-1. Increase orchestrator.py coverage (55% → 70%)
-2. Increase conversation_memory.py coverage (62% → 70%)
-3. Increase unified_task_tracker.py coverage (57% → 70%)
+### victor/agent/
+- `orchestrator.py` - 7 delegation methods, Tuple import, wired handler calls
 
-### Phase 2: Further Handler Integration (Optional)
-1. Replace more iteration logic with handler methods
-2. Replace blocked attempts tracking with handler methods
-3. Replace recovery logic with handler methods
-4. Remove local aliases once all code uses context directly
+### tests/unit/
+- `test_streaming_handler.py` - 44 tests
+- `test_streaming_context.py` - Context tests
+- `test_orchestrator_core.py` - Updated tests for new return types
 
-## Files Modified This Session
-- `victor/agent/streaming/context.py` - StreamingChatContext dataclass
-- `victor/agent/streaming/handler.py` - StreamingChatHandler
-- `victor/agent/streaming/iteration.py` - IterationResult types
-- `victor/agent/orchestrator.py` - Added context integration
-- `tests/unit/test_orchestrator_core.py` - Added streaming integration tests
-- `tests/unit/test_streaming_*.py` - New test files
+## Completed Tasks
+
+1. ✅ Wire handler methods into main loop - blocked tool filtering
+2. ✅ Wire handler methods into main loop - force_tool_execution handling
+3. ✅ Wire handler methods into main loop - empty response handling
+4. ✅ Wire handler methods into main loop - natural completion check
+5. ✅ Remove local aliases - force_completion
+6. ✅ Remove local aliases - total_accumulated_chars
+
+## Next Steps (Future Work)
+
+1. **Increase coverage** - orchestrator.py 55% -> 70%
+2. **Wire remaining aliases** - iteration counters, exploration flags
+3. **Extract tool execution phase** - Move to handler for testability

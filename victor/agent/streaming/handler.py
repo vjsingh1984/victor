@@ -487,13 +487,17 @@ class StreamingChatHandler:
         return result
 
     def handle_force_tool_execution(
-        self, ctx: StreamingChatContext, mentioned_tools: List[str]
+        self,
+        ctx: StreamingChatContext,
+        mentioned_tools: List[str],
+        force_message: Optional[str] = None,
     ) -> Optional[IterationResult]:
         """Handle forcing tool execution when model mentions tools without calling them.
 
         Args:
             ctx: The streaming context
             mentioned_tools: Tools that were mentioned but not executed
+            force_message: Optional pre-crafted message to use instead of default
 
         Returns:
             IterationResult with appropriate action, None if not applicable
@@ -512,13 +516,18 @@ class StreamingChatHandler:
             ctx.reset_force_tool_attempts()
             return create_continue_result()
 
-        tools_str = ", ".join(mentioned_tools)
-        self.message_adder.add_message(
-            "user",
-            f"You mentioned using {tools_str} but did not actually call the tool(s). "
-            "Please make the actual tool call now, or provide your final answer without "
-            "mentioning tools you cannot use.",
-        )
+        # Use provided message or fall back to default
+        if force_message:
+            message = force_message
+        else:
+            tools_str = ", ".join(mentioned_tools)
+            message = (
+                f"You mentioned using {tools_str} but did not actually call the tool(s). "
+                "Please make the actual tool call now, or provide your final answer without "
+                "mentioning tools you cannot use."
+            )
+
+        self.message_adder.add_message("user", message)
         return create_continue_result()
 
 

@@ -3008,6 +3008,7 @@ class AgentOrchestrator:
                     ),
                     "reason": f"Forcing tool execution after {self._hallucinated_tool_count + 2} hallucinated tool mentions",
                     "updates": updates,
+                    "mentioned_tools": mentioned_tools,  # Pass tools for handler delegation
                 }
             else:
                 updates["continuation_prompts"] = continuation_prompts + 1
@@ -4240,19 +4241,20 @@ class AgentOrchestrator:
     def _handle_empty_response_with_handler(
         self,
         stream_ctx: StreamingChatContext,
-    ) -> Optional[StreamChunk]:
+    ) -> Tuple[Optional[StreamChunk], bool]:
         """Handle empty response using the streaming handler.
 
         Args:
             stream_ctx: The streaming context
 
         Returns:
-            StreamChunk if threshold exceeded and recovery triggered, None otherwise
+            Tuple of (StreamChunk if threshold exceeded, should_force_completion flag)
         """
         result = self._streaming_handler.handle_empty_response(stream_ctx)
         if result and result.chunks:
-            return result.chunks[0]
-        return None
+            # Handler sets ctx.force_completion = True when threshold exceeded
+            return result.chunks[0], stream_ctx.force_completion
+        return None, False
 
     def _handle_blocked_tool_with_handler(
         self,
@@ -4304,6 +4306,24 @@ class AgentOrchestrator:
             )
             return (chunk, result.clear_tool_calls)
         return None
+
+    def _handle_force_tool_execution_with_handler(
+        self,
+        stream_ctx: StreamingChatContext,
+        mentioned_tools: List[str],
+        force_message: Optional[str] = None,
+    ) -> None:
+        """Handle force tool execution using the streaming handler.
+
+        Args:
+            stream_ctx: The streaming context
+            mentioned_tools: Tools that were mentioned but not executed
+            force_message: Optional pre-crafted message to use instead of default
+        """
+        self._streaming_handler.handle_force_tool_execution(
+            stream_ctx, mentioned_tools, force_message
+        )
+        self.unified_tracker.increment_turn()
 
     def _parse_and_validate_tool_calls(
         self,
@@ -4532,7 +4552,7 @@ class AgentOrchestrator:
         max_total_iterations = stream_ctx.max_total_iterations
         max_exploration_iterations = stream_ctx.max_exploration_iterations
         total_iterations = stream_ctx.total_iterations
-        force_completion = stream_ctx.force_completion
+        # force_completion moved to context-only access (stream_ctx.force_completion)
         unified_task_type = stream_ctx.unified_task_type
         task_classification = stream_ctx.task_classification
         complexity_tool_budget = stream_ctx.complexity_tool_budget
@@ -4613,9 +4633,8 @@ class AgentOrchestrator:
         # (also stored in stream_ctx.last_quality_score)
         last_quality_score = stream_ctx.last_quality_score
 
-        # Track accumulated content - use context for centralized state
-        # Local alias for backward compatibility
-        total_accumulated_chars = stream_ctx.total_accumulated_chars
+        # Track accumulated content - context-only access
+        # Content accumulation is handled by stream_ctx.accumulate_content()
         substantial_content_threshold = stream_ctx.substantial_content_threshold
 
         while True:
@@ -4628,16 +4647,14 @@ class AgentOrchestrator:
             if compaction_chunk:
                 yield compaction_chunk
 
-            # Sync local state to context before handler checks
-            stream_ctx.total_accumulated_chars = total_accumulated_chars
-            stream_ctx.force_completion = force_completion
+            # Context state is maintained directly - no sync needed
+            # force_completion and total_accumulated_chars are accessed via stream_ctx
 
             # Check session time limit using handler delegation (testable)
             time_limit_chunk = self._check_time_limit_with_handler(stream_ctx)
             if time_limit_chunk:
                 yield time_limit_chunk
-                # Sync context state back to local
-                force_completion = stream_ctx.force_completion
+                # Handler already set stream_ctx.force_completion = True
                 # Force the model to summarize (handler already added message)
 
             # Check hard iteration limit
@@ -4649,7 +4666,7 @@ class AgentOrchestrator:
                 f"Iteration {total_iterations}/{max_total_iterations}: "
                 f"tool_calls_used={self.tool_calls_used}/{self.tool_budget}, "
                 f"unique_resources={len(unique_resources)}, "
-                f"force_completion={force_completion}"
+                f"force_completion={stream_ctx.force_completion}"
             )
 
             # Use debug logger for incremental tracking
@@ -4707,7 +4724,7 @@ class AgentOrchestrator:
 
             # If garbage was detected, force completion on next iteration
             if garbage_detected and not tool_calls:
-                force_completion = True
+                stream_ctx.force_completion = True
                 logger.info("Setting force_completion due to garbage detection")
 
             # Parse, validate, and normalize tool calls (fallback parsing, filtering, arg coercion)
@@ -4750,46 +4767,25 @@ class AgentOrchestrator:
                             "This may indicate the model is hallucinating tool calls."
                         )
             elif not tool_calls:
-                # No content and no tool calls - but check if substantial content was already provided
-                # If we already gave the user a good response, treat this as natural completion
-                if total_accumulated_chars >= substantial_content_threshold:
-                    logger.info(
-                        f"Model returned empty after {total_accumulated_chars} chars of content - "
-                        "treating as natural completion (skipping recovery)"
-                    )
-                    # Yield final chunk and return - task is complete
-                    yield StreamChunk(content="", is_final=True)
+                # No content and no tool calls - check for natural completion using handler
+                # Handler checks if substantial content was already provided
+                final_chunk = self._check_natural_completion_with_handler(
+                    stream_ctx, has_tool_calls=False, content_length=0
+                )
+                if final_chunk:
+                    yield final_chunk
                     return
 
                 # No substantial content yet - attempt aggressive recovery
                 logger.warning("Model returned empty response - attempting aggressive recovery")
 
-                # Track empty responses as they may indicate model is stuck after blocking
-                if not hasattr(self, "_consecutive_empty_responses"):
-                    self._consecutive_empty_responses = 0
-                self._consecutive_empty_responses += 1
-
-                # If model keeps returning empty responses, force a summary
-                # Use configurable threshold from settings
-                empty_response_threshold = getattr(
-                    self.settings, "recovery_empty_response_threshold", 3
-                )
-                if self._consecutive_empty_responses >= empty_response_threshold:
-                    logger.warning(
-                        f"Model stuck with {self._consecutive_empty_responses} consecutive empty responses - forcing summary"
-                    )
-                    yield StreamChunk(
-                        content="\n[recovery] Forcing summary after repeated empty responses\n"
-                    )
-                    # Add strong instruction to summarize
-                    self.add_message(
-                        "user",
-                        "You seem to be stuck. Please provide a summary of what you have found so far. "
-                        "DO NOT call any more tools - just summarize the information you have already gathered.",
-                    )
-                    self._consecutive_empty_responses = 0
-                    # CRITICAL: Set force_completion to prevent model from making more tool calls
-                    force_completion = True
+                # Track empty responses using handler delegation for testable logic
+                # Handler tracks consecutive empty responses and forces summary if threshold exceeded
+                recovery_chunk, should_force = self._handle_empty_response_with_handler(stream_ctx)
+                if recovery_chunk:
+                    yield recovery_chunk
+                    # CRITICAL: Handler already set stream_ctx.force_completion if needed
+                    # The should_force flag confirms the handler's decision
                     continue
 
                 # Check if model has thinking disable prefix (e.g., Qwen3 /no_think)
@@ -5051,7 +5047,7 @@ class AgentOrchestrator:
             # Check for loop warning using UnifiedTaskTracker (primary)
             # This gives the model a chance to correct behavior before we force stop
             unified_loop_warning = self.unified_tracker.check_loop_warning()
-            if unified_loop_warning and not force_completion:
+            if unified_loop_warning and not stream_ctx.force_completion:
                 logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
                 yield StreamChunk(
                     content=f"\n[loop] ⚠ Warning: Approaching loop limit - {unified_loop_warning}\n"
@@ -5070,8 +5066,8 @@ class AgentOrchestrator:
             else:
                 # PRIMARY: Check UnifiedTaskTracker for stop decision (single source of truth)
                 unified_should_force, unified_hint = self.unified_tracker.should_force_action()
-                if unified_should_force and not force_completion:
-                    force_completion = True
+                if unified_should_force and not stream_ctx.force_completion:
+                    stream_ctx.force_completion = True
                     logger.info(
                         f"UnifiedTaskTracker forcing action: {unified_hint}, "
                         f"metrics={self.unified_tracker.get_metrics()}"
@@ -5092,9 +5088,8 @@ class AgentOrchestrator:
                             yield StreamChunk(content=sanitized)
                             # Track accumulated content - use context method for consistency
                             stream_ctx.accumulate_content(sanitized)
-                            total_accumulated_chars = stream_ctx.total_accumulated_chars
                             logger.debug(
-                                f"Total accumulated content: {total_accumulated_chars} chars"
+                                f"Total accumulated content: {stream_ctx.total_accumulated_chars} chars"
                             )
                             # Clear full_content to prevent duplicate output later
                             full_content = ""
@@ -5206,25 +5201,13 @@ class AgentOrchestrator:
                         skip_rest = True
 
                     # Handle action: force_tool_execution (for hallucinated tool mentions)
+                    # Uses handler delegation for testable attempt tracking and message injection
                     elif action == "force_tool_execution":
-                        # Use stronger prompting and lower temperature on retry
-                        self.add_message("user", action_result["message"])
-                        self.unified_tracker.increment_turn()
-                        # Track that we're in forced tool execution mode
-                        if not hasattr(self, "_force_tool_execution_attempts"):
-                            self._force_tool_execution_attempts = 0
-                        self._force_tool_execution_attempts += 1
-                        # After 3 forced attempts, give up and request summary
-                        if self._force_tool_execution_attempts >= 3:
-                            logger.warning(
-                                "Giving up on forced tool execution after 3 attempts - requesting summary"
-                            )
-                            self.add_message(
-                                "user",
-                                "You are unable to make tool calls. Please provide your response "
-                                "NOW based on what you know. Do not mention any tools."
-                            )
-                            self._force_tool_execution_attempts = 0
+                        mentioned_tools = action_result.get("mentioned_tools", [])
+                        force_message = action_result.get("message")
+                        self._handle_force_tool_execution_with_handler(
+                            stream_ctx, mentioned_tools, force_message
+                        )
                         skip_rest = True
 
                     if skip_rest:
@@ -5371,7 +5354,7 @@ class AgentOrchestrator:
                 max_consecutive_tool_calls = getattr(
                     self.settings, "max_consecutive_tool_calls", base_max_consecutive
                 )
-                if self.tool_calls_used >= max_consecutive_tool_calls and not force_completion:
+                if self.tool_calls_used >= max_consecutive_tool_calls and not stream_ctx.force_completion:
                     # Check if we've been making progress (reading new files)
                     # For analysis/action tasks, use a more lenient progress threshold
                     # Action tasks may do web searches, directory listings, bash commands - not just file reads
@@ -5387,10 +5370,10 @@ class AgentOrchestrator:
                             f"Forcing completion: {self.tool_calls_used} tool calls but only "
                             f"{len(unique_resources)} unique resources (threshold: {progress_threshold})"
                         )
-                        force_completion = True
+                        stream_ctx.force_completion = True
 
                 # Force completion if too many low-output iterations or research calls
-                if force_completion:
+                if stream_ctx.force_completion:
                     # Check stop reason from unified tracker to determine message type
                     stop_decision = self.unified_tracker.should_stop()
                     is_research_loop = (
@@ -5450,15 +5433,20 @@ class AgentOrchestrator:
 
                 # Filter out tool calls that are blocked after loop warning
                 # After warning, the same signature cannot be attempted again
+                # Uses handler delegation for testable blocked tool processing
                 filtered_tool_calls = []
-                blocked_tool_calls = []
+                blocked_count = 0
                 for tc in tool_calls:
                     tc_name = tc.get("name", "")
                     tc_args = tc.get("arguments", {})
                     block_reason = self.unified_tracker.is_blocked_after_warning(tc_name, tc_args)
                     if block_reason:
-                        yield StreamChunk(content=f"\n[loop] ⛔ {block_reason}\n")
-                        blocked_tool_calls.append((tc_name, tc_args, block_reason))
+                        # Use handler to process blocked tool (records and adds feedback)
+                        chunk = self._handle_blocked_tool_with_handler(
+                            stream_ctx, tc_name, tc_args, block_reason
+                        )
+                        yield chunk
+                        blocked_count += 1
                     else:
                         filtered_tool_calls.append(tc)
 
@@ -5466,70 +5454,17 @@ class AgentOrchestrator:
                 tool_name = None
                 tool_results = []
 
-                # Track total blocked attempts across the conversation (not just consecutive)
-                if not hasattr(self, "_total_blocked_attempts"):
-                    self._total_blocked_attempts = 0
-
-                # Add feedback for each blocked tool call
-                for tc_name, tc_args, block_reason in blocked_tool_calls:
-                    self._total_blocked_attempts += 1
-                    logger.debug(f"BLOCKED tool call: {tc_name}({tc_args}) - {block_reason}")
-                    # Add tool result feedback (as "user" role to match normal tool results)
-                    self.add_message(
-                        "user",
-                        f"⛔ TOOL BLOCKED: {tc_name}({', '.join(f'{k}={repr(v)[:30]}' for k, v in tc_args.items())})\n\n"
-                        f"Reason: {block_reason}\n\n"
-                        "This operation was permanently blocked because you already tried it multiple times. "
-                        "You MUST use a DIFFERENT approach - this exact operation will NEVER work again.",
-                    )
-
                 # Check if we should force completion due to excessive blocking
-                # Use configurable recovery thresholds from settings (overrides unified tracker defaults)
-                consecutive_limit = getattr(
-                    self.settings, "recovery_blocked_consecutive_threshold", 4
+                # Uses handler delegation for testable threshold checking
+                all_blocked = blocked_count > 0 and not filtered_tool_calls
+                threshold_result = self._check_blocked_threshold_with_handler(
+                    stream_ctx, all_blocked
                 )
-                total_limit = getattr(self.settings, "recovery_blocked_total_threshold", 6)
-
-                force_completion_triggered = False
-                if not filtered_tool_calls and tool_calls:
-                    # All tool calls were blocked - track consecutive blocks
-                    if not hasattr(self, "_consecutive_blocked_attempts"):
-                        self._consecutive_blocked_attempts = 0
-                    self._consecutive_blocked_attempts += 1
-
-                    # After N consecutive blocked attempts, force completion
-                    if self._consecutive_blocked_attempts >= consecutive_limit:
-                        force_completion_triggered = True
-                        logger.warning(
-                            f"Model stuck in loop after {self._consecutive_blocked_attempts} consecutive blocked attempts (limit: {consecutive_limit}) - forcing completion"
-                        )
-                else:
-                    # Reset consecutive counter when we have valid tool calls
-                    if hasattr(self, "_consecutive_blocked_attempts"):
-                        self._consecutive_blocked_attempts = 0
-
-                # Also check total blocked attempts (even if some valid calls exist)
-                if not force_completion_triggered and self._total_blocked_attempts >= total_limit:
-                    force_completion_triggered = True
-                    logger.warning(
-                        f"Model stuck in loop after {self._total_blocked_attempts} total blocked attempts (limit: {total_limit}) - forcing completion"
-                    )
-
-                if force_completion_triggered:
-                    yield StreamChunk(
-                        content="\n[loop] ⚠️ Multiple blocked attempts - forcing completion\n"
-                    )
-                    # Add strong instruction to stop tool use
-                    self.add_message(
-                        "user",
-                        "⚠️ STOP: You have attempted blocked operations too many times. "
-                        "You MUST now provide your final response WITHOUT any tool calls. "
-                        "Summarize what you found and answer the user's question based on "
-                        "the information you have already gathered. DO NOT call any more tools.",
-                    )
-                    self._consecutive_blocked_attempts = 0
-                    # Clear filtered_tool_calls to prevent any more tool execution
-                    filtered_tool_calls = []
+                if threshold_result:
+                    chunk, should_clear = threshold_result
+                    yield chunk
+                    if should_clear:
+                        filtered_tool_calls = []
 
                 tool_calls = filtered_tool_calls
 
