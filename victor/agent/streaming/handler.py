@@ -697,6 +697,170 @@ class StreamingChatHandler:
         result.add_chunk(warning_chunk)
         return result
 
+    def get_recovery_prompts(
+        self,
+        ctx: StreamingChatContext,
+        base_temperature: float,
+        has_thinking_mode: bool,
+        thinking_disable_prefix: Optional[str] = None,
+    ) -> List[tuple[str, float]]:
+        """Generate recovery prompts for empty response recovery.
+
+        This method generates a list of recovery prompts with varying temperatures
+        based on the task type and model capabilities.
+
+        Args:
+            ctx: The streaming context
+            base_temperature: Base temperature to use for recovery
+            has_thinking_mode: Whether the model supports thinking mode
+            thinking_disable_prefix: Optional prefix to disable thinking
+
+        Returns:
+            List of (prompt, temperature) tuples for recovery attempts
+        """
+        # Check if we should continue the task vs summarize
+        has_budget_remaining = ctx.tool_calls_used < ctx.tool_budget * 0.8
+        should_continue_task = (ctx.is_analysis_task or ctx.is_action_task) and has_budget_remaining
+
+        def maybe_prefix(prompt: str) -> str:
+            """Add thinking disable prefix if available."""
+            if thinking_disable_prefix:
+                return f"{thinking_disable_prefix}\n{prompt}"
+            return prompt
+
+        if should_continue_task:
+            # Task-aware recovery: first attempt to continue, then fall back to summary
+            if has_thinking_mode:
+                return [
+                    (
+                        maybe_prefix(
+                            "The previous action did not complete. Use discovery tools:\n"
+                            "- graph(mode='pagerank', top_k=5) to find important symbols\n"
+                            "- search(query='...') for semantic code search\n"
+                            "- overview(path='.') for project structure\n"
+                            "Pick ONE tool to continue."
+                        ),
+                        min(base_temperature + 0.1, 0.7),
+                    ),
+                    (
+                        maybe_prefix(
+                            "Call a tool: search(query='main') or read(path='filename'). "
+                            "Pick a file to examine."
+                        ),
+                        min(base_temperature + 0.2, 0.8),
+                    ),
+                    (
+                        maybe_prefix(
+                            "Respond in 2-3 sentences: What files did you read and what did you find?"
+                        ),
+                        min(base_temperature + 0.3, 0.9),
+                    ),
+                ]
+            else:
+                return [
+                    (
+                        "The previous action did not complete. Use discovery tools:\n"
+                        "- graph(mode='pagerank', top_k=5) - find important symbols\n"
+                        "- search(query='...') - semantic code search\n"
+                        "- overview(path='.') - project structure\n"
+                        "- refs(symbol_name='...') - find usages\n"
+                        "Make ONE tool call to continue exploring.",
+                        min(base_temperature + 0.2, 1.0),
+                    ),
+                    (
+                        "Call search(query='main') or read(path='filename') to examine code. "
+                        "Continue your analysis.",
+                        min(base_temperature + 0.3, 1.0),
+                    ),
+                    (
+                        "Summarize your findings so far. What files did you examine? "
+                        "What patterns or issues did you notice? Keep it brief.",
+                        min(base_temperature + 0.4, 1.0),
+                    ),
+                ]
+        elif has_thinking_mode:
+            # Simpler prompts and lower temps for thinking models (summary mode)
+            return [
+                (
+                    maybe_prefix(
+                        "Respond in 2-3 sentences: What files did you read and what did you find?"
+                    ),
+                    min(base_temperature + 0.1, 0.7),
+                ),
+                (
+                    maybe_prefix(
+                        "List 3 bullet points about the code you examined."
+                    ),
+                    min(base_temperature + 0.2, 0.8),
+                ),
+                (
+                    maybe_prefix(
+                        "One sentence answer: What is the main thing you learned?"
+                    ),
+                    min(base_temperature + 0.3, 0.9),
+                ),
+            ]
+        else:
+            # Standard recovery prompts (summary mode)
+            return [
+                (
+                    "Summarize your findings so far. What files did you examine? "
+                    "What patterns or issues did you notice? Keep it brief.",
+                    min(base_temperature + 0.2, 1.0),
+                ),
+                (
+                    "Based on the code you've seen, list 3-5 observations or suggestions.",
+                    min(base_temperature + 0.3, 1.0),
+                ),
+                (
+                    "What did you learn from the files? One paragraph summary.",
+                    min(base_temperature + 0.4, 1.0),
+                ),
+            ]
+
+    def should_use_tools_for_recovery(
+        self, ctx: StreamingChatContext, attempt: int
+    ) -> bool:
+        """Determine if tools should be enabled for a recovery attempt.
+
+        Args:
+            ctx: The streaming context
+            attempt: The recovery attempt number (1-indexed)
+
+        Returns:
+            True if tools should be enabled, False otherwise
+        """
+        # For task-continuation mode, enable tools on first 2 attempts
+        has_budget_remaining = ctx.tool_calls_used < ctx.tool_budget * 0.8
+        should_continue_task = (ctx.is_analysis_task or ctx.is_action_task) and has_budget_remaining
+        return should_continue_task and attempt <= 2
+
+    def get_recovery_fallback_message(
+        self, ctx: StreamingChatContext, unique_resources: List[str]
+    ) -> str:
+        """Generate a fallback message when all recovery attempts fail.
+
+        Args:
+            ctx: The streaming context
+            unique_resources: List of unique resources examined
+
+        Returns:
+            Fallback message string
+        """
+        if ctx.is_analysis_task and ctx.tool_calls_used > 0:
+            files_examined = unique_resources[:10]
+            return (
+                f"\n\n**Analysis Summary** (auto-generated)\n\n"
+                f"Examined {len(unique_resources)} files including:\n"
+                + "\n".join(f"- {f}" for f in files_examined)
+                + "\n\nThe model was unable to provide detailed analysis. "
+                "Try with a simpler query like 'analyze victor/agent/' or use a different model."
+            )
+        return (
+            "No tool calls were returned and the model provided no content. "
+            "Please retry or simplify the request."
+        )
+
 
 def create_streaming_handler(
     settings: "Settings",

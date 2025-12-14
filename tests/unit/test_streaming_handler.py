@@ -761,3 +761,201 @@ class TestForceCompletionMessages:
         call_args = mock_message_adder.add_message.call_args
         assert call_args[0][0] == "system"
         assert "FINAL COMPREHENSIVE ANSWER" in call_args[0][1]
+
+
+class TestRecoveryPrompts:
+    """Tests for recovery prompt generation methods."""
+
+    def test_get_recovery_prompts_analysis_task_with_budget(self, handler):
+        """Analysis task with budget returns task continuation prompts."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            is_analysis_task=True,
+            tool_calls_used=10,
+            tool_budget=100,  # 80% threshold = 80, so 10 < 80 = has budget
+        )
+        prompts = handler.get_recovery_prompts(ctx, 0.5, has_thinking_mode=False)
+
+        assert len(prompts) == 3
+        # First prompt should be about continuing exploration
+        assert "discovery tools" in prompts[0][0].lower() or "tool call" in prompts[0][0].lower()
+        # Temperatures should increase
+        assert prompts[1][1] > prompts[0][1]
+        assert prompts[2][1] > prompts[1][1]
+
+    def test_get_recovery_prompts_analysis_task_exhausted(self, handler):
+        """Analysis task with exhausted budget returns summary prompts."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            is_analysis_task=True,
+            tool_calls_used=90,  # Above 80% of 100
+            tool_budget=100,
+        )
+        prompts = handler.get_recovery_prompts(ctx, 0.5, has_thinking_mode=False)
+
+        assert len(prompts) == 3
+        # Should be summary prompts since budget exhausted
+        assert "summarize" in prompts[0][0].lower() or "findings" in prompts[0][0].lower()
+
+    def test_get_recovery_prompts_thinking_mode(self, handler):
+        """Thinking mode returns simpler prompts with lower temps."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            is_analysis_task=False,
+            tool_calls_used=90,
+            tool_budget=100,
+        )
+        prompts = handler.get_recovery_prompts(ctx, 0.5, has_thinking_mode=True)
+
+        assert len(prompts) == 3
+        # Should have lower temperature caps
+        for _, temp in prompts:
+            assert temp <= 0.9
+
+    def test_get_recovery_prompts_with_thinking_prefix(self, handler):
+        """Thinking prefix is added when provided."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            is_analysis_task=True,
+            tool_calls_used=10,
+            tool_budget=100,
+        )
+        prompts = handler.get_recovery_prompts(
+            ctx, 0.5, has_thinking_mode=True, thinking_disable_prefix="/no_think"
+        )
+
+        assert len(prompts) == 3
+        # First prompt should have the prefix
+        assert "/no_think" in prompts[0][0]
+
+    def test_get_recovery_prompts_action_task(self, handler):
+        """Action task with budget returns task continuation prompts."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            is_action_task=True,
+            is_analysis_task=False,
+            tool_calls_used=10,
+            tool_budget=100,
+        )
+        prompts = handler.get_recovery_prompts(ctx, 0.5, has_thinking_mode=False)
+
+        assert len(prompts) == 3
+        # Should be task continuation prompts
+        assert "discovery tools" in prompts[0][0].lower() or "tool call" in prompts[0][0].lower()
+
+    def test_get_recovery_prompts_standard_task(self, handler):
+        """Standard task returns summary prompts."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            is_analysis_task=False,
+            is_action_task=False,
+            tool_calls_used=10,
+            tool_budget=100,
+        )
+        prompts = handler.get_recovery_prompts(ctx, 0.5, has_thinking_mode=False)
+
+        assert len(prompts) == 3
+        # Should be summary prompts
+        assert "summarize" in prompts[0][0].lower() or "findings" in prompts[0][0].lower()
+
+
+class TestShouldUseToolsForRecovery:
+    """Tests for should_use_tools_for_recovery method."""
+
+    def test_uses_tools_for_analysis_task_first_attempts(self, handler):
+        """Analysis task enables tools for first 2 attempts."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            is_analysis_task=True,
+            tool_calls_used=10,
+            tool_budget=100,
+        )
+
+        assert handler.should_use_tools_for_recovery(ctx, 1) is True
+        assert handler.should_use_tools_for_recovery(ctx, 2) is True
+        assert handler.should_use_tools_for_recovery(ctx, 3) is False
+
+    def test_no_tools_for_exhausted_budget(self, handler):
+        """No tools when budget is exhausted."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            is_analysis_task=True,
+            tool_calls_used=90,  # Above 80% threshold
+            tool_budget=100,
+        )
+
+        assert handler.should_use_tools_for_recovery(ctx, 1) is False
+
+    def test_no_tools_for_standard_task(self, handler):
+        """Standard tasks don't use tools for recovery."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            is_analysis_task=False,
+            is_action_task=False,
+            tool_calls_used=10,
+            tool_budget=100,
+        )
+
+        assert handler.should_use_tools_for_recovery(ctx, 1) is False
+
+
+class TestGetRecoveryFallbackMessage:
+    """Tests for get_recovery_fallback_message method."""
+
+    def test_analysis_task_with_tool_calls(self, handler):
+        """Analysis task with tool calls returns file summary."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            is_analysis_task=True,
+            tool_calls_used=5,
+        )
+        unique_resources = ["file1.py", "file2.py", "file3.py"]
+
+        message = handler.get_recovery_fallback_message(ctx, unique_resources)
+
+        assert "Analysis Summary" in message
+        assert "3 files" in message
+        assert "file1.py" in message
+
+    def test_analysis_task_truncates_files(self, handler):
+        """Analysis task truncates file list to 10."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            is_analysis_task=True,
+            tool_calls_used=5,
+        )
+        unique_resources = [f"file{i}.py" for i in range(20)]
+
+        message = handler.get_recovery_fallback_message(ctx, unique_resources)
+
+        assert "20 files" in message
+        # Should only show first 10
+        assert "file9.py" in message
+        assert "file10.py" not in message
+
+    def test_non_analysis_task(self, handler):
+        """Non-analysis task returns generic message."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            is_analysis_task=False,
+            tool_calls_used=0,
+        )
+        unique_resources = []
+
+        message = handler.get_recovery_fallback_message(ctx, unique_resources)
+
+        assert "No tool calls were returned" in message
+        assert "retry" in message.lower()
+
+    def test_analysis_task_no_tool_calls(self, handler):
+        """Analysis task with no tool calls returns generic message."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            is_analysis_task=True,
+            tool_calls_used=0,
+        )
+        unique_resources = []
+
+        message = handler.get_recovery_fallback_message(ctx, unique_resources)
+
+        assert "No tool calls were returned" in message

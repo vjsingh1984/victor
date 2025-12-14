@@ -143,8 +143,63 @@ _stream_chat_impl (main loop)
 - Net reduction: ~10 lines (removed 4 alias definitions, simplified method signature)
 - All 418 tests pass
 
+### Force Completion Logic Extraction (Session 4)
+**Commit: 80235e6**
+
+- Added handler methods for force completion:
+  - `is_research_loop()` - Detect research loop from stop reason/hint
+  - `get_force_completion_chunks()` - Generate warning chunk and system message
+  - `handle_force_completion()` - Main handler combining detection and message generation
+- Added orchestrator delegation method:
+  - `_handle_force_completion_with_handler()` - Calls unified_tracker.should_stop() for stop decision
+- Wired into `_stream_chat_impl` at force completion section
+- Replaced ~50 lines of inline force completion logic with handler delegation
+- Added 8 new tests in 2 test classes:
+  - `TestResearchLoopDetection` (3 tests)
+  - `TestForceCompletionMessages` (5 tests)
+- All 426 tests pass (368 orchestrator + 58 streaming)
+
+### Task Classification Aliases Removal (Session 4 continued)
+**Commit: 562bf4e**
+
+- Removed 5 more aliases from `_stream_chat_impl`:
+  - `unified_task_type` → `stream_ctx.unified_task_type`
+  - `task_classification` (removed, unused in loop)
+  - `complexity_tool_budget` (removed, unused in loop)
+  - `coarse_task_type` → `stream_ctx.coarse_task_type`
+  - `context_msg` → `stream_ctx.context_msg` with `update_context_message()`
+- Updated 7 usage sites to use `stream_ctx.*` directly
+- All 426 tests pass
+
+### Quality Score Aliases Removal (Session 4 continued)
+**Commit: f1c67a1**
+
+- Added `update_quality_score()` method to StreamingChatContext
+- Removed 2 more aliases from `_stream_chat_impl`:
+  - `last_quality_score` → `stream_ctx.last_quality_score` with `update_quality_score()`
+  - `substantial_content_threshold` (removed, unused - config value)
+- Updated 5 usage sites to use `stream_ctx.last_quality_score` directly
+- All 426 tests pass
+
 ## Next Steps (Future Work)
 
-1. **Increase coverage** - orchestrator.py 55% -> 70%
-2. **Extract more logic** - force completion messages, research loop detection
-3. **Remove more aliases** - unified_task_type, task_classification, complexity_tool_budget, coarse_task_type, context_msg, etc.
+1. ✅ ~~**Increase coverage**~~ - orchestrator.py 55% -> 57% (added 12 delegation tests)
+2. ✅ ~~Extract more logic~~ - force completion messages, research loop detection (DONE)
+3. ✅ ~~Remove more aliases~~ - unified_task_type, task_classification, complexity_tool_budget, coarse_task_type, context_msg (DONE)
+4. ✅ ~~Remaining quality aliases~~ - last_quality_score, substantial_content_threshold (DONE)
+5. **Remaining config aliases (intentionally kept)** - max_total_iterations, max_exploration_iterations (read-only config)
+
+### Session 5: Recovery Prompts Extraction
+**Commit: (pending)**
+
+Added handler methods for recovery prompt generation:
+- `get_recovery_prompts()` - Generates list of (prompt, temperature) tuples for empty response recovery
+- `should_use_tools_for_recovery()` - Determines if tools should be enabled for recovery attempts
+- `get_recovery_fallback_message()` - Generates fallback message when all recovery fails
+
+Added 13 new tests in 3 test classes:
+- `TestRecoveryPrompts` (6 tests) - Tests for prompt generation logic
+- `TestShouldUseToolsForRecovery` (3 tests) - Tests for tool enablement decision
+- `TestGetRecoveryFallbackMessage` (4 tests) - Tests for fallback messages
+
+All 71 streaming handler tests pass, 392 orchestrator tests pass
