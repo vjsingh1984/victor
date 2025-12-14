@@ -4640,36 +4640,35 @@ class AgentOrchestrator:
         # stream_ctx.total_tokens, stream_ctx.cumulative_usage directly
         # total_iterations removed - use stream_ctx.total_iterations directly
         # force_completion already moved to context-only access (stream_ctx.force_completion)
-        unified_task_type = stream_ctx.unified_task_type
-        task_classification = stream_ctx.task_classification
-        complexity_tool_budget = stream_ctx.complexity_tool_budget
-
+        # Task classification aliases removed - use stream_ctx.* directly:
+        #   - stream_ctx.unified_task_type
+        #   - stream_ctx.task_classification (unused in loop)
+        #   - stream_ctx.complexity_tool_budget (unused in loop)
+        #   - stream_ctx.coarse_task_type
+        #   - stream_ctx.context_msg (updates via update_context_message())
         # Task classification flags - use stream_ctx.* directly for access
         # Aliases removed for: is_action_task, is_analysis_task, needs_execution
-        # context_msg still needed as it updates within the loop
-        coarse_task_type = stream_ctx.coarse_task_type
-        context_msg = stream_ctx.context_msg
 
         # Detect intent and inject prompt guard for non-write tasks
         self._apply_intent_guard(user_message)
 
         # For compound analysis+edit tasks, unified_tracker handles exploration limits
-        if stream_ctx.is_analysis_task and unified_task_type.value in ("edit", "create"):
+        if stream_ctx.is_analysis_task and stream_ctx.unified_task_type.value in ("edit", "create"):
             logger.info(
-                f"Compound task detected (analysis+{unified_task_type.value}): "
+                f"Compound task detected (analysis+{stream_ctx.unified_task_type.value}): "
                 f"unified_tracker will use appropriate exploration limits"
             )
 
         logger.info(
-            f"Task type classification: coarse={coarse_task_type}, "
-            f"unified={unified_task_type.value}, is_analysis={stream_ctx.is_analysis_task}, "
+            f"Task type classification: coarse={stream_ctx.coarse_task_type}, "
+            f"unified={stream_ctx.unified_task_type.value}, is_analysis={stream_ctx.is_analysis_task}, "
             f"is_action={stream_ctx.is_action_task}"
         )
 
         # Apply guidance for analysis/action tasks
         self._apply_task_guidance(
             user_message,
-            unified_task_type,
+            stream_ctx.unified_task_type,
             stream_ctx.is_analysis_task,
             stream_ctx.is_action_task,
             stream_ctx.needs_execution,
@@ -4781,7 +4780,7 @@ class AgentOrchestrator:
             if handled:
                 break
 
-            tools = await self._select_tools_for_turn(context_msg, goals)
+            tools = await self._select_tools_for_turn(stream_ctx.context_msg, goals)
 
             # Prepare optional thinking parameter for providers that support it (Anthropic)
             provider_kwargs = {}
@@ -5114,7 +5113,7 @@ class AgentOrchestrator:
                     response=full_content,
                     query=user_message,
                     tool_calls=self.tool_calls_used,
-                    task_type=unified_task_type.value,
+                    task_type=stream_ctx.unified_task_type.value,
                 )
                 if quality_result and not quality_result.get("is_grounded", True):
                     # Log grounding issues for debugging
@@ -5604,7 +5603,8 @@ class AgentOrchestrator:
                 if reminder:
                     self.add_message("system", reminder)
 
-                context_msg = full_content or user_message
+                # Update context message for next iteration (uses helper method)
+                stream_ctx.update_context_message(full_content or user_message)
 
     async def _execute_tool_with_retry(
         self, tool_name: str, tool_args: Dict[str, Any], context: Dict[str, Any]
