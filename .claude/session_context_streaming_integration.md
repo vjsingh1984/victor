@@ -92,9 +92,21 @@ _stream_chat_impl (main loop)
 4. ✅ Wire handler methods into main loop - natural completion check
 5. ✅ Remove local aliases - force_completion
 6. ✅ Remove local aliases - total_accumulated_chars
+7. ✅ Remove local aliases - total_iterations (use stream_ctx.increment_iteration())
+8. ✅ Remove local aliases - is_analysis_task, is_action_task, needs_execution
+
+## Recent Work (Current Session)
+
+### Alias Migration to Context Access
+- Removed `total_iterations` alias - now uses `stream_ctx.increment_iteration()` and `stream_ctx.total_iterations`
+- Removed `is_analysis_task` alias - all 10 usages now use `stream_ctx.is_analysis_task`
+- Removed `is_action_task` alias - all 8 usages now use `stream_ctx.is_action_task`
+- Removed `needs_execution` alias - 2 usages now use `stream_ctx.needs_execution`
+- All 368 orchestrator core tests pass
+- All 65 streaming tests pass
 
 ## Next Steps (Future Work)
 
 1. **Increase coverage** - orchestrator.py 55% -> 70%
-2. **Wire remaining aliases** - iteration counters, exploration flags
-3. **Extract tool execution phase** - Move to handler for testability
+2. **Extract tool execution phase** - Move to handler for testability
+3. **Remove remaining aliases** - stream_metrics, start_time, total_tokens, cumulative_usage, etc.

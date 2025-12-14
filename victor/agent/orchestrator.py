@@ -4549,18 +4549,19 @@ class AgentOrchestrator:
         start_time = stream_ctx.start_time
         total_tokens = stream_ctx.total_tokens
         cumulative_usage = stream_ctx.cumulative_usage
+        # Iteration limits - kept as read-only local references for readability
+        # (These are configuration values that don't change during the loop)
         max_total_iterations = stream_ctx.max_total_iterations
         max_exploration_iterations = stream_ctx.max_exploration_iterations
-        total_iterations = stream_ctx.total_iterations
-        # force_completion moved to context-only access (stream_ctx.force_completion)
+        # total_iterations removed - use stream_ctx.total_iterations directly
+        # force_completion already moved to context-only access (stream_ctx.force_completion)
         unified_task_type = stream_ctx.unified_task_type
         task_classification = stream_ctx.task_classification
         complexity_tool_budget = stream_ctx.complexity_tool_budget
 
-        # Task classification from context
-        is_action_task = stream_ctx.is_action_task
-        is_analysis_task = stream_ctx.is_analysis_task
-        needs_execution = stream_ctx.needs_execution
+        # Task classification flags - use stream_ctx.* directly for access
+        # Aliases removed for: is_action_task, is_analysis_task, needs_execution
+        # context_msg still needed as it updates within the loop
         coarse_task_type = stream_ctx.coarse_task_type
         context_msg = stream_ctx.context_msg
 
@@ -4568,7 +4569,7 @@ class AgentOrchestrator:
         self._apply_intent_guard(user_message)
 
         # For compound analysis+edit tasks, unified_tracker handles exploration limits
-        if is_analysis_task and unified_task_type.value in ("edit", "create"):
+        if stream_ctx.is_analysis_task and unified_task_type.value in ("edit", "create"):
             logger.info(
                 f"Compound task detected (analysis+{unified_task_type.value}): "
                 f"unified_tracker will use appropriate exploration limits"
@@ -4576,27 +4577,28 @@ class AgentOrchestrator:
 
         logger.info(
             f"Task type classification: coarse={coarse_task_type}, "
-            f"unified={unified_task_type.value}, is_analysis={is_analysis_task}, is_action={is_action_task}"
+            f"unified={unified_task_type.value}, is_analysis={stream_ctx.is_analysis_task}, "
+            f"is_action={stream_ctx.is_action_task}"
         )
 
         # Apply guidance for analysis/action tasks
         self._apply_task_guidance(
             user_message,
             unified_task_type,
-            is_analysis_task,
-            is_action_task,
-            needs_execution,
+            stream_ctx.is_analysis_task,
+            stream_ctx.is_action_task,
+            stream_ctx.needs_execution,
             max_exploration_iterations,
         )
 
         # Add guidance for action-oriented tasks
-        if is_action_task:
+        if stream_ctx.is_action_task:
             logger.info(
                 f"Detected action-oriented task - allowing up to {max_exploration_iterations} exploration iterations"
             )
 
             # needs_execution is already computed by _classify_task_keywords
-            if needs_execution:
+            if stream_ctx.needs_execution:
                 self.add_message(
                     "system",
                     "This is an action-oriented task requiring execution. "
@@ -4622,8 +4624,8 @@ class AgentOrchestrator:
             f"tool_budget={self.tool_budget}, "
             f"max_total_iterations={max_total_iterations}, "
             f"max_exploration_iterations={max_exploration_iterations}, "
-            f"is_analysis_task={is_analysis_task}, "
-            f"is_action_task={is_action_task}"
+            f"is_analysis_task={stream_ctx.is_analysis_task}, "
+            f"is_action_task={stream_ctx.is_action_task}"
         )
 
         # Reset debug logger for new conversation turn
@@ -4657,13 +4659,11 @@ class AgentOrchestrator:
                 # Handler already set stream_ctx.force_completion = True
                 # Force the model to summarize (handler already added message)
 
-            # Check hard iteration limit
-            total_iterations += 1
-            # Sync iteration count to context
-            stream_ctx.total_iterations = total_iterations
+            # Increment iteration count using context method (single source of truth)
+            stream_ctx.increment_iteration()
             unique_resources = self.unified_tracker.unique_resources
             logger.debug(
-                f"Iteration {total_iterations}/{max_total_iterations}: "
+                f"Iteration {stream_ctx.total_iterations}/{max_total_iterations}: "
                 f"tool_calls_used={self.tool_calls_used}/{self.tool_budget}, "
                 f"unique_resources={len(unique_resources)}, "
                 f"force_completion={stream_ctx.force_completion}"
@@ -4671,7 +4671,7 @@ class AgentOrchestrator:
 
             # Use debug logger for incremental tracking
             self.debug_logger.log_iteration_start(
-                total_iterations,
+                stream_ctx.total_iterations,
                 tool_calls=self.tool_calls_used,
                 files_read=len(unique_resources),
             )
@@ -4679,8 +4679,8 @@ class AgentOrchestrator:
                 tool_budget=self.tool_budget,
                 tool_calls_used=self.tool_calls_used,
                 max_iterations=max_total_iterations,
-                current_iteration=total_iterations,
-                is_analysis_task=is_analysis_task,
+                current_iteration=stream_ctx.total_iterations,
+                is_analysis_task=stream_ctx.is_analysis_task,
             )
 
             max_context = self._get_max_context_chars()
@@ -4688,7 +4688,7 @@ class AgentOrchestrator:
                 user_message,
                 max_total_iterations,
                 max_context,
-                total_iterations,
+                stream_ctx.total_iterations,
                 last_quality_score,
             )
             if iter_chunk:
@@ -4800,7 +4800,7 @@ class AgentOrchestrator:
                 # Check if we should continue the task vs summarize
                 # If we're in analysis/action mode with budget remaining, first try to continue
                 has_budget_remaining = self.tool_calls_used < self.tool_budget * 0.8
-                should_continue_task = (is_analysis_task or is_action_task) and has_budget_remaining
+                should_continue_task = (stream_ctx.is_analysis_task or stream_ctx.is_action_task) and has_budget_remaining
 
                 if should_continue_task:
                     # Task-aware recovery: first attempt to continue, then fall back to summary
@@ -4987,7 +4987,7 @@ class AgentOrchestrator:
                     )
                 else:
                     # All recovery attempts failed - provide helpful error
-                    if is_analysis_task and self.tool_calls_used > 0:
+                    if stream_ctx.is_analysis_task and self.tool_calls_used > 0:
                         # Generate a minimal summary from what we know
                         unique_resources = self.unified_tracker.unique_resources
                         files_examined = list(unique_resources)[:10]
@@ -5129,8 +5129,8 @@ class AgentOrchestrator:
                     one_shot_mode = getattr(self.settings, "one_shot_mode", False)
                     action_result = self._determine_continuation_action(
                         intent_result=intent_result,
-                        is_analysis_task=is_analysis_task,
-                        is_action_task=is_action_task,
+                        is_analysis_task=stream_ctx.is_analysis_task,
+                        is_action_task=stream_ctx.is_action_task,
                         content_length=content_length,
                         full_content=full_content,
                         continuation_prompts=self._continuation_prompts,
@@ -5345,9 +5345,9 @@ class AgentOrchestrator:
                 # This prevents endless tool call loops
                 # For analysis/action tasks, allow significantly more tool calls
                 base_max_consecutive = 8
-                if is_analysis_task:
+                if stream_ctx.is_analysis_task:
                     base_max_consecutive = 50  # Analysis needs many tool calls to explore codebase
-                elif is_action_task:
+                elif stream_ctx.is_action_task:
                     base_max_consecutive = (
                         30  # Action tasks (web search, multi-step) need flexibility
                     )
@@ -5358,7 +5358,7 @@ class AgentOrchestrator:
                     # Check if we've been making progress (reading new files)
                     # For analysis/action tasks, use a more lenient progress threshold
                     # Action tasks may do web searches, directory listings, bash commands - not just file reads
-                    requires_lenient_progress = is_analysis_task or is_action_task
+                    requires_lenient_progress = stream_ctx.is_analysis_task or stream_ctx.is_action_task
                     progress_threshold = (
                         self.tool_calls_used // 4
                         if requires_lenient_progress
