@@ -620,6 +620,83 @@ class StreamingChatHandler:
             return []
         return tool_calls[:remaining]
 
+    def is_research_loop(self, stop_reason_value: str, stop_hint: str) -> bool:
+        """Check if the stop reason indicates a research loop.
+
+        Args:
+            stop_reason_value: The string value of the stop reason enum
+            stop_hint: The hint string from the stop decision
+
+        Returns:
+            True if this is a research loop, False otherwise
+        """
+        return (
+            stop_reason_value == "loop_detected"
+            and "research" in stop_hint.lower()
+        )
+
+    def get_force_completion_chunks(
+        self, ctx: StreamingChatContext, is_research_loop: bool
+    ) -> tuple[StreamChunk, str]:
+        """Get the warning chunk and system message for force completion.
+
+        Args:
+            ctx: The streaming context
+            is_research_loop: Whether this is a research loop
+
+        Returns:
+            Tuple of (warning_chunk, system_message)
+        """
+        if is_research_loop:
+            warning_chunk = StreamChunk(
+                content="[tool] ⚠ Research loop detected - forcing synthesis\n"
+            )
+            system_message = (
+                "You have performed multiple consecutive research/web searches. "
+                "STOP searching now. Instead, SYNTHESIZE and ANALYZE the information you've already gathered. "
+                "Provide your FINAL ANSWER based on the search results you have collected. "
+                "Answer all parts of the user's question comprehensively."
+            )
+        else:
+            warning_chunk = StreamChunk(
+                content="⚠️ Reached exploration limit - summarizing findings...\n"
+            )
+            system_message = (
+                "You have made multiple tool calls without providing substantial analysis. "
+                "STOP using tools now. Instead, provide your FINAL COMPREHENSIVE ANSWER based on "
+                "the information you have already gathered. Answer all parts of the user's question."
+            )
+        return warning_chunk, system_message
+
+    def handle_force_completion(
+        self,
+        ctx: StreamingChatContext,
+        stop_reason_value: str,
+        stop_hint: str,
+    ) -> Optional[IterationResult]:
+        """Handle force completion when the model is stuck.
+
+        Args:
+            ctx: The streaming context
+            stop_reason_value: The string value of the stop reason enum
+            stop_hint: The hint string from the stop decision
+
+        Returns:
+            IterationResult with warning chunk if force_completion is set, None otherwise
+        """
+        if not ctx.force_completion:
+            return None
+
+        is_research = self.is_research_loop(stop_reason_value, stop_hint)
+        warning_chunk, system_message = self.get_force_completion_chunks(ctx, is_research)
+
+        # Add system message to force summary
+        self.message_adder.add_message("system", system_message)
+
+        result = IterationResult(action=IterationAction.YIELD_AND_BREAK)
+        result.add_chunk(warning_chunk)
+        return result
+
 
 def create_streaming_handler(
     settings: "Settings",

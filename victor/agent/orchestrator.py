@@ -4378,6 +4378,36 @@ class AgentOrchestrator:
         """
         return self._streaming_handler.truncate_tool_calls(tool_calls, stream_ctx)
 
+    def _handle_force_completion_with_handler(
+        self,
+        stream_ctx: StreamingChatContext,
+    ) -> Optional[StreamChunk]:
+        """Handle force completion when the model is stuck.
+
+        Uses the unified_tracker to get stop decision info for determining
+        whether this is a research loop or exploration limit.
+
+        Args:
+            stream_ctx: The streaming context
+
+        Returns:
+            Warning chunk if force_completion is set, None otherwise
+        """
+        if not stream_ctx.force_completion:
+            return None
+
+        # Get stop decision from unified tracker for context
+        stop_decision = self.unified_tracker.should_stop()
+        stop_reason_value = stop_decision.reason.value
+        stop_hint = stop_decision.hint
+
+        result = self._streaming_handler.handle_force_completion(
+            stream_ctx, stop_reason_value, stop_hint
+        )
+        if result and result.chunks:
+            return result.chunks[0]
+        return None
+
     def _parse_and_validate_tool_calls(
         self,
         tool_calls: Optional[List[Dict[str, Any]]],
@@ -5403,35 +5433,10 @@ class AgentOrchestrator:
                 self._check_progress_with_handler(stream_ctx)
 
                 # Force completion if too many low-output iterations or research calls
-                if stream_ctx.force_completion:
-                    # Check stop reason from unified tracker to determine message type
-                    stop_decision = self.unified_tracker.should_stop()
-                    is_research_loop = (
-                        stop_decision.reason.value == "loop_detected"
-                        and "research" in stop_decision.hint.lower()
-                    )
-
-                    if is_research_loop:
-                        yield StreamChunk(
-                            content="[tool] ⚠ Research loop detected - forcing synthesis\n"
-                        )
-                        self.add_message(
-                            "system",
-                            "You have performed multiple consecutive research/web searches. "
-                            "STOP searching now. Instead, SYNTHESIZE and ANALYZE the information you've already gathered. "
-                            "Provide your FINAL ANSWER based on the search results you have collected. "
-                            "Answer all parts of the user's question comprehensively.",
-                        )
-                    else:
-                        yield StreamChunk(
-                            content="⚠️ Reached exploration limit - summarizing findings...\n"
-                        )
-                        self.add_message(
-                            "system",
-                            "You have made multiple tool calls without providing substantial analysis. "
-                            "STOP using tools now. Instead, provide your FINAL COMPREHENSIVE ANSWER based on "
-                            "the information you have already gathered. Answer all parts of the user's question.",
-                        )
+                # Use handler delegation for message generation (testable)
+                force_chunk = self._handle_force_completion_with_handler(stream_ctx)
+                if force_chunk:
+                    yield force_chunk
 
                     # Force a final response by calling provider WITHOUT tools
                     try:

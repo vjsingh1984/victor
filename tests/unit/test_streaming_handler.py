@@ -674,3 +674,90 @@ class TestProgressChecking:
         )
         result = handler.check_progress_and_force(ctx, base_max_consecutive=8)
         assert result is False  # Returns False because it didn't set it
+
+
+class TestResearchLoopDetection:
+    """Tests for research loop detection methods."""
+
+    def test_is_research_loop_true(self, handler):
+        """Detects research loop correctly."""
+        assert handler.is_research_loop("loop_detected", "research pattern detected") is True
+        assert handler.is_research_loop("loop_detected", "Research loop: web_search") is True
+        assert handler.is_research_loop("loop_detected", "RESEARCH pattern") is True
+
+    def test_is_research_loop_false_wrong_reason(self, handler):
+        """Not a research loop with different reason."""
+        assert handler.is_research_loop("tool_budget", "research loop") is False
+        assert handler.is_research_loop("max_iterations", "research") is False
+        assert handler.is_research_loop("none", "research") is False
+
+    def test_is_research_loop_false_no_research(self, handler):
+        """Not a research loop without research in hint."""
+        assert handler.is_research_loop("loop_detected", "tool budget exceeded") is False
+        assert handler.is_research_loop("loop_detected", "max iterations") is False
+        assert handler.is_research_loop("loop_detected", "") is False
+
+
+class TestForceCompletionMessages:
+    """Tests for force completion message generation."""
+
+    def test_get_force_completion_chunks_research_loop(self, handler):
+        """Research loop generates research-specific message."""
+        ctx = StreamingChatContext(user_message="test")
+        chunk, message = handler.get_force_completion_chunks(ctx, is_research_loop=True)
+
+        assert "Research loop detected" in chunk.content
+        assert "SYNTHESIZE" in message
+        assert "search results" in message
+
+    def test_get_force_completion_chunks_exploration_limit(self, handler):
+        """Non-research generates exploration limit message."""
+        ctx = StreamingChatContext(user_message="test")
+        chunk, message = handler.get_force_completion_chunks(ctx, is_research_loop=False)
+
+        assert "exploration limit" in chunk.content
+        assert "FINAL COMPREHENSIVE ANSWER" in message
+        assert "STOP using tools" in message
+
+    def test_handle_force_completion_not_forcing(self, handler):
+        """Returns None when force_completion is False."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            force_completion=False,
+        )
+        result = handler.handle_force_completion(ctx, "loop_detected", "research")
+        assert result is None
+
+    def test_handle_force_completion_research_loop(self, handler, mock_message_adder):
+        """Handles research loop force completion."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            force_completion=True,
+        )
+        result = handler.handle_force_completion(ctx, "loop_detected", "research loop detected")
+
+        assert result is not None
+        assert len(result.chunks) == 1
+        assert "Research loop detected" in result.chunks[0].content
+        # Check system message was added
+        mock_message_adder.add_message.assert_called_once()
+        call_args = mock_message_adder.add_message.call_args
+        assert call_args[0][0] == "system"
+        assert "SYNTHESIZE" in call_args[0][1]
+
+    def test_handle_force_completion_exploration_limit(self, handler, mock_message_adder):
+        """Handles exploration limit force completion."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            force_completion=True,
+        )
+        result = handler.handle_force_completion(ctx, "max_iterations", "too many iterations")
+
+        assert result is not None
+        assert len(result.chunks) == 1
+        assert "exploration limit" in result.chunks[0].content
+        # Check system message was added
+        mock_message_adder.add_message.assert_called_once()
+        call_args = mock_message_adder.add_message.call_args
+        assert call_args[0][0] == "system"
+        assert "FINAL COMPREHENSIVE ANSWER" in call_args[0][1]
