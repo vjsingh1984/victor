@@ -69,6 +69,48 @@ class TestEditBasicOperations:
         assert result["success"] is True
 
     @pytest.mark.asyncio
+    async def test_edit_json_raw_newlines_auto_fixed(self, tmp_path):
+        """Test JSON parsing auto-fixes raw newlines in strings.
+
+        Models sometimes pass JSON with raw newlines inside string values.
+        The edit tool should auto-fix these and proceed.
+        """
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("old line1\nold line2")
+
+        # Create JSON with ACTUAL raw newlines inside the string values
+        # (not escaped \n, but real newline characters)
+        ops_json = (
+            '[{"type": "replace", "path": "'
+            + str(test_file)
+            + '", "old_str": "old line1\nold line2", "new_str": "new line1\nnew line2"}]'
+        )
+
+        # This should auto-fix the raw newlines and succeed
+        result = await edit(ops=ops_json)
+
+        assert result["success"] is True
+        assert test_file.read_text() == "new line1\nnew line2"
+
+    @pytest.mark.asyncio
+    async def test_edit_json_raw_tabs_auto_fixed(self, tmp_path):
+        """Test JSON parsing auto-fixes raw tabs in strings."""
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("col1\tcol2")
+
+        # Create JSON with ACTUAL raw tab inside the string value
+        ops_json = (
+            '[{"type": "replace", "path": "'
+            + str(test_file)
+            + '", "old_str": "col1\tcol2", "new_str": "COL1\tCOL2"}]'
+        )
+
+        result = await edit(ops=ops_json)
+
+        assert result["success"] is True
+        assert test_file.read_text() == "COL1\tCOL2"
+
+    @pytest.mark.asyncio
     async def test_edit_op_not_dict(self):
         """Test error when operation is not a dictionary."""
         result = await edit(ops=["not a dict"])
