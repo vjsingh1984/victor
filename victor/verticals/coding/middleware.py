@@ -180,6 +180,61 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
                 return None
         return self._inner_middleware
 
+    def should_validate(self, tool_name: str) -> bool:
+        """Check if this tool should have its code validated.
+
+        Delegates to the inner middleware.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            True if code validation should be applied
+        """
+        inner = self._get_inner()
+        if inner is None:
+            return False
+        return inner.should_validate(tool_name)
+
+    def validate_and_fix(self, tool_name: str, arguments: Dict[str, Any]):
+        """Validate and optionally fix code in arguments.
+
+        Delegates to the inner middleware.
+
+        Args:
+            tool_name: Name of the tool
+            arguments: Tool arguments
+
+        Returns:
+            CorrectionResult from inner middleware
+        """
+        inner = self._get_inner()
+        if inner is None:
+            # Return a minimal "no issues" result
+            from victor.agent.code_correction_middleware import CorrectionResult, ValidationResult
+            return CorrectionResult(
+                validation=ValidationResult(valid=True, errors=[]),
+                was_corrected=False,
+            )
+        return inner.validate_and_fix(tool_name, arguments)
+
+    def apply_correction(self, arguments: Dict[str, Any], correction_result):
+        """Apply a correction to the arguments.
+
+        Delegates to the inner middleware.
+
+        Args:
+            arguments: Original arguments
+            correction_result: Result from validate_and_fix
+
+        Returns:
+            Modified arguments with corrections applied
+        """
+        inner = self._get_inner()
+        if inner is None:
+            return arguments
+        return inner.apply_correction(arguments, correction_result)
+
     async def before_tool_call(
         self, tool_name: str, arguments: Dict[str, Any]
     ) -> MiddlewareResult:
