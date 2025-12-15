@@ -1145,6 +1145,36 @@ class StreamingChatHandler:
         """
         return StreamChunk(content="", metadata={"status": "💭 Thinking..."})
 
+    def generate_budget_error_chunk(self) -> StreamChunk:
+        """Generate a chunk for budget limit summary error.
+
+        Returns:
+            StreamChunk with budget limit error message
+        """
+        return StreamChunk(
+            content="Unable to generate summary due to budget limit.\n"
+        )
+
+    def generate_force_response_error_chunk(self) -> StreamChunk:
+        """Generate a chunk for forced response generation error.
+
+        Returns:
+            StreamChunk with force response error message
+        """
+        return StreamChunk(
+            content="Unable to generate final summary. Please try a simpler query."
+        )
+
+    def generate_final_marker_chunk(self) -> StreamChunk:
+        """Generate an empty final marker chunk.
+
+        This chunk signals the end of the streaming response.
+
+        Returns:
+            StreamChunk with is_final=True and empty content
+        """
+        return StreamChunk(content="", is_final=True)
+
 
 def create_streaming_handler(
     settings: "Settings",

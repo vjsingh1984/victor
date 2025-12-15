@@ -1420,3 +1420,48 @@ class TestGenerateThinkingStatusChunk:
 
         assert chunk.content == ""
         assert len(chunk.content) == 0
+
+
+class TestGenerateBudgetErrorChunk:
+    """Tests for generate_budget_error_chunk method."""
+
+    def test_generates_budget_error_chunk(self, handler):
+        """Generates a budget error chunk with correct message."""
+        chunk = handler.generate_budget_error_chunk()
+
+        assert "Unable to generate summary due to budget limit" in chunk.content
+
+    def test_chunk_ends_with_newline(self, handler):
+        """Budget error chunk ends with newline."""
+        chunk = handler.generate_budget_error_chunk()
+
+        assert chunk.content.endswith("\n")
+
+
+class TestGenerateForceResponseErrorChunk:
+    """Tests for generate_force_response_error_chunk method."""
+
+    def test_generates_force_response_error_chunk(self, handler):
+        """Generates a force response error chunk with correct message."""
+        chunk = handler.generate_force_response_error_chunk()
+
+        assert "Unable to generate final summary" in chunk.content
+        assert "simpler query" in chunk.content
+
+
+class TestGenerateFinalMarkerChunk:
+    """Tests for generate_final_marker_chunk method."""
+
+    def test_generates_final_marker_chunk(self, handler):
+        """Generates a final marker chunk with is_final=True."""
+        chunk = handler.generate_final_marker_chunk()
+
+        assert chunk.content == ""
+        assert chunk.is_final is True
+
+    def test_chunk_has_no_content(self, handler):
+        """Final marker chunk has empty content."""
+        chunk = handler.generate_final_marker_chunk()
+
+        assert chunk.content == ""
+        assert len(chunk.content) == 0

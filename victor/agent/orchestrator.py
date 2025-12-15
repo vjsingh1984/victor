@@ -4572,6 +4572,30 @@ class AgentOrchestrator:
         """
         return self._streaming_handler.generate_thinking_status_chunk()
 
+    def _generate_budget_error_chunk_with_handler(self) -> StreamChunk:
+        """Generate budget limit error chunk using handler delegation.
+
+        Returns:
+            StreamChunk with budget limit error message
+        """
+        return self._streaming_handler.generate_budget_error_chunk()
+
+    def _generate_force_response_error_chunk_with_handler(self) -> StreamChunk:
+        """Generate force response error chunk using handler delegation.
+
+        Returns:
+            StreamChunk with force response error message
+        """
+        return self._streaming_handler.generate_force_response_error_chunk()
+
+    def _generate_final_marker_chunk_with_handler(self) -> StreamChunk:
+        """Generate final marker chunk using handler delegation.
+
+        Returns:
+            StreamChunk with is_final=True
+        """
+        return self._streaming_handler.generate_final_marker_chunk()
+
     def _parse_and_validate_tool_calls(
         self,
         tool_calls: Optional[List[Dict[str, Any]]],
@@ -5396,9 +5420,8 @@ class AgentOrchestrator:
                                 yield StreamChunk(content=sanitized + "\n")
                     except Exception as e:
                         logger.warning(f"Failed to generate final summary: {e}")
-                        yield StreamChunk(
-                            content="Unable to generate summary due to budget limit.\n"
-                        )
+                        # Use handler delegation for budget error chunk (testable)
+                        yield self._generate_budget_error_chunk_with_handler()
 
                     # Finalize and display performance metrics using handler delegation
                     final_metrics = self._finalize_stream_metrics()
@@ -5452,9 +5475,8 @@ class AgentOrchestrator:
                                 yield StreamChunk(content=sanitized)
                     except Exception as e:
                         logger.warning(f"Error forcing final response: {e}")
-                        yield StreamChunk(
-                            content="Unable to generate final summary. Please try a simpler query."
-                        )
+                        # Use handler delegation for force response error chunk (testable)
+                        yield self._generate_force_response_error_chunk_with_handler()
                     return  # Exit the loop after forcing final response
 
                 # Guard against None tool_calls (can happen when model response has no tool calls
