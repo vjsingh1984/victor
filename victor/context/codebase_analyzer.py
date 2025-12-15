@@ -76,6 +76,13 @@ class CodebaseAnalysis:
     cli_commands: List[str] = field(default_factory=list)
     architecture_patterns: List[str] = field(default_factory=list)
     config_files: List[Tuple[str, str]] = field(default_factory=list)  # (path, description)
+    # Enhanced fields
+    dependencies: Dict[str, List[str]] = field(default_factory=dict)  # {category: [dep1, dep2]}
+    test_coverage: Optional[float] = None  # Coverage percentage if available
+    loc_stats: Dict[str, int] = field(default_factory=dict)  # {total_lines, total_files, largest_file}
+    top_imports: List[Tuple[str, int]] = field(default_factory=list)  # [(module, import_count)]
+    method_count: int = 0
+    protocol_count: int = 0  # Python Protocol/ABC count
 
 
 class CodebaseAnalyzer:
@@ -173,6 +180,18 @@ class CodebaseAnalyzer:
 
         # Step 6: Find config files
         self._find_config_files()
+
+        # Step 7: Extract dependencies from pyproject.toml/package.json
+        self._extract_dependencies()
+
+        # Step 8: Calculate LOC stats
+        self._calculate_loc_stats()
+
+        # Step 9: Extract top imports
+        self._extract_top_imports()
+
+        # Step 10: Try to get test coverage
+        self._extract_test_coverage()
 
         return self.analysis
 
@@ -470,10 +489,23 @@ class CodebaseAnalyzer:
     def _identify_key_components(self) -> None:
         """Identify the most important classes in the codebase."""
         all_classes: List[ClassInfo] = []
+        method_count = 0
+        protocol_count = 0
 
         for modules in self.analysis.packages.values():
             for module in modules:
                 all_classes.extend(module.classes)
+                # Count methods (top-level functions are tracked separately)
+                method_count += len(module.functions)
+                # Count protocols/ABCs
+                for cls in module.classes:
+                    if cls.is_abstract or "Protocol" in cls.name or any(
+                        base in ("Protocol", "ABC") for base in cls.base_classes
+                    ):
+                        protocol_count += 1
+
+        self.analysis.method_count = method_count
+        self.analysis.protocol_count = protocol_count
 
         # Priority scoring for key components
         def score_class(cls: ClassInfo) -> int:
@@ -498,8 +530,8 @@ class CodebaseAnalyzer:
         scored = [(score_class(c), c) for c in all_classes if c.category]
         scored.sort(key=lambda x: -x[0])
 
-        # Take top 15 most important
-        self.analysis.key_components = [c for _, c in scored[:15]]
+        # Take top 20 most important (increased from 15)
+        self.analysis.key_components = [c for _, c in scored[:20]]
 
     def _extract_entry_points(self) -> None:
         """Extract CLI entry points from pyproject.toml."""
@@ -601,6 +633,201 @@ class CodebaseAnalyzer:
             else:
                 if (self.root / pattern).exists():
                     self.analysis.config_files.append((pattern, description))
+
+    def _extract_dependencies(self) -> None:
+        """Extract dependencies from pyproject.toml or package.json."""
+        # Try pyproject.toml first (Python)
+        pyproject = self.root / "pyproject.toml"
+        if pyproject.exists():
+            try:
+                content = pyproject.read_text(encoding="utf-8")
+                deps: Dict[str, List[str]] = {"core": [], "dev": [], "optional": []}
+
+                # Parse [project.dependencies]
+                deps_match = re.search(
+                    r"\[project\].*?dependencies\s*=\s*\[(.*?)\]", content, re.DOTALL
+                )
+                if deps_match:
+                    deps_text = deps_match.group(1)
+                    for line in deps_text.split(","):
+                        dep = line.strip().strip('"\'')
+                        if dep and not dep.startswith("#"):
+                            # Extract package name (before version specifier)
+                            pkg_name = re.split(r"[<>=~!]", dep)[0].strip()
+                            if pkg_name:
+                                deps["core"].append(pkg_name)
+
+                # Parse [project.optional-dependencies]
+                opt_deps_match = re.search(
+                    r"\[project\.optional-dependencies\](.*?)(?=\[|\Z)", content, re.DOTALL
+                )
+                if opt_deps_match:
+                    opt_section = opt_deps_match.group(1)
+                    # Extract dev dependencies
+                    dev_match = re.search(r'dev\s*=\s*\[(.*?)\]', opt_section, re.DOTALL)
+                    if dev_match:
+                        for line in dev_match.group(1).split(","):
+                            dep = line.strip().strip('"\'')
+                            if dep and not dep.startswith("#"):
+                                pkg_name = re.split(r"[<>=~!]", dep)[0].strip()
+                                if pkg_name:
+                                    deps["dev"].append(pkg_name)
+
+                self.analysis.dependencies = deps
+
+            except Exception as e:
+                logger.debug(f"Failed to parse pyproject.toml dependencies: {e}")
+
+        # Try package.json (Node.js)
+        package_json = self.root / "package.json"
+        if package_json.exists() and not self.analysis.dependencies:
+            try:
+                import json
+                data = json.loads(package_json.read_text(encoding="utf-8"))
+                deps: Dict[str, List[str]] = {"core": [], "dev": []}
+
+                if "dependencies" in data:
+                    deps["core"] = list(data["dependencies"].keys())[:15]
+                if "devDependencies" in data:
+                    deps["dev"] = list(data["devDependencies"].keys())[:10]
+
+                self.analysis.dependencies = deps
+
+            except Exception as e:
+                logger.debug(f"Failed to parse package.json dependencies: {e}")
+
+    def _calculate_loc_stats(self) -> None:
+        """Calculate lines of code statistics."""
+        total_lines = 0
+        total_files = 0
+        largest_file = ""
+        largest_file_lines = 0
+        file_sizes: List[Tuple[str, int]] = []
+
+        # Scan all source files
+        for ext in self.LANGUAGE_EXTENSIONS.keys():
+            search_dirs = [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
+            for search_dir in search_dirs:
+                if not search_dir.is_dir():
+                    continue
+                for source_file in search_dir.rglob(f"*{ext}"):
+                    if should_ignore_path(source_file, skip_dirs=self.effective_skip_dirs):
+                        continue
+                    try:
+                        content = source_file.read_text(encoding="utf-8", errors="ignore")
+                        lines = len(content.splitlines())
+                        total_lines += lines
+                        total_files += 1
+                        rel_path = str(source_file.relative_to(self.root))
+                        file_sizes.append((rel_path, lines))
+                        if lines > largest_file_lines:
+                            largest_file_lines = lines
+                            largest_file = rel_path
+                    except Exception:
+                        pass
+
+        # Sort by size and get top 5
+        file_sizes.sort(key=lambda x: -x[1])
+        top_files = file_sizes[:5]
+
+        self.analysis.loc_stats = {
+            "total_lines": total_lines,
+            "total_files": total_files,
+            "largest_file": largest_file,
+            "largest_file_lines": largest_file_lines,
+            "top_files": top_files,
+        }
+
+    def _extract_top_imports(self) -> None:
+        """Extract the most commonly imported modules (Python only)."""
+        import_counts: Dict[str, int] = defaultdict(int)
+
+        # Only scan Python files
+        search_dirs = [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
+        for search_dir in search_dirs:
+            if not search_dir.is_dir():
+                continue
+            for source_file in search_dir.rglob("*.py"):
+                if should_ignore_path(source_file, skip_dirs=self.effective_skip_dirs):
+                    continue
+                try:
+                    content = source_file.read_text(encoding="utf-8", errors="ignore")
+                    tree = ast.parse(content)
+
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.Import):
+                            for alias in node.names:
+                                # Get top-level module
+                                module = alias.name.split(".")[0]
+                                import_counts[module] += 1
+                        elif isinstance(node, ast.ImportFrom):
+                            if node.module:
+                                module = node.module.split(".")[0]
+                                import_counts[module] += 1
+
+                except Exception:
+                    pass
+
+        # Filter out standard library and sort by count
+        # Common stdlib modules to exclude from "top imports" (not exhaustive)
+        stdlib = {
+            "os", "sys", "re", "json", "typing", "dataclasses", "pathlib",
+            "collections", "functools", "itertools", "logging", "abc",
+            "datetime", "time", "asyncio", "contextlib", "copy", "enum",
+            "hashlib", "io", "math", "random", "shutil", "subprocess",
+            "tempfile", "threading", "traceback", "unittest", "uuid", "warnings"
+        }
+
+        # Filter and sort
+        filtered = [(mod, count) for mod, count in import_counts.items() if mod not in stdlib]
+        filtered.sort(key=lambda x: -x[1])
+
+        self.analysis.top_imports = filtered[:10]
+
+    def _extract_test_coverage(self) -> None:
+        """Try to extract test coverage from coverage reports."""
+        # Check for coverage.xml
+        coverage_file = self.root / "coverage.xml"
+        if coverage_file.exists():
+            try:
+                content = coverage_file.read_text(encoding="utf-8")
+                # Parse line-rate attribute (0.0 to 1.0)
+                match = re.search(r'line-rate="([0-9.]+)"', content)
+                if match:
+                    coverage_pct = float(match.group(1)) * 100
+                    self.analysis.test_coverage = round(coverage_pct, 1)
+                    return
+            except Exception:
+                pass
+
+        # Check for .coverage SQLite database
+        coverage_db = self.root / ".coverage"
+        if coverage_db.exists():
+            try:
+                import sqlite3
+                conn = sqlite3.connect(str(coverage_db))
+                cursor = conn.cursor()
+                # Get line counts
+                cursor.execute("SELECT SUM(num_statements), SUM(num_statements - missing_lines) FROM file_summary")
+                row = cursor.fetchone()
+                if row and row[0]:
+                    total, covered = row[0], row[1] or 0
+                    self.analysis.test_coverage = round((covered / total) * 100, 1)
+                conn.close()
+            except Exception:
+                pass
+
+        # Check htmlcov/index.html for coverage percentage
+        htmlcov = self.root / "htmlcov" / "index.html"
+        if htmlcov.exists():
+            try:
+                content = htmlcov.read_text(encoding="utf-8")
+                # Look for coverage percentage in the HTML
+                match = re.search(r'(\d+)%\s*</span>\s*</h1>', content)
+                if match:
+                    self.analysis.test_coverage = float(match.group(1))
+            except Exception:
+                pass
 
 
 def generate_smart_victor_md(
@@ -1415,10 +1642,18 @@ async def generate_victor_md_from_index(
     await store.index_codebase(force=force)
 
     stats = store.get_stats()
-    key_components = store.find_key_components(limit=15)
+    key_components = store.find_key_components(limit=20)  # Increased from 15 for more context
     patterns = store.get_detected_patterns()
     named_impls = store.find_named_implementations()
     perf_hints = store.find_performance_hints()
+
+    # Also run CodebaseAnalyzer for enhanced info (dependencies, LOC, imports, coverage)
+    analyzer = CodebaseAnalyzer(str(root), include_dirs=include_dirs, exclude_dirs=exclude_dirs)
+    analyzer._extract_dependencies()
+    analyzer._calculate_loc_stats()
+    analyzer._extract_top_imports()
+    analyzer._extract_test_coverage()
+    enhanced_info = analyzer.analysis
 
     sections = []
 
@@ -1469,7 +1704,7 @@ async def generate_victor_md_from_index(
         sections.append("| Component | Type | Path | Description |")
         sections.append("|-----------|------|------|-------------|")
 
-        for comp in key_components[:12]:
+        for comp in key_components[:15]:  # Show top 15 (increased from 12)
             raw_desc = (
                 comp.docstring or comp.category.title()
                 if comp.category
@@ -1485,6 +1720,47 @@ async def generate_victor_md_from_index(
                 f"| {comp.name} | {comp.symbol_type} | {path_with_line} | {desc} |"
             )
 
+        sections.append("")
+
+    # Dependencies (from pyproject.toml/package.json)
+    if enhanced_info.dependencies:
+        sections.append("## Dependencies\n")
+        if enhanced_info.dependencies.get("core"):
+            core_deps = enhanced_info.dependencies["core"][:12]
+            sections.append(f"**Core** ({len(enhanced_info.dependencies['core'])} packages): {', '.join(core_deps)}")
+            if len(enhanced_info.dependencies["core"]) > 12:
+                sections.append(f"  ...and {len(enhanced_info.dependencies['core']) - 12} more")
+        if enhanced_info.dependencies.get("dev"):
+            dev_deps = enhanced_info.dependencies["dev"][:8]
+            sections.append(f"\n**Dev** ({len(enhanced_info.dependencies['dev'])} packages): {', '.join(dev_deps)}")
+        sections.append("")
+
+    # Codebase Stats (LOC, files, coverage)
+    if enhanced_info.loc_stats:
+        sections.append("## Codebase Stats\n")
+        loc = enhanced_info.loc_stats
+        stats_line = f"- **{loc.get('total_lines', 0):,}** lines of code across **{loc.get('total_files', 0)}** files"
+        if enhanced_info.test_coverage is not None:
+            stats_line += f" ({enhanced_info.test_coverage}% test coverage)"
+        sections.append(stats_line)
+
+        if loc.get("largest_file"):
+            sections.append(f"- Largest file: `{loc['largest_file']}` ({loc.get('largest_file_lines', 0):,} lines)")
+
+        # Show top 3 largest files
+        top_files = loc.get("top_files", [])[:3]
+        if top_files:
+            sections.append("- Top files by size:")
+            for path, lines in top_files:
+                sections.append(f"  - `{path}` ({lines:,} lines)")
+        sections.append("")
+
+    # Top Imports (most used internal/external modules)
+    if enhanced_info.top_imports:
+        sections.append("## Most Imported Modules\n")
+        sections.append("*Non-stdlib modules imported most frequently*\n")
+        for module, count in enhanced_info.top_imports[:8]:
+            sections.append(f"- `{module}` ({count} imports)")
         sections.append("")
 
     # Named Implementations (grouped by domain)
