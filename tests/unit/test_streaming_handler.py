@@ -1402,3 +1402,21 @@ class TestHandleLoopWarning:
 
         assert chunk is None
         mock_message_adder.add_message.assert_not_called()
+
+
+class TestGenerateThinkingStatusChunk:
+    """Tests for generate_thinking_status_chunk method."""
+
+    def test_generates_thinking_status_chunk(self, handler):
+        """Generates a thinking status chunk with correct metadata."""
+        chunk = handler.generate_thinking_status_chunk()
+
+        assert chunk.content == ""
+        assert chunk.metadata == {"status": "💭 Thinking..."}
+
+    def test_chunk_has_no_content(self, handler):
+        """Generated chunk has empty content."""
+        chunk = handler.generate_thinking_status_chunk()
+
+        assert chunk.content == ""
+        assert len(chunk.content) == 0

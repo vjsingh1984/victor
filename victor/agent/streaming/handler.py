@@ -1137,6 +1137,14 @@ class StreamingChatHandler:
         self.message_adder.add_message("system", system_message)
         return warning_chunk
 
+    def generate_thinking_status_chunk(self) -> StreamChunk:
+        """Generate a thinking status chunk to indicate model is processing.
+
+        Returns:
+            StreamChunk with thinking status metadata
+        """
+        return StreamChunk(content="", metadata={"status": "💭 Thinking..."})
+
 
 def create_streaming_handler(
     settings: "Settings",

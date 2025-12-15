@@ -4550,6 +4550,28 @@ class AgentOrchestrator:
             tool_name, tool_args, status_msg
         )
 
+    def _get_budget_exhausted_chunks_with_handler(
+        self,
+        stream_ctx: "StreamingChatContext",
+    ) -> List[StreamChunk]:
+        """Get budget exhausted warning chunks using handler delegation.
+
+        Args:
+            stream_ctx: The streaming context
+
+        Returns:
+            List of StreamChunks for budget exhausted warning
+        """
+        return self._streaming_handler.get_budget_exhausted_chunks(stream_ctx)
+
+    def _generate_thinking_status_chunk_with_handler(self) -> StreamChunk:
+        """Generate thinking status chunk using handler delegation.
+
+        Returns:
+            StreamChunk with thinking status metadata
+        """
+        return self._streaming_handler.generate_thinking_status_chunk()
+
     def _parse_and_validate_tool_calls(
         self,
         tool_calls: Optional[List[Dict[str, Any]]],
@@ -5352,11 +5374,9 @@ class AgentOrchestrator:
                     yield budget_warning
 
                 if remaining <= 0:
-                    yield StreamChunk(
-                        content=f"[tool] ⚠ Tool budget reached ({self.tool_budget}); skipping tool calls.\n"
-                    )
-                    # Try to generate a final summary before exiting
-                    yield StreamChunk(content="Generating final summary...\n")
+                    # Use handler delegation for budget exhausted chunks (testable)
+                    for chunk in self._get_budget_exhausted_chunks_with_handler(stream_ctx):
+                        yield chunk
                     try:
                         self.add_message(
                             "system",
@@ -5499,7 +5519,8 @@ class AgentOrchestrator:
                     for chunk in self._generate_tool_result_chunks_with_handler(result):
                         yield chunk
 
-                yield StreamChunk(content="", metadata={"status": "💭 Thinking..."})
+                # Use handler delegation for thinking status chunk (testable)
+                yield self._generate_thinking_status_chunk_with_handler()
 
                 # Update reminder manager state and inject consolidated reminder if needed
                 # This replaces the previous per-tool-call evidence injection with smart throttling
