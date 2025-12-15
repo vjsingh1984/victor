@@ -4458,6 +4458,62 @@ class AgentOrchestrator:
         """
         return self._streaming_handler.generate_tool_result_chunks(result)
 
+    def _get_recovery_prompts_with_handler(
+        self,
+        stream_ctx: "StreamingChatContext",
+    ) -> List[tuple[str, float]]:
+        """Get recovery prompts using handler delegation.
+
+        Args:
+            stream_ctx: The streaming context
+
+        Returns:
+            List of (prompt, temperature) tuples for recovery attempts
+        """
+        # Get thinking mode settings
+        has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
+        thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
+
+        return self._streaming_handler.get_recovery_prompts(
+            ctx=stream_ctx,
+            base_temperature=self.temperature,
+            has_thinking_mode=has_thinking_mode,
+            thinking_disable_prefix=thinking_prefix,
+        )
+
+    def _should_use_tools_for_recovery_with_handler(
+        self,
+        stream_ctx: "StreamingChatContext",
+        attempt: int,
+    ) -> bool:
+        """Check if tools should be enabled for recovery using handler delegation.
+
+        Args:
+            stream_ctx: The streaming context
+            attempt: The recovery attempt number (1-indexed)
+
+        Returns:
+            True if tools should be enabled, False otherwise
+        """
+        return self._streaming_handler.should_use_tools_for_recovery(stream_ctx, attempt)
+
+    def _get_recovery_fallback_message_with_handler(
+        self,
+        stream_ctx: "StreamingChatContext",
+    ) -> str:
+        """Get recovery fallback message using handler delegation.
+
+        Args:
+            stream_ctx: The streaming context
+
+        Returns:
+            Fallback message string
+        """
+        unique_resources = list(self.unified_tracker.unique_resources)
+        return self._streaming_handler.get_recovery_fallback_message(
+            stream_ctx, unique_resources
+        )
+
     def _parse_and_validate_tool_calls(
         self,
         tool_calls: Optional[List[Dict[str, Any]]],
@@ -4917,109 +4973,9 @@ class AgentOrchestrator:
                     # The should_force flag confirms the handler's decision
                     continue
 
-                # Check if model has thinking disable prefix (e.g., Qwen3 /no_think)
-                thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
-                if thinking_prefix:
-                    logger.debug(f"Using thinking disable prefix '{thinking_prefix}' for recovery")
-
-                # Build recovery prompts - _get_thinking_disabled_prompt adds prefix if available
-                # Use simpler prompts and lower temps for models with thinking mode
-                has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
-
-                # Check if we should continue the task vs summarize
-                # If we're in analysis/action mode with budget remaining, first try to continue
-                has_budget_remaining = self.tool_calls_used < self.tool_budget * 0.8
-                should_continue_task = (stream_ctx.is_analysis_task or stream_ctx.is_action_task) and has_budget_remaining
-
-                if should_continue_task:
-                    # Task-aware recovery: first attempt to continue, then fall back to summary
-                    if has_thinking_mode:
-                        recovery_prompts = [
-                            (
-                                self._get_thinking_disabled_prompt(
-                                    "The previous action did not complete. Use discovery tools:\n"
-                                    "- graph(mode='pagerank', top_k=5) to find important symbols\n"
-                                    "- search(query='...') for semantic code search\n"
-                                    "- overview(path='.') for project structure\n"
-                                    "Pick ONE tool to continue."
-                                ),
-                                min(self.temperature + 0.1, 0.7),
-                            ),
-                            (
-                                self._get_thinking_disabled_prompt(
-                                    "Call a tool: search(query='main') or read(path='filename'). "
-                                    "Pick a file to examine."
-                                ),
-                                min(self.temperature + 0.2, 0.8),
-                            ),
-                            (
-                                self._get_thinking_disabled_prompt(
-                                    "Respond in 2-3 sentences: What files did you read and what did you find?"
-                                ),
-                                min(self.temperature + 0.3, 0.9),
-                            ),
-                        ]
-                    else:
-                        recovery_prompts = [
-                            (
-                                "The previous action did not complete. Use discovery tools:\n"
-                                "- graph(mode='pagerank', top_k=5) - find important symbols\n"
-                                "- search(query='...') - semantic code search\n"
-                                "- overview(path='.') - project structure\n"
-                                "- refs(symbol_name='...') - find usages\n"
-                                "Make ONE tool call to continue exploring.",
-                                min(self.temperature + 0.2, 1.0),
-                            ),
-                            (
-                                "Call search(query='main') or read(path='filename') to examine code. "
-                                "Continue your analysis.",
-                                min(self.temperature + 0.3, 1.0),
-                            ),
-                            (
-                                "Summarize your findings so far. What files did you examine? "
-                                "What patterns or issues did you notice? Keep it brief.",
-                                min(self.temperature + 0.4, 1.0),
-                            ),
-                        ]
-                elif has_thinking_mode:
-                    # Simpler prompts and lower temps for thinking models (summary mode)
-                    recovery_prompts = [
-                        (
-                            self._get_thinking_disabled_prompt(
-                                "Respond in 2-3 sentences: What files did you read and what did you find?"
-                            ),
-                            min(self.temperature + 0.1, 0.7),
-                        ),
-                        (
-                            self._get_thinking_disabled_prompt(
-                                "List 3 bullet points about the code you examined."
-                            ),
-                            min(self.temperature + 0.2, 0.8),
-                        ),
-                        (
-                            self._get_thinking_disabled_prompt(
-                                "One sentence answer: What is the main thing you learned?"
-                            ),
-                            min(self.temperature + 0.3, 0.9),
-                        ),
-                    ]
-                else:
-                    # Standard recovery prompts (summary mode)
-                    recovery_prompts = [
-                        (
-                            "Summarize your findings so far. What files did you examine? "
-                            "What patterns or issues did you notice? Keep it brief.",
-                            min(self.temperature + 0.2, 1.0),
-                        ),
-                        (
-                            "Based on the code you've seen, list 3-5 observations or suggestions.",
-                            min(self.temperature + 0.3, 1.0),
-                        ),
-                        (
-                            "What did you learn from the files? One paragraph summary.",
-                            min(self.temperature + 0.4, 1.0),
-                        ),
-                    ]
+                # Get recovery prompts using handler delegation (testable)
+                # Handler handles thinking mode prefix and task-aware prompts
+                recovery_prompts = self._get_recovery_prompts_with_handler(stream_ctx)
 
                 recovery_success = False
                 for attempt, (prompt, temp) in enumerate(recovery_prompts, 1):
@@ -5032,9 +4988,8 @@ class AgentOrchestrator:
                     )
                     recovery_messages = recent_messages + [Message(role="user", content=prompt)]
 
-                    # For task-continuation mode, enable tools on first 2 attempts so model can
-                    # actually make tool calls. Fall back to text-only on last attempt.
-                    use_tools = should_continue_task and attempt <= 2
+                    # Use handler to decide if tools should be enabled (testable)
+                    use_tools = self._should_use_tools_for_recovery_with_handler(stream_ctx, attempt)
                     recovery_tools = tools if use_tools else None
 
                     try:
@@ -5115,20 +5070,8 @@ class AgentOrchestrator:
                         f"Recovery produced {len(tool_calls)} tool call(s) - continuing main loop"
                     )
                 else:
-                    # All recovery attempts failed - provide helpful error
-                    if stream_ctx.is_analysis_task and self.tool_calls_used > 0:
-                        # Generate a minimal summary from what we know
-                        unique_resources = self.unified_tracker.unique_resources
-                        files_examined = list(unique_resources)[:10]
-                        fallback_msg = (
-                            f"\n\n**Analysis Summary** (auto-generated)\n\n"
-                            f"Examined {len(unique_resources)} files including:\n"
-                            + "\n".join(f"- {f}" for f in files_examined)
-                            + "\n\nThe model was unable to provide detailed analysis. "
-                            "Try with a simpler query like 'analyze victor/agent/' or use a different model."
-                        )
-                    else:
-                        fallback_msg = "No tool calls were returned and the model provided no content. Please retry or simplify the request."
+                    # All recovery attempts failed - get fallback message using handler (testable)
+                    fallback_msg = self._get_recovery_fallback_message_with_handler(stream_ctx)
                     # Record outcome for Q-learning (fallback = partial failure)
                     self._record_intelligent_outcome(
                         success=False,

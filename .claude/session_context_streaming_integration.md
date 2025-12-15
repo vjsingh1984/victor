@@ -243,4 +243,18 @@ Wired handler method into orchestrator:
 - Added `_generate_tool_result_chunks_with_handler()` delegation method
 - Replaced ~60 lines of inline tool result processing with handler call
 
+All 96 streaming handler tests pass, 380 orchestrator tests pass (476 total).
+
+### Session 8: Recovery Prompts Wiring into Orchestrator
+**Commit: (pending)**
+
+Wired existing recovery handler methods into orchestrator:
+- Added `_get_recovery_prompts_with_handler()` delegation method
+- Added `_should_use_tools_for_recovery_with_handler()` delegation method
+- Added `_get_recovery_fallback_message_with_handler()` delegation method
+- Replaced ~110 lines of inline recovery prompt logic with handler calls
+- Recovery prompts now use handler's `get_recovery_prompts()` (handles thinking mode)
+- Tool enablement uses handler's `should_use_tools_for_recovery()` (testable)
+- Fallback message uses handler's `get_recovery_fallback_message()` (testable)
+
 All 96 streaming handler tests pass, 380 orchestrator tests pass (476 total)
