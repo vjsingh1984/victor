@@ -491,12 +491,24 @@ class AgentOrchestrator:
             self._container.get_optional(ResponseSanitizerProtocol) or ResponseSanitizer()
         )
 
+        # Get prompt contributors from vertical extensions
+        prompt_contributors = []
+        try:
+            from victor.verticals.protocols import VerticalExtensions
+
+            extensions = self._container.get_optional(VerticalExtensions)
+            if extensions and extensions.prompt_contributors:
+                prompt_contributors = extensions.prompt_contributors
+        except Exception as e:
+            logger.debug(f"Could not load vertical prompt contributors: {e}")
+
         # System prompt builder for provider-specific prompts
         self.prompt_builder = SystemPromptBuilder(
             provider_name=self.provider_name,
             model=model,
             tool_adapter=self.tool_adapter,
             capabilities=self.tool_calling_caps,
+            prompt_contributors=prompt_contributors,
         )
 
         # Load project context from .victor/init.md (DI with fallback)
@@ -763,39 +775,76 @@ class AgentOrchestrator:
         }
         validation_mode = validation_mode_map.get(validation_mode_str, ValidationMode.LENIENT)
 
-        # Initialize CodeCorrectionMiddleware for automatic code validation and fixing
-        # This reduces failed tool calls by ~15-20% by fixing common syntax issues
-        # Lazy import to avoid circular import chain
+        # Initialize middleware chain from vertical extensions (DI-injected)
+        # Middleware provides code validation, safety checks, and domain-specific processing
+        self._middleware_chain: Optional[Any] = None
+        self._code_correction_middleware: Optional[Any] = None  # For backward compatibility
         code_correction_enabled = getattr(settings, "code_correction_enabled", True)
-        code_correction_auto_fix = getattr(settings, "code_correction_auto_fix", True)
-        code_correction_max_iterations = getattr(settings, "code_correction_max_iterations", 1)
 
-        self._code_correction_middleware: Optional[Any] = None
-        if code_correction_enabled:
-            try:
-                from victor.agent.code_correction_middleware import (
-                    CodeCorrectionMiddleware,
-                    CodeCorrectionConfig,
-                )
+        try:
+            from victor.agent.middleware_chain import MiddlewareChain
+            from victor.verticals.protocols import VerticalExtensions
 
-                self._code_correction_middleware = CodeCorrectionMiddleware(
-                    config=CodeCorrectionConfig(
-                        enabled=True,
-                        auto_fix=code_correction_auto_fix,
-                        max_iterations=code_correction_max_iterations,
-                    )
-                )
-                logger.debug(
-                    f"CodeCorrectionMiddleware enabled (auto_fix={code_correction_auto_fix}, "
-                    f"max_iterations={code_correction_max_iterations})"
-                )
-            except ImportError as e:
-                logger.warning(f"CodeCorrectionMiddleware unavailable: {e}")
-                code_correction_enabled = False
+            self._middleware_chain = MiddlewareChain()
+
+            # Get vertical extensions from DI container if available
+            extensions = self._container.get_optional(VerticalExtensions)
+            if extensions and extensions.middleware:
+                for middleware in extensions.middleware:
+                    self._middleware_chain.add(middleware)
+                    logger.debug(f"Added middleware from vertical: {type(middleware).__name__}")
+
+                # For backward compatibility, find CodeCorrectionMiddleware
+                for mw in extensions.middleware:
+                    if "CodeCorrection" in type(mw).__name__:
+                        self._code_correction_middleware = mw
+                        break
+            else:
+                # Fallback: Load default code correction middleware for backward compatibility
+                if code_correction_enabled:
+                    try:
+                        from victor.agent.code_correction_middleware import (
+                            CodeCorrectionMiddleware,
+                            CodeCorrectionConfig,
+                        )
+                        code_correction_auto_fix = getattr(settings, "code_correction_auto_fix", True)
+                        code_correction_max_iterations = getattr(settings, "code_correction_max_iterations", 1)
+
+                        self._code_correction_middleware = CodeCorrectionMiddleware(
+                            config=CodeCorrectionConfig(
+                                enabled=True,
+                                auto_fix=code_correction_auto_fix,
+                                max_iterations=code_correction_max_iterations,
+                            )
+                        )
+                        logger.debug("Using fallback CodeCorrectionMiddleware (no vertical loaded)")
+                    except ImportError as e:
+                        logger.warning(f"CodeCorrectionMiddleware unavailable: {e}")
+        except ImportError as e:
+            logger.warning(f"Middleware chain unavailable: {e}")
 
         # Initialize SafetyChecker for dangerous operation detection
         # Exposes via property for UI layer to set confirmation callback
         self._safety_checker = get_safety_checker()
+
+        # Register vertical safety patterns with the safety checker
+        try:
+            from victor.verticals.protocols import VerticalExtensions
+
+            extensions = self._container.get_optional(VerticalExtensions)
+            if extensions and extensions.safety_extensions:
+                for safety_ext in extensions.safety_extensions:
+                    # Add all bash patterns from the extension
+                    for pattern in safety_ext.get_bash_patterns():
+                        self._safety_checker.add_custom_pattern(
+                            pattern.pattern,
+                            pattern.description,
+                            pattern.risk_level,
+                            pattern.category,
+                        )
+                    logger.debug(f"Added safety patterns from vertical: {safety_ext.get_category()}")
+        except Exception as e:
+            logger.debug(f"Could not load vertical safety extensions: {e}")
 
         # Initialize AutoCommitter for AI-assisted code change commits
         # Provides conventional commits with co-authorship attribution
@@ -2111,10 +2160,18 @@ class AgentOrchestrator:
             "enabled": self._code_correction_middleware is not None,
         }
         if self._code_correction_middleware:
-            status["components"]["code_correction"]["config"] = {
-                "auto_fix": self._code_correction_middleware.config.auto_fix,
-                "max_iterations": self._code_correction_middleware.config.max_iterations,
-            }
+            # Support both old-style (with config) and new vertical middleware (without config)
+            if hasattr(self._code_correction_middleware, "config"):
+                status["components"]["code_correction"]["config"] = {
+                    "auto_fix": self._code_correction_middleware.config.auto_fix,
+                    "max_iterations": self._code_correction_middleware.config.max_iterations,
+                }
+            else:
+                # New vertical middleware - use get_config() if available or default values
+                status["components"]["code_correction"]["config"] = {
+                    "auto_fix": getattr(self._code_correction_middleware, "auto_fix", True),
+                    "max_iterations": getattr(self._code_correction_middleware, "max_iterations", 1),
+                }
 
         # Safety Checker
         status["components"]["safety_checker"] = {
@@ -2396,12 +2453,24 @@ class AgentOrchestrator:
                 continuation_patience=self.tool_calling_caps.continuation_patience,
             )
 
+            # Get prompt contributors from vertical extensions
+            prompt_contributors = []
+            try:
+                from victor.verticals.protocols import VerticalExtensions
+
+                extensions = self._container.get_optional(VerticalExtensions)
+                if extensions and extensions.prompt_contributors:
+                    prompt_contributors = extensions.prompt_contributors
+            except Exception:
+                pass
+
             # Reinitialize prompt builder
             self.prompt_builder = SystemPromptBuilder(
                 provider_name=self.provider_name,
                 model=new_model,
                 tool_adapter=self.tool_adapter,
                 capabilities=self.tool_calling_caps,
+                prompt_contributors=prompt_contributors,
             )
 
             # Rebuild system prompt with new adapter hints
@@ -2486,12 +2555,24 @@ class AgentOrchestrator:
                 continuation_patience=self.tool_calling_caps.continuation_patience,
             )
 
+            # Get prompt contributors from vertical extensions
+            prompt_contributors = []
+            try:
+                from victor.verticals.protocols import VerticalExtensions
+
+                extensions = self._container.get_optional(VerticalExtensions)
+                if extensions and extensions.prompt_contributors:
+                    prompt_contributors = extensions.prompt_contributors
+            except Exception:
+                pass
+
             # Reinitialize prompt builder
             self.prompt_builder = SystemPromptBuilder(
                 provider_name=self.provider_name,
                 model=model,
                 tool_adapter=self.tool_adapter,
                 capabilities=self.tool_calling_caps,
+                prompt_contributors=prompt_contributors,
             )
 
             # Rebuild system prompt

@@ -101,15 +101,32 @@ Use 15-20 tool calls minimum. Prioritize by architectural importance.""",
 }
 
 
-def get_task_type_hint(task_type: str) -> str:
+def get_task_type_hint(task_type: str, prompt_contributors: Optional[list] = None) -> str:
     """Get prompt hint for a specific task type.
+
+    This function now supports vertical prompt contributors. It merges hints from:
+    1. Vertical prompt contributors (if provided)
+    2. Hardcoded TASK_TYPE_HINTS (fallback for backward compatibility)
 
     Args:
         task_type: The detected task type (e.g., "create_simple", "edit")
+        prompt_contributors: Optional list of PromptContributorProtocol implementations
 
     Returns:
         Task-specific prompt hint or empty string if not found
     """
+    # Try vertical contributors first
+    if prompt_contributors:
+        for contributor in sorted(prompt_contributors, key=lambda c: c.get_priority()):
+            hints = contributor.get_task_type_hints()
+            if task_type.lower() in hints:
+                task_hint = hints[task_type.lower()]
+                # Handle TaskTypeHint objects or plain strings
+                if hasattr(task_hint, 'hint'):
+                    return task_hint.hint
+                return str(task_hint)
+
+    # Fallback to hardcoded hints
     return TASK_TYPE_HINTS.get(task_type.lower(), "")
 
 
@@ -143,6 +160,11 @@ class SystemPromptBuilder:
     - vLLM: Production-grade OpenAI-compatible with tool parsers
     - LMStudio: OpenAI-compatible with Native vs Default mode
     - Ollama: Native tool_calls for Llama3.1+, Qwen2.5+, Mistral; fallback otherwise
+
+    Vertical Integration:
+    - Accepts prompt contributors from verticals via DI container
+    - Merges vertical-specific task hints and system prompt sections
+    - Falls back to hardcoded TASK_TYPE_HINTS for backward compatibility
     """
 
     def __init__(
@@ -151,6 +173,7 @@ class SystemPromptBuilder:
         model: str,
         tool_adapter: Optional[BaseToolCallingAdapter] = None,
         capabilities: Optional[ToolCallingCapabilities] = None,
+        prompt_contributors: Optional[list] = None,
     ):
         """Initialize the prompt builder.
 
@@ -159,12 +182,17 @@ class SystemPromptBuilder:
             model: Model name/identifier
             tool_adapter: Optional tool calling adapter for getting hints
             capabilities: Optional pre-computed capabilities
+            prompt_contributors: Optional list of PromptContributorProtocol implementations
         """
         self.provider_name = (provider_name or "").lower()
         self.model = model or ""
         self.model_lower = self.model.lower()
         self.tool_adapter = tool_adapter
         self.capabilities = capabilities
+        self.prompt_contributors = prompt_contributors or []
+
+        # Cache merged task hints from vertical contributors
+        self._merged_task_hints = None
 
     def is_cloud_provider(self) -> bool:
         """Check if the provider is a cloud-based API with robust tool calling."""
@@ -177,6 +205,66 @@ class SystemPromptBuilder:
     def has_native_tool_support(self) -> bool:
         """Check if the model has known native tool calling support."""
         return any(pattern in self.model_lower for pattern in NATIVE_TOOL_MODELS)
+
+    def get_merged_task_hints(self) -> dict:
+        """Get merged task hints from vertical contributors.
+
+        Returns:
+            Dict of task type -> hint string, merged from all contributors
+        """
+        if self._merged_task_hints is not None:
+            return self._merged_task_hints
+
+        merged = TASK_TYPE_HINTS.copy()  # Start with hardcoded hints
+
+        # Override with vertical contributors (sorted by priority)
+        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+            hints = contributor.get_task_type_hints()
+            for task_type, task_hint in hints.items():
+                # Extract hint string from TaskTypeHint objects
+                if hasattr(task_hint, 'hint'):
+                    merged[task_type] = task_hint.hint
+                else:
+                    merged[task_type] = str(task_hint)
+
+        self._merged_task_hints = merged
+        return merged
+
+    def get_vertical_grounding_rules(self) -> str:
+        """Get grounding rules from vertical contributors.
+
+        Returns:
+            Merged grounding rules from all contributors
+        """
+        if not self.prompt_contributors:
+            return ""
+
+        # Collect grounding rules from all contributors
+        rules = []
+        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+            grounding = contributor.get_grounding_rules()
+            if grounding:
+                rules.append(grounding)
+
+        return "\n\n".join(rules) if rules else ""
+
+    def get_vertical_system_prompt_sections(self) -> str:
+        """Get system prompt sections from vertical contributors.
+
+        Returns:
+            Merged system prompt sections from all contributors
+        """
+        if not self.prompt_contributors:
+            return ""
+
+        # Collect sections from all contributors
+        sections = []
+        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+            section = contributor.get_system_prompt_section()
+            if section:
+                sections.append(section)
+
+        return "\n\n".join(sections) if sections else ""
 
     def build(self) -> str:
         """Build the system prompt.
@@ -436,6 +524,7 @@ def build_system_prompt(
     model: str,
     tool_adapter: Optional[BaseToolCallingAdapter] = None,
     capabilities: Optional[ToolCallingCapabilities] = None,
+    prompt_contributors: Optional[list] = None,
 ) -> str:
     """Build a system prompt (convenience function).
 
@@ -444,6 +533,7 @@ def build_system_prompt(
         model: Model name
         tool_adapter: Optional tool calling adapter
         capabilities: Optional pre-computed capabilities
+        prompt_contributors: Optional list of PromptContributorProtocol implementations
 
     Returns:
         System prompt string
@@ -453,5 +543,6 @@ def build_system_prompt(
         model=model,
         tool_adapter=tool_adapter,
         capabilities=capabilities,
+        prompt_contributors=prompt_contributors,
     )
     return builder.build()
