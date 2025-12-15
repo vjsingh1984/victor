@@ -1175,6 +1175,42 @@ class StreamingChatHandler:
         """
         return StreamChunk(content="", is_final=True)
 
+    def generate_metrics_chunk(
+        self, metrics_line: str, is_final: bool = False, prefix: str = "\n\n"
+    ) -> StreamChunk:
+        """Generate a metrics display chunk.
+
+        Args:
+            metrics_line: The formatted metrics line
+            is_final: Whether this is the final chunk
+            prefix: Prefix before metrics line (default: double newline)
+
+        Returns:
+            StreamChunk with formatted metrics content
+        """
+        return StreamChunk(
+            content=f"{prefix}{metrics_line}\n",
+            is_final=is_final,
+        )
+
+    def generate_content_chunk(
+        self, content: str, is_final: bool = False, suffix: str = ""
+    ) -> StreamChunk:
+        """Generate a content chunk with optional suffix.
+
+        Args:
+            content: The sanitized content to display
+            is_final: Whether this is the final chunk
+            suffix: Optional suffix to append (e.g., newline)
+
+        Returns:
+            StreamChunk with content and optional suffix
+        """
+        return StreamChunk(
+            content=f"{content}{suffix}",
+            is_final=is_final,
+        )
+
 
 def create_streaming_handler(
     settings: "Settings",

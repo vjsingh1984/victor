@@ -4596,6 +4596,40 @@ class AgentOrchestrator:
         """
         return self._streaming_handler.generate_final_marker_chunk()
 
+    def _generate_metrics_chunk_with_handler(
+        self, metrics_line: str, is_final: bool = False, prefix: str = "\n\n"
+    ) -> StreamChunk:
+        """Generate metrics display chunk using handler delegation.
+
+        Args:
+            metrics_line: The formatted metrics line
+            is_final: Whether this is the final chunk
+            prefix: Prefix before metrics line (default: double newline)
+
+        Returns:
+            StreamChunk with formatted metrics content
+        """
+        return self._streaming_handler.generate_metrics_chunk(
+            metrics_line, is_final=is_final, prefix=prefix
+        )
+
+    def _generate_content_chunk_with_handler(
+        self, content: str, is_final: bool = False, suffix: str = ""
+    ) -> StreamChunk:
+        """Generate content chunk using handler delegation.
+
+        Args:
+            content: The sanitized content to display
+            is_final: Whether this is the final chunk
+            suffix: Optional suffix to append
+
+        Returns:
+            StreamChunk with content and optional suffix
+        """
+        return self._streaming_handler.generate_content_chunk(
+            content, is_final=is_final, suffix=suffix
+        )
+
     def _parse_and_validate_tool_calls(
         self,
         tool_calls: Optional[List[Dict[str, Any]]],
@@ -5105,13 +5139,17 @@ class AgentOrchestrator:
                             sanitized = self._sanitize_response(response.content)
                             if sanitized and len(sanitized) > 20:
                                 self.add_message("assistant", sanitized)
-                                yield StreamChunk(content=sanitized, is_final=True)
+                                yield self._generate_content_chunk_with_handler(
+                                    sanitized, is_final=True
+                                )
                                 recovery_success = True
                                 break
                             elif response.content and len(response.content) > 20:
                                 # Use raw if sanitization failed but content exists
                                 self.add_message("assistant", response.content)
-                                yield StreamChunk(content=response.content, is_final=True)
+                                yield self._generate_content_chunk_with_handler(
+                                    response.content, is_final=True
+                                )
                                 recovery_success = True
                                 break
                         else:
@@ -5161,7 +5199,9 @@ class AgentOrchestrator:
                         user_satisfied=False,
                         completed=False,
                     )
-                    yield StreamChunk(content=fallback_msg, is_final=True)
+                    yield self._generate_content_chunk_with_handler(
+                        fallback_msg, is_final=True
+                    )
                     return
 
             # Record tool calls in progress tracker for loop detection
@@ -5369,7 +5409,7 @@ class AgentOrchestrator:
                         metrics_line = self._format_completion_metrics_with_handler(
                             stream_ctx, elapsed_time
                         )
-                        yield StreamChunk(content=f"\n\n{metrics_line}\n")
+                        yield self._generate_metrics_chunk_with_handler(metrics_line)
                         # Record outcome for Q-learning (normal completion = success)
                         self._record_intelligent_outcome(
                             success=True,

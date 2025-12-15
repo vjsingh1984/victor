@@ -1465,3 +1465,74 @@ class TestGenerateFinalMarkerChunk:
 
         assert chunk.content == ""
         assert len(chunk.content) == 0
+
+
+class TestGenerateMetricsChunk:
+    """Tests for generate_metrics_chunk method."""
+
+    def test_generates_metrics_chunk_with_default_prefix(self, handler):
+        """Generates a metrics chunk with double newline prefix."""
+        metrics_line = "⏱ 1.5s | 💰 1000 tokens"
+        chunk = handler.generate_metrics_chunk(metrics_line)
+
+        assert chunk.content == f"\n\n{metrics_line}\n"
+        assert chunk.is_final is False
+
+    def test_generates_metrics_chunk_with_custom_prefix(self, handler):
+        """Generates a metrics chunk with custom prefix."""
+        metrics_line = "⏱ 2.0s | 💰 2000 tokens"
+        chunk = handler.generate_metrics_chunk(metrics_line, prefix="\n")
+
+        assert chunk.content == f"\n{metrics_line}\n"
+        assert chunk.is_final is False
+
+    def test_generates_final_metrics_chunk(self, handler):
+        """Generates a final metrics chunk."""
+        metrics_line = "⏱ 3.0s | 💰 3000 tokens"
+        chunk = handler.generate_metrics_chunk(metrics_line, is_final=True)
+
+        assert chunk.content == f"\n\n{metrics_line}\n"
+        assert chunk.is_final is True
+
+    def test_generates_metrics_chunk_with_empty_prefix(self, handler):
+        """Generates a metrics chunk with empty prefix."""
+        metrics_line = "⏱ 4.0s"
+        chunk = handler.generate_metrics_chunk(metrics_line, prefix="")
+
+        assert chunk.content == f"{metrics_line}\n"
+
+
+class TestGenerateContentChunk:
+    """Tests for generate_content_chunk method."""
+
+    def test_generates_content_chunk(self, handler):
+        """Generates a basic content chunk."""
+        content = "Hello, world!"
+        chunk = handler.generate_content_chunk(content)
+
+        assert chunk.content == content
+        assert chunk.is_final is False
+
+    def test_generates_content_chunk_with_suffix(self, handler):
+        """Generates a content chunk with suffix."""
+        content = "Hello"
+        chunk = handler.generate_content_chunk(content, suffix="\n")
+
+        assert chunk.content == "Hello\n"
+        assert chunk.is_final is False
+
+    def test_generates_final_content_chunk(self, handler):
+        """Generates a final content chunk."""
+        content = "Goodbye!"
+        chunk = handler.generate_content_chunk(content, is_final=True)
+
+        assert chunk.content == content
+        assert chunk.is_final is True
+
+    def test_generates_final_content_chunk_with_suffix(self, handler):
+        """Generates a final content chunk with suffix."""
+        content = "Final answer"
+        chunk = handler.generate_content_chunk(content, is_final=True, suffix="\n\n")
+
+        assert chunk.content == "Final answer\n\n"
+        assert chunk.is_final is True
