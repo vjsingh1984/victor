@@ -335,10 +335,34 @@ class IntelligentAgentPipeline:
             should_continue = action.should_continue
             recommended_budget = tool_budget + action.adjust_tool_budget
 
-            # Get learned optimal budget for task type
+            # Get learned optimal budget for task type - used as GUIDANCE not hard cap
+            # The RL system learns from outcomes:
+            # - Success with efficiency → gradually decreases learned budget
+            # - Failure/low quality → increases learned budget
+            # - Budget exhaustion failures → strongly increases learned budget
+            #
+            # We use learned budget to potentially INCREASE the recommendation (if
+            # history shows this task type needs more), but NEVER decrease below
+            # the user's original tool_budget.
             learned_budget = self._mode_controller.get_optimal_tool_budget(task_type)
-            if learned_budget != 10:  # Not default
-                recommended_budget = min(recommended_budget, learned_budget + 5)
+
+            # If learned budget suggests we need MORE than user specified, recommend
+            # a slight increase (bounded). This helps tasks that historically need more.
+            if learned_budget > tool_budget:
+                # Recommend up to 20% more, but cap at learned budget
+                suggested_increase = min(
+                    learned_budget,
+                    int(tool_budget * 1.2)
+                )
+                recommended_budget = max(recommended_budget, suggested_increase)
+                logger.debug(
+                    f"[IntelligentPipeline] RL suggests higher budget for {task_type}: "
+                    f"learned={learned_budget}, recommending={recommended_budget}"
+                )
+
+            # Floor: never go below user's original budget or minimum viable
+            min_budget = max(15, tool_budget)
+            recommended_budget = max(recommended_budget, min_budget)
 
         # Get profile stats
         profile_stats = {}

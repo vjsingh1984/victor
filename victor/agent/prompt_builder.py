@@ -39,6 +39,15 @@ GROUNDING: Base ALL responses on tool output only. Never invent file paths or co
 Quote code exactly from tool output. If more info needed, call another tool.
 """.strip()
 
+# Parallel read optimization guidance
+PARALLEL_READ_GUIDANCE = """
+PARALLEL READS: For exploration tasks, batch multiple read calls together.
+- Call read on 5-10 files simultaneously when analyzing a codebase
+- Each file read is limited to ~8K chars (~230 lines) to fit context
+- List files first (ls), then batch-read relevant ones in parallel
+- Example: To understand a module, read all .py files in that directory at once
+""".strip()
+
 # Extended grounding rules for local models that need more explicit guidance
 GROUNDING_RULES_EXTENDED = """
 CRITICAL - TOOL OUTPUT GROUNDING:
@@ -261,6 +270,7 @@ class SystemPromptBuilder:
             "3. Provide clear, actionable responses based on actual file contents.\n"
             "4. Always cite specific file paths and line numbers when referencing code.\n"
             "5. You may call multiple tools in parallel when they are independent.\n\n"
+            f"{PARALLEL_READ_GUIDANCE}\n\n"
             f"{GROUNDING_RULES}"
         )
 
@@ -284,6 +294,7 @@ class SystemPromptBuilder:
             "• Exploration: Use tools systematically, then summarize\n"
             "• Modification: Read → understand → edit\n"
             "• Actions: Execute fully, report results\n\n"
+            f"{PARALLEL_READ_GUIDANCE}\n\n"
             f"{GROUNDING_RULES}"
         )
 
@@ -355,9 +366,10 @@ class SystemPromptBuilder:
                 "You are a code analyst with tool calling capability.\n\n"
                 "TOOL USAGE:\n"
                 "- Use list_directory and read_file to inspect code.\n"
-                "- Call tools one at a time, waiting for results.\n"
-                "- After 2-3 successful tool calls, provide your answer.\n"
+                "- You can call multiple read tools in parallel for efficiency.\n"
+                "- After reading relevant files, provide your answer.\n"
                 "- Do NOT make identical repeated tool calls.\n\n"
+                f"{PARALLEL_READ_GUIDANCE}\n\n"
                 "RESPONSE FORMAT:\n"
                 "- Write your answer in plain, readable text.\n"
                 "- Do NOT output raw JSON in your response.\n"

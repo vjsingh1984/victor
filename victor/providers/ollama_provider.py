@@ -132,20 +132,12 @@ class OllamaProvider(BaseProvider):
                 resp.raise_for_status()
                 data = resp.json()
 
-                # Look for context_length in model_info
-                # Keys are like "qwen3moe.context_length" or "llama.context_length"
-                model_info = data.get("model_info", {})
-                for key, value in model_info.items():
-                    if "context_length" in key.lower():
-                        context_window = int(value)
-                        self._context_window_cache[cache_key] = context_window
-                        logger.debug(f"Ollama model {model} context window: {context_window}")
-                        return context_window
-
-                # Fallback: check parameters for num_ctx
+                # PRIORITY 1: Check parameters for num_ctx (runtime context limit)
+                # This is the ACTUAL context limit set in the modelfile, which may be
+                # smaller than the model's training context (e.g., 64K vs 262K for VRAM)
                 parameters = data.get("parameters", "")
                 if "num_ctx" in parameters:
-                    # Parse "num_ctx 262144" from parameters string
+                    # Parse "num_ctx 65536" from parameters string
                     for line in parameters.split("\n"):
                         if "num_ctx" in line:
                             parts = line.split()
@@ -154,11 +146,23 @@ class OllamaProvider(BaseProvider):
                                     context_window = int(parts[-1])
                                     self._context_window_cache[cache_key] = context_window
                                     logger.debug(
-                                        f"Ollama model {model} context window (from params): {context_window}"
+                                        f"Ollama model {model} runtime context (num_ctx): {context_window}"
                                     )
                                     return context_window
                                 except ValueError:
                                     pass
+
+                # PRIORITY 2: Fall back to context_length in model_info (training context)
+                # Keys are like "qwen3moe.context_length" or "llama.context_length"
+                model_info = data.get("model_info", {})
+                for key, value in model_info.items():
+                    if "context_length" in key.lower():
+                        context_window = int(value)
+                        self._context_window_cache[cache_key] = context_window
+                        logger.debug(
+                            f"Ollama model {model} training context (context_length): {context_window}"
+                        )
+                        return context_window
 
                 logger.warning(
                     f"Could not determine context window for {model}, using default {default_context}"

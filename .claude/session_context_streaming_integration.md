@@ -260,7 +260,7 @@ Wired existing recovery handler methods into orchestrator:
 All 96 streaming handler tests pass, 380 orchestrator tests pass (476 total)
 
 ### Session 9: Loop Warning and Tool Start Chunk Wiring
-**Commit: (pending)**
+**Commit: cf48132**
 
 Added handler methods for loop warning:
 - `get_loop_warning_chunks()` - Generates warning chunk and system message for loop detection
@@ -277,3 +277,106 @@ Wired handler methods into orchestrator:
 - Replaced inline tool start chunk generation (~10 lines) with handler call
 
 All 102 streaming handler tests pass, 380 orchestrator tests pass (482 total)
+
+### Session 10: Blocked Tool Call Filtering Extraction
+**Commit: fa79fb5**
+
+Added handler method for blocked tool call filtering:
+- `filter_blocked_tool_calls()` - Filters tool calls through block_checker callable
+  - Takes tool_calls list and block_checker function
+  - Returns (filtered_tool_calls, blocked_chunks, blocked_count)
+  - Delegates to `handle_blocked_tool_call()` for each blocked tool
+- Added `Tuple` to handler imports
+
+Added 7 new tests in 1 test class:
+- `TestFilterBlockedToolCalls` (7 tests) - Tool filtering with various block patterns
+
+Wired handler method into orchestrator:
+- Added `_filter_blocked_tool_calls_with_handler()` delegation method
+  - Uses `unified_tracker.is_blocked_after_warning` as block checker
+- Replaced ~15 lines of inline filtering loop with 4-line delegation call
+
+All 124 streaming handler tests pass, 380 orchestrator tests pass (504 total)
+
+### Session 11: Force Action Check Extraction
+**Commit: 4486f57**
+
+Added handler method for force action checking:
+- `check_force_action()` - Checks and updates force_completion via callable
+  - Takes force_checker function returning (should_force, hint)
+  - Updates ctx.force_completion if newly triggered
+  - Returns (was_triggered, hint) tuple
+
+Added 5 new tests in 1 test class:
+- `TestCheckForceAction` (5 tests) - Force completion triggering logic
+
+Wired handler method into orchestrator:
+- Added `_check_force_action_with_handler()` delegation method
+  - Uses `unified_tracker.should_force_action` as force checker
+- Simplified force action check in main loop
+
+All 129 streaming handler tests pass, 380 orchestrator tests pass (509 total)
+
+### Session 12: Request Summary Infinite Loop Bug Fix (Part 1)
+**Commit: (pending)**
+
+Fixed bug where `request_summary` action caused infinite loop:
+- **Root cause**: When `request_summary` was triggered (max prompts or stuck loop), it set `continuation_prompts = 99` but the next iteration would still match the condition `continuation_prompts >= max_continuation_prompts` and return `request_summary` again
+- **Symptoms**: Same content displayed multiple times, session timeout (240s), repeated "Continuation action: request_summary - Max continuation prompts (6) reached" logs
+
+**Fix applied:**
+- Added `set_max_prompts_summary_requested: True` flag to both `request_summary` return points
+- Added check `and not getattr(self, "_max_prompts_summary_requested", False)` to both conditions
+- Added flag handling in main loop: `if action_result.get("set_max_prompts_summary_requested"): self._max_prompts_summary_requested = True`
+
+**Changes in `orchestrator.py`:**
+- Line 3072: Added flag check to stuck continuation loop detection
+- Line 3089: Added `set_max_prompts_summary_requested: True` to return dict
+- Line 3120: Added flag check to max continuation prompts condition
+- Line 3131: Added `set_max_prompts_summary_requested: True` to return dict
+- Lines 5383-5384: Added flag setter in main loop
+
+All 129 streaming handler tests pass, 380 orchestrator tests pass (509 total)
+
+### Session 13: Request Summary Duplicate Output Fix (Part 2)
+**Commit: (pending)**
+
+Fixed remaining duplicate output issue after `request_summary` was requested:
+- **Root cause**: Part 1 fix prevented returning `request_summary` twice, but the model's response AFTER `request_summary` was still going through full `_determine_continuation_action` logic, potentially continuing the loop
+- **Symptoms**: Content still being yielded multiple times even with Part 1 fix
+
+**Additional fix applied:**
+- Added early exit at TOP of `_determine_continuation_action`:
+  - If `_max_prompts_summary_requested` is already True, return `finish` immediately
+  - This prevents any further continuation logic after summary was requested
+
+**Changes in `orchestrator.py`:**
+- Added early return at start of `_determine_continuation_action`:
+  ```python
+  # CRITICAL FIX: If summary was already requested in a previous iteration,
+  # we should finish now - don't ask for another summary or loop again.
+  if getattr(self, "_max_prompts_summary_requested", False):
+      logger.info("Summary was already requested - finishing to prevent duplicate output")
+      return {"action": "finish", "message": None, "reason": "Summary already requested", "updates": updates}
+  ```
+- Removed duplicate `updates: Dict[str, int] = {}` definition that was causing variable shadowing
+
+All 509 tests pass (129 streaming + 380 orchestrator)
+
+### Session 13 (cont): Ollama Context Detection Fix
+**Commit: (pending)**
+
+Fixed Ollama provider showing wrong context window (262K instead of 64K):
+- **Root cause**: `get_context_window()` checked `model_info.context_length` (training context) before `parameters.num_ctx` (runtime context)
+- **Training context** (262K): What the model was trained with
+- **Runtime context** (64K): Actual `num_ctx` set in modelfile for VRAM constraints
+
+**Fix applied in `ollama_provider.py`:**
+- Reordered priority: Check `parameters.num_ctx` FIRST before falling back to `model_info.context_length`
+- Debug log now shows: `"Ollama model qwen3-coder-tools:30b-64K runtime context (num_ctx): 65536"`
+
+**Stream Timeout vs Session Time Limit Analysis:**
+- Session time limit: 240s (graceful completion with summary)
+- Stream timeout: 300s (provider-level LLM response timeout)
+- Relationship: Session limit (240s) < Stream timeout (300s) allows graceful session end before stream error
+- With the duplicate output fix, sessions now end gracefully at 240s instead of timing out at 300s

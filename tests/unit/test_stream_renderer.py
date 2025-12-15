@@ -269,18 +269,18 @@ class TestLiveDisplayRenderer:
         assert mock_live.start.call_count == 2
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_tool_start_prints_status(self, mock_live_class, renderer, mock_console):
-        """Test on_tool_start() prints tool invocation status."""
+    def test_on_tool_start_stores_pending_tool(self, mock_live_class, renderer, mock_console):
+        """Test on_tool_start() stores pending tool for consolidated output."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
 
         renderer.start()
         renderer.on_tool_start("read", {"path": "/test.py"})
 
-        # Should print status
-        mock_console.print.assert_called()
-        call_str = str(mock_console.print.call_args)
-        assert "read" in call_str
+        # Should store pending tool without printing (print happens on result)
+        assert renderer._pending_tool is not None
+        assert renderer._pending_tool["name"] == "read"
+        assert renderer._pending_tool["arguments"] == {"path": "/test.py"}
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_success_prints_checkmark(self, mock_live_class, renderer, mock_console):
@@ -417,10 +417,31 @@ class TestLiveDisplayRenderer:
         mock_live_class.return_value = mock_live
 
         renderer.start()
+        # Add thinking content first
+        renderer.on_thinking_start()
+        renderer._thinking_buffer = "Some thinking content"
         renderer.on_thinking_end()
 
-        # Should print newline
+        # Should print thinking content and newline
         mock_console.print.assert_called()
+
+    @patch("victor.ui.rendering.live_renderer.Live")
+    def test_on_thinking_end_without_content_just_resumes(
+        self, mock_live_class, renderer, mock_console
+    ):
+        """Test on_thinking_end() without content just resumes display."""
+        mock_live = MagicMock()
+        mock_live_class.return_value = mock_live
+
+        renderer.start()
+        # Simulate thinking mode without content
+        renderer._in_thinking_mode = True
+        renderer._is_paused = True
+        renderer.on_thinking_end()
+
+        # Should NOT print anything (no content to render)
+        # Just resume the live display
+        assert renderer._in_thinking_mode is False
 
 
 class TestStreamResponse:

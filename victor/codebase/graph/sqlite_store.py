@@ -284,10 +284,11 @@ class SqliteGraphStore(GraphStoreProtocol):
                 conn.close()
 
     async def delete_by_repo(self) -> None:
+        """Clear all nodes, edges, and file mtimes for this repo (full rebuild)."""
         async with self._lock:
             conn = self._connect()
             try:
-                conn.executescript("DELETE FROM edges; DELETE FROM nodes;")
+                conn.executescript("DELETE FROM edges; DELETE FROM nodes; DELETE FROM file_mtimes;")
                 conn.commit()
             finally:
                 conn.close()

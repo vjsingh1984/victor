@@ -2930,6 +2930,19 @@ class AgentOrchestrator:
             - reason: str - Human-readable reason for the action
             - updates: Dict - State updates (continuation_prompts, asking_input_prompts)
         """
+        updates: Dict[str, Any] = {}
+
+        # CRITICAL FIX: If summary was already requested in a previous iteration,
+        # we should finish now - don't ask for another summary or loop again.
+        # This prevents duplicate output where the same content is yielded multiple times.
+        if getattr(self, "_max_prompts_summary_requested", False):
+            logger.info("Summary was already requested - finishing to prevent duplicate output")
+            return {
+                "action": "finish",
+                "message": None,
+                "reason": "Summary already requested - final response received",
+                "updates": updates,
+            }
 
         # Extract intent type
         intends_to_continue = intent_result.intent == IntentType.CONTINUATION
@@ -2978,9 +2991,6 @@ class AgentOrchestrator:
         iteration_threshold = (
             max_iterations * 3 // 4 if requires_continuation_support else max_iterations // 2
         )
-
-        # State updates to apply
-        updates: Dict[str, int] = {}
 
         # CRITICAL FIX: Handle tool mention without execution (hallucinated tool calls)
         # If model says "let me call search()" but didn't actually call it, force action
@@ -3064,16 +3074,27 @@ class AgentOrchestrator:
 
         # CRITICAL FIX: Detect stuck continuation loop pattern
         # If model keeps saying "let me read" but never calls tools, after 2 prompts
-        # stop prompting and force a summary instead
+        # stop prompting and force a summary instead.
+        # Track tool calls at start of continuation prompting to detect when model is stuck
+        # even if it made tool calls earlier in the session.
+        if not hasattr(self, "_tool_calls_at_continuation_start"):
+            self._tool_calls_at_continuation_start = self.tool_calls_used
+        if continuation_prompts == 0:
+            # Reset tracking on first prompt of a new sequence
+            self._tool_calls_at_continuation_start = self.tool_calls_used
+
+        tool_calls_during_continuation = self.tool_calls_used - self._tool_calls_at_continuation_start
         if (
             intends_to_continue
             and continuation_prompts >= 2
-            and self.tool_calls_used == 0
+            and tool_calls_during_continuation == 0
+            and not getattr(self, "_max_prompts_summary_requested", False)
         ):
             # Model is in a continuation loop without making any progress
             logger.warning(
                 f"Detected stuck continuation loop: {continuation_prompts} prompts, "
-                f"0 tool calls, intent={intent_result.intent.name}"
+                f"0 tool calls since continuation started (total: {self.tool_calls_used}), "
+                f"intent={intent_result.intent.name}"
             )
             updates["continuation_prompts"] = 99  # Prevent further prompting
             return {
@@ -3085,6 +3106,7 @@ class AgentOrchestrator:
                 ),
                 "reason": "Stuck continuation loop - no tool calls after multiple prompts",
                 "updates": updates,
+                "set_max_prompts_summary_requested": True,
             }
 
         # Prompt model to make tool call if appropriate
@@ -3115,6 +3137,7 @@ class AgentOrchestrator:
             requires_continuation_support
             and continuation_prompts >= max_continuation_prompts
             and self.tool_calls_used > 0
+            and not getattr(self, "_max_prompts_summary_requested", False)
         ):
             updates["continuation_prompts"] = 99  # Prevent further prompting
             return {
@@ -3125,6 +3148,7 @@ class AgentOrchestrator:
                 ),
                 "reason": f"Max continuation prompts ({max_continuation_prompts}) reached",
                 "updates": updates,
+                "set_max_prompts_summary_requested": True,
             }
 
         # Request completion for incomplete output
@@ -4311,6 +4335,127 @@ class AgentOrchestrator:
             return (chunk, result.clear_tool_calls)
         return None
 
+    async def _handle_recovery_with_integration(
+        self,
+        stream_ctx: StreamingChatContext,
+        full_content: str,
+        tool_calls: Optional[List[Dict[str, Any]]],
+        mentioned_tools: Optional[List[str]] = None,
+    ) -> "OrchestratorRecoveryAction":
+        """Handle response using the recovery integration.
+
+        This method delegates to OrchestratorRecoveryIntegration to:
+        - Detect failures from model responses
+        - Apply recovery strategies via RecoveryHandler
+        - Provide recovery prompts and temperature adjustments
+
+        Args:
+            stream_ctx: The streaming context
+            full_content: Full response content
+            tool_calls: Tool calls made (if any)
+            mentioned_tools: Tools mentioned but not called
+
+        Returns:
+            RecoveryAction with action to take (continue, retry, abort, force_summary)
+        """
+        if self._recovery_integration is None or not self._recovery_integration.enabled:
+            # Return a continue action if recovery not enabled
+            return OrchestratorRecoveryAction(action="continue", reason="Recovery disabled")
+
+        # Get context utilization for recovery decisions
+        context_utilization = None
+        if self._context_compactor:
+            stats = self._context_compactor.get_statistics()
+            context_utilization = stats.get("current_utilization")
+
+        # Call recovery integration
+        recovery_action = await self._recovery_integration.handle_response(
+            content=full_content,
+            tool_calls=tool_calls,
+            mentioned_tools=mentioned_tools,
+            provider_name=self.provider_name,
+            model_name=self.model,
+            tool_calls_made=self.tool_calls_used,
+            tool_budget=self.tool_budget,
+            iteration_count=stream_ctx.total_iterations,
+            max_iterations=stream_ctx.max_total_iterations,
+            current_temperature=self.temperature,
+            quality_score=stream_ctx.last_quality_score,
+            task_type=stream_ctx.unified_task_type.value,
+            is_analysis_task=stream_ctx.is_analysis_task,
+            is_action_task=stream_ctx.is_action_task,
+            context_utilization=context_utilization,
+        )
+
+        # Log recovery decision
+        if recovery_action.action != "continue":
+            logger.info(
+                f"Recovery integration: action={recovery_action.action}, "
+                f"reason={recovery_action.reason}, "
+                f"failure_type={recovery_action.failure_type}, "
+                f"strategy={recovery_action.strategy_name}"
+            )
+
+        return recovery_action
+
+    def _apply_recovery_action(
+        self,
+        recovery_action: "OrchestratorRecoveryAction",
+        stream_ctx: StreamingChatContext,
+    ) -> Optional[StreamChunk]:
+        """Apply a recovery action from the recovery integration.
+
+        This method handles the various recovery actions:
+        - continue: No action needed
+        - retry: Add recovery message and optionally adjust temperature
+        - force_summary: Force completion with summary request
+        - abort: Return abort chunk
+
+        Args:
+            recovery_action: The recovery action to apply
+            stream_ctx: The streaming context
+
+        Returns:
+            StreamChunk if action requires immediate yield, None otherwise
+        """
+        if recovery_action.action == "continue":
+            return None
+
+        if recovery_action.action == "retry":
+            # Add recovery message if provided
+            if recovery_action.message:
+                self.add_message("user", recovery_action.message)
+
+            # Adjust temperature if provided (for next iteration)
+            if recovery_action.new_temperature is not None:
+                logger.debug(
+                    f"Recovery: adjusting temperature from {self.temperature} to "
+                    f"{recovery_action.new_temperature}"
+                )
+                # Note: Temperature adjustment is per-call, not persistent
+                # The next iteration will use this in provider_kwargs
+
+            return None
+
+        if recovery_action.action == "force_summary":
+            stream_ctx.force_completion = True
+            if recovery_action.message:
+                self.add_message("user", recovery_action.message)
+            else:
+                self.add_message(
+                    "user",
+                    "Please provide a brief summary of what you've accomplished and any findings.",
+                )
+            return None
+
+        if recovery_action.action == "abort":
+            return StreamChunk(
+                content=f"\n[recovery] Session aborted: {recovery_action.reason}\n",
+                is_final=True,
+            )
+
+        return None
+
     def _filter_blocked_tool_calls_with_handler(
         self,
         stream_ctx: StreamingChatContext,
@@ -5089,6 +5234,32 @@ class AgentOrchestrator:
             # Initialize mentioned_tools_detected for later use in continuation action
             mentioned_tools_detected: List[str] = []
 
+            # Check for mentioned tools early for recovery integration
+            if full_content and not tool_calls:
+                mentioned_tools_detected = _detect_mentioned_tools(full_content)
+
+            # Use recovery integration to detect and handle failures
+            # This runs after each response to check for stuck states, empty responses, etc.
+            recovery_action = await self._handle_recovery_with_integration(
+                stream_ctx=stream_ctx,
+                full_content=full_content,
+                tool_calls=tool_calls,
+                mentioned_tools=mentioned_tools_detected or None,
+            )
+
+            # Apply recovery action if not just "continue"
+            if recovery_action.action != "continue":
+                recovery_chunk = self._apply_recovery_action(recovery_action, stream_ctx)
+                if recovery_chunk:
+                    yield recovery_chunk
+                    if recovery_chunk.is_final:
+                        # Record outcome for Q-learning
+                        self._recovery_integration.record_outcome(success=False)
+                        return
+                # If action was retry/force_summary, continue the loop with updated state
+                if recovery_action.action in ("retry", "force_summary"):
+                    continue
+
             if full_content:
                 # Sanitize response to remove malformed patterns from local models
                 sanitized = self._sanitize_response(full_content)
@@ -5100,16 +5271,14 @@ class AgentOrchestrator:
                     if plain_text:
                         self.add_message("assistant", plain_text)
 
-                # Check if model mentioned tools but didn't execute them
-                # Store for use in continuation action decision
-                if not tool_calls:
-                    mentioned_tools_detected = _detect_mentioned_tools(full_content)
-                    if mentioned_tools_detected:
-                        tools_str = ", ".join(mentioned_tools_detected)
-                        logger.warning(
-                            f"Model mentioned tool(s) [{tools_str}] but did not execute them. "
-                            "This may indicate the model is hallucinating tool calls."
-                        )
+                # Log warning if model mentioned tools but didn't execute them
+                # (mentioned_tools_detected was already computed earlier for recovery integration)
+                if mentioned_tools_detected:
+                    tools_str = ", ".join(mentioned_tools_detected)
+                    logger.warning(
+                        f"Model mentioned tool(s) [{tools_str}] but did not execute them. "
+                        "This may indicate the model is hallucinating tool calls."
+                    )
             elif not tool_calls:
                 # No content and no tool calls - check for natural completion using handler
                 # Handler checks if substantial content was already provided
@@ -5376,6 +5545,8 @@ class AgentOrchestrator:
                         ]
                     if action_result.get("set_final_summary_requested"):
                         self._final_summary_requested = True
+                    if action_result.get("set_max_prompts_summary_requested"):
+                        self._max_prompts_summary_requested = True
 
                     action = action_result["action"]
 
@@ -5884,6 +6055,9 @@ class AgentOrchestrator:
                     f"Resetting continuation prompts counter (was {self._continuation_prompts}) after successful tool call"
                 )
                 self._continuation_prompts = 0
+                # Also reset the tool call tracking for stuck loop detection
+                if hasattr(self, "_tool_calls_at_continuation_start"):
+                    self._tool_calls_at_continuation_start = self.tool_calls_used
 
             # Reset asking input prompts counter on successful tool call
             if hasattr(self, "_asking_input_prompts") and self._asking_input_prompts > 0:

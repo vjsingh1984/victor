@@ -206,6 +206,9 @@ class GroundingVerifier:
         self.config = config or VerifierConfig()
         self._file_cache: Dict[str, str] = {}
         self._existing_files: Optional[Set[str]] = None
+        logger.debug(
+            f"GroundingVerifier initialized with project_root={self.project_root}"
+        )
 
     def _get_existing_files(self) -> Set[str]:
         """Get set of existing files in project (cached)."""
@@ -223,6 +226,10 @@ class GroundingVerifier:
                     for file in files:
                         rel_path = os.path.relpath(os.path.join(root, file), self.project_root)
                         self._existing_files.add(rel_path)
+                logger.debug(
+                    f"GroundingVerifier scanned {len(self._existing_files)} files "
+                    f"under {self.project_root}"
+                )
             except Exception as e:
                 logger.warning(f"Error scanning project files: {e}")
         return self._existing_files

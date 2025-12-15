@@ -250,6 +250,41 @@ class SafetyChecker:
             (re.compile(p, re.IGNORECASE), desc) for p, desc in self.BASH_MEDIUM_PATTERNS
         ]
 
+        # Custom patterns from vertical extensions
+        self._custom_patterns: List[tuple[re.Pattern, str, RiskLevel]] = []
+
+    def add_custom_pattern(
+        self,
+        pattern: str,
+        description: str,
+        risk_level: str = "HIGH",
+        category: str = "custom",
+    ) -> None:
+        """Add a custom safety pattern from vertical extensions.
+
+        Args:
+            pattern: Regex pattern to match.
+            description: Human-readable description of the danger.
+            risk_level: Risk level string (CRITICAL, HIGH, MEDIUM, LOW).
+            category: Category for the pattern (for logging/grouping).
+        """
+        # Convert risk_level string to RiskLevel enum
+        risk_map = {
+            "CRITICAL": RiskLevel.CRITICAL,
+            "HIGH": RiskLevel.HIGH,
+            "MEDIUM": RiskLevel.MEDIUM,
+            "LOW": RiskLevel.LOW,
+            "SAFE": RiskLevel.SAFE,
+        }
+        risk = risk_map.get(risk_level.upper(), RiskLevel.HIGH)
+
+        try:
+            compiled = re.compile(pattern, re.IGNORECASE)
+            self._custom_patterns.append((compiled, description, risk))
+            logger.debug(f"Added custom safety pattern [{category}]: {description}")
+        except re.error as e:
+            logger.warning(f"Invalid regex pattern for safety checker: {pattern} - {e}")
+
     def check_bash_command(self, command: str) -> tuple[RiskLevel, List[str]]:
         """Check a bash command for dangerous patterns.
 
@@ -287,6 +322,13 @@ class SafetyChecker:
                 matched.append(desc)
                 if _RISK_ORDER[max_risk] < _RISK_ORDER[RiskLevel.MEDIUM]:
                     max_risk = RiskLevel.MEDIUM
+
+        # Check custom patterns from vertical extensions
+        for pattern, desc, risk in self._custom_patterns:
+            if pattern.search(command):
+                matched.append(desc)
+                if _RISK_ORDER[max_risk] < _RISK_ORDER[risk]:
+                    max_risk = risk
 
         return max_risk, matched
 

@@ -262,6 +262,120 @@ class VerticalBase(ABC):
         return config
 
     # =========================================================================
+    # Extension Protocol Methods (Optional)
+    # =========================================================================
+    # These methods enable verticals to provide framework extensions.
+    # Override them to integrate with the framework's middleware, safety,
+    # prompt, and configuration systems.
+
+    @classmethod
+    def get_middleware(cls) -> List[Any]:
+        """Get middleware implementations for this vertical.
+
+        Override to provide vertical-specific middleware for tool
+        execution processing.
+
+        Returns:
+            List of middleware implementations (MiddlewareProtocol)
+        """
+        return []
+
+    @classmethod
+    def get_safety_extension(cls) -> Optional[Any]:
+        """Get safety extension for this vertical.
+
+        Override to provide vertical-specific dangerous operation patterns.
+
+        Returns:
+            Safety extension (SafetyExtensionProtocol) or None
+        """
+        return None
+
+    @classmethod
+    def get_prompt_contributor(cls) -> Optional[Any]:
+        """Get prompt contributor for this vertical.
+
+        Override to provide vertical-specific task hints and prompt sections.
+
+        Returns:
+            Prompt contributor (PromptContributorProtocol) or None
+        """
+        return None
+
+    @classmethod
+    def get_mode_config_provider(cls) -> Optional[Any]:
+        """Get mode configuration provider for this vertical.
+
+        Override to provide vertical-specific operational modes.
+
+        Returns:
+            Mode config provider (ModeConfigProviderProtocol) or None
+        """
+        return None
+
+    @classmethod
+    def get_tool_dependency_provider(cls) -> Optional[Any]:
+        """Get tool dependency provider for this vertical.
+
+        Override to provide vertical-specific tool execution patterns.
+
+        Returns:
+            Tool dependency provider (ToolDependencyProviderProtocol) or None
+        """
+        return None
+
+    @classmethod
+    def get_workflow_provider(cls) -> Optional[Any]:
+        """Get workflow provider for this vertical.
+
+        Override to provide vertical-specific workflows.
+
+        Returns:
+            Workflow provider (WorkflowProviderProtocol) or None
+        """
+        return None
+
+    @classmethod
+    def get_service_provider(cls) -> Optional[Any]:
+        """Get service provider for this vertical.
+
+        Override to register vertical-specific services with DI container.
+
+        Returns:
+            Service provider (ServiceProviderProtocol) or None
+        """
+        return None
+
+    @classmethod
+    def get_extensions(cls) -> Any:
+        """Get all extensions for this vertical.
+
+        Aggregates all extension implementations for framework integration.
+        Override for custom extension aggregation.
+
+        Returns:
+            VerticalExtensions or None
+        """
+        # Import here to avoid circular dependency
+        try:
+            from victor.verticals.protocols import VerticalExtensions
+
+            safety = cls.get_safety_extension()
+            prompt = cls.get_prompt_contributor()
+
+            return VerticalExtensions(
+                middleware=cls.get_middleware(),
+                safety_extensions=[safety] if safety else [],
+                prompt_contributors=[prompt] if prompt else [],
+                mode_config_provider=cls.get_mode_config_provider(),
+                tool_dependency_provider=cls.get_tool_dependency_provider(),
+                workflow_provider=cls.get_workflow_provider(),
+                service_provider=cls.get_service_provider(),
+            )
+        except ImportError:
+            return None
+
+    # =========================================================================
     # Template Method Implementation
     # =========================================================================
 

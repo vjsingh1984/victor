@@ -662,18 +662,24 @@ class CodebaseIndex:
             graph_path: Optional explicit graph store path
         """
         self.root = Path(root_path).resolve()
+        # Note: Hidden directories (starting with '.') are excluded automatically
+        # by _should_ignore(), so no need to list .git/, .venv/, .pytest_cache/, etc.
         self.ignore_patterns = ignore_patterns or [
             "venv/",
-            ".venv/",
             "env/",
             "node_modules/",
-            ".git/",
             "__pycache__/",
             "*.pyc",
-            ".pytest_cache/",
-            ".mypy_cache/",
             "dist/",
             "build/",
+            # Coverage and docs
+            "htmlcov/",
+            "coverage/",
+            # Third party / vendor
+            "vendor/",
+            "third_party/",
+            # Archive/legacy code (not actively maintained)
+            "archive/",
         ]
 
         # Indexed data
@@ -737,8 +743,18 @@ class CodebaseIndex:
         self._symbol_resolver = SymbolResolver()
 
     def _should_ignore(self, path: Path) -> bool:
-        """Check if a path should be ignored based on ignore patterns."""
+        """Check if a path should be ignored based on ignore patterns.
+
+        Also excludes hidden directories (starting with '.') by convention.
+        """
         path_str = str(path)
+
+        # Skip hidden directories (Unix convention: directories starting with '.')
+        # This excludes .git/, .vscode-test/, .vscode-victor/, etc.
+        for part in path.parts:
+            if part.startswith(".") and part not in (".", ".."):
+                return True
+
         for pattern in self.ignore_patterns:
             if pattern.endswith("/"):
                 # Directory pattern
@@ -768,11 +784,22 @@ class CodebaseIndex:
         - `self.files` contains FileMetadata for each indexed file
         - `self.symbols` contains all extracted symbols
         - Graph store (if configured) contains relationship data
+
+        Note: This is a FULL rebuild. It clears the graph store first to remove
+        stale entries from renamed/deleted files, then rebuilds from scratch.
         """
         self._reset_graph_buffers()
         self.files.clear()
         self.symbols.clear()
         self.symbol_index.clear()
+
+        # Clear graph store first to remove stale entries from renamed/deleted files
+        if self.graph_store:
+            try:
+                await self.graph_store.delete_by_repo()
+                logger.debug("Cleared graph store for full rebuild")
+            except Exception as e:
+                logger.warning(f"Failed to clear graph store: {e}")
 
         # Discover files matching watched patterns
         for pattern in self.WATCHED_PATTERNS:
@@ -816,6 +843,217 @@ class CodebaseIndex:
             # Index exists but is stale - rebuild
             logger.debug("Index is stale, rebuilding")
             await self.index_codebase()
+
+    async def incremental_reindex(self, files: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Perform incremental reindexing of changed files only.
+
+        This method efficiently updates the index by only processing files that:
+        1. Have been modified since last indexing (detected via mtime)
+        2. Have been added since last indexing
+        3. Are explicitly specified in the `files` parameter
+
+        Files that have been deleted are automatically removed from the index.
+
+        Args:
+            files: Optional list of specific file paths to reindex.
+                   If None, auto-detects changed files via mtime comparison.
+
+        Returns:
+            Dictionary with reindex statistics:
+            - updated: List of files that were re-indexed
+            - added: List of new files that were indexed
+            - removed: List of files removed from index
+            - unchanged: Count of files that didn't need updating
+            - errors: List of files that failed to index
+        """
+        stats = {
+            "updated": [],
+            "added": [],
+            "removed": [],
+            "unchanged": 0,
+            "errors": [],
+        }
+
+        if not self._is_indexed:
+            # No existing index - do full index instead
+            logger.info("No existing index, performing full index")
+            await self.index_codebase()
+            stats["added"] = list(self.files.keys())
+            return stats
+
+        # Determine which files to process
+        if files:
+            # Explicit file list provided
+            files_to_check = [Path(f) if not isinstance(f, Path) else f for f in files]
+        else:
+            # Auto-detect: check all watched files for changes
+            files_to_check = []
+            for pattern in self.WATCHED_PATTERNS:
+                for file_path in self.root.rglob(pattern):
+                    if file_path.is_file() and not self._should_ignore(file_path):
+                        files_to_check.append(file_path)
+
+        # Track current files to detect deletions
+        current_files: Set[str] = set()
+
+        for file_path in files_to_check:
+            if not file_path.exists():
+                continue
+
+            rel_path = str(file_path.relative_to(self.root))
+            current_files.add(rel_path)
+
+            try:
+                current_mtime = file_path.stat().st_mtime
+
+                # Check if file is new or modified
+                if rel_path in self.files:
+                    existing_mtime = self.files[rel_path].last_modified
+                    if current_mtime <= existing_mtime:
+                        # File unchanged
+                        stats["unchanged"] += 1
+                        continue
+
+                    # File modified - reindex it
+                    language = self._detect_language(file_path)
+                    await self._index_single_file(file_path, language)
+                    stats["updated"].append(rel_path)
+                    logger.debug(f"Updated index for: {rel_path}")
+                else:
+                    # New file - add to index
+                    language = self._detect_language(file_path)
+                    await self._index_single_file(file_path, language)
+                    stats["added"].append(rel_path)
+                    logger.debug(f"Added to index: {rel_path}")
+
+            except Exception as e:
+                logger.warning(f"Failed to reindex {rel_path}: {e}")
+                stats["errors"].append({"file": rel_path, "error": str(e)})
+
+        # Detect and remove deleted files (only if we scanned all files)
+        if not files:
+            for indexed_path in list(self.files.keys()):
+                if indexed_path not in current_files:
+                    # File was deleted - remove from index
+                    await self._remove_file_from_index(indexed_path)
+                    stats["removed"].append(indexed_path)
+                    logger.debug(f"Removed from index: {indexed_path}")
+
+        # Clear staleness flag and update changed files set
+        with self._staleness_lock:
+            self._is_stale = False
+            self._changed_files.clear()
+            self._last_indexed = time.time()
+
+        # Log summary
+        total_changes = len(stats["updated"]) + len(stats["added"]) + len(stats["removed"])
+        if total_changes > 0:
+            logger.info(
+                f"Incremental reindex: {len(stats['updated'])} updated, "
+                f"{len(stats['added'])} added, {len(stats['removed'])} removed, "
+                f"{stats['unchanged']} unchanged"
+            )
+        else:
+            logger.debug(f"Incremental reindex: no changes detected ({stats['unchanged']} files)")
+
+        return stats
+
+    async def _index_single_file(self, file_path: Path, language: str) -> None:
+        """Index a single file and update the index structures.
+
+        This is used by incremental_reindex to update individual files
+        without rebuilding the entire index.
+
+        Args:
+            file_path: Path to the file to index
+            language: Detected language of the file
+        """
+        rel_path = str(file_path.relative_to(self.root))
+
+        # Remove existing symbols for this file
+        if rel_path in self.symbol_index:
+            for symbol_key in self.symbol_index[rel_path]:
+                self.symbols.pop(symbol_key, None)
+            self.symbol_index[rel_path] = []
+
+        # Use the existing tree-sitter indexing logic
+        await self._index_tree_sitter_file(file_path, language)
+
+        # Update embeddings if enabled
+        if self.use_embeddings and self.embedding_provider and rel_path in self.files:
+            file_meta = self.files[rel_path]
+            for symbol in file_meta.symbols:
+                # Generate embedding for symbol if it has meaningful content
+                text_for_embedding = self._get_symbol_embedding_text(symbol)
+                if text_for_embedding:
+                    try:
+                        await self.embedding_provider.add_document(
+                            doc_id=f"{rel_path}:{symbol.name}",
+                            text=text_for_embedding,
+                            metadata={
+                                "file_path": rel_path,
+                                "symbol_name": symbol.name,
+                                "symbol_type": symbol.type,
+                                "line_number": symbol.line_number,
+                            },
+                        )
+                    except Exception as e:
+                        logger.debug(f"Failed to embed symbol {symbol.name}: {e}")
+
+    async def _remove_file_from_index(self, rel_path: str) -> None:
+        """Remove a file and its symbols from the index.
+
+        Args:
+            rel_path: Relative path of the file to remove
+        """
+        # Remove symbols
+        if rel_path in self.symbol_index:
+            for symbol_key in self.symbol_index[rel_path]:
+                self.symbols.pop(symbol_key, None)
+
+                # Remove from embeddings if enabled
+                if self.use_embeddings and self.embedding_provider:
+                    try:
+                        await self.embedding_provider.delete_document(symbol_key)
+                    except Exception:
+                        pass  # Ignore deletion errors
+
+            del self.symbol_index[rel_path]
+
+        # Remove file metadata
+        self.files.pop(rel_path, None)
+
+        # Remove from graph store if available
+        if self.graph_store:
+            try:
+                # Delete nodes and edges associated with this file
+                await self.graph_store.delete_by_file(rel_path)
+            except Exception as e:
+                logger.debug(f"Failed to remove graph nodes for {rel_path}: {e}")
+
+    def _get_symbol_embedding_text(self, symbol: Symbol) -> str:
+        """Generate text representation of a symbol for embedding.
+
+        Args:
+            symbol: The symbol to generate embedding text for
+
+        Returns:
+            Text suitable for embedding, or empty string if not embeddable
+        """
+        parts = []
+
+        # Add symbol type and name
+        parts.append(f"{symbol.type} {symbol.name}")
+
+        # Add signature if available
+        if symbol.signature:
+            parts.append(symbol.signature)
+
+        # Add docstring if available
+        if symbol.docstring:
+            parts.append(symbol.docstring[:500])  # Limit docstring length
+
+        return " ".join(parts)
 
     def _detect_language(self, file_path: Path, default: str = "python") -> str:
         """Detect language from extension for tree-sitter queries.

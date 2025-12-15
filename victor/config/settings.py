@@ -416,6 +416,14 @@ class Settings(BaseSettings):
     # Privacy and Security
     airgapped_mode: bool = False
 
+    # ==========================================================================
+    # Vertical Configuration
+    # ==========================================================================
+    # Verticals are domain-specific configurations that customize Victor's behavior.
+    # Available verticals: coding, research, devops (extensible via plugins)
+    default_vertical: str = "coding"  # Default vertical when --vertical not specified
+    auto_detect_vertical: bool = False  # Auto-detect vertical from project context (experimental)
+
     # Server Security (FastAPI/WebSocket layer)
     # When set, API key is required for HTTP + WebSocket requests (Authorization: Bearer <token>)
     server_api_key: Optional[str] = None
@@ -605,6 +613,10 @@ class Settings(BaseSettings):
     max_continuation_prompts_analysis: int = 6  # For analysis tasks (4 * 1.5 = 6)
     max_continuation_prompts_action: int = 5  # For action tasks (3 * 1.5 = 4.5 → 5)
     max_continuation_prompts_default: int = 3  # For other tasks (2 * 1.5 = 3)
+
+    # Session time limit: Maximum seconds before forcing completion
+    # Set below provider timeout (300s default) to provide graceful completion
+    session_time_limit: int = 240  # 4 minutes default, leaves 60s buffer for summary
 
     # ==========================================================================
     # Conversation Memory (Multi-turn Context Retention)

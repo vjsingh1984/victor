@@ -174,14 +174,21 @@ async def test_list_directory_success():
         # depth=1 returns immediate children with "name" key
         result = await ls(path=tmpdir, depth=1)
 
-        assert len(result) == 3
-        names = [item["name"] for item in result]
+        # Result is now a dict with cwd, target, items, count
+        assert "cwd" in result
+        assert "target" in result
+        assert "items" in result
+        assert "count" in result
+        assert result["count"] == 3
+
+        items = result["items"]
+        names = [item["name"] for item in items]
         assert "file1.txt" in names
         assert "file2.txt" in names
         assert "subdir" in names
 
         # Check types
-        types = {item["name"]: item["type"] for item in result}
+        types = {item["name"]: item["type"] for item in items}
         assert types["file1.txt"] == "file"
         assert types["file2.txt"] == "file"
         assert types["subdir"] == "directory"
@@ -189,7 +196,7 @@ async def test_list_directory_success():
 
 @pytest.mark.asyncio
 async def test_list_directory_default_depth():
-    """Test listing directory with default depth=1 returns immediate children."""
+    """Test listing directory with default depth=2 returns immediate children and one level nested."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create nested structure
         file1 = os.path.join(tmpdir, "file1.txt")
@@ -202,13 +209,19 @@ async def test_list_directory_default_depth():
         with open(nested_file, "w") as f:
             f.write("nested")
 
-        # Default depth=1 returns only immediate children with "name" key
+        # Default depth=2 returns immediate children AND one level nested
         result = await ls(path=tmpdir)
 
-        assert len(result) == 2  # file1.txt, subdir (not nested.txt)
-        names = [item["name"] for item in result]
-        assert "file1.txt" in names
-        assert "subdir" in names
+        # Result is now a dict with items
+        assert "items" in result
+        items = result["items"]
+        # With depth=2: file1.txt, subdir, subdir/nested.txt
+        assert len(items) == 3
+        paths = [item.get("path", item.get("name")) for item in items]
+        assert "file1.txt" in paths
+        assert "subdir" in paths
+        # nested.txt should be included at depth=2
+        assert any("nested.txt" in p for p in paths)
 
 
 @pytest.mark.asyncio
@@ -228,8 +241,11 @@ async def test_list_directory_recursive():
 
         result = await ls(path=tmpdir, recursive=True)
 
-        assert len(result) == 3  # subdir, file1.txt, subdir/file2.txt
-        paths = [item["path"] for item in result]
+        # Result is now a dict with items
+        assert "items" in result
+        items = result["items"]
+        assert len(items) == 3  # subdir, file1.txt, subdir/file2.txt
+        paths = [item["path"] for item in items]
         assert "subdir" in paths
         assert "file1.txt" in paths
         assert os.path.join("subdir", "file2.txt") in paths or "subdir/file2.txt" in paths
@@ -262,7 +278,10 @@ async def test_list_directory_empty():
     with tempfile.TemporaryDirectory() as tmpdir:
         result = await ls(path=tmpdir)
 
-        assert result == []
+        # Result is now a dict with items
+        assert "items" in result
+        assert result["items"] == []
+        assert result["count"] == 0
 
 
 @pytest.mark.asyncio

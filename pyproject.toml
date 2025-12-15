@@ -66,11 +66,12 @@ dependencies = [
     "typer>=0.12",
     "rich>=13.7",
     "prompt-toolkit>=3.0",
+    "textual>=0.89",
 
-    # LLM Providers
+    # LLM Providers (core - always installed)
     "anthropic>=0.34",
     "openai>=1.40",
-    "google-generativeai>=0.7",
+    # google-generativeai moved to optional due to protobuf version conflicts
 
     # Tools
     "gitpython>=3.1",
@@ -81,7 +82,7 @@ dependencies = [
     "lxml>=5.0",
 
     # Code Analysis (core)
-    "tree-sitter>=0.21",
+    "tree-sitter>=0.23",  # 0.23+ required for QueryCursor API
     "pygments>=2.17",
 
     # Tree-sitter language packages (core languages - always installed)
@@ -138,6 +139,12 @@ build = [
     # Binary distribution
     "pyinstaller>=6.0",
     "pyinstaller-hooks-contrib>=2024.0",
+]
+
+# Google Gemini provider (optional due to protobuf version conflicts)
+# Usage: pip install victor[google]
+google = [
+    "google-generativeai>=0.7",
 ]
 
 # Language-specific tree-sitter grammars (optional - install what you need)

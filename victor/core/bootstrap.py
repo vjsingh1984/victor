@@ -171,6 +171,7 @@ class UsageLoggerProtocol:
 
 def bootstrap_container(
     settings: Optional[Settings] = None,
+    vertical: Optional[str] = None,
     override_services: Optional[Dict[Type, Any]] = None,
 ) -> ServiceContainer:
     """Bootstrap the DI container with default service implementations.
@@ -180,6 +181,8 @@ def bootstrap_container(
 
     Args:
         settings: Optional Settings instance (loads from config if None)
+        vertical: Optional vertical name to activate (e.g., "coding", "research")
+                 If None, uses settings.default_vertical or "coding"
         override_services: Optional dict of service type -> instance for testing
 
     Returns:
@@ -207,6 +210,9 @@ def bootstrap_container(
 
     # Register orchestrator services (Phase 10 DI Migration)
     _register_orchestrator_services(container, settings)
+
+    # Register vertical services
+    _register_vertical_services(container, settings, vertical)
 
     # Apply overrides for testing
     if override_services:
@@ -350,6 +356,55 @@ def _register_orchestrator_services(container: ServiceContainer, settings: Setti
         # Don't fail bootstrap if orchestrator services can't be registered
         # The orchestrator will fall back to direct instantiation
         logger.warning(f"Failed to register orchestrator services: {e}")
+
+
+def _register_vertical_services(
+    container: ServiceContainer,
+    settings: Settings,
+    vertical_name: Optional[str] = None,
+) -> None:
+    """Register vertical-specific services.
+
+    Loads the specified vertical and registers its services with the container.
+    This enables verticals to provide:
+    - Custom middleware for tool execution
+    - Safety patterns for dangerous operations
+    - Prompt contributions for task hints
+    - Mode configurations
+
+    Args:
+        container: DI container to register services in
+        settings: Application settings
+        vertical_name: Optional vertical name (defaults to settings or "coding")
+    """
+    # Determine which vertical to load
+    if vertical_name is None:
+        vertical_name = getattr(settings, "default_vertical", "coding")
+
+    try:
+        from victor.verticals.vertical_loader import get_vertical_loader
+        from victor.verticals.protocols import VerticalExtensions
+
+        # Load and activate the vertical
+        loader = get_vertical_loader()
+        loader.load(vertical_name)
+
+        # Register vertical services with DI container
+        loader.register_services(container, settings)
+
+        # Register the extensions as a service for framework access
+        extensions = loader.get_extensions()
+        if extensions:
+            container.register_instance(VerticalExtensions, extensions)
+
+        logger.info(f"Registered vertical services: {vertical_name}")
+    except ImportError as e:
+        logger.debug(f"Vertical loading not available: {e}")
+    except ValueError as e:
+        logger.warning(f"Failed to load vertical '{vertical_name}': {e}")
+    except Exception as e:
+        # Don't fail bootstrap if vertical services can't be registered
+        logger.warning(f"Failed to register vertical services: {e}")
 
 
 # =============================================================================

@@ -49,6 +49,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from victor.codebase.ignore_patterns import DEFAULT_SKIP_DIRS, should_ignore_path
+
 logger = logging.getLogger(__name__)
 
 
@@ -136,26 +138,10 @@ class SymbolStore:
         ".svelte": "svelte",
     }
 
-    # Directories to skip
-    SKIP_DIRS = {
-        "__pycache__",
-        ".git",
-        ".pytest_cache",
-        "venv",
-        ".venv",
-        "env",
-        "node_modules",
-        ".tox",
-        "build",
-        "dist",
-        "target",
-        ".next",
-        ".nuxt",
-        "coverage",
-        ".cache",
-        "out",
-        "vendor",
-    }
+    # Use shared default skip directories from ignore_patterns module
+    # Hidden directories (starting with '.') are excluded automatically
+    # by the shared should_ignore_path() utility
+    SKIP_DIRS = DEFAULT_SKIP_DIRS
 
     def __init__(
         self,
@@ -263,8 +249,12 @@ class SymbolStore:
             )
 
     def should_ignore(self, path: Path) -> bool:
-        """Check if path should be ignored."""
-        return any(skip in path.parts for skip in self.effective_skip_dirs)
+        """Check if path should be ignored.
+
+        Uses shared ignore logic from ignore_patterns module.
+        Automatically excludes hidden directories (starting with '.').
+        """
+        return should_ignore_path(path, skip_dirs=self.effective_skip_dirs)
 
     def detect_language(self, path: Path) -> Optional[str]:
         """Detect language from file extension."""

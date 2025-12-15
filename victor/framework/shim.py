@@ -206,6 +206,9 @@ class FrameworkShim:
         - System prompt (via prompt_builder)
         - Tool filter (stored for selection-time filtering)
         - Stage configuration (stored for state machine hints)
+        - Middleware chain (for tool execution processing)
+        - Safety extensions (for dangerous operation patterns)
+        - Prompt contributions (for task type hints)
 
         Args:
             vertical: Vertical class to apply.
@@ -245,6 +248,193 @@ class FrameworkShim:
         # Store vertical metadata on orchestrator
         self._orchestrator._vertical_name = vertical.name
         self._orchestrator._vertical_config = self._vertical_config
+
+        # Apply vertical extensions (new protocol-based system)
+        self._apply_vertical_extensions(vertical)
+
+    def _apply_vertical_extensions(self, vertical: Type["VerticalBase"]) -> None:
+        """Apply vertical extensions to orchestrator.
+
+        This applies the protocol-based extension system:
+        - Middleware chain for tool execution
+        - Safety extensions for danger pattern detection
+        - Prompt contributors for task hints
+        - Mode configurations for tool budgets
+
+        Args:
+            vertical: Vertical class to get extensions from.
+        """
+        extensions = vertical.get_extensions()
+        if extensions is None:
+            logger.debug("No extensions available for vertical")
+            return
+
+        # Apply middleware chain
+        if extensions.middleware:
+            self._apply_middleware(extensions.middleware)
+
+        # Apply safety extensions
+        if extensions.safety_extensions:
+            self._apply_safety_extensions(extensions.safety_extensions)
+
+        # Apply prompt contributors
+        if extensions.prompt_contributors:
+            self._apply_prompt_contributors(extensions.prompt_contributors)
+
+        # Apply mode config provider
+        if extensions.mode_config_provider:
+            self._apply_mode_config(extensions.mode_config_provider)
+
+        # Apply tool dependency provider
+        if extensions.tool_dependency_provider:
+            self._apply_tool_dependencies(extensions.tool_dependency_provider)
+
+        logger.debug(
+            f"Applied vertical extensions: "
+            f"middleware={len(extensions.middleware)}, "
+            f"safety={len(extensions.safety_extensions)}, "
+            f"prompts={len(extensions.prompt_contributors)}"
+        )
+
+    def _apply_middleware(self, middleware_list: list) -> None:
+        """Apply middleware implementations to orchestrator.
+
+        Args:
+            middleware_list: List of MiddlewareProtocol implementations.
+        """
+        # Use orchestrator's apply method if available (preferred)
+        if hasattr(self._orchestrator, "apply_vertical_middleware"):
+            self._orchestrator.apply_vertical_middleware(middleware_list)
+            return
+
+        # Fallback: Check if orchestrator has middleware chain support
+        chain = getattr(self._orchestrator, "middleware_chain", None)
+        if chain is not None and hasattr(chain, "add"):
+            for middleware in middleware_list:
+                chain.add(middleware)
+            logger.debug(f"Added {len(middleware_list)} middleware to chain")
+        else:
+            chain = getattr(self._orchestrator, "_middleware_chain", None)
+            if chain is not None and hasattr(chain, "add"):
+                for middleware in middleware_list:
+                    chain.add(middleware)
+                logger.debug(f"Added {len(middleware_list)} middleware to chain")
+            else:
+                # Store for later use by orchestrator
+                self._orchestrator._vertical_middleware = middleware_list
+                logger.debug(f"Stored {len(middleware_list)} middleware for orchestrator")
+
+    def _apply_safety_extensions(self, safety_extensions: list) -> None:
+        """Apply safety extensions to orchestrator.
+
+        Args:
+            safety_extensions: List of SafetyExtensionProtocol implementations.
+        """
+        # Collect all patterns from extensions
+        all_patterns = []
+        for ext in safety_extensions:
+            all_patterns.extend(ext.get_bash_patterns())
+            all_patterns.extend(ext.get_file_patterns())
+
+        # Use orchestrator's apply method if available (preferred)
+        if hasattr(self._orchestrator, "apply_vertical_safety_patterns"):
+            self._orchestrator.apply_vertical_safety_patterns(all_patterns)
+            return
+
+        # Fallback: Store patterns on orchestrator for safety checker
+        safety_checker = getattr(self._orchestrator, "safety_checker", None)
+        if safety_checker is not None:
+            # If safety checker exists, try to add patterns
+            if hasattr(safety_checker, "add_patterns"):
+                safety_checker.add_patterns(all_patterns)
+            elif hasattr(safety_checker, "_custom_patterns"):
+                safety_checker._custom_patterns.extend(all_patterns)
+            logger.debug(f"Applied {len(all_patterns)} safety patterns to checker")
+        else:
+            # Store for later initialization
+            self._orchestrator._vertical_safety_patterns = all_patterns
+            logger.debug(f"Stored {len(all_patterns)} safety patterns for orchestrator")
+
+    def _apply_prompt_contributors(self, contributors: list) -> None:
+        """Apply prompt contributors to orchestrator.
+
+        Args:
+            contributors: List of PromptContributorProtocol implementations.
+        """
+        # Merge task hints from all contributors
+        merged_hints = {}
+        for contributor in sorted(contributors, key=lambda c: c.get_priority()):
+            merged_hints.update(contributor.get_task_type_hints())
+
+        # Apply to prompt builder if available
+        if hasattr(self._orchestrator, "prompt_builder"):
+            prompt_builder = self._orchestrator.prompt_builder
+            if hasattr(prompt_builder, "set_task_type_hints"):
+                prompt_builder.set_task_type_hints(merged_hints)
+            elif hasattr(prompt_builder, "_task_type_hints"):
+                prompt_builder._task_type_hints = merged_hints
+
+            # Apply additional system prompt sections
+            for contributor in sorted(contributors, key=lambda c: c.get_priority()):
+                section = contributor.get_system_prompt_section()
+                if section:
+                    if hasattr(prompt_builder, "add_prompt_section"):
+                        prompt_builder.add_prompt_section(section)
+                    elif hasattr(prompt_builder, "_prompt_sections"):
+                        prompt_builder._prompt_sections.append(section)
+
+        # Store for reference
+        self._orchestrator._vertical_task_hints = merged_hints
+        logger.debug(f"Applied {len(merged_hints)} task type hints")
+
+    def _apply_mode_config(self, mode_provider: Any) -> None:
+        """Apply mode configuration provider.
+
+        Args:
+            mode_provider: ModeConfigProviderProtocol implementation.
+        """
+        mode_configs = mode_provider.get_mode_configs()
+        default_mode = mode_provider.get_default_mode()
+        default_budget = mode_provider.get_default_tool_budget()
+
+        # Apply to adaptive mode controller if available
+        if hasattr(self._orchestrator, "adaptive_mode_controller"):
+            controller = self._orchestrator.adaptive_mode_controller
+            if hasattr(controller, "set_mode_configs"):
+                controller.set_mode_configs(mode_configs)
+            if hasattr(controller, "set_default_budget"):
+                controller.set_default_budget(default_budget)
+
+        # Store for reference
+        self._orchestrator._vertical_mode_configs = mode_configs
+        self._orchestrator._vertical_default_mode = default_mode
+        self._orchestrator._vertical_default_budget = default_budget
+        logger.debug(f"Applied {len(mode_configs)} mode configurations")
+
+    def _apply_tool_dependencies(self, dep_provider: Any) -> None:
+        """Apply tool dependency provider.
+
+        Args:
+            dep_provider: ToolDependencyProviderProtocol implementation.
+        """
+        dependencies = dep_provider.get_dependencies()
+        sequences = dep_provider.get_tool_sequences()
+
+        # Apply to tool sequence tracker if available
+        if hasattr(self._orchestrator, "tool_sequence_tracker"):
+            tracker = self._orchestrator.tool_sequence_tracker
+            if hasattr(tracker, "set_dependencies"):
+                tracker.set_dependencies(dependencies)
+            if hasattr(tracker, "set_sequences"):
+                tracker.set_sequences(sequences)
+
+        # Store for reference
+        self._orchestrator._vertical_tool_dependencies = dependencies
+        self._orchestrator._vertical_tool_sequences = sequences
+        logger.debug(
+            f"Applied {len(dependencies)} tool dependencies, "
+            f"{len(sequences)} sequences"
+        )
 
     def _apply_system_prompt(self, system_prompt: str) -> None:
         """Apply a custom system prompt to the orchestrator.

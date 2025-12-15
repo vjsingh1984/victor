@@ -48,6 +48,10 @@ class LiveDisplayRenderer:
         self._pending_tool: dict | None = None  # Track tool waiting for result
         self._last_thinking_rendered = ""  # Track last rendered thinking to avoid dupes
         self._thinking_indicator_shown = False  # Track if we've shown the indicator
+        self._in_thinking_mode = False  # Track if we're in thinking mode to avoid content pollution
+        self._content_shown_before_pause = (
+            ""  # Track content shown before pause to avoid re-display
+        )
 
     def start(self) -> None:
         """Start the Live display."""
@@ -60,12 +64,21 @@ class LiveDisplayRenderer:
         if self._live and not self._is_paused:
             self._live.stop()
             self._is_paused = True
+            # Remember what content was shown before pause to avoid re-display on resume
+            self._content_shown_before_pause = self._content_buffer
 
     def resume(self) -> None:
-        """Resume the Live display with current content."""
+        """Resume the Live display with only NEW content since pause.
+
+        This prevents content duplication when pause/resume cycles occur
+        (e.g., around tool calls or thinking blocks).
+        """
         if self._is_paused:
+            # Only show content that was added AFTER the pause, not the full buffer
+            # This prevents re-displaying content that was already shown before pause
+            new_content = self._content_buffer[len(self._content_shown_before_pause) :]
             self._live = Live(
-                Markdown(self._content_buffer),
+                Markdown(new_content),
                 console=self.console,
                 refresh_per_second=10,
             )
@@ -147,9 +160,16 @@ class LiveDisplayRenderer:
         Args:
             text: Content text to append
         """
+        # Don't add to content buffer during thinking mode - thinking content
+        # is handled separately by on_thinking_content() to avoid duplication
+        if self._in_thinking_mode:
+            return
         self._content_buffer += text
         if self._live:
-            self._live.update(Markdown(self._content_buffer))
+            # Only show content added AFTER last pause to avoid re-displaying old content
+            # This handles the case where we've had pause/resume cycles
+            new_content = self._content_buffer[len(self._content_shown_before_pause) :]
+            self._live.update(Markdown(new_content))
 
     def on_thinking_content(self, text: str) -> None:
         """Accumulate thinking content - will render on thinking_end.
@@ -164,13 +184,18 @@ class LiveDisplayRenderer:
         """Show thinking indicator and pause Live display."""
         self.pause()
         self._thinking_buffer = ""  # Reset thinking buffer
-        # Only show indicator once per thinking session
+        # Only show indicator once per response (reset in cleanup)
         if not self._thinking_indicator_shown:
             render_thinking_indicator(self.console)
             self._thinking_indicator_shown = True
+        # Mark that we're in thinking mode - content will be separate
+        self._in_thinking_mode = True
 
     def on_thinking_end(self) -> None:
         """End thinking - render accumulated content and resume Live display."""
+        # Exit thinking mode first
+        self._in_thinking_mode = False
+
         # Render only the NEW content (not already rendered) to avoid duplication
         if self._thinking_buffer:
             # Only render the portion we haven't already shown
@@ -211,3 +236,5 @@ class LiveDisplayRenderer:
         self._last_thinking_rendered = ""
         self._pending_tool = None
         self._thinking_indicator_shown = False
+        self._in_thinking_mode = False
+        self._content_shown_before_pause = ""

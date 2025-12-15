@@ -153,6 +153,11 @@ def chat(
         "--observability/--no-observability",
         help="Enable observability integration for event tracking.",
     ),
+    tui: bool = typer.Option(
+        False,
+        "--tui/--no-tui",
+        help="Use modern TUI interface. Use --no-tui for simple CLI mode (default).",
+    ),
 ):
     """Start interactive chat or send a one-shot message."""
     if ctx.invoked_subcommand is None:
@@ -287,6 +292,8 @@ def chat(
                     vertical=vertical,
                     enable_observability=enable_observability,
                     legacy_mode=legacy_mode,
+                    # Smart TUI detection: disable if non-interactive terminal or automation mode
+                    use_tui=tui and not automation_mode and sys.stdin.isatty() and sys.stdout.isatty(),
                 )
             )
 
@@ -300,7 +307,7 @@ def _run_default_interactive() -> None:
 
     settings = load_settings()
     setup_safety_confirmation()
-    asyncio.run(run_interactive(settings, "default", True, False))
+    asyncio.run(run_interactive(settings, "default", True, False, use_tui=False))
 
 
 async def run_oneshot(
@@ -460,12 +467,16 @@ async def run_interactive(
     vertical: Optional[str] = None,
     enable_observability: bool = True,
     legacy_mode: bool = False,
+    use_tui: bool = True,
 ) -> None:
     """Run interactive CLI mode.
 
     By default, uses FrameworkShim to bridge CLI with framework features
     like observability and vertical configuration. Use legacy_mode=True
     to bypass the framework and use direct orchestrator creation.
+
+    Args:
+        use_tui: If True, use the modern TUI interface. If False, use simple CLI.
     """
     agent = None
     shim: Optional[FrameworkShim] = None
@@ -527,21 +538,43 @@ async def run_interactive(
             except Exception:
                 pass
 
-        from victor.ui.commands import SlashCommandHandler
+        if use_tui:
+            # Use modern TUI interface
+            try:
+                from victor.ui.tui import VictorTUI
 
-        cmd_handler = SlashCommandHandler(console, settings, agent)
+                tui_app = VictorTUI(
+                    agent=agent,
+                    provider=profile_config.provider,
+                    model=profile_config.model,
+                    stream=stream,
+                    settings=settings,  # Pass settings for slash commands
+                )
+                await tui_app.run_async()
+            except ImportError:
+                # Fall back to CLI if Textual not available
+                console.print(
+                    "[yellow]Warning:[/] TUI not available (textual not installed). "
+                    "Using CLI mode."
+                )
+                use_tui = False
 
-        rl_suggestion = get_rl_profile_suggestion(profile_config.provider, profiles)
-        await _run_cli_repl(
-            agent,
-            settings,
-            cmd_handler,
-            profile_config,
-            stream,
-            rl_suggestion,
-            renderer_choice=renderer_choice,
-            vertical_name=vertical,
-        )
+        if not use_tui:
+            from victor.ui.commands import SlashCommandHandler
+
+            cmd_handler = SlashCommandHandler(console, settings, agent)
+
+            rl_suggestion = get_rl_profile_suggestion(profile_config.provider, profiles)
+            await _run_cli_repl(
+                agent,
+                settings,
+                cmd_handler,
+                profile_config,
+                stream,
+                rl_suggestion,
+                renderer_choice=renderer_choice,
+                vertical_name=vertical,
+            )
 
         success = True
         if hasattr(agent, "get_session_metrics"):

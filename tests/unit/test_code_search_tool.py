@@ -241,7 +241,7 @@ class TestSemanticCodeSearch:
     async def test_semantic_search_no_root(self):
         """Test semantic search with non-existent root."""
         result = await search(
-            "query", path="/nonexistent/path/xyz", context={"settings": MagicMock()}
+            "query", path="/nonexistent/path/xyz", _exec_ctx={"settings": MagicMock()}
         )
         assert result["success"] is False
         assert "not found" in result["error"].lower()
@@ -249,14 +249,14 @@ class TestSemanticCodeSearch:
     @pytest.mark.asyncio
     async def test_semantic_search_no_settings(self):
         """Test semantic search without settings."""
-        result = await search("query", path=".", context={})
+        result = await search("query", path=".", _exec_ctx={})
         assert result["success"] is False
         assert "settings" in result["error"].lower()
 
     @pytest.mark.asyncio
     async def test_semantic_search_no_context(self):
         """Test semantic search without context."""
-        result = await search("query", path=".", context=None)
+        result = await search("query", path=".", _exec_ctx=None)
         assert result["success"] is False
         assert "settings" in result["error"].lower()
 
@@ -266,7 +266,7 @@ class TestSemanticCodeSearch:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("victor.tools.code_search_tool._get_or_build_index") as mock_index:
                 mock_index.side_effect = ImportError("lancedb not installed")
-                result = await search("query", path=tmpdir, context={"settings": MagicMock()})
+                result = await search("query", path=tmpdir, _exec_ctx={"settings": MagicMock()})
                 assert result["success"] is False
                 assert "dependencies" in result["error"].lower()
 
@@ -276,7 +276,7 @@ class TestSemanticCodeSearch:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("victor.tools.code_search_tool._get_or_build_index") as mock_index:
                 mock_index.side_effect = Exception("Some error")
-                result = await search("query", path=tmpdir, context={"settings": MagicMock()})
+                result = await search("query", path=tmpdir, _exec_ctx={"settings": MagicMock()})
                 assert result["success"] is False
 
     @pytest.mark.asyncio
@@ -296,7 +296,7 @@ class TestSemanticCodeSearch:
                 # Set up cache entry
                 _INDEX_CACHE[root_key] = {"indexed_at": 123456}
                 try:
-                    result = await search("hello", path=tmpdir, context={"settings": MagicMock()})
+                    result = await search("hello", path=tmpdir, _exec_ctx={"settings": MagicMock()})
                     assert result["success"] is True
                     assert result["count"] == 1
                 finally:

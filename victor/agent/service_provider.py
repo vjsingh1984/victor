@@ -134,6 +134,7 @@ class OrchestratorServiceProvider:
             ObservabilityProtocol,
             ToolRegistryProtocol,
             ProjectContextProtocol,
+            RecoveryHandlerProtocol,
         )
 
         # ToolRegistry - shared tool definitions
@@ -189,6 +190,9 @@ class OrchestratorServiceProvider:
             lambda c: self._create_project_context(),
             ServiceLifetime.SINGLETON,
         )
+
+        # RecoveryHandler - model failure recovery with Q-learning
+        self._register_recovery_handler(container)
 
         logger.debug("Registered singleton orchestrator services")
 
@@ -336,6 +340,41 @@ class OrchestratorServiceProvider:
         context.load()
         return context
 
+    def _register_recovery_handler(self, container: ServiceContainer) -> None:
+        """Register RecoveryHandler as singleton.
+
+        The RecoveryHandler integrates with:
+        - Q-learning for adaptive recovery strategy selection
+        - UsageAnalytics for telemetry
+        - ContextCompactor for proactive context management
+
+        Note: Session-specific state (recent_responses, consecutive_failures)
+        is reset via set_session_id() when orchestrator creates a new session.
+        """
+        from victor.agent.protocols import RecoveryHandlerProtocol
+
+        def create_recovery_handler(_: ServiceContainer) -> Any:
+            enabled = getattr(self._settings, "enable_recovery_system", True)
+            if not enabled:
+                return _NullRecoveryHandler()
+
+            try:
+                from victor.agent.recovery import RecoveryHandler
+
+                return RecoveryHandler.create(settings=self._settings)
+            except ImportError as e:
+                logger.warning(f"RecoveryHandler not available: {e}")
+                return _NullRecoveryHandler()
+            except Exception as e:
+                logger.warning(f"RecoveryHandler creation failed: {e}")
+                return _NullRecoveryHandler()
+
+        container.register(
+            RecoveryHandlerProtocol,
+            create_recovery_handler,
+            ServiceLifetime.SINGLETON,
+        )
+
     # =========================================================================
     # Factory methods for scoped services
     # =========================================================================
@@ -401,6 +440,60 @@ class _NullTaskAnalyzer:
 
     def detect_intent(self, prompt: str) -> Any:
         return None
+
+
+class _NullRecoveryHandler:
+    """No-op recovery handler implementation for disabled mode."""
+
+    @property
+    def enabled(self) -> bool:
+        return False
+
+    @property
+    def consecutive_failures(self) -> int:
+        return 0
+
+    def detect_failure(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+    async def recover(self, *args: Any, **kwargs: Any) -> Any:
+        # Return a no-op outcome
+        from dataclasses import dataclass, field
+        from enum import Enum, auto
+
+        class _RecoveryAction(Enum):
+            CONTINUE = auto()
+
+        @dataclass
+        class _RecoveryResult:
+            action: _RecoveryAction = _RecoveryAction.CONTINUE
+            success: bool = True
+            strategy_name: str = "disabled"
+            reason: str = "Recovery system disabled"
+
+        @dataclass
+        class _RecoveryOutcome:
+            result: _RecoveryResult = field(default_factory=_RecoveryResult)
+
+        return _RecoveryOutcome()
+
+    def record_outcome(self, success: bool, quality_improvement: float = 0.0) -> None:
+        pass
+
+    def track_response(self, content: str) -> None:
+        pass
+
+    def reset_session(self, session_id: str) -> None:
+        pass
+
+    def set_context_compactor(self, compactor: Any) -> None:
+        pass
+
+    def set_session_id(self, session_id: str) -> None:
+        pass
+
+    def get_diagnostics(self) -> dict:
+        return {"enabled": False}
 
 
 # =============================================================================

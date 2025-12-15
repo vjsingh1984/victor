@@ -115,6 +115,7 @@ class ToolNames:
     # SHELL / COMMAND EXECUTION (Platform-agnostic)
     # ==========================================================================
     SHELL = "shell"  # execute_bash → shell (works on all platforms)
+    SHELL_READONLY = "shell_readonly"  # read-only shell for safe exploration
     SANDBOX = "sandbox"  # execute_python_in_sandbox → sandbox
     SANDBOX_UPLOAD = "sandbox_upload"  # upload_files_to_sandbox → sandbox_upload
 
@@ -212,6 +213,10 @@ TOOL_ALIASES: Dict[str, str] = {
     "get_project_overview": ToolNames.OVERVIEW,
     # Shell / Execution
     "execute_bash": ToolNames.SHELL,
+    "run": ToolNames.SHELL,  # LLMs often hallucinate "run" as a tool name
+    "bash": ToolNames.SHELL,  # Common alias
+    "execute": ToolNames.SHELL,  # Common alias
+    "cmd": ToolNames.SHELL,  # Windows-style alias
     "execute_python_in_sandbox": ToolNames.SANDBOX,
     "upload_files_to_sandbox": ToolNames.SANDBOX_UPLOAD,
     # Search
@@ -229,7 +234,15 @@ TOOL_ALIASES: Dict[str, str] = {
     "refactor_extract_function": ToolNames.EXTRACT,
     "refactor_inline_variable": ToolNames.INLINE,
     "refactor_organize_imports": ToolNames.IMPORTS,
-    # Git
+    # Git - operation-specific aliases that resolve to unified "git" tool
+    # LLMs may call "git_status" expecting a tool, but we use "git" with operation param
+    "git_status": ToolNames.GIT,
+    "git_diff": ToolNames.GIT,
+    "git_log": ToolNames.GIT,
+    "git_commit": ToolNames.GIT,
+    "git_branch": ToolNames.GIT,
+    "git_stage": ToolNames.GIT,
+    # PR and commit message tools
     "git_create_pr": ToolNames.PR,
     "git_suggest_commit": ToolNames.COMMIT_MSG,
     "git_analyze_conflicts": ToolNames.CONFLICTS,

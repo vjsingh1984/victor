@@ -72,6 +72,83 @@ class TruncationStrategy(Enum):
 
 
 @dataclass
+class ParallelReadBudget:
+    """Budget information for parallel file reads.
+
+    This helps the LLM plan efficient parallel reads by knowing:
+    - How many files can be read in parallel
+    - Maximum chars per file to stay within context limits
+    - Total budget available for reads
+
+    Example:
+        budget = calculate_parallel_read_budget(context_window=65536)
+        # Returns: ParallelReadBudget(max_parallel_files=10, chars_per_file=8192, ...)
+    """
+
+    context_window: int  # Model's context window in tokens
+    usable_tokens: int  # Tokens available for reads (after reserving for output)
+    usable_chars: int  # Approximate chars available (~3 chars/token)
+    max_parallel_files: int  # Recommended number of parallel reads
+    chars_per_file: int  # Max chars per file to stay within budget
+    total_read_budget: int  # Total chars budget for all reads
+
+    def to_prompt_hint(self) -> str:
+        """Generate a hint string for the system prompt."""
+        return (
+            f"PARALLEL READ BUDGET: You can read up to {self.max_parallel_files} files "
+            f"in parallel, each limited to ~{self.chars_per_file:,} chars "
+            f"(~{self.chars_per_file // 35} lines). "
+            f"Total read budget: {self.total_read_budget:,} chars."
+        )
+
+
+def calculate_parallel_read_budget(
+    context_window: int = 65536,
+    output_reserve: float = 0.5,
+    chars_per_token: float = 3.0,
+    target_parallel_files: int = 10,
+) -> ParallelReadBudget:
+    """Calculate optimal budget for parallel file reads.
+
+    This function helps plan parallel reads by calculating how much content
+    can be read from multiple files while staying within context limits.
+
+    Args:
+        context_window: Model's context window in tokens (default: 64K)
+        output_reserve: Fraction of context to reserve for output (default: 0.5)
+        chars_per_token: Approximate characters per token (default: 3.0)
+        target_parallel_files: Target number of parallel reads (default: 10)
+
+    Returns:
+        ParallelReadBudget with calculated limits
+
+    Example:
+        >>> budget = calculate_parallel_read_budget(65536)
+        >>> budget.max_parallel_files
+        10
+        >>> budget.chars_per_file
+        9830
+    """
+    usable_tokens = int(context_window * (1 - output_reserve))
+    usable_chars = int(usable_tokens * chars_per_token)
+    chars_per_file = usable_chars // target_parallel_files
+
+    # Round down to nice number (multiple of 1024)
+    chars_per_file = (chars_per_file // 1024) * 1024
+    if chars_per_file < 4096:
+        chars_per_file = 4096  # Minimum useful read size
+
+    return ParallelReadBudget(
+        context_window=context_window,
+        usable_tokens=usable_tokens,
+        usable_chars=usable_chars,
+        max_parallel_files=target_parallel_files,
+        chars_per_file=chars_per_file,
+        total_read_budget=chars_per_file * target_parallel_files,
+    )
+
+
+@dataclass
 class CompactorConfig:
     """Configuration for the context compactor.
 
@@ -89,8 +166,11 @@ class CompactorConfig:
 
     proactive_threshold: float = 0.90  # Compact at 90% utilization (configurable)
     min_messages_after_compact: int = 8
-    tool_result_max_chars: int = 8000  # ~2000 tokens
-    tool_result_max_lines: int = 200
+    # 8192 chars allows ~10-12 parallel file reads within 32K usable tokens (64K context / 2)
+    # Dynamic formula: (context_window * 0.5 * 3) / expected_parallel_files
+    # Example: (65536 * 0.5 * 3) / 10 = ~9,830 chars per file
+    tool_result_max_chars: int = 8192  # ~2048 tokens, fits 10-12 parallel reads
+    tool_result_max_lines: int = 230  # 8192 / 35 chars per line ≈ 234 lines
     truncation_strategy: TruncationStrategy = TruncationStrategy.SMART
     preserve_code_blocks: bool = True
     preserve_json_structure: bool = True
@@ -573,7 +653,7 @@ def create_context_compactor(
     controller: "ConversationController",
     proactive_threshold: float = 0.90,
     min_messages_after_compact: int = 8,
-    tool_result_max_chars: int = 8000,
+    tool_result_max_chars: int = 8192,
     tool_result_max_lines: int = 200,
     truncation_strategy: TruncationStrategy = TruncationStrategy.SMART,
     preserve_code_blocks: bool = True,
@@ -586,7 +666,7 @@ def create_context_compactor(
         controller: The ConversationController to wrap
         proactive_threshold: Utilization % to trigger proactive compaction (default: 0.90)
         min_messages_after_compact: Minimum messages to keep after compaction (default: 8)
-        tool_result_max_chars: Maximum characters for tool results (default: 8000)
+        tool_result_max_chars: Maximum characters for tool results (default: 8192)
         tool_result_max_lines: Maximum lines for tool results (default: 200)
         truncation_strategy: Strategy for truncating tool results (default: SMART)
         preserve_code_blocks: Preserve code blocks during truncation (default: True)

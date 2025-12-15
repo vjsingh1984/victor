@@ -453,3 +453,261 @@ class TestSlashCommandHandlerStatus:
 
         # Should show some status info
         assert len(output) > 0
+
+
+class TestAllCommandsRegistered:
+    """Tests to verify all expected slash commands are registered."""
+
+    # Complete list of expected commands from _register_default_commands
+    EXPECTED_COMMANDS = [
+        "help", "init", "model", "profile", "provider", "clear", "context",
+        "lmstudio", "tools", "status", "config", "save", "load", "sessions",
+        "compact", "mcp", "review", "bug", "exit", "undo", "redo", "history",
+        "theme", "changes", "cost", "approvals", "resume", "plan", "search",
+        "copy", "directory", "snapshots", "commit", "mode", "build", "explore",
+        "reindex", "metrics", "serialization", "learning", "mlstats",
+    ]
+
+    # Expected aliases mapping
+    EXPECTED_ALIASES = {
+        "help": ["?", "commands"],
+        "model": ["models"],
+        "profile": ["profiles"],
+        "provider": ["providers"],
+        "clear": ["reset"],
+        "context": ["ctx", "memory"],
+        "lmstudio": ["lm"],
+        "status": ["info"],
+        "config": ["settings"],
+        "sessions": ["history"],  # Note: history is both command and alias
+        "compact": ["summarize"],
+        "mcp": ["servers"],
+        "bug": ["issue", "feedback"],
+        "exit": ["quit", "bye"],
+        "theme": ["dark", "light"],
+        "changes": ["diff", "undo", "rollback"],
+        "cost": ["usage", "tokens", "stats"],
+        "approvals": ["safety"],
+        "search": ["web"],
+        "directory": ["dir", "cd", "pwd"],
+        "snapshots": ["snap"],
+        "commit": ["ci"],
+        "mode": ["m"],
+        "reindex": ["index"],
+        "metrics": ["perf", "performance"],
+        "serialization": ["serialize", "ser"],
+        "learning": ["qlearn", "rl"],
+        "mlstats": ["ml", "analytics"],
+    }
+
+    def test_all_commands_registered(self):
+        """Test that all expected commands are registered."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        for cmd_name in self.EXPECTED_COMMANDS:
+            assert cmd_name in handler._commands, f"Command '{cmd_name}' not registered"
+
+    def test_all_aliases_registered(self):
+        """Test that all expected aliases are registered."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        for cmd_name, aliases in self.EXPECTED_ALIASES.items():
+            for alias in aliases:
+                assert alias in handler._commands, f"Alias '{alias}' for '{cmd_name}' not registered"
+
+    def test_command_count(self):
+        """Test total number of registered commands (including aliases)."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        # Should have at least 41 commands + their aliases
+        assert len(handler._commands) >= 41, f"Expected at least 41 commands, got {len(handler._commands)}"
+
+    def test_each_command_has_description(self):
+        """Test that each command has a non-empty description."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        for cmd_name in self.EXPECTED_COMMANDS:
+            cmd = handler._commands.get(cmd_name)
+            assert cmd is not None, f"Command '{cmd_name}' not found"
+            assert cmd.description, f"Command '{cmd_name}' has empty description"
+
+    def test_each_command_has_handler(self):
+        """Test that each command has a callable handler."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        for cmd_name in self.EXPECTED_COMMANDS:
+            cmd = handler._commands.get(cmd_name)
+            assert cmd is not None, f"Command '{cmd_name}' not found"
+            assert callable(cmd.handler), f"Command '{cmd_name}' handler is not callable"
+
+
+class TestTUIConsoleAdapter:
+    """Tests for TUIConsoleAdapter that bridges SlashCommandHandler to TUI."""
+
+    def test_adapter_imports(self):
+        """Test that TUIConsoleAdapter can be imported."""
+        from victor.ui.tui.app import TUIConsoleAdapter
+        assert TUIConsoleAdapter is not None
+
+    def test_adapter_captures_print(self):
+        """Test that adapter captures print output."""
+        from victor.ui.tui.app import TUIConsoleAdapter
+        from victor.ui.tui.widgets import ConversationLog
+
+        # Create a mock conversation log
+        mock_log = MagicMock(spec=ConversationLog)
+
+        adapter = TUIConsoleAdapter(mock_log)
+        adapter.print("Hello, World!")
+
+        # Should have called add_system_message
+        mock_log.add_system_message.assert_called()
+
+    def test_adapter_multiline_output(self):
+        """Test that adapter handles multiline output."""
+        from victor.ui.tui.app import TUIConsoleAdapter
+        from victor.ui.tui.widgets import ConversationLog
+
+        mock_log = MagicMock(spec=ConversationLog)
+        adapter = TUIConsoleAdapter(mock_log)
+
+        adapter.print("Line 1\nLine 2\nLine 3")
+
+        # Should have called add_system_message multiple times
+        assert mock_log.add_system_message.call_count >= 1
+
+
+class TestTUISlashCommandIntegration:
+    """Tests for TUI slash command integration."""
+
+    def test_tui_accepts_settings(self):
+        """Test VictorTUI accepts settings parameter."""
+        from victor.ui.tui.app import VictorTUI
+
+        settings = MagicMock()
+        tui = VictorTUI(settings=settings)
+
+        assert tui.settings is settings
+
+    def test_tui_creates_slash_handler_with_settings(self):
+        """Test VictorTUI can create slash handler when mounted."""
+        from victor.ui.tui.app import VictorTUI
+
+        # This tests the structure, actual mounting requires async context
+        settings = MagicMock()
+        tui = VictorTUI(settings=settings)
+
+        assert tui.settings is settings
+        # Handler is created in on_mount, not constructor
+        assert tui._slash_handler is None  # Not yet mounted
+
+    def test_run_tui_accepts_settings(self):
+        """Test run_tui function accepts settings parameter."""
+        import inspect
+        from victor.ui.tui.app import run_tui
+
+        sig = inspect.signature(run_tui)
+        assert "settings" in sig.parameters
+
+
+class TestSlashCommandCLIParity:
+    """Tests to verify CLI and TUI have parity in slash command handling."""
+
+    def test_cli_handler_creation(self):
+        """Test CLI creates SlashCommandHandler correctly."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        agent = MagicMock()
+
+        handler = SlashCommandHandler(console=console, settings=settings, agent=agent)
+
+        assert handler.console is console
+        assert handler.settings is settings
+        assert handler.agent is agent
+
+    @pytest.mark.asyncio
+    async def test_handler_works_with_custom_console(self):
+        """Test handler works with different console implementations."""
+        from victor.ui.tui.app import TUIConsoleAdapter
+        from victor.ui.tui.widgets import ConversationLog
+
+        mock_log = MagicMock(spec=ConversationLog)
+        adapter = TUIConsoleAdapter(mock_log)
+        settings = MagicMock()
+
+        handler = SlashCommandHandler(console=adapter, settings=settings)
+
+        # Execute help command - should work with custom console
+        await handler.execute("/help")
+
+        # Adapter should have received output
+        assert mock_log.add_system_message.called
+
+
+class TestSlashCommandCategories:
+    """Tests for different categories of slash commands."""
+
+    @pytest.mark.asyncio
+    async def test_session_commands(self):
+        """Test session-related commands exist."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        session_commands = ["save", "load", "sessions", "resume"]
+        for cmd in session_commands:
+            assert cmd in handler._commands, f"Session command '{cmd}' missing"
+
+    @pytest.mark.asyncio
+    async def test_mode_commands(self):
+        """Test mode-related commands exist."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        mode_commands = ["mode", "build", "explore", "plan"]
+        for cmd in mode_commands:
+            assert cmd in handler._commands, f"Mode command '{cmd}' missing"
+
+    @pytest.mark.asyncio
+    async def test_utility_commands(self):
+        """Test utility commands exist."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        util_commands = ["copy", "theme", "directory", "search"]
+        for cmd in util_commands:
+            assert cmd in handler._commands, f"Utility command '{cmd}' missing"
+
+    @pytest.mark.asyncio
+    async def test_metrics_commands(self):
+        """Test metrics/stats commands exist."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        metrics_commands = ["cost", "metrics", "mlstats", "learning"]
+        for cmd in metrics_commands:
+            assert cmd in handler._commands, f"Metrics command '{cmd}' missing"
+
+    @pytest.mark.asyncio
+    async def test_git_commands(self):
+        """Test git-related commands exist."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        git_commands = ["commit", "changes", "snapshots"]
+        for cmd in git_commands:
+            assert cmd in handler._commands, f"Git command '{cmd}' missing"

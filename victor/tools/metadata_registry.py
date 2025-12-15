@@ -514,6 +514,7 @@ class ToolMetadataRegistry:
             "metrics",
             "symbol",
             "refs",
+            "graph",  # Code graph traversal for rapid codebase discovery
         }
 
         core_readonly: List[str] = list(default_readonly)

@@ -1,0 +1,362 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Coding-specific middleware for tool execution.
+
+This module provides middleware implementations for the coding vertical,
+including code validation, syntax checking, and auto-correction.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict, Optional, Set
+
+from victor.verticals.protocols import (
+    MiddlewarePriority,
+    MiddlewareProtocol,
+    MiddlewareResult,
+)
+
+logger = logging.getLogger(__name__)
+
+
+# Tools that write or execute code
+CODE_TOOLS: frozenset[str] = frozenset({
+    "code_executor",
+    "execute_code",
+    "run_code",
+    "write_file",
+    "file_editor",
+    "edit_file",
+    "edit_files",
+    "create_file",
+})
+
+# Argument names that contain code
+CODE_ARGUMENT_NAMES: frozenset[str] = frozenset({
+    "code",
+    "python_code",
+    "content",
+    "source",
+    "script",
+    "new_content",
+    "file_content",
+})
+
+
+class CodingMiddleware(MiddlewareProtocol):
+    """Base middleware for coding-related tool calls.
+
+    Provides common functionality for code validation and processing.
+    Can be extended for specific coding operations.
+    """
+
+    def __init__(
+        self,
+        enabled: bool = True,
+        applicable_tools: Optional[Set[str]] = None,
+    ):
+        """Initialize the middleware.
+
+        Args:
+            enabled: Whether the middleware is enabled
+            applicable_tools: Set of tool names this applies to (None for all)
+        """
+        self._enabled = enabled
+        self._applicable_tools = applicable_tools
+
+    async def before_tool_call(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> MiddlewareResult:
+        """Called before a tool is executed.
+
+        Base implementation does nothing. Override in subclasses.
+
+        Args:
+            tool_name: Name of the tool being called
+            arguments: Arguments passed to the tool
+
+        Returns:
+            MiddlewareResult indicating whether to proceed
+        """
+        return MiddlewareResult()
+
+    async def after_tool_call(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        result: Any,
+        success: bool,
+    ) -> Optional[Any]:
+        """Called after a tool is executed.
+
+        Base implementation returns None (no modification).
+
+        Args:
+            tool_name: Name of the tool that was called
+            arguments: Arguments that were passed
+            result: Result from the tool execution
+            success: Whether the tool execution succeeded
+
+        Returns:
+            Modified result (or None to keep original)
+        """
+        return None
+
+    def get_priority(self) -> MiddlewarePriority:
+        """Get the priority of this middleware.
+
+        Returns:
+            Priority level for execution ordering
+        """
+        return MiddlewarePriority.NORMAL
+
+    def get_applicable_tools(self) -> Optional[Set[str]]:
+        """Get tools this middleware applies to.
+
+        Returns:
+            Set of tool names, or None for all tools
+        """
+        return self._applicable_tools
+
+
+class CodeCorrectionMiddleware(MiddlewareProtocol):
+    """Middleware for validating and correcting code in tool arguments.
+
+    Integrates with the existing code correction system to provide
+    automatic validation and fixing of code before execution.
+
+    This middleware is specific to the coding vertical and wraps
+    the framework's CodeCorrectionMiddleware for protocol compliance.
+    """
+
+    def __init__(
+        self,
+        enabled: bool = True,
+        auto_fix: bool = True,
+        max_iterations: int = 1,
+    ):
+        """Initialize the middleware.
+
+        Args:
+            enabled: Whether correction is enabled
+            auto_fix: Whether to automatically fix detected issues
+            max_iterations: Maximum correction iterations
+        """
+        self._enabled = enabled
+        self._auto_fix = auto_fix
+        self._max_iterations = max_iterations
+        self._inner_middleware = None
+
+    def _get_inner(self):
+        """Lazy-load the inner middleware."""
+        if self._inner_middleware is None:
+            try:
+                from victor.agent.code_correction_middleware import (
+                    CodeCorrectionMiddleware as InnerMiddleware,
+                    CodeCorrectionConfig,
+                )
+
+                config = CodeCorrectionConfig(
+                    enabled=self._enabled,
+                    auto_fix=self._auto_fix,
+                    max_iterations=self._max_iterations,
+                )
+                self._inner_middleware = InnerMiddleware(config=config)
+            except ImportError:
+                logger.warning("Code correction middleware not available")
+                return None
+        return self._inner_middleware
+
+    async def before_tool_call(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> MiddlewareResult:
+        """Validate and optionally fix code before tool execution.
+
+        Args:
+            tool_name: Name of the tool being called
+            arguments: Arguments passed to the tool
+
+        Returns:
+            MiddlewareResult with validation status and any corrections
+        """
+        if not self._enabled:
+            return MiddlewareResult()
+
+        inner = self._get_inner()
+        if inner is None or not inner.should_validate(tool_name):
+            return MiddlewareResult()
+
+        try:
+            result = inner.validate_and_fix(tool_name, arguments)
+
+            if result.was_corrected:
+                # Apply the correction
+                modified = inner.apply_correction(arguments, result)
+                logger.debug("Code corrected for tool %s", tool_name)
+                return MiddlewareResult(
+                    proceed=True,
+                    modified_arguments=modified,
+                    metadata={"code_corrected": True},
+                )
+
+            if not result.validation.valid:
+                # Code is invalid and couldn't be fixed
+                error_msg = inner.format_validation_error(result)
+                logger.warning("Code validation failed for %s: %s", tool_name, error_msg)
+                return MiddlewareResult(
+                    proceed=True,  # Still proceed, but with metadata
+                    metadata={
+                        "code_validation_failed": True,
+                        "validation_error": error_msg,
+                    },
+                )
+
+        except Exception as e:
+            logger.error("Code correction middleware error: %s", e)
+            # Don't block on middleware errors
+
+        return MiddlewareResult()
+
+    async def after_tool_call(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        result: Any,
+        success: bool,
+    ) -> Optional[Any]:
+        """Called after tool execution.
+
+        Currently does nothing for code correction.
+
+        Args:
+            tool_name: Name of the tool
+            arguments: Arguments passed
+            result: Tool result
+            success: Whether execution succeeded
+
+        Returns:
+            None (no modification)
+        """
+        return None
+
+    def get_priority(self) -> MiddlewarePriority:
+        """Get the priority - HIGH for code validation.
+
+        Returns:
+            HIGH priority to run before most other middleware
+        """
+        return MiddlewarePriority.HIGH
+
+    def get_applicable_tools(self) -> Optional[Set[str]]:
+        """Get tools this middleware applies to.
+
+        Returns:
+            Set of code-related tools
+        """
+        return set(CODE_TOOLS)
+
+
+class GitSafetyMiddleware(MiddlewareProtocol):
+    """Middleware for git operation safety checks.
+
+    Validates git operations before execution and can block
+    dangerous operations like force push or hard reset.
+    """
+
+    # Dangerous git operations
+    BLOCKED_OPERATIONS = frozenset({
+        "push --force",
+        "push -f",
+        "reset --hard HEAD~",
+        "clean -fd",
+    })
+
+    WARNED_OPERATIONS = frozenset({
+        "reset --hard",
+        "checkout --",
+        "stash drop",
+        "branch -D",
+    })
+
+    def __init__(
+        self,
+        block_dangerous: bool = False,
+        warn_on_risky: bool = True,
+    ):
+        """Initialize git safety middleware.
+
+        Args:
+            block_dangerous: Whether to block dangerous operations
+            warn_on_risky: Whether to add warnings for risky operations
+        """
+        self._block_dangerous = block_dangerous
+        self._warn_on_risky = warn_on_risky
+
+    async def before_tool_call(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> MiddlewareResult:
+        """Check git operations for safety.
+
+        Args:
+            tool_name: Tool name
+            arguments: Tool arguments
+
+        Returns:
+            MiddlewareResult with safety check results
+        """
+        if tool_name not in {"git", "execute_bash"}:
+            return MiddlewareResult()
+
+        command = arguments.get("command", "") or arguments.get("args", "")
+        if not command:
+            return MiddlewareResult()
+
+        # Check for blocked operations
+        if self._block_dangerous:
+            for blocked in self.BLOCKED_OPERATIONS:
+                if blocked in command:
+                    return MiddlewareResult(
+                        proceed=False,
+                        error_message=f"Blocked dangerous git operation: {blocked}",
+                    )
+
+        # Add warnings for risky operations
+        if self._warn_on_risky:
+            for warned in self.WARNED_OPERATIONS:
+                if warned in command:
+                    return MiddlewareResult(
+                        proceed=True,
+                        metadata={"git_warning": f"Risky operation: {warned}"},
+                    )
+
+        return MiddlewareResult()
+
+    def get_priority(self) -> MiddlewarePriority:
+        """Get priority - CRITICAL for safety checks."""
+        return MiddlewarePriority.CRITICAL
+
+    def get_applicable_tools(self) -> Optional[Set[str]]:
+        """Get applicable tools."""
+        return {"git", "execute_bash"}
+
+
+__all__ = [
+    "CodingMiddleware",
+    "CodeCorrectionMiddleware",
+    "GitSafetyMiddleware",
+    "CODE_TOOLS",
+    "CODE_ARGUMENT_NAMES",
+]

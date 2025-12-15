@@ -585,6 +585,83 @@ class ProjectContextProtocol(Protocol):
         ...
 
 
+# =============================================================================
+# Recovery Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class RecoveryHandlerProtocol(Protocol):
+    """Protocol for model failure recovery.
+
+    Provides a high-level interface for detecting and recovering from
+    model failures, stuck states, and hallucinations. Integrates with:
+    - Q-learning for adaptive strategy selection
+    - UsageAnalytics for telemetry
+    - ContextCompactor for proactive compaction
+    """
+
+    def detect_failure(
+        self,
+        content: str,
+        tool_calls: Optional[List[Dict[str, Any]]],
+        mentioned_tools: Optional[List[str]],
+        elapsed_time: float,
+        session_time_limit: float,
+        quality_score: float,
+        consecutive_failures: int,
+        recent_responses: Optional[List[str]],
+        context_utilization: Optional[float],
+    ) -> Optional[Any]:
+        """Detect failure type from response characteristics.
+
+        Returns:
+            FailureType if failure detected, None otherwise
+        """
+        ...
+
+    async def recover(
+        self,
+        failure_type: Any,
+        provider: str,
+        model: str,
+        content: str,
+        tool_calls_made: int,
+        tool_budget: int,
+        iteration_count: int,
+        max_iterations: int,
+        elapsed_time: float,
+        session_time_limit: float,
+        current_temperature: float,
+        consecutive_failures: int,
+        mentioned_tools: Optional[List[str]],
+        recent_responses: Optional[List[str]],
+        quality_score: float,
+        task_type: str,
+        is_analysis_task: bool,
+        is_action_task: bool,
+        session_id: Optional[str],
+    ) -> Any:
+        """Attempt recovery using appropriate strategy.
+
+        Returns:
+            RecoveryOutcome with action to take
+        """
+        ...
+
+    def record_outcome(self, success: bool, quality_improvement: float) -> None:
+        """Record recovery outcome for Q-learning."""
+        ...
+
+    def reset_session(self, session_id: str) -> None:
+        """Reset recovery state for a new session."""
+        ...
+
+    def get_diagnostics(self) -> Dict[str, Any]:
+        """Get diagnostic information about recovery system."""
+        ...
+
+
 __all__ = [
     # Provider protocols
     "ProviderManagerProtocol",
@@ -617,4 +694,6 @@ __all__ = [
     # Utility protocols
     "ArgumentNormalizerProtocol",
     "ProjectContextProtocol",
+    # Recovery protocols
+    "RecoveryHandlerProtocol",
 ]

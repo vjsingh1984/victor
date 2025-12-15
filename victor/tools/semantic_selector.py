@@ -566,6 +566,13 @@ class SemanticToolSelector:
         # Count operations are more efficient with shell
         "count": ["shell", "ls"],
         "how many": ["shell", "ls"],
+        # Analysis tasks need semantic search tools for codebase understanding
+        "analyze": ["search", "grep", "symbol", "graph"],
+        "analyze codebase": ["search", "graph", "symbol"],
+        "codebase analysis": ["search", "graph", "symbol"],
+        "understand": ["search", "read", "symbol"],
+        "explore codebase": ["search", "ls", "read"],
+        "architecture": ["search", "graph", "symbol"],
     }
 
     # Conceptual query patterns that strongly prefer semantic_code_search over code_search
@@ -596,6 +603,15 @@ class SemanticToolSelector:
         "validation",  # conceptual search
         "similar to",  # conceptual search
         "related to",  # conceptual search
+        # Analysis/exploration patterns - trigger semantic search
+        "analyze",  # "analyze codebase", "analyze this code"
+        "understand",  # "understand architecture"
+        "architecture",  # "show architecture", "explain architecture"
+        "structure",  # "codebase structure"
+        "overview",  # "codebase overview"
+        "how does",  # "how does X work"
+        "what is the",  # "what is the architecture"
+        "explore",  # "explore codebase"
     ]
 
     # Tools for conceptual queries - forces semantic search as primary
@@ -819,15 +835,17 @@ class SemanticToolSelector:
         pending = []
 
         # Action keywords to check
+        # NOTE: Be specific to avoid false positives. Generic words like "check"
+        # or "examine" in analysis tasks shouldn't trigger pending actions.
         action_patterns = {
-            "edit": ["edit", "modify", "change", "update"],
-            "show_diff": ["diff", "show changes", "show diff", "compare"],
-            "read": ["read", "examine", "look at", "check"],
-            "propose": ["propose", "suggest", "recommend"],
-            "create": ["create", "generate", "make"],
-            "test": ["test", "verify", "validate"],
-            "commit": ["commit"],
-            "pr": ["pull request", "pr"],
+            "edit": ["edit the file", "modify the file", "change the code", "update the file"],
+            "show_diff": ["show diff", "show the diff", "git diff", "compare changes"],
+            "read": ["read the file", "read this file", "show me the file"],
+            "propose": ["propose changes", "suggest changes", "recommend changes"],
+            "create": ["create a file", "create new file", "generate a file", "make a file"],
+            "test": ["run tests", "run the tests", "execute tests"],
+            "commit": ["commit the changes", "make a commit", "git commit"],
+            "pr": ["create a pull request", "open a pr", "make a pr", "raise a pr"],
         }
 
         # Check which actions were requested
@@ -845,6 +863,8 @@ class SemanticToolSelector:
     def _was_action_completed(self, action: str, history: List[Dict[str, Any]]) -> bool:
         """Check if an action was completed based on conversation history.
 
+        Checks both tool calls made and text content for completion indicators.
+
         Args:
             action: Action type to check
             history: Conversation history
@@ -852,31 +872,44 @@ class SemanticToolSelector:
         Returns:
             True if action was completed, False otherwise
         """
-        # Look for tool results in assistant messages
+        # Map action types to tool names that complete them
+        action_to_tools = {
+            "show_diff": ["git", "shell", "shell_readonly"],
+            "edit": ["edit", "write", "patch"],
+            "read": ["read", "symbol", "search", "overview", "ls"],
+            "create": ["write", "scaffold"],
+            "test": ["test", "shell"],
+            "commit": ["git", "commit_msg"],
+            "pr": ["pr", "git"],
+        }
+
+        # Check if any tool that completes this action was called
+        tools_for_action = action_to_tools.get(action, [])
         for msg in history:
             if msg.get("role") == "assistant":
-                content = str(msg.get("content", "")).lower()
+                # Check tool_calls in the message
+                tool_calls = msg.get("tool_calls", [])
+                for tc in tool_calls:
+                    tool_name = tc.get("name", "") or tc.get("function", {}).get("name", "")
+                    if tool_name in tools_for_action:
+                        return True
 
-                # Check based on action type
-                if action == "show_diff":
-                    if "diff" in content or "git diff" in content:
-                        return True
-                elif action == "edit":
-                    if "modified" in content or "edited" in content or "updated" in content:
-                        # Check if the specific file mentioned was edited
-                        return True
-                elif action == "read":
-                    if "read" in content or "file contents" in content:
-                        return True
-                elif action == "create":
-                    if "created" in content or "written" in content:
-                        return True
-                elif action == "test":
-                    if "test" in content and ("passed" in content or "failed" in content):
-                        return True
-                elif action == "commit":
-                    if "committed" in content or "commit" in content:
-                        return True
+                # Also check content for tool result markers
+                content = str(msg.get("content", "")).lower()
+                if action == "show_diff" and ("diff" in content or "git diff" in content):
+                    return True
+                elif action == "test" and "test" in content and ("passed" in content or "failed" in content):
+                    return True
+
+        # Check user messages for tool output markers (TOOL_OUTPUT tags)
+        for msg in history:
+            if msg.get("role") == "user":
+                content = str(msg.get("content", ""))
+                if "<TOOL_OUTPUT" in content:
+                    # Check if any relevant tool output exists
+                    for tool_name in tools_for_action:
+                        if f'tool="{tool_name}"' in content or f"tool='{tool_name}'" in content:
+                            return True
 
         return False
 
