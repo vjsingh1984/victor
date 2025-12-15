@@ -205,7 +205,7 @@ Added 13 new tests in 3 test classes:
 All 71 streaming handler tests pass, 392 orchestrator tests pass
 
 ### Session 6: Metrics Display Formatting Extraction
-**Commit: (pending)**
+**Commit: 647a3df (methods), (pending wiring)**
 
 Added handler methods for metrics display formatting:
 - `format_completion_metrics()` - Formats detailed metrics with cache info for normal completion
@@ -215,4 +215,11 @@ Added 10 new tests in 2 test classes:
 - `TestFormatCompletionMetrics` (6 tests) - Tests for normal completion metrics formatting
 - `TestFormatBudgetExhaustedMetrics` (4 tests) - Tests for budget exhausted metrics formatting
 
-All 81 streaming handler tests pass, 380 orchestrator tests pass
+Wired handler methods into orchestrator:
+- Added `_format_completion_metrics_with_handler()` delegation method
+- Added `_format_budget_exhausted_metrics_with_handler()` delegation method
+- Replaced ~40 lines of inline metrics logic in `_stream_chat_impl` with handler calls
+- Normal completion metrics now use handler (lines 5339-5344)
+- Budget exhausted metrics now use handler (lines 5401-5418)
+
+All 81 streaming handler tests pass, 380 orchestrator tests pass (461 total)

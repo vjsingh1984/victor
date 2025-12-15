@@ -4408,6 +4408,42 @@ class AgentOrchestrator:
             return result.chunks[0]
         return None
 
+    def _format_completion_metrics_with_handler(
+        self,
+        stream_ctx: StreamingChatContext,
+        elapsed_time: float,
+    ) -> str:
+        """Format completion metrics using handler delegation.
+
+        Args:
+            stream_ctx: The streaming context
+            elapsed_time: Elapsed time in seconds
+
+        Returns:
+            Formatted metrics line string
+        """
+        return self._streaming_handler.format_completion_metrics(stream_ctx, elapsed_time)
+
+    def _format_budget_exhausted_metrics_with_handler(
+        self,
+        stream_ctx: StreamingChatContext,
+        elapsed_time: float,
+        time_to_first_token: Optional[float] = None,
+    ) -> str:
+        """Format budget exhausted metrics using handler delegation.
+
+        Args:
+            stream_ctx: The streaming context
+            elapsed_time: Elapsed time in seconds
+            time_to_first_token: Optional time to first token
+
+        Returns:
+            Formatted metrics line string
+        """
+        return self._streaming_handler.format_budget_exhausted_metrics(
+            stream_ctx, elapsed_time, time_to_first_token
+        )
+
     def _parse_and_validate_tool_calls(
         self,
         tool_calls: Optional[List[Dict[str, Any]]],
@@ -5300,48 +5336,11 @@ class AgentOrchestrator:
                             if sanitized:
                                 yield StreamChunk(content=sanitized)
 
-                        # Display performance metrics
+                        # Display performance metrics using handler delegation
                         elapsed_time = time.time() - stream_ctx.start_time
-
-                        # Build token usage summary
-                        # Use actual provider-reported usage if available, else use estimate
-                        if stream_ctx.cumulative_usage["total_tokens"] > 0:
-                            # Provider-reported tokens (accurate)
-                            input_tokens = stream_ctx.cumulative_usage["prompt_tokens"]
-                            output_tokens = stream_ctx.cumulative_usage["completion_tokens"]
-                            _display_tokens = stream_ctx.cumulative_usage["total_tokens"]
-                            cache_read = stream_ctx.cumulative_usage.get("cache_read_input_tokens", 0)
-                            cache_create = stream_ctx.cumulative_usage.get("cache_creation_input_tokens", 0)
-
-                            # Build metrics line
-                            tokens_per_second = (
-                                output_tokens / elapsed_time if elapsed_time > 0 else 0
-                            )
-                            metrics_parts = [
-                                f"📊 in={input_tokens:,}",
-                                f"out={output_tokens:,}",
-                            ]
-                            if cache_read > 0:
-                                metrics_parts.append(f"cached={cache_read:,}")
-                            if cache_create > 0:
-                                metrics_parts.append(f"cache_new={cache_create:,}")
-                            metrics_parts.extend(
-                                [
-                                    f"| {elapsed_time:.1f}s",
-                                    f"| {tokens_per_second:.1f} tok/s",
-                                ]
-                            )
-                            metrics_line = " ".join(metrics_parts)
-                        else:
-                            # Fallback to estimate
-                            tokens_per_second = (
-                                stream_ctx.total_tokens / elapsed_time if elapsed_time > 0 else 0
-                            )
-                            metrics_line = (
-                                f"📊 ~{stream_ctx.total_tokens:.0f} tokens (est.) | "
-                                f"{elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s"
-                            )
-
+                        metrics_line = self._format_completion_metrics_with_handler(
+                            stream_ctx, elapsed_time
+                        )
                         yield StreamChunk(content=f"\n\n{metrics_line}\n")
                         # Record outcome for Q-learning (normal completion = success)
                         self._record_intelligent_outcome(
@@ -5399,15 +5398,15 @@ class AgentOrchestrator:
                             content="Unable to generate summary due to budget limit.\n"
                         )
 
-                    # Finalize and display performance metrics
+                    # Finalize and display performance metrics using handler delegation
                     final_metrics = self._finalize_stream_metrics()
                     elapsed_time = (
                         final_metrics.total_duration if final_metrics else time.time() - stream_ctx.start_time
                     )
-                    tokens_per_second = stream_ctx.total_tokens / elapsed_time if elapsed_time > 0 else 0
-                    ttft_info = ""
-                    if final_metrics and final_metrics.time_to_first_token:
-                        ttft_info = f" | TTFT: {final_metrics.time_to_first_token:.2f}s"
+                    ttft = final_metrics.time_to_first_token if final_metrics else None
+                    metrics_line = self._format_budget_exhausted_metrics_with_handler(
+                        stream_ctx, elapsed_time, ttft
+                    )
                     # Record outcome for Q-learning (budget reached = partial success)
                     self._record_intelligent_outcome(
                         success=True,  # We provided a summary
@@ -5416,7 +5415,7 @@ class AgentOrchestrator:
                         completed=True,
                     )
                     yield StreamChunk(
-                        content=f"\n📊 {stream_ctx.total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}\n",
+                        content=f"\n{metrics_line}\n",
                         is_final=True,
                     )
                     return
