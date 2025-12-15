@@ -4514,6 +4514,42 @@ class AgentOrchestrator:
             stream_ctx, unique_resources
         )
 
+    def _handle_loop_warning_with_handler(
+        self,
+        stream_ctx: "StreamingChatContext",
+        warning_message: Optional[str],
+    ) -> Optional[StreamChunk]:
+        """Handle loop warning using handler delegation.
+
+        Args:
+            stream_ctx: The streaming context
+            warning_message: The warning message from unified tracker
+
+        Returns:
+            StreamChunk with warning if applicable, None otherwise
+        """
+        return self._streaming_handler.handle_loop_warning(stream_ctx, warning_message)
+
+    def _generate_tool_start_chunk_with_handler(
+        self,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        status_msg: str,
+    ) -> StreamChunk:
+        """Generate tool start chunk using handler delegation.
+
+        Args:
+            tool_name: Name of the tool
+            tool_args: Tool arguments
+            status_msg: Status message to display
+
+        Returns:
+            StreamChunk with tool start metadata
+        """
+        return self._streaming_handler.generate_tool_start_chunk(
+            tool_name, tool_args, status_msg
+        )
+
     def _parse_and_validate_tool_calls(
         self,
         tool_calls: Optional[List[Dict[str, Any]]],
@@ -5117,25 +5153,14 @@ class AgentOrchestrator:
                     new_score = quality_result.get("quality_score", stream_ctx.last_quality_score)
                     stream_ctx.update_quality_score(new_score)
 
-            # Check for loop warning using UnifiedTaskTracker (primary)
-            # This gives the model a chance to correct behavior before we force stop
+            # Check for loop warning using handler delegation (testable)
             unified_loop_warning = self.unified_tracker.check_loop_warning()
-            if unified_loop_warning and not stream_ctx.force_completion:
+            loop_warning_chunk = self._handle_loop_warning_with_handler(
+                stream_ctx, unified_loop_warning
+            )
+            if loop_warning_chunk:
                 logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
-                yield StreamChunk(
-                    content=f"\n[loop] ⚠ Warning: Approaching loop limit - {unified_loop_warning}\n"
-                )
-                # Inject system message to warn the model
-                self.add_message(
-                    "system",
-                    "WARNING: You are about to hit loop detection. You have been performing "
-                    "the same operation repeatedly (e.g., writing the same file, making the same call). "
-                    "Please do something DIFFERENT now:\n"
-                    "- If you're writing a file repeatedly, STOP and move to a different task\n"
-                    "- If you're stuck, provide your current progress and ask for clarification\n"
-                    "- If you've completed the task, provide a summary and finish\n\n"
-                    "Continuing the same operation will force the conversation to end.",
-                )
+                yield loop_warning_chunk
             else:
                 # PRIMARY: Check UnifiedTaskTracker for stop decision (single source of truth)
                 unified_should_force, unified_hint = self.unified_tracker.should_force_action()
@@ -5459,16 +5484,9 @@ class AgentOrchestrator:
                     tool_args = tool_call.get("arguments", {})
                     # Generate user-friendly status message with relevant context
                     status_msg = self._get_tool_status_message(tool_name, tool_args)
-                    # Emit structured tool_start event for CLI to format with arguments
-                    yield StreamChunk(
-                        content="",
-                        metadata={
-                            "tool_start": {
-                                "name": tool_name,
-                                "arguments": tool_args,
-                                "status_msg": status_msg,
-                            }
-                        },
+                    # Emit structured tool_start event using handler delegation (testable)
+                    yield self._generate_tool_start_chunk_with_handler(
+                        tool_name, tool_args, status_msg
                     )
 
                 tool_results = await self._handle_tool_calls(tool_calls)

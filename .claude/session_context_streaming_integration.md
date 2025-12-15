@@ -246,7 +246,7 @@ Wired handler method into orchestrator:
 All 96 streaming handler tests pass, 380 orchestrator tests pass (476 total).
 
 ### Session 8: Recovery Prompts Wiring into Orchestrator
-**Commit: (pending)**
+**Commit: c344a5d**
 
 Wired existing recovery handler methods into orchestrator:
 - Added `_get_recovery_prompts_with_handler()` delegation method
@@ -258,3 +258,22 @@ Wired existing recovery handler methods into orchestrator:
 - Fallback message uses handler's `get_recovery_fallback_message()` (testable)
 
 All 96 streaming handler tests pass, 380 orchestrator tests pass (476 total)
+
+### Session 9: Loop Warning and Tool Start Chunk Wiring
+**Commit: (pending)**
+
+Added handler methods for loop warning:
+- `get_loop_warning_chunks()` - Generates warning chunk and system message for loop detection
+- `handle_loop_warning()` - Main handler combining chunk generation and message addition
+
+Added 6 new tests in 2 test classes:
+- `TestLoopWarningChunks` (2 tests) - Warning chunk and message generation
+- `TestHandleLoopWarning` (4 tests) - Full loop warning handling
+
+Wired handler methods into orchestrator:
+- Added `_handle_loop_warning_with_handler()` delegation method
+- Added `_generate_tool_start_chunk_with_handler()` delegation method
+- Replaced inline loop warning logic (~15 lines) with handler call
+- Replaced inline tool start chunk generation (~10 lines) with handler call
+
+All 102 streaming handler tests pass, 380 orchestrator tests pass (482 total)

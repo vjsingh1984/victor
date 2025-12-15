@@ -1090,6 +1090,53 @@ class StreamingChatHandler:
 
         return chunks
 
+    def get_loop_warning_chunks(
+        self,
+        warning_message: str,
+    ) -> tuple[StreamChunk, str]:
+        """Get the warning chunk and system message for loop detection.
+
+        Args:
+            warning_message: The warning message from unified tracker
+
+        Returns:
+            Tuple of (warning_chunk, system_message)
+        """
+        warning_chunk = StreamChunk(
+            content=f"\n[loop] ⚠ Warning: Approaching loop limit - {warning_message}\n"
+        )
+        system_message = (
+            "WARNING: You are about to hit loop detection. You have been performing "
+            "the same operation repeatedly (e.g., writing the same file, making the same call). "
+            "Please do something DIFFERENT now:\n"
+            "- If you're writing a file repeatedly, STOP and move to a different task\n"
+            "- If you're stuck, provide your current progress and ask for clarification\n"
+            "- If you've completed the task, provide a summary and finish\n\n"
+            "Continuing the same operation will force the conversation to end."
+        )
+        return warning_chunk, system_message
+
+    def handle_loop_warning(
+        self,
+        ctx: StreamingChatContext,
+        warning_message: str,
+    ) -> Optional[StreamChunk]:
+        """Handle loop warning by generating warning chunk and adding system message.
+
+        Args:
+            ctx: The streaming context
+            warning_message: The warning message from unified tracker
+
+        Returns:
+            StreamChunk with warning if warning_message is set, None otherwise
+        """
+        if not warning_message or ctx.force_completion:
+            return None
+
+        warning_chunk, system_message = self.get_loop_warning_chunks(warning_message)
+        self.message_adder.add_message("system", system_message)
+        return warning_chunk
+
 
 def create_streaming_handler(
     settings: "Settings",

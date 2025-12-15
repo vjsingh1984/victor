@@ -1330,3 +1330,75 @@ class TestGenerateToolResultChunks:
 
         # 1 result + 2 edit previews (max_files=2)
         assert len(chunks) == 3
+
+
+class TestLoopWarningChunks:
+    """Tests for loop warning chunk generation."""
+
+    def test_generates_warning_chunk_and_message(self, handler):
+        """Generates both warning chunk and system message."""
+        warning_msg = "repeated tool call detected"
+
+        chunk, system_msg = handler.get_loop_warning_chunks(warning_msg)
+
+        assert chunk.content == f"\n[loop] ⚠ Warning: Approaching loop limit - {warning_msg}\n"
+        assert "WARNING" in system_msg
+        assert "loop detection" in system_msg
+        assert "DIFFERENT" in system_msg
+
+    def test_system_message_contains_guidance(self, handler):
+        """System message contains helpful guidance."""
+        warning_msg = "test warning"
+
+        _, system_msg = handler.get_loop_warning_chunks(warning_msg)
+
+        assert "writing a file repeatedly" in system_msg
+        assert "summary and finish" in system_msg
+        assert "force the conversation to end" in system_msg
+
+
+class TestHandleLoopWarning:
+    """Tests for handle_loop_warning method."""
+
+    def test_returns_chunk_when_warning_present(self, handler, mock_message_adder):
+        """Returns warning chunk when warning message is present."""
+        ctx = StreamingChatContext(user_message="test")
+        ctx.force_completion = False
+
+        chunk = handler.handle_loop_warning(ctx, "repeated pattern detected")
+
+        assert chunk is not None
+        assert "repeated pattern detected" in chunk.content
+        mock_message_adder.add_message.assert_called_once()
+        call_args = mock_message_adder.add_message.call_args
+        assert call_args[0][0] == "system"
+
+    def test_returns_none_when_no_warning(self, handler, mock_message_adder):
+        """Returns None when warning message is empty."""
+        ctx = StreamingChatContext(user_message="test")
+        ctx.force_completion = False
+
+        chunk = handler.handle_loop_warning(ctx, "")
+
+        assert chunk is None
+        mock_message_adder.add_message.assert_not_called()
+
+    def test_returns_none_when_force_completion_set(self, handler, mock_message_adder):
+        """Returns None when force_completion is already set."""
+        ctx = StreamingChatContext(user_message="test")
+        ctx.force_completion = True
+
+        chunk = handler.handle_loop_warning(ctx, "some warning")
+
+        assert chunk is None
+        mock_message_adder.add_message.assert_not_called()
+
+    def test_returns_none_when_none_warning(self, handler, mock_message_adder):
+        """Returns None when warning message is None."""
+        ctx = StreamingChatContext(user_message="test")
+        ctx.force_completion = False
+
+        chunk = handler.handle_loop_warning(ctx, None)
+
+        assert chunk is None
+        mock_message_adder.add_message.assert_not_called()
