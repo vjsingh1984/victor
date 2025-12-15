@@ -6703,6 +6703,10 @@ class AgentOrchestrator:
             tools: Set of tool names to enable
         """
         self._enabled_tools = tools
+        # Propagate to tool_selector for selection-time filtering
+        if hasattr(self, "tool_selector") and self.tool_selector:
+            self.tool_selector.set_enabled_tools(tools)
+            logger.info(f"Enabled tools filter propagated to selector: {sorted(tools)}")
 
     def is_tool_enabled(self, tool_name: str) -> bool:
         """Check if a specific tool is enabled (protocol method).

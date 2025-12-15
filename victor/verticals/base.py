@@ -325,6 +325,34 @@ class VerticalBase(ABC):
         return None
 
     @classmethod
+    def get_tiered_tools(cls) -> Optional[Any]:
+        """Get tiered tool configuration for intelligent selection.
+
+        Override to provide vertical-specific tiered tool configuration
+        for context-efficient tool selection. When implemented, this enables:
+
+        1. Mandatory tools: Always included (e.g., read, ls)
+        2. Vertical core: Always included for this vertical (e.g., web, fetch for research)
+        3. Semantic pool: Selected based on query similarity and stage
+
+        Example for research vertical:
+            return TieredToolConfig(
+                mandatory={"read", "ls"},
+                vertical_core={"web", "fetch"},
+                semantic_pool={"write", "edit", "grep", "search"},
+                stage_tools={
+                    "WRITING": {"write", "edit"},
+                    "SEARCHING": {"web", "fetch", "grep"},
+                },
+                readonly_only_for_analysis=True,
+            )
+
+        Returns:
+            TieredToolConfig or None (falls back to get_tools())
+        """
+        return None
+
+    @classmethod
     def get_workflow_provider(cls) -> Optional[Any]:
         """Get workflow provider for this vertical.
 

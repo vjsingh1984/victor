@@ -3,13 +3,14 @@
 Competitive positioning: ChatGPT Data Analysis, Claude Artifacts, Jupyter AI.
 """
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from victor.verticals.base import StageDefinition, VerticalBase, VerticalConfig
 from victor.verticals.protocols import (
     ModeConfigProviderProtocol,
     PromptContributorProtocol,
     SafetyExtensionProtocol,
+    TieredToolConfig,
     ToolDependencyProviderProtocol,
 )
 
@@ -26,22 +27,27 @@ class DataAnalysisAssistant(VerticalBase):
 
     @classmethod
     def get_tools(cls) -> List[str]:
-        """Get the list of tools for data analysis tasks."""
+        """Get the list of tools for data analysis tasks.
+
+        Uses canonical tool names from victor.tools.tool_names.
+        """
+        from victor.tools.tool_names import ToolNames
+
         return [
             # Core filesystem for data files
-            "read_file",
-            "write_file",
-            "edit_files",
-            "list_directory",
-            # Python execution for analysis
-            "bash",  # For running Python scripts
+            ToolNames.READ,      # read_file → read
+            ToolNames.WRITE,     # write_file → write
+            ToolNames.EDIT,      # edit_files → edit
+            ToolNames.LS,        # list_directory → ls
+            # Python/Shell execution for analysis
+            ToolNames.SHELL,     # bash → shell (for running Python scripts)
             # Code generation and search
-            "code_search",
-            "semantic_code_search",
-            "codebase_overview",
+            ToolNames.GREP,      # code_search → grep
+            ToolNames.SEARCH,    # semantic_code_search → search
+            ToolNames.OVERVIEW,  # codebase_overview → overview
             # Web for datasets and documentation
-            "web_search",
-            "web_fetch",
+            ToolNames.WEB,       # web_search → web
+            ToolNames.FETCH,     # web_fetch → fetch
         ]
 
     @classmethod
@@ -51,27 +57,16 @@ class DataAnalysisAssistant(VerticalBase):
 
     @classmethod
     def get_config(cls) -> VerticalConfig:
+        """Get the complete configuration for Data Analysis vertical.
+
+        Uses base class implementation with Data Analysis-specific customizations.
+        """
+        from victor.framework.tools import ToolSet
+
         return VerticalConfig(
-            name="data_analysis",
-            description="Data analysis assistant for exploration, statistics, and visualization",
-            tools=[
-                # Core filesystem for data files
-                "read_file",
-                "write_file",
-                "edit_files",
-                "list_directory",
-                # Python execution for analysis
-                "bash",  # For running Python scripts
-                # Code generation and search
-                "code_search",
-                "semantic_code_search",
-                "codebase_overview",
-                # Web for datasets and documentation
-                "web_search",
-                "web_fetch",
-            ],
-            stages=cls._get_stages(),
+            tools=ToolSet.from_tools(cls.get_tools()),
             system_prompt=cls._get_system_prompt(),
+            stages=cls._get_stages(),
             provider_hints={
                 "preferred_providers": ["anthropic", "openai"],
                 "min_context_window": 128000,  # Large context for data descriptions
@@ -85,60 +80,79 @@ class DataAnalysisAssistant(VerticalBase):
                 "data_privacy",
                 "methodology_transparency",
             ],
+            metadata={
+                "vertical_name": cls.name,
+                "vertical_version": cls.version,
+                "description": cls.description,
+            },
         )
 
     @classmethod
-    def _get_stages(cls) -> List[StageDefinition]:
-        return [
-            StageDefinition(
+    def _get_stages(cls) -> Dict[str, StageDefinition]:
+        """Get Data Analysis-specific stage definitions.
+
+        Uses canonical tool names from victor.tools.tool_names.
+        """
+        from victor.tools.tool_names import ToolNames
+
+        return {
+            "INITIAL": StageDefinition(
                 name="INITIAL",
                 description="Understanding the data and analysis goals",
-                allowed_tools=["read_file", "list_directory", "codebase_overview"],
-                next_stages=["DATA_LOADING", "EXPLORATION"],
+                tools={ToolNames.READ, ToolNames.LS, ToolNames.OVERVIEW},
+                keywords=["what", "data", "analyze", "understand", "explore"],
+                next_stages={"DATA_LOADING", "EXPLORATION"},
             ),
-            StageDefinition(
+            "DATA_LOADING": StageDefinition(
                 name="DATA_LOADING",
                 description="Loading and validating data files",
-                allowed_tools=["read_file", "bash", "write_file"],
-                next_stages=["EXPLORATION", "CLEANING"],
+                tools={ToolNames.READ, ToolNames.SHELL, ToolNames.WRITE},
+                keywords=["load", "import", "read", "open", "fetch"],
+                next_stages={"EXPLORATION", "CLEANING"},
             ),
-            StageDefinition(
+            "EXPLORATION": StageDefinition(
                 name="EXPLORATION",
                 description="Exploratory data analysis and profiling",
-                allowed_tools=["bash", "read_file", "write_file"],
-                next_stages=["CLEANING", "ANALYSIS"],
+                tools={ToolNames.SHELL, ToolNames.READ, ToolNames.WRITE},
+                keywords=["explore", "profile", "describe", "summary", "statistics"],
+                next_stages={"CLEANING", "ANALYSIS"},
             ),
-            StageDefinition(
+            "CLEANING": StageDefinition(
                 name="CLEANING",
                 description="Data cleaning and transformation",
-                allowed_tools=["bash", "write_file", "edit_files"],
-                next_stages=["ANALYSIS", "EXPLORATION"],
+                tools={ToolNames.SHELL, ToolNames.WRITE, ToolNames.EDIT},
+                keywords=["clean", "transform", "fix", "handle", "remove"],
+                next_stages={"ANALYSIS", "EXPLORATION"},
             ),
-            StageDefinition(
+            "ANALYSIS": StageDefinition(
                 name="ANALYSIS",
                 description="Statistical analysis and modeling",
-                allowed_tools=["bash", "write_file", "read_file"],
-                next_stages=["VISUALIZATION", "REPORTING"],
+                tools={ToolNames.SHELL, ToolNames.WRITE, ToolNames.READ},
+                keywords=["analyze", "model", "correlate", "test", "predict"],
+                next_stages={"VISUALIZATION", "REPORTING"},
             ),
-            StageDefinition(
+            "VISUALIZATION": StageDefinition(
                 name="VISUALIZATION",
                 description="Creating charts and visualizations",
-                allowed_tools=["bash", "write_file"],
-                next_stages=["REPORTING", "ANALYSIS"],
+                tools={ToolNames.SHELL, ToolNames.WRITE},
+                keywords=["plot", "chart", "visualize", "graph", "figure"],
+                next_stages={"REPORTING", "ANALYSIS"},
             ),
-            StageDefinition(
+            "REPORTING": StageDefinition(
                 name="REPORTING",
                 description="Generating insights and reports",
-                allowed_tools=["write_file", "edit_files", "read_file"],
-                next_stages=["COMPLETION"],
+                tools={ToolNames.WRITE, ToolNames.EDIT, ToolNames.READ},
+                keywords=["report", "summarize", "document", "present"],
+                next_stages={"COMPLETION"},
             ),
-            StageDefinition(
+            "COMPLETION": StageDefinition(
                 name="COMPLETION",
                 description="Finalizing analysis deliverables",
-                allowed_tools=["write_file", "read_file"],
-                next_stages=[],
+                tools={ToolNames.WRITE, ToolNames.READ},
+                keywords=["done", "complete", "finish", "final"],
+                next_stages=set(),
             ),
-        ]
+        }
 
     @classmethod
     def _get_system_prompt(cls) -> str:
@@ -207,3 +221,37 @@ When presenting analysis:
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
         from victor.verticals.data_analysis.tool_dependencies import DataAnalysisToolDependencyProvider
         return DataAnalysisToolDependencyProvider()
+
+    @classmethod
+    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
+        """Get tiered tool configuration for Data Analysis.
+
+        Simplified configuration using consolidated tool metadata:
+        - Mandatory: Core tools always included for any task
+        - Vertical Core: Essential tools for data analysis tasks
+        - semantic_pool: Derived from ToolMetadataRegistry.get_all_tool_names()
+        - stage_tools: Derived from @tool(stages=[...]) decorator metadata
+
+        Returns:
+            TieredToolConfig for Data Analysis vertical
+        """
+        from victor.tools.tool_names import ToolNames
+
+        return TieredToolConfig(
+            # Tier 1: Mandatory - always included for any task
+            mandatory={
+                ToolNames.READ,      # Read files - essential for data
+                ToolNames.LS,        # List directory - essential
+                ToolNames.GREP,      # Search code/data - essential
+            },
+            # Tier 2: Vertical Core - essential for data analysis tasks
+            vertical_core={
+                ToolNames.SHELL,     # Shell commands - core for running Python scripts
+                ToolNames.WRITE,     # Write files - core for saving results
+                ToolNames.OVERVIEW,  # Codebase overview - core for understanding
+            },
+            # semantic_pool and stage_tools are now derived from @tool decorator metadata
+            # Use get_effective_semantic_pool() and get_tools_for_stage_from_registry()
+            # Data analysis often involves exploratory work, allow write tools for analysis
+            readonly_only_for_analysis=False,
+        )

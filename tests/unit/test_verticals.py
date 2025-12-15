@@ -197,15 +197,14 @@ class TestResearchAssistant:
         """get_tools should return research-related tools."""
         tools = ResearchAssistant.get_tools()
         assert isinstance(tools, list)
-        # Research tools
-        assert "web_search" in tools
-        assert "web_fetch" in tools
-        # Reading tools (uses full tool names)
-        assert "read_file" in tools
+        # Research tools (using canonical names)
+        assert "web" in tools
+        assert "fetch" in tools
+        # Reading tools (using canonical names)
+        assert "read" in tools
         # Should NOT have many coding tools
         assert "git" not in tools
-        assert "git_status" not in tools
-        assert "bash" not in tools
+        assert "shell" not in tools
 
     def test_get_system_prompt(self):
         """get_system_prompt should return research-focused prompt."""
@@ -232,11 +231,9 @@ class TestResearchAssistant:
         # Research should have fewer tools
         assert len(research_tools) < len(coding_tools)
 
-        # Research should not have shell/git
+        # Research should not have shell/git (using canonical names)
         assert "shell" not in research_tools
-        assert "bash" not in research_tools
         assert "git" not in research_tools
-        assert "git_status" not in research_tools
 
     def test_customize_config(self):
         """customize_config should add research-specific metadata."""
@@ -421,9 +418,9 @@ class TestVerticalIntegration:
         coding_tools = CodingAssistant.get_tool_set()
         research_tools = ResearchAssistant.get_tool_set()
 
-        # Should be able to check membership
+        # Should be able to check membership (using canonical names)
         assert "read" in coding_tools
-        assert "web_search" in research_tools
+        assert "web" in research_tools
 
         # Should be able to get tool names
         coding_names = coding_tools.get_tool_names()

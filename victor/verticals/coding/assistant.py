@@ -39,6 +39,7 @@ from victor.verticals.protocols import (
     ToolDependencyProviderProtocol,
     WorkflowProviderProtocol,
     ServiceProviderProtocol,
+    TieredToolConfig,
     VerticalExtensions,
 )
 
@@ -397,6 +398,43 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         from victor.verticals.coding.service_provider import CodingServiceProvider
 
         return CodingServiceProvider()
+
+    @classmethod
+    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
+        """Get tiered tool configuration for coding.
+
+        Simplified configuration using consolidated tool metadata:
+        - Mandatory: Core tools always included for any task
+        - Vertical Core: Essential tools for coding tasks
+        - semantic_pool: Derived from ToolMetadataRegistry.get_all_tool_names()
+        - stage_tools: Derived from @tool(stages=[...]) decorator metadata
+
+        Returns:
+            TieredToolConfig for coding vertical
+        """
+        from victor.tools.tool_names import ToolNames
+
+        return TieredToolConfig(
+            # Tier 1: Mandatory - always included for any task
+            mandatory={
+                ToolNames.READ,      # Read files - essential
+                ToolNames.LS,        # List directory - essential
+                ToolNames.GREP,      # Code search - essential for finding code
+            },
+            # Tier 2: Vertical Core - essential for coding tasks
+            vertical_core={
+                ToolNames.EDIT,      # Edit files - core coding
+                ToolNames.WRITE,     # Write files - core coding
+                ToolNames.SHELL,     # Shell commands - core for build/test
+                ToolNames.GIT,       # Git operations - core for version control
+                ToolNames.SEARCH,    # Semantic search - core for code exploration
+                ToolNames.OVERVIEW,  # Codebase overview - core for understanding
+            },
+            # semantic_pool and stage_tools are now derived from @tool decorator metadata
+            # Use get_effective_semantic_pool() and get_tools_for_stage_from_registry()
+            # For analysis queries, don't hide write tools - coding often needs them
+            readonly_only_for_analysis=False,
+        )
 
     @classmethod
     def get_extensions(cls) -> VerticalExtensions:

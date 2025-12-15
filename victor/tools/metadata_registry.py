@@ -551,6 +551,11 @@ class ToolMetadataRegistry:
     def get(self, name: str) -> Optional[ToolMetadataEntry]:
         """Get metadata entry by name (canonical or alias).
 
+        Alias resolution order:
+        1. Check canonical name directly
+        2. Check @tool decorator aliases (from entry.aliases)
+        3. Check global TOOL_ALIASES registry (tool_names.py)
+
         Args:
             name: Tool name (canonical or alias)
 
@@ -560,10 +565,20 @@ class ToolMetadataRegistry:
         # Check canonical name first
         if name in self._entries:
             return self._entries[name]
-        # Check aliases
+
+        # Check decorator aliases (from entry.aliases)
         canonical = self._alias_map.get(name)
         if canonical:
             return self._entries.get(canonical)
+
+        # Fallback: Check global TOOL_ALIASES registry for backward compatibility
+        # This is the single source of truth for legacy name mappings
+        from victor.tools.tool_names import get_canonical_name
+
+        resolved = get_canonical_name(name)
+        if resolved != name and resolved in self._entries:
+            return self._entries.get(resolved)
+
         return None
 
     def get_by_priority(self, priority: Priority) -> List[ToolMetadataEntry]:
@@ -1161,6 +1176,42 @@ class ToolMetadataRegistry:
         """
         return set(self._by_keyword.keys())
 
+    def get_all_tool_names(self) -> Set[str]:
+        """Get all registered tool names.
+
+        Returns:
+            Set of all registered tool names (canonical names only)
+        """
+        return set(self._entries.keys())
+
+    def get_fallback_tools_for_category(self, category: str) -> Set[str]:
+        """Get fallback tools for a logical category.
+
+        Used when semantic selection returns empty results for a category.
+        Returns tools from the specified execution category.
+
+        Args:
+            category: Logical category name (e.g., "file_ops", "git_ops")
+
+        Returns:
+            Set of tool names that serve as fallback for this category
+        """
+        # Map logical categories to execution categories or tool categories
+        CATEGORY_TO_EXECUTION = {
+            "file_ops": ExecutionCategory.READ_ONLY,
+            "execution": ExecutionCategory.EXECUTE,
+            "generation": ExecutionCategory.WRITE,
+            "compute": ExecutionCategory.COMPUTE,
+        }
+
+        if category in CATEGORY_TO_EXECUTION:
+            return self._by_execution_category.get(
+                CATEGORY_TO_EXECUTION[category], set()
+            ).copy()
+
+        # Try direct category lookup
+        return self._by_category.get(category, set()).copy()
+
     def get_critical_tools(self) -> List[ToolMetadataEntry]:
         """Get all CRITICAL priority tools."""
         return self.get_by_priority(Priority.CRITICAL)
@@ -1315,8 +1366,22 @@ class ToolMetadataRegistry:
         return iter(self._entries.values())
 
     def __contains__(self, name: str) -> bool:
-        """Check if a tool name is registered."""
-        return name in self._entries or name in self._alias_map
+        """Check if a tool name is registered (supports aliases).
+
+        Checks:
+        1. Canonical names in registry
+        2. Decorator aliases (from @tool decorator)
+        3. Global TOOL_ALIASES (from tool_names.py)
+        """
+        if name in self._entries:
+            return True
+        if name in self._alias_map:
+            return True
+        # Check global TOOL_ALIASES
+        from victor.tools.tool_names import get_canonical_name
+
+        resolved = get_canonical_name(name)
+        return resolved != name and resolved in self._entries
 
     def summary(self) -> Dict[str, Any]:
         """Get summary statistics of registered tools.

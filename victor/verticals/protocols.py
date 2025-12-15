@@ -174,6 +174,129 @@ class ToolDependency:
     weight: float = 1.0
 
 
+@dataclass
+class TieredToolConfig:
+    """Tiered tool configuration for intelligent tool selection.
+
+    Implements a three-tier system:
+    1. Mandatory (always included): Essential tools for any task
+    2. Vertical Core (always included for this vertical): Domain-specific core tools
+    3. Semantic/Contextual (selected dynamically): Additional tools based on task
+
+    Each tier can specify read-only vs read-write tools to enable
+    intelligent filtering based on task intent (analysis vs modification).
+
+    Migration Note:
+        The `semantic_pool` and `stage_tools` fields are being deprecated in favor
+        of using @tool decorator metadata:
+        - `semantic_pool`: Will be derived from ToolMetadataRegistry.get_all_tool_names()
+          minus mandatory/vertical_core. Most tools should be candidates.
+        - `stage_tools`: Will be derived from @tool(stages=[...]) decorator metadata.
+          Use ToolMetadataRegistry.get_tools_by_stage() instead.
+
+        For new verticals, prefer specifying only mandatory+vertical_core and let
+        the system derive the rest from tool metadata.
+
+    Example:
+        # Preferred (new style)
+        TieredToolConfig(
+            mandatory={"read", "ls", "grep"},            # Essential for any task
+            vertical_core={"web", "fetch", "overview"},  # Research-specific core
+            readonly_only_for_analysis=True,             # Hide write tools for analysis
+        )
+
+        # Legacy (still supported)
+        TieredToolConfig(
+            mandatory={"read", "ls"},
+            vertical_core={"web", "fetch"},
+            semantic_pool={"write", "edit", "grep"},     # DEPRECATED: use decorator metadata
+            stage_tools={...},                           # DEPRECATED: use @tool(stages=[...])
+            readonly_only_for_analysis=True,
+        )
+
+    Attributes:
+        mandatory: Tools always included regardless of task type
+        vertical_core: Tools always included for this vertical
+        semantic_pool: DEPRECATED - Tools selected via semantic matching
+        stage_tools: DEPRECATED - Tools available at specific stages
+        readonly_only_for_analysis: If True, hide write/execute tools for analysis tasks
+    """
+
+    mandatory: Set[str] = field(default_factory=set)
+    vertical_core: Set[str] = field(default_factory=set)
+    semantic_pool: Set[str] = field(default_factory=set)  # DEPRECATED: derive from registry
+    stage_tools: Dict[str, Set[str]] = field(default_factory=dict)  # DEPRECATED: use @tool(stages=[])
+    readonly_only_for_analysis: bool = True
+
+    def get_base_tools(self) -> Set[str]:
+        """Get tools always included (mandatory + vertical core)."""
+        return self.mandatory | self.vertical_core
+
+    def get_all_tools(self) -> Set[str]:
+        """Get all tools in the configuration."""
+        all_tools = self.mandatory | self.vertical_core | self.semantic_pool
+        for stage_set in self.stage_tools.values():
+            all_tools |= stage_set
+        return all_tools
+
+    def get_tools_for_stage(self, stage: str) -> Set[str]:
+        """Get tools for a specific stage.
+
+        Args:
+            stage: Stage name (e.g., "INITIAL", "SEARCHING", "WRITING")
+
+        Returns:
+            Set of tool names for the stage (base + stage-specific)
+        """
+        base = self.get_base_tools()
+        stage_specific = self.stage_tools.get(stage, set())
+        return base | stage_specific
+
+    def get_semantic_pool_from_registry(self) -> Set[str]:
+        """Get semantic pool dynamically from ToolMetadataRegistry.
+
+        This method derives the semantic pool from all registered tools
+        minus the mandatory and vertical_core tools. Use this instead of
+        the static semantic_pool field for new implementations.
+
+        Returns:
+            Set of tool names for semantic selection
+        """
+        from victor.tools.metadata_registry import ToolMetadataRegistry
+
+        registry = ToolMetadataRegistry.get_instance()
+        all_tools = registry.get_all_tool_names()
+        # Semantic pool = all tools - base tools (mandatory + vertical_core)
+        base = self.get_base_tools()
+        return all_tools - base
+
+    def get_effective_semantic_pool(self) -> Set[str]:
+        """Get effective semantic pool, preferring registry over static.
+
+        Returns:
+            semantic_pool if explicitly set, otherwise derives from registry
+        """
+        if self.semantic_pool:
+            return self.semantic_pool
+        return self.get_semantic_pool_from_registry()
+
+    def get_tools_for_stage_from_registry(self, stage: str) -> Set[str]:
+        """Get tools for a stage using @tool decorator metadata.
+
+        Args:
+            stage: Stage name (e.g., "INITIAL", "READING", "EXECUTION")
+
+        Returns:
+            Base tools plus stage-specific tools from registry
+        """
+        from victor.tools.metadata_registry import ToolMetadataRegistry
+
+        registry = ToolMetadataRegistry.get_instance()
+        base = self.get_base_tools()
+        registry_stage_tools = registry.get_tools_by_stage(stage)
+        return base | registry_stage_tools
+
+
 # =============================================================================
 # Middleware Protocol
 # =============================================================================

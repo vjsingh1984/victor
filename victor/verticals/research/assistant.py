@@ -3,13 +3,14 @@
 Competitive positioning: Perplexity AI, Google Gemini Deep Research, ChatGPT Browse.
 """
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from victor.verticals.base import StageDefinition, VerticalBase, VerticalConfig
 from victor.verticals.protocols import (
     ModeConfigProviderProtocol,
     PromptContributorProtocol,
     SafetyExtensionProtocol,
+    TieredToolConfig,
     ToolDependencyProviderProtocol,
 )
 
@@ -26,20 +27,25 @@ class ResearchAssistant(VerticalBase):
 
     @classmethod
     def get_tools(cls) -> List[str]:
-        """Get the list of tools for research tasks."""
+        """Get the list of tools for research tasks.
+
+        Uses canonical tool names from victor.tools.tool_names.
+        """
+        from victor.tools.tool_names import ToolNames
+
         return [
             # Core research tools
-            "web_search",
-            "web_fetch",
+            ToolNames.WEB,  # web_search → web
+            ToolNames.FETCH,  # web_fetch → fetch
             # File operations for reading/writing reports
-            "read_file",
-            "write_file",
-            "edit_files",
-            "list_directory",
+            ToolNames.READ,  # read_file → read
+            ToolNames.WRITE,  # write_file → write
+            ToolNames.EDIT,  # edit_files → edit
+            ToolNames.LS,  # list_directory → ls
             # Code search for technical research
-            "code_search",
-            "semantic_code_search",
-            "codebase_overview",
+            ToolNames.GREP,  # code_search → grep
+            ToolNames.SEARCH,  # semantic_code_search → search
+            ToolNames.OVERVIEW,  # codebase_overview → overview
         ]
 
     @classmethod
@@ -76,47 +82,52 @@ class ResearchAssistant(VerticalBase):
 
     @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
-        """Get research-specific stage definitions."""
+        """Get research-specific stage definitions.
+
+        Uses canonical tool names from victor.tools.tool_names.
+        """
+        from victor.tools.tool_names import ToolNames
+
         return {
             "INITIAL": StageDefinition(
                 name="INITIAL",
                 description="Understanding the research question",
-                tools={"web_search", "read_file", "list_directory"},
+                tools={ToolNames.WEB, ToolNames.READ, ToolNames.LS},
                 keywords=["research", "find", "search", "look up"],
                 next_stages={"SEARCHING"},
             ),
             "SEARCHING": StageDefinition(
                 name="SEARCHING",
                 description="Gathering sources and information",
-                tools={"web_search", "web_fetch", "code_search"},
+                tools={ToolNames.WEB, ToolNames.FETCH, ToolNames.GREP},
                 keywords=["search", "find", "gather", "discover"],
                 next_stages={"READING", "SEARCHING"},
             ),
             "READING": StageDefinition(
                 name="READING",
                 description="Deep reading and extraction from sources",
-                tools={"web_fetch", "read_file", "semantic_code_search"},
+                tools={ToolNames.FETCH, ToolNames.READ, ToolNames.SEARCH},
                 keywords=["read", "extract", "analyze", "understand"],
                 next_stages={"SYNTHESIZING", "SEARCHING"},
             ),
             "SYNTHESIZING": StageDefinition(
                 name="SYNTHESIZING",
                 description="Combining and analyzing information",
-                tools={"read_file", "codebase_overview"},
+                tools={ToolNames.READ, ToolNames.OVERVIEW},
                 keywords=["combine", "synthesize", "integrate", "compare"],
                 next_stages={"WRITING", "READING"},
             ),
             "WRITING": StageDefinition(
                 name="WRITING",
                 description="Producing the research output",
-                tools={"write_file", "edit_files"},
+                tools={ToolNames.WRITE, ToolNames.EDIT},
                 keywords=["write", "document", "report", "summarize"],
                 next_stages={"VERIFICATION", "SYNTHESIZING"},
             ),
             "VERIFICATION": StageDefinition(
                 name="VERIFICATION",
                 description="Fact-checking and source verification",
-                tools={"web_search", "web_fetch"},
+                tools={ToolNames.WEB, ToolNames.FETCH},
                 keywords=["verify", "check", "confirm", "validate"],
                 next_stages={"COMPLETION", "WRITING"},
             ),
@@ -185,3 +196,37 @@ class ResearchAssistant(VerticalBase):
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
         from victor.verticals.research.tool_dependencies import ResearchToolDependencyProvider
         return ResearchToolDependencyProvider()
+
+    @classmethod
+    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
+        """Get tiered tool configuration for research.
+
+        Simplified configuration using consolidated tool metadata:
+        - Mandatory: Core tools always included for any task
+        - Vertical Core: Essential tools for research tasks
+        - semantic_pool: Derived from ToolMetadataRegistry.get_all_tool_names()
+        - stage_tools: Derived from @tool(stages=[...]) decorator metadata
+
+        Returns:
+            TieredToolConfig for research vertical
+        """
+        from victor.tools.tool_names import ToolNames
+
+        return TieredToolConfig(
+            # Tier 1: Mandatory - always included for any task
+            mandatory={
+                ToolNames.READ,  # Read files - essential
+                ToolNames.LS,    # List directory - essential
+                ToolNames.GREP,  # Search - essential for research
+            },
+            # Tier 2: Vertical Core - essential for research tasks
+            vertical_core={
+                ToolNames.WEB,       # Web search is core to research
+                ToolNames.FETCH,     # Fetching content is core to research
+                ToolNames.OVERVIEW,  # Codebase overview - core for understanding
+            },
+            # semantic_pool and stage_tools are now derived from @tool decorator metadata
+            # Use get_effective_semantic_pool() and get_tools_for_stage_from_registry()
+            # Research can benefit from readonly_only_for_analysis since it's primarily reading
+            readonly_only_for_analysis=True,
+        )

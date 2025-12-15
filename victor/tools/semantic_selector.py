@@ -472,9 +472,10 @@ class SemanticToolSelector:
         except Exception as e:
             logger.warning(f"Failed to save embedding cache: {e}")
 
-    # Category alias mappings: maps semantic category names to registry categories
+    # DEPRECATED: Category alias mappings (migrate to @tool(execution_category=...) metadata)
     # This enables using logical names (file_ops, git_ops) that map to
     # auto-generated metadata categories (filesystem, git, etc.)
+    # TODO: Remove once all tools have proper execution_category in @tool decorator
     CATEGORY_ALIASES = {
         "file_ops": ["filesystem", "code"],
         "git_ops": ["git", "merge"],
@@ -491,8 +492,9 @@ class SemanticToolSelector:
         "audit": ["audit"],
     }
 
-    # Fallback tools for each logical category (used when registry has no matches)
-    # These are deprecated and will be removed once all tools have proper metadata
+    # DEPRECATED: Fallback tools for each logical category
+    # Migrate to ToolMetadataRegistry.get_fallback_tools_for_category() instead.
+    # These will be removed once all tools have proper metadata in @tool decorator.
     # NOTE: Uses canonical short names for token efficiency
     FALLBACK_CATEGORY_TOOLS = {
         "file_ops": ["read", "write", "edit", "ls"],
@@ -535,7 +537,11 @@ class SemanticToolSelector:
         # Fallback to hardcoded list (deprecated)
         return self.FALLBACK_CATEGORY_TOOLS.get(logical_category, [])
 
-    # Mandatory tools for specific keywords (Phase 1)
+    # DEPRECATED: Mandatory tools for specific keywords
+    # Migrate to @tool(mandatory_keywords=["diff", "show changes"]) decorator metadata.
+    # Use ToolMetadataRegistry.get_tools_matching_mandatory_keywords() for primary lookup.
+    # This static dict is used as fallback for tools not yet migrated.
+    # TODO: Remove once all tools have mandatory_keywords in @tool decorator
     # NOTE: Uses canonical short names for token efficiency
     MANDATORY_TOOL_KEYWORDS = {
         "diff": ["shell"],
@@ -1734,7 +1740,10 @@ class SemanticToolSelector:
     # Classification-Aware Tool Selection (UnifiedTaskClassifier Integration)
     # ========================================================================
 
-    # Task type to logical category mapping
+    # DEPRECATED: Task type to logical category mapping
+    # Migrate to @tool(task_types=["analysis", "action"]) decorator metadata.
+    # Use ToolMetadataRegistry.get_tools_by_task_type() for primary lookup.
+    # TODO: Remove once all tools have task_types in @tool decorator
     TASK_TYPE_CATEGORIES = {
         "analysis": ["analysis", "code_intel", "file_ops"],
         "action": ["execution", "git_ops", "file_ops"],
@@ -1744,7 +1753,11 @@ class SemanticToolSelector:
         "default": ["file_ops", "execution"],
     }
 
-    # Tools to exclude based on negated keywords
+    # DEPRECATED: Tools to exclude based on negated keywords
+    # This mapping is used for negation detection to exclude irrelevant tools.
+    # Migrate to @tool(keywords=["analyze", "review"]) decorator metadata.
+    # The negation logic will use ToolMetadataRegistry.get_tools_by_keywords() instead.
+    # TODO: Remove once negation uses registry-based keyword lookup
     # NOTE: Uses canonical short names for token efficiency
     KEYWORD_TOOL_MAPPING = {
         "analyze": ["docs_coverage", "metrics", "review"],

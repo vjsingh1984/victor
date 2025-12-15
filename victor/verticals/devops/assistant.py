@@ -3,13 +3,14 @@
 Competitive positioning: Docker Desktop AI, Terraform Assistant, Pulumi AI, K8s GPT.
 """
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.verticals.base import StageDefinition, VerticalBase, VerticalConfig
 from victor.verticals.protocols import (
     ModeConfigProviderProtocol,
     PromptContributorProtocol,
     SafetyExtensionProtocol,
+    TieredToolConfig,
     ToolDependencyProviderProtocol,
 )
 
@@ -26,26 +27,29 @@ class DevOpsAssistant(VerticalBase):
 
     @classmethod
     def get_tools(cls) -> List[str]:
-        """Get the list of tools for DevOps tasks."""
+        """Get the list of tools for DevOps tasks.
+
+        Uses canonical tool names from victor.tools.tool_names.
+        """
+        from victor.tools.tool_names import ToolNames
+
         return [
             # Core filesystem
-            "read_file",
-            "write_file",
-            "edit_files",
-            "list_directory",
+            ToolNames.READ,      # read_file → read
+            ToolNames.WRITE,     # write_file → write
+            ToolNames.EDIT,      # edit_files → edit
+            ToolNames.LS,        # list_directory → ls
             # Shell for infrastructure commands
-            "bash",
+            ToolNames.SHELL,     # bash → shell
             # Git for version control
-            "git_status",
-            "git_diff",
-            "git_commit",
+            ToolNames.GIT,       # Git operations
             # Code search for configurations
-            "code_search",
-            "semantic_code_search",
-            "codebase_overview",
+            ToolNames.GREP,      # code_search → grep
+            ToolNames.SEARCH,    # semantic_code_search → search
+            ToolNames.OVERVIEW,  # codebase_overview → overview
             # Web for documentation
-            "web_search",
-            "web_fetch",
+            ToolNames.WEB,       # web_search → web
+            ToolNames.FETCH,     # web_fetch → fetch
         ]
 
     @classmethod
@@ -55,31 +59,16 @@ class DevOpsAssistant(VerticalBase):
 
     @classmethod
     def get_config(cls) -> VerticalConfig:
+        """Get the complete configuration for DevOps vertical.
+
+        Uses base class implementation with DevOps-specific customizations.
+        """
+        from victor.framework.tools import ToolSet
+
         return VerticalConfig(
-            name="devops",
-            description="DevOps assistant for infrastructure and deployment automation",
-            tools=[
-                # Core filesystem
-                "read_file",
-                "write_file",
-                "edit_files",
-                "list_directory",
-                # Shell for infrastructure commands
-                "bash",
-                # Git for version control
-                "git_status",
-                "git_diff",
-                "git_commit",
-                # Code search for configurations
-                "code_search",
-                "semantic_code_search",
-                "codebase_overview",
-                # Web for documentation
-                "web_search",
-                "web_fetch",
-            ],
-            stages=cls._get_stages(),
+            tools=ToolSet.from_tools(cls.get_tools()),
             system_prompt=cls._get_system_prompt(),
+            stages=cls._get_stages(),
             provider_hints={
                 "preferred_providers": ["anthropic", "openai"],
                 "min_context_window": 100000,
@@ -95,60 +84,79 @@ class DevOpsAssistant(VerticalBase):
                 "disaster_recovery",
                 "monitoring_coverage",
             ],
+            metadata={
+                "vertical_name": cls.name,
+                "vertical_version": cls.version,
+                "description": cls.description,
+            },
         )
 
     @classmethod
-    def _get_stages(cls) -> List[StageDefinition]:
-        return [
-            StageDefinition(
+    def _get_stages(cls) -> Dict[str, StageDefinition]:
+        """Get DevOps-specific stage definitions.
+
+        Uses canonical tool names from victor.tools.tool_names.
+        """
+        from victor.tools.tool_names import ToolNames
+
+        return {
+            "INITIAL": StageDefinition(
                 name="INITIAL",
                 description="Understanding the infrastructure request",
-                allowed_tools=["read_file", "list_directory", "codebase_overview"],
-                next_stages=["ASSESSMENT", "PLANNING"],
+                tools={ToolNames.READ, ToolNames.LS, ToolNames.OVERVIEW},
+                keywords=["what", "how", "explain", "infrastructure", "setup"],
+                next_stages={"ASSESSMENT", "PLANNING"},
             ),
-            StageDefinition(
+            "ASSESSMENT": StageDefinition(
                 name="ASSESSMENT",
                 description="Assessing current infrastructure state",
-                allowed_tools=["read_file", "bash", "code_search", "git_status"],
-                next_stages=["PLANNING", "IMPLEMENTATION"],
+                tools={ToolNames.READ, ToolNames.SHELL, ToolNames.GREP, ToolNames.GIT},
+                keywords=["check", "status", "current", "existing", "review"],
+                next_stages={"PLANNING", "IMPLEMENTATION"},
             ),
-            StageDefinition(
+            "PLANNING": StageDefinition(
                 name="PLANNING",
                 description="Planning infrastructure changes",
-                allowed_tools=["read_file", "code_search", "web_search", "web_fetch"],
-                next_stages=["IMPLEMENTATION"],
+                tools={ToolNames.READ, ToolNames.GREP, ToolNames.WEB, ToolNames.FETCH},
+                keywords=["plan", "design", "architecture", "strategy"],
+                next_stages={"IMPLEMENTATION"},
             ),
-            StageDefinition(
+            "IMPLEMENTATION": StageDefinition(
                 name="IMPLEMENTATION",
                 description="Implementing infrastructure changes",
-                allowed_tools=["write_file", "edit_files", "bash"],
-                next_stages=["VALIDATION", "DEPLOYMENT"],
+                tools={ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL, ToolNames.DOCKER},
+                keywords=["create", "build", "configure", "implement", "deploy"],
+                next_stages={"VALIDATION", "DEPLOYMENT"},
             ),
-            StageDefinition(
+            "VALIDATION": StageDefinition(
                 name="VALIDATION",
                 description="Validating configurations and testing",
-                allowed_tools=["bash", "read_file"],
-                next_stages=["DEPLOYMENT", "IMPLEMENTATION"],
+                tools={ToolNames.SHELL, ToolNames.READ, ToolNames.TEST},
+                keywords=["test", "validate", "verify", "check"],
+                next_stages={"DEPLOYMENT", "IMPLEMENTATION"},
             ),
-            StageDefinition(
+            "DEPLOYMENT": StageDefinition(
                 name="DEPLOYMENT",
                 description="Deploying to target environment",
-                allowed_tools=["bash", "git_commit", "git_status"],
-                next_stages=["MONITORING", "COMPLETION"],
+                tools={ToolNames.SHELL, ToolNames.GIT, ToolNames.DOCKER},
+                keywords=["deploy", "push", "release", "launch"],
+                next_stages={"MONITORING", "COMPLETION"},
             ),
-            StageDefinition(
+            "MONITORING": StageDefinition(
                 name="MONITORING",
                 description="Setting up monitoring and observability",
-                allowed_tools=["write_file", "edit_files", "bash"],
-                next_stages=["COMPLETION"],
+                tools={ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL},
+                keywords=["monitor", "observe", "alert", "metrics"],
+                next_stages={"COMPLETION"},
             ),
-            StageDefinition(
+            "COMPLETION": StageDefinition(
                 name="COMPLETION",
                 description="Documenting and finalizing",
-                allowed_tools=["write_file", "git_commit"],
-                next_stages=[],
+                tools={ToolNames.WRITE, ToolNames.GIT},
+                keywords=["done", "complete", "document", "finish"],
+                next_stages=set(),
             ),
-        ]
+        }
 
     @classmethod
     def _get_system_prompt(cls) -> str:
@@ -215,3 +223,38 @@ When creating configurations:
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
         from victor.verticals.devops.tool_dependencies import DevOpsToolDependencyProvider
         return DevOpsToolDependencyProvider()
+
+    @classmethod
+    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
+        """Get tiered tool configuration for DevOps.
+
+        Simplified configuration using consolidated tool metadata:
+        - Mandatory: Core tools always included for any task
+        - Vertical Core: Essential tools for DevOps tasks
+        - semantic_pool: Derived from ToolMetadataRegistry.get_all_tool_names()
+        - stage_tools: Derived from @tool(stages=[...]) decorator metadata
+
+        Returns:
+            TieredToolConfig for DevOps vertical
+        """
+        from victor.tools.tool_names import ToolNames
+
+        return TieredToolConfig(
+            # Tier 1: Mandatory - always included for any task
+            mandatory={
+                ToolNames.READ,      # Read files - essential
+                ToolNames.LS,        # List directory - essential
+                ToolNames.GREP,      # Search code/configs - essential for DevOps
+            },
+            # Tier 2: Vertical Core - essential for DevOps tasks
+            vertical_core={
+                ToolNames.SHELL,     # Shell commands - core for infrastructure
+                ToolNames.GIT,       # Git operations - core for version control
+                ToolNames.DOCKER,    # Docker - core for containers
+                ToolNames.OVERVIEW,  # Codebase overview - core for understanding
+            },
+            # semantic_pool and stage_tools are now derived from @tool decorator metadata
+            # Use get_effective_semantic_pool() and get_tools_for_stage_from_registry()
+            # DevOps often needs write/execute tools even for analysis queries
+            readonly_only_for_analysis=False,
+        )
