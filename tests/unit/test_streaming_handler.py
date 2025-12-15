@@ -1538,6 +1538,72 @@ class TestGenerateContentChunk:
         assert chunk.is_final is True
 
 
+class TestCheckForceAction:
+    """Tests for check_force_action method."""
+
+    def test_triggers_force_completion_when_checker_returns_true(self, handler, basic_context):
+        """Sets force_completion when force checker returns True."""
+        assert basic_context.force_completion is False
+
+        def force_checker():
+            return True, "Budget exhausted"
+
+        was_triggered, hint = handler.check_force_action(basic_context, force_checker)
+
+        assert was_triggered is True
+        assert hint == "Budget exhausted"
+        assert basic_context.force_completion is True
+
+    def test_does_not_trigger_when_checker_returns_false(self, handler, basic_context):
+        """Does not set force_completion when force checker returns False."""
+        assert basic_context.force_completion is False
+
+        def force_checker():
+            return False, None
+
+        was_triggered, hint = handler.check_force_action(basic_context, force_checker)
+
+        assert was_triggered is False
+        assert hint is None
+        assert basic_context.force_completion is False
+
+    def test_does_not_trigger_when_already_forced(self, handler, basic_context):
+        """Does not re-trigger when force_completion is already True."""
+        basic_context.force_completion = True
+
+        def force_checker():
+            return True, "Should not trigger again"
+
+        was_triggered, hint = handler.check_force_action(basic_context, force_checker)
+
+        assert was_triggered is False
+        assert hint is None
+        # Still True from before
+        assert basic_context.force_completion is True
+
+    def test_returns_hint_from_checker(self, handler, basic_context):
+        """Returns the hint string from force checker."""
+
+        def force_checker():
+            return True, "Max iterations reached"
+
+        was_triggered, hint = handler.check_force_action(basic_context, force_checker)
+
+        assert hint == "Max iterations reached"
+
+    def test_handles_none_hint(self, handler, basic_context):
+        """Handles None hint from force checker gracefully."""
+
+        def force_checker():
+            return True, None
+
+        was_triggered, hint = handler.check_force_action(basic_context, force_checker)
+
+        assert was_triggered is True
+        assert hint is None
+        assert basic_context.force_completion is True
+
+
 class TestFilterBlockedToolCalls:
     """Tests for filter_blocked_tool_calls method."""
 

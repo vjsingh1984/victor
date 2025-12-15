@@ -465,6 +465,34 @@ class StreamingChatHandler:
 
         return filtered_tool_calls, blocked_chunks, blocked_count
 
+    def check_force_action(
+        self,
+        ctx: StreamingChatContext,
+        force_checker: Callable[[], Tuple[bool, Optional[str]]],
+    ) -> Tuple[bool, Optional[str]]:
+        """Check if action should be forced and update context accordingly.
+
+        This method delegates to a force_checker function that determines
+        whether to force action, then updates the context if needed.
+
+        Args:
+            ctx: The streaming context
+            force_checker: Function that returns (should_force, hint_string)
+
+        Returns:
+            Tuple of (was_triggered, hint):
+            - was_triggered: True if force_completion was newly set
+            - hint: The hint string from the force_checker if triggered
+        """
+        should_force, hint = force_checker()
+
+        if should_force and not ctx.force_completion:
+            ctx.force_completion = True
+            logger.info(f"Force action triggered: {hint}")
+            return True, hint
+
+        return False, None
+
     def check_blocked_threshold(
         self,
         ctx: StreamingChatContext,

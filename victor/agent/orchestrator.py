@@ -4333,6 +4333,27 @@ class AgentOrchestrator:
             self.unified_tracker.is_blocked_after_warning,
         )
 
+    def _check_force_action_with_handler(
+        self,
+        stream_ctx: StreamingChatContext,
+    ) -> Tuple[bool, Optional[str]]:
+        """Check if force action should be triggered using the streaming handler.
+
+        Uses unified_tracker.should_force_action as the force checker.
+
+        Args:
+            stream_ctx: The streaming context
+
+        Returns:
+            Tuple of (was_triggered, hint):
+            - was_triggered: True if force_completion was newly set
+            - hint: The hint string if triggered
+        """
+        return self._streaming_handler.check_force_action(
+            stream_ctx,
+            self.unified_tracker.should_force_action,
+        )
+
     def _handle_force_tool_execution_with_handler(
         self,
         stream_ctx: StreamingChatContext,
@@ -5270,12 +5291,11 @@ class AgentOrchestrator:
                 logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
                 yield loop_warning_chunk
             else:
-                # PRIMARY: Check UnifiedTaskTracker for stop decision (single source of truth)
-                unified_should_force, unified_hint = self.unified_tracker.should_force_action()
-                if unified_should_force and not stream_ctx.force_completion:
-                    stream_ctx.force_completion = True
+                # PRIMARY: Check UnifiedTaskTracker for stop decision using handler delegation
+                was_triggered, hint = self._check_force_action_with_handler(stream_ctx)
+                if was_triggered:
                     logger.info(
-                        f"UnifiedTaskTracker forcing action: {unified_hint}, "
+                        f"UnifiedTaskTracker forcing action: {hint}, "
                         f"metrics={self.unified_tracker.get_metrics()}"
                     )
 
