@@ -4311,6 +4311,28 @@ class AgentOrchestrator:
             return (chunk, result.clear_tool_calls)
         return None
 
+    def _filter_blocked_tool_calls_with_handler(
+        self,
+        stream_ctx: StreamingChatContext,
+        tool_calls: List[Dict[str, Any]],
+    ) -> Tuple[List[Dict[str, Any]], List[StreamChunk], int]:
+        """Filter blocked tool calls using the streaming handler.
+
+        Uses unified_tracker.is_blocked_after_warning as the block checker.
+
+        Args:
+            stream_ctx: The streaming context
+            tool_calls: List of tool calls to filter
+
+        Returns:
+            Tuple of (filtered_tool_calls, blocked_chunks, blocked_count)
+        """
+        return self._streaming_handler.filter_blocked_tool_calls(
+            stream_ctx,
+            tool_calls,
+            self.unified_tracker.is_blocked_after_warning,
+        )
+
     def _handle_force_tool_execution_with_handler(
         self,
         stream_ctx: StreamingChatContext,
@@ -5526,23 +5548,12 @@ class AgentOrchestrator:
                 tool_calls = self._truncate_tool_calls_with_handler(tool_calls or [], stream_ctx)
 
                 # Filter out tool calls that are blocked after loop warning
-                # After warning, the same signature cannot be attempted again
-                # Uses handler delegation for testable blocked tool processing
-                filtered_tool_calls = []
-                blocked_count = 0
-                for tc in tool_calls:
-                    tc_name = tc.get("name", "")
-                    tc_args = tc.get("arguments", {})
-                    block_reason = self.unified_tracker.is_blocked_after_warning(tc_name, tc_args)
-                    if block_reason:
-                        # Use handler to process blocked tool (records and adds feedback)
-                        chunk = self._handle_blocked_tool_with_handler(
-                            stream_ctx, tc_name, tc_args, block_reason
-                        )
-                        yield chunk
-                        blocked_count += 1
-                    else:
-                        filtered_tool_calls.append(tc)
+                # Uses handler delegation for testable blocked tool filtering
+                filtered_tool_calls, blocked_chunks, blocked_count = (
+                    self._filter_blocked_tool_calls_with_handler(stream_ctx, tool_calls)
+                )
+                for chunk in blocked_chunks:
+                    yield chunk
 
                 # Initialize variables that may not be set if no tool calls
                 tool_name = None

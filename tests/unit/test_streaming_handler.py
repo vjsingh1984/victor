@@ -1536,3 +1536,132 @@ class TestGenerateContentChunk:
 
         assert chunk.content == "Final answer\n\n"
         assert chunk.is_final is True
+
+
+class TestFilterBlockedToolCalls:
+    """Tests for filter_blocked_tool_calls method."""
+
+    def test_no_blocked_tools_returns_all(self, handler, basic_context):
+        """Returns all tools when none are blocked."""
+        tool_calls = [
+            {"name": "read_file", "arguments": {"path": "/test.txt"}},
+            {"name": "write_file", "arguments": {"path": "/out.txt", "content": "hello"}},
+        ]
+
+        # Block checker that blocks nothing
+        def block_checker(name, args):
+            return None
+
+        filtered, blocked_chunks, count = handler.filter_blocked_tool_calls(
+            basic_context, tool_calls, block_checker
+        )
+
+        assert filtered == tool_calls
+        assert blocked_chunks == []
+        assert count == 0
+
+    def test_all_blocked_returns_empty(self, handler, basic_context):
+        """Returns empty list when all tools are blocked."""
+        tool_calls = [
+            {"name": "read_file", "arguments": {"path": "/test.txt"}},
+            {"name": "write_file", "arguments": {"path": "/out.txt", "content": "hello"}},
+        ]
+
+        # Block checker that blocks everything
+        def block_checker(name, args):
+            return f"Tool {name} is blocked"
+
+        filtered, blocked_chunks, count = handler.filter_blocked_tool_calls(
+            basic_context, tool_calls, block_checker
+        )
+
+        assert filtered == []
+        assert len(blocked_chunks) == 2
+        assert count == 2
+
+    def test_partial_blocking(self, handler, basic_context):
+        """Returns only non-blocked tools when some are blocked."""
+        tool_calls = [
+            {"name": "read_file", "arguments": {"path": "/test.txt"}},
+            {"name": "write_file", "arguments": {"path": "/out.txt", "content": "hello"}},
+            {"name": "list_dir", "arguments": {"path": "/"}},
+        ]
+
+        # Block only write_file
+        def block_checker(name, args):
+            if name == "write_file":
+                return "Write blocked for testing"
+            return None
+
+        filtered, blocked_chunks, count = handler.filter_blocked_tool_calls(
+            basic_context, tool_calls, block_checker
+        )
+
+        assert len(filtered) == 2
+        assert filtered[0]["name"] == "read_file"
+        assert filtered[1]["name"] == "list_dir"
+        assert len(blocked_chunks) == 1
+        assert count == 1
+
+    def test_blocked_chunk_content(self, handler, basic_context):
+        """Blocked chunks contain expected content."""
+        tool_calls = [
+            {"name": "dangerous_tool", "arguments": {"target": "system"}},
+        ]
+
+        def block_checker(name, args):
+            return "This is dangerous"
+
+        filtered, blocked_chunks, count = handler.filter_blocked_tool_calls(
+            basic_context, tool_calls, block_checker
+        )
+
+        assert len(blocked_chunks) == 1
+        assert "This is dangerous" in blocked_chunks[0].content
+
+    def test_records_blocked_count_in_context(self, handler, basic_context):
+        """Records blocked tool count in context."""
+        initial_blocked = basic_context.total_blocked_attempts
+        tool_calls = [
+            {"name": "tool1", "arguments": {}},
+            {"name": "tool2", "arguments": {}},
+        ]
+
+        def block_checker(name, args):
+            return "blocked"
+
+        handler.filter_blocked_tool_calls(basic_context, tool_calls, block_checker)
+
+        # handle_blocked_tool_call calls ctx.record_tool_blocked() for each
+        assert basic_context.total_blocked_attempts == initial_blocked + 2
+
+    def test_empty_tool_calls_list(self, handler, basic_context):
+        """Handles empty tool_calls list gracefully."""
+
+        def block_checker(name, args):
+            return None
+
+        filtered, blocked_chunks, count = handler.filter_blocked_tool_calls(
+            basic_context, [], block_checker
+        )
+
+        assert filtered == []
+        assert blocked_chunks == []
+        assert count == 0
+
+    def test_block_checker_receives_correct_args(self, handler, basic_context):
+        """Block checker receives tool name and arguments correctly."""
+        received_calls = []
+        tool_calls = [
+            {"name": "my_tool", "arguments": {"key": "value", "num": 42}},
+        ]
+
+        def block_checker(name, args):
+            received_calls.append((name, args))
+            return None
+
+        handler.filter_blocked_tool_calls(basic_context, tool_calls, block_checker)
+
+        assert len(received_calls) == 1
+        assert received_calls[0][0] == "my_tool"
+        assert received_calls[0][1] == {"key": "value", "num": 42}

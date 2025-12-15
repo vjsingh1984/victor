@@ -20,7 +20,7 @@ for better testability and separation of concerns.
 
 import logging
 import time
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, TYPE_CHECKING
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, Tuple, TYPE_CHECKING
 
 from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.streaming.iteration import (
@@ -418,6 +418,52 @@ class StreamingChatHandler:
         )
 
         return StreamChunk(content=f"\n[loop] ⛔ {block_reason}\n")
+
+    def filter_blocked_tool_calls(
+        self,
+        ctx: StreamingChatContext,
+        tool_calls: List[Dict[str, Any]],
+        block_checker: Callable[[str, Dict[str, Any]], Optional[str]],
+    ) -> Tuple[List[Dict[str, Any]], List[StreamChunk], int]:
+        """Filter out blocked tool calls and generate notification chunks.
+
+        This method iterates through tool calls, checks each one against the
+        block_checker function, and separates them into allowed and blocked.
+        For blocked calls, it generates notification chunks using
+        handle_blocked_tool_call.
+
+        Args:
+            ctx: The streaming context
+            tool_calls: List of tool call dicts with 'name' and 'arguments'
+            block_checker: Function that takes (tool_name, tool_args) and returns
+                          block_reason string if blocked, None if allowed
+
+        Returns:
+            Tuple of:
+            - filtered_tool_calls: List of tool calls that are NOT blocked
+            - blocked_chunks: List of StreamChunk notifications for blocked tools
+            - blocked_count: Number of tools that were blocked
+        """
+        filtered_tool_calls = []
+        blocked_chunks = []
+        blocked_count = 0
+
+        for tc in tool_calls:
+            tc_name = tc.get("name", "")
+            tc_args = tc.get("arguments", {})
+            block_reason = block_checker(tc_name, tc_args)
+
+            if block_reason:
+                # Use existing handler method to process blocked tool
+                chunk = self.handle_blocked_tool_call(
+                    ctx, tc_name, tc_args, block_reason
+                )
+                blocked_chunks.append(chunk)
+                blocked_count += 1
+            else:
+                filtered_tool_calls.append(tc)
+
+        return filtered_tool_calls, blocked_chunks, blocked_count
 
     def check_blocked_threshold(
         self,
