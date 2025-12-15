@@ -23,8 +23,9 @@ domains. Each vertical defines:
 
 Available Verticals:
 - CodingAssistant: Software development (current Victor default)
-- ResearchAssistant: Web research and document analysis
-- DevOpsAssistant: Infrastructure and deployment (template)
+- ResearchAssistant: Web research and document analysis (Perplexity AI competitor)
+- DevOpsAssistant: Infrastructure and deployment (Docker Desktop AI competitor)
+- DataAnalysisAssistant: Data exploration and ML (ChatGPT Data Analysis competitor)
 
 Architecture:
     Uses the Template Method pattern - VerticalBase defines the skeleton,
@@ -49,6 +50,7 @@ from victor.verticals.base import (
 from victor.verticals.coding import CodingAssistant
 from victor.verticals.devops import DevOpsAssistant
 from victor.verticals.research import ResearchAssistant
+from victor.verticals.data_analysis import DataAnalysisAssistant
 
 __all__ = [
     # Base classes
@@ -60,6 +62,7 @@ __all__ = [
     "CodingAssistant",
     "DevOpsAssistant",
     "ResearchAssistant",
+    "DataAnalysisAssistant",
     # Helper functions
     "get_vertical",
     "list_verticals",
@@ -116,5 +119,6 @@ def list_verticals() -> List[str]:
 VerticalRegistry.register(CodingAssistant)
 VerticalRegistry.register(DevOpsAssistant)
 VerticalRegistry.register(ResearchAssistant)
+VerticalRegistry.register(DataAnalysisAssistant)
 
 __version__ = "0.1.0"

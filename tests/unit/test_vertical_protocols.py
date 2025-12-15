@@ -512,12 +512,13 @@ class TestResearchVerticalExtensions:
         assert extensions is not None
         assert isinstance(extensions, VerticalExtensions)
 
-    def test_research_minimal_extensions(self):
-        """ResearchAssistant currently has minimal extensions."""
+    def test_research_complete_extensions(self):
+        """ResearchAssistant now has complete extensions."""
         from victor.verticals import ResearchAssistant
 
         extensions = ResearchAssistant.get_extensions()
-        # Research vertical doesn't define custom extensions yet
-        # This is expected - it uses defaults
-        assert extensions.middleware == []
-        assert extensions.safety_extensions == []
+        # Research vertical now has safety extensions defined
+        assert len(extensions.safety_extensions) >= 1
+        # Safety extension should have get_bash_patterns
+        patterns = extensions.get_all_safety_patterns()
+        assert len(patterns) > 0
