@@ -1126,3 +1126,207 @@ class TestFormatBudgetExhaustedMetrics:
         )
 
         assert "TTFT" not in result
+
+
+class TestGenerateToolResultChunk:
+    """Tests for generate_tool_result_chunk method."""
+
+    def test_successful_result(self, handler):
+        """Generates correct chunk for successful tool."""
+        chunk = handler.generate_tool_result_chunk(
+            tool_name="read_file",
+            tool_args={"path": "/test.py"},
+            elapsed=0.5,
+            success=True,
+        )
+
+        assert chunk.content == ""
+        assert chunk.metadata["tool_result"]["name"] == "read_file"
+        assert chunk.metadata["tool_result"]["success"] is True
+        assert chunk.metadata["tool_result"]["elapsed"] == 0.5
+        assert chunk.metadata["tool_result"]["arguments"] == {"path": "/test.py"}
+        assert "error" not in chunk.metadata["tool_result"]
+
+    def test_failed_result_with_error(self, handler):
+        """Generates correct chunk for failed tool with error."""
+        chunk = handler.generate_tool_result_chunk(
+            tool_name="write_file",
+            tool_args={"path": "/test.py"},
+            elapsed=0.1,
+            success=False,
+            error="Permission denied",
+        )
+
+        assert chunk.metadata["tool_result"]["success"] is False
+        assert chunk.metadata["tool_result"]["error"] == "Permission denied"
+
+    def test_failed_result_no_error(self, handler):
+        """Failed result without error message."""
+        chunk = handler.generate_tool_result_chunk(
+            tool_name="bash",
+            tool_args={"command": "ls"},
+            elapsed=0.2,
+            success=False,
+        )
+
+        assert chunk.metadata["tool_result"]["success"] is False
+        assert "error" not in chunk.metadata["tool_result"]
+
+
+class TestGenerateFilePreviewChunk:
+    """Tests for generate_file_preview_chunk method."""
+
+    def test_short_content(self, handler):
+        """Short content shows in full."""
+        content = "line1\nline2\nline3"
+        chunk = handler.generate_file_preview_chunk(content, "/test.py")
+
+        assert chunk is not None
+        assert chunk.metadata["file_preview"] == content
+        assert chunk.metadata["path"] == "/test.py"
+
+    def test_long_content_truncated(self, handler):
+        """Long content is truncated with line count."""
+        content = "\n".join([f"line{i}" for i in range(20)])
+        chunk = handler.generate_file_preview_chunk(content, "/test.py", preview_lines=8)
+
+        assert chunk is not None
+        assert "... (12 more lines)" in chunk.metadata["file_preview"]
+        assert "line7" in chunk.metadata["file_preview"]
+        assert "line8" not in chunk.metadata["file_preview"]
+
+    def test_empty_content_returns_none(self, handler):
+        """Empty content returns None."""
+        chunk = handler.generate_file_preview_chunk("", "/test.py")
+        assert chunk is None
+
+
+class TestGenerateEditPreviewChunk:
+    """Tests for generate_edit_preview_chunk method."""
+
+    def test_short_strings(self, handler):
+        """Short strings show in full."""
+        chunk = handler.generate_edit_preview_chunk(
+            old_string="old text",
+            new_string="new text",
+            path="/test.py",
+        )
+
+        assert chunk is not None
+        assert "- old text..." in chunk.metadata["edit_preview"]
+        assert "+ new text..." in chunk.metadata["edit_preview"]
+        assert chunk.metadata["path"] == "/test.py"
+
+    def test_long_strings_truncated(self, handler):
+        """Long strings are truncated."""
+        old_string = "x" * 100
+        new_string = "y" * 100
+        chunk = handler.generate_edit_preview_chunk(
+            old_string, new_string, "/test.py", max_preview_len=50
+        )
+
+        assert chunk is not None
+        assert len(chunk.metadata["edit_preview"]) < 250
+
+    def test_empty_old_returns_none(self, handler):
+        """Empty old_string returns None."""
+        chunk = handler.generate_edit_preview_chunk("", "new", "/test.py")
+        assert chunk is None
+
+    def test_empty_new_returns_none(self, handler):
+        """Empty new_string returns None."""
+        chunk = handler.generate_edit_preview_chunk("old", "", "/test.py")
+        assert chunk is None
+
+
+class TestGenerateToolResultChunks:
+    """Tests for generate_tool_result_chunks method."""
+
+    def test_simple_success(self, handler):
+        """Simple successful result generates one chunk."""
+        result = {
+            "name": "read_file",
+            "elapsed": 0.5,
+            "args": {"path": "/test.py"},
+            "success": True,
+        }
+
+        chunks = handler.generate_tool_result_chunks(result)
+
+        assert len(chunks) == 1
+        assert chunks[0].metadata["tool_result"]["success"] is True
+
+    def test_write_file_with_preview(self, handler):
+        """write_file generates result and preview chunks."""
+        result = {
+            "name": "write_file",
+            "elapsed": 0.3,
+            "args": {"path": "/test.py", "content": "line1\nline2\nline3"},
+            "success": True,
+        }
+
+        chunks = handler.generate_tool_result_chunks(result)
+
+        assert len(chunks) == 2
+        assert chunks[0].metadata["tool_result"]["name"] == "write_file"
+        assert "file_preview" in chunks[1].metadata
+
+    def test_edit_files_with_preview(self, handler):
+        """edit_files generates result and edit preview chunks."""
+        result = {
+            "name": "edit_files",
+            "elapsed": 0.4,
+            "args": {
+                "files": [
+                    {
+                        "path": "/test.py",
+                        "edits": [
+                            {"old_string": "old1", "new_string": "new1"},
+                            {"old_string": "old2", "new_string": "new2"},
+                        ],
+                    }
+                ]
+            },
+            "success": True,
+        }
+
+        chunks = handler.generate_tool_result_chunks(result)
+
+        assert len(chunks) == 3  # 1 result + 2 edit previews
+        assert chunks[0].metadata["tool_result"]["name"] == "edit_files"
+        assert "edit_preview" in chunks[1].metadata
+        assert "edit_preview" in chunks[2].metadata
+
+    def test_failed_result_no_preview(self, handler):
+        """Failed result doesn't generate preview chunks."""
+        result = {
+            "name": "write_file",
+            "elapsed": 0.1,
+            "args": {"path": "/test.py", "content": "content"},
+            "success": False,
+            "error": "Permission denied",
+        }
+
+        chunks = handler.generate_tool_result_chunks(result)
+
+        assert len(chunks) == 1
+        assert chunks[0].metadata["tool_result"]["success"] is False
+
+    def test_max_files_limit(self, handler):
+        """Respects max_files limit for edit_files."""
+        result = {
+            "name": "edit_files",
+            "elapsed": 0.5,
+            "args": {
+                "files": [
+                    {"path": f"/file{i}.py", "edits": [{"old_string": "old", "new_string": "new"}]}
+                    for i in range(10)
+                ]
+            },
+            "success": True,
+        }
+
+        chunks = handler.generate_tool_result_chunks(result, max_files=2)
+
+        # 1 result + 2 edit previews (max_files=2)
+        assert len(chunks) == 3

@@ -933,6 +933,163 @@ class StreamingChatHandler:
             ttft_info = f" | TTFT: {time_to_first_token:.2f}s"
         return f"📊 {ctx.total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}"
 
+    def generate_tool_result_chunk(
+        self,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        elapsed: float,
+        success: bool,
+        error: Optional[str] = None,
+    ) -> StreamChunk:
+        """Generate a StreamChunk for a tool result.
+
+        Args:
+            tool_name: Name of the tool
+            tool_args: Arguments passed to the tool
+            elapsed: Time elapsed for tool execution
+            success: Whether the tool succeeded
+            error: Optional error message if failed
+
+        Returns:
+            StreamChunk with tool_result metadata
+        """
+        metadata: Dict[str, Any] = {
+            "tool_result": {
+                "name": tool_name,
+                "success": success,
+                "elapsed": elapsed,
+                "arguments": tool_args,
+            }
+        }
+        if not success and error:
+            metadata["tool_result"]["error"] = error
+        return StreamChunk(content="", metadata=metadata)
+
+    def generate_file_preview_chunk(
+        self,
+        content: str,
+        path: str,
+        preview_lines: int = 8,
+    ) -> Optional[StreamChunk]:
+        """Generate a file preview chunk for write_file operations.
+
+        Args:
+            content: The file content to preview
+            path: The file path
+            preview_lines: Number of lines to show in preview
+
+        Returns:
+            StreamChunk with file_preview metadata, or None if no content
+        """
+        if not content:
+            return None
+
+        lines = content.split("\n")
+        if len(lines) > preview_lines:
+            preview = "\n".join(lines[:preview_lines])
+            preview += f"\n... ({len(lines) - preview_lines} more lines)"
+        else:
+            preview = content
+
+        return StreamChunk(
+            content="",
+            metadata={
+                "file_preview": preview,
+                "path": path,
+            },
+        )
+
+    def generate_edit_preview_chunk(
+        self,
+        old_string: str,
+        new_string: str,
+        path: str,
+        max_preview_len: int = 50,
+    ) -> Optional[StreamChunk]:
+        """Generate an edit preview chunk for edit_files operations.
+
+        Args:
+            old_string: The old string being replaced
+            new_string: The new string
+            path: The file path
+            max_preview_len: Maximum length of preview strings
+
+        Returns:
+            StreamChunk with edit_preview metadata, or None if no strings
+        """
+        if not old_string or not new_string:
+            return None
+
+        old_preview = old_string[:max_preview_len]
+        new_preview = new_string[:max_preview_len]
+
+        return StreamChunk(
+            content="",
+            metadata={
+                "edit_preview": f"- {old_preview}...\n+ {new_preview}...",
+                "path": path,
+            },
+        )
+
+    def generate_tool_result_chunks(
+        self,
+        result: Dict[str, Any],
+        max_files: int = 3,
+        max_edits_per_file: int = 2,
+    ) -> List[StreamChunk]:
+        """Generate all chunks for a tool result including previews.
+
+        This method generates the main tool_result chunk plus any file or
+        edit preview chunks for write_file/edit_files operations.
+
+        Args:
+            result: The tool execution result dictionary
+            max_files: Maximum number of files to show for edit_files
+            max_edits_per_file: Maximum edits per file to preview
+
+        Returns:
+            List of StreamChunks for the tool result
+        """
+        chunks: List[StreamChunk] = []
+        tool_name = result.get("name", "tool")
+        elapsed = result.get("elapsed", 0.0)
+        tool_args = result.get("args", {})
+        success = result.get("success", False)
+        error = result.get("error") if not success else None
+
+        # Main tool result chunk
+        chunks.append(
+            self.generate_tool_result_chunk(
+                tool_name, tool_args, elapsed, success, error
+            )
+        )
+
+        # Generate preview chunks for successful write/edit operations
+        if success:
+            if tool_name == "write_file" and tool_args.get("content"):
+                preview_chunk = self.generate_file_preview_chunk(
+                    tool_args["content"],
+                    tool_args.get("path", ""),
+                )
+                if preview_chunk:
+                    chunks.append(preview_chunk)
+
+            elif tool_name == "edit_files" and tool_args.get("files"):
+                files = tool_args.get("files", [])
+                for file_edit in files[:max_files]:
+                    path = file_edit.get("path", "")
+                    edits = file_edit.get("edits", [])
+                    for edit in edits[:max_edits_per_file]:
+                        old_str = edit.get("old_string", "")
+                        new_str = edit.get("new_string", "")
+                        edit_chunk = self.generate_edit_preview_chunk(
+                            old_str, new_str, path
+                        )
+                        if edit_chunk:
+                            chunks.append(edit_chunk)
+
+        return chunks
+
 
 def create_streaming_handler(
     settings: "Settings",

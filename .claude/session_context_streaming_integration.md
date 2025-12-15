@@ -223,3 +223,24 @@ Wired handler methods into orchestrator:
 - Budget exhausted metrics now use handler (lines 5401-5418)
 
 All 81 streaming handler tests pass, 380 orchestrator tests pass (461 total)
+
+### Session 7: Tool Result Chunk Generation Extraction
+**Commit: (pending)**
+
+Added handler methods for tool result chunk generation:
+- `generate_tool_result_chunk()` - Generates single tool_result metadata chunk
+- `generate_file_preview_chunk()` - Generates file_preview for write_file operations
+- `generate_edit_preview_chunk()` - Generates edit_preview for edit_files operations
+- `generate_tool_result_chunks()` - Unified method generating result + preview chunks
+
+Added 15 new tests in 5 test classes:
+- `TestGenerateToolResultChunk` (3 tests) - Success/failure result generation
+- `TestGenerateFilePreviewChunk` (3 tests) - File preview with truncation
+- `TestGenerateEditPreviewChunk` (4 tests) - Edit preview generation
+- `TestGenerateToolResultChunks` (5 tests) - Combined result/preview generation
+
+Wired handler method into orchestrator:
+- Added `_generate_tool_result_chunks_with_handler()` delegation method
+- Replaced ~60 lines of inline tool result processing with handler call
+
+All 96 streaming handler tests pass, 380 orchestrator tests pass (476 total)

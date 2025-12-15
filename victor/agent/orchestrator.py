@@ -4444,6 +4444,20 @@ class AgentOrchestrator:
             stream_ctx, elapsed_time, time_to_first_token
         )
 
+    def _generate_tool_result_chunks_with_handler(
+        self,
+        result: Dict[str, Any],
+    ) -> List[StreamChunk]:
+        """Generate tool result chunks using handler delegation.
+
+        Args:
+            result: The tool execution result dictionary
+
+        Returns:
+            List of StreamChunks for the tool result
+        """
+        return self._streaming_handler.generate_tool_result_chunks(result)
+
     def _parse_and_validate_tool_calls(
         self,
         tool_calls: Optional[List[Dict[str, Any]]],
@@ -5517,73 +5531,12 @@ class AgentOrchestrator:
                 tool_results = await self._handle_tool_calls(tool_calls)
                 # CRITICAL FIX: Increment tool_calls_used counter to prevent infinite loops
                 self.tool_calls_used += len(tool_calls)
+
+                # Generate tool result and preview chunks using handler delegation
                 for result in tool_results:
                     tool_name = result.get("name", "tool")
-                    elapsed = result.get("elapsed", 0.0)
-                    tool_args = result.get("args", {})
-                    if result.get("success"):
-                        # Emit structured tool_result event for CLI to format with arguments
-                        yield StreamChunk(
-                            content="",
-                            metadata={
-                                "tool_result": {
-                                    "name": tool_name,
-                                    "success": True,
-                                    "elapsed": elapsed,
-                                    "arguments": tool_args,
-                                }
-                            },
-                        )
-                        # Show content preview for write/edit operations (like Claude Code)
-                        tool_args = result.get("args", {})
-                        if tool_name == "write_file" and tool_args.get("content"):
-                            content = tool_args["content"]
-                            lines = content.split("\n")
-                            preview_lines = 8  # Show first N lines
-                            if len(lines) > preview_lines:
-                                preview = "\n".join(lines[:preview_lines])
-                                preview += f"\n... ({len(lines) - preview_lines} more lines)"
-                            else:
-                                preview = content
-                            # Format as a code block preview
-                            yield StreamChunk(
-                                content="",
-                                metadata={
-                                    "file_preview": preview,
-                                    "path": tool_args.get("path", ""),
-                                },
-                            )
-                        elif tool_name == "edit_files" and tool_args.get("files"):
-                            # Show edit operations summary
-                            files = tool_args.get("files", [])
-                            for file_edit in files[:3]:  # Show first 3 files
-                                path = file_edit.get("path", "")
-                                edits = file_edit.get("edits", [])
-                                for edit in edits[:2]:  # Show first 2 edits per file
-                                    old_str = edit.get("old_string", "")[:50]
-                                    new_str = edit.get("new_string", "")[:50]
-                                    if old_str and new_str:
-                                        yield StreamChunk(
-                                            content="",
-                                            metadata={
-                                                "edit_preview": f"- {old_str}...\n+ {new_str}...",
-                                                "path": path,
-                                            },
-                                        )
-                    else:
-                        error_msg = result.get("error", "failed")
-                        yield StreamChunk(
-                            content="",
-                            metadata={
-                                "tool_result": {
-                                    "name": tool_name,
-                                    "success": False,
-                                    "elapsed": elapsed,
-                                    "arguments": tool_args,
-                                    "error": error_msg,
-                                }
-                            },
-                        )
+                    for chunk in self._generate_tool_result_chunks_with_handler(result):
+                        yield chunk
 
                 yield StreamChunk(content="", metadata={"status": "💭 Thinking..."})
 
