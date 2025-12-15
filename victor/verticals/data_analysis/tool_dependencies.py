@@ -112,6 +112,12 @@ class DataAnalysisToolDependencyProvider(ToolDependencyProviderProtocol):
         """Return tools that enhance analysis but aren't essential."""
         return {"code_search", "semantic_code_search", "edit_files", "list_directory", "web_search", "web_fetch"}
 
+    def get_tool_sequences(self) -> List[List[str]]:
+        """Return recommended tool sequences for data analysis workflows."""
+        return [
+            list(seq) for seq in DATA_ANALYSIS_TOOL_SEQUENCES.values()
+        ]
+
     def suggest_next_tool(self, current_tool: str, used_tools: List[str]) -> str:
         """Suggest the next tool based on current tool and history."""
         transitions = self.get_tool_transitions()
