@@ -861,6 +861,78 @@ class StreamingChatHandler:
             "Please retry or simplify the request."
         )
 
+    def format_completion_metrics(
+        self, ctx: StreamingChatContext, elapsed_time: float
+    ) -> str:
+        """Format performance metrics for normal completion.
+
+        This generates the detailed metrics line with cache info when available,
+        or falls back to estimated tokens.
+
+        Args:
+            ctx: The streaming context
+            elapsed_time: Elapsed time in seconds
+
+        Returns:
+            Formatted metrics line string
+        """
+        # Use actual provider-reported usage if available, else use estimate
+        if ctx.cumulative_usage.get("total_tokens", 0) > 0:
+            # Provider-reported tokens (accurate)
+            input_tokens = ctx.cumulative_usage["prompt_tokens"]
+            output_tokens = ctx.cumulative_usage["completion_tokens"]
+            cache_read = ctx.cumulative_usage.get("cache_read_input_tokens", 0)
+            cache_create = ctx.cumulative_usage.get("cache_creation_input_tokens", 0)
+
+            # Build metrics line
+            tokens_per_second = output_tokens / elapsed_time if elapsed_time > 0 else 0
+            metrics_parts = [
+                f"📊 in={input_tokens:,}",
+                f"out={output_tokens:,}",
+            ]
+            if cache_read > 0:
+                metrics_parts.append(f"cached={cache_read:,}")
+            if cache_create > 0:
+                metrics_parts.append(f"cache_new={cache_create:,}")
+            metrics_parts.extend(
+                [
+                    f"| {elapsed_time:.1f}s",
+                    f"| {tokens_per_second:.1f} tok/s",
+                ]
+            )
+            return " ".join(metrics_parts)
+        else:
+            # Fallback to estimate
+            tokens_per_second = ctx.total_tokens / elapsed_time if elapsed_time > 0 else 0
+            return (
+                f"📊 ~{ctx.total_tokens:.0f} tokens (est.) | "
+                f"{elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s"
+            )
+
+    def format_budget_exhausted_metrics(
+        self,
+        ctx: StreamingChatContext,
+        elapsed_time: float,
+        time_to_first_token: Optional[float] = None,
+    ) -> str:
+        """Format performance metrics for budget exhausted completion.
+
+        This generates a simpler metrics line with optional TTFT info.
+
+        Args:
+            ctx: The streaming context
+            elapsed_time: Elapsed time in seconds
+            time_to_first_token: Optional time to first token
+
+        Returns:
+            Formatted metrics line string
+        """
+        tokens_per_second = ctx.total_tokens / elapsed_time if elapsed_time > 0 else 0
+        ttft_info = ""
+        if time_to_first_token:
+            ttft_info = f" | TTFT: {time_to_first_token:.2f}s"
+        return f"📊 {ctx.total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}"
+
 
 def create_streaming_handler(
     settings: "Settings",

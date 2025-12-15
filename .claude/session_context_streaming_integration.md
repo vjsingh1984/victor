@@ -190,7 +190,7 @@ _stream_chat_impl (main loop)
 5. **Remaining config aliases (intentionally kept)** - max_total_iterations, max_exploration_iterations (read-only config)
 
 ### Session 5: Recovery Prompts Extraction
-**Commit: (pending)**
+**Commit: 2d4485f**
 
 Added handler methods for recovery prompt generation:
 - `get_recovery_prompts()` - Generates list of (prompt, temperature) tuples for empty response recovery
@@ -203,3 +203,16 @@ Added 13 new tests in 3 test classes:
 - `TestGetRecoveryFallbackMessage` (4 tests) - Tests for fallback messages
 
 All 71 streaming handler tests pass, 392 orchestrator tests pass
+
+### Session 6: Metrics Display Formatting Extraction
+**Commit: (pending)**
+
+Added handler methods for metrics display formatting:
+- `format_completion_metrics()` - Formats detailed metrics with cache info for normal completion
+- `format_budget_exhausted_metrics()` - Formats simpler metrics with optional TTFT for budget exhausted
+
+Added 10 new tests in 2 test classes:
+- `TestFormatCompletionMetrics` (6 tests) - Tests for normal completion metrics formatting
+- `TestFormatBudgetExhaustedMetrics` (4 tests) - Tests for budget exhausted metrics formatting
+
+All 81 streaming handler tests pass, 380 orchestrator tests pass

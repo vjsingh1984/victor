@@ -959,3 +959,170 @@ class TestGetRecoveryFallbackMessage:
         message = handler.get_recovery_fallback_message(ctx, unique_resources)
 
         assert "No tool calls were returned" in message
+
+
+class TestFormatCompletionMetrics:
+    """Tests for format_completion_metrics method."""
+
+    def test_with_provider_reported_tokens(self, handler):
+        """Uses provider-reported tokens when available."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            cumulative_usage={
+                "prompt_tokens": 1000,
+                "completion_tokens": 500,
+                "total_tokens": 1500,
+                "cache_read_input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+            },
+            total_tokens=100,  # Should be ignored
+        )
+
+        result = handler.format_completion_metrics(ctx, elapsed_time=10.0)
+
+        assert "in=1,000" in result
+        assert "out=500" in result
+        assert "10.0s" in result
+        assert "50.0 tok/s" in result
+        assert "cached" not in result  # No cache tokens
+
+    def test_with_cache_read_tokens(self, handler):
+        """Includes cache read info when available."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            cumulative_usage={
+                "prompt_tokens": 1000,
+                "completion_tokens": 500,
+                "total_tokens": 1500,
+                "cache_read_input_tokens": 800,
+                "cache_creation_input_tokens": 0,
+            },
+        )
+
+        result = handler.format_completion_metrics(ctx, elapsed_time=10.0)
+
+        assert "cached=800" in result
+
+    def test_with_cache_creation_tokens(self, handler):
+        """Includes cache creation info when available."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            cumulative_usage={
+                "prompt_tokens": 1000,
+                "completion_tokens": 500,
+                "total_tokens": 1500,
+                "cache_read_input_tokens": 0,
+                "cache_creation_input_tokens": 200,
+            },
+        )
+
+        result = handler.format_completion_metrics(ctx, elapsed_time=10.0)
+
+        assert "cache_new=200" in result
+
+    def test_with_both_cache_types(self, handler):
+        """Includes both cache types when available."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            cumulative_usage={
+                "prompt_tokens": 1000,
+                "completion_tokens": 500,
+                "total_tokens": 1500,
+                "cache_read_input_tokens": 800,
+                "cache_creation_input_tokens": 200,
+            },
+        )
+
+        result = handler.format_completion_metrics(ctx, elapsed_time=10.0)
+
+        assert "cached=800" in result
+        assert "cache_new=200" in result
+
+    def test_fallback_to_estimated_tokens(self, handler):
+        """Falls back to estimated tokens when no provider tokens."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            cumulative_usage={
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+            },
+            total_tokens=1500.0,
+        )
+
+        result = handler.format_completion_metrics(ctx, elapsed_time=10.0)
+
+        assert "~1500 tokens (est.)" in result
+        assert "10.0s" in result
+        assert "150.0 tok/s" in result
+
+    def test_handles_zero_elapsed_time(self, handler):
+        """Handles zero elapsed time without division error."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            cumulative_usage={
+                "prompt_tokens": 1000,
+                "completion_tokens": 500,
+                "total_tokens": 1500,
+            },
+        )
+
+        result = handler.format_completion_metrics(ctx, elapsed_time=0.0)
+
+        assert "0.0 tok/s" in result
+
+
+class TestFormatBudgetExhaustedMetrics:
+    """Tests for format_budget_exhausted_metrics method."""
+
+    def test_basic_format(self, handler):
+        """Basic metrics format without TTFT."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            total_tokens=2000.0,
+        )
+
+        result = handler.format_budget_exhausted_metrics(ctx, elapsed_time=20.0)
+
+        assert "2000 tokens" in result
+        assert "20.0s" in result
+        assert "100.0 tok/s" in result
+        assert "TTFT" not in result
+
+    def test_with_ttft(self, handler):
+        """Includes TTFT when provided."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            total_tokens=2000.0,
+        )
+
+        result = handler.format_budget_exhausted_metrics(
+            ctx, elapsed_time=20.0, time_to_first_token=1.5
+        )
+
+        assert "2000 tokens" in result
+        assert "TTFT: 1.50s" in result
+
+    def test_handles_zero_elapsed_time(self, handler):
+        """Handles zero elapsed time without division error."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            total_tokens=1000.0,
+        )
+
+        result = handler.format_budget_exhausted_metrics(ctx, elapsed_time=0.0)
+
+        assert "0.0 tok/s" in result
+
+    def test_ttft_zero_not_included(self, handler):
+        """TTFT of 0 or None is not included."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            total_tokens=1000.0,
+        )
+
+        result = handler.format_budget_exhausted_metrics(
+            ctx, elapsed_time=10.0, time_to_first_token=0.0
+        )
+
+        assert "TTFT" not in result
