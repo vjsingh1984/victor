@@ -5269,7 +5269,7 @@ class AgentOrchestrator:
                         sanitized = self._sanitize_response(full_content)
                         if sanitized:
                             logger.debug(f"Yielding content to UI: {len(sanitized)} chars")
-                            yield StreamChunk(content=sanitized)
+                            yield self._generate_content_chunk_with_handler(sanitized)
                             # Track accumulated content - use context method for consistency
                             stream_ctx.accumulate_content(sanitized)
                             logger.debug(
@@ -5360,8 +5360,8 @@ class AgentOrchestrator:
                         if full_content:
                             sanitized = self._sanitize_response(full_content)
                             if sanitized:
-                                yield StreamChunk(content=sanitized)
-                        yield StreamChunk(content="", is_final=True)
+                                yield self._generate_content_chunk_with_handler(sanitized)
+                        yield self._generate_final_marker_chunk_with_handler()
                         return
 
                     # Handle action: prompt_tool_call
@@ -5402,7 +5402,7 @@ class AgentOrchestrator:
                         if full_content:
                             sanitized = self._sanitize_response(full_content)
                             if sanitized:
-                                yield StreamChunk(content=sanitized)
+                                yield self._generate_content_chunk_with_handler(sanitized)
 
                         # Display performance metrics using handler delegation
                         elapsed_time = time.time() - stream_ctx.start_time
@@ -5417,7 +5417,7 @@ class AgentOrchestrator:
                             user_satisfied=True,
                             completed=True,
                         )
-                        yield StreamChunk(content="", is_final=True)
+                        yield self._generate_final_marker_chunk_with_handler()
                         return
 
                 # Tool execution section - runs regardless of loop warning
@@ -5457,7 +5457,9 @@ class AgentOrchestrator:
                         if response and response.content:
                             sanitized = self._sanitize_response(response.content)
                             if sanitized:
-                                yield StreamChunk(content=sanitized + "\n")
+                                yield self._generate_content_chunk_with_handler(
+                                    sanitized, suffix="\n"
+                                )
                     except Exception as e:
                         logger.warning(f"Failed to generate final summary: {e}")
                         # Use handler delegation for budget error chunk (testable)
@@ -5479,9 +5481,8 @@ class AgentOrchestrator:
                         user_satisfied=True,
                         completed=True,
                     )
-                    yield StreamChunk(
-                        content=f"\n{metrics_line}\n",
-                        is_final=True,
+                    yield self._generate_metrics_chunk_with_handler(
+                        metrics_line, is_final=True, prefix="\n"
                     )
                     return
 
@@ -5512,7 +5513,7 @@ class AgentOrchestrator:
                             sanitized = self._sanitize_response(response.content)
                             if sanitized:
                                 self.add_message("assistant", sanitized)
-                                yield StreamChunk(content=sanitized)
+                                yield self._generate_content_chunk_with_handler(sanitized)
                     except Exception as e:
                         logger.warning(f"Error forcing final response: {e}")
                         # Use handler delegation for force response error chunk (testable)
