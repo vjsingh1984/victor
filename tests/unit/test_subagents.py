@@ -522,3 +522,56 @@ class TestSubAgentIntegration:
         subagent = SubAgent(config, mock_parent)
         assert subagent.config.role == SubAgentRole.PLANNER
         assert subagent.config.tool_budget == 10
+
+
+# =============================================================================
+# AgentOrchestrator Integration Tests
+# =============================================================================
+
+
+class TestOrchestratorSubAgentIntegration:
+    """Tests for SubAgentOrchestrator integration in AgentOrchestrator."""
+
+    def test_orchestrator_has_subagent_orchestrator_property(self):
+        """Test that AgentOrchestrator has the subagent_orchestrator property."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        assert hasattr(AgentOrchestrator, "subagent_orchestrator")
+
+    def test_orchestrator_subagent_fields_exist(self):
+        """Test that AgentOrchestrator has subagent-related fields in __init__."""
+        # This tests that the fields were added correctly by checking the
+        # class structure without needing to instantiate it (which requires many deps)
+        import inspect
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        source = inspect.getsource(AgentOrchestrator.__init__)
+        assert "_subagent_orchestrator" in source
+        assert "_subagent_orchestration_enabled" in source
+        assert "subagent_orchestration_enabled" in source
+
+    def test_subagent_orchestrator_property_is_lazy(self):
+        """Test that subagent_orchestrator property follows lazy init pattern."""
+        import inspect
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        source = inspect.getsource(AgentOrchestrator.subagent_orchestrator.fget)
+        # Check for lazy initialization pattern
+        assert "_subagent_orchestration_enabled" in source
+        assert "_subagent_orchestrator is None" in source
+        assert "from victor.agent.subagents import SubAgentOrchestrator" in source
+
+    def test_subagent_orchestrator_returns_none_when_disabled(self):
+        """Test that property returns None when subagent orchestration is disabled."""
+        from unittest.mock import MagicMock, patch
+
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        # Create a mock that simulates disabled state
+        mock_orchestrator = MagicMock(spec=AgentOrchestrator)
+        mock_orchestrator._subagent_orchestration_enabled = False
+        mock_orchestrator._subagent_orchestrator = None
+
+        # Call the property getter directly
+        result = AgentOrchestrator.subagent_orchestrator.fget(mock_orchestrator)
+        assert result is None

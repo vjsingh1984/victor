@@ -733,6 +733,13 @@ class AgentOrchestrator:
         )
         self._intelligent_pipeline_enabled = getattr(settings, "intelligent_pipeline_enabled", True)
 
+        # Sub-agent orchestration (lazy initialization)
+        # Enables spawning specialized sub-agents for parallel task delegation
+        self._subagent_orchestrator: Optional["SubAgentOrchestrator"] = None  # noqa: F821
+        self._subagent_orchestration_enabled = getattr(
+            settings, "subagent_orchestration_enabled", True
+        )
+
         # Tool registry
         self.tools = ToolRegistry()
 
@@ -816,8 +823,13 @@ class AgentOrchestrator:
                             CodeCorrectionMiddleware,
                             CodeCorrectionConfig,
                         )
-                        code_correction_auto_fix = getattr(settings, "code_correction_auto_fix", True)
-                        code_correction_max_iterations = getattr(settings, "code_correction_max_iterations", 1)
+
+                        code_correction_auto_fix = getattr(
+                            settings, "code_correction_auto_fix", True
+                        )
+                        code_correction_max_iterations = getattr(
+                            settings, "code_correction_max_iterations", 1
+                        )
 
                         self._code_correction_middleware = CodeCorrectionMiddleware(
                             config=CodeCorrectionConfig(
@@ -851,7 +863,9 @@ class AgentOrchestrator:
                             pattern.risk_level,
                             pattern.category,
                         )
-                    logger.debug(f"Added safety patterns from vertical: {safety_ext.get_category()}")
+                    logger.debug(
+                        f"Added safety patterns from vertical: {safety_ext.get_category()}"
+                    )
         except Exception as e:
             logger.debug(f"Could not load vertical safety extensions: {e}")
 
@@ -1449,6 +1463,33 @@ class AgentOrchestrator:
                 self._intelligent_pipeline_enabled = False
 
         return self._intelligent_integration
+
+    @property
+    def subagent_orchestrator(self) -> Optional["SubAgentOrchestrator"]:  # noqa: F821
+        """Get the sub-agent orchestrator (lazy initialization).
+
+        Use this for:
+        - Spawning specialized sub-agents (researcher, planner, executor, etc.)
+        - Parallel task delegation via fan_out()
+        - Hierarchical task decomposition
+
+        Returns:
+            SubAgentOrchestrator instance or None if disabled or failed to initialize
+        """
+        if not self._subagent_orchestration_enabled:
+            return None
+
+        if self._subagent_orchestrator is None:
+            try:
+                from victor.agent.subagents import SubAgentOrchestrator
+
+                self._subagent_orchestrator = SubAgentOrchestrator(parent=self)
+                logger.info("SubAgentOrchestrator initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize SubAgentOrchestrator: {e}")
+                self._subagent_orchestration_enabled = False
+
+        return self._subagent_orchestrator
 
     async def _prepare_intelligent_request(
         self, task: str, task_type: str
@@ -2183,7 +2224,9 @@ class AgentOrchestrator:
                 # New vertical middleware - use get_config() if available or default values
                 status["components"]["code_correction"]["config"] = {
                     "auto_fix": getattr(self._code_correction_middleware, "auto_fix", True),
-                    "max_iterations": getattr(self._code_correction_middleware, "max_iterations", 1),
+                    "max_iterations": getattr(
+                        self._code_correction_middleware, "max_iterations", 1
+                    ),
                 }
 
         # Safety Checker
@@ -2751,9 +2794,7 @@ class AgentOrchestrator:
 
         inferred_op = alias_to_operation.get(original_name)
         if inferred_op:
-            logger.debug(
-                f"Inferred git operation '{inferred_op}' from alias '{original_name}'"
-            )
+            logger.debug(f"Inferred git operation '{inferred_op}' from alias '{original_name}'")
             args = dict(args)  # Copy to avoid mutation
             args["operation"] = inferred_op
 
@@ -3047,8 +3088,8 @@ class AgentOrchestrator:
         # CRITICAL FIX: Handle stuck loop immediately - model is planning but not executing
         if is_stuck_loop:
             logger.warning(
-                f"Detected STUCK_LOOP intent - model is planning but not executing. "
-                f"Forcing summary."
+                "Detected STUCK_LOOP intent - model is planning but not executing. "
+                "Forcing summary."
             )
             return {
                 "action": "request_summary",
@@ -3177,7 +3218,9 @@ class AgentOrchestrator:
             # Reset tracking on first prompt of a new sequence
             self._tool_calls_at_continuation_start = self.tool_calls_used
 
-        tool_calls_during_continuation = self.tool_calls_used - self._tool_calls_at_continuation_start
+        tool_calls_during_continuation = (
+            self.tool_calls_used - self._tool_calls_at_continuation_start
+        )
         if (
             intends_to_continue
             and continuation_prompts >= 2
@@ -4360,7 +4403,7 @@ class AgentOrchestrator:
             if result.chunks:
                 return result.chunks[0]
             return StreamChunk(
-                content=f"\n\n⏱️ Session time limit reached. "
+                content="\n\n⏱️ Session time limit reached. "
                 "Providing summary of progress so far.\n",
                 is_final=False,
             )
@@ -4460,17 +4503,19 @@ class AgentOrchestrator:
         Returns:
             Tuple of (chunk, should_clear_tools) if threshold exceeded, None otherwise
         """
-        consecutive_limit = getattr(
-            self.settings, "recovery_blocked_consecutive_threshold", 4
-        )
+        consecutive_limit = getattr(self.settings, "recovery_blocked_consecutive_threshold", 4)
         total_limit = getattr(self.settings, "recovery_blocked_total_threshold", 6)
 
         result = self._streaming_handler.check_blocked_threshold(
             stream_ctx, all_blocked, consecutive_limit, total_limit
         )
         if result:
-            chunk = result.chunks[0] if result.chunks else StreamChunk(
-                content="\n[loop] ⚠️ Multiple blocked attempts - forcing completion\n"
+            chunk = (
+                result.chunks[0]
+                if result.chunks
+                else StreamChunk(
+                    content="\n[loop] ⚠️ Multiple blocked attempts - forcing completion\n"
+                )
             )
             return (chunk, result.clear_tool_calls)
         return None
@@ -4668,17 +4713,13 @@ class AgentOrchestrator:
         Returns:
             StreamChunk with warning if approaching limit, None otherwise
         """
-        warning_threshold = getattr(
-            self.settings, "tool_call_budget_warning_threshold", 250
-        )
+        warning_threshold = getattr(self.settings, "tool_call_budget_warning_threshold", 250)
         result = self._streaming_handler.check_tool_budget(stream_ctx, warning_threshold)
         if result and result.chunks:
             return result.chunks[0]
         return None
 
-    def _check_progress_with_handler(
-        self, stream_ctx: StreamingChatContext
-    ) -> bool:
+    def _check_progress_with_handler(self, stream_ctx: StreamingChatContext) -> bool:
         """Check progress and set force_completion if stuck.
 
         Args:
@@ -4838,9 +4879,7 @@ class AgentOrchestrator:
             Fallback message string
         """
         unique_resources = list(self.unified_tracker.unique_resources)
-        return self._streaming_handler.get_recovery_fallback_message(
-            stream_ctx, unique_resources
-        )
+        return self._streaming_handler.get_recovery_fallback_message(stream_ctx, unique_resources)
 
     def _handle_loop_warning_with_handler(
         self,
@@ -4874,9 +4913,7 @@ class AgentOrchestrator:
         Returns:
             StreamChunk with tool start metadata
         """
-        return self._streaming_handler.generate_tool_start_chunk(
-            tool_name, tool_args, status_msg
-        )
+        return self._streaming_handler.generate_tool_start_chunk(tool_name, tool_args, status_msg)
 
     def _get_budget_exhausted_chunks_with_handler(
         self,
@@ -5335,12 +5372,10 @@ class AgentOrchestrator:
                 # Anthropic extended thinking format
                 provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
 
-            full_content, tool_calls, _, garbage_detected = (
-                await self._stream_provider_response(
-                    tools=tools,
-                    provider_kwargs=provider_kwargs,
-                    stream_ctx=stream_ctx,
-                )
+            full_content, tool_calls, _, garbage_detected = await self._stream_provider_response(
+                tools=tools,
+                provider_kwargs=provider_kwargs,
+                stream_ctx=stream_ctx,
             )
 
             # Debug: Log response details
@@ -5458,7 +5493,9 @@ class AgentOrchestrator:
                     recovery_messages = recent_messages + [Message(role="user", content=prompt)]
 
                     # Use handler to decide if tools should be enabled (testable)
-                    use_tools = self._should_use_tools_for_recovery_with_handler(stream_ctx, attempt)
+                    use_tools = self._should_use_tools_for_recovery_with_handler(
+                        stream_ctx, attempt
+                    )
                     recovery_tools = tools if use_tools else None
 
                     try:
@@ -5552,9 +5589,7 @@ class AgentOrchestrator:
                         user_satisfied=False,
                         completed=False,
                     )
-                    yield self._generate_content_chunk_with_handler(
-                        fallback_msg, is_final=True
-                    )
+                    yield self._generate_content_chunk_with_handler(fallback_msg, is_final=True)
                     return
 
             # Record tool calls in progress tracker for loop detection
@@ -5822,7 +5857,9 @@ class AgentOrchestrator:
                     # Finalize and display performance metrics using handler delegation
                     final_metrics = self._finalize_stream_metrics()
                     elapsed_time = (
-                        final_metrics.total_duration if final_metrics else time.time() - stream_ctx.start_time
+                        final_metrics.total_duration
+                        if final_metrics
+                        else time.time() - stream_ctx.start_time
                     )
                     ttft = final_metrics.time_to_first_token if final_metrics else None
                     metrics_line = self._format_budget_exhausted_metrics_with_handler(
@@ -6080,14 +6117,16 @@ class AgentOrchestrator:
                 )
                 # GAP-5 FIX: Add feedback so model learns from invalid tool name
                 # Instead of silently dropping, return an error result the model can learn from
-                results.append({
-                    "tool_name": tool_name,
-                    "success": False,
-                    "result": None,
-                    "error": f"Invalid tool name '{tool_name}'. This tool does not exist. "
-                             "Use only tools from the provided tool list. "
-                             "Check for typos or hallucinated tool names.",
-                })
+                results.append(
+                    {
+                        "tool_name": tool_name,
+                        "success": False,
+                        "result": None,
+                        "error": f"Invalid tool name '{tool_name}'. This tool does not exist. "
+                        "Use only tools from the provided tool list. "
+                        "Check for typos or hallucinated tool names.",
+                    }
+                )
                 continue
 
             # Resolve legacy/alias names to canonical form before checks
@@ -6106,14 +6145,16 @@ class AgentOrchestrator:
                 )
                 # GAP-5 FIX: Add feedback so model learns from unknown/disabled tool
                 # Instead of silently dropping, return an error result the model can learn from
-                results.append({
-                    "tool_name": tool_name,
-                    "success": False,
-                    "result": None,
-                    "error": f"Tool '{tool_name}' is not available. It may be disabled, not registered, "
-                             "or not included in the current tool selection. "
-                             "Use only the tools listed in your available tools.",
-                })
+                results.append(
+                    {
+                        "tool_name": tool_name,
+                        "success": False,
+                        "result": None,
+                        "error": f"Tool '{tool_name}' is not available. It may be disabled, not registered, "
+                        "or not included in the current tool selection. "
+                        "Use only the tools listed in your available tools.",
+                    }
+                )
                 continue
 
             if self.tool_calls_used >= self.tool_budget:
