@@ -1,6 +1,6 @@
 # Sub-Agent Architecture Design
 
-**Status**: Phase 1 Complete (Implementation)
+**Status**: Phase 2 Complete (Integration)
 **Created**: 2025-12-16
 **Updated**: 2025-12-16
 **Related**: ROADMAP.md P2.1, P2.2
@@ -10,7 +10,7 @@
 | Phase | Status | Description |
 |-------|--------|-------------|
 | Phase 1: Core Infrastructure | ✅ Complete | SubAgent, SubAgentOrchestrator, role prompts |
-| Phase 2: Integration | ⏳ Pending | AgentOrchestrator integration |
+| Phase 2: Integration | ✅ Complete | AgentOrchestrator integration |
 | Phase 3: Advanced Features | ⏳ Pending | Parallel execution, hierarchical spawning |
 | Phase 4: UX & Polish | ⏳ Pending | CLI commands, TUI visualization |
 
@@ -20,6 +20,12 @@
 - `victor/agent/subagents/orchestrator.py` - SubAgentOrchestrator, FanOutResult, role defaults
 - `victor/agent/subagents/prompts.py` - Role-specific system prompts
 - `tests/unit/test_subagents.py` - 31 unit tests (all passing)
+
+### Phase 2 Deliverables
+- `victor/agent/orchestrator.py` - Added `subagent_orchestrator` property with lazy initialization
+- `_subagent_orchestrator` field and `_subagent_orchestration_enabled` setting flag
+- Integration tests in `tests/unit/test_subagents.py` - 4 new tests (35 total subagent tests)
+- Total: 78 tests passing (35 subagent + 43 planning)
 
 ### P2.2 Autonomous Planning Mode
 - `victor/agent/planning/__init__.py` - Package exports
