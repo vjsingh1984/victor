@@ -115,6 +115,7 @@ class ToolNames:
     # SHELL / COMMAND EXECUTION (Platform-agnostic)
     # ==========================================================================
     SHELL = "shell"  # execute_bash → shell (works on all platforms)
+    SHELL_READONLY = "shell_readonly"  # read-only shell for safe exploration
     SANDBOX = "sandbox"  # execute_python_in_sandbox → sandbox
     SANDBOX_UPLOAD = "sandbox_upload"  # upload_files_to_sandbox → sandbox_upload
 
@@ -122,10 +123,15 @@ class ToolNames:
     # SEARCH TOOLS
     # ==========================================================================
     GREP = "grep"  # code_search → grep (keyword search)
-    SEARCH = "search"  # semantic_code_search → search (semantic/AI)
-    WEB = "web"  # web_search → web
-    FETCH = "fetch"  # web_fetch → fetch
+    CODE_SEARCH = "code_search"  # semantic_code_search → code_search (semantic/AI)
+    WEB_SEARCH = "web_search"  # web_search (internet search)
+    WEB_FETCH = "web_fetch"  # web_fetch (fetch URL content)
     SUMMARIZE = "summarize"  # web_summarize → summarize
+
+    # Deprecated aliases (kept for backward compatibility imports)
+    SEARCH = CODE_SEARCH  # Deprecated: use CODE_SEARCH instead
+    WEB = WEB_SEARCH  # Deprecated: use WEB_SEARCH instead
+    FETCH = WEB_FETCH  # Deprecated: use WEB_FETCH instead
 
     # ==========================================================================
     # CODE INTELLIGENCE
@@ -197,6 +203,7 @@ class ToolNames:
     PIPELINE = "pipeline"  # pipeline_analyzer → pipeline (CI/CD analysis)
     AUDIT = "audit"  # audit → audit (codebase auditing)
     IAC = "iac"  # iac_scanner → iac (infrastructure as code)
+    GRAPH = "graph"  # graph → graph (code graph analysis: PageRank, dependencies)
 
 
 # =============================================================================
@@ -212,13 +219,20 @@ TOOL_ALIASES: Dict[str, str] = {
     "get_project_overview": ToolNames.OVERVIEW,
     # Shell / Execution
     "execute_bash": ToolNames.SHELL,
+    "run": ToolNames.SHELL,  # LLMs often hallucinate "run" as a tool name
+    "bash": ToolNames.SHELL,  # Common alias
+    "execute": ToolNames.SHELL,  # Common alias
+    "cmd": ToolNames.SHELL,  # Windows-style alias
     "execute_python_in_sandbox": ToolNames.SANDBOX,
     "upload_files_to_sandbox": ToolNames.SANDBOX_UPLOAD,
-    # Search
+    # Search - keyword search
     "code_search": ToolNames.GREP,
-    "semantic_code_search": ToolNames.SEARCH,
-    "web_search": ToolNames.WEB,
-    "web_fetch": ToolNames.FETCH,
+    # Search - semantic (AI-powered) code search
+    "semantic_code_search": ToolNames.CODE_SEARCH,
+    "search": ToolNames.CODE_SEARCH,  # Short alias for backward compatibility
+    # Web tools
+    "web": ToolNames.WEB_SEARCH,  # Short alias for backward compatibility
+    "fetch": ToolNames.WEB_FETCH,  # Short alias for backward compatibility
     "web_summarize": ToolNames.SUMMARIZE,
     # Code Intelligence
     "find_symbol": ToolNames.SYMBOL,
@@ -229,7 +243,15 @@ TOOL_ALIASES: Dict[str, str] = {
     "refactor_extract_function": ToolNames.EXTRACT,
     "refactor_inline_variable": ToolNames.INLINE,
     "refactor_organize_imports": ToolNames.IMPORTS,
-    # Git
+    # Git - operation-specific aliases that resolve to unified "git" tool
+    # LLMs may call "git_status" expecting a tool, but we use "git" with operation param
+    "git_status": ToolNames.GIT,
+    "git_diff": ToolNames.GIT,
+    "git_log": ToolNames.GIT,
+    "git_commit": ToolNames.GIT,
+    "git_branch": ToolNames.GIT,
+    "git_stage": ToolNames.GIT,
+    # PR and commit message tools
     "git_create_pr": ToolNames.PR,
     "git_suggest_commit": ToolNames.COMMIT_MSG,
     "git_analyze_conflicts": ToolNames.CONFLICTS,

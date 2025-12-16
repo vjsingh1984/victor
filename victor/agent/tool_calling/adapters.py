@@ -40,9 +40,11 @@ from victor.providers.base import ToolDefinition
 
 logger = logging.getLogger(__name__)
 
+
 # Capability loader instance (lazy-initialized)
 class _CapabilityLoaderHolder:
     """Holder for capability loader singleton."""
+
     _instance: Optional[ModelCapabilityLoader] = None
 
     @classmethod
@@ -357,7 +359,11 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             return OllamaToolCallingAdapter._tool_support_cache[self.model]
 
         # Try dynamic detection via Ollama /api/show
-        base_url = self.config.get("base_url", "http://localhost:11434") if self.config else "http://localhost:11434"
+        base_url = (
+            self.config.get("base_url", "http://localhost:11434")
+            if self.config
+            else "http://localhost:11434"
+        )
 
         try:
             from victor.providers.ollama_capability_detector import OllamaCapabilityDetector

@@ -123,9 +123,7 @@ def get_parser(language: str) -> Parser:
     return parser
 
 
-def run_query(
-    tree: "Tree", query_src: str, language: str
-) -> Dict[str, List["Node"]]:
+def run_query(tree: "Tree", query_src: str, language: str) -> Dict[str, List["Node"]]:
     """Run a tree-sitter query using the modern QueryCursor API.
 
     This is the preferred way to run queries in tree-sitter 0.25+.

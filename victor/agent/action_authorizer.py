@@ -212,6 +212,56 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
     (r"\bmake\s+(the\s+)?(changes?|it\s+work|corrections?)\b", 0.8, "make_changes"),
     # "Refactor and improve"
     (r"\b(refactor|clean\s*up)\s+(and\s+)?(improve|optimize)?\b", 0.8, "refactor_improve"),
+    # =============================================================================
+    # Implementation task patterns - tasks that require creating/modifying artifacts
+    # =============================================================================
+    # "Create/Write a Dockerfile/docker-compose/manifest/config" - infrastructure files
+    (
+        r"\b(create|write|generate|build)\s+(a\s+)?(dockerfile|docker-compose|makefile|"
+        r"jenkinsfile|gitlab-ci|github\s*actions?|kubernetes|k8s|helm|terraform|ansible)",
+        0.9,
+        "create_infra_file",
+    ),
+    # "Generate/Create a CI/CD/pipeline/workflow" - pipeline configuration
+    (
+        r"\b(create|write|generate|set\s*up)\s+(a\s+)?(ci/?cd|pipeline|workflow|"
+        r"deployment|build)\s*(configuration|config|file|yaml|yml)?",
+        0.85,
+        "create_pipeline",
+    ),
+    # "Create a {report/analysis/document}" - document creation tasks
+    (
+        r"\b(create|write|generate)\s+(a\s+)?([\w\s]+)?(report|analysis|document|documentation)",
+        0.8,
+        "create_document",
+    ),
+    # "Create/Write/Generate a {artifact} for {project/this}" - project-specific creation
+    (
+        r"\b(create|write|generate)\s+(a\s+)?[\w\s]+\s+(for|in)\s+(this|the|my)\s+(project|repo|codebase)",
+        0.85,
+        "create_for_project",
+    ),
+    # "Implement {feature}" - explicit implementation request
+    (r"\bimplement\s+(\w+\s+)?(feature|functionality|module|component|system|service)", 0.85, "implement_feature"),
+    # "Implement {something}" - any implementation task (user authentication, login, etc.)
+    (r"\bimplement\s+(the\s+)?[\w\s]+(authentication|login|logout|auth|api|endpoint|handler|service)", 0.85, "implement_auth"),
+    # Generic "implement" followed by a noun phrase
+    (r"\bimplement\s+[\w\s]{3,30}$", 0.75, "implement_generic"),
+    # "Add {feature/functionality} to" - adding to existing codebase
+    (r"\badd\s+(\w+\s+)?(feature|functionality|support|capability|module)\s+(to|for)\b", 0.85, "add_feature"),
+    # "Set up/Configure {tool/system}" - setup tasks
+    (r"\b(set\s*up|configure|initialize|bootstrap)\s+(a\s+)?\w+", 0.8, "setup_configure"),
+    # "Build/Deploy {service/app}" - deployment tasks
+    (r"\b(build|deploy|release)\s+(the\s+)?\w+\s*(service|app|application|container)?", 0.8, "build_deploy"),
+    # "Create a {type} that {does something}" - functional creation for project artifacts
+    # EXCLUDES function/class/method/script (those are DISPLAY_ONLY patterns)
+    (
+        r"\bcreate\s+(a\s+)?(?!.*\b(function|class|method|script)\b)[\w\s]+\s+that\s+",
+        0.75,
+        "create_functional",
+    ),
+    # "Write/Create tests for" - test creation
+    (r"\b(write|create|add|implement)\s+(unit\s+|integration\s+)?tests?\s+(for|to)\b", 0.85, "write_tests"),
 ]
 
 # Safe actions by intent type

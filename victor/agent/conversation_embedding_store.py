@@ -200,9 +200,13 @@ class ConversationEmbeddingStore:
                 query = f"SELECT MAX(timestamp) as max_ts FROM {self.TABLE_NAME} WHERE session_id = '{session_id}'"
             else:
                 query = f"SELECT MAX(timestamp) as max_ts FROM {self.TABLE_NAME}"
-                
-            result = self._table.to_lance().to_table(filter=None).to_pandas().query(query) if session_id else None
-            
+
+            (
+                self._table.to_lance().to_table(filter=None).to_pandas().query(query)
+                if session_id
+                else None
+            )
+
             # Fallback to pandas for now (LanceDB SQL support varies)
             df = self._table.to_pandas()
             if df.empty:
@@ -234,21 +238,21 @@ class ConversationEmbeddingStore:
         try:
             with sqlite3.connect(self._sqlite_db_path) as conn:
                 conn.row_factory = sqlite3.Row
-                
+
                 # Single parameterized query with conditional WHERE clauses
                 conditions = ["LENGTH(content) >= ?"]
                 params = [min_content_length]
-                
+
                 if session_id:
                     conditions.append("session_id = ?")
                     params.append(session_id)
-                    
+
                 if after_timestamp:
                     conditions.append("timestamp > ?")
                     params.append(after_timestamp)
-                    
+
                 params.append(limit)
-                
+
                 query = f"""
                     SELECT id, session_id, content, timestamp
                     FROM messages
@@ -256,9 +260,9 @@ class ConversationEmbeddingStore:
                     ORDER BY timestamp ASC
                     LIMIT ?
                 """
-                
+
                 rows = conn.execute(query, params).fetchall()
-                
+
                 return [
                     {
                         "message_id": row["id"],
@@ -507,7 +511,7 @@ class ConversationEmbeddingStore:
             # Delete in optimized batches
             deleted = 0
             for i in range(0, len(oldest_ids), 100):
-                batch_ids = oldest_ids[i:i + 100]
+                batch_ids = oldest_ids[i : i + 100]
                 id_list = ", ".join(f"'{id}'" for id in batch_ids)
                 self._table.delete(f"message_id IN ({id_list})")
                 deleted += len(batch_ids)

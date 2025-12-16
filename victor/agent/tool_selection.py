@@ -669,6 +669,9 @@ class ToolSelector:
         self._cached_core_readonly: Optional[Set[str]] = None
         self._cached_web_tools: Optional[Set[str]] = None
 
+        # Enabled tools filter (set by vertical, None = all tools)
+        self._enabled_tools: Optional[Set[str]] = None
+
         # Populate global metadata registry for keyword-based tool selection
         self._populate_metadata_registry()
 
@@ -738,14 +741,22 @@ class ToolSelector:
             entry = get_global_registry().get(tool_name)
             if not entry:
                 return False
-            return entry.access_mode == AccessMode.READONLY or entry.execution_category == ExecutionCategory.READ_ONLY
+            return (
+                entry.access_mode == AccessMode.READONLY
+                or entry.execution_category == ExecutionCategory.READ_ONLY
+            )
         except Exception:
             return False
 
     def _filter_tools_for_stage(
         self, tools: List["ToolDefinition"], stage: Optional[ConversationStage]
     ) -> List["ToolDefinition"]:
-        """Remove write/execute tools during exploration/analysis stages."""
+        """Remove write/execute tools during exploration/analysis stages.
+
+        Note: Vertical core tools (from TieredToolConfig) are ALWAYS preserved
+        since they are essential for the vertical's operation even in early stages.
+        For example, DevOps needs 'docker' and 'shell', Research needs 'web_search'.
+        """
         if stage not in {
             ConversationStage.INITIAL,
             ConversationStage.PLANNING,
@@ -754,8 +765,31 @@ class ToolSelector:
         }:
             return tools
 
-        filtered = [t for t in tools if self._is_readonly_tool(t.name)]
+        # Get vertical core tools that should be preserved regardless of stage
+        preserved_tools: Set[str] = set()
+        tiered_config = getattr(self, "_tiered_config", None)
+        if tiered_config:
+            # Always preserve mandatory and vertical_core tools
+            preserved_tools.update(tiered_config.mandatory)
+            preserved_tools.update(tiered_config.vertical_core)
+            # If vertical has readonly_only_for_analysis=False, don't filter at all
+            if hasattr(tiered_config, "readonly_only_for_analysis") and not tiered_config.readonly_only_for_analysis:
+                logger.debug(
+                    f"Stage filtering skipped: vertical has readonly_only_for_analysis=False"
+                )
+                return tools
+
+        # Filter to readonly tools, but always keep vertical core tools
+        filtered = [
+            t for t in tools
+            if self._is_readonly_tool(t.name) or t.name in preserved_tools
+        ]
+
         if filtered:
+            if preserved_tools:
+                logger.debug(
+                    f"Stage filtering preserved vertical tools: {preserved_tools & {t.name for t in filtered}}"
+                )
             return filtered
 
         # Fallback to core readonly if filtering removed everything
@@ -800,6 +834,201 @@ class ToolSelector:
         self._cached_core_readonly = None
         self._cached_web_tools = None
         logger.debug("Tool selection cache invalidated - will re-discover on next access")
+
+    def set_enabled_tools(self, tools: Optional[Set[str]]) -> None:
+        """Set which tools are enabled for selection (vertical filter).
+
+        When set, only tools in this set will be considered for selection.
+        Pass None to allow all tools.
+
+        Args:
+            tools: Set of tool names to enable, or None for all tools
+        """
+        self._enabled_tools = tools
+        if tools:
+            logger.info(f"Tool selector enabled tools filter: {sorted(tools)}")
+        else:
+            logger.debug("Tool selector enabled tools filter cleared")
+
+    def get_enabled_tools(self) -> Optional[Set[str]]:
+        """Get the enabled tools filter.
+
+        Returns:
+            Set of enabled tool names, or None if all tools are enabled
+        """
+        return self._enabled_tools
+
+    def set_tiered_config(self, config: Any) -> None:
+        """Set tiered tool configuration for intelligent selection.
+
+        When set, tool selection uses the tiered approach:
+        1. Mandatory + Vertical Core are always included
+        2. Semantic pool is selected based on query similarity
+        3. Stage tools are added for specific stages
+
+        Args:
+            config: TieredToolConfig instance
+        """
+        self._tiered_config = config
+        if config:
+            logger.info(
+                f"Tiered tool config set: "
+                f"mandatory={sorted(config.mandatory)}, "
+                f"vertical_core={sorted(config.vertical_core)}, "
+                f"semantic_pool={sorted(config.semantic_pool)}"
+            )
+        else:
+            logger.debug("Tiered tool config cleared")
+
+    def get_tiered_config(self) -> Optional[Any]:
+        """Get the tiered tool configuration.
+
+        Returns:
+            TieredToolConfig or None if not set
+        """
+        return getattr(self, "_tiered_config", None)
+
+    def select_tiered_tools(
+        self,
+        user_message: str,
+        stage: Optional[str] = None,
+        is_analysis_task: bool = False,
+    ) -> List["ToolDefinition"]:
+        """Select tools using tiered configuration.
+
+        This method provides context-efficient tool selection by using:
+        1. Always: mandatory + vertical_core tools
+        2. If not analysis or readonly_only_for_analysis=False: write/execute tools
+        3. Stage-specific tools if stage is provided
+        4. Semantic pool tools matched to the query
+
+        Args:
+            user_message: User's query for semantic matching
+            stage: Optional stage name for stage-specific tools
+            is_analysis_task: If True and config.readonly_only_for_analysis,
+                              exclude write/execute tools
+
+        Returns:
+            List of ToolDefinition objects
+        """
+        from victor.providers.base import ToolDefinition
+
+        config = self.get_tiered_config()
+        if not config:
+            # Fall back to regular selection
+            return self.select_keywords(user_message)
+
+        all_tools_map = {tool.name: tool for tool in self.tools.list_tools()}
+        selected: Dict[str, ToolDefinition] = {}
+
+        # Tier 1: Mandatory tools (always included)
+        for name in config.mandatory:
+            if name in all_tools_map:
+                tool = all_tools_map[name]
+                selected[name] = ToolDefinition(
+                    name=tool.name,
+                    description=tool.description,
+                    parameters=tool.parameters,
+                )
+
+        # Tier 2: Vertical core tools (always included for this vertical)
+        for name in config.vertical_core:
+            if name in all_tools_map and name not in selected:
+                tool = all_tools_map[name]
+                # Skip write/execute tools for analysis tasks if configured
+                if is_analysis_task and config.readonly_only_for_analysis:
+                    if not self._is_readonly_tool(name):
+                        continue
+                selected[name] = ToolDefinition(
+                    name=tool.name,
+                    description=tool.description,
+                    parameters=tool.parameters,
+                )
+
+        # Tier 3: Stage-specific tools
+        # Use config helper method that prefers registry metadata over static stage_tools
+        if stage:
+            stage_tools = config.get_tools_for_stage_from_registry(stage) if hasattr(config, 'get_tools_for_stage_from_registry') else config.stage_tools.get(stage, set())
+            for name in stage_tools:
+                if name in all_tools_map and name not in selected:
+                    tool = all_tools_map[name]
+                    # Skip write/execute for analysis tasks
+                    if is_analysis_task and config.readonly_only_for_analysis:
+                        if not self._is_readonly_tool(name):
+                            continue
+                    selected[name] = ToolDefinition(
+                        name=tool.name,
+                        description=tool.description,
+                        parameters=tool.parameters,
+                    )
+
+        # Tier 4: Semantic pool (selected based on query)
+        # Use config helper method that prefers registry metadata over static semantic_pool
+        semantic_pool = config.get_effective_semantic_pool() if hasattr(config, 'get_effective_semantic_pool') else config.semantic_pool
+        if semantic_pool:
+            # Simple keyword matching for semantic pool
+            message_lower = user_message.lower()
+            for name in semantic_pool:
+                if name in all_tools_map and name not in selected:
+                    tool = all_tools_map[name]
+
+                    # Check if query suggests need for this tool
+                    should_include = False
+
+                    # Check tool keywords from metadata
+                    if hasattr(tool, 'metadata') and tool.metadata:
+                        keywords = getattr(tool.metadata, 'keywords', []) or []
+                        if any(kw.lower() in message_lower for kw in keywords):
+                            should_include = True
+
+                    # Check tool description keywords
+                    desc_words = tool.description.lower().split()[:10]
+                    if any(word in message_lower for word in desc_words if len(word) > 4):
+                        should_include = True
+
+                    # Skip write/execute for analysis tasks
+                    if should_include and is_analysis_task and config.readonly_only_for_analysis:
+                        if not self._is_readonly_tool(name):
+                            should_include = False
+
+                    if should_include:
+                        selected[name] = ToolDefinition(
+                            name=tool.name,
+                            description=tool.description,
+                            parameters=tool.parameters,
+                        )
+
+        result = list(selected.values())
+        logger.info(
+            f"Tiered selection: {len(result)} tools "
+            f"(mandatory={len(config.mandatory)}, "
+            f"core={len(config.vertical_core)}, "
+            f"stage={stage or 'None'}, "
+            f"analysis={is_analysis_task}): "
+            f"{', '.join(t.name for t in result)}"
+        )
+        self._record_selection("tiered", len(result))
+        return result
+
+    def _filter_by_enabled(self, tools: List["ToolDefinition"]) -> List["ToolDefinition"]:
+        """Filter tools by the enabled tools set.
+
+        Args:
+            tools: List of tool definitions to filter
+
+        Returns:
+            Filtered list containing only enabled tools
+        """
+        if not self._enabled_tools:
+            return tools
+
+        filtered = [t for t in tools if t.name in self._enabled_tools]
+        if len(filtered) < len(tools):
+            logger.debug(
+                f"Filtered tools by enabled set: {len(filtered)} from {len(tools)} "
+                f"(enabled: {sorted(self._enabled_tools)})"
+            )
+        return filtered
 
     def _record_selection(self, method: str, num_tools: int) -> None:
         """Record a selection event.
@@ -1028,6 +1257,9 @@ class ToolSelector:
     ) -> List["ToolDefinition"]:
         """Select tools using keyword-based category matching.
 
+        If enabled_tools filter is set (from vertical), returns all enabled tools.
+        Otherwise falls back to core tools + keyword matching.
+
         Args:
             user_message: The user's input message
             planned_tools: Optional pre-planned tools to include
@@ -1043,7 +1275,37 @@ class ToolSelector:
         selected_tools: List[ToolDefinition] = list(planned_tools) if planned_tools else []
         existing_names = {t.name for t in selected_tools}
 
-        # Build selected tool names: core tools + registry keyword matches
+        # If vertical has set enabled tools, use those directly
+        # This allows verticals like "research" to specify web_search, web_fetch, etc.
+        if self._enabled_tools:
+            logger.info(
+                f"Using vertical enabled tools ({len(self._enabled_tools)}): "
+                f"{sorted(self._enabled_tools)}"
+            )
+            for tool in all_tools:
+                if tool.name in self._enabled_tools and tool.name not in existing_names:
+                    selected_tools.append(
+                        ToolDefinition(
+                            name=tool.name,
+                            description=tool.description,
+                            parameters=tool.parameters,
+                        )
+                    )
+                    existing_names.add(tool.name)
+
+            # Apply stage filtering and return
+            stage = self.conversation_state.get_stage() if self.conversation_state else None
+            selected_tools = self._filter_tools_for_stage(selected_tools, stage)
+
+            tool_names = [t.name for t in selected_tools]
+            logger.info(
+                f"Selected {len(selected_tools)} tools from vertical filter: "
+                f"{', '.join(tool_names)}"
+            )
+            self._record_selection("vertical", len(selected_tools))
+            return selected_tools
+
+        # Fallback: Build selected tool names using core tools + registry keyword matches
         # Uses keywords from @tool decorators as single source of truth
         stage = self.conversation_state.get_stage() if self.conversation_state else None
         selected_tool_names = self._get_stage_core_tools(stage).copy()
@@ -1133,6 +1395,13 @@ class ToolSelector:
         # Combine stage-specific tools with core and web tools
         keep = stage_tools | core | web_tools
 
+        # Always include vertical_core tools from tiered config (GAP-4 fix)
+        # These are essential tools for the vertical (e.g., docker for DevOps, web_search for Research)
+        tiered_config = getattr(self, "_tiered_config", None)
+        if tiered_config:
+            keep.update(tiered_config.mandatory)
+            keep.update(tiered_config.vertical_core)
+
         # Also get tools from adjacent stages for flexibility
         for tool in tools:
             if self.conversation_state.should_include_tool(tool.name):
@@ -1156,12 +1425,15 @@ class ToolSelector:
             )
             return pruned
 
-        # Fallback to core tools (stage-aware)
+        # Fallback to core tools (stage-aware) + vertical_core tools
         core_fallback = self._get_stage_core_tools(current_stage)
+        # Also include vertical_core tools in fallback (GAP-4 fix)
+        if tiered_config:
+            core_fallback = core_fallback | tiered_config.mandatory | tiered_config.vertical_core
         fallback_tools = [t for t in tools if t.name in core_fallback]
 
         if fallback_tools:
-            logger.debug(f"Stage pruning fallback: {len(fallback_tools)} core tools")
+            logger.debug(f"Stage pruning fallback: {len(fallback_tools)} core+vertical tools")
             return fallback_tools
 
         # Last resort: return a small prefix

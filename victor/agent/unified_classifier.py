@@ -207,6 +207,11 @@ SEARCH_KEYWORDS: List[Tuple[str, float]] = [
     ("where is", 0.8),
     ("grep", 1.0),
     ("look for", 0.7),
+    ("list", 0.7),  # "list the directory structure"
+    ("show", 0.6),  # "show me the files"
+    ("directory structure", 0.9),
+    ("folder structure", 0.9),
+    ("project structure", 0.8),
 ]
 
 EDIT_KEYWORDS: List[Tuple[str, float]] = [
@@ -599,7 +604,9 @@ class UnifiedTaskClassifier:
         # If action keywords appear AFTER analysis keywords, action is the end goal
         # (e.g., "analyze the codebase and apply the fix" → ACTION)
         # (e.g., "analyze the logs" → ANALYSIS)
-        action_positions = [m.position for m in action_matches + gen_matches + edit_matches if not m.negated]
+        action_positions = [
+            m.position for m in action_matches + gen_matches + edit_matches if not m.negated
+        ]
         analysis_positions = [m.position for m in analysis_matches if not m.negated]
 
         if analysis_positions and action_positions:
@@ -641,13 +648,14 @@ class UnifiedTaskClassifier:
         has_action = any(not m.negated for m in action_matches)
         has_gen = any(not m.negated for m in gen_matches)
         has_analysis = any(not m.negated for m in analysis_matches)
+        has_search = any(not m.negated for m in search_matches)
         has_execution = any(not m.negated for m in exec_matches)
 
         result = ClassificationResult(
             task_type=best_type,
             confidence=confidence,
             is_action_task=has_action or has_gen,  # Generation is a form of action
-            is_analysis_task=has_analysis,
+            is_analysis_task=has_analysis or has_search,  # Search is exploratory like analysis
             is_generation_task=has_gen,
             needs_execution=has_execution,
             source="keyword",

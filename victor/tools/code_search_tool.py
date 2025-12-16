@@ -292,10 +292,17 @@ async def _literal_search(
         "find",
         "grep",
         "literal",
+        "code search",
     ],
-    mandatory_keywords=["search code", "find in code", "search for"],  # Force inclusion
+    mandatory_keywords=[
+        "search code", "find in code", "search for", "code search",
+        # Analysis-related from MANDATORY_TOOL_KEYWORDS
+        "analyze", "analyze codebase", "codebase analysis", "understand",
+        "explore codebase", "architecture", "search",
+    ],  # Force inclusion
+    aliases=["search"],  # Backward compatibility alias
 )
-async def search(
+async def code_search(
     query: str,
     path: str = ".",
     k: int = 10,
@@ -306,9 +313,17 @@ async def search(
     lang: Optional[str] = None,
     test: Optional[bool] = None,
     exts: Optional[List[str]] = None,
-    context: Optional[Dict[str, Any]] = None,
+    _exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Unified code search with multiple modes.
+    """Find code by CONCEPT or TEXT when you DON'T know exact location/name.
+
+    Use this tool for exploration when you need to discover where relevant code
+    lives. Returns file snippets ranked by relevance.
+
+    DIFFERS FROM:
+    - symbol(): Gets FULL CODE of a known symbol. Use when you know file + name.
+    - refs(): Finds USAGE locations of a known symbol. Use for "where is X called".
+    - graph(): Shows RELATIONSHIPS between symbols. Use for dependencies/impact.
 
     Modes:
     - "semantic": Embedding-based search. Best for concepts, patterns, inheritance.
@@ -325,6 +340,11 @@ async def search(
         lang: Filter by language (python/rust/js) (semantic mode only)
         test: Filter test files (true/false) (semantic mode only)
         exts: File extensions for literal mode (e.g., [".py", ".js"])
+        _exec_ctx: Framework execution context (contains settings, etc.)
+
+    Example:
+        search(query="error handling in providers")  # Semantic: find related concepts
+        search(query="BaseProvider", mode="literal")  # Literal: grep-like text match
     """
     # Route to literal search if mode is "literal"
     if mode == "literal":
@@ -335,7 +355,7 @@ async def search(
         if not root_path.exists():
             return {"success": False, "error": f"Root not found: {search_root}"}
 
-        settings = context.get("settings") if context else None
+        settings = _exec_ctx.get("settings") if _exec_ctx else None
         if settings is None:
             return {"success": False, "error": "Settings not available in tool context."}
 

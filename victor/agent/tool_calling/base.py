@@ -131,6 +131,10 @@ class ToolCallingCapabilities:
     exploration_multiplier: float = 1.0  # Multiplies max_exploration_iterations
     continuation_patience: int = 10  # Empty turns to allow before forcing completion
 
+    # Model-specific timeout settings
+    # Slow local models (30B+ params on CPU) need longer timeouts
+    timeout_multiplier: float = 1.0  # Multiplies provider timeout (default 300s)
+
 
 @dataclass
 class ToolCall:
@@ -556,6 +560,39 @@ class BaseToolCallingAdapter(ABC):
 
         return "\n".join(hints)
 
+    # =============================================================================
+    # ARGUMENT ALIASES
+    # =============================================================================
+    # Maps alternate argument names to canonical names that tools expect.
+    # LLMs often hallucinate alternate names for common parameters.
+    # Key: (tool_name, alias_name), Value: canonical_name
+    # Use None as tool_name for global aliases that apply to all tools.
+    ARGUMENT_ALIASES: Dict[tuple, str] = {
+        # Shell tool: LLMs often use 'command' instead of 'cmd'
+        ("shell", "command"): "cmd",
+        ("execute_bash", "command"): "cmd",
+        # Read tool: 'file_path' or 'filename' instead of 'path'
+        ("read", "file_path"): "path",
+        ("read", "filename"): "path",
+        ("read_file", "file_path"): "path",
+        # Write tool: 'file_path' or 'filename' instead of 'path'
+        ("write", "file_path"): "path",
+        ("write", "filename"): "path",
+        ("write_file", "file_path"): "path",
+        # Edit tool: 'file_path' instead of 'path'
+        ("edit", "file_path"): "path",
+        ("edit_file", "file_path"): "path",
+        # Grep/search: 'pattern' instead of 'query'
+        ("grep", "pattern"): "query",
+        ("grep", "search"): "query",
+        ("search", "pattern"): "query",
+        ("code_search", "pattern"): "query",
+        # Ls tool: 'directory' instead of 'path'
+        ("ls", "directory"): "path",
+        ("ls", "dir"): "path",
+        ("list_directory", "directory"): "path",
+    }
+
     # Default values for required parameters that providers may omit.
     # These are sensible defaults that preserve expected tool behavior.
     # Key: tool_name, Value: dict of parameter defaults
@@ -564,13 +601,13 @@ class BaseToolCallingAdapter(ABC):
         # Canonical short names
         "ls": {"path": "."},
         "read": {"path": ""},  # Empty string will fail gracefully
-        "shell": {"command": ""},
+        "shell": {"cmd": ""},  # Note: canonical param is 'cmd', not 'command'
         "grep": {"query": "", "path": "."},
         "search": {"query": "", "path": "."},
         # Legacy names (backward compatibility - LLMs may still use these)
         "list_directory": {"path": "."},
         "read_file": {"path": ""},
-        "execute_bash": {"command": ""},
+        "execute_bash": {"cmd": ""},  # Note: canonical param is 'cmd'
         "code_search": {"query": "", "path": "."},
         "semantic_code_search": {"query": "", "path": "."},
     }
@@ -615,8 +652,9 @@ class BaseToolCallingAdapter(ABC):
         """Normalize tool arguments with sensible defaults and filter hallucinations.
 
         This method:
-        1. Filters out common hallucinated arguments that models generate
-        2. Fills in sensible defaults for missing required parameters
+        1. Applies argument aliases (e.g., 'command' -> 'cmd' for shell tool)
+        2. Filters out common hallucinated arguments that models generate
+        3. Fills in sensible defaults for missing required parameters
 
         Providers may omit required parameters (e.g., Gemini returning empty args
         for list_directory when it means "current directory"). Models may also
@@ -639,21 +677,38 @@ class BaseToolCallingAdapter(ABC):
 
         logger = logging.getLogger(__name__)
 
-        # Step 1: Filter out hallucinated arguments
+        # Step 1: Apply argument aliases (e.g., 'command' -> 'cmd' for shell)
+        aliased = {}
+        aliased_keys = []
+        for key, value in arguments.items():
+            # Check for tool-specific alias
+            alias_key = (tool_name, key)
+            if alias_key in self.ARGUMENT_ALIASES:
+                canonical = self.ARGUMENT_ALIASES[alias_key]
+                # Only apply alias if canonical key doesn't already exist with a value
+                if canonical not in aliased or not aliased[canonical]:
+                    aliased[canonical] = value
+                    aliased_keys.append(f"{key}->{canonical}")
+            else:
+                # No alias, keep original key
+                aliased[key] = value
+
+        if aliased_keys:
+            logger.debug(f"Applied argument aliases for {tool_name}: {aliased_keys}")
+
+        # Step 2: Filter out hallucinated arguments
         filtered = {}
         filtered_out = []
-        for key, value in arguments.items():
+        for key, value in aliased.items():
             if key in self.HALLUCINATED_ARGUMENTS:
                 filtered_out.append(key)
             else:
                 filtered[key] = value
 
         if filtered_out:
-            logger.debug(
-                f"Filtered hallucinated arguments for {tool_name}: {filtered_out}"
-            )
+            logger.debug(f"Filtered hallucinated arguments for {tool_name}: {filtered_out}")
 
-        # Step 2: Apply defaults for missing required parameters
+        # Step 3: Apply defaults for missing required parameters
         defaults = self.TOOL_ARGUMENT_DEFAULTS.get(tool_name, {})
         for param, default_value in defaults.items():
             if param not in filtered or filtered[param] is None:

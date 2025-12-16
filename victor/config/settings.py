@@ -22,6 +22,7 @@ import yaml
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
+from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
 
 
 # =============================================================================
@@ -337,13 +338,13 @@ class ProfileConfig(BaseSettings):
         if v is None:
             return None
 
-        # Predefined model size tiers for convenience
+        # Predefined model size tiers for convenience (from orchestrator_constants)
         TIER_PRESETS = {
-            "tiny": {"base_threshold": 0.35, "base_max_tools": 5},  # 0.5B-3B
-            "small": {"base_threshold": 0.25, "base_max_tools": 7},  # 7B-8B
-            "medium": {"base_threshold": 0.20, "base_max_tools": 10},  # 13B-15B
-            "large": {"base_threshold": 0.15, "base_max_tools": 12},  # 30B+
-            "cloud": {"base_threshold": 0.18, "base_max_tools": 10},  # Claude/GPT
+            "tiny": TOOL_SELECTION_PRESETS.tiny,  # 0.5B-3B
+            "small": TOOL_SELECTION_PRESETS.small,  # 7B-8B
+            "medium": TOOL_SELECTION_PRESETS.medium,  # 13B-15B
+            "large": TOOL_SELECTION_PRESETS.large,  # 30B+
+            "cloud": TOOL_SELECTION_PRESETS.cloud,  # Claude/GPT
         }
 
         # Expand tier shortcuts
@@ -415,6 +416,14 @@ class Settings(BaseSettings):
 
     # Privacy and Security
     airgapped_mode: bool = False
+
+    # ==========================================================================
+    # Vertical Configuration
+    # ==========================================================================
+    # Verticals are domain-specific configurations that customize Victor's behavior.
+    # Available verticals: coding, research, devops (extensible via plugins)
+    default_vertical: str = "coding"  # Default vertical when --vertical not specified
+    auto_detect_vertical: bool = False  # Auto-detect vertical from project context (experimental)
 
     # Server Security (FastAPI/WebSocket layer)
     # When set, API key is required for HTTP + WebSocket requests (Authorization: Bearer <token>)
@@ -503,10 +512,10 @@ class Settings(BaseSettings):
     mcp_prefix: str = "mcp"
 
     # Tool Execution Settings
-    tool_call_budget: int = (
-        300  # Maximum tool calls per session (increased from 20 for long operations)
-    )
-    tool_call_budget_warning_threshold: int = 250  # Warn when approaching budget limit
+    tool_call_budget: int = BUDGET_LIMITS.max_session_budget  # Maximum tool calls per session
+    tool_call_budget_warning_threshold: int = int(
+        BUDGET_LIMITS.max_session_budget * BUDGET_LIMITS.warning_threshold_pct
+    )  # Warn when approaching budget limit
 
     # Models known to support structured tool calls per provider
     # Loaded from model_capabilities.yaml, can be extended in profiles.yaml
@@ -588,17 +597,27 @@ class Settings(BaseSettings):
     # Higher values = more patience but may waste tokens on stuck loops.
 
     # Empty response recovery: Force after N consecutive empty responses from model
-    recovery_empty_response_threshold: int = 5  # Default: force after 5 empty responses (3 * 1.5 = 4.5 → 5)
+    recovery_empty_response_threshold: int = (
+        5  # Default: force after 5 empty responses (3 * 1.5 = 4.5 → 5)
+    )
 
     # Loop detection patience: How many consecutive blocked attempts before forcing completion
     # This is separate from the per-task loop_repeat_threshold (which controls when to warn/block)
-    recovery_blocked_consecutive_threshold: int = 6  # Default: force after 6 consecutive blocks (4 * 1.5 = 6)
-    recovery_blocked_total_threshold: int = 9  # Default: force after 9 total blocked attempts (6 * 1.5 = 9)
+    recovery_blocked_consecutive_threshold: int = (
+        6  # Default: force after 6 consecutive blocks (4 * 1.5 = 6)
+    )
+    recovery_blocked_total_threshold: int = (
+        9  # Default: force after 9 total blocked attempts (6 * 1.5 = 9)
+    )
 
     # Continuation prompts: How many times to prompt model to continue before forcing
     max_continuation_prompts_analysis: int = 6  # For analysis tasks (4 * 1.5 = 6)
     max_continuation_prompts_action: int = 5  # For action tasks (3 * 1.5 = 4.5 → 5)
     max_continuation_prompts_default: int = 3  # For other tasks (2 * 1.5 = 3)
+
+    # Session time limit: Maximum seconds before forcing completion
+    # Set below provider timeout (300s default) to provide graceful completion
+    session_time_limit: int = 240  # 4 minutes default, leaves 60s buffer for summary
 
     # ==========================================================================
     # Conversation Memory (Multi-turn Context Retention)

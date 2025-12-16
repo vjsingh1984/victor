@@ -49,6 +49,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from victor.codebase.ignore_patterns import DEFAULT_SKIP_DIRS, should_ignore_path
+
 logger = logging.getLogger(__name__)
 
 
@@ -136,28 +138,17 @@ class SymbolStore:
         ".svelte": "svelte",
     }
 
-    # Directories to skip
-    SKIP_DIRS = {
-        "__pycache__",
-        ".git",
-        ".pytest_cache",
-        "venv",
-        ".venv",
-        "env",
-        "node_modules",
-        ".tox",
-        "build",
-        "dist",
-        "target",
-        ".next",
-        ".nuxt",
-        "coverage",
-        ".cache",
-        "out",
-        "vendor",
-    }
+    # Use shared default skip directories from ignore_patterns module
+    # Hidden directories (starting with '.') are excluded automatically
+    # by the shared should_ignore_path() utility
+    SKIP_DIRS = DEFAULT_SKIP_DIRS
 
-    def __init__(self, root_path: str, include_dirs: Optional[List[str]] = None, exclude_dirs: Optional[List[str]] = None):
+    def __init__(
+        self,
+        root_path: str,
+        include_dirs: Optional[List[str]] = None,
+        exclude_dirs: Optional[List[str]] = None,
+    ):
         """Initialize symbol store.
 
         Args:
@@ -167,11 +158,11 @@ class SymbolStore:
         """
         self.root = Path(root_path).resolve()
         self.include_dirs = include_dirs
-        
+
         self.effective_skip_dirs = self.SKIP_DIRS.copy()
         if exclude_dirs:
             self.effective_skip_dirs.update(exclude_dirs)
-            
+
         self._init_db()
 
     @property
@@ -258,8 +249,12 @@ class SymbolStore:
             )
 
     def should_ignore(self, path: Path) -> bool:
-        """Check if path should be ignored."""
-        return any(skip in path.parts for skip in self.effective_skip_dirs)
+        """Check if path should be ignored.
+
+        Uses shared ignore logic from ignore_patterns module.
+        Automatically excludes hidden directories (starting with '.').
+        """
+        return should_ignore_path(path, skip_dirs=self.effective_skip_dirs)
 
     def detect_language(self, path: Path) -> Optional[str]:
         """Detect language from file extension."""
@@ -306,8 +301,10 @@ class SymbolStore:
         # Collect all current source files
         current_files: Set[str] = set()
         source_files = []
-        search_paths = [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
-        
+        search_paths = (
+            [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
+        )
+
         for search_path in search_paths:
             if not search_path.is_dir():
                 continue

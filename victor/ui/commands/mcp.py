@@ -14,6 +14,7 @@ from victor.tools.base import ToolRegistry
 mcp_app = typer.Typer(name="mcp", help="Run Victor as an MCP server.")
 console = Console()
 
+
 @mcp_app.callback(invoke_without_command=True)
 def mcp(
     ctx: typer.Context,
@@ -32,6 +33,7 @@ def mcp(
     """Run Victor as an MCP server."""
     if ctx.invoked_subcommand is None:
         _mcp(stdio, log_level)
+
 
 def _mcp(stdio: bool, log_level: str):
     # Configure logging to stderr (stdout is for MCP protocol)

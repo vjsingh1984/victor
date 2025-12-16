@@ -663,7 +663,6 @@ class TestStreamRetryWithoutTools:
             mock_response.__aexit__ = AsyncMock()
             return mock_response
 
-        original_stream = ollama_provider.client.stream
 
         def mock_stream(*args, **kwargs):
             nonlocal call_count
@@ -672,9 +671,7 @@ class TestStreamRetryWithoutTools:
 
             # First call with tools should fail
             if call_count == 1 and "tools" in payload and payload["tools"]:
-                return create_mock_response(
-                    400, '{"error":"model does not support tools"}'
-                )
+                return create_mock_response(400, '{"error":"model does not support tools"}')
             # Second call without tools should succeed
             return create_mock_response(200)
 
@@ -719,7 +716,6 @@ class TestStreamRetryWithoutTools:
 
         payloads_sent = []
 
-        original_stream = ollama_provider.client.stream
 
         def capture_stream(*args, **kwargs):
             payloads_sent.append(kwargs.get("json", {}))

@@ -667,6 +667,8 @@ TEXT_EXTENSIONS = {
         "show file",
         "explain this code",
         "what does this",
+        # Additional keywords from MANDATORY_TOOL_KEYWORDS
+        "explain", "describe", "what does",
     ],  # Force inclusion
     priority_hints=[
         "TRUNCATION: Output limited to ~15,000 chars. Use offset/limit for large files.",
@@ -1107,14 +1109,15 @@ async def write(path: str, content: str) -> str:
         "count files",
     ],  # Force inclusion
     priority_hints=[
-        "Use for browsing directory contents",
+        "Use for browsing directory contents (default depth=2 shows subdirectories)",
         "Use pattern parameter for filtering (e.g., '*.py', 'test_*')",
+        "For searching specific files, use find(name='filename') instead",
     ],
 )
 async def ls(
     path: str,
     recursive: bool = False,
-    depth: int = 1,
+    depth: int = 2,
     pattern: str = "",
     limit: int = 1000,
 ) -> List[Dict[str, Any]]:
@@ -1123,7 +1126,7 @@ async def ls(
     Args:
         path: Directory path
         recursive: All levels (ignores depth)
-        depth: Levels to explore (1=children)
+        depth: Levels to explore (default=2 for subdirectory visibility)
         pattern: Glob filter (*.py, test_*)
         limit: Max entries
 
@@ -1131,6 +1134,9 @@ async def ls(
         List of {name/path, type, depth, size, hint}.
         - size: File size in bytes (files only)
         - hint: For large files (>100KB), pagination instruction
+
+    Tip: Default depth=2 shows contents of immediate subdirectories.
+         Use depth=1 for just the top level, or recursive=True for all.
     """
     import fnmatch
 
@@ -1236,16 +1242,30 @@ async def ls(
             items.append(item)
             count += 1
 
-        # Add metadata if filtered or truncated
-        if pattern or count >= limit:
-            return {
-                "items": items,
-                "count": len(items),
-                "truncated": count >= limit,
-                "filter": pattern or None,
-            }
+        # Build result with cwd context for better LLM orientation
+        cwd = str(Path.cwd())
 
-        return items
+        # Try to express the target path relative to cwd for clarity
+        try:
+            relative_target = str(dir_path.relative_to(Path.cwd()))
+        except ValueError:
+            relative_target = str(dir_path)  # Use absolute if outside cwd
+
+        # Always include cwd context and relative target path in response
+        result = {
+            "cwd": cwd,
+            "target": relative_target if relative_target != "." else ".",
+            "items": items,
+            "count": len(items),
+        }
+
+        # Add optional metadata
+        if pattern:
+            result["filter"] = pattern
+        if count >= limit:
+            result["truncated"] = True
+
+        return result
 
     except Exception as e:
         # Let the decorator handle the exception and format it
@@ -1319,7 +1339,8 @@ async def find(
         for root, dirs, files in base_path.walk():
             # Skip hidden and common excluded directories
             dirs[:] = [
-                d for d in dirs
+                d
+                for d in dirs
                 if not d.startswith(".")
                 and d not in {"node_modules", "__pycache__", "venv", ".venv", "build", "dist"}
             ]
@@ -1329,11 +1350,13 @@ async def find(
                 for d in dirs:
                     if fnmatch.fnmatch(d, name) or fnmatch.fnmatch(d.lower(), name.lower()):
                         dir_path = root / d
-                        results.append({
-                            "path": str(dir_path.relative_to(base_path)),
-                            "type": "directory",
-                            "size": 0,
-                        })
+                        results.append(
+                            {
+                                "path": str(dir_path.relative_to(base_path)),
+                                "type": "directory",
+                                "size": 0,
+                            }
+                        )
                         count += 1
                         if count >= limit:
                             break
@@ -1347,11 +1370,13 @@ async def find(
                             size = file_path.stat().st_size
                         except OSError:
                             size = 0
-                        results.append({
-                            "path": str(file_path.relative_to(base_path)),
-                            "type": "file",
-                            "size": size,
-                        })
+                        results.append(
+                            {
+                                "path": str(file_path.relative_to(base_path)),
+                                "type": "file",
+                                "size": size,
+                            }
+                        )
                         count += 1
                         if count >= limit:
                             break
@@ -1360,10 +1385,12 @@ async def find(
                 break
 
         if not results:
-            return [{
-                "message": f"No files matching '{name}' found in {path}",
-                "suggestion": "Try a broader pattern like '*{name}*' or search from project root with path='.'",
-            }]
+            return [
+                {
+                    "message": f"No files matching '{name}' found in {path}",
+                    "suggestion": "Try a broader pattern like '*{name}*' or search from project root with path='.'",
+                }
+            ]
 
         return results
 
@@ -1448,7 +1475,13 @@ async def overview(
         if not root.exists():
             raise FileNotFoundError(f"Directory not found: {path}")
         if not root.is_dir():
-            raise NotADirectoryError(f"Path is not a directory: {path}")
+            # GAP-14 FIX: If a file path is given, use its parent directory
+            # This is a common model mistake - be helpful and auto-correct
+            parent = root.parent
+            if parent.is_dir():
+                root = parent
+            else:
+                raise NotADirectoryError(f"Path is not a directory: {path}. Use the parent directory or a directory path.")
 
         # Excluded directories
         exclude_dirs = {

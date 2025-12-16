@@ -145,6 +145,7 @@ def _run_git(*args: str, env_overrides: Optional[Dict[str, str]] = None) -> Tupl
         "Supports custom author name and email for commits",
         "Can stage individual files or all changes",
     ],
+    mandatory_keywords=["commit", "git commit", "git status", "git diff"],  # From MANDATORY_TOOL_KEYWORDS
 )
 async def git(
     operation: str,

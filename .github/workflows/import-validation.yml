@@ -1,0 +1,30 @@
+name: Import Validation
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  validate-imports:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Validate import dependencies
+        run: |
+          python scripts/check_imports.py
+
+      - name: Report results
+        if: failure()
+        run: |
+          echo "::error::Import validation failed - see details above"
+          echo "Import violations detected. Please fix circular dependencies."
+          exit 1

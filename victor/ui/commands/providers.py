@@ -7,6 +7,7 @@ from victor.providers.registry import ProviderRegistry
 providers_app = typer.Typer(name="providers", help="List all available providers.")
 console = Console()
 
+
 @providers_app.command("list")
 def list_providers() -> None:
     """List all available providers."""

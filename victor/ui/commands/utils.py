@@ -26,6 +26,7 @@ console = Console()
 # Global reference for signal handler cleanup
 _current_agent: Optional[AgentOrchestrator] = None
 
+
 def configure_logging(log_level: str, stream: Optional[Any] = None) -> None:
     """Configure logging to stderr (separate from Rich console output)."""
     logging.basicConfig(
@@ -35,10 +36,12 @@ def configure_logging(log_level: str, stream: Optional[Any] = None) -> None:
         force=True,
     )
 
+
 def flush_logging() -> None:
     """Flush all logging handlers before shutdown messages."""
     for handler in logging.root.handlers:
         handler.flush()
+
 
 async def graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
     """Perform graceful shutdown of the agent."""
@@ -46,11 +49,13 @@ async def graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
         return
     try:
         from victor.agent.rl_model_selector import SessionReward, get_model_selector
+
         selector = get_model_selector()
         if selector and agent.provider and hasattr(agent, "message_count"):
             msg_count = agent.message_count
             if msg_count > 0:
                 import uuid
+
                 metrics = {}
                 if hasattr(agent, "get_session_metrics"):
                     metrics = agent.get_session_metrics() or {}
@@ -84,8 +89,10 @@ async def graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
     finally:
         flush_logging()
 
+
 def setup_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
     """Set up signal handlers for graceful shutdown."""
+
     def signal_handler(sig: int, frame: Any) -> None:
         global _current_agent
         sig_name = signal.Signals(sig).name
@@ -102,8 +109,10 @@ def setup_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
                     pass
         if sig == signal.SIGINT:
             raise KeyboardInterrupt()
+
     if sys.platform != "win32":
         signal.signal(signal.SIGTERM, signal_handler)
+
 
 async def check_codebase_index(cwd: str, console_obj: Console, silent: bool = False) -> None:
     """Check codebase index status at startup and reindex if needed."""
@@ -116,7 +125,9 @@ async def check_codebase_index(cwd: str, console_obj: Console, silent: bool = Fa
             return
         total_changes = len(modified) + len(deleted)
         if not silent:
-            console_obj.print(f"[dim]Index stale: {len(modified)} modified, {len(deleted)} deleted files[/]")
+            console_obj.print(
+                f"[dim]Index stale: {len(modified)} modified, {len(deleted)} deleted files[/]"
+            )
         if total_changes <= 10:
             await index.incremental_reindex()
             if not silent:
@@ -130,7 +141,10 @@ async def check_codebase_index(cwd: str, console_obj: Console, silent: bool = Fa
     except Exception as e:
         logger.debug(f"Codebase index check failed: {e}")
 
-async def preload_semantic_index(cwd: str, settings: Any, console_obj: Console, force: bool = False) -> bool:
+
+async def preload_semantic_index(
+    cwd: str, settings: Any, console_obj: Console, force: bool = False
+) -> bool:
     """Preload semantic codebase index with embeddings and graph upfront."""
     try:
         root_path = Path(cwd).resolve()
@@ -168,6 +182,7 @@ async def preload_semantic_index(cwd: str, settings: Any, console_obj: Console, 
         console_obj.print(f"[yellow]⚠ Semantic index preload failed: {e}[/]")
         return False
 
+
 async def cli_confirmation_callback(request: ConfirmationRequest) -> bool:
     """Prompt user for confirmation of dangerous operations."""
     risk_colors = {
@@ -199,14 +214,19 @@ async def cli_confirmation_callback(request: ConfirmationRequest) -> bool:
         console.print("\n[dim]Operation cancelled[/dim]")
         return False
 
+
 def setup_safety_confirmation() -> None:
     """Set up the CLI confirmation callback for dangerous operations."""
     set_confirmation_callback(cli_confirmation_callback)
 
-def get_rl_profile_suggestion(current_provider: str, profiles: dict) -> Optional[tuple[str, str, float]]:
+
+def get_rl_profile_suggestion(
+    current_provider: str, profiles: dict
+) -> Optional[tuple[str, str, float]]:
     """Get RL-based profile suggestion if different from current."""
     try:
         from victor.agent.rl_model_selector import get_model_selector
+
         selector = get_model_selector()
         if not selector:
             return None

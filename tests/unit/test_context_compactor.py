@@ -65,8 +65,8 @@ class TestCompactorConfig:
 
         assert config.proactive_threshold == 0.90
         assert config.min_messages_after_compact == 8
-        assert config.tool_result_max_chars == 8000
-        assert config.tool_result_max_lines == 200
+        assert config.tool_result_max_chars == 8192
+        assert config.tool_result_max_lines == 230
         assert config.truncation_strategy == TruncationStrategy.SMART
         assert config.preserve_code_blocks is True
         assert config.enable_proactive is True

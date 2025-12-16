@@ -206,6 +206,9 @@ class GroundingVerifier:
         self.config = config or VerifierConfig()
         self._file_cache: Dict[str, str] = {}
         self._existing_files: Optional[Set[str]] = None
+        logger.debug(
+            f"GroundingVerifier initialized with project_root={self.project_root}"
+        )
 
     def _get_existing_files(self) -> Set[str]:
         """Get set of existing files in project (cached)."""
@@ -223,6 +226,10 @@ class GroundingVerifier:
                     for file in files:
                         rel_path = os.path.relpath(os.path.join(root, file), self.project_root)
                         self._existing_files.add(rel_path)
+                logger.debug(
+                    f"GroundingVerifier scanned {len(self._existing_files)} files "
+                    f"under {self.project_root}"
+                )
             except Exception as e:
                 logger.warning(f"Error scanning project files: {e}")
         return self._existing_files
@@ -334,16 +341,32 @@ class GroundingVerifier:
             filename = os.path.basename(path)
             # Match files ending with the exact filename (separated by /)
             partial_matches = [
-                f for f in existing_files
+                f
+                for f in existing_files
                 if f.endswith(filename) and (f == filename or f.endswith("/" + filename))
             ]
 
             if partial_matches:
                 # File exists - if it's just a filename without path, count as verified
                 # (model may have abbreviated the path which is fine)
-                if "/" not in path or len(partial_matches) == 1:
-                    # Exact filename or only one match - count as verified
+                if "/" not in path:
+                    # Just a filename - count as verified
                     result.verified_references.append(path)
+                elif len(partial_matches) == 1 and partial_matches[0] == clean_path:
+                    # Single match and path is correct - count as verified
+                    result.verified_references.append(path)
+                elif len(partial_matches) == 1:
+                    # Single match but wrong directory path - flag it but low severity
+                    result.add_issue(
+                        GroundingIssue(
+                            issue_type=IssueType.PATH_INVALID,
+                            severity=IssueSeverity.LOW,
+                            description=f"Path '{path}' has incorrect directory",
+                            reference=path,
+                            suggestion=f"Correct path is: {partial_matches[0]}",
+                        )
+                    )
+                    result.unverified_references.append(path)
                 else:
                     # Multiple matches and a partial path was given - ambiguous
                     result.add_issue(
@@ -516,15 +539,36 @@ class GroundingVerifier:
                 file_symbols = self.SYMBOL_PATTERN.findall(content)
                 known_symbols.update(file_symbols)
 
+        # GAP-15 FIX: Skip common keywords and built-ins that should not be flagged
+        # These are Python/JavaScript language constructs, not user-defined symbols
+        language_keywords = {
+            # Python keywords
+            "if", "else", "elif", "for", "while", "try", "except", "finally",
+            "with", "as", "import", "from", "class", "def", "return", "yield",
+            "raise", "assert", "pass", "break", "continue", "lambda", "and",
+            "or", "not", "in", "is", "True", "False", "None", "async", "await",
+            # Python built-ins commonly appearing in code
+            "print", "len", "range", "str", "int", "float", "list", "dict",
+            "set", "tuple", "type", "isinstance", "hasattr", "getattr", "setattr",
+            "open", "file", "input", "output", "read", "write", "append",
+            # JavaScript/TypeScript keywords
+            "const", "let", "var", "function", "return", "returns", "async",
+            "await", "export", "import", "default", "interface", "type",
+            # Common patterns in generated code descriptions
+            "returns", "takes", "args", "kwargs", "param", "params",
+            # Magic methods
+            "__init__", "__str__", "__repr__", "self", "cls", "__name__",
+            "__main__", "__file__", "__doc__",
+        }
+
         # Verify each symbol
         for symbol in symbols:
             if symbol in known_symbols:
                 result.verified_references.append(f"symbol:{symbol}")
+            elif symbol.lower() in language_keywords or symbol in language_keywords:
+                # GAP-15 FIX: Skip language keywords - they are not user symbols
+                continue
             else:
-                # Check if it's a built-in or common name
-                if symbol in {"__init__", "__str__", "__repr__", "self", "cls"}:
-                    continue
-
                 result.add_issue(
                     GroundingIssue(
                         issue_type=IssueType.SYMBOL_NOT_FOUND,

@@ -13,10 +13,23 @@
 # limitations under the License.
 
 """
-CodingAgent - A universal terminal-based coding agent supporting multiple LLM providers.
+Victor - A universal terminal-based coding agent supporting multiple LLM providers.
 
 Supports frontier models (Claude, GPT, Gemini) and open-source models
 (Ollama, LMStudio, vLLM) with unified tool calling integration.
+
+Simple API (recommended):
+    from victor import Agent
+
+    agent = await Agent.create(provider="anthropic")
+    result = await agent.run("Write a hello world function")
+    print(result.content)
+
+Full API (advanced):
+    from victor import AgentOrchestrator, Settings
+
+    settings = Settings()
+    orchestrator = await AgentOrchestrator.from_settings(settings, "default")
 """
 
 __version__ = "0.1.0"
@@ -24,7 +37,59 @@ __author__ = "Vijaykumar Singh"
 __email__ = "singhvjd@gmail.com"
 __license__ = "Apache-2.0"
 
+# Core classes (existing API - for backward compatibility)
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings
 
-__all__ = ["AgentOrchestrator", "Settings"]
+# Framework API (simplified - new golden path)
+from victor.framework import (
+    Agent,
+    AgentConfig,
+    AgentError,
+    BudgetExhaustedError,
+    CancellationError,
+    ChatSession,
+    ConfigurationError,
+    Event,
+    EventType,
+    ProviderError,
+    Stage,
+    State,
+    StateHooks,
+    Task,
+    TaskResult,
+    TaskType,
+    ToolCategory,
+    ToolError,
+    Tools,
+    ToolSet,
+)
+
+__all__ = [
+    # Framework API (5 core concepts + supporting classes)
+    "Agent",
+    "Task",
+    "Tools",
+    "State",
+    "Event",
+    # Supporting classes
+    "ChatSession",
+    "TaskResult",
+    "TaskType",
+    "ToolSet",
+    "ToolCategory",
+    "Stage",
+    "StateHooks",
+    "EventType",
+    "AgentConfig",
+    # Errors
+    "AgentError",
+    "ProviderError",
+    "ToolError",
+    "ConfigurationError",
+    "BudgetExhaustedError",
+    "CancellationError",
+    # Core classes (existing API)
+    "AgentOrchestrator",
+    "Settings",
+]

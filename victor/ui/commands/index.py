@@ -11,6 +11,7 @@ from victor.ui.commands.utils import preload_semantic_index
 index_app = typer.Typer(name="index", help="Build semantic code search index for the codebase.")
 console = Console()
 
+
 @index_app.callback(invoke_without_command=True)
 def index(
     ctx: typer.Context,

@@ -63,31 +63,32 @@ PYTHON_QUERIES = {
         "code for",
         "implementation",
     ],
-    stages=["analysis"],  # Conversation stages where relevant
+    stages=["initial", "planning", "reading", "analysis"],  # Available early when symbol name known
+    mandatory_keywords=["find", "find symbol", "find definition"],  # From MANDATORY_TOOL_KEYWORDS "find" -> ["symbol", "refs"]
 )
 async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
-    """[AST-AWARE] Find function/class definition using tree-sitter parsing.
+    """[AST-AWARE] Get FULL CODE of a function/class definition in a specific file.
 
-    Uses AST analysis for accurate symbol lookup. For Python code analysis only.
-    Use this instead of grep/text search when you need precise symbol definitions.
+    Returns the complete code block (not just a reference). Use when you KNOW:
+    1. The exact file path
+    2. The exact symbol name
+
+    DIFFERS FROM:
+    - search(): Finds files/snippets when you DON'T know where code is
+    - refs(): Finds all USAGES of a symbol across project (not the definition)
+    - graph(): Shows RELATIONSHIPS between symbols (not code content)
 
     Args:
-        file_path: Path to Python file (.py).
-        symbol_name: Name of function or class to find.
+        file_path: Path to Python file (.py). MUST be known.
+        symbol_name: Exact name of function or class. MUST be known.
 
     Returns:
         Dict with symbol_name, type, file_path, start_line, end_line, code.
         None if not found. {"error": ...} on file/parse errors.
 
-    When to use:
-        - Finding where a function/class is defined
-        - Getting the full code block of a symbol
-        - Navigating to symbol definitions
-
-    When NOT to use:
-        - Non-Python files (use grep/search instead)
-        - Finding usages/references (use refs() instead)
-        - Text patterns that aren't symbol names
+    Example:
+        symbol(file_path="victor/agent/orchestrator.py", symbol_name="chat")
+        # Returns full code of the chat() method with line numbers
     """
     try:
         parser = get_parser("python")
@@ -138,49 +139,52 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
     keywords=[
         "refs",
         "references",
-        "find",
         "usage",
         "occurrences",
-        "symbol",
         "ast",
         # Natural language patterns for usage lookup (semantic matching)
-        "where is",
         "used",
         "called",
         "invoked",
         "callers",
         "who calls",
-        "find all",
         "all usages",
         "find usages",
         "list references",
+        "where used",
     ],
-    stages=["analysis", "reading"],
+    stages=["initial", "planning", "reading", "analysis"],  # Available early for impact analysis
     execution_category=ExecutionCategory.READ_ONLY,
+    mandatory_keywords=["find", "find references", "find usages"],  # From MANDATORY_TOOL_KEYWORDS "find" -> ["symbol", "refs"]
 )
 async def refs(symbol_name: str, search_path: str = ".") -> List[Dict[str, Any]]:
-    """[AST-AWARE] Find all references to a symbol using tree-sitter parsing.
+    """[AST-AWARE] Find all USAGES of a symbol across the project.
 
-    Scans Python files and identifies exact identifier matches using AST analysis.
-    More accurate than grep for finding symbol usages (won't match substrings).
+    Project-wide scan using AST parsing. More accurate than grep (exact identifier
+    matches only, no substrings). Use when you KNOW the symbol name but want to
+    find WHERE it's used.
+
+    DIFFERS FROM:
+    - symbol(): Gets the DEFINITION code (not usages). Use when you know file + name.
+    - search(): Finds files by CONCEPT/TEXT. Use when you DON'T know the exact name.
+    - graph(): Shows RELATIONSHIPS/dependencies. Use for impact analysis, not locations.
 
     Args:
-        symbol_name: Symbol name (variable, function, class) to find.
+        symbol_name: Exact symbol name (function, class, variable) to find usages of.
         search_path: Directory to search recursively. Default: current directory.
 
     Returns:
         List of dicts: [{file_path, line, column, preview}, ...]
         Empty list if no references found.
 
-    When to use:
-        - Finding all usages of a function/variable/class
-        - Understanding symbol usage patterns
-        - Preparing for refactoring (see rename() for actual changes)
+    Example:
+        refs(symbol_name="BaseProvider")
+        # Returns all files/lines where BaseProvider is referenced
 
     When NOT to use:
         - Non-Python files (use grep instead)
-        - Finding text patterns (use grep instead)
-        - Modifying code (use rename() for symbol renames)
+        - Finding text patterns (use search() with mode="literal")
+        - Getting the definition code (use symbol() instead)
     """
     references = []
     parser = get_parser("python")

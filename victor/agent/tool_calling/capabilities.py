@@ -200,7 +200,7 @@ class ModelCapabilityLoader:
 
         config_dict = self._config or {}
         provider_lower = provider.lower()
-        
+
         # Start building resolved config
         resolved = {}
 
@@ -343,6 +343,8 @@ class ModelCapabilityLoader:
             # Model-specific exploration behavior
             exploration_multiplier=config.get("exploration_multiplier", 1.0),
             continuation_patience=config.get("continuation_patience", 3),
+            # Model-specific timeout settings
+            timeout_multiplier=config.get("timeout_multiplier", 1.0),
         )
 
     # =========================================================================

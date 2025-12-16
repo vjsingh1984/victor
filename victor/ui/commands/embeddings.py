@@ -8,8 +8,11 @@ from pathlib import Path
 
 from victor.cache.embedding_cache_manager import CacheType, EmbeddingCacheManager
 
-embeddings_app = typer.Typer(name="embeddings", help="Manage Victor embeddings for troubleshooting.")
+embeddings_app = typer.Typer(
+    name="embeddings", help="Manage Victor embeddings for troubleshooting."
+)
 console = Console()
+
 
 @embeddings_app.callback(invoke_without_command=True)
 def embeddings(
@@ -53,10 +56,11 @@ def embeddings(
         else:
             _show_status(stat, targets, clear, rebuild)
 
+
 def _show_status(stat: bool, targets: list[CacheType], clear: bool, rebuild: bool):
     manager = EmbeddingCacheManager.get_instance()
     status = manager.get_status()
-    
+
     console.print("\n[bold]Victor Embedding Status[/]")
     console.print("─" * 70)
 
@@ -99,7 +103,7 @@ def _show_status(stat: bool, targets: list[CacheType], clear: bool, rebuild: boo
 
     console.print("─" * 70)
     console.print(f"  Total: {status.total_files} files ({status.total_size_str})")
-    
+
     no_flags = not stat and not clear and not rebuild and not targets
     if no_flags:
         console.print("\n[bold]Commands:[/]")
@@ -113,10 +117,11 @@ def _show_status(stat: bool, targets: list[CacheType], clear: bool, rebuild: boo
         console.print("  [cyan]--all[/]          All embeddings (default)")
         console.print("\n[dim]Combine: victor embeddings --rebuild --tool --yes[/]")
 
+
 def _clear_embeddings(targets: list[CacheType], rebuild: bool, yes: bool):
     manager = EmbeddingCacheManager.get_instance()
     status = manager.get_status()
-    
+
     target_files = sum(status.get_cache(t).file_count for t in targets)
     target_size = sum(status.get_cache(t).total_size for t in targets)
 
@@ -131,7 +136,7 @@ def _clear_embeddings(targets: list[CacheType], rebuild: bool, yes: bool):
 
     if not yes:
         console.print("")
-        if not Confirm.ask("[yellow]Proceed?[/]"): # default=False
+        if not Confirm.ask("[yellow]Proceed?[/]"):  # default=False
             console.print("[dim]Cancelled.[/]")
             return
 
@@ -149,14 +154,19 @@ def _clear_embeddings(targets: list[CacheType], rebuild: bool, yes: bool):
             console.print(f"  [dim]{msg}[/]")
 
     result = manager.clear(targets, progress_callback)
-    
-    size_str = f"{result.cleared_size / 1024:.1f} KB" if result.cleared_size >= 1024 else f"{result.cleared_size} B"
+
+    size_str = (
+        f"{result.cleared_size / 1024:.1f} KB"
+        if result.cleared_size >= 1024
+        else f"{result.cleared_size} B"
+    )
     console.print(f"\n[green]✓ Cleared {result.cleared_files} files ({size_str})[/]")
 
     if rebuild:
         _rebuild_embeddings(targets, progress_callback)
     else:
         console.print("[dim]Embeddings will auto-rebuild on next 'victor chat'.[/]")
+
 
 def _rebuild_embeddings(targets: list[CacheType], progress_callback):
     console.print("\n[bold]Rebuilding...[/]")
@@ -187,13 +197,13 @@ def _rebuild_embeddings(targets: list[CacheType], progress_callback):
                                     registry.register(obj)
                         except Exception:
                             pass
-                
+
                 async def rebuild_tool_embeddings():
                     selector = SemanticToolSelector(cache_embeddings=True)
                     await selector.initialize_tool_embeddings(registry)
                     await selector.close()
                     return len(registry.list_tools())
-                
+
                 tool_count = asyncio.run(rebuild_tool_embeddings())
                 console.print(f"  [green]✓[/] Tool embeddings rebuilt ({tool_count} tools)")
             except Exception as e:
@@ -206,6 +216,7 @@ def _rebuild_embeddings(targets: list[CacheType], progress_callback):
 
             try:
                 console.print("  [dim]Rebuilding conversation embeddings...[/]")
+
                 async def rebuild_conversations():
                     embedding_service = EmbeddingService.get_instance()
                     store = ConversationEmbeddingStore(embedding_service)
@@ -213,11 +224,14 @@ def _rebuild_embeddings(targets: list[CacheType], progress_callback):
                     count = await store.rebuild()
                     await store.close()
                     return count
+
                 msg_count = asyncio.run(rebuild_conversations())
-                console.print(f"  [green]✓[/] Conversation embeddings rebuilt ({msg_count} messages)")
+                console.print(
+                    f"  [green]✓[/] Conversation embeddings rebuilt ({msg_count} messages)"
+                )
             except Exception as e:
                 console.print(f"  [yellow]⚠[/] Conversation embeddings: {e}")
-        
+
         console.print("\n[green]✓ Rebuild complete![/]")
     except Exception as e:
         console.print(f"\n[yellow]Rebuild skipped: {e}[/]")

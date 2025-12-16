@@ -361,7 +361,9 @@ class ToolExecutor:
                     return False, validation
                 else:  # LENIENT
                     logger.warning(
-                        "Validation issues for '%s' (proceeding anyway): %s", tool.name, error_summary
+                        "Validation issues for '%s' (proceeding anyway): %s",
+                        tool.name,
+                        error_summary,
                     )
                     return True, validation
 
@@ -440,7 +442,7 @@ class ToolExecutor:
                     logger.info(
                         "Code auto-corrected for tool '%s': %d issues fixed",
                         tool_name,
-                        len(correction_result.validation.errors)
+                        len(correction_result.validation.errors),
                     )
 
                 if not correction_result.validation.valid:
@@ -448,7 +450,7 @@ class ToolExecutor:
                     logger.warning(
                         "Code validation errors for tool '%s': %s",
                         tool_name,
-                        list(correction_result.validation.errors)
+                        list(correction_result.validation.errors),
                     )
             except (AttributeError, TypeError, ValueError, RuntimeError) as e:
                 logger.warning("Code correction middleware failed: %s", str(e))
@@ -725,8 +727,7 @@ class ToolExecutor:
                     self.retry_strategy.on_retry(retry_context)
                     delay = self.retry_strategy.get_delay(retry_context)
                     logger.warning(
-                        "[%s] Tool %s timeout - retrying in %.2fs "
-                        "(attempt %d/%d): %s",
+                        "[%s] Tool %s timeout - retrying in %.2fs " "(attempt %d/%d): %s",
                         last_error_info.correlation_id,
                         tool.name,
                         delay,
@@ -745,7 +746,14 @@ class ToolExecutor:
                     last_error_info,
                 )
 
-            except (ToolExecutionError, ValueError, TypeError, KeyError, FileNotFoundError, OSError) as e:
+            except (
+                ToolExecutionError,
+                ValueError,
+                TypeError,
+                KeyError,
+                FileNotFoundError,
+                OSError,
+            ) as e:
                 retry_context.record_exception(e)
 
                 # Use centralized error handler for structured logging
@@ -766,7 +774,7 @@ class ToolExecutor:
                     tool.name,
                     retry_context.attempt,
                     retry_context.max_attempts,
-                    str(e)
+                    str(e),
                 )
 
                 if self.retry_strategy.should_retry(retry_context):

@@ -5,15 +5,17 @@ from rich.table import Table
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import load_settings
+
 # ToolDefinition is imported for type hinting, though not directly used in the logic
-from victor.providers.base import ToolDefinition # noqa: F401
+from victor.providers.base import ToolDefinition  # noqa: F401
 
 
 tools_app = typer.Typer(name="tools", help="Manage Victor's integrated tools.")
 console = Console()
 
+
 @tools_app.command("list")
-def list_tools( # Keep the command name as 'list' for the CLI
+def list_tools(  # Keep the command name as 'list' for the CLI
     profile: str = typer.Option(
         "default",
         "--profile",
@@ -23,6 +25,7 @@ def list_tools( # Keep the command name as 'list' for the CLI
 ) -> None:
     """List all available tools with their descriptions."""
     asyncio.run(_list_tools_async(profile))
+
 
 async def _list_tools_async(profile: str) -> None:
     console.print(f"[dim]Initializing agent with profile '{profile}' to list tools...[/]")
@@ -51,9 +54,15 @@ async def _list_tools_async(profile: str) -> None:
         # Sort tools by name for consistent output
         for tool in sorted(all_tools, key=lambda t: t.name):
             # Take only the first line of the description for brevity in the table
-            description = tool.description.split('\\n')[0] if tool.description else "No description available."
+            description = (
+                tool.description.split("\\n")[0]
+                if tool.description
+                else "No description available."
+            )
             # Check the actual enabled status from the tool_states map
-            enabled_status = "[green]✓ Yes[/]" if tool_states.get(tool.name, False) else "[dim]✗ No[/]"
+            enabled_status = (
+                "[green]✓ Yes[/]" if tool_states.get(tool.name, False) else "[dim]✗ No[/]"
+            )
             table.add_row(tool.name, description, enabled_status)
 
         console.print(table)
@@ -62,6 +71,7 @@ async def _list_tools_async(profile: str) -> None:
         console.print(f"[red]Error listing tools:[/] {e}")
         # Log full traceback for debugging purposes during development
         import traceback
+
         console.print(traceback.format_exc())
         raise typer.Exit(1)
     finally:

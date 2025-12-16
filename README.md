@@ -9,8 +9,9 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
+[![Tests](https://img.shields.io/badge/tests-7500%2B%20passing-brightgreen.svg)](#project-status)
 
-[Quick Start](#quick-start) • [Use Cases](#use-cases) • [Features](#features) • [Documentation](#documentation)
+[Quick Start](#quick-start) • [Why Victor](#why-victor) • [Features](#features) • [Documentation](#documentation)
 
 </div>
 
@@ -18,7 +19,7 @@
 
 ## What is Victor?
 
-Victor is a terminal-based AI coding assistant that works with **any LLM provider**—cloud or local. Unlike single-vendor tools, Victor lets you switch models without changing your workflow.
+Victor is an enterprise-grade, terminal-based AI coding assistant that works with **any LLM provider**—cloud or local. Unlike single-vendor tools, Victor gives you provider freedom, complete data privacy, and specialized domain verticals.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4F46E5', 'primaryTextColor': '#fff', 'primaryBorderColor': '#4338CA', 'lineColor': '#6366F1', 'secondaryColor': '#E0E7FF'}}}%%
@@ -33,17 +34,100 @@ flowchart LR
         Agent["Agent<br/>Orchestrator"]
         Tools["45 Tools"]
         Search["Semantic<br/>Search"]
+        Verticals["4 Domain<br/>Verticals"]
     end
 
     subgraph Providers["Any Provider"]
-        Cloud["Cloud APIs"]
-        Local["Local Models"]
+        Cloud["Cloud APIs<br/>(25+ providers)"]
+        Local["Local Models<br/>(Ollama/vLLM)"]
     end
 
     Interface --> Victor --> Providers
 
     style Victor fill:#10B981,stroke:#059669,color:#fff
 ```
+
+---
+
+## Why Victor?
+
+### The Problem with AI Coding Tools
+
+| Challenge | Typical AI Tool | Victor Solution |
+|-----------|-----------------|-----------------|
+| **Vendor Lock-in** | Single provider only | 25+ providers, switch anytime |
+| **Data Privacy** | Code goes to vendor cloud | 100% air-gapped mode available |
+| **Domain Expertise** | Generic code assistant | 4 specialized verticals |
+| **Tool Access** | Fixed, limited toolset | 45 tools with cost-aware selection |
+| **Protocol Support** | Proprietary integrations | MCP client + server support |
+
+### Evidence-Based Differentiators
+
+<details>
+<summary><b>25+ Provider Support</b> - Verified in <code>victor/providers/</code></summary>
+
+```
+victor/providers/
+├── anthropic.py      # Claude models
+├── openai.py         # GPT-4, GPT-4o
+├── google.py         # Gemini Pro
+├── xai.py            # Grok
+├── deepseek.py       # DeepSeek Coder
+├── groq.py           # Fast inference
+├── mistral.py        # Mistral models
+├── together.py       # Together AI
+├── ollama.py         # Local: 100+ models
+├── lmstudio.py       # Local GUI
+├── vllm.py           # Local: production serving
+└── ... (15 more)
+```
+
+**Technical Detail**: Each provider inherits from `BaseProvider` (victor/providers/base.py) implementing `chat()`, `stream_chat()`, and `supports_tools()`. Tool calling adapters (victor/agent/tool_calling/) normalize provider-specific formats.
+</details>
+
+<details>
+<summary><b>45 Built-in Tools</b> - Verified in <code>docs/TOOL_CATALOG.md</code></summary>
+
+Tools are classified by cost tier for intelligent selection:
+
+| Tier | Cost | Examples |
+|------|------|----------|
+| FREE | Local only | read, write, edit, ls, grep, git |
+| LOW | Compute | code_review, refactor, metrics |
+| MEDIUM | External API | web_search, web_fetch |
+| HIGH | Resource-intensive | batch (100+ files) |
+
+**Technical Detail**: Each tool inherits from `BaseTool` (victor/tools/base.py) with `cost_tier`, `priority`, `access_mode`, and `danger_level` properties. The `SemanticToolSelector` uses embeddings for intelligent selection.
+</details>
+
+<details>
+<summary><b>4 Domain Verticals</b> - Verified in <code>victor/verticals/</code></summary>
+
+| Vertical | Tools | Specialization |
+|----------|-------|----------------|
+| **Coding** | 30 | Multi-file refactoring, AST operations, test generation |
+| **Research** | 9 | Web search, citation management, fact synthesis |
+| **DevOps** | 13 | Docker, Terraform, CI/CD, infrastructure |
+| **Data Analysis** | 11 | Pandas, visualization, statistical analysis |
+
+**Technical Detail**: Verticals implement `VerticalBase` (victor/verticals/base.py) with protocol-based extensions: `PromptContributorProtocol`, `SafetyExtensionProtocol`, `ModeConfigProviderProtocol`. Framework remains vertical-agnostic.
+</details>
+
+<details>
+<summary><b>MCP Protocol Support</b> - Verified in <code>victor/mcp/</code></summary>
+
+Victor acts as both MCP client AND server:
+
+```bash
+# As MCP server (for Claude Desktop)
+victor mcp
+
+# As MCP client (connect to external servers)
+# Configure in settings
+```
+
+**Technical Detail**: MCP server exposes Victor's 45 tools to Claude Desktop and other MCP clients. MCP client allows Victor to consume tools from external MCP servers.
+</details>
 
 ---
 
@@ -67,7 +151,11 @@ victor chat --provider ollama --model qwen3-coder:30b --endpoint http://localhos
 # Switch output renderer (auto|rich|rich-text|text); text is best for debugging
 victor chat --renderer text --log-level DEBUG "Hi"
 
-# Set initial mode (build|plan|explore) and tighten budgets
+# Select a domain vertical
+victor chat --vertical devops "Set up a CI/CD pipeline"
+victor chat --vertical research "Summarize recent advances in RAG"
+
+# Set initial mode and budgets
 victor chat --mode explore --tool-budget 20 --max-iterations 60
 ```
 
@@ -92,9 +180,175 @@ victor chat --provider anthropic --model claude-sonnet-4-5
 
 ---
 
-## Use Cases
+## Features
 
-Victor addresses three primary scenarios where existing AI coding tools fall short:
+### Provider Support (25+)
+
+Works with cloud APIs and local inference engines:
+
+| Type | Providers | Notes |
+|------|-----------|-------|
+| **Cloud** | Anthropic, OpenAI, Google, xAI, DeepSeek, Groq, Mistral, Together, Fireworks, Perplexity | API key required |
+| **Local** | Ollama (100+ models), LMStudio, vLLM, OpenRouter | Free, private |
+| **Enterprise** | Azure OpenAI, AWS Bedrock, Vertex AI | SSO/SAML support |
+
+### Domain Verticals
+
+Specialized assistants with domain-optimized prompts, tool selection, and safety rules:
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#8B5CF6'}}}%%
+mindmap
+  root((4 Verticals))
+    Coding
+      30 tools
+      Multi-file edit
+      AST refactoring
+      Test generation
+    Research
+      9 tools
+      Web search
+      Citation synthesis
+      Fact checking
+    DevOps
+      13 tools
+      Docker/K8s
+      Terraform/Ansible
+      CI/CD pipelines
+    Data Analysis
+      11 tools
+      Pandas/NumPy
+      Visualization
+      Statistical analysis
+```
+
+### Built-in Tools (45)
+
+Tools organized by function with cost-aware selection:
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#8B5CF6'}}}%%
+mindmap
+  root((45 Tools))
+    Code
+      Multi-file Edit
+      Batch Operations
+      AST Refactoring
+      Git Integration
+    Quality
+      Code Review
+      Security Scan
+      Metrics
+      Test Runner
+    Search
+      Semantic Search
+      Symbol Lookup
+      Reference Finder
+      Graph Analysis
+    DevOps
+      Docker
+      Database
+      CI/CD
+      HTTP Client
+```
+
+### Semantic Code Search
+
+Local embedding-based search with multi-language support:
+
+- **10 languages**: Python, TypeScript, JavaScript, Go, Rust, Java, C, HTML, JSON, YAML
+- **AST parsing**: Tree-sitter for accurate symbol extraction
+- **Incremental indexing**: Only re-embeds changed files
+- **Sub-100ms search**: Vector similarity on local embeddings
+- **Shared embeddings**: Same model (all-MiniLM-L12-v2) for tools and code search (40% memory reduction)
+
+### Air-Gapped Mode
+
+100% offline operation for regulated environments:
+
+| Requirement | Victor Capability |
+|------------|-------------------|
+| Data stays on-premises | Local model execution via Ollama/vLLM |
+| No cloud dependencies | Local embeddings (sentence-transformers) |
+| Audit logging | Built-in compliance logging |
+| Container deployment | Official Docker images |
+
+```bash
+# Enable air-gapped mode
+victor chat --airgapped
+# or set in config: airgapped_mode: true
+```
+
+---
+
+## Architecture
+
+### Protocol-First Design
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#6366F1', 'primaryTextColor': '#fff'}}}%%
+flowchart TB
+    subgraph Clients["Layer 3: Clients"]
+        CLI["CLI/TUI"]
+        VSCode["VS Code"]
+        MCP["MCP Clients"]
+    end
+
+    subgraph Protocol["Layer 2: Protocol"]
+        Direct["DirectProtocolAdapter"]
+        HTTP["HTTPProtocolAdapter"]
+        MCPServer["MCPServer"]
+    end
+
+    subgraph Core["Layer 1: Core Engine"]
+        Orchestrator["AgentOrchestrator"]
+        Providers["25+ Providers"]
+        Tools["45 Tools"]
+        Verticals["4 Verticals"]
+    end
+
+    CLI --> Direct
+    VSCode --> HTTP
+    MCP --> MCPServer
+    Direct --> Orchestrator
+    HTTP --> Orchestrator
+    MCPServer --> Orchestrator
+    Orchestrator --> Providers
+    Orchestrator --> Tools
+    Orchestrator --> Verticals
+
+    style Core fill:#E0E7FF,stroke:#6366F1
+```
+
+### Tool Calling Flow
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#6366F1', 'primaryTextColor': '#fff'}}}%%
+sequenceDiagram
+    participant User as Developer
+    participant Victor as Victor Agent
+    participant Selector as Tool Selector
+    participant Tools as Tool System
+    participant LLM as AI Model
+
+    User->>Victor: Natural language request
+    Victor->>Selector: Select relevant tools
+    Selector-->>Victor: 10-15 tools (cost-aware)
+    Victor->>LLM: Request + tools
+    LLM-->>Victor: Tool calls
+
+    loop Execution
+        Victor->>Tools: Execute tool
+        Tools-->>Victor: Result
+        Victor->>LLM: Update context
+    end
+
+    Victor-->>User: Completed result
+```
+
+---
+
+## Use Cases
 
 ### 1. Developer Productivity
 
@@ -115,7 +369,7 @@ Victor > Found 47 references across 12 files. Applying changes...
 
 ### 2. Team Standardization
 
-Consistent tooling regardless of individual model preferences. Teams can standardize on Victor while developers choose their preferred AI backend.
+Consistent tooling regardless of individual model preferences. Teams standardize on Victor while developers choose their preferred AI backend.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#6366F1'}}}%%
@@ -123,13 +377,13 @@ flowchart TB
     subgraph Team["Development Team"]
         D1["Dev 1<br/>Local Ollama"]
         D2["Dev 2<br/>Cloud API"]
-        D3["Dev 3<br/>Self-hosted"]
+        D3["Dev 3<br/>Self-hosted vLLM"]
     end
 
     subgraph Standard["Standardized Workflow"]
         V["Victor"]
         T["Same 45 Tools"]
-        W["Same Workflows"]
+        W["Same Verticals"]
     end
 
     Team --> Standard
@@ -141,109 +395,19 @@ flowchart TB
 
 100% air-gapped operation with local models and embeddings. No external network calls.
 
-| Requirement | Victor Capability |
-|------------|-------------------|
-| Data stays on-premises | Local model execution via Ollama/vLLM |
-| No cloud dependencies | Local embeddings (sentence-transformers) |
-| Audit logging | Built-in compliance logging |
-| Container deployment | Official Docker images |
+### 4. Domain-Specific Work
 
----
+Use specialized verticals for focused assistance:
 
-## Capabilities Comparison
+```bash
+# DevOps workflow
+victor chat --vertical devops "Create a Kubernetes deployment for our API"
 
-How Victor compares to typical AI coding assistants:
+# Research workflow
+victor chat --vertical research "Analyze recent papers on transformer efficiency"
 
-```mermaid
-%%{init: {'theme': 'base'}}%%
-xychart-beta
-    title "Feature Maturity"
-    x-axis ["Provider<br/>Flexibility", "Local<br/>Models", "Code<br/>Tools", "Semantic<br/>Search", "Air-Gap<br/>Support", "IDE<br/>Integration"]
-    y-axis "Maturity %" 0 --> 100
-    bar [95, 90, 85, 80, 90, 60]
-```
-
-| Capability | Victor | Typical AI Tool |
-|------------|--------|-----------------|
-| **Provider Lock-in** | None (25+ providers) | Single vendor |
-| **Local Model Support** | Full (Ollama, vLLM, LMStudio) | Limited or none |
-| **Air-Gapped Mode** | Complete | Not available |
-| **Tool Extensibility** | 46 built-in + plugins | Fixed toolset |
-| **Code Privacy** | Your infrastructure | Vendor cloud |
-| **Open Source** | Apache 2.0 | Proprietary |
-
----
-
-## Features
-
-### Provider Support
-
-Works with cloud APIs and local inference engines:
-
-| Type | Providers | Cost |
-|------|-----------|------|
-| **Cloud** | Anthropic, OpenAI, Google, xAI, DeepSeek, Groq, Mistral, Together | Varies |
-| **Local** | Ollama (100+ models), LMStudio, vLLM | Free |
-
-### Built-in Tools
-
-45 tools organized by function:
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#8B5CF6'}}}%%
-mindmap
-  root((45 Tools))
-    Code
-      Multi-file Edit
-      Batch Operations
-      AST Refactoring
-      Git Integration
-    Quality
-      Code Review
-      Security Scan
-      Metrics
-    Search
-      Semantic Search
-      Symbol Lookup
-      Reference Finder
-    DevOps
-      Docker
-      Database
-      CI/CD
-```
-
-### Semantic Code Search
-
-Local embedding-based search with multi-language support:
-
-- **10 languages**: Python, TypeScript, JavaScript, Go, Rust, Java, C, HTML, JSON, YAML
-- **AST parsing**: Tree-sitter for accurate symbol extraction
-- **Incremental indexing**: Only re-embeds changed files
-- **Sub-100ms search**: Vector similarity on local embeddings
-
----
-
-## Architecture
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#6366F1', 'primaryTextColor': '#fff'}}}%%
-sequenceDiagram
-    participant User as Developer
-    participant Victor as Victor Agent
-    participant Tools as Tool System
-    participant LLM as AI Model
-
-    User->>Victor: Natural language request
-    Victor->>LLM: Analyze + plan
-    LLM-->>Victor: Tool calls
-
-    loop Execution
-        Victor->>Tools: Execute tool
-        Tools-->>Victor: Result
-        Victor->>LLM: Update context
-    end
-
-    Victor-->>User: Completed result
+# Data analysis workflow
+victor chat --vertical data_analysis "Profile this dataset and identify correlations"
 ```
 
 ---
@@ -286,16 +450,49 @@ See [Installation Guide](docs/guides/INSTALLATION.md) for details.
 
 ## Project Status
 
-Victor is in active development. Core functionality is stable.
+Victor is in active development with 7500+ passing tests. Core functionality is stable.
 
-| Component | Status |
-|-----------|--------|
-| Agent Orchestrator | Stable |
-| 45 Tools | Stable |
-| 25+ Providers | Stable |
-| Semantic Search | Stable |
-| VS Code Extension | Beta |
-| Test Generation | In Progress |
+| Component | Status | Evidence |
+|-----------|--------|----------|
+| Agent Orchestrator | Stable | Phase 10 DI migration in progress |
+| 45 Tools | Stable | Documented in TOOL_CATALOG.md |
+| 25+ Providers | Stable | victor/providers/ directory |
+| 4 Domain Verticals | Stable | victor/verticals/ directory |
+| Semantic Search | Stable | 10 languages, AST parsing |
+| VS Code Extension | Beta | vscode-victor/ directory |
+| MCP Support | Stable | Client + server modes |
+
+---
+
+## Technical Highlights
+
+### Dependency Injection Container
+
+Thread-safe, type-safe service container with lifecycle management (victor/core/container.py):
+
+```python
+# Protocol-based service resolution
+conversation = container.get(ConversationControllerProtocol)
+pipeline = container.get(ToolPipelineProtocol)
+```
+
+### Tool Metadata System
+
+Comprehensive tool classification for intelligent selection (victor/tools/base.py):
+
+- **CostTier**: FREE, LOW, MEDIUM, HIGH
+- **Priority**: CRITICAL, HIGH, MEDIUM, LOW, CONTEXTUAL
+- **AccessMode**: READONLY, WRITE, EXECUTE, NETWORK, MIXED
+- **DangerLevel**: SAFE, LOW, MEDIUM, HIGH, CRITICAL
+
+### Conversation Management
+
+4 compaction strategies with SQLite-backed persistence (victor/agent/conversation_controller.py):
+
+- SIMPLE: Keep N most recent
+- TIERED: Prioritize tool results (3x weight)
+- SEMANTIC: Embeddings-based relevance
+- HYBRID: Combined scoring
 
 ---
 

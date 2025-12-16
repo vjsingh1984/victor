@@ -225,7 +225,9 @@ class VictorAPIServer:
             # CompletionResponse is a Pydantic model; access attributes
             content = getattr(response, "content", None) or ""
             tool_calls = getattr(response, "tool_calls", None) or []
-            return web.json_response({"role": "assistant", "content": content, "tool_calls": tool_calls})
+            return web.json_response(
+                {"role": "assistant", "content": content, "tool_calls": tool_calls}
+            )
 
         except Exception as e:
             logger.exception("Chat error")

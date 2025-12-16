@@ -387,8 +387,24 @@ class QLearningStore:
         tool_budget_used: int,
         quality_score: float,
         completed: bool,
+        tool_budget_total: int = 0,
+        budget_exhausted: bool = False,
     ) -> None:
-        """Update task-type statistics."""
+        """Update task-type statistics with outcome-aware budget learning.
+
+        The budget learning considers both success/failure and efficiency:
+        - Success with few tools → gradual decrease (efficient)
+        - Failure or low quality → gradual increase (needs more resources)
+        - Budget exhausted with failure → stronger increase signal
+
+        Args:
+            task_type: Type of task
+            tool_budget_used: Number of tool calls made
+            quality_score: Quality score (0-1)
+            completed: Whether task completed successfully
+            tool_budget_total: Total budget that was available
+            budget_exhausted: Whether budget was exhausted
+        """
         self._ensure_initialized()
 
         with sqlite3.connect(self.db_path) as conn:
@@ -398,15 +414,59 @@ class QLearningStore:
             ).fetchone()
 
             if row:
-                # Exponential moving average
-                alpha = 0.1
+                current_budget = row[1]
+                current_quality = row[2]
+                current_completion = row[3]
                 count = row[4] + 1
-                new_budget = int((1 - alpha) * row[1] + alpha * tool_budget_used)
-                new_quality = (1 - alpha) * row[2] + alpha * quality_score
-                completion_rate = (1 - alpha) * row[3] + alpha * (1.0 if completed else 0.0)
+
+                # Outcome-aware budget adjustment
+                # Use smaller alpha for stability, larger for learning from failures
+                base_alpha = 0.05  # Slower learning for stability
+
+                if completed and quality_score >= 0.7:
+                    # SUCCESS: Task completed well
+                    if tool_budget_used < current_budget * 0.5:
+                        # Very efficient - gradually decrease budget
+                        # But never drop below what was actually used + buffer
+                        target_budget = max(tool_budget_used + 3, current_budget - 2)
+                        new_budget = int((1 - base_alpha) * current_budget + base_alpha * target_budget)
+                    else:
+                        # Normal completion - keep budget stable, slight move toward usage
+                        alpha = base_alpha * 0.5  # Even slower for stable scenarios
+                        new_budget = int((1 - alpha) * current_budget + alpha * tool_budget_used)
+                else:
+                    # FAILURE or low quality
+                    if budget_exhausted:
+                        # Budget was exhausted AND failed - strong signal to increase
+                        # Increase by 20% or at least 5, capped at reasonable max
+                        increase = max(5, int(current_budget * 0.2))
+                        new_budget = min(current_budget + increase, 100)
+                        logger.debug(
+                            f"[QLearningStore] Budget exhaustion failure for {task_type}: "
+                            f"{current_budget} -> {new_budget}"
+                        )
+                    elif quality_score < 0.5:
+                        # Low quality - moderate increase
+                        increase = max(2, int(current_budget * 0.1))
+                        new_budget = min(current_budget + increase, 100)
+                    else:
+                        # Partial success - slight increase
+                        new_budget = min(current_budget + 1, 100)
+
+                # Ensure budget stays within reasonable bounds
+                # Floor: minimum viable budget for the task type
+                min_budget = self._get_min_budget_for_task(task_type)
+                new_budget = max(min_budget, new_budget)
+
+                # Update quality and completion rate with standard EMA
+                alpha = 0.1
+                new_quality = (1 - alpha) * current_quality + alpha * quality_score
+                completion_rate = (1 - alpha) * current_completion + alpha * (1.0 if completed else 0.0)
             else:
+                # First sample - initialize with reasonable defaults
                 count = 1
-                new_budget = tool_budget_used
+                # Don't just use what was used; start with a reasonable baseline
+                new_budget = max(tool_budget_used + 5, self._get_min_budget_for_task(task_type))
                 new_quality = quality_score
                 completion_rate = 1.0 if completed else 0.0
 
@@ -436,6 +496,26 @@ class QLearningStore:
                     datetime.now().isoformat(),
                 ),
             )
+
+    def _get_min_budget_for_task(self, task_type: str) -> int:
+        """Get minimum viable budget for a task type.
+
+        This prevents learned budgets from dropping below usable thresholds.
+        """
+        # Minimum budgets by task type - these are floors, not targets
+        min_budgets = {
+            "code_generation": 8,
+            "create_simple": 5,
+            "create": 10,
+            "edit": 10,
+            "search": 8,
+            "action": 15,
+            "analysis_deep": 20,
+            "analyze": 15,
+            "design": 25,
+            "general": 15,
+        }
+        return min_budgets.get(task_type, 10)
 
     def get_task_stats(self, task_type: str) -> Dict[str, Any]:
         """Get statistics for a task type."""
@@ -797,17 +877,25 @@ class AdaptiveModeController:
 
             self._pending_transition = None
 
-        # Update task stats
+        # Update task stats with outcome-aware budget learning
+        # Detect if budget was exhausted (used >= budget)
+        budget_exhausted = (
+            self._current_state.tool_calls_made >= self._current_state.tool_budget
+        )
+
         self._q_store.update_task_stats(
             task_type=self._current_state.task_type,
             tool_budget_used=self._current_state.tool_calls_made,
             quality_score=quality_score,
             completed=completed,
+            tool_budget_total=self._current_state.tool_budget,
+            budget_exhausted=budget_exhausted and not success,  # Only counts as exhaustion failure if not successful
         )
 
         logger.debug(
             f"[AdaptiveModeController] Recorded outcome: "
-            f"success={success}, quality={quality_score:.2f}, reward={reward:.2f}"
+            f"success={success}, quality={quality_score:.2f}, reward={reward:.2f}, "
+            f"budget_exhausted={budget_exhausted}"
         )
 
         return reward

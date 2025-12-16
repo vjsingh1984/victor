@@ -301,11 +301,15 @@ class OrchestratorIntegration:
         self._metrics.quality_validated_responses += 1
         if result.grounding_score > 0:
             self._metrics.grounding_checked_responses += 1
-        
+
         # Use faster exponential moving average
         alpha = 0.1
-        self._metrics.avg_quality_score += alpha * (result.quality_score - self._metrics.avg_quality_score)
-        self._metrics.avg_grounding_score += alpha * (result.grounding_score - self._metrics.avg_grounding_score)
+        self._metrics.avg_quality_score += alpha * (
+            result.quality_score - self._metrics.avg_quality_score
+        )
+        self._metrics.avg_grounding_score += alpha * (
+            result.grounding_score - self._metrics.avg_grounding_score
+        )
         self._metrics.total_learning_reward += result.learning_reward
 
         # Single-pass observer notification
@@ -383,7 +387,7 @@ class OrchestratorIntegration:
             Dictionary with pipeline stats
         """
         pipeline_stats = self._pipeline.get_stats()
-        
+
         return {
             "integration": {
                 "total_requests": self._metrics.total_requests,
@@ -417,12 +421,13 @@ class OrchestratorIntegration:
         """
         quality_score = round(self._metrics.avg_quality_score, 3)
         grounding_score = round(self._metrics.avg_grounding_score, 3)
-        
+
         return {
             "quality_meets_threshold": quality_score >= self._config.min_quality_threshold,
             "quality_score": quality_score,
             "quality_threshold": self._config.min_quality_threshold,
-            "grounding_meets_threshold": grounding_score >= self._config.grounding_confidence_threshold,
+            "grounding_meets_threshold": grounding_score
+            >= self._config.grounding_confidence_threshold,
             "grounding_score": grounding_score,
             "grounding_threshold": self._config.grounding_confidence_threshold,
         }

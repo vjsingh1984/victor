@@ -27,6 +27,7 @@ from victor.config.api_keys import is_keyring_available, get_configured_provider
 security_app = typer.Typer(name="security", help="Security status and plugin trust management.")
 console = Console()
 
+
 @security_app.callback(invoke_without_command=True)
 def security(
     ctx: typer.Context,
@@ -60,6 +61,7 @@ def security(
         else:
             _status()
 
+
 def _trust_plugin(plugin_path: str):
     # Trust a plugin
     plugin_path = Path(plugin_path).expanduser().resolve()
@@ -73,12 +75,14 @@ def _trust_plugin(plugin_path: str):
         console.print("[red]Failed to trust plugin[/]")
         raise typer.Exit(1)
 
+
 def _untrust_plugin(plugin_name: str):
     # Untrust a plugin
     if do_untrust_plugin(plugin_name):
         console.print(f"[green]✓[/] Removed [cyan]{plugin_name}[/] from trust store")
     else:
         console.print(f"[yellow]Plugin {plugin_name} not found in trust store[/]")
+
 
 def _list_plugins():
     # List trusted plugins
@@ -93,11 +97,10 @@ def _list_plugins():
     table.add_column("Path")
 
     for plugin in plugins:
-        table.add_row(
-            plugin["name"], plugin.get("hash", "")[:16] + "...", plugin.get("path", "")
-        )
+        table.add_row(plugin["name"], plugin.get("hash", "")[:16] + "...", plugin.get("path", ""))
 
     console.print(table)
+
 
 def _verify_cache():
     # Verify cache integrity
@@ -125,6 +128,7 @@ def _verify_cache():
                 console.print("[green]✓ Manifest recreated[/]")
             else:
                 console.print("[red]Failed to recreate manifest[/]")
+
 
 def _verify_all():
     # Comprehensive security verification
@@ -178,9 +182,7 @@ def _verify_all():
         if is_valid:
             console.print("   [green]✓ Embeddings cache integrity verified[/]")
         else:
-            console.print(
-                f"   [red]✗ Cache integrity failed: {len(tampered)} tampered files[/]"
-            )
+            console.print(f"   [red]✗ Cache integrity failed: {len(tampered)} tampered files[/]")
             all_passed = False
             issues.append(f"Cache tampering detected: {len(tampered)} files modified")
     else:
@@ -222,6 +224,7 @@ def _verify_all():
         console.print("[bold yellow]Security Issues Found:[/]")
         for issue in issues:
             console.print(f"  [red]•[/] {issue}")
+
 
 def _status():
     # Default: show security status

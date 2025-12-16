@@ -19,6 +19,7 @@ OpenTelemetry, Prometheus, or other backends.
 """
 
 import logging
+import threading
 import time
 import uuid
 from contextlib import contextmanager
@@ -74,11 +75,13 @@ class Span:
 
     def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None) -> None:
         """Add an event to the span."""
-        self.events.append({
-            "name": name,
-            "timestamp": time.time(),
-            "attributes": attributes or {},
-        })
+        self.events.append(
+            {
+                "name": name,
+                "timestamp": time.time(),
+                "attributes": attributes or {},
+            }
+        )
 
     def end(self, status: SpanStatus = SpanStatus.OK) -> None:
         """End the span."""
@@ -277,8 +280,6 @@ class TracingProvider:
 ObservabilityManager = TracingProvider
 
 
-import threading
-
 # Global instance for convenience with thread safety
 _global_observability: Optional[TracingProvider] = None
 _observability_lock = threading.Lock()
@@ -298,22 +299,13 @@ def get_observability() -> TracingProvider:
 
 
 def set_observability(provider: TracingProvider) -> None:
-    """Set the global tracing provider instance."""
-    global _global_observability
-    with _observability_lock:
-        _global_observability = provider_observability
-    if _global_observability is None:
-        _global_observability = TracingProvider()
-    return _global_observability
-
-
-def set_observability(manager: TracingProvider) -> None:
     """Set the global tracing provider instance.
 
     Note: Function name kept for backward compatibility.
     """
     global _global_observability
-    _global_observability = manager
+    with _observability_lock:
+        _global_observability = provider
 
 
 # Convenience decorators

@@ -56,21 +56,32 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CodeCorrectionConfig:
     """Configuration for code correction middleware."""
+
     enabled: bool = True
     auto_fix: bool = True
     max_iterations: int = 1
     collect_metrics: bool = True
-    
+
     # Use frozensets for better performance
-    code_tools: Set[str] = field(default_factory=lambda: frozenset({
-        "code_executor", "execute_code", "run_code", "write_file", 
-        "file_editor", "edit_file", "create_file"
-    }))
-    
-    code_argument_names: Set[str] = field(default_factory=lambda: frozenset({
-        "code", "python_code", "content", "source", "script", 
-        "new_content", "file_content"
-    }))
+    code_tools: Set[str] = field(
+        default_factory=lambda: frozenset(
+            {
+                "code_executor",
+                "execute_code",
+                "run_code",
+                "write_file",
+                "file_editor",
+                "edit_file",
+                "create_file",
+            }
+        )
+    )
+
+    code_argument_names: Set[str] = field(
+        default_factory=lambda: frozenset(
+            {"code", "python_code", "content", "source", "script", "new_content", "file_content"}
+        )
+    )
 
 
 @dataclass
@@ -175,34 +186,47 @@ class CodeCorrectionMiddleware:
 
         if not code_arg:
             return CorrectionResult(
-                "", "", 
-                ValidationResult(True, Language.UNKNOWN, True, True, (), ()),
-                False
+                "", "", ValidationResult(True, Language.UNKNOWN, True, True, (), ()), False
             )
 
         arg_name, code = code_arg
 
         # Detect language
-        lang = (detect_language(code, filename=f"code.{language_hint}") if language_hint
-                else Language.PYTHON if tool_name in {"code_executor", "execute_code", "run_code"}
-                else detect_language(code))
+        lang = (
+            detect_language(code, filename=f"code.{language_hint}")
+            if language_hint
+            else (
+                Language.PYTHON
+                if tool_name in {"code_executor", "execute_code", "run_code"}
+                else detect_language(code)
+            )
+        )
 
         # Validate and fix
         fixed_code, validation = self.corrector.validate_and_fix(code, language=lang)
-        
+
         if self.metrics_collector:
             self.metrics_collector.record_validation(lang, validation)
-        
+
         return CorrectionResult(
-            code, fixed_code, validation, fixed_code != code,
-            self.corrector.generate_feedback(code=code, validation=validation) if not validation.valid else None
+            code,
+            fixed_code,
+            validation,
+            fixed_code != code,
+            (
+                self.corrector.generate_feedback(code=code, validation=validation)
+                if not validation.valid
+                else None
+            ),
         )
 
-    def apply_correction(self, arguments: Dict[str, Any], result: CorrectionResult) -> Dict[str, Any]:
+    def apply_correction(
+        self, arguments: Dict[str, Any], result: CorrectionResult
+    ) -> Dict[str, Any]:
         """Apply correction to tool arguments."""
         if not result.was_corrected or not (code_arg := self.find_code_argument(arguments)):
             return arguments
-        
+
         updated = arguments.copy()
         updated[code_arg[0]] = result.corrected_code
         return updated
@@ -211,31 +235,38 @@ class CodeCorrectionMiddleware:
         """Format validation errors for display."""
         if result.validation.valid:
             return ""
-        
+
         lines = ["Code validation failed:"]
-        
+
         if not result.validation.syntax_valid:
             lines.append("  - Syntax errors detected")
-        
+
         if not result.validation.imports_valid:
             lines.append("  - Import issues detected")
-            if hasattr(result.validation, 'missing_imports') and result.validation.missing_imports:
-                lines.extend(f"    - Missing: {imp}" for imp in result.validation.missing_imports[:5])
-        
+            if hasattr(result.validation, "missing_imports") and result.validation.missing_imports:
+                lines.extend(
+                    f"    - Missing: {imp}" for imp in result.validation.missing_imports[:5]
+                )
+
         lines.extend(f"  - {error}" for error in result.validation.errors[:5])
-        
+
         if result.feedback and result.feedback.suggestions:
             lines.append("\nSuggestions:")
             lines.extend(f"  - {suggestion}" for suggestion in result.feedback.suggestions[:3])
-        
+
         return "\n".join(lines)
 
-    def get_retry_prompt(self, result: CorrectionResult, original_prompt: Optional[str] = None) -> str:
+    def get_retry_prompt(
+        self, result: CorrectionResult, original_prompt: Optional[str] = None
+    ) -> str:
         """Generate a retry prompt for the LLM."""
-        return (self.format_validation_error(result) if not result.feedback
-                else self.corrector.build_retry_prompt(
-                    original_prompt or "", result.original_code, result.feedback, 1
-                ))
+        return (
+            self.format_validation_error(result)
+            if not result.feedback
+            else self.corrector.build_retry_prompt(
+                original_prompt or "", result.original_code, result.feedback, 1
+            )
+        )
 
 
 # Singleton instance for shared use

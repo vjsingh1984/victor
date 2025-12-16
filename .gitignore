@@ -198,3 +198,6 @@ victor/audit/
 
 # Embeddings cache (generated, contains binary data)
 victor/agent/.embeddings/
+
+# Internal roadmap (not for public distribution)
+ROADMAP.md

@@ -100,9 +100,7 @@ class ASTAwareChunker:
             logger.debug(f"Could not get parser for {language}: {e}")
             return None
 
-    def chunk_file(
-        self, file_path: Path, language: Optional[str] = None
-    ) -> List[CodeChunk]:
+    def chunk_file(self, file_path: Path, language: Optional[str] = None) -> List[CodeChunk]:
         """Split a file into semantic chunks using AST.
 
         Args:
@@ -125,9 +123,7 @@ class ASTAwareChunker:
         try:
             content = file_path.read_bytes()
             tree = parser.parse(content)
-            return self._chunk_from_tree(
-                tree, content, str(file_path), language
-            )
+            return self._chunk_from_tree(tree, content, str(file_path), language)
         except Exception as e:
             logger.debug(f"Failed to parse {file_path} for chunking: {e}")
             return self._chunk_by_lines(file_path)
@@ -192,9 +188,9 @@ class ASTAwareChunker:
         for node, sym_type, sym_name in symbol_nodes:
             # Check for module-level code before this symbol
             if node.start_byte > prev_end:
-                gap_text = content[prev_end : node.start_byte].decode(
-                    "utf-8", errors="ignore"
-                ).strip()
+                gap_text = (
+                    content[prev_end : node.start_byte].decode("utf-8", errors="ignore").strip()
+                )
                 if gap_text and len(gap_text) >= self.min_chunk_size:
                     start_line = content[:prev_end].count(b"\n") + 1
                     end_line = content[: node.start_byte].count(b"\n")
@@ -209,9 +205,7 @@ class ASTAwareChunker:
                     )
 
             # Create chunk for the symbol
-            sym_text = content[node.start_byte : node.end_byte].decode(
-                "utf-8", errors="ignore"
-            )
+            sym_text = content[node.start_byte : node.end_byte].decode("utf-8", errors="ignore")
             start_line = node.start_point[0] + 1
             end_line = node.end_point[0] + 1
 
@@ -257,9 +251,7 @@ class ASTAwareChunker:
 
         return chunks
 
-    def _find_definition_parent(
-        self, name_node: "Node", language: str
-    ) -> Optional["Node"]:
+    def _find_definition_parent(self, name_node: "Node", language: str) -> Optional["Node"]:
         """Find the definition node that contains a name node."""
         # Definition node types by language
         definition_types = {
@@ -360,9 +352,7 @@ class ASTAwareChunker:
         except Exception:
             return []
 
-    def _chunk_by_lines_content(
-        self, content: str, file_path: str
-    ) -> List[CodeChunk]:
+    def _chunk_by_lines_content(self, content: str, file_path: str) -> List[CodeChunk]:
         """Chunk content by lines."""
         chunks: List[CodeChunk] = []
         lines = content.split("\n")

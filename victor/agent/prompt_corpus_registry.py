@@ -620,7 +620,7 @@ OUTPUT FORMAT:
 - Return ONLY the Python code for the function.
 - Include proper indentation.
 - Do not wrap in markdown code blocks unless explicitly asked.""",
-        "hints": ["complete_function", "no_exploration_needed"]
+        "hints": ["complete_function", "no_exploration_needed"],
     },
     PromptCategory.ALGORITHM_IMPLEMENTATION: {
         "system": """You are an algorithm expert implementing efficient solutions.
@@ -637,7 +637,7 @@ OUTPUT FORMAT:
 - Return the complete Python function implementation.
 - Include type hints for parameters and return type.
 - Add a brief complexity comment (# O(n) time, O(1) space).""",
-        "hints": ["algorithm", "complexity_aware"]
+        "hints": ["algorithm", "complexity_aware"],
     },
     PromptCategory.DATA_STRUCTURE: {
         "system": """You are a data structure specialist.
@@ -654,7 +654,7 @@ OUTPUT FORMAT:
 - Return the complete function implementation.
 - Use clear parameter names that indicate expected types.
 - Include handling for edge cases.""",
-        "hints": ["data_structure", "edge_cases"]
+        "hints": ["data_structure", "edge_cases"],
     },
     PromptCategory.STRING_MANIPULATION: {
         "system": """You are a string processing expert.
@@ -671,7 +671,7 @@ OUTPUT FORMAT:
 - Return the complete function implementation.
 - Handle edge cases (empty string, single character, etc.).
 - Use efficient string operations (avoid += in loops).""",
-        "hints": ["string_ops", "unicode_aware"]
+        "hints": ["string_ops", "unicode_aware"],
     },
     PromptCategory.MATHEMATICAL: {
         "system": """You are a mathematical computing expert.
@@ -688,7 +688,7 @@ OUTPUT FORMAT:
 - Return the complete function implementation.
 - Include type hints (int, float, List[int], etc.).
 - Handle division by zero and other mathematical edge cases.""",
-        "hints": ["numerical", "precision_aware"]
+        "hints": ["numerical", "precision_aware"],
     },
     PromptCategory.FILE_IO: {
         "system": """You are a file handling expert.
@@ -705,7 +705,7 @@ OUTPUT FORMAT:
 - Return the complete function implementation.
 - Include proper error handling with try/except.
 - Close resources properly (or use context managers).""",
-        "hints": ["file_io", "resource_management"]
+        "hints": ["file_io", "resource_management"],
     },
     PromptCategory.CODE_DEBUGGING: {
         "system": """You are a debugging expert.
@@ -722,7 +722,7 @@ OUTPUT FORMAT:
 - First, briefly explain the bug.
 - Then provide the corrected code.
 - Highlight the specific lines that changed.""",
-        "hints": ["debugging", "explanation_needed"]
+        "hints": ["debugging", "explanation_needed"],
     },
     PromptCategory.CODE_EXPLANATION: {
         "system": """You are a code explanation expert.
@@ -739,7 +739,7 @@ OUTPUT FORMAT:
 - Provide a clear, structured explanation.
 - Use examples to illustrate key points.
 - Mention time/space complexity if relevant.""",
-        "hints": ["explanation", "educational"]
+        "hints": ["explanation", "educational"],
     },
     PromptCategory.CODE_REFACTORING: {
         "system": """You are a code refactoring expert.
@@ -756,7 +756,7 @@ OUTPUT FORMAT:
 - Provide the refactored code.
 - Briefly explain the improvements made.
 - Ensure tests would still pass (same behavior).""",
-        "hints": ["refactoring", "preserve_behavior"]
+        "hints": ["refactoring", "preserve_behavior"],
     },
     PromptCategory.API_INTEGRATION: {
         "system": """You are an API integration expert.
@@ -773,7 +773,7 @@ OUTPUT FORMAT:
 - Provide complete, runnable code.
 - Include error handling for network issues.
 - Use async if the context requires it.""",
-        "hints": ["api", "error_handling"]
+        "hints": ["api", "error_handling"],
     },
     PromptCategory.TESTING: {
         "system": """You are a testing expert.
@@ -790,7 +790,7 @@ OUTPUT FORMAT:
 - Provide complete, runnable test code.
 - Include necessary imports.
 - Organize tests logically.""",
-        "hints": ["testing", "pytest"]
+        "hints": ["testing", "pytest"],
     },
     PromptCategory.GENERAL_CODING: {
         "system": """You are an expert programmer.
@@ -807,8 +807,8 @@ OUTPUT FORMAT:
 - Provide complete, working code.
 - Include necessary imports.
 - Add brief comments for complex logic.""",
-        "hints": ["general"]
-    }
+        "hints": ["general"],
+    },
 }
 
 
@@ -832,7 +832,9 @@ class PromptBuilder:
         Returns:
             EnrichedPrompt with system and user prompts
         """
-        template = PROMPT_TEMPLATES.get(self.category, PROMPT_TEMPLATES[PromptCategory.GENERAL_CODING])
+        template = PROMPT_TEMPLATES.get(
+            self.category, PROMPT_TEMPLATES[PromptCategory.GENERAL_CODING]
+        )
         return EnrichedPrompt(
             system_prompt=template["system"],
             user_prompt=user_prompt,
@@ -843,63 +845,74 @@ class PromptBuilder:
 
 class FunctionCompletionBuilder(PromptBuilder):
     """Builder for function completion prompts."""
+
     category = PromptCategory.FUNCTION_COMPLETION
 
 
 class AlgorithmImplementationBuilder(PromptBuilder):
     """Builder for algorithm implementation prompts."""
+
     category = PromptCategory.ALGORITHM_IMPLEMENTATION
 
 
 class DataStructureBuilder(PromptBuilder):
     """Builder for data structure prompts."""
+
     category = PromptCategory.DATA_STRUCTURE
 
 
 class StringManipulationBuilder(PromptBuilder):
     """Builder for string manipulation prompts."""
+
     category = PromptCategory.STRING_MANIPULATION
 
 
 class MathematicalBuilder(PromptBuilder):
     """Builder for mathematical prompts."""
+
     category = PromptCategory.MATHEMATICAL
 
 
 class FileIOBuilder(PromptBuilder):
     """Builder for file I/O prompts."""
+
     category = PromptCategory.FILE_IO
 
 
 class CodeDebuggingBuilder(PromptBuilder):
     """Builder for code debugging prompts."""
+
     category = PromptCategory.CODE_DEBUGGING
 
 
 class CodeExplanationBuilder(PromptBuilder):
     """Builder for code explanation prompts."""
+
     category = PromptCategory.CODE_EXPLANATION
 
 
 class CodeRefactoringBuilder(PromptBuilder):
     """Builder for code refactoring prompts."""
+
     category = PromptCategory.CODE_REFACTORING
 
 
 class APIIntegrationBuilder(PromptBuilder):
     """Builder for API integration prompts."""
+
     category = PromptCategory.API_INTEGRATION
 
 
 class TestingBuilder(PromptBuilder):
     """Builder for testing prompts."""
+
     category = PromptCategory.TESTING
 
 
 class GeneralCodingBuilder(PromptBuilder):
     """Builder for general coding prompts."""
-    category = PromptCategory.GENERAL_CODING
 
+    category = PromptCategory.GENERAL_CODING
 
 
 # =============================================================================
@@ -943,10 +956,12 @@ class PromptCorpusRegistry:
         if cache_dir is None:
             try:
                 from victor.config.settings import get_project_paths
+
                 cache_dir = get_project_paths().global_embeddings_dir
             except ImportError:
                 try:
                     from victor.config.secure_paths import get_victor_dir
+
                     cache_dir = get_victor_dir() / "embeddings"
                 except ImportError:
                     cache_dir = Path.home() / ".victor" / "embeddings"
@@ -1169,7 +1184,7 @@ class PromptCorpusRegistry:
         service = self._get_embedding_service()
         query_embedding = service.embed_text_sync(user_prompt)
         similarities = service.cosine_similarity_matrix(query_embedding, corpus_embeddings)
-        
+
         best_idx = int(np.argmax(similarities))
         best_similarity = float(similarities[best_idx])
         best_entry = self._corpus[best_idx]
@@ -1301,8 +1316,10 @@ class PromptCorpusRegistry:
             EnrichedPrompt with system and user prompts
         """
         match = self.match(user_prompt)
-        template = PROMPT_TEMPLATES.get(match.category, PROMPT_TEMPLATES[PromptCategory.GENERAL_CODING])
-        
+        template = PROMPT_TEMPLATES.get(
+            match.category, PROMPT_TEMPLATES[PromptCategory.GENERAL_CODING]
+        )
+
         return EnrichedPrompt(
             system_prompt=template["system"],
             user_prompt=user_prompt,

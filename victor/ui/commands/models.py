@@ -10,6 +10,7 @@ models_app = typer.Typer(name="models", help="List available models for a provid
 console = Console()
 logger = logging.getLogger(__name__)
 
+
 @models_app.command("list")
 def list_models(
     provider: str = typer.Option(

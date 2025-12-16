@@ -160,7 +160,12 @@ class TestQLearningStore:
         assert True
 
     def test_update_task_stats(self, temp_store):
-        """Test updating task statistics."""
+        """Test updating task statistics with outcome-aware learning.
+
+        The new system considers success/failure:
+        - First sample for successful task uses: max(used + 5, min_budget)
+        - For unknown task types, min_budget defaults to 10
+        """
         temp_store.update_task_stats(
             task_type="analysis",
             tool_budget_used=5,
@@ -171,8 +176,70 @@ class TestQLearningStore:
         stats = temp_store.get_task_stats("analysis")
 
         assert stats["task_type"] == "analysis"
-        assert stats["optimal_tool_budget"] == 5
+        # First sample: max(5 + 5, 10) = 10 (default min budget)
+        assert stats["optimal_tool_budget"] == 10
         assert stats["sample_count"] == 1
+
+    def test_update_task_stats_budget_exhaustion_increases_budget(self, temp_store):
+        """Budget exhaustion with failure should increase the learned budget.
+
+        This tests the outcome-aware learning: when budget is exhausted but
+        task fails, the system should learn to allocate more budget next time.
+        """
+        # First establish a baseline budget
+        temp_store.update_task_stats(
+            task_type="test_task",
+            tool_budget_used=10,
+            quality_score=0.8,
+            completed=True,
+        )
+        initial_stats = temp_store.get_task_stats("test_task")
+        initial_budget = initial_stats["optimal_tool_budget"]
+
+        # Now simulate budget exhaustion failure
+        temp_store.update_task_stats(
+            task_type="test_task",
+            tool_budget_used=15,
+            quality_score=0.3,  # Low quality
+            completed=False,  # Failed
+            tool_budget_total=15,
+            budget_exhausted=True,  # Budget was exhausted
+        )
+
+        stats = temp_store.get_task_stats("test_task")
+        # Budget should have increased due to exhaustion failure
+        assert stats["optimal_tool_budget"] > initial_budget
+
+    def test_update_task_stats_success_gradually_decreases_budget(self, temp_store):
+        """Efficient success should gradually decrease the learned budget.
+
+        When tasks complete successfully with fewer tool calls than budget,
+        the system should learn to gradually reduce budget (but not abruptly).
+        """
+        # Start with a higher budget
+        temp_store.update_task_stats(
+            task_type="efficient_task",
+            tool_budget_used=30,
+            quality_score=0.8,
+            completed=True,
+        )
+        initial_stats = temp_store.get_task_stats("efficient_task")
+        initial_budget = initial_stats["optimal_tool_budget"]
+
+        # Simulate multiple efficient completions
+        for _ in range(5):
+            temp_store.update_task_stats(
+                task_type="efficient_task",
+                tool_budget_used=10,  # Much less than current budget
+                quality_score=0.9,
+                completed=True,
+            )
+
+        stats = temp_store.get_task_stats("efficient_task")
+        # Budget should have decreased but gradually (not all at once)
+        # It should still be above the min budget (10) but lower than initial
+        assert stats["optimal_tool_budget"] < initial_budget
+        assert stats["optimal_tool_budget"] >= 10  # Min floor
 
     def test_get_task_stats_returns_defaults(self, temp_store):
         """Should return defaults for unknown task types."""
@@ -285,7 +352,13 @@ class TestAdaptiveModeController:
         assert reward < 1.0  # Should be penalized
 
     def test_get_optimal_tool_budget_uses_learned_value(self, controller, temp_store):
-        """Should return learned optimal budget."""
+        """Should return learned optimal budget.
+
+        With outcome-aware learning:
+        - First sample for successful task: max(used + 5, min_budget)
+        - For unknown task types (like 'analysis'), min_budget defaults to 10
+        - So max(7 + 5, 10) = 12
+        """
         # Train some data
         temp_store.update_task_stats(
             task_type="analysis",
@@ -296,7 +369,8 @@ class TestAdaptiveModeController:
 
         budget = controller.get_optimal_tool_budget("analysis")
 
-        assert budget == 7
+        # First sample: max(7 + 5, 10) = 12 (default min budget)
+        assert budget == 12
 
     def test_get_optimal_tool_budget_uses_default(self, controller):
         """Should return default budget for unknown task types."""

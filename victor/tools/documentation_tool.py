@@ -597,6 +597,7 @@ async def docs(
     access_mode=AccessMode.READONLY,  # Only reads files for analysis
     danger_level=DangerLevel.SAFE,  # No side effects
     keywords=["documentation", "coverage", "analyze", "quality", "docstring"],
+    mandatory_keywords=["docs", "documentation coverage"],  # From MANDATORY_TOOL_KEYWORDS "docs" -> ["docs", "docs_coverage"]
     stages=["analysis", "reading"],
     execution_category=ExecutionCategory.READ_ONLY,
 )

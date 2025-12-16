@@ -10,6 +10,7 @@ from victor.config.settings import load_settings
 config_app = typer.Typer(name="config", help="Validate configuration files and profiles.")
 console = Console()
 
+
 @config_app.command("validate")
 def config_validate(
     verbose: bool = typer.Option(

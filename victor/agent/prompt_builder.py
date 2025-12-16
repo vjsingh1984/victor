@@ -39,6 +39,15 @@ GROUNDING: Base ALL responses on tool output only. Never invent file paths or co
 Quote code exactly from tool output. If more info needed, call another tool.
 """.strip()
 
+# Parallel read optimization guidance
+PARALLEL_READ_GUIDANCE = """
+PARALLEL READS: For exploration tasks, batch multiple read calls together.
+- Call read on 5-10 files simultaneously when analyzing a codebase
+- Each file read is limited to ~8K chars (~230 lines) to fit context
+- List files first (ls), then batch-read relevant ones in parallel
+- Example: To understand a module, read all .py files in that directory at once
+""".strip()
+
 # Extended grounding rules for local models that need more explicit guidance
 GROUNDING_RULES_EXTENDED = """
 CRITICAL - TOOL OUTPUT GROUNDING:
@@ -89,19 +98,198 @@ Output requirements:
 - Verify improvements reference ACTUAL code patterns (grep first)
 Use 15-20 tool calls minimum. Prioritize by architectural importance.""",
     "general": """[GENERAL] Moderate exploration. 3-6 tool calls. Answer concisely.""",
+    # DevOps vertical task types (aligned with TaskType enum)
+    "infrastructure": """[INFRASTRUCTURE] Deploy infrastructure (Kubernetes, Terraform, Docker, cloud):
+1. Use Infrastructure as Code (Terraform, CloudFormation, Pulumi)
+2. Implement multi-stage Docker builds for smaller images
+3. Define resource limits and requests for Kubernetes
+4. Use ConfigMaps/Secrets for configuration management
+5. Tag all resources for cost tracking and organization""",
+    "ci_cd": """[CI/CD] Configure continuous integration/deployment:
+1. Define clear stages: lint, test, build, deploy
+2. Cache dependencies for faster builds
+3. Use matrix builds for cross-platform testing
+4. Implement proper secret management (GitHub Secrets, Vault)
+5. Add manual approval for production deployments""",
+    # Data Analysis vertical task types (aligned with TaskType enum)
+    "data_analysis": """[DATA ANALYSIS] Comprehensive data exploration and analysis:
+1. Load data and check shape/types with df.info(), df.describe()
+2. Calculate summary statistics (mean, median, std, quartiles)
+3. Identify missing values and their patterns (df.isnull().sum())
+4. Check for duplicates and data quality issues
+5. Analyze correlations and distributions before modeling""",
+    "visualization": """[VISUALIZATION] Create informative charts and dashboards:
+1. Choose appropriate chart type for the data (bar, line, scatter, heatmap)
+2. Use clear labels, titles, and legends
+3. Add context (units, time periods, annotations)
+4. Consider colorblind-friendly palettes (viridis, cividis)
+5. Save as high-resolution images (plt.savefig('fig.png', dpi=300))""",
+    # Research vertical task types (aligned with TaskType enum)
+    "fact_check": """[FACT-CHECK] Verify claims with multiple independent sources:
+1. Search for original sources and official documentation
+2. Cross-reference with authoritative databases
+3. Check recency and relevance of sources
+4. Note any conflicting information found""",
+    "literature_review": """[LITERATURE] Systematic review of existing knowledge:
+1. Define scope and search criteria
+2. Search academic and authoritative sources
+3. Extract key findings and methodologies
+4. Synthesize patterns and gaps
+5. Provide structured bibliography""",
+    "competitive_analysis": """[ANALYSIS] Compare products, services, or approaches:
+1. Identify key comparison criteria
+2. Gather data from official sources
+3. Create objective comparison matrix
+4. Note strengths, weaknesses, limitations
+5. Avoid promotional language""",
+    "trend_research": """[TRENDS] Identify patterns and emerging developments:
+1. Search recent news and publications
+2. Look for quantitative data and statistics
+3. Identify key players and innovations
+4. Note methodology limitations
+5. Distinguish facts from speculation""",
+    "technical_research": """[TECHNICAL] Deep dive into technical topics:
+1. Start with official documentation
+2. Search code repositories and examples
+3. Look for benchmarks and comparisons
+4. Note version-specific information
+5. Verify with multiple technical sources""",
+    # Coding vertical granular task types (aligned with TaskType enum)
+    "refactor": """[REFACTOR] Restructure existing code without changing behavior:
+1. Analyze current code structure and identify issues
+2. Plan incremental changes to minimize risk
+3. Apply refactoring patterns (extract method, rename, move)
+4. Verify behavior unchanged with existing tests
+5. Document architectural decisions""",
+    "debug": """[DEBUG] Find and fix bugs systematically:
+1. Reproduce the issue consistently
+2. Read error messages and stack traces carefully
+3. Trace execution flow to find root cause
+4. Isolate the problem with minimal test case
+5. Fix root cause, not just symptoms""",
+    "test": """[TEST] Write comprehensive tests for code:
+1. Identify critical paths and edge cases
+2. Write unit tests for individual functions
+3. Add integration tests for component interactions
+4. Mock external dependencies appropriately
+5. Aim for meaningful coverage, not just metrics""",
+    # DevOps vertical granular task types (aligned with TaskType enum)
+    "dockerfile": """[DOCKERFILE] Create optimized Docker images:
+1. Use official base images with specific version tags
+2. Implement multi-stage builds for smaller images
+3. Order layers for optimal cache utilization
+4. Add health checks and proper signal handling
+5. Run as non-root user for security""",
+    "docker_compose": """[COMPOSE] Configure multi-container applications:
+1. Define all services with explicit dependencies
+2. Use named volumes for persistent data
+3. Configure proper network isolation
+4. Add health checks for service readiness
+5. Use environment files for secrets""",
+    "kubernetes": """[K8S] Create Kubernetes configurations:
+1. Use Deployments for stateless, StatefulSets for stateful apps
+2. Define resource requests and limits appropriately
+3. Add liveness and readiness probes
+4. Use ConfigMaps for config, Secrets for sensitive data
+5. Implement NetworkPolicies for security""",
+    "terraform": """[TERRAFORM] Write Infrastructure as Code:
+1. Organize code into reusable modules
+2. Use remote state with locking (S3+DynamoDB, etc.)
+3. Implement proper variable typing and validation
+4. Tag all resources for cost tracking
+5. Use data sources instead of hardcoded IDs""",
+    "monitoring": """[MONITORING] Set up observability infrastructure:
+1. Define key metrics and SLIs/SLOs
+2. Configure alerting with appropriate thresholds
+3. Set up distributed tracing for microservices
+4. Implement structured logging with context
+5. Create dashboards for visibility""",
+    # Data Analysis vertical granular task types (aligned with TaskType enum)
+    "data_profiling": """[PROFILE] Comprehensive data profiling:
+1. Load data and check shape/types (df.info(), df.dtypes)
+2. Calculate summary statistics (mean, median, std, quartiles)
+3. Identify missing values and their patterns
+4. Check for duplicates and uniqueness constraints
+5. Analyze value distributions and outliers""",
+    "statistical_analysis": """[STATISTICS] Perform rigorous statistical analysis:
+1. State null and alternative hypotheses clearly
+2. Check assumptions (normality, variance homogeneity)
+3. Choose appropriate test (t-test, ANOVA, chi-square)
+4. Calculate test statistic and p-value
+5. Interpret results with effect size and confidence intervals""",
+    "correlation_analysis": """[CORRELATION] Analyze variable relationships:
+1. Calculate correlation matrix for numeric variables
+2. Use appropriate method (Pearson for linear, Spearman for monotonic)
+3. Visualize with heatmap or scatter matrix
+4. Identify strong correlations (|r| > 0.7)
+5. Note potential confounders and causation vs correlation""",
+    "regression": """[REGRESSION] Build predictive regression models:
+1. Define target and feature variables clearly
+2. Split data into train/test sets (or use cross-validation)
+3. Check for multicollinearity (VIF analysis)
+4. Fit model and assess coefficients significance
+5. Evaluate with R², RMSE, residual plots""",
+    "clustering": """[CLUSTERING] Segment data into meaningful groups:
+1. Scale features appropriately (StandardScaler, MinMaxScaler)
+2. Determine optimal cluster count (elbow method, silhouette score)
+3. Apply appropriate algorithm (K-means, hierarchical, DBSCAN)
+4. Visualize clusters (PCA/t-SNE for high dimensions)
+5. Profile cluster characteristics and interpret business meaning""",
+    "time_series": """[TIMESERIES] Analyze temporal data patterns:
+1. Check datetime format and ensure proper frequency
+2. Plot time series and identify patterns (trend, seasonality, cycles)
+3. Decompose into trend, seasonal, and residual components
+4. Check stationarity (ADF test) and apply differencing if needed
+5. Apply appropriate forecasting method (ARIMA, Prophet, etc.)""",
+    # Research vertical granular task types (aligned with TaskType enum)
+    "general_query": """[QUERY] Answer general research questions:
+1. Clarify the scope and specific aspects of the question
+2. Search for authoritative sources and documentation
+3. Synthesize information from multiple perspectives
+4. Provide clear, structured explanation
+5. Note limitations and areas of uncertainty""",
 }
 
 
-def get_task_type_hint(task_type: str) -> str:
+def get_task_type_hint(task_type: str, prompt_contributors: Optional[list] = None) -> str:
     """Get prompt hint for a specific task type.
+
+    This function now supports vertical prompt contributors. It merges hints from:
+    1. Vertical prompt contributors (if provided)
+    2. Hardcoded TASK_TYPE_HINTS (fallback for backward compatibility)
 
     Args:
         task_type: The detected task type (e.g., "create_simple", "edit")
+        prompt_contributors: Optional list of PromptContributorProtocol implementations
 
     Returns:
         Task-specific prompt hint or empty string if not found
     """
-    return TASK_TYPE_HINTS.get(task_type.lower(), "")
+    # Try vertical contributors first
+    if prompt_contributors:
+        for contributor in sorted(prompt_contributors, key=lambda c: c.get_priority()):
+            hints = contributor.get_task_type_hints()
+            if task_type.lower() in hints:
+                task_hint = hints[task_type.lower()]
+                # Handle TaskTypeHint objects or plain strings
+                if hasattr(task_hint, 'hint'):
+                    hint_text = task_hint.hint
+                else:
+                    hint_text = str(task_hint)
+                # Log when vertical hint is applied
+                contributor_name = type(contributor).__name__
+                logger.info(
+                    "Applied vertical task hint: task_type=%s, contributor=%s",
+                    task_type,
+                    contributor_name,
+                )
+                return hint_text
+
+    # Fallback to hardcoded hints
+    hint = TASK_TYPE_HINTS.get(task_type.lower(), "")
+    if hint:
+        logger.debug("Applied default task hint for task_type=%s", task_type)
+    return hint
 
 
 # Models with known good native tool calling support
@@ -134,6 +322,11 @@ class SystemPromptBuilder:
     - vLLM: Production-grade OpenAI-compatible with tool parsers
     - LMStudio: OpenAI-compatible with Native vs Default mode
     - Ollama: Native tool_calls for Llama3.1+, Qwen2.5+, Mistral; fallback otherwise
+
+    Vertical Integration:
+    - Accepts prompt contributors from verticals via DI container
+    - Merges vertical-specific task hints and system prompt sections
+    - Falls back to hardcoded TASK_TYPE_HINTS for backward compatibility
     """
 
     def __init__(
@@ -142,6 +335,7 @@ class SystemPromptBuilder:
         model: str,
         tool_adapter: Optional[BaseToolCallingAdapter] = None,
         capabilities: Optional[ToolCallingCapabilities] = None,
+        prompt_contributors: Optional[list] = None,
     ):
         """Initialize the prompt builder.
 
@@ -150,12 +344,17 @@ class SystemPromptBuilder:
             model: Model name/identifier
             tool_adapter: Optional tool calling adapter for getting hints
             capabilities: Optional pre-computed capabilities
+            prompt_contributors: Optional list of PromptContributorProtocol implementations
         """
         self.provider_name = (provider_name or "").lower()
         self.model = model or ""
         self.model_lower = self.model.lower()
         self.tool_adapter = tool_adapter
         self.capabilities = capabilities
+        self.prompt_contributors = prompt_contributors or []
+
+        # Cache merged task hints from vertical contributors
+        self._merged_task_hints = None
 
     def is_cloud_provider(self) -> bool:
         """Check if the provider is a cloud-based API with robust tool calling."""
@@ -168,6 +367,66 @@ class SystemPromptBuilder:
     def has_native_tool_support(self) -> bool:
         """Check if the model has known native tool calling support."""
         return any(pattern in self.model_lower for pattern in NATIVE_TOOL_MODELS)
+
+    def get_merged_task_hints(self) -> dict:
+        """Get merged task hints from vertical contributors.
+
+        Returns:
+            Dict of task type -> hint string, merged from all contributors
+        """
+        if self._merged_task_hints is not None:
+            return self._merged_task_hints
+
+        merged = TASK_TYPE_HINTS.copy()  # Start with hardcoded hints
+
+        # Override with vertical contributors (sorted by priority)
+        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+            hints = contributor.get_task_type_hints()
+            for task_type, task_hint in hints.items():
+                # Extract hint string from TaskTypeHint objects
+                if hasattr(task_hint, 'hint'):
+                    merged[task_type] = task_hint.hint
+                else:
+                    merged[task_type] = str(task_hint)
+
+        self._merged_task_hints = merged
+        return merged
+
+    def get_vertical_grounding_rules(self) -> str:
+        """Get grounding rules from vertical contributors.
+
+        Returns:
+            Merged grounding rules from all contributors
+        """
+        if not self.prompt_contributors:
+            return ""
+
+        # Collect grounding rules from all contributors
+        rules = []
+        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+            grounding = contributor.get_grounding_rules()
+            if grounding:
+                rules.append(grounding)
+
+        return "\n\n".join(rules) if rules else ""
+
+    def get_vertical_system_prompt_sections(self) -> str:
+        """Get system prompt sections from vertical contributors.
+
+        Returns:
+            Merged system prompt sections from all contributors
+        """
+        if not self.prompt_contributors:
+            return ""
+
+        # Collect sections from all contributors
+        sections = []
+        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+            section = contributor.get_system_prompt_section()
+            if section:
+                sections.append(section)
+
+        return "\n\n".join(sections) if sections else ""
 
     def build(self) -> str:
         """Build the system prompt.
@@ -261,6 +520,7 @@ class SystemPromptBuilder:
             "3. Provide clear, actionable responses based on actual file contents.\n"
             "4. Always cite specific file paths and line numbers when referencing code.\n"
             "5. You may call multiple tools in parallel when they are independent.\n\n"
+            f"{PARALLEL_READ_GUIDANCE}\n\n"
             f"{GROUNDING_RULES}"
         )
 
@@ -284,6 +544,7 @@ class SystemPromptBuilder:
             "• Exploration: Use tools systematically, then summarize\n"
             "• Modification: Read → understand → edit\n"
             "• Actions: Execute fully, report results\n\n"
+            f"{PARALLEL_READ_GUIDANCE}\n\n"
             f"{GROUNDING_RULES}"
         )
 
@@ -355,9 +616,10 @@ class SystemPromptBuilder:
                 "You are a code analyst with tool calling capability.\n\n"
                 "TOOL USAGE:\n"
                 "- Use list_directory and read_file to inspect code.\n"
-                "- Call tools one at a time, waiting for results.\n"
-                "- After 2-3 successful tool calls, provide your answer.\n"
+                "- You can call multiple read tools in parallel for efficiency.\n"
+                "- After reading relevant files, provide your answer.\n"
                 "- Do NOT make identical repeated tool calls.\n\n"
+                f"{PARALLEL_READ_GUIDANCE}\n\n"
                 "RESPONSE FORMAT:\n"
                 "- Write your answer in plain, readable text.\n"
                 "- Do NOT output raw JSON in your response.\n"
@@ -424,6 +686,7 @@ def build_system_prompt(
     model: str,
     tool_adapter: Optional[BaseToolCallingAdapter] = None,
     capabilities: Optional[ToolCallingCapabilities] = None,
+    prompt_contributors: Optional[list] = None,
 ) -> str:
     """Build a system prompt (convenience function).
 
@@ -432,6 +695,7 @@ def build_system_prompt(
         model: Model name
         tool_adapter: Optional tool calling adapter
         capabilities: Optional pre-computed capabilities
+        prompt_contributors: Optional list of PromptContributorProtocol implementations
 
     Returns:
         System prompt string
@@ -441,5 +705,6 @@ def build_system_prompt(
         model=model,
         tool_adapter=tool_adapter,
         capabilities=capabilities,
+        prompt_contributors=prompt_contributors,
     )
     return builder.build()

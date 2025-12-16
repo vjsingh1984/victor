@@ -93,6 +93,31 @@ class TestModelCapabilityLoader:
         assert caps.streaming_tool_calls is True
         assert caps.tool_choice_param is True
 
+    def test_ollama_timeout_multiplier(self):
+        """Ollama should have higher timeout multiplier for slow local models."""
+        caps = get_model_capabilities("ollama", "qwen3-coder:30b")
+        # Ollama has 2.0x multiplier in provider_defaults
+        assert caps.timeout_multiplier == 2.0
+        assert caps.exploration_multiplier == 1.5
+
+    def test_lmstudio_timeout_multiplier(self):
+        """LMStudio should have timeout multiplier for local inference."""
+        caps = get_model_capabilities("lmstudio", "qwen2.5-coder:32b")
+        # LMStudio has 1.5x multiplier
+        assert caps.timeout_multiplier == 1.5
+        assert caps.exploration_multiplier == 1.3
+
+    def test_anthropic_default_timeout(self):
+        """Cloud providers should use default timeout multiplier."""
+        caps = get_model_capabilities("anthropic", "claude-3-sonnet")
+        # Cloud providers use default 1.0x
+        assert caps.timeout_multiplier == 1.0
+
+    def test_openai_default_timeout(self):
+        """OpenAI should use default timeout multiplier."""
+        caps = get_model_capabilities("openai", "gpt-4o")
+        assert caps.timeout_multiplier == 1.0
+
 
 class TestToolCallingAdapterRegistry:
     """Tests for ToolCallingAdapterRegistry."""

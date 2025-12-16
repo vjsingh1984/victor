@@ -454,7 +454,9 @@ class TestCheckCodebaseIndex:
         mock_index.check_staleness_by_mtime.side_effect = Exception("Test error")
 
         with patch.dict("sys.modules", {"victor.codebase.indexer": MagicMock()}):
-            with patch("victor.ui.commands.utils.CodebaseIndex", return_value=mock_index, create=True):
+            with patch(
+                "victor.ui.commands.utils.CodebaseIndex", return_value=mock_index, create=True
+            ):
                 # Should not raise
                 await check_codebase_index("/tmp", mock_console)
 

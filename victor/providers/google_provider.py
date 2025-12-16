@@ -12,28 +12,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Google Gemini provider implementation."""
+"""Google Gemini provider implementation.
+
+Requires optional dependency: pip install victor[google]
+"""
 
 import logging
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
 
-import google.generativeai as genai
-from google.generativeai.types import (
-    FunctionDeclaration,
-    GenerateContentResponse,
-    HarmBlockThreshold,
-    HarmCategory,
-    Tool,
-)
+# Google generative AI is an optional dependency due to protobuf conflicts
+try:
+    import google.generativeai as genai
+    from google.generativeai.types import (
+        FunctionDeclaration,
+        GenerateContentResponse,
+        HarmBlockThreshold,
+        HarmCategory,
+        Tool,
+    )
+    HAS_GOOGLE_GENAI = True
+except ImportError:
+    HAS_GOOGLE_GENAI = False
+    genai = None
+    FunctionDeclaration = None
+    GenerateContentResponse = None
+    HarmBlockThreshold = None
+    HarmCategory = None
+    Tool = None
 
 # Try to import ToolConfig for explicit function calling mode
-try:
-    from google.generativeai.types import ToolConfig
-
-    HAS_TOOL_CONFIG = True
-except ImportError:
-    HAS_TOOL_CONFIG = False
-    ToolConfig = None
+HAS_TOOL_CONFIG = False
+ToolConfig = None
+if HAS_GOOGLE_GENAI:
+    try:
+        from google.generativeai.types import ToolConfig
+        HAS_TOOL_CONFIG = True
+    except ImportError:
+        pass
 
 from victor.providers.base import (
     BaseProvider,
@@ -49,17 +64,20 @@ logger = logging.getLogger(__name__)
 # Safety threshold levels (from most to least restrictive)
 # Note: BLOCK_NONE is known to be unreliable - Google's internal filters may override it
 # See: https://discuss.ai.google.dev/t/safety-settings-2025-update-broken-again/59360
-SAFETY_LEVELS = {
-    "block_none": HarmBlockThreshold.BLOCK_NONE,
-    "off": (
-        HarmBlockThreshold.OFF
-        if hasattr(HarmBlockThreshold, "OFF")
-        else HarmBlockThreshold.BLOCK_NONE
-    ),
-    "block_few": HarmBlockThreshold.BLOCK_ONLY_HIGH,
-    "block_some": HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-    "block_most": HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
-}
+# These are defined inside the class method when google-generativeai is not installed
+SAFETY_LEVELS: Dict[str, Any] = {}
+if HAS_GOOGLE_GENAI and HarmBlockThreshold is not None:
+    SAFETY_LEVELS = {
+        "block_none": HarmBlockThreshold.BLOCK_NONE,
+        "off": (
+            HarmBlockThreshold.OFF
+            if hasattr(HarmBlockThreshold, "OFF")
+            else HarmBlockThreshold.BLOCK_NONE
+        ),
+        "block_few": HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        "block_some": HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        "block_most": HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+    }
 
 
 class GoogleProvider(BaseProvider):
@@ -92,7 +110,15 @@ class GoogleProvider(BaseProvider):
             safety_level: Safety filter level - "block_none", "block_few",
                          "block_some", or "block_most" (default: "block_none")
             **kwargs: Additional configuration
+
+        Raises:
+            ImportError: If google-generativeai package is not installed
         """
+        if not HAS_GOOGLE_GENAI:
+            raise ImportError(
+                "google-generativeai package not installed. "
+                "Install with: pip install victor[google]"
+            )
         super().__init__(api_key=api_key, timeout=timeout, **kwargs)
         genai.configure(api_key=api_key)
 

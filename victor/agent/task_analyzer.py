@@ -105,7 +105,9 @@ class TaskAnalyzer:
     @property
     def unified_classifier(self) -> UnifiedTaskClassifier:
         if not self._unified_classifier:
-            self._unified_classifier = UnifiedTaskClassifier(task_analyzer=self, enable_semantic=True)
+            self._unified_classifier = UnifiedTaskClassifier(
+                task_analyzer=self, enable_semantic=True
+            )
         return self._unified_classifier
 
     @property
@@ -113,6 +115,7 @@ class TaskAnalyzer:
         if self._task_classifier is None:
             try:
                 from victor.embeddings.task_classifier import TaskTypeClassifier
+
                 self._task_classifier = TaskTypeClassifier.get_instance()
             except ImportError:
                 logger.warning("TaskTypeClassifier not available")
@@ -123,20 +126,30 @@ class TaskAnalyzer:
         if self._intent_classifier is None:
             try:
                 from victor.embeddings.intent_classifier import IntentClassifier
+
                 self._intent_classifier = IntentClassifier.get_instance()
             except ImportError:
                 logger.warning("IntentClassifier not available")
         return self._intent_classifier
 
-    def analyze(self, message: str, include_task_type: bool = True, include_intent: bool = False, context: Optional[Dict[str, Any]] = None) -> TaskAnalysis:
+    def analyze(
+        self,
+        message: str,
+        include_task_type: bool = True,
+        include_intent: bool = False,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> TaskAnalysis:
         context = context or {}
         history = context.get("history", [])
-        
+
         complexity_result = self.complexity_classifier.classify(message)
         action_result = self.action_authorizer.detect(message)
-        unified_result = (self.unified_classifier.classify_with_context(message, history) if history 
-                         else self.unified_classifier.classify(message))
-        
+        unified_result = (
+            self.unified_classifier.classify_with_context(message, history)
+            if history
+            else self.unified_classifier.classify(message)
+        )
+
         analysis = TaskAnalysis(
             complexity=complexity_result.complexity,
             tool_budget=complexity_result.tool_budget,
@@ -159,7 +172,7 @@ class TaskAnalyzer:
                 "unified_matched_keywords": [m.keyword for m in unified_result.matched_keywords],
             },
         )
-        
+
         if include_task_type and self.task_classifier:
             try:
                 task_result = self.task_classifier.classify(message)
@@ -169,7 +182,7 @@ class TaskAnalyzer:
                 analysis.analysis_details["task_type_matches"] = task_result.top_matches
             except Exception as e:
                 logger.warning(f"Task type classification failed: {e}")
-        
+
         if include_intent and self.intent_classifier:
             try:
                 intent_result = self.intent_classifier.classify(message)
@@ -178,7 +191,7 @@ class TaskAnalyzer:
                 analysis.analysis_details["intent_confidence"] = intent_result.confidence
             except Exception as e:
                 logger.warning(f"Intent classification failed: {e}")
-        
+
         return analysis
 
     def classify_complexity(self, message: str) -> TaskClassification:
@@ -196,9 +209,14 @@ class TaskAnalyzer:
     def get_tool_budget(self, message: str) -> int:
         return self.complexity_classifier.classify(message).tool_budget
 
-    def classify_unified(self, message: str, history: Optional[List[Dict[str, Any]]] = None) -> ClassificationResult:
-        return (self.unified_classifier.classify_with_context(message, history) if history 
-                else self.unified_classifier.classify(message))
+    def classify_unified(
+        self, message: str, history: Optional[List[Dict[str, Any]]] = None
+    ) -> ClassificationResult:
+        return (
+            self.unified_classifier.classify_with_context(message, history)
+            if history
+            else self.unified_classifier.classify(message)
+        )
 
     def is_analysis_task(self, message: str) -> bool:
         return self.unified_classifier.classify(message).is_analysis_task
@@ -212,11 +230,13 @@ class TaskAnalyzer:
 
 _analyzer: Optional[TaskAnalyzer] = None
 
+
 def get_task_analyzer() -> TaskAnalyzer:
     global _analyzer
     if not _analyzer:
         _analyzer = TaskAnalyzer()
     return _analyzer
+
 
 def reset_task_analyzer() -> None:
     global _analyzer

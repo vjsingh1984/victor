@@ -63,6 +63,7 @@ def orchestrator() -> AgentOrchestrator:
         yield orch
     finally:
         import asyncio
+
         asyncio.run(orch.shutdown())
 
 

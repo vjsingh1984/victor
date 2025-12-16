@@ -47,22 +47,25 @@ class ToolCategory(Enum):
 
 
 # Optimized tool categorization using frozenset for O(1) lookups
-READ_TOOLS = frozenset({
-    "read_file", "list_directory", "code_search", "semantic_code_search",
-    "grep_search", "plan_files", "git"
-})
-WRITE_TOOLS = frozenset({
-    "write_file", "edit_files", "execute_bash", "docker"
-})
-NETWORK_TOOLS = frozenset({
-    "web_search", "web_fetch", "http_request"
-})
+READ_TOOLS = frozenset(
+    {
+        "read_file",
+        "list_directory",
+        "code_search",
+        "semantic_code_search",
+        "grep_search",
+        "plan_files",
+        "git",
+    }
+)
+WRITE_TOOLS = frozenset({"write_file", "edit_files", "execute_bash", "docker"})
+NETWORK_TOOLS = frozenset({"web_search", "web_fetch", "http_request"})
 
 # TOOL_CATEGORIES dictionary for backward compatibility with tests
 TOOL_CATEGORIES: Dict[str, ToolCategory] = {
-    **{name: ToolCategory.READ_ONLY for name in READ_TOOLS},
-    **{name: ToolCategory.WRITE for name in WRITE_TOOLS},
-    **{name: ToolCategory.NETWORK for name in NETWORK_TOOLS},
+    **dict.fromkeys(READ_TOOLS, ToolCategory.READ_ONLY),
+    **dict.fromkeys(WRITE_TOOLS, ToolCategory.WRITE),
+    **dict.fromkeys(NETWORK_TOOLS, ToolCategory.NETWORK),
 }
 
 
@@ -135,10 +138,10 @@ class ParallelToolExecutor:
             name = tc.get("name", "")
             args = tc.get("arguments", {})
             path = args.get("path") or args.get("file_path")
-            
+
             if not path:
                 continue
-                
+
             if name in WRITE_TOOLS:
                 path_writers.setdefault(path, []).append(i)
             elif name in READ_TOOLS and path in path_writers:
@@ -153,25 +156,29 @@ class ParallelToolExecutor:
     ) -> ParallelExecutionResult:
         start_time = time.time()
         result = ParallelExecutionResult()
-        
+
         if not tool_calls:
             return result
-            
+
         context = context or {}
-        
+
         # Simple parallelization: skip if writes present or disabled
-        if not self.config.enable_parallel or len(tool_calls) <= 1 or self._has_write_tools(tool_calls):
+        if (
+            not self.config.enable_parallel
+            or len(tool_calls) <= 1
+            or self._has_write_tools(tool_calls)
+        ):
             return await self._execute_sequential(tool_calls, context, result, start_time)
-            
+
         # Parallel execution with dependency handling
         dependencies = self._extract_file_dependencies(tool_calls)
         pending = set(range(len(tool_calls)))
         completed = set()
         results_by_index = {}
-        
+
         while pending:
             ready = [i for i in pending if not (dependencies[i] - completed)]
-            
+
             if not ready:
                 # Handle deadlock
                 for i in pending:
@@ -180,14 +187,14 @@ class ParallelToolExecutor:
                     )
                     result.failed_count += 1
                 break
-                
+
             # Execute batch with concurrency limit
-            batch = ready[:self.config.max_concurrent]
+            batch = ready[: self.config.max_concurrent]
             tasks = [self._execute_single(tool_calls[i], context) for i in batch]
             batch_results = await asyncio.gather(*tasks, return_exceptions=True)
-            
+
             # Process results
-            for idx, res in zip(batch, batch_results):
+            for idx, res in zip(batch, batch_results, strict=False):
                 if isinstance(res, Exception):
                     exec_result = self._create_error_result(
                         tool_calls[idx].get("name", "unknown"), str(res)
@@ -201,20 +208,25 @@ class ParallelToolExecutor:
                         result.failed_count += 1
                         if exec_result.error:
                             result.errors.append(exec_result.error)
-                            
+
                 results_by_index[idx] = exec_result
                 completed.add(idx)
                 pending.discard(idx)
-                
+
         # Collect results in order
-        result.results = [results_by_index[i] for i in range(len(tool_calls)) if i in results_by_index]
+        result.results = [
+            results_by_index[i] for i in range(len(tool_calls)) if i in results_by_index
+        ]
         result.total_time = time.time() - start_time
-        
+
         return result
-        
+
     async def _execute_sequential(
-        self, tool_calls: List[Dict[str, Any]], context: Dict[str, Any], 
-        result: ParallelExecutionResult, start_time: float
+        self,
+        tool_calls: List[Dict[str, Any]],
+        context: Dict[str, Any],
+        result: ParallelExecutionResult,
+        start_time: float,
     ) -> ParallelExecutionResult:
         for tc in tool_calls:
             exec_result = await self._execute_single(tc, context)
@@ -225,10 +237,10 @@ class ParallelToolExecutor:
                 result.failed_count += 1
                 if exec_result.error:
                     result.errors.append(exec_result.error)
-                    
+
         result.total_time = time.time() - start_time
         return result
-        
+
     def _create_error_result(self, tool_name: str, error: str) -> ToolExecutionResult:
         return ToolExecutionResult(
             tool_name=tool_name,
@@ -242,27 +254,27 @@ class ParallelToolExecutor:
     ) -> ToolExecutionResult:
         tool_name = tool_call.get("name", "unknown")
         arguments = tool_call.get("arguments", {})
-        
+
         if self.progress_callback:
             self.progress_callback(tool_name, "started", True)
-            
+
         try:
             result = await asyncio.wait_for(
                 self.executor.execute(tool_name=tool_name, arguments=arguments, context=context),
                 timeout=self.config.timeout_per_tool,
             )
-            
+
             if self.progress_callback:
                 self.progress_callback(tool_name, "completed", result.success)
-                
+
             return result
-            
+
         except asyncio.TimeoutError:
             error_msg = f"Tool '{tool_name}' timed out after {self.config.timeout_per_tool}s"
             if self.progress_callback:
                 self.progress_callback(tool_name, "timeout", False)
             return self._create_error_result(tool_name, error_msg)
-            
+
         except Exception as e:
             if self.progress_callback:
                 self.progress_callback(tool_name, "error", False)
