@@ -82,6 +82,11 @@ from victor.agent.protocols import (
     ArgumentNormalizerProtocol,
     ConversationStateMachineProtocol,
     TaskTrackerProtocol,
+    CodeExecutionManagerProtocol,
+    WorkflowRegistryProtocol,
+    UsageAnalyticsProtocol,
+    ToolSequenceTrackerProtocol,
+    ContextCompactorProtocol,
 )
 
 # Config loaders for externalized configuration
@@ -636,12 +641,16 @@ class AgentOrchestrator:
         self.tool_graph = ToolDependencyGraph()
         self._register_default_tool_dependencies()
 
-        # Stateful managers
-        self.code_manager = CodeExecutionManager()
-        self.code_manager.start()
+        # Stateful managers (DI with fallback)
+        self.code_manager = self._container.get_optional(CodeExecutionManagerProtocol)
+        if self.code_manager is None:
+            self.code_manager = CodeExecutionManager()
+            self.code_manager.start()
 
-        # Workflow registry
-        self.workflow_registry = WorkflowRegistry()
+        # Workflow registry (DI with fallback)
+        self.workflow_registry = self._container.get_optional(WorkflowRegistryProtocol)
+        if self.workflow_registry is None:
+            self.workflow_registry = WorkflowRegistry()
         self._register_default_workflows()
 
         # Conversation history (using MessageHistory for better encapsulation)
@@ -1055,24 +1064,28 @@ class AgentOrchestrator:
         # later in this method to avoid accidental double-initialization.)
         # Previous duplicate initialization removed to reduce boilerplate.
 
-        # Initialize UsageAnalytics singleton for data-driven optimization
-        analytics_cache_dir = (
-            Path(settings.cache_dir)
-            if hasattr(settings, "cache_dir") and settings.cache_dir
-            else None
-        )
-        self._usage_analytics = UsageAnalytics.get_instance(
-            AnalyticsConfig(
-                cache_dir=analytics_cache_dir,
-                enable_prometheus_export=getattr(settings, "enable_prometheus_export", True),
+        # Initialize UsageAnalytics singleton for data-driven optimization (DI with fallback)
+        self._usage_analytics = self._container.get_optional(UsageAnalyticsProtocol)
+        if self._usage_analytics is None:
+            analytics_cache_dir = (
+                Path(settings.cache_dir)
+                if hasattr(settings, "cache_dir") and settings.cache_dir
+                else None
             )
-        )
+            self._usage_analytics = UsageAnalytics.get_instance(
+                AnalyticsConfig(
+                    cache_dir=analytics_cache_dir,
+                    enable_prometheus_export=getattr(settings, "enable_prometheus_export", True),
+                )
+            )
 
-        # Initialize ToolSequenceTracker for intelligent next-tool suggestions
-        self._sequence_tracker = create_sequence_tracker(
-            use_predefined=getattr(settings, "use_predefined_patterns", True),
-            learning_rate=getattr(settings, "sequence_learning_rate", 0.3),
-        )
+        # Initialize ToolSequenceTracker for intelligent next-tool suggestions (DI with fallback)
+        self._sequence_tracker = self._container.get_optional(ToolSequenceTrackerProtocol)
+        if self._sequence_tracker is None:
+            self._sequence_tracker = create_sequence_tracker(
+                use_predefined=getattr(settings, "use_predefined_patterns", True),
+                learning_rate=getattr(settings, "sequence_learning_rate", 0.3),
+            )
 
         # Initialize ToolOutputFormatter for LLM-context-aware output formatting
         self._tool_output_formatter = create_tool_output_formatter(
@@ -3300,7 +3313,9 @@ class AgentOrchestrator:
 
     def _register_default_workflows(self) -> None:
         """Register default workflows."""
-        self.workflow_registry.register(NewFeatureWorkflow())
+        # Only register if not already registered (singleton registry may have it)
+        if self.workflow_registry.get("new_feature") is None:
+            self.workflow_registry.register(NewFeatureWorkflow())
 
     def _register_default_tools(self) -> None:
         """Dynamically discovers and registers all tools.

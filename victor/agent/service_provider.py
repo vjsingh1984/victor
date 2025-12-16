@@ -135,6 +135,10 @@ class OrchestratorServiceProvider:
             ToolRegistryProtocol,
             ProjectContextProtocol,
             RecoveryHandlerProtocol,
+            CodeExecutionManagerProtocol,
+            WorkflowRegistryProtocol,
+            UsageAnalyticsProtocol,
+            ToolSequenceTrackerProtocol,
         )
 
         # ToolRegistry - shared tool definitions
@@ -193,6 +197,34 @@ class OrchestratorServiceProvider:
 
         # RecoveryHandler - model failure recovery with Q-learning
         self._register_recovery_handler(container)
+
+        # CodeExecutionManager - manages code execution sandboxes
+        container.register(
+            CodeExecutionManagerProtocol,
+            lambda c: self._create_code_execution_manager(),
+            ServiceLifetime.SINGLETON,
+        )
+
+        # WorkflowRegistry - shared workflow definitions
+        container.register(
+            WorkflowRegistryProtocol,
+            lambda c: self._create_workflow_registry(),
+            ServiceLifetime.SINGLETON,
+        )
+
+        # UsageAnalytics - singleton for data-driven optimization
+        container.register(
+            UsageAnalyticsProtocol,
+            lambda c: self._create_usage_analytics(),
+            ServiceLifetime.SINGLETON,
+        )
+
+        # ToolSequenceTracker - singleton for pattern learning
+        container.register(
+            ToolSequenceTrackerProtocol,
+            lambda c: self._create_tool_sequence_tracker(),
+            ServiceLifetime.SINGLETON,
+        )
 
         logger.debug("Registered singleton orchestrator services")
 
@@ -398,6 +430,48 @@ class OrchestratorServiceProvider:
         return MessageHistory(
             system_prompt="",  # Will be set by orchestrator
             max_history_messages=getattr(self._settings, "max_conversation_history", 100),
+        )
+
+    def _create_code_execution_manager(self) -> Any:
+        """Create CodeExecutionManager instance."""
+        from victor.tools.code_executor_tool import CodeExecutionManager
+
+        manager = CodeExecutionManager()
+        manager.start()
+        return manager
+
+    def _create_workflow_registry(self) -> Any:
+        """Create WorkflowRegistry instance."""
+        from victor.workflows.base import WorkflowRegistry
+
+        return WorkflowRegistry()
+
+    def _create_usage_analytics(self) -> Any:
+        """Create UsageAnalytics singleton instance."""
+        from victor.agent.usage_analytics import UsageAnalytics, AnalyticsConfig
+        from pathlib import Path
+
+        # Use settings cache_dir if available
+        analytics_cache_dir = (
+            Path(self._settings.cache_dir)
+            if hasattr(self._settings, "cache_dir") and self._settings.cache_dir
+            else None
+        )
+
+        return UsageAnalytics.get_instance(
+            AnalyticsConfig(
+                cache_dir=analytics_cache_dir,
+                enable_prometheus_export=getattr(self._settings, "enable_prometheus_export", True),
+            )
+        )
+
+    def _create_tool_sequence_tracker(self) -> Any:
+        """Create ToolSequenceTracker instance."""
+        from victor.agent.tool_sequence_tracker import create_sequence_tracker
+
+        return create_sequence_tracker(
+            use_predefined=getattr(self._settings, "use_predefined_patterns", True),
+            learning_rate=getattr(self._settings, "sequence_learning_rate", 0.3),
         )
 
 

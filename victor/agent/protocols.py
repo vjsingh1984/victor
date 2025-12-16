@@ -586,6 +586,104 @@ class ProjectContextProtocol(Protocol):
 
 
 # =============================================================================
+# Component Lifecycle Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class CodeExecutionManagerProtocol(Protocol):
+    """Protocol for code execution management."""
+
+    def start(self) -> None:
+        """Start the execution manager."""
+        ...
+
+    def stop(self) -> None:
+        """Stop the execution manager."""
+        ...
+
+
+@runtime_checkable
+class WorkflowRegistryProtocol(Protocol):
+    """Protocol for workflow registry."""
+
+    def register(self, workflow: Any) -> None:
+        """Register a workflow."""
+        ...
+
+    def get(self, name: str) -> Optional[Any]:
+        """Get a workflow by name."""
+        ...
+
+
+@runtime_checkable
+class ToolRegistrarProtocol(Protocol):
+    """Protocol for tool registration and plugin management."""
+
+    def set_background_task_callback(self, callback: Callable[[Any], Any]) -> None:
+        """Set callback for background task creation."""
+        ...
+
+
+@runtime_checkable
+class UsageAnalyticsProtocol(Protocol):
+    """Protocol for usage analytics."""
+
+    def record_tool_selection(
+        self,
+        tool_name: str,
+        score: float,
+        selected: bool,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Record a tool selection decision."""
+        ...
+
+    def end_session(self) -> None:
+        """End the current analytics session."""
+        ...
+
+    @classmethod
+    def get_instance(cls, config: Any) -> "UsageAnalyticsProtocol":
+        """Get singleton instance."""
+        ...
+
+
+@runtime_checkable
+class ToolSequenceTrackerProtocol(Protocol):
+    """Protocol for tool sequence tracking."""
+
+    def record_transition(self, from_tool: str, to_tool: str) -> None:
+        """Record a tool-to-tool transition."""
+        ...
+
+    def get_next_tool_suggestions(
+        self, current_tool: str, top_k: int = 3
+    ) -> List[Tuple[str, float]]:
+        """Get suggested next tools based on patterns."""
+        ...
+
+
+@runtime_checkable
+class ContextCompactorProtocol(Protocol):
+    """Protocol for context compaction."""
+
+    def maybe_compact_proactively(self) -> bool:
+        """Attempt proactive compaction if threshold reached.
+
+        Returns:
+            True if compaction occurred
+        """
+        ...
+
+    def truncate_tool_result(
+        self, tool_name: str, result: str, context: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Truncate tool result if needed."""
+        ...
+
+
+# =============================================================================
 # Recovery Protocols
 # =============================================================================
 
@@ -694,6 +792,13 @@ __all__ = [
     # Utility protocols
     "ArgumentNormalizerProtocol",
     "ProjectContextProtocol",
+    # Component lifecycle protocols
+    "CodeExecutionManagerProtocol",
+    "WorkflowRegistryProtocol",
+    "ToolRegistrarProtocol",
+    "UsageAnalyticsProtocol",
+    "ToolSequenceTrackerProtocol",
+    "ContextCompactorProtocol",
     # Recovery protocols
     "RecoveryHandlerProtocol",
 ]
