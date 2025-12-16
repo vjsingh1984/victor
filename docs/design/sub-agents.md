@@ -1,8 +1,31 @@
 # Sub-Agent Architecture Design
 
-**Status**: Research/Design Phase
+**Status**: Phase 1 Complete (Implementation)
 **Created**: 2025-12-16
-**Related**: ROADMAP.md P2.1
+**Updated**: 2025-12-16
+**Related**: ROADMAP.md P2.1, P2.2
+
+## Implementation Status
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 1: Core Infrastructure | ✅ Complete | SubAgent, SubAgentOrchestrator, role prompts |
+| Phase 2: Integration | ⏳ Pending | AgentOrchestrator integration |
+| Phase 3: Advanced Features | ⏳ Pending | Parallel execution, hierarchical spawning |
+| Phase 4: UX & Polish | ⏳ Pending | CLI commands, TUI visualization |
+
+### Phase 1 Deliverables
+- `victor/agent/subagents/__init__.py` - Package exports
+- `victor/agent/subagents/base.py` - SubAgent, SubAgentConfig, SubAgentResult, SubAgentRole
+- `victor/agent/subagents/orchestrator.py` - SubAgentOrchestrator, FanOutResult, role defaults
+- `victor/agent/subagents/prompts.py` - Role-specific system prompts
+- `tests/unit/test_subagents.py` - 31 unit tests (all passing)
+
+### P2.2 Autonomous Planning Mode
+- `victor/agent/planning/__init__.py` - Package exports
+- `victor/agent/planning/base.py` - ExecutionPlan, PlanStep, StepResult, PlanResult
+- `victor/agent/planning/autonomous.py` - AutonomousPlanner with plan_for_goal(), execute_plan()
+- `tests/unit/test_planning.py` - 43 unit tests (all passing)
 
 ## Executive Summary
 
@@ -608,12 +631,12 @@ summary = aggregate_research(results)
 
 ## Implementation Plan
 
-### Phase 1: Core Infrastructure (Week 1)
-- [ ] Create `victor/agent/subagents/base.py` with SubAgent classes
-- [ ] Implement SubAgentOrchestrator with spawn() method
-- [ ] Add role-specific system prompts
-- [ ] Create constrained orchestrator factory
-- [ ] Unit tests for sub-agent creation
+### Phase 1: Core Infrastructure ✅ COMPLETE
+- [x] Create `victor/agent/subagents/base.py` with SubAgent classes
+- [x] Implement SubAgentOrchestrator with spawn() method
+- [x] Add role-specific system prompts
+- [x] Create constrained orchestrator factory
+- [x] Unit tests for sub-agent creation (31 tests passing)
 
 ### Phase 2: Integration (Week 2)
 - [ ] Integrate SubAgentOrchestrator into AgentOrchestrator
