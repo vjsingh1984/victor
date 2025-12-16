@@ -500,6 +500,7 @@ class Settings(BaseSettings):
     theme: str = "monokai"
     show_token_count: bool = True
     stream_responses: bool = True
+    use_emojis: bool = True  # Enable emoji indicators in output (✓, ✗, etc.)
 
     # Interaction Mode
     # When True (one-shot mode), auto-continue when model asks for user input
