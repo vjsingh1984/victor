@@ -292,10 +292,17 @@ async def _literal_search(
         "find",
         "grep",
         "literal",
+        "code search",
     ],
-    mandatory_keywords=["search code", "find in code", "search for"],  # Force inclusion
+    mandatory_keywords=[
+        "search code", "find in code", "search for", "code search",
+        # Analysis-related from MANDATORY_TOOL_KEYWORDS
+        "analyze", "analyze codebase", "codebase analysis", "understand",
+        "explore codebase", "architecture", "search",
+    ],  # Force inclusion
+    aliases=["search"],  # Backward compatibility alias
 )
-async def search(
+async def code_search(
     query: str,
     path: str = ".",
     k: int = 10,

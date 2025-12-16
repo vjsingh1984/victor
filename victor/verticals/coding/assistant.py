@@ -97,9 +97,8 @@ class CodingAssistant(VerticalBase):
             "ls",
             "overview",
             # Search
-            "search",
-            "code_search",
-            "semantic_code_search",
+            "code_search",  # Semantic code search (primary name)
+            "grep",         # Keyword search
             "plan_files",
             # Git
             "git",

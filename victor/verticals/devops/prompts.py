@@ -6,7 +6,25 @@ from victor.verticals.protocols import PromptContributorProtocol
 
 
 # DevOps-specific task type hints
+# Keys align with TaskTypeClassifier task types (infrastructure, ci_cd)
+# Also includes granular hints for specific technologies
 DEVOPS_TASK_TYPE_HINTS: Dict[str, str] = {
+    # Classifier task types (matched by TaskTypeClassifier)
+    "infrastructure": """[INFRASTRUCTURE] Deploy infrastructure (Kubernetes, Terraform, Docker, cloud):
+1. Use Infrastructure as Code (Terraform, CloudFormation, Pulumi)
+2. Implement multi-stage Docker builds for smaller images
+3. Define resource limits and requests for Kubernetes
+4. Use ConfigMaps/Secrets for configuration management
+5. Tag all resources for cost tracking and organization""",
+
+    "ci_cd": """[CI/CD] Configure continuous integration/deployment:
+1. Define clear stages: lint, test, build, deploy
+2. Cache dependencies for faster builds
+3. Use matrix builds for cross-platform testing
+4. Implement proper secret management (GitHub Secrets, Vault)
+5. Add manual approval for production deployments""",
+
+    # Granular hints for specific technologies (context_hints)
     "dockerfile": """[DOCKER] Create or optimize Dockerfile:
 1. Use official base images with specific tags
 2. Implement multi-stage builds for smaller images
@@ -21,12 +39,7 @@ DEVOPS_TASK_TYPE_HINTS: Dict[str, str] = {
 4. Add health checks for service readiness
 5. Use environment files for secrets (never hardcode)""",
 
-    "ci_cd_pipeline": """[CI/CD] Configure continuous integration/deployment:
-1. Define clear stages: lint, test, build, deploy
-2. Cache dependencies for faster builds
-3. Use matrix builds for cross-platform testing
-4. Implement proper secret management
-5. Add manual approval for production deployments""",
+    # Note: ci_cd_pipeline removed as duplicate - use ci_cd key which aligns with TaskType.CI_CD
 
     "kubernetes": """[K8S] Create Kubernetes manifests:
 1. Use Deployments for stateless apps, StatefulSets for stateful
@@ -48,6 +61,14 @@ DEVOPS_TASK_TYPE_HINTS: Dict[str, str] = {
 3. Set up distributed tracing for microservices
 4. Implement structured logging
 5. Create dashboards for visibility""",
+
+    # Default fallback for 'general' task type
+    "general": """[GENERAL DEVOPS] For general infrastructure queries:
+1. Read existing configuration files first (ls, read)
+2. Check for Dockerfiles, compose files, k8s manifests
+3. Use shell for quick inspections
+4. Follow security best practices
+5. Document any changes made""",
 }
 
 

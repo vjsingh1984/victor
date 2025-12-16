@@ -35,17 +35,17 @@ class ResearchAssistant(VerticalBase):
 
         return [
             # Core research tools
-            ToolNames.WEB,  # web_search → web
-            ToolNames.FETCH,  # web_fetch → fetch
+            ToolNames.WEB_SEARCH,  # Web search (internet search)
+            ToolNames.WEB_FETCH,   # Fetch URL content
             # File operations for reading/writing reports
-            ToolNames.READ,  # read_file → read
+            ToolNames.READ,   # read_file → read
             ToolNames.WRITE,  # write_file → write
-            ToolNames.EDIT,  # edit_files → edit
-            ToolNames.LS,  # list_directory → ls
+            ToolNames.EDIT,   # edit_files → edit
+            ToolNames.LS,     # list_directory → ls
             # Code search for technical research
-            ToolNames.GREP,  # code_search → grep
-            ToolNames.SEARCH,  # semantic_code_search → search
-            ToolNames.OVERVIEW,  # codebase_overview → overview
+            ToolNames.GREP,        # Keyword search
+            ToolNames.CODE_SEARCH, # Semantic code search
+            ToolNames.OVERVIEW,    # codebase_overview → overview
         ]
 
     @classmethod
@@ -92,21 +92,21 @@ class ResearchAssistant(VerticalBase):
             "INITIAL": StageDefinition(
                 name="INITIAL",
                 description="Understanding the research question",
-                tools={ToolNames.WEB, ToolNames.READ, ToolNames.LS},
+                tools={ToolNames.WEB_SEARCH, ToolNames.READ, ToolNames.LS},
                 keywords=["research", "find", "search", "look up"],
                 next_stages={"SEARCHING"},
             ),
             "SEARCHING": StageDefinition(
                 name="SEARCHING",
                 description="Gathering sources and information",
-                tools={ToolNames.WEB, ToolNames.FETCH, ToolNames.GREP},
+                tools={ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.GREP},
                 keywords=["search", "find", "gather", "discover"],
                 next_stages={"READING", "SEARCHING"},
             ),
             "READING": StageDefinition(
                 name="READING",
                 description="Deep reading and extraction from sources",
-                tools={ToolNames.FETCH, ToolNames.READ, ToolNames.SEARCH},
+                tools={ToolNames.WEB_FETCH, ToolNames.READ, ToolNames.CODE_SEARCH},
                 keywords=["read", "extract", "analyze", "understand"],
                 next_stages={"SYNTHESIZING", "SEARCHING"},
             ),
@@ -127,7 +127,7 @@ class ResearchAssistant(VerticalBase):
             "VERIFICATION": StageDefinition(
                 name="VERIFICATION",
                 description="Fact-checking and source verification",
-                tools={ToolNames.WEB, ToolNames.FETCH},
+                tools={ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH},
                 keywords=["verify", "check", "confirm", "validate"],
                 next_stages={"COMPLETION", "WRITING"},
             ),
@@ -142,7 +142,17 @@ class ResearchAssistant(VerticalBase):
 
     @classmethod
     def _get_system_prompt(cls) -> str:
-        return """You are a research assistant specialized in finding, verifying, and synthesizing information.
+        return """You are a research assistant specialized in finding, verifying, and synthesizing information from the web and other sources.
+
+## Your Primary Role
+
+You are designed for WEB RESEARCH. Unlike coding assistants that focus on local codebases, your job is to:
+- Search the internet for information using web_search
+- Fetch and read web pages using web_fetch
+- Synthesize information from multiple online sources
+- Provide researched answers with citations
+
+IMPORTANT: When asked about topics requiring external information (news, trends, research, facts), you SHOULD use web_search and web_fetch tools. Do NOT refuse saying "this is outside the codebase" - web research IS your purpose.
 
 ## Core Principles
 
@@ -155,11 +165,18 @@ class ResearchAssistant(VerticalBase):
 ## Research Process
 
 1. **Understand**: Clarify the research question and scope
-2. **Search**: Use multiple search queries to find diverse perspectives
-3. **Read**: Extract key facts, statistics, and expert opinions
+2. **Search**: Use web_search with multiple queries to find diverse perspectives
+3. **Read**: Use web_fetch to extract key facts, statistics, and expert opinions
 4. **Verify**: Cross-check important claims with independent sources
 5. **Synthesize**: Combine findings into coherent analysis
 6. **Cite**: Provide proper attribution for all sources
+
+## Available Tools
+
+- **web_search**: Search the internet for information - USE THIS for any external knowledge queries
+- **web_fetch**: Fetch and read content from URLs - USE THIS to get details from search results
+- **read/ls/grep**: For local file operations when needed
+- **write/edit**: For creating research reports
 
 ## Output Format
 
@@ -221,9 +238,9 @@ class ResearchAssistant(VerticalBase):
             },
             # Tier 2: Vertical Core - essential for research tasks
             vertical_core={
-                ToolNames.WEB,       # Web search is core to research
-                ToolNames.FETCH,     # Fetching content is core to research
-                ToolNames.OVERVIEW,  # Codebase overview - core for understanding
+                ToolNames.WEB_SEARCH,  # Web search is core to research
+                ToolNames.WEB_FETCH,   # Fetching content is core to research
+                ToolNames.OVERVIEW,    # Codebase overview - core for understanding
             },
             # semantic_pool and stage_tools are now derived from @tool decorator metadata
             # Use get_effective_semantic_pool() and get_tools_for_stage_from_registry()

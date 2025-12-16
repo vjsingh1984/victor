@@ -22,6 +22,11 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.agent.message_history import MessageHistory
 from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
+from victor.config.orchestrator_constants import (
+    COMPACTION_CONFIG,
+    CONTEXT_LIMITS,
+    SEMANTIC_THRESHOLDS,
+)
 from victor.providers.base import Message
 
 if TYPE_CHECKING:
@@ -70,15 +75,15 @@ class ContextMetrics:
 
 @dataclass
 class ConversationConfig:
-    max_context_chars: int = 200000
-    chars_per_token_estimate: int = 4
+    max_context_chars: int = CONTEXT_LIMITS.max_context_chars
+    chars_per_token_estimate: int = CONTEXT_LIMITS.chars_per_token_estimate
     enable_stage_tracking: bool = True
     enable_context_monitoring: bool = True
     compaction_strategy: CompactionStrategy = CompactionStrategy.TIERED
     min_messages_to_keep: int = 6
-    tool_result_retention_weight: float = 1.5
-    recent_message_weight: float = 2.0
-    semantic_relevance_threshold: float = 0.3
+    tool_result_retention_weight: float = COMPACTION_CONFIG.tool_result_retention_weight
+    recent_message_weight: float = COMPACTION_CONFIG.recent_message_weight
+    semantic_relevance_threshold: float = SEMANTIC_THRESHOLDS.compaction_relevance
 
 
 class ConversationController:
@@ -215,7 +220,7 @@ class ConversationController:
             char_count=total_chars,
             estimated_tokens=estimated_tokens,
             message_count=len(self.messages),
-            is_overflow_risk=total_chars > self.config.max_context_chars * 0.8,
+            is_overflow_risk=total_chars > self.config.max_context_chars * CONTEXT_LIMITS.overflow_threshold,
             max_context_chars=self.config.max_context_chars,
         )
 

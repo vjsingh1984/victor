@@ -6,20 +6,31 @@ from victor.verticals.protocols import PromptContributorProtocol
 
 
 # Data analysis-specific task type hints
+# Keys align with TaskTypeClassifier task types (data_analysis, visualization)
+# Also includes granular hints for specific analysis methods
 DATA_ANALYSIS_TASK_TYPE_HINTS: Dict[str, str] = {
+    # Classifier task types (matched by TaskTypeClassifier)
+    "data_analysis": """[DATA ANALYSIS] Comprehensive data exploration and analysis:
+1. Load data and check shape/types with df.info(), df.describe()
+2. Calculate summary statistics (mean, median, std, quartiles)
+3. Identify missing values and their patterns (df.isnull().sum())
+4. Check for duplicates and data quality issues
+5. Analyze correlations and distributions before modeling""",
+
+    "visualization": """[VISUALIZATION] Create informative charts and dashboards:
+1. Choose appropriate chart type for the data (bar, line, scatter, heatmap)
+2. Use clear labels, titles, and legends
+3. Add context (units, time periods, annotations)
+4. Consider colorblind-friendly palettes (viridis, cividis)
+5. Save as high-resolution images (plt.savefig('fig.png', dpi=300))""",
+
+    # Granular hints for specific analysis methods (context_hints)
     "data_profiling": """[PROFILE] Comprehensive data profiling:
 1. Load data and check shape/types
 2. Calculate summary statistics (mean, median, std, quartiles)
 3. Identify missing values and their patterns
 4. Check for duplicates and uniqueness
 5. Analyze value distributions""",
-
-    "visualization": """[VISUALIZE] Create informative visualizations:
-1. Choose appropriate chart type for the data
-2. Use clear labels and titles
-3. Add context (units, time periods)
-4. Consider colorblind-friendly palettes
-5. Save as high-resolution images""",
 
     "statistical_analysis": """[STATISTICS] Perform statistical analysis:
 1. State null and alternative hypotheses
@@ -55,6 +66,14 @@ DATA_ANALYSIS_TASK_TYPE_HINTS: Dict[str, str] = {
 3. Decompose into trend, seasonal, residual
 4. Check stationarity (ADF test)
 5. Apply appropriate forecasting method""",
+
+    # Default fallback for 'general' task type
+    "general": """[GENERAL DATA] For general data queries:
+1. Read available data files (CSV, Excel, databases)
+2. Use pandas for data exploration (df.info(), df.describe())
+3. Calculate basic statistics and distributions
+4. Create simple visualizations for insights
+5. Summarize findings clearly""",
 }
 
 

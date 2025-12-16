@@ -22,6 +22,7 @@ import yaml
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
+from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
 
 
 # =============================================================================
@@ -337,13 +338,13 @@ class ProfileConfig(BaseSettings):
         if v is None:
             return None
 
-        # Predefined model size tiers for convenience
+        # Predefined model size tiers for convenience (from orchestrator_constants)
         TIER_PRESETS = {
-            "tiny": {"base_threshold": 0.35, "base_max_tools": 5},  # 0.5B-3B
-            "small": {"base_threshold": 0.25, "base_max_tools": 7},  # 7B-8B
-            "medium": {"base_threshold": 0.20, "base_max_tools": 10},  # 13B-15B
-            "large": {"base_threshold": 0.15, "base_max_tools": 12},  # 30B+
-            "cloud": {"base_threshold": 0.18, "base_max_tools": 10},  # Claude/GPT
+            "tiny": TOOL_SELECTION_PRESETS.tiny,  # 0.5B-3B
+            "small": TOOL_SELECTION_PRESETS.small,  # 7B-8B
+            "medium": TOOL_SELECTION_PRESETS.medium,  # 13B-15B
+            "large": TOOL_SELECTION_PRESETS.large,  # 30B+
+            "cloud": TOOL_SELECTION_PRESETS.cloud,  # Claude/GPT
         }
 
         # Expand tier shortcuts
@@ -511,10 +512,10 @@ class Settings(BaseSettings):
     mcp_prefix: str = "mcp"
 
     # Tool Execution Settings
-    tool_call_budget: int = (
-        300  # Maximum tool calls per session (increased from 20 for long operations)
-    )
-    tool_call_budget_warning_threshold: int = 250  # Warn when approaching budget limit
+    tool_call_budget: int = BUDGET_LIMITS.max_session_budget  # Maximum tool calls per session
+    tool_call_budget_warning_threshold: int = int(
+        BUDGET_LIMITS.max_session_budget * BUDGET_LIMITS.warning_threshold_pct
+    )  # Warn when approaching budget limit
 
     # Models known to support structured tool calls per provider
     # Loaded from model_capabilities.yaml, can be extended in profiles.yaml

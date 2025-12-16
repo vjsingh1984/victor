@@ -161,10 +161,11 @@ class FrameworkShim:
         """Create orchestrator with framework features wired.
 
         This is the main entry point. It:
-        1. Creates the base orchestrator via from_settings()
-        2. Applies vertical configuration if specified
-        3. Wires observability if enabled
-        4. Returns the enhanced orchestrator
+        1. Bootstraps the DI container with the correct vertical
+        2. Creates the base orchestrator via from_settings()
+        3. Applies vertical configuration if specified
+        4. Wires observability if enabled
+        5. Returns the enhanced orchestrator
 
         Returns:
             Configured AgentOrchestrator instance.
@@ -173,12 +174,18 @@ class FrameworkShim:
             RuntimeError: If orchestrator creation fails.
         """
         from victor.agent.orchestrator import AgentOrchestrator
+        from victor.core.bootstrap import ensure_bootstrapped
 
         logger.debug(
             f"FrameworkShim creating orchestrator: profile={self._profile_name}, "
             f"thinking={self._thinking}, vertical={self._vertical}, "
             f"observability={self._enable_observability}"
         )
+
+        # Step 0: Ensure bootstrap with correct vertical BEFORE orchestrator creation
+        # This ensures vertical services are registered with the correct vertical name
+        vertical_name = self._vertical.name if self._vertical else None
+        ensure_bootstrapped(self._settings, vertical=vertical_name)
 
         # Step 1: Create base orchestrator
         self._orchestrator = await AgentOrchestrator.from_settings(

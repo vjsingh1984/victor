@@ -53,6 +53,9 @@ defaults:
     exploration_multiplier: 1.0
     # Continuation patience: how many empty turns to allow before forcing completion
     continuation_patience: 10
+    # Timeout multiplier: slow local models (30B+ params) need longer timeouts
+    # Multiplies provider timeout (default 300s)
+    timeout_multiplier: 1.0
     # Payload size limits (bytes) - prevents HTTP 413 errors
     # Default is generous; providers with strict limits override this
     max_request_payload_bytes: 10485760  # 10MB default
@@ -148,6 +151,7 @@ provider_defaults:
     recommended_tool_budget: 15
 
   # Ollama - requires {{ if .Tools }} in Modelfile template
+  # Local inference is slower than cloud, especially for 30B+ models
   ollama:
     native_tool_calls: false  # Must be enabled per-model
     streaming_tool_calls: false
@@ -156,6 +160,10 @@ provider_defaults:
     requires_strict_prompting: true
     recommended_max_tools: 20
     recommended_tool_budget: 12
+    # Local inference needs longer timeouts (300s * 2 = 600s = 10min)
+    timeout_multiplier: 2.0
+    # More exploration turns for local models
+    exploration_multiplier: 1.5
 
   # LMStudio - llama.cpp enables tools for ALL models (0.3.6+)
   lmstudio:
@@ -166,6 +174,10 @@ provider_defaults:
     requires_strict_prompting: false
     recommended_max_tools: 25
     recommended_tool_budget: 15
+    # Local inference needs longer timeouts (300s * 1.5 = 450s = 7.5min)
+    timeout_multiplier: 1.5
+    # Slightly more exploration turns for local models
+    exploration_multiplier: 1.3
 
   # vLLM - guided decoding via Outlines for all models
   vllm:

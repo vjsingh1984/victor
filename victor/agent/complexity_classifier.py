@@ -78,7 +78,11 @@ PATTERNS = {
             0.9,
             "implement_feature",
         ),
-        (r"\b(migrate|upgrade|convert)\b", 0.8, "migration"),
+        # Migration and restructuring tasks require deep codebase understanding
+        (r"\b(migrate|upgrade)\s+", 0.9, "migration"),
+        (r"\b(restructure|reorganize)\s+(the\s+)?(project|code|module|layout)\b", 0.9, "restructure"),
+        (r"\bconvert\s+.+\s+(to|into)\s+", 0.9, "convert_code"),
+        (r"\bconsolidate\s+(the\s+)?(code|duplicate|files?)\b", 0.9, "consolidate"),
     ],
     TaskComplexity.GENERATION: [
         (
@@ -152,6 +156,7 @@ EXTENDED_PROMPT_HINTS = {
 class ComplexityClassifier:
 
     TASK_TYPE_TO_COMPLEXITY = {
+        # Core task types
         "edit": TaskComplexity.MEDIUM,
         "search": TaskComplexity.MEDIUM,
         "create": TaskComplexity.COMPLEX,
@@ -161,6 +166,35 @@ class ComplexityClassifier:
         "general": TaskComplexity.MEDIUM,
         "action": TaskComplexity.ACTION,
         "analysis_deep": TaskComplexity.COMPLEX,
+        # Research vertical task types - GAP-13 FIX: Research tasks need more exploration
+        "literature_review": TaskComplexity.COMPLEX,
+        "trend_research": TaskComplexity.COMPLEX,
+        "technical_research": TaskComplexity.COMPLEX,
+        "competitive_analysis": TaskComplexity.COMPLEX,
+        "fact_check": TaskComplexity.MEDIUM,  # Fact checking is focused, not complex
+        "general_query": TaskComplexity.MEDIUM,
+        # Coding vertical task types
+        "code_generation": TaskComplexity.GENERATION,
+        "refactor": TaskComplexity.COMPLEX,
+        "debug": TaskComplexity.MEDIUM,
+        "test": TaskComplexity.MEDIUM,
+        # DevOps vertical task types
+        "infrastructure": TaskComplexity.COMPLEX,
+        "ci_cd": TaskComplexity.COMPLEX,
+        "dockerfile": TaskComplexity.MEDIUM,
+        "docker_compose": TaskComplexity.MEDIUM,
+        "kubernetes": TaskComplexity.COMPLEX,
+        "terraform": TaskComplexity.COMPLEX,
+        "monitoring": TaskComplexity.COMPLEX,
+        # Data Analysis vertical task types
+        "data_analysis": TaskComplexity.COMPLEX,
+        "data_profiling": TaskComplexity.MEDIUM,
+        "statistical_analysis": TaskComplexity.COMPLEX,
+        "correlation_analysis": TaskComplexity.MEDIUM,
+        "regression": TaskComplexity.COMPLEX,
+        "clustering": TaskComplexity.COMPLEX,
+        "time_series": TaskComplexity.COMPLEX,
+        "visualization": TaskComplexity.MEDIUM,
     }
 
     def __init__(

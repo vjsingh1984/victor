@@ -42,12 +42,13 @@ class DataAnalysisAssistant(VerticalBase):
             # Python/Shell execution for analysis
             ToolNames.SHELL,     # bash → shell (for running Python scripts)
             # Code generation and search
-            ToolNames.GREP,      # code_search → grep
-            ToolNames.SEARCH,    # semantic_code_search → search
-            ToolNames.OVERVIEW,  # codebase_overview → overview
+            ToolNames.GREP,        # Keyword search
+            ToolNames.CODE_SEARCH, # Semantic code search
+            ToolNames.OVERVIEW,    # codebase_overview → overview
+            ToolNames.GRAPH,       # Code graph analysis (PageRank, dependencies)
             # Web for datasets and documentation
-            ToolNames.WEB,       # web_search → web
-            ToolNames.FETCH,     # web_fetch → fetch
+            ToolNames.WEB_SEARCH,  # Web search (internet search)
+            ToolNames.WEB_FETCH,   # Fetch URL content
         ]
 
     @classmethod

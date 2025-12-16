@@ -539,15 +539,36 @@ class GroundingVerifier:
                 file_symbols = self.SYMBOL_PATTERN.findall(content)
                 known_symbols.update(file_symbols)
 
+        # GAP-15 FIX: Skip common keywords and built-ins that should not be flagged
+        # These are Python/JavaScript language constructs, not user-defined symbols
+        language_keywords = {
+            # Python keywords
+            "if", "else", "elif", "for", "while", "try", "except", "finally",
+            "with", "as", "import", "from", "class", "def", "return", "yield",
+            "raise", "assert", "pass", "break", "continue", "lambda", "and",
+            "or", "not", "in", "is", "True", "False", "None", "async", "await",
+            # Python built-ins commonly appearing in code
+            "print", "len", "range", "str", "int", "float", "list", "dict",
+            "set", "tuple", "type", "isinstance", "hasattr", "getattr", "setattr",
+            "open", "file", "input", "output", "read", "write", "append",
+            # JavaScript/TypeScript keywords
+            "const", "let", "var", "function", "return", "returns", "async",
+            "await", "export", "import", "default", "interface", "type",
+            # Common patterns in generated code descriptions
+            "returns", "takes", "args", "kwargs", "param", "params",
+            # Magic methods
+            "__init__", "__str__", "__repr__", "self", "cls", "__name__",
+            "__main__", "__file__", "__doc__",
+        }
+
         # Verify each symbol
         for symbol in symbols:
             if symbol in known_symbols:
                 result.verified_references.append(f"symbol:{symbol}")
+            elif symbol.lower() in language_keywords or symbol in language_keywords:
+                # GAP-15 FIX: Skip language keywords - they are not user symbols
+                continue
             else:
-                # Check if it's a built-in or common name
-                if symbol in {"__init__", "__str__", "__repr__", "self", "cls"}:
-                    continue
-
                 result.add_issue(
                     GroundingIssue(
                         issue_type=IssueType.SYMBOL_NOT_FOUND,

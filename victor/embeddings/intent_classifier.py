@@ -81,6 +81,15 @@ def _has_stuck_loop_heuristic(text: str) -> bool:
     This detects patterns where the model keeps saying what it will do
     but never actually makes tool calls.
 
+    The detection requires either:
+    - 3+ planning statements (strong indicator of stalling)
+    - The repeating pattern "I'll use X... I'll use Y" (already indicates multiple plans)
+    - 2+ planning statements from different pattern types
+
+    This threshold balances:
+    - Too low (1-2): False positives when model legitimately plans before acting
+    - Too high (4+): Misses actual stuck loops where model can't execute
+
     Args:
         text: Text to check
 
@@ -89,12 +98,40 @@ def _has_stuck_loop_heuristic(text: str) -> bool:
     """
     # Check if multiple planning statements exist (strong stuck signal)
     planning_count = 0
-    for pattern in STUCK_LOOP_HEURISTIC_PATTERNS:
-        matches = pattern.findall(text)
-        planning_count += len(matches)
+    has_repeating_pattern = False
+    matched_pattern_indices = set()
 
-    if planning_count >= 2:
-        logger.debug(f"Stuck loop heuristic: found {planning_count} planning statements")
+    for i, pattern in enumerate(STUCK_LOOP_HEURISTIC_PATTERNS):
+        matches = pattern.findall(text)
+        match_count = len(matches)
+        planning_count += match_count
+
+        if match_count > 0:
+            matched_pattern_indices.add(i)
+
+        # Pattern 3 (index 3) is the "repeating tool use" pattern - strongest indicator
+        # This pattern already implies 2+ planning statements in one match
+        if i == 3 and match_count > 0:
+            has_repeating_pattern = True
+
+    # The repeating pattern is a strong signal on its own (implies 2+ I'll use statements)
+    if has_repeating_pattern:
+        logger.debug(
+            f"Stuck loop heuristic: found repeating 'I'll use X... I'll use Y' pattern"
+        )
+        return True
+
+    # Require 3+ planning statements OR 2+ from different pattern types
+    # This prevents false positives for legitimate planning responses
+    if planning_count >= 3:
+        logger.debug(f"Stuck loop heuristic: found {planning_count} planning statements (threshold=3)")
+        return True
+
+    # 2+ statements from different pattern types indicates diverse planning without action
+    if planning_count >= 2 and len(matched_pattern_indices) >= 2:
+        logger.debug(
+            f"Stuck loop heuristic: found {planning_count} statements from {len(matched_pattern_indices)} pattern types"
+        )
         return True
 
     return False

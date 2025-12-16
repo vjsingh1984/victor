@@ -4116,6 +4116,15 @@ class AgentOrchestrator:
         ctx.needs_execution = task_keywords["needs_execution"]
         ctx.coarse_task_type = task_keywords["coarse_task_type"]
 
+        # GAP-16: Set is_complex_task from ComplexityClassifier for lenient progress checking
+        # This allows COMPLEX tasks (like refactoring, multi-file changes) to continue exploring
+        # even when is_analysis_task and is_action_task are False
+        if task_classification and hasattr(task_classification, "complexity"):
+            ctx.is_complex_task = task_classification.complexity in (
+                TaskComplexity.COMPLEX,
+                TaskComplexity.ANALYSIS,
+            )
+
         # Set goals for tool selection
         ctx.goals = self._goal_hints_for_message(user_message)
 
@@ -4128,10 +4137,45 @@ class AgentOrchestrator:
     def _prepare_task(self, user_message: str, unified_task_type: TaskType) -> tuple[Any, int]:
         """Prepare task-specific guidance and budget adjustments."""
         # Inject task-specific prompt hint for better guidance
-        task_hint = get_task_type_hint(unified_task_type.value)
+        # Pass prompt_contributors from prompt_builder to support vertical-specific hints
+        #
+        # GAP-10 Fix: Use the granular TaskTypeClassifier result for hint lookup
+        # The unified_task_type is coarsened (REFACTOR → EDIT), but vertical hints use granular types.
+        # Try granular type first (e.g., "refactor"), then fall back to unified type (e.g., "edit")
+        from victor.embeddings.task_classifier import TaskTypeClassifier
+
+        granular_task_type = None
+        try:
+            classifier = TaskTypeClassifier.get_instance()
+            if classifier._initialized:
+                result = classifier.classify_sync(user_message)
+                granular_task_type = result.task_type.value
+        except Exception:
+            pass  # Fall back to unified type
+
+        # Try granular type first (e.g., "refactor", "bug_fix", "documentation")
+        task_hint = None
+        hint_source = None
+        if granular_task_type:
+            task_hint = get_task_type_hint(
+                granular_task_type,
+                prompt_contributors=self.prompt_builder.prompt_contributors,
+            )
+            if task_hint:
+                hint_source = granular_task_type
+
+        # Fall back to unified type if no granular hint found
+        if not task_hint:
+            task_hint = get_task_type_hint(
+                unified_task_type.value,
+                prompt_contributors=self.prompt_builder.prompt_contributors,
+            )
+            if task_hint:
+                hint_source = unified_task_type.value
+
         if task_hint:
             self.add_message("system", task_hint.strip())
-            logger.debug(f"Injected task hint for task type: {unified_task_type.value}")
+            logger.debug(f"Injected task hint for task type: {hint_source}")
 
         # Classify task complexity and adjust tool budget
         task_classification = self.task_classifier.classify(user_message)
@@ -5352,13 +5396,14 @@ class AgentOrchestrator:
                     if plain_text:
                         self.add_message("assistant", plain_text)
 
-                # Log warning if model mentioned tools but didn't execute them
+                # Log info if model mentioned tools but didn't execute them
                 # (mentioned_tools_detected was already computed earlier for recovery integration)
+                # This is common with local models that struggle with native tool calling
                 if mentioned_tools_detected:
                     tools_str = ", ".join(mentioned_tools_detected)
-                    logger.warning(
-                        f"Model mentioned tool(s) [{tools_str}] but did not execute them. "
-                        "This may indicate the model is hallucinating tool calls."
+                    logger.info(
+                        f"Model mentioned tool(s) [{tools_str}] in text without executing. "
+                        "Common with local models - tool syntax detected in response content."
                     )
             elif not tool_calls:
                 # No content and no tool calls - check for natural completion using handler
@@ -6018,6 +6063,16 @@ class AgentOrchestrator:
                 self.console.print(
                     f"[yellow]⚠ Skipping invalid/hallucinated tool name: {tool_name}[/]"
                 )
+                # GAP-5 FIX: Add feedback so model learns from invalid tool name
+                # Instead of silently dropping, return an error result the model can learn from
+                results.append({
+                    "tool_name": tool_name,
+                    "success": False,
+                    "result": None,
+                    "error": f"Invalid tool name '{tool_name}'. This tool does not exist. "
+                             "Use only tools from the provided tool list. "
+                             "Check for typos or hallucinated tool names.",
+                })
                 continue
 
             # Resolve legacy/alias names to canonical form before checks
@@ -6034,6 +6089,16 @@ class AgentOrchestrator:
                 self.console.print(
                     f"[yellow]⚠ Skipping unknown or disabled tool: {tool_name} (resolved: {canonical_tool_name})[/]"
                 )
+                # GAP-5 FIX: Add feedback so model learns from unknown/disabled tool
+                # Instead of silently dropping, return an error result the model can learn from
+                results.append({
+                    "tool_name": tool_name,
+                    "success": False,
+                    "result": None,
+                    "error": f"Tool '{tool_name}' is not available. It may be disabled, not registered, "
+                             "or not included in the current tool selection. "
+                             "Use only the tools listed in your available tools.",
+                })
                 continue
 
             if self.tool_calls_used >= self.tool_budget:
@@ -6696,17 +6761,47 @@ class AgentOrchestrator:
         # Fall back to all available tools
         return self.get_available_tools()
 
-    def set_enabled_tools(self, tools: Set[str]) -> None:
+    def set_enabled_tools(self, tools: Set[str], tiered_config: Any = None) -> None:
         """Set which tools are enabled for this session (protocol method).
 
         Args:
             tools: Set of tool names to enable
+            tiered_config: Optional TieredToolConfig to propagate for stage filtering.
+                          If None, will attempt to retrieve from active vertical.
         """
         self._enabled_tools = tools
         # Propagate to tool_selector for selection-time filtering
         if hasattr(self, "tool_selector") and self.tool_selector:
             self.tool_selector.set_enabled_tools(tools)
             logger.info(f"Enabled tools filter propagated to selector: {sorted(tools)}")
+
+            # Also propagate TieredToolConfig for stage-aware filtering
+            if tiered_config is None:
+                # Try to get tiered config from active vertical
+                tiered_config = self._get_vertical_tiered_config()
+            if tiered_config is not None:
+                self.tool_selector.set_tiered_config(tiered_config)
+                logger.info(
+                    f"Tiered config propagated to selector: "
+                    f"mandatory={sorted(tiered_config.mandatory)}, "
+                    f"vertical_core={sorted(tiered_config.vertical_core)}"
+                )
+
+    def _get_vertical_tiered_config(self) -> Any:
+        """Get TieredToolConfig from active vertical if available.
+
+        Returns:
+            TieredToolConfig or None
+        """
+        try:
+            from victor.verticals.vertical_loader import get_vertical_loader
+
+            loader = get_vertical_loader()
+            if loader.active_vertical:
+                return loader.active_vertical.get_tiered_tools()
+        except Exception as e:
+            logger.debug(f"Could not get tiered config from vertical: {e}")
+        return None
 
     def is_tool_enabled(self, tool_name: str) -> bool:
         """Check if a specific tool is enabled (protocol method).
@@ -6845,6 +6940,21 @@ class AgentOrchestrator:
             provider_settings.update(profile.__pydantic_extra__)
             logger.debug(
                 f"Profile '{profile_name}' overrides: {list(profile.__pydantic_extra__.keys())}"
+            )
+
+        # Apply timeout multiplier from model capabilities
+        # Slow local models (Ollama, LMStudio) get longer timeouts
+        from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
+
+        cap_loader = ModelCapabilityLoader()
+        caps = cap_loader.get_capabilities(profile.provider, profile.model)
+        if caps and caps.timeout_multiplier > 1.0:
+            base_timeout = provider_settings.get("timeout", 300)
+            adjusted_timeout = int(base_timeout * caps.timeout_multiplier)
+            provider_settings["timeout"] = adjusted_timeout
+            logger.info(
+                f"Adjusted timeout for {profile.provider}/{profile.model}: "
+                f"{base_timeout}s -> {adjusted_timeout}s (multiplier: {caps.timeout_multiplier}x)"
             )
 
         # Create provider instance using registry

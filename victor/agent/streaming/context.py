@@ -68,6 +68,7 @@ class StreamingChatContext:
     complexity_tool_budget: Optional[int] = None
     is_analysis_task: bool = False
     is_action_task: bool = False
+    is_complex_task: bool = False  # GAP-16: Track COMPLEX complexity for lenient progress checking
     needs_execution: bool = False
     coarse_task_type: str = "default"
 
@@ -201,18 +202,26 @@ class StreamingChatContext:
         """Check if progress is being made relative to tool calls.
 
         Returns True if progress is adequate, False if stuck.
+
+        GAP-16: Also considers is_complex_task for lenient treatment, not just
+        is_analysis_task and is_action_task. COMPLEX tasks from ComplexityClassifier
+        need more exploration before forcing completion.
         """
         max_consecutive = base_max_consecutive
         if self.is_analysis_task:
             max_consecutive = 50
         elif self.is_action_task:
             max_consecutive = 30
+        elif self.is_complex_task:
+            # GAP-16: COMPLEX tasks get moderate leniency (between action and default)
+            max_consecutive = 20
 
         if self.tool_calls_used < max_consecutive:
             return True  # Haven't hit limit yet
 
         # Check unique resources accessed
-        requires_lenient = self.is_analysis_task or self.is_action_task
+        # GAP-16: Include is_complex_task for lenient threshold calculation
+        requires_lenient = self.is_analysis_task or self.is_action_task or self.is_complex_task
         threshold = self.tool_calls_used // 4 if requires_lenient else self.tool_calls_used // 2
         return len(self.unique_resources) >= threshold
 

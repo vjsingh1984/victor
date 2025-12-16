@@ -46,6 +46,14 @@ RESEARCH_TASK_TYPE_HINTS: Dict[str, str] = {
 2. Provide direct answer with context
 3. Cite sources with URLs
 4. Note any uncertainty or limitations""",
+
+    # Default fallback for 'general' task type
+    "general": """[GENERAL RESEARCH] For general research queries:
+1. Use web_search to find relevant sources
+2. Fetch key pages with web_fetch for details
+3. Synthesize findings from multiple sources
+4. Cite all sources with URLs
+5. Note limitations or areas needing further research""",
 }
 
 

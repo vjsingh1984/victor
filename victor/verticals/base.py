@@ -111,6 +111,61 @@ class VerticalConfig:
             # System prompt is typically handled separately
         }
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert config to dictionary for dict-like access.
+
+        Returns:
+            Dictionary representation of the configuration.
+        """
+        return {
+            "tools": self.tools.tools if self.tools else [],
+            "system_prompt": self.system_prompt,
+            "stages": {k: {"name": v.name, "description": v.description} for k, v in self.stages.items()},
+            "provider_hints": self.provider_hints,
+            "evaluation_criteria": self.evaluation_criteria,
+            "metadata": self.metadata,
+        }
+
+    def keys(self):
+        """Return keys for dict-like access compatibility.
+
+        Returns:
+            Keys iterator for dictionary representation.
+        """
+        return self.to_dict().keys()
+
+    def __getitem__(self, key: str) -> Any:
+        """Enable dict-like access: config["key"].
+
+        Args:
+            key: Configuration key
+
+        Returns:
+            Configuration value
+
+        Raises:
+            KeyError: If key not found
+        """
+        d = self.to_dict()
+        if key not in d:
+            raise KeyError(key)
+        return d[key]
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get config value with default, like dict.get().
+
+        Args:
+            key: Configuration key
+            default: Default value if key not found
+
+        Returns:
+            Configuration value or default
+        """
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
 
 class VerticalBase(ABC):
     """Abstract base class for domain-specific assistants.
@@ -314,6 +369,89 @@ class VerticalBase(ABC):
         return None
 
     @classmethod
+    def get_mode_config(cls) -> Dict[str, Any]:
+        """Get mode configurations for this vertical.
+
+        Returns operational modes like 'fast', 'thorough', 'explore' with
+        their configurations (tool_budget, max_iterations, temperature).
+
+        Default implementation provides standard modes. Override in subclasses
+        for vertical-specific mode configurations.
+
+        Returns:
+            Dictionary mapping mode names to ModeConfig-like dicts.
+        """
+        return {
+            "fast": {
+                "name": "fast",
+                "tool_budget": 10,
+                "max_iterations": 20,
+                "temperature": 0.7,
+                "description": "Quick responses with limited tool usage",
+            },
+            "thorough": {
+                "name": "thorough",
+                "tool_budget": 50,
+                "max_iterations": 50,
+                "temperature": 0.7,
+                "description": "Comprehensive analysis with extensive tool usage",
+            },
+            "explore": {
+                "name": "explore",
+                "tool_budget": 30,
+                "max_iterations": 30,
+                "temperature": 0.9,
+                "description": "Exploratory mode with higher creativity",
+            },
+        }
+
+    @classmethod
+    def get_task_type_hints(cls) -> Dict[str, Any]:
+        """Get task-type-specific prompt hints.
+
+        Returns hints for common task types (edit, search, explain, etc.)
+        with tool priorities and budget recommendations.
+
+        Default implementation provides standard hints. Override in subclasses
+        for vertical-specific task type hints.
+
+        Returns:
+            Dictionary mapping task types to TaskTypeHint-like dicts.
+        """
+        return {
+            "edit": {
+                "task_type": "edit",
+                "hint": "[EDIT MODE] Read target files first, then make focused modifications.",
+                "tool_budget": 15,
+                "priority_tools": ["read", "edit", "grep"],
+            },
+            "search": {
+                "task_type": "search",
+                "hint": "[SEARCH MODE] Use semantic search and grep for efficient discovery.",
+                "tool_budget": 10,
+                "priority_tools": ["grep", "code_search", "ls"],
+            },
+            "explain": {
+                "task_type": "explain",
+                "hint": "[EXPLAIN MODE] Read relevant code and provide clear explanations.",
+                "tool_budget": 8,
+                "priority_tools": ["read", "grep", "overview"],
+            },
+            "debug": {
+                "task_type": "debug",
+                "hint": "[DEBUG MODE] Investigate systematically, check logs and error messages.",
+                "tool_budget": 20,
+                "priority_tools": ["read", "grep", "shell", "run_tests"],
+            },
+            "implement": {
+                "task_type": "implement",
+                "hint": "[IMPLEMENT MODE] Plan first, implement incrementally, verify each step.",
+                "tool_budget": 30,
+                "priority_tools": ["read", "write", "edit", "shell"],
+            },
+        }
+
+    @classmethod
     def get_tool_dependency_provider(cls) -> Optional[Any]:
         """Get tool dependency provider for this vertical.
 
@@ -367,12 +505,20 @@ class VerticalBase(ABC):
     def get_service_provider(cls) -> Optional[Any]:
         """Get service provider for this vertical.
 
-        Override to register vertical-specific services with DI container.
+        By default, returns a BaseVerticalServiceProvider that registers
+        the vertical's prompt contributor, safety extension, mode config,
+        and tool dependency providers with the DI container.
+
+        Override to provide custom service registration logic.
 
         Returns:
-            Service provider (ServiceProviderProtocol) or None
+            Service provider (ServiceProviderProtocol) or factory-created provider
         """
-        return None
+        try:
+            from victor.verticals.base_service_provider import VerticalServiceProviderFactory
+            return VerticalServiceProviderFactory.create(cls)
+        except ImportError:
+            return None
 
     @classmethod
     def get_extensions(cls) -> Any:

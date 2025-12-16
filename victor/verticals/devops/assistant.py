@@ -43,13 +43,16 @@ class DevOpsAssistant(VerticalBase):
             ToolNames.SHELL,     # bash → shell
             # Git for version control
             ToolNames.GIT,       # Git operations
+            # Container and infrastructure tools
+            ToolNames.DOCKER,    # Docker operations - essential for DevOps
+            ToolNames.TEST,      # Run tests - essential for validation
             # Code search for configurations
-            ToolNames.GREP,      # code_search → grep
-            ToolNames.SEARCH,    # semantic_code_search → search
-            ToolNames.OVERVIEW,  # codebase_overview → overview
+            ToolNames.GREP,        # Keyword search
+            ToolNames.CODE_SEARCH, # Semantic code search
+            ToolNames.OVERVIEW,    # codebase_overview → overview
             # Web for documentation
-            ToolNames.WEB,       # web_search → web
-            ToolNames.FETCH,     # web_fetch → fetch
+            ToolNames.WEB_SEARCH,  # Web search (internet search)
+            ToolNames.WEB_FETCH,   # Fetch URL content
         ]
 
     @classmethod
@@ -117,7 +120,7 @@ class DevOpsAssistant(VerticalBase):
             "PLANNING": StageDefinition(
                 name="PLANNING",
                 description="Planning infrastructure changes",
-                tools={ToolNames.READ, ToolNames.GREP, ToolNames.WEB, ToolNames.FETCH},
+                tools={ToolNames.READ, ToolNames.GREP, ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH},
                 keywords=["plan", "design", "architecture", "strategy"],
                 next_stages={"IMPLEMENTATION"},
             ),

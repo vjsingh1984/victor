@@ -667,6 +667,8 @@ TEXT_EXTENSIONS = {
         "show file",
         "explain this code",
         "what does this",
+        # Additional keywords from MANDATORY_TOOL_KEYWORDS
+        "explain", "describe", "what does",
     ],  # Force inclusion
     priority_hints=[
         "TRUNCATION: Output limited to ~15,000 chars. Use offset/limit for large files.",
@@ -1473,7 +1475,13 @@ async def overview(
         if not root.exists():
             raise FileNotFoundError(f"Directory not found: {path}")
         if not root.is_dir():
-            raise NotADirectoryError(f"Path is not a directory: {path}")
+            # GAP-14 FIX: If a file path is given, use its parent directory
+            # This is a common model mistake - be helpful and auto-correct
+            parent = root.parent
+            if parent.is_dir():
+                root = parent
+            else:
+                raise NotADirectoryError(f"Path is not a directory: {path}. Use the parent directory or a directory path.")
 
         # Excluded directories
         exclude_dirs = {

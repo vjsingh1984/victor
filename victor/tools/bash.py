@@ -315,7 +315,15 @@ def _is_dangerous(command: str) -> bool:
     stages=["execution", "verification"],  # Conversation stages where relevant
     task_types=["action", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.EXECUTE,  # Cannot run safely in parallel
-    mandatory_keywords=["run command", "execute", "shell"],  # Force inclusion
+    mandatory_keywords=[
+        "run command", "execute", "shell",
+        # Git diff/compare operations (from MANDATORY_TOOL_KEYWORDS)
+        "diff", "show changes", "git diff", "show diff", "compare",
+        # Running/executing (from MANDATORY_TOOL_KEYWORDS)
+        "run", "install", "test",
+        # Count operations (from MANDATORY_TOOL_KEYWORDS)
+        "count", "how many",
+    ],  # Force inclusion
     keywords=["bash", "shell", "command", "run", "execute", "terminal", "cli"],
 )
 async def shell(

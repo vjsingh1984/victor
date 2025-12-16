@@ -375,11 +375,13 @@ def _register_vertical_services(
     Args:
         container: DI container to register services in
         settings: Application settings
-        vertical_name: Optional vertical name (defaults to settings or "coding")
+        vertical_name: Optional vertical name. If None, uses settings.default_vertical.
+                       If settings.default_vertical is also not set, defaults to "coding".
     """
     # Determine which vertical to load
+    # Priority: explicit parameter > settings.default_vertical > "coding"
     if vertical_name is None:
-        vertical_name = getattr(settings, "default_vertical", "coding")
+        vertical_name = getattr(settings, "default_vertical", None) or "coding"
 
     try:
         from victor.verticals.vertical_loader import get_vertical_loader
@@ -436,13 +438,18 @@ def get_service_optional(service_type: Type[T]) -> Optional[T]:
     return get_container().get_optional(service_type)
 
 
-def ensure_bootstrapped(settings: Optional[Settings] = None) -> ServiceContainer:
-    """Ensure the container is bootstrapped.
+def ensure_bootstrapped(
+    settings: Optional[Settings] = None,
+    vertical: Optional[str] = None,
+) -> ServiceContainer:
+    """Ensure the container is bootstrapped with correct vertical.
 
-    Idempotent - only bootstraps if not already done.
+    Semi-idempotent - only bootstraps if not already done, but will
+    re-activate vertical if a different one is requested.
 
     Args:
         settings: Optional Settings instance
+        vertical: Optional vertical name (e.g., "coding", "data_analysis")
 
     Returns:
         Service container
@@ -451,6 +458,60 @@ def ensure_bootstrapped(settings: Optional[Settings] = None) -> ServiceContainer
 
     # Check if already bootstrapped (Settings registered)
     if container.is_registered(Settings):
+        # Container already bootstrapped, but check if we need to switch verticals
+        if vertical is not None:
+            _ensure_vertical_activated(container, settings or container.get(Settings), vertical)
         return container
 
-    return bootstrap_container(settings)
+    return bootstrap_container(settings, vertical=vertical)
+
+
+def _ensure_vertical_activated(
+    container: ServiceContainer,
+    settings: Settings,
+    vertical_name: str,
+) -> None:
+    """Ensure the specified vertical is activated, switching if needed.
+
+    This handles the case where the container was bootstrapped with one
+    vertical but we need to use a different one (e.g., --vertical CLI flag).
+
+    Args:
+        container: DI container
+        settings: Application settings
+        vertical_name: Vertical name to ensure is active
+    """
+    try:
+        from victor.verticals.vertical_loader import get_vertical_loader
+        from victor.verticals.protocols import VerticalExtensions
+
+        loader = get_vertical_loader()
+        current_vertical = loader.active_vertical_name
+
+        # If no vertical active or different vertical requested, (re)activate
+        if current_vertical is None or current_vertical != vertical_name:
+            logger.info(
+                f"Switching vertical: {current_vertical or 'none'} -> {vertical_name}"
+            )
+            # Load and activate the new vertical
+            loader.load(vertical_name)
+
+            # Re-register vertical services (loader tracks if already registered)
+            loader.register_services(container, settings)
+
+            # Update the extensions in container
+            extensions = loader.get_extensions()
+            if extensions:
+                container.register_or_replace(
+                    VerticalExtensions,
+                    lambda c, ext=extensions: ext,
+                    ServiceLifetime.SINGLETON,
+                )
+
+            logger.info(f"Vertical switched to: {vertical_name}")
+    except ImportError as e:
+        logger.debug(f"Vertical loading not available: {e}")
+    except ValueError as e:
+        logger.warning(f"Failed to switch to vertical '{vertical_name}': {e}")
+    except Exception as e:
+        logger.warning(f"Failed to ensure vertical activation: {e}")

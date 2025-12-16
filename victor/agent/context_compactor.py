@@ -44,6 +44,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
+from victor.config.orchestrator_constants import COMPACTION_CONFIG, CONTEXT_LIMITS
 from victor.providers.base import Message
 
 if TYPE_CHECKING:
@@ -104,9 +105,9 @@ class ParallelReadBudget:
 
 def calculate_parallel_read_budget(
     context_window: int = 65536,
-    output_reserve: float = 0.5,
-    chars_per_token: float = 3.0,
-    target_parallel_files: int = 10,
+    output_reserve: float = COMPACTION_CONFIG.output_reserve_pct,
+    chars_per_token: float = COMPACTION_CONFIG.chars_per_token,
+    target_parallel_files: int = COMPACTION_CONFIG.parallel_read_target_files,
 ) -> ParallelReadBudget:
     """Calculate optimal budget for parallel file reads.
 
@@ -164,13 +165,13 @@ class CompactorConfig:
         enable_tool_truncation: Enable automatic tool result truncation
     """
 
-    proactive_threshold: float = 0.90  # Compact at 90% utilization (configurable)
-    min_messages_after_compact: int = 8
+    proactive_threshold: float = CONTEXT_LIMITS.proactive_compaction_threshold
+    min_messages_after_compact: int = COMPACTION_CONFIG.min_messages_after_compact
     # 8192 chars allows ~10-12 parallel file reads within 32K usable tokens (64K context / 2)
     # Dynamic formula: (context_window * 0.5 * 3) / expected_parallel_files
     # Example: (65536 * 0.5 * 3) / 10 = ~9,830 chars per file
-    tool_result_max_chars: int = 8192  # ~2048 tokens, fits 10-12 parallel reads
-    tool_result_max_lines: int = 230  # 8192 / 35 chars per line ≈ 234 lines
+    tool_result_max_chars: int = COMPACTION_CONFIG.tool_result_max_chars
+    tool_result_max_lines: int = COMPACTION_CONFIG.tool_result_max_lines
     truncation_strategy: TruncationStrategy = TruncationStrategy.SMART
     preserve_code_blocks: bool = True
     preserve_json_structure: bool = True

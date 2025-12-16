@@ -64,6 +64,7 @@ PYTHON_QUERIES = {
         "implementation",
     ],
     stages=["initial", "planning", "reading", "analysis"],  # Available early when symbol name known
+    mandatory_keywords=["find", "find symbol", "find definition"],  # From MANDATORY_TOOL_KEYWORDS "find" -> ["symbol", "refs"]
 )
 async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
     """[AST-AWARE] Get FULL CODE of a function/class definition in a specific file.
@@ -154,6 +155,7 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
     ],
     stages=["initial", "planning", "reading", "analysis"],  # Available early for impact analysis
     execution_category=ExecutionCategory.READ_ONLY,
+    mandatory_keywords=["find", "find references", "find usages"],  # From MANDATORY_TOOL_KEYWORDS "find" -> ["symbol", "refs"]
 )
 async def refs(symbol_name: str, search_path: str = ".") -> List[Dict[str, Any]]:
     """[AST-AWARE] Find all USAGES of a symbol across the project.

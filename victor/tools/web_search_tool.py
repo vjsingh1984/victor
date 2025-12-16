@@ -187,10 +187,12 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
         "google",
         "duckduckgo",
         "summarize",
+        "web search",
     ],
-    mandatory_keywords=["search web", "search online", "look up online"],  # Force inclusion
+    mandatory_keywords=["search web", "search online", "look up online", "web search"],  # Force inclusion
+    aliases=["web"],  # Backward compatibility alias
 )
-async def web(
+async def web_search(
     query: str,
     max_results: int = 5,
     region: str = "wt-wt",
@@ -291,9 +293,10 @@ async def web(
     stages=["planning", "initial"],  # Conversation stages where relevant
     task_types=["research", "analysis"],  # Task types for classification-aware selection
     execution_category="network",  # Can run in parallel with read-only ops
-    keywords=["fetch", "url", "webpage", "download", "http", "content"],
+    keywords=["fetch", "url", "webpage", "download", "http", "content", "web fetch"],
+    aliases=["fetch"],  # Backward compatibility alias
 )
-async def fetch(url: str) -> Dict[str, Any]:
+async def web_fetch(url: str) -> Dict[str, Any]:
     """Fetch and extract main text content from a URL.
 
     Args:
@@ -414,7 +417,7 @@ async def _summarize_search(
             url = result.get("url")
             if not url:
                 continue
-            fetch_res = await fetch(url=url)
+            fetch_res = await web_fetch(url=url)
             if fetch_res.get("success") and fetch_res.get("content"):
                 content = fetch_res["content"][:max_content_length]
                 fetched_contents.append({"url": url, "content": content})

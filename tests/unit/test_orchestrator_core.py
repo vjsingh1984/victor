@@ -861,19 +861,30 @@ class TestHandleToolCalls:
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_invalid_name(self, orchestrator):
-        """Test _handle_tool_calls with invalid tool name (covers lines 1800-1804)."""
+        """Test _handle_tool_calls with invalid tool name returns error feedback (GAP-5 fix)."""
         # Register a mock that returns False for invalid names
         orchestrator.sanitizer.is_valid_tool_name = MagicMock(return_value=False)
 
         result = await orchestrator._handle_tool_calls([{"name": "123invalid"}])
-        assert result == []
+        # GAP-5 FIX: Invalid tools now return error feedback instead of being silently skipped
+        assert len(result) == 1
+        assert result[0]["tool_name"] == "123invalid"
+        assert result[0]["success"] is False
+        assert "Invalid tool name" in result[0]["error"]
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_disabled_tool(self, orchestrator):
-        """Test _handle_tool_calls with disabled tool (covers lines 1807-1809)."""
-        # Ensure tool is not in registry
+        """Test _handle_tool_calls with disabled tool returns error feedback (GAP-5 fix)."""
+        # Ensure tool name validation passes (reset if previous test mocked it)
+        orchestrator.sanitizer.is_valid_tool_name = MagicMock(return_value=True)
+        # Ensure tool is not in registry (explicitly mock to return False)
+        orchestrator.tools.is_tool_enabled = MagicMock(return_value=False)
         result = await orchestrator._handle_tool_calls([{"name": "nonexistent_tool"}])
-        assert result == []
+        # GAP-5 FIX: Disabled tools now return error feedback instead of being silently skipped
+        assert len(result) == 1
+        assert result[0]["tool_name"] == "nonexistent_tool"
+        assert result[0]["success"] is False
+        assert "not available" in result[0]["error"]
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_budget_reached(self, orchestrator):

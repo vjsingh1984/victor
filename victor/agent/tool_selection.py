@@ -751,7 +751,12 @@ class ToolSelector:
     def _filter_tools_for_stage(
         self, tools: List["ToolDefinition"], stage: Optional[ConversationStage]
     ) -> List["ToolDefinition"]:
-        """Remove write/execute tools during exploration/analysis stages."""
+        """Remove write/execute tools during exploration/analysis stages.
+
+        Note: Vertical core tools (from TieredToolConfig) are ALWAYS preserved
+        since they are essential for the vertical's operation even in early stages.
+        For example, DevOps needs 'docker' and 'shell', Research needs 'web_search'.
+        """
         if stage not in {
             ConversationStage.INITIAL,
             ConversationStage.PLANNING,
@@ -760,8 +765,31 @@ class ToolSelector:
         }:
             return tools
 
-        filtered = [t for t in tools if self._is_readonly_tool(t.name)]
+        # Get vertical core tools that should be preserved regardless of stage
+        preserved_tools: Set[str] = set()
+        tiered_config = getattr(self, "_tiered_config", None)
+        if tiered_config:
+            # Always preserve mandatory and vertical_core tools
+            preserved_tools.update(tiered_config.mandatory)
+            preserved_tools.update(tiered_config.vertical_core)
+            # If vertical has readonly_only_for_analysis=False, don't filter at all
+            if hasattr(tiered_config, "readonly_only_for_analysis") and not tiered_config.readonly_only_for_analysis:
+                logger.debug(
+                    f"Stage filtering skipped: vertical has readonly_only_for_analysis=False"
+                )
+                return tools
+
+        # Filter to readonly tools, but always keep vertical core tools
+        filtered = [
+            t for t in tools
+            if self._is_readonly_tool(t.name) or t.name in preserved_tools
+        ]
+
         if filtered:
+            if preserved_tools:
+                logger.debug(
+                    f"Stage filtering preserved vertical tools: {preserved_tools & {t.name for t in filtered}}"
+                )
             return filtered
 
         # Fallback to core readonly if filtering removed everything
@@ -1367,6 +1395,13 @@ class ToolSelector:
         # Combine stage-specific tools with core and web tools
         keep = stage_tools | core | web_tools
 
+        # Always include vertical_core tools from tiered config (GAP-4 fix)
+        # These are essential tools for the vertical (e.g., docker for DevOps, web_search for Research)
+        tiered_config = getattr(self, "_tiered_config", None)
+        if tiered_config:
+            keep.update(tiered_config.mandatory)
+            keep.update(tiered_config.vertical_core)
+
         # Also get tools from adjacent stages for flexibility
         for tool in tools:
             if self.conversation_state.should_include_tool(tool.name):
@@ -1390,12 +1425,15 @@ class ToolSelector:
             )
             return pruned
 
-        # Fallback to core tools (stage-aware)
+        # Fallback to core tools (stage-aware) + vertical_core tools
         core_fallback = self._get_stage_core_tools(current_stage)
+        # Also include vertical_core tools in fallback (GAP-4 fix)
+        if tiered_config:
+            core_fallback = core_fallback | tiered_config.mandatory | tiered_config.vertical_core
         fallback_tools = [t for t in tools if t.name in core_fallback]
 
         if fallback_tools:
-            logger.debug(f"Stage pruning fallback: {len(fallback_tools)} core tools")
+            logger.debug(f"Stage pruning fallback: {len(fallback_tools)} core+vertical tools")
             return fallback_tools
 
         # Last resort: return a small prefix

@@ -1163,6 +1163,10 @@ async def _load_graph(graph_store: GraphStoreProtocol) -> GraphAnalyzer:
         "impact of changing",
     ],
     stages=["initial", "planning", "reading", "analysis"],  # Rapid discovery in early stages
+    mandatory_keywords=[
+        "analyze codebase", "codebase analysis", "architecture",
+        "analyze dependencies", "dependency graph",
+    ],  # From MANDATORY_TOOL_KEYWORDS
 )
 async def graph(
     mode: GraphMode,

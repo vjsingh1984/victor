@@ -52,6 +52,7 @@ BUILTIN_VERTICALS: Dict[str, str] = {
     "coding": "victor.verticals.coding.CodingAssistant",
     "research": "victor.verticals.research.ResearchAssistant",
     "devops": "victor.verticals.devops.DevOpsAssistant",
+    "data_analysis": "victor.verticals.data_analysis.DataAnalysisAssistant",
 }
 
 

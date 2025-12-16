@@ -198,8 +198,8 @@ class TestResearchAssistant:
         tools = ResearchAssistant.get_tools()
         assert isinstance(tools, list)
         # Research tools (using canonical names)
-        assert "web" in tools
-        assert "fetch" in tools
+        assert "web_search" in tools
+        assert "web_fetch" in tools
         # Reading tools (using canonical names)
         assert "read" in tools
         # Should NOT have many coding tools
@@ -410,6 +410,215 @@ class TestCustomVertical:
         assert "extra_tool" in tools  # Added
 
 
+class TestVerticalLoaderSwitch:
+    """Tests for VerticalLoader vertical switching behavior (GAP-1, GAP-6 fixes)."""
+
+    def test_loader_switch_clears_extensions(self):
+        """Switching verticals should clear cached extensions."""
+        from victor.verticals.vertical_loader import VerticalLoader
+
+        loader = VerticalLoader()
+
+        # Load coding
+        loader.load("coding")
+        coding_ext = loader.get_extensions()
+        assert coding_ext is not None
+
+        # Switch to research
+        loader.load("research")
+        research_ext = loader.get_extensions()
+        assert research_ext is not None
+
+        # Extensions should be different
+        assert coding_ext is not research_ext
+
+    def test_loader_switch_resets_registered_services(self):
+        """Switching verticals should reset _registered_services flag."""
+        from victor.verticals.vertical_loader import VerticalLoader
+
+        loader = VerticalLoader()
+
+        # Load coding
+        loader.load("coding")
+        assert loader._registered_services is False
+
+        # Manually set to True (simulating service registration)
+        loader._registered_services = True
+
+        # Switch to research
+        loader.load("research")
+        # Should be reset
+        assert loader._registered_services is False
+
+    def test_loader_active_vertical_name(self):
+        """active_vertical_name should reflect current vertical."""
+        from victor.verticals.vertical_loader import VerticalLoader
+
+        loader = VerticalLoader()
+        assert loader.active_vertical_name is None
+
+        loader.load("coding")
+        assert loader.active_vertical_name == "coding"
+
+        loader.load("data_analysis")
+        assert loader.active_vertical_name == "data_analysis"
+
+    def test_loader_get_tools_per_vertical(self):
+        """Each vertical should have distinct tool sets."""
+        from victor.verticals.vertical_loader import VerticalLoader
+
+        loader = VerticalLoader()
+
+        loader.load("coding")
+        coding_tools = set(loader.get_tools())
+
+        loader.load("research")
+        research_tools = set(loader.get_tools())
+
+        # Research should have fewer tools
+        assert len(research_tools) < len(coding_tools)
+        # Research should not have shell/git
+        assert "shell" not in research_tools
+        assert "git" not in research_tools
+
+
+class TestBootstrapVerticalActivation:
+    """Tests for bootstrap container vertical re-activation (GAP-1 fix)."""
+
+    def test_ensure_bootstrapped_with_vertical(self):
+        """ensure_bootstrapped should activate specified vertical."""
+        from victor.core.bootstrap import ensure_bootstrapped, get_container
+        from victor.verticals.vertical_loader import get_vertical_loader
+        from victor.config.settings import Settings
+
+        # Reset for test
+        loader = get_vertical_loader()
+        loader.reset()
+
+        # Bootstrap with research
+        container = ensure_bootstrapped(Settings(), vertical="research")
+        assert container is not None
+
+        # Verify research is active
+        assert loader.active_vertical_name == "research"
+
+    def test_ensure_bootstrapped_switch_vertical(self):
+        """ensure_bootstrapped should switch vertical if different requested."""
+        from victor.core.bootstrap import ensure_bootstrapped
+        from victor.verticals.vertical_loader import get_vertical_loader
+        from victor.config.settings import Settings
+
+        loader = get_vertical_loader()
+
+        # Bootstrap with coding
+        ensure_bootstrapped(Settings(), vertical="coding")
+        assert loader.active_vertical_name == "coding"
+
+        # Request switch to research
+        ensure_bootstrapped(vertical="research")
+        assert loader.active_vertical_name == "research"
+
+
+class TestVerticalProtocolMethods:
+    """Tests for vertical protocol methods (GAP-2, GAP-3 fixes)."""
+
+    def test_get_mode_config_default(self):
+        """All verticals should have default get_mode_config()."""
+        mode_config = CodingAssistant.get_mode_config()
+        assert isinstance(mode_config, dict)
+        assert "fast" in mode_config
+        assert "thorough" in mode_config
+        assert "explore" in mode_config
+
+        # Each mode should have expected fields
+        fast = mode_config["fast"]
+        assert "tool_budget" in fast
+        assert "max_iterations" in fast
+
+    def test_get_task_type_hints_default(self):
+        """All verticals should have default get_task_type_hints()."""
+        hints = CodingAssistant.get_task_type_hints()
+        assert isinstance(hints, dict)
+        assert "edit" in hints
+        assert "search" in hints
+        assert "explain" in hints
+        assert "debug" in hints
+        assert "implement" in hints
+
+        # Each hint should have expected fields
+        edit_hint = hints["edit"]
+        assert "hint" in edit_hint
+        assert "priority_tools" in edit_hint
+
+    def test_all_verticals_have_mode_config(self):
+        """All built-in verticals should have get_mode_config()."""
+        from victor.verticals import DevOpsAssistant, DataAnalysisAssistant
+
+        for vertical in [CodingAssistant, ResearchAssistant, DevOpsAssistant, DataAnalysisAssistant]:
+            mode_config = vertical.get_mode_config()
+            assert isinstance(mode_config, dict), f"{vertical.name} get_mode_config failed"
+            assert len(mode_config) >= 3, f"{vertical.name} missing modes"
+
+    def test_all_verticals_have_task_type_hints(self):
+        """All built-in verticals should have get_task_type_hints()."""
+        from victor.verticals import DevOpsAssistant, DataAnalysisAssistant
+
+        for vertical in [CodingAssistant, ResearchAssistant, DevOpsAssistant, DataAnalysisAssistant]:
+            hints = vertical.get_task_type_hints()
+            assert isinstance(hints, dict), f"{vertical.name} get_task_type_hints failed"
+            assert len(hints) >= 5, f"{vertical.name} missing hints"
+
+
+class TestVerticalConfigDictCompatibility:
+    """Tests for VerticalConfig dict-like access (GAP-4 fix)."""
+
+    def test_vertical_config_to_dict(self):
+        """VerticalConfig should support to_dict()."""
+        config = CodingAssistant.get_config()
+        d = config.to_dict()
+
+        assert isinstance(d, dict)
+        assert "tools" in d
+        assert "system_prompt" in d
+        assert "stages" in d
+        assert "provider_hints" in d
+        assert "metadata" in d
+
+    def test_vertical_config_keys(self):
+        """VerticalConfig should support .keys()."""
+        config = CodingAssistant.get_config()
+        keys = config.keys()
+
+        assert "tools" in keys
+        assert "system_prompt" in keys
+
+    def test_vertical_config_getitem(self):
+        """VerticalConfig should support dict-style access."""
+        config = CodingAssistant.get_config()
+
+        # Should not raise
+        system_prompt = config["system_prompt"]
+        assert isinstance(system_prompt, str)
+
+        # Invalid key should raise KeyError
+        import pytest
+
+        with pytest.raises(KeyError):
+            _ = config["nonexistent_key"]
+
+    def test_vertical_config_get_with_default(self):
+        """VerticalConfig should support .get() with default."""
+        config = CodingAssistant.get_config()
+
+        # Existing key
+        prompt = config.get("system_prompt")
+        assert prompt is not None
+
+        # Missing key with default
+        missing = config.get("nonexistent", "default_value")
+        assert missing == "default_value"
+
+
 class TestVerticalIntegration:
     """Integration tests for verticals with other components."""
 
@@ -420,7 +629,7 @@ class TestVerticalIntegration:
 
         # Should be able to check membership (using canonical names)
         assert "read" in coding_tools
-        assert "web" in research_tools
+        assert "web_search" in research_tools
 
         # Should be able to get tool names
         coding_names = coding_tools.get_tool_names()
