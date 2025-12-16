@@ -1,0 +1,368 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Sub-agent base classes for hierarchical task delegation.
+
+This module provides the core infrastructure for sub-agents - specialized,
+isolated instances of AgentOrchestrator with constrained scopes. Sub-agents
+enable hierarchical task delegation and parallel execution.
+
+Design Principles:
+- Context Isolation: Each sub-agent has independent message history
+- Resource Constraints: Limited tool access and budget
+- Role Specialization: Specific roles (researcher, planner, executor, etc.)
+- Backward Compatible: Existing code works without sub-agents
+
+Example Usage:
+    from victor.agent.subagents.base import SubAgent, SubAgentRole, SubAgentConfig
+
+    # Create sub-agent configuration
+    config = SubAgentConfig(
+        role=SubAgentRole.RESEARCHER,
+        task="Research authentication patterns in codebase",
+        allowed_tools=["read", "search", "code_search"],
+        tool_budget=15,
+        context_limit=50000,
+    )
+
+    # Create and execute sub-agent
+    subagent = SubAgent(config, parent_orchestrator)
+    result = await subagent.execute()
+
+    print(f"Success: {result.success}")
+    print(f"Summary: {result.summary}")
+    print(f"Tool calls used: {result.tool_calls_used}")
+"""
+
+from __future__ import annotations
+
+import logging
+import time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.core.container import ServiceContainer
+
+logger = logging.getLogger(__name__)
+
+
+class SubAgentRole(Enum):
+    """Role specialization for sub-agents.
+
+    Each role has specific capabilities and constraints:
+
+    - RESEARCHER: Read-only exploration (read, search, code_search, web_search)
+    - PLANNER: Task breakdown and planning (read, ls, search, plan_files)
+    - EXECUTOR: Code changes and execution (read, write, edit, shell, test, git)
+    - REVIEWER: Quality checks and testing (read, search, test, git_diff, shell)
+    - TESTER: Test writing and running (read, write to tests/, test, shell)
+    """
+
+    RESEARCHER = "researcher"
+    PLANNER = "planner"
+    EXECUTOR = "executor"
+    REVIEWER = "reviewer"
+    TESTER = "tester"
+
+
+@dataclass
+class SubAgentConfig:
+    """Configuration for a sub-agent instance.
+
+    Defines the constraints and capabilities for a sub-agent. All fields
+    except role and task have sensible defaults based on the role.
+
+    Attributes:
+        role: Sub-agent role specialization
+        task: Task description for the sub-agent to execute
+        allowed_tools: List of tool names the sub-agent can use
+        tool_budget: Maximum number of tool calls allowed
+        context_limit: Maximum context size in characters
+        can_spawn_subagents: Whether this sub-agent can spawn child sub-agents
+        working_directory: Optional working directory override
+        timeout_seconds: Maximum execution time in seconds
+        system_prompt_override: Optional custom system prompt (overrides role default)
+    """
+
+    role: SubAgentRole
+    task: str
+    allowed_tools: List[str]
+    tool_budget: int
+    context_limit: int
+    can_spawn_subagents: bool = False
+    working_directory: Optional[str] = None
+    timeout_seconds: int = 300
+    system_prompt_override: Optional[str] = None
+
+
+@dataclass
+class SubAgentResult:
+    """Result from sub-agent execution.
+
+    Contains both the outcome (success/failure) and detailed metrics about
+    the execution. The summary provides a concise overview while details
+    contain the full response and tool calls.
+
+    Attributes:
+        success: Whether the sub-agent completed successfully
+        summary: Brief summary of the result (first 500 chars)
+        details: Full details including response and tool calls
+        tool_calls_used: Number of tool calls made
+        context_size: Final context size in characters
+        duration_seconds: Execution time in seconds
+        error: Error message if execution failed
+    """
+
+    success: bool
+    summary: str
+    details: Dict[str, Any]
+    tool_calls_used: int
+    context_size: int
+    duration_seconds: float
+    error: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert result to dictionary for serialization."""
+        return {
+            "success": self.success,
+            "summary": self.summary,
+            "details": self.details,
+            "tool_calls_used": self.tool_calls_used,
+            "context_size": self.context_size,
+            "duration_seconds": self.duration_seconds,
+            "error": self.error,
+        }
+
+
+class SubAgent:
+    """Represents a spawned sub-agent instance.
+
+    A sub-agent is a wrapper around AgentOrchestrator with:
+    - Constrained tool access (only allowed_tools)
+    - Independent context (isolated message history)
+    - Limited budget (max tool calls)
+    - Role-specific system prompt
+
+    Sub-agents execute a single task and return a structured result.
+    They cannot interact directly with the user - all results are
+    returned to the parent orchestrator.
+
+    Attributes:
+        config: Configuration defining constraints and capabilities
+        parent: Parent orchestrator that spawned this sub-agent
+        orchestrator: Constrained orchestrator instance for execution
+
+    Example:
+        config = SubAgentConfig(
+            role=SubAgentRole.PLANNER,
+            task="Create implementation plan for JWT auth",
+            allowed_tools=["read", "ls", "search", "plan_files"],
+            tool_budget=10,
+            context_limit=30000,
+        )
+
+        subagent = SubAgent(config, parent_orchestrator)
+        result = await subagent.execute()
+    """
+
+    def __init__(
+        self,
+        config: SubAgentConfig,
+        parent_orchestrator: "AgentOrchestrator",
+    ):
+        """Initialize sub-agent with configuration and parent.
+
+        Args:
+            config: Sub-agent configuration
+            parent_orchestrator: Parent orchestrator that spawned this sub-agent
+        """
+        self.config = config
+        self.parent = parent_orchestrator
+        self.orchestrator: Optional["AgentOrchestrator"] = None
+
+        logger.info(
+            f"Created {config.role.value} sub-agent: {config.task[:50]}... "
+            f"(budget={config.tool_budget}, tools={len(config.allowed_tools)})"
+        )
+
+    def _create_constrained_orchestrator(self) -> "AgentOrchestrator":
+        """Create orchestrator with role-specific constraints.
+
+        Creates a new orchestrator instance with:
+        - Limited tool access (only allowed_tools)
+        - Constrained budget and context
+        - Role-specific system prompt
+        - Shared provider and settings from parent
+
+        Returns:
+            Constrained orchestrator instance
+        """
+        from copy import deepcopy
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        # Copy settings from parent but apply constraints
+        settings = deepcopy(self.parent.settings)
+        settings.tool_budget = self.config.tool_budget
+        settings.max_context_chars = self.config.context_limit
+
+        # Create new orchestrator instance with same provider
+        orchestrator = AgentOrchestrator(
+            settings=settings,
+            provider=self.parent.provider_name,
+            model=self.parent.model,
+            temperature=self.parent.temperature,
+            # Note: We'll share the parent's DI container for now
+            # In production, we might want isolated scoped containers
+        )
+
+        # Set role-specific system prompt
+        system_prompt = self._get_role_prompt()
+        orchestrator.set_system_prompt(system_prompt)
+
+        # Register only allowed tools
+        self._configure_allowed_tools(orchestrator)
+
+        logger.debug(
+            f"Created constrained orchestrator for {self.config.role.value}: "
+            f"{len(self.config.allowed_tools)} tools, budget={self.config.tool_budget}"
+        )
+
+        return orchestrator
+
+    def _configure_allowed_tools(self, orchestrator: "AgentOrchestrator") -> None:
+        """Configure orchestrator with only allowed tools.
+
+        Args:
+            orchestrator: Orchestrator to configure
+        """
+        # Clear existing tool registrations
+        orchestrator.tool_registry.clear()
+
+        # Register only allowed tools from parent
+        for tool_name in self.config.allowed_tools:
+            tool = self.parent.tool_registry.get(tool_name)
+            if tool:
+                orchestrator.tool_registry.register(tool)
+            else:
+                logger.warning(
+                    f"Allowed tool '{tool_name}' not found in parent registry "
+                    f"for {self.config.role.value} sub-agent"
+                )
+
+    def _get_role_prompt(self) -> str:
+        """Get system prompt for this role.
+
+        If a custom system_prompt_override is provided in config, use that.
+        Otherwise, use the role-specific default prompt.
+
+        Returns:
+            System prompt string
+        """
+        if self.config.system_prompt_override:
+            return self.config.system_prompt_override
+
+        # Import here to avoid circular dependency
+        from victor.agent.subagents.prompts import get_role_prompt
+
+        return get_role_prompt(self.config.role)
+
+    async def execute(self) -> SubAgentResult:
+        """Execute the sub-agent task.
+
+        Runs the task in the constrained orchestrator and returns a
+        structured result. Handles exceptions gracefully and always
+        returns a SubAgentResult (never raises).
+
+        Returns:
+            SubAgentResult with execution outcome and metrics
+        """
+        start_time = time.time()
+
+        try:
+            # Create constrained orchestrator lazily
+            if self.orchestrator is None:
+                self.orchestrator = self._create_constrained_orchestrator()
+
+            logger.info(f"Executing {self.config.role.value} sub-agent: {self.config.task[:50]}...")
+
+            # Run the task
+            response = await self.orchestrator.chat(self.config.task)
+
+            # Extract metrics
+            tool_calls_used = getattr(self.orchestrator, "tool_calls_used", 0)
+            context_size = len(str(self.orchestrator.get_messages()))
+
+            # Create success result
+            result = SubAgentResult(
+                success=True,
+                summary=response.content[:500] if response.content else "",
+                details={
+                    "full_response": response.content,
+                    "tool_calls": getattr(response, "tool_calls", []) or [],
+                    "role": self.config.role.value,
+                },
+                tool_calls_used=tool_calls_used,
+                context_size=context_size,
+                duration_seconds=time.time() - start_time,
+            )
+
+            logger.info(
+                f"{self.config.role.value} sub-agent completed: "
+                f"{tool_calls_used}/{self.config.tool_budget} tool calls, "
+                f"{result.duration_seconds:.1f}s"
+            )
+
+            return result
+
+        except Exception as e:
+            # Create error result
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            logger.error(
+                f"{self.config.role.value} sub-agent failed: {error_msg}",
+                exc_info=True,
+            )
+
+            tool_calls_used = 0
+            context_size = 0
+            if self.orchestrator:
+                tool_calls_used = getattr(self.orchestrator, "tool_calls_used", 0)
+                try:
+                    context_size = len(str(self.orchestrator.get_messages()))
+                except Exception:
+                    pass
+
+            return SubAgentResult(
+                success=False,
+                summary=f"Sub-agent failed: {error_msg[:450]}",
+                details={
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "role": self.config.role.value,
+                },
+                tool_calls_used=tool_calls_used,
+                context_size=context_size,
+                duration_seconds=time.time() - start_time,
+                error=error_msg,
+            )
+
+
+__all__ = [
+    "SubAgentRole",
+    "SubAgentConfig",
+    "SubAgentResult",
+    "SubAgent",
+]
