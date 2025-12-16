@@ -16,11 +16,12 @@ Victor's vertical system uses the **Template Method Pattern** - `VerticalBase` d
 │  get_config()         → Complete VerticalConfig                 │
 └─────────────────────────────────────────────────────────────────┘
                               ▲
-         ┌────────────────────┼────────────────────┐
-         │                    │                    │
-┌────────┴────────┐  ┌────────┴────────┐  ┌───────┴────────┐
-│ CodingAssistant │  │ResearchAssistant│  │ DevOpsAssistant│
-└─────────────────┘  └─────────────────┘  └────────────────┘
+    ┌─────────────┬───────────┼───────────┬──────────────┐
+    │             │           │           │              │
+┌───┴───┐    ┌────┴────┐  ┌───┴───┐  ┌────┴────┐  ┌──────┴──────┐
+│Coding │    │Research │  │DevOps │  │  Data   │  │   Custom    │
+│       │    │         │  │       │  │Analysis │  │ (your own)  │
+└───────┘    └─────────┘  └───────┘  └─────────┘  └─────────────┘
 ```
 
 ## Available Verticals
@@ -33,7 +34,7 @@ The default Victor vertical, optimized for software development tasks.
 from victor.verticals import CodingAssistant
 
 config = CodingAssistant.get_config()
-# 31 tools: filesystem, git, shell, code analysis, web search
+# 30 tools: filesystem, git, shell, code analysis, web search
 # 7 stages: INITIAL → PLANNING → READING → ANALYSIS → EXECUTION → VERIFICATION → COMPLETION
 ```
 
@@ -59,7 +60,7 @@ Optimized for web research and document analysis.
 from victor.verticals import ResearchAssistant
 
 config = ResearchAssistant.get_config()
-# 8 tools: web_search, web_fetch, read, write, summarize
+# 9 tools: web_search, web_fetch, read, write, grep, ls, etc.
 # 4 stages: SEARCHING → READING → SYNTHESIZING → WRITING
 ```
 
@@ -83,7 +84,7 @@ Optimized for infrastructure and deployment tasks.
 from victor.verticals import DevOpsAssistant
 
 config = DevOpsAssistant.get_config()
-# 16 tools: docker, shell, git, kubernetes support
+# 13 tools: docker, shell, git, test, web_search, web_fetch, etc.
 # 8 stages: INITIAL → ASSESSMENT → PLANNING → IMPLEMENTATION → VALIDATION → DEPLOYMENT → MONITORING → COMPLETION
 ```
 
@@ -99,6 +100,31 @@ config = DevOpsAssistant.get_config()
 - Idempotent operations
 - Infrastructure as Code
 - No hardcoded secrets
+
+### DataAnalysisAssistant
+
+Optimized for data science and analysis tasks.
+
+```python
+from victor.verticals import DataAnalysisAssistant
+
+config = DataAnalysisAssistant.get_config()
+# 11 tools: read, write, shell, graph, grep, ls, overview, web_search, web_fetch, etc.
+# Stages: LOADING → CLEANING → ANALYSIS → VISUALIZATION → COMPLETION
+```
+
+**Capabilities:**
+- Data loading and examination
+- Data cleaning and transformation
+- Statistical analysis with pandas/numpy
+- Visualization with matplotlib/seaborn
+- Report generation
+
+**System Prompt Focus:**
+- Data quality and validation
+- Statistical rigor
+- Clear visualizations
+- Reproducible analysis
 
 ## CLI Usage
 
@@ -126,6 +152,7 @@ victor chat --help  # Shows available verticals in help text
 | coding | `--vertical coding` | Software development (default behavior) |
 | research | `--vertical research` | Web research and document analysis |
 | devops | `--vertical devops` | Infrastructure and deployment |
+| data_analysis | `--vertical data_analysis` | Data science and analysis |
 
 ### Observability Options
 
@@ -184,7 +211,7 @@ print(config.metadata)       # {"supports_docker": True, ...}
 from victor.verticals import VerticalRegistry
 
 # List available verticals
-names = VerticalRegistry.list_names()  # ["coding", "research", "devops"]
+names = VerticalRegistry.list_names()  # ["coding", "research", "devops", "data_analysis"]
 
 # Get vertical by name
 vertical = VerticalRegistry.get("research")
@@ -198,52 +225,52 @@ config = vertical.get_config()
 ```python
 from victor.verticals import VerticalBase, StageDefinition
 
-class DataAnalysisAssistant(VerticalBase):
-    """Vertical for data analysis tasks."""
+class MLOpsAssistant(VerticalBase):
+    """Vertical for ML operations tasks."""
 
-    name = "data_analysis"
-    description = "Data science and analysis assistant"
+    name = "mlops"
+    description = "Machine learning operations assistant"
     version = "1.0.0"
 
     @classmethod
     def get_tools(cls):
-        return ["read", "write", "shell", "python"]
+        return ["read", "write", "shell", "docker"]
 
     @classmethod
     def get_system_prompt(cls):
-        return """You are a data analysis assistant.
-        Focus on: data cleaning, visualization, statistical analysis.
-        Use Python with pandas, numpy, matplotlib."""
+        return """You are an MLOps assistant.
+        Focus on: model training, deployment, monitoring.
+        Use Python with MLflow, Docker, Kubernetes."""
 
     @classmethod
     def get_stages(cls):
         return {
-            "LOADING": StageDefinition(
-                name="LOADING",
-                description="Loading and examining data",
+            "EXPLORATION": StageDefinition(
+                name="EXPLORATION",
+                description="Exploring model requirements",
                 tools={"read", "shell"},
-                keywords=["load", "read", "import", "examine"],
-                next_stages={"CLEANING", "ANALYSIS"},
+                keywords=["explore", "requirements", "data"],
+                next_stages={"TRAINING", "DEPLOYMENT"},
             ),
-            "CLEANING": StageDefinition(
-                name="CLEANING",
-                description="Cleaning and transforming data",
-                tools={"read", "write", "python"},
-                keywords=["clean", "transform", "filter", "missing"],
-                next_stages={"ANALYSIS"},
+            "TRAINING": StageDefinition(
+                name="TRAINING",
+                description="Training and evaluating models",
+                tools={"read", "write", "shell"},
+                keywords=["train", "evaluate", "model", "metrics"],
+                next_stages={"DEPLOYMENT"},
             ),
-            "ANALYSIS": StageDefinition(
-                name="ANALYSIS",
-                description="Analyzing data patterns",
-                tools={"python", "read"},
-                keywords=["analyze", "compute", "calculate", "statistics"],
-                next_stages={"VISUALIZATION", "COMPLETION"},
+            "DEPLOYMENT": StageDefinition(
+                name="DEPLOYMENT",
+                description="Deploying models to production",
+                tools={"shell", "docker", "write"},
+                keywords=["deploy", "serve", "container", "endpoint"],
+                next_stages={"MONITORING", "COMPLETION"},
             ),
-            "VISUALIZATION": StageDefinition(
-                name="VISUALIZATION",
-                description="Creating visualizations",
-                tools={"python", "write"},
-                keywords=["plot", "chart", "visualize", "graph"],
+            "MONITORING": StageDefinition(
+                name="MONITORING",
+                description="Monitoring model performance",
+                tools={"shell", "read"},
+                keywords=["monitor", "metrics", "drift", "performance"],
                 next_stages={"COMPLETION"},
             ),
             "COMPLETION": StageDefinition(
@@ -257,7 +284,7 @@ class DataAnalysisAssistant(VerticalBase):
 
 # Register the vertical
 from victor.verticals import VerticalRegistry
-VerticalRegistry.register(DataAnalysisAssistant)
+VerticalRegistry.register(MLOpsAssistant)
 ```
 
 ### Extending Existing Vertical
