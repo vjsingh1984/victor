@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **FastAPI Server Backend** - New `victor serve --backend fastapi` option with OpenAPI docs at `/docs`
+- **Server Backend Selection** - `--backend` flag for `victor serve` to choose between `aiohttp` (legacy) and `fastapi` (modern)
+- **Profile CRUD Operations** - New `victor profiles create/edit/delete/set-default` commands for full profile management
+- **Lightweight Tool Listing** - `victor tools list --lightweight` for fast tool discovery without agent initialization
+- **Semantic Query Expansion** - Automatic query expansion with synonyms/related terms to fix false negatives in semantic search (P4.X Multi-Provider Excellence)
+- **Tool Deduplication Tracker** - Prevents redundant tool calls by tracking recent operations and detecting semantic overlap (integrated into ToolPipeline)
+- **Provider-Specific Tool Guidance** - Each provider now boosts tools aligned with their strengths (Gemini → code analysis, Claude → reasoning, etc.)
+- **RL-Based Semantic Threshold Learning** - Learns optimal similarity thresholds per (embedding_model, task_type, tool) context (integrated into code_search tool)
+- **Hybrid Search (RRF)** - Combines semantic + keyword search using Reciprocal Rank Fusion for 50-80% better recall (integrated into code_search tool)
+- **Comprehensive Unit Tests** - 66 new unit tests for query expansion and tool deduplication (100% coverage)
+- **Integration Tests** - 16 new integration tests for P4 Multi-Provider Excellence features
+- **Monitoring Script** - `scripts/show_semantic_threshold_rl.py` for viewing threshold learning status and exporting recommendations
+
+### Changed
+- **RL Framework Migration Complete** - Unified all 3 RL learners (continuation prompts, semantic threshold, model selector) into centralized framework with SQLite storage at `~/.victor/graph/graph.db`. Deprecated bespoke implementations moved to `archive/deprecated_rl_modules/`. All 19 import sites across API servers, UI, and scripts updated to use `RLCoordinator`.
+- **VS Code Extension Server Discovery** - Auto-discovers existing servers on multiple ports before spawning new ones
+- **VS Code Port Fallback** - Tries fallback ports (8765, 8766, 8767, 8768, 8000) if primary port is occupied
+- **VS Code Exponential Backoff** - Improved reconnection with exponential backoff (100ms → 30s max, 10 retries)
+- **VS Code Multi-Window Sharing** - PID file at `~/.victor/server.pid` for server coordination across VS Code windows
+- **VS Code Extension Configuration** - New settings: `victor.serverBackend`, `victor.fallbackPorts`
+- **Semantic Similarity Threshold** - Lowered from 0.7 to 0.5 to reduce false negatives and improve recall
+- **RL Continuation Bounds** - Expanded from [2, 12] to [1, 20] to give RL more liberty for provider-specific tuning
+- **ToolPipeline** - Now supports optional deduplication tracker for preventing redundant calls
+- **Code Search Tool** - Automatically records outcomes for RL threshold learning when enabled
+
+### Fixed
+- Added missing `ServerStatus.Reconnecting` state to VS Code extension status bar configuration
+- **Semantic Search False Negatives** - Query expansion now searches with multiple variations (e.g., "tool registration" → ["register tool", "@tool decorator", "ToolRegistry"])
+- **Google SDK Warning** - Suppressed cosmetic warning about non-text parts (Victor already handles multi-part responses correctly)
+
+### Configuration
+New settings for P4 Multi-Provider Excellence features (all disabled by default for backward compatibility):
+```yaml
+# Hybrid Search (Semantic + Keyword with RRF)
+enable_hybrid_search: false
+hybrid_search_semantic_weight: 0.6
+hybrid_search_keyword_weight: 0.4
+
+# RL-based threshold learning per (embedding_model, task_type, tool_context)
+enable_semantic_threshold_rl_learning: false
+semantic_threshold_overrides: {}  # Format: {"model:task:tool": threshold}
+
+# Tool call deduplication
+enable_tool_deduplication: false
+tool_deduplication_window_size: 10
+
+# Semantic search quality improvements
+semantic_similarity_threshold: 0.5  # Lowered from 0.7
+semantic_query_expansion_enabled: true
+semantic_max_query_expansions: 5
+```
+
 ## [0.2.0-alpha] - 2025-12-02
 
 ### Added

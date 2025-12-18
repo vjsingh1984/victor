@@ -48,10 +48,12 @@ async def graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
     if agent is None:
         return
     try:
-        from victor.agent.rl_model_selector import SessionReward, get_model_selector
+        from victor.agent.rl.base import RLOutcome
+        from victor.agent.rl.coordinator import get_rl_coordinator
 
-        selector = get_model_selector()
-        if selector and agent.provider and hasattr(agent, "message_count"):
+        coordinator = get_rl_coordinator()
+        learner = coordinator.get_learner("model_selector")
+        if learner and agent.provider and hasattr(agent, "message_count"):
             msg_count = agent.message_count
             if msg_count > 0:
                 import uuid
@@ -59,19 +61,43 @@ async def graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
                 metrics = {}
                 if hasattr(agent, "get_session_metrics"):
                     metrics = agent.get_session_metrics() or {}
-                reward = SessionReward(
-                    session_id=str(uuid.uuid4())[:8],
+
+                # Compute quality score based on session metrics
+                latency = metrics.get("total_latency", 0)
+                tool_calls = metrics.get("tool_calls", 0)
+                quality_score = 1.0
+                if latency > 30:
+                    quality_score -= min(0.1 * (latency - 30) / 30, 0.5)
+                if tool_calls > 0:
+                    quality_score += min(0.05 * tool_calls, 0.2)
+
+                outcome = RLOutcome(
                     provider=agent.provider.name,
                     model=getattr(agent.provider, "model", "unknown"),
+                    task_type="chat",
                     success=True,
-                    latency_seconds=metrics.get("total_latency", 0),
-                    token_count=metrics.get("total_tokens", 0),
-                    tool_calls_made=metrics.get("tool_calls", 0),
+                    quality_score=max(0.0, min(1.0, quality_score)),
+                    metadata={
+                        "session_id": str(uuid.uuid4())[:8],
+                        "latency_seconds": latency,
+                        "token_count": metrics.get("total_tokens", 0),
+                        "tool_calls_made": tool_calls,
+                        "message_count": msg_count,
+                    },
+                    vertical="coding",
                 )
-                new_q = selector.update_q_value(reward)
+                coordinator.record_outcome("model_selector", outcome, "coding")
+
+                # Get updated Q-value for logging
+                rankings = learner.get_provider_rankings()
+                provider_ranking = next(
+                    (r for r in rankings if r["provider"] == agent.provider.name), None
+                )
+                new_q = provider_ranking["q_value"] if provider_ranking else 0.0
+
                 logger.info(
                     f"RL session feedback: {agent.provider.name} "
-                    f"({msg_count} messages, {metrics.get('tool_calls', 0)} tools) → Q={new_q:.3f}"
+                    f"({msg_count} messages, {tool_calls} tools) → Q={new_q:.3f}"
                 )
     except Exception as e:
         logger.debug(f"RL feedback recording skipped: {e}")
@@ -225,21 +251,35 @@ def get_rl_profile_suggestion(
 ) -> Optional[tuple[str, str, float]]:
     """Get RL-based profile suggestion if different from current."""
     try:
-        from victor.agent.rl_model_selector import get_model_selector
+        from victor.agent.rl.coordinator import get_rl_coordinator
+        import json
 
-        selector = get_model_selector()
-        if not selector:
+        coordinator = get_rl_coordinator()
+        learner = coordinator.get_learner("model_selector")
+        if not learner:
             return None
-        rec = selector.recommend()
+
+        # Get available providers from profiles
+        available = list(set(cfg.provider for cfg in profiles.values()))
+
+        # Get recommendation
+        rec = coordinator.get_recommendation(
+            "model_selector",
+            json.dumps(available),
+            "",
+            "chat",
+        )
         if not rec or rec.confidence < 0.3:
             return None
-        if rec.provider.lower() == current_provider.lower():
+        if rec.value.lower() == current_provider.lower():
             return None
+
+        # Find matching profile for recommended provider
         matching_profiles = [
-            name for name, cfg in profiles.items() if cfg.provider.lower() == rec.provider.lower()
+            name for name, cfg in profiles.items() if cfg.provider.lower() == rec.value.lower()
         ]
         if matching_profiles:
-            return (matching_profiles[0], rec.provider, rec.q_value)
+            return (matching_profiles[0], rec.value, rec.confidence)
         return None
     except Exception:
         return None

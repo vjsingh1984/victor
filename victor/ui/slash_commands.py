@@ -895,14 +895,15 @@ class SlashCommandHandler:
         rl_rankings = {}
         rl_best_provider = None
         try:
-            from victor.agent.rl_model_selector import get_model_selector
+            from victor.agent.rl.coordinator import get_rl_coordinator
 
-            selector = get_model_selector()
-            if selector:
-                rankings = selector.get_provider_rankings()
-                rl_rankings = {p.lower(): q for p, q in rankings}
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("model_selector")
+            if learner:
+                rankings = learner.get_provider_rankings()
+                rl_rankings = {r["provider"].lower(): r["q_value"] for r in rankings}
                 if rankings:
-                    rl_best_provider = rankings[0][0].lower()
+                    rl_best_provider = rankings[0]["provider"].lower()
         except Exception:
             pass
 
@@ -974,14 +975,15 @@ class SlashCommandHandler:
             rl_rankings = {}
             rl_best_provider = None
             try:
-                from victor.agent.rl_model_selector import get_model_selector
+                from victor.agent.rl.coordinator import get_rl_coordinator
 
-                selector = get_model_selector()
-                if selector:
-                    rankings = selector.get_provider_rankings()
-                    rl_rankings = {p.lower(): q for p, q in rankings}
+                coordinator = get_rl_coordinator()
+                learner = coordinator.get_learner("model_selector")
+                if learner:
+                    rankings = learner.get_provider_rankings()
+                    rl_rankings = {r["provider"].lower(): r["q_value"] for r in rankings}
                     if rankings:
-                        rl_best_provider = rankings[0][0].lower()
+                        rl_best_provider = rankings[0]["provider"].lower()
             except Exception:
                 pass
 
@@ -1274,18 +1276,28 @@ class SlashCommandHandler:
 
         # Add RL recommendation if available
         try:
-            from victor.agent.rl_model_selector import get_model_selector
+            from victor.agent.rl.coordinator import get_rl_coordinator
+            import json
 
-            selector = get_model_selector()
-            if selector:
-                rec = selector.recommend()
-                if rec and rec.confidence > 0.3:
-                    current_provider = self.agent.provider.__class__.__name__.lower()
-                    if rec.provider != current_provider:
-                        content += f"\n\n[dim]RL Suggestion: Consider [cyan]{rec.provider}[/] "
-                        content += f"(Q={rec.q_value:.2f}, {rec.reason})[/]"
-                    else:
-                        content += f"\n\n[dim]RL: Using optimal provider (Q={rec.q_value:.2f})[/]"
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("model_selector")
+            if learner:
+                # Get available providers
+                available = list(learner._q_table.keys()) if learner._q_table else []
+                if available:
+                    rec = coordinator.get_recommendation(
+                        "model_selector",
+                        json.dumps(available),
+                        "",
+                        "chat",
+                    )
+                    if rec and rec.confidence > 0.3:
+                        current_provider = self.agent.provider.__class__.__name__.lower()
+                        if rec.value.lower() != current_provider:
+                            content += f"\n\n[dim]RL Suggestion: Consider [cyan]{rec.value}[/] "
+                            content += f"(Q={rec.confidence:.2f}, {rec.reasoning})[/]"
+                        else:
+                            content += f"\n\n[dim]RL: Using optimal provider (Q={rec.confidence:.2f})[/]"
         except Exception:
             pass
 
@@ -2142,23 +2154,24 @@ Provide a 2-3 sentence summary:"""
 
         # Add RL model selection stats
         try:
-            from victor.agent.rl_model_selector import get_model_selector
+            from victor.agent.rl.coordinator import get_rl_coordinator
 
-            selector = get_model_selector()
-            if selector:
-                stats = selector.get_stats()
-                rankings = selector.get_provider_rankings()
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("model_selector")
+            if learner:
+                rankings = learner.get_provider_rankings()
 
                 content += "\n[bold]RL Model Selection:[/]\n"
-                content += f"  Strategy: {stats.get('strategy', 'epsilon_greedy')}\n"
-                content += f"  Epsilon:  {stats.get('epsilon', 0):.2f} (exploration rate)\n"
-                content += f"  Sessions: {stats.get('total_sessions', 0)}\n"
+                content += f"  Strategy: {learner.strategy.value}\n"
+                content += f"  Epsilon:  {learner.epsilon:.2f} (exploration rate)\n"
+                content += f"  Sessions: {learner._total_selections}\n"
 
                 if rankings:
                     content += "\n[bold]Provider Q-Value Rankings:[/]\n"
-                    for i, (provider, q_val) in enumerate(rankings[:5], 1):
+                    for i, r in enumerate(rankings[:5], 1):
+                        q_val = r["q_value"]
                         bar = "*" * int(q_val * 20)
-                        content += f"  {i}. {provider}: {q_val:.3f} {bar}\n"
+                        content += f"  {i}. {r['provider']}: {q_val:.3f} {bar}\n"
 
                 content += "\n[dim]Use /learning for detailed RL stats and control[/]"
         except Exception:
@@ -3273,36 +3286,33 @@ Please think through this carefully and provide a detailed plan:"""
             /learning reset         - Reset Q-values to initial state
             /learning strategy <name> - Set selection strategy (epsilon_greedy|ucb|exploit)
         """
-        from victor.agent.rl_model_selector import (
-            RLModelSelector,
-            SelectionStrategy,
-            get_model_selector,
-        )
+        from victor.agent.rl.coordinator import get_rl_coordinator
+        from victor.agent.rl.learners.model_selector import SelectionStrategy
+        import json
 
-        selector = get_model_selector()
+        coordinator = get_rl_coordinator()
+        learner = coordinator.get_learner("model_selector")
+        if learner is None:
+            self.console.print("[red]Model selector learner not available[/]")
+            return
+
         subcommand = args[0].lower() if args else "stats"
 
         if subcommand == "stats":
             # Show RL statistics
-            stats = selector.get_stats()
-            rankings = selector.get_provider_rankings()
+            rankings = learner.get_provider_rankings()
 
             # Provider rankings table
             table = Table(title="Provider Q-Value Rankings", show_header=True)
             table.add_column("Provider", style="cyan")
             table.add_column("Q-Value", justify="right")
-            table.add_column("Sessions", justify="right")
-            table.add_column("UCB Score", justify="right")
-            table.add_column("Confidence", justify="right")
+            table.add_column("Selections", justify="right")
 
             for r in rankings[:10]:
-                ucb_str = f"{r.ucb_score:.3f}" if r.ucb_score != float("inf") else "inf"
                 table.add_row(
-                    r.provider,
-                    f"{r.q_value:.3f}",
-                    str(r.session_count),
-                    ucb_str,
-                    f"{r.confidence:.1%}",
+                    r["provider"],
+                    f"{r['q_value']:.3f}",
+                    str(r["selection_count"]),
                 )
 
             self.console.print(table)
@@ -3310,12 +3320,12 @@ Please think through this carefully and provide a detailed plan:"""
             # Summary panel
             self.console.print(
                 Panel(
-                    f"[bold]Strategy:[/] {stats['strategy']}\n"
-                    f"[bold]Epsilon:[/] {stats['epsilon']:.3f}\n"
-                    f"[bold]Total Selections:[/] {stats['total_selections']}\n"
-                    f"[bold]Providers Tracked:[/] {stats['num_providers']}\n"
-                    f"[bold]Learning Rate:[/] {stats['learning_rate']}\n"
-                    f"[bold]UCB-c:[/] {stats['ucb_c']}",
+                    f"[bold]Strategy:[/] {learner.strategy.value}\n"
+                    f"[bold]Epsilon:[/] {learner.epsilon:.3f}\n"
+                    f"[bold]Total Selections:[/] {learner._total_selections}\n"
+                    f"[bold]Providers Tracked:[/] {len(learner._q_table)}\n"
+                    f"[bold]Learning Rate:[/] {learner.learning_rate}\n"
+                    f"[bold]UCB-c:[/] {learner.ucb_c}",
                     title="RL Model Selector",
                     border_style="blue",
                 )
@@ -3324,7 +3334,7 @@ Please think through this carefully and provide a detailed plan:"""
         elif subcommand == "explore":
             # Set exploration rate
             if len(args) < 2:
-                self.console.print(f"[bold]Current epsilon:[/] {selector.epsilon:.3f}")
+                self.console.print(f"[bold]Current epsilon:[/] {learner.epsilon:.3f}")
                 self.console.print("[dim]Usage: /learning explore <rate>[/]")
                 return
 
@@ -3334,8 +3344,8 @@ Please think through this carefully and provide a detailed plan:"""
                     self.console.print("[red]Exploration rate must be between 0.0 and 1.0[/]")
                     return
 
-                old_rate = selector.epsilon
-                selector.epsilon = rate
+                old_rate = learner.epsilon
+                learner.epsilon = rate
                 self.console.print(
                     f"[green]Exploration rate updated:[/] {old_rate:.3f} -> {rate:.3f}"
                 )
@@ -3346,23 +3356,39 @@ Please think through this carefully and provide a detailed plan:"""
             # Get model recommendation with optional task_type
             # Usage: /learning recommend [task_type]
             # task_type: simple, complex, action, generation, analysis
-            task_type = args[1] if len(args) > 1 else None
+            task_type = args[1] if len(args) > 1 else "chat"
 
-            available = list(selector._q_table.keys()) if selector._q_table else ["ollama"]
-            recommendation = selector.select_provider(available, task_type=task_type)
+            available = list(learner._q_table.keys()) if learner._q_table else ["ollama"]
+            recommendation = coordinator.get_recommendation(
+                "model_selector",
+                json.dumps(available),
+                "",
+                task_type,
+            )
 
-            task_info = f" for task type '[cyan]{task_type}[/]'" if task_type else ""
+            if not recommendation:
+                self.console.print("[red]No recommendation available[/]")
+                return
+
+            # Get rankings for alternatives
+            rankings = learner.get_provider_rankings()
+            alternatives = [
+                (r["provider"], r["q_value"])
+                for r in rankings
+                if r["provider"] != recommendation.value
+            ][:5]
+
+            task_info = f" for task type '[cyan]{task_type}[/]'" if task_type != "chat" else ""
             self.console.print(
                 Panel(
-                    f"[bold]Recommended Provider{task_info}:[/] [cyan]{recommendation.provider}[/]\n"
-                    f"[bold]Q-Value:[/] {recommendation.q_value:.3f}\n"
-                    f"[bold]Confidence:[/] {recommendation.confidence:.1%}\n"
-                    f"[bold]Reason:[/] {recommendation.reason}\n\n"
+                    f"[bold]Recommended Provider{task_info}:[/] [cyan]{recommendation.value}[/]\n"
+                    f"[bold]Q-Value:[/] {recommendation.confidence:.3f}\n"
+                    f"[bold]Reason:[/] {recommendation.reasoning}\n\n"
                     f"[bold]Alternatives:[/]\n"
-                    + "\n".join(f"  - {p}: {q:.3f}" for p, q in recommendation.alternatives)
+                    + "\n".join(f"  - {p}: {q:.3f}" for p, q in alternatives)
                     + (
                         "\n\n[dim]Task types: simple, complex, action, generation, analysis[/]"
-                        if not task_type
+                        if task_type == "chat"
                         else ""
                     ),
                     title="Model Recommendation",
@@ -3371,21 +3397,34 @@ Please think through this carefully and provide a detailed plan:"""
             )
 
         elif subcommand == "reset":
-            # Reset Q-values
-            selector.reset()
+            # Reset Q-values by clearing database tables
+            import sqlite3
+            db_path = coordinator.db_path
+            conn = sqlite3.connect(str(db_path))
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM model_selector_q_values")
+            cursor.execute("DELETE FROM model_selector_task_q_values")
+            cursor.execute("DELETE FROM model_selector_state")
+            conn.commit()
+            conn.close()
+
+            # Reload learner
+            coordinator._learners.pop("model_selector", None)
+            learner = coordinator.get_learner("model_selector")
+
             self.console.print("[green]RL model selector reset to initial state[/]")
 
         elif subcommand == "strategy":
             # Set selection strategy
             if len(args) < 2:
-                self.console.print(f"[bold]Current strategy:[/] {selector.strategy.value}")
+                self.console.print(f"[bold]Current strategy:[/] {learner.strategy.value}")
                 self.console.print("[dim]Available: epsilon_greedy, ucb, exploit, thompson[/]")
                 return
 
             strategy_name = args[1].lower()
             try:
                 strategy = SelectionStrategy(strategy_name)
-                selector.strategy = strategy
+                learner.strategy = strategy
                 self.console.print(f"[green]Strategy set to:[/] {strategy.value}")
             except ValueError:
                 self.console.print(
@@ -3409,8 +3448,7 @@ Please think through this carefully and provide a detailed plan:"""
                     "[cyan]/learning reset[/]\n"
                     "  Reset Q-values to initial state\n\n"
                     "[dim]The RL selector learns from session performance to optimize\n"
-                    "model selection. Q-values are computed from ConversationStore\n"
-                    "normalized aggregation data.[/]",
+                    "model selection. Q-values are stored in the unified SQLite database.[/]",
                     title="RL Learning Commands",
                     border_style="blue",
                 )

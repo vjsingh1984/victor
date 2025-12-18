@@ -995,10 +995,12 @@ class VictorAPIServer:
             return
 
         try:
-            from victor.agent.rl_model_selector import SessionReward, get_model_selector
+            from victor.agent.rl.base import RLOutcome
+            from victor.agent.rl.coordinator import get_rl_coordinator
 
-            selector = get_model_selector()
-            if selector is None:
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("model_selector")
+            if learner is None:
                 return
 
             provider = self._orchestrator.provider
@@ -1023,20 +1025,50 @@ class VictorAPIServer:
 
             import uuid
 
-            reward = SessionReward(
-                session_id=str(uuid.uuid4())[:8],
+            # Compute quality score based on session metrics
+            latency = metrics.get("total_latency", 0)
+            token_count = metrics.get("total_tokens", 0)
+            tool_calls = metrics.get("tool_calls", 0)
+
+            # Base quality: 1.0 for successful session
+            quality_score = 1.0
+
+            # Latency penalty: -0.1 per 30s over 30s threshold (max -0.5)
+            if latency > 30:
+                quality_score -= min(0.1 * (latency - 30) / 30, 0.5)
+
+            # Tool usage bonus: +0.05 per tool (max +0.2)
+            if tool_calls > 0:
+                quality_score += min(0.05 * tool_calls, 0.2)
+
+            outcome = RLOutcome(
                 provider=provider.name,
                 model=getattr(provider, "model", "unknown"),
+                task_type="chat",  # API sessions are general chat
                 success=True,  # Session completed normally
-                latency_seconds=metrics.get("total_latency", 0),
-                token_count=metrics.get("total_tokens", 0),
-                tool_calls_made=metrics.get("tool_calls", 0),
+                quality_score=max(0.0, min(1.0, quality_score)),
+                metadata={
+                    "session_id": str(uuid.uuid4())[:8],
+                    "latency_seconds": latency,
+                    "token_count": token_count,
+                    "tool_calls_made": tool_calls,
+                    "message_count": msg_count,
+                },
+                vertical="coding",
             )
 
-            new_q = selector.update_q_value(reward)
+            coordinator.record_outcome("model_selector", outcome, "coding")
+
+            # Get updated Q-value for logging
+            rankings = learner.get_provider_rankings()
+            provider_ranking = next(
+                (r for r in rankings if r["provider"] == provider.name), None
+            )
+            new_q = provider_ranking["q_value"] if provider_ranking else 0.0
+
             logger.info(
                 f"RL API session feedback: {provider.name} "
-                f"({msg_count} messages, {metrics.get('tool_calls', 0)} tools) → Q={new_q:.3f}"
+                f"({msg_count} messages, {tool_calls} tools) → Q={new_q:.3f}"
             )
 
         except Exception as e:
@@ -1739,20 +1771,46 @@ class VictorAPIServer:
     async def _rl_stats(self, request: Request) -> Response:
         """Get RL model selector statistics."""
         try:
-            from victor.agent.rl_model_selector import get_model_selector
+            from victor.agent.rl.coordinator import get_rl_coordinator
 
-            selector = get_model_selector()
-            stats = selector.get_stats()
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("model_selector")
+            if learner is None:
+                return web.json_response(
+                    {"error": "Model selector learner not available"}, status=503
+                )
 
-            # Add task-specific Q-table info
+            # Get provider rankings
+            rankings = learner.get_provider_rankings()
+
+            # Build task-specific Q-table summary from database
+            import sqlite3
             task_q_summary = {}
-            for provider, task_q_table in selector._q_table_by_task.items():
-                task_q_summary[provider] = {
-                    task_type: round(q_val, 3) for task_type, q_val in task_q_table.items()
-                }
+            conn = sqlite3.connect(str(coordinator.db_path))
+            cursor = conn.cursor()
+            cursor.execute("SELECT provider, task_type, q_value FROM model_selector_task_q_values")
+            for row in cursor.fetchall():
+                provider, task_type, q_value = row
+                if provider not in task_q_summary:
+                    task_q_summary[provider] = {}
+                task_q_summary[provider][task_type] = round(q_value, 3)
+            conn.close()
 
-            stats["task_q_tables"] = task_q_summary
-            stats["q_table_path"] = str(selector.q_table_path)
+            stats = {
+                "strategy": learner.strategy.value,
+                "epsilon": round(learner.epsilon, 3),
+                "total_selections": learner._total_selections,
+                "provider_rankings": [
+                    {
+                        "provider": r["provider"],
+                        "q_value": round(r["q_value"], 3),
+                        "selection_count": r["selection_count"],
+                    }
+                    for r in rankings
+                ],
+                "task_q_tables": task_q_summary,
+                "q_table_path": str(coordinator.db_path),
+            }
 
             return web.json_response(stats)
 
@@ -1768,26 +1826,51 @@ class VictorAPIServer:
                        (simple, complex, action, generation, analysis)
         """
         try:
-            from victor.agent.rl_model_selector import get_model_selector
+            from victor.agent.rl.coordinator import get_rl_coordinator
+            import json
 
-            selector = get_model_selector()
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("model_selector")
+            if learner is None:
+                return web.json_response(
+                    {"error": "Model selector learner not available"}, status=503
+                )
+
             task_type = request.query.get("task_type")
 
-            available = list(selector._q_table.keys()) if selector._q_table else ["ollama"]
-            recommendation = selector.select_provider(available, task_type=task_type)
+            # Get available providers from learner's Q-table
+            available = list(learner._q_table.keys()) if learner._q_table else ["ollama"]
+
+            # Get recommendation from coordinator
+            recommendation = coordinator.get_recommendation(
+                "model_selector",
+                json.dumps(available),  # Pass as JSON string
+                "",  # model param not used
+                task_type or "chat",
+            )
+
+            if recommendation is None:
+                return web.json_response(
+                    {"error": "No recommendation available"}, status=500
+                )
+
+            # Get rankings for alternatives
+            rankings = learner.get_provider_rankings()
+            alternatives = [
+                {"provider": r["provider"], "q_value": round(r["q_value"], 3)}
+                for r in rankings
+                if r["provider"] != recommendation.value
+            ][:5]  # Top 5 alternatives
 
             return web.json_response(
                 {
-                    "provider": recommendation.provider,
-                    "model": recommendation.model,
-                    "q_value": round(recommendation.q_value, 3),
+                    "provider": recommendation.value,
+                    "model": recommendation.model or "default",
+                    "q_value": round(recommendation.confidence, 3),
                     "confidence": round(recommendation.confidence, 3),
-                    "reason": recommendation.reason,
+                    "reason": recommendation.reasoning,
                     "task_type": task_type,
-                    "alternatives": [
-                        {"provider": p, "q_value": round(q, 3)}
-                        for p, q in recommendation.alternatives
-                    ],
+                    "alternatives": alternatives,
                 }
             )
 
@@ -1798,7 +1881,14 @@ class VictorAPIServer:
     async def _rl_explore(self, request: Request) -> Response:
         """Set exploration rate for RL model selector."""
         try:
-            from victor.agent.rl_model_selector import get_model_selector
+            from victor.agent.rl.coordinator import get_rl_coordinator
+
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("model_selector")
+            if learner is None:
+                return web.json_response(
+                    {"error": "Model selector learner not available"}, status=503
+                )
 
             data = await request.json()
             rate = data.get("rate")
@@ -1815,9 +1905,8 @@ class VictorAPIServer:
             except ValueError:
                 return web.json_response({"error": "rate must be a number"}, status=400)
 
-            selector = get_model_selector()
-            old_rate = selector.epsilon
-            selector.epsilon = rate
+            old_rate = learner.epsilon
+            learner.epsilon = rate
 
             return web.json_response(
                 {
@@ -1834,7 +1923,15 @@ class VictorAPIServer:
     async def _rl_strategy(self, request: Request) -> Response:
         """Set selection strategy for RL model selector."""
         try:
-            from victor.agent.rl_model_selector import SelectionStrategy, get_model_selector
+            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.agent.rl.learners.model_selector import SelectionStrategy
+
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("model_selector")
+            if learner is None:
+                return web.json_response(
+                    {"error": "Model selector learner not available"}, status=503
+                )
 
             data = await request.json()
             strategy_name = data.get("strategy")
@@ -1854,9 +1951,8 @@ class VictorAPIServer:
                     status=400,
                 )
 
-            selector = get_model_selector()
-            old_strategy = selector.strategy.value
-            selector.strategy = strategy
+            old_strategy = learner.strategy.value
+            learner.strategy = strategy
 
             return web.json_response(
                 {
@@ -1873,10 +1969,29 @@ class VictorAPIServer:
     async def _rl_reset(self, request: Request) -> Response:
         """Reset RL model selector Q-values to initial state."""
         try:
-            from victor.agent.rl_model_selector import get_model_selector
+            from victor.agent.rl.coordinator import get_rl_coordinator
 
-            selector = get_model_selector()
-            selector.reset()
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("model_selector")
+            if learner is None:
+                return web.json_response(
+                    {"error": "Model selector learner not available"}, status=503
+                )
+
+            # Reset Q-values by clearing database tables
+            import sqlite3
+            db_path = coordinator.db_path
+            conn = sqlite3.connect(str(db_path))
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM model_selector_q_values")
+            cursor.execute("DELETE FROM model_selector_task_q_values")
+            cursor.execute("DELETE FROM model_selector_state")
+            conn.commit()
+            conn.close()
+
+            # Reload learner to pick up cleared state
+            coordinator._learners.pop("model_selector", None)
+            learner = coordinator.get_learner("model_selector")
 
             return web.json_response(
                 {
