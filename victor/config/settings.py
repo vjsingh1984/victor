@@ -321,6 +321,48 @@ class ProfileConfig(BaseSettings):
         None, description="Tool selection configuration for adaptive thresholds"
     )
 
+    # -------------------------------------------------------------------------
+    # Provider Tuning Options (P3-1)
+    # -------------------------------------------------------------------------
+    # These settings allow fine-tuning agent behavior per provider/model.
+    # Override defaults from Settings for provider-specific optimizations.
+
+    # Loop detection thresholds - controls when to detect repetitive tool calls
+    loop_repeat_threshold: Optional[int] = Field(
+        None, description="Number of identical calls before triggering loop detection"
+    )
+    max_continuation_prompts: Optional[int] = Field(
+        None, description="Max consecutive continuation prompts before forcing completion"
+    )
+
+    # Quality thresholds - controls response quality requirements
+    quality_threshold: Optional[float] = Field(
+        None, ge=0.0, le=1.0, description="Minimum quality score to accept response"
+    )
+    grounding_threshold: Optional[float] = Field(
+        None, ge=0.0, le=1.0, description="Confidence threshold for grounding verification"
+    )
+
+    # Tool behavior - controls tool usage patterns
+    max_tool_calls_per_turn: Optional[int] = Field(
+        None, gt=0, description="Maximum tool calls allowed in single model turn"
+    )
+    tool_cache_enabled: Optional[bool] = Field(
+        None, description="Enable/disable tool result caching for this profile"
+    )
+    tool_deduplication_enabled: Optional[bool] = Field(
+        None, description="Enable/disable tool call deduplication"
+    )
+
+    # Timeout and session limits
+    session_idle_timeout: Optional[int] = Field(
+        None, gt=0, description="Maximum idle time in seconds (resets on provider response/tool execution)"
+    )
+    # Future: session_time_limit for total session duration cap (regardless of activity)
+    timeout: Optional[int] = Field(
+        None, gt=0, description="Request timeout in seconds"
+    )
+
     @field_validator("tool_selection")
     @classmethod
     def validate_tool_selection(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -496,6 +538,24 @@ class Settings(BaseSettings):
     codebase_graph_path: Optional[str] = None  # Optional explicit graph db path
     core_readonly_tools: Optional[List[str]] = None  # Override/extend curated read-only tool set
 
+    # Semantic Search Quality Improvements (P4.X - Multi-Provider Excellence)
+    semantic_similarity_threshold: float = 0.5  # Min score [0.1-0.9], lowered from 0.7 to reduce false negatives
+    semantic_query_expansion_enabled: bool = True  # Expand queries with synonyms/related terms
+    semantic_max_query_expansions: int = 5  # Max query variations to try (including original)
+
+    # Hybrid Search (Semantic + Keyword with RRF)
+    enable_hybrid_search: bool = False  # Enable hybrid search combining semantic + keyword
+    hybrid_search_semantic_weight: float = 0.6  # Weight for semantic search (0.0-1.0)
+    hybrid_search_keyword_weight: float = 0.4  # Weight for keyword search (0.0-1.0)
+
+    # RL-based threshold learning per (embedding_model, task_type, tool_context)
+    enable_semantic_threshold_rl_learning: bool = False  # Enable automatic threshold learning
+    semantic_threshold_overrides: dict = {}  # Format: {"model:task:tool": threshold}
+
+    # Tool call deduplication
+    enable_tool_deduplication: bool = False  # Enable deduplication tracker
+    tool_deduplication_window_size: int = 10  # Number of recent calls to track
+
     # UI
     theme: str = "monokai"
     show_token_count: bool = True
@@ -612,13 +672,28 @@ class Settings(BaseSettings):
     )
 
     # Continuation prompts: How many times to prompt model to continue before forcing
+    # These are global defaults - can be overridden per provider/model via RL learning
     max_continuation_prompts_analysis: int = 6  # For analysis tasks (4 * 1.5 = 6)
     max_continuation_prompts_action: int = 5  # For action tasks (3 * 1.5 = 4.5 → 5)
     max_continuation_prompts_default: int = 3  # For other tasks (2 * 1.5 = 3)
 
-    # Session time limit: Maximum seconds before forcing completion
+    # Provider/model-specific continuation prompt overrides (learned via RL)
+    # Format: {"provider:model": {"analysis": N, "action": N, "default": N}}
+    # Example: {"ollama:qwen3-coder-tools:30b": {"analysis": 8, "action": 6, "default": 4}}
+    continuation_prompt_overrides: dict = {}
+
+    # Enable RL-based learning of optimal continuation prompts per provider/model
+    # Tracks success rates and adjusts limits automatically (future feature)
+    enable_continuation_rl_learning: bool = False
+
+    # Session idle timeout: Maximum seconds of inactivity before forcing completion
+    # Timer resets on each provider response or tool execution
     # Set below provider timeout (300s default) to provide graceful completion
-    session_time_limit: int = 240  # 4 minutes default, leaves 60s buffer for summary
+    # Can be overridden per profile in profiles.yaml
+    session_idle_timeout: int = 180  # 3 minutes idle time, leaves 120s buffer for summary
+
+    # Future: session_time_limit will be separate config for total session duration
+    # regardless of activity (for sub-task agents, resource limits, etc.)
 
     # ==========================================================================
     # Conversation Memory (Multi-turn Context Retention)

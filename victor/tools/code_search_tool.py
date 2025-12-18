@@ -379,11 +379,141 @@ async def code_search(
                 filters_applied.append(f"test={test}")
 
         index, rebuilt = await _get_or_build_index(root_path, settings, force_reindex=reindex)
+
+        # Get semantic search configuration from settings
+        similarity_threshold = getattr(settings, "semantic_similarity_threshold", 0.5)
+        expand_query = getattr(settings, "semantic_query_expansion_enabled", True)
+        enable_hybrid = getattr(settings, "enable_hybrid_search", False)
+
+        # Perform semantic search
         results = await index.semantic_search(
             query=query,
-            max_results=k,
+            max_results=k * 2 if enable_hybrid else k,  # Get more for hybrid combining
             filter_metadata=filter_metadata,
+            similarity_threshold=similarity_threshold,
+            expand_query=expand_query,
         )
+
+        # Record outcome for RL threshold learning if enabled
+        if getattr(settings, "enable_semantic_threshold_rl_learning", False):
+            try:
+                from victor.agent.rl.coordinator import get_rl_coordinator
+                from victor.agent.rl.base import RLOutcome
+
+                coordinator = get_rl_coordinator()
+
+                # Get embedding model from settings
+                embedding_model = getattr(
+                    settings,
+                    "codebase_embedding_model",
+                    getattr(settings, "unified_embedding_model", "all-MiniLM-L12-v2"),
+                )
+
+                # Get task type from execution context (default to "search")
+                task_type = _exec_ctx.get("task_type", "search") if _exec_ctx else "search"
+
+                # Create outcome with semantic search metadata
+                outcome = RLOutcome(
+                    provider=embedding_model,  # Using embedding model as "provider"
+                    model="code_search",  # Tool name as "model"
+                    task_type=task_type,
+                    success=(len(results) > 0),
+                    quality_score=0.5,  # Neutral score, would need user feedback for better estimate
+                    metadata={
+                        "embedding_model": embedding_model,
+                        "tool_name": "code_search",
+                        "query": query,
+                        "results_count": len(results),
+                        "threshold_used": similarity_threshold,
+                        "false_negatives": (len(results) == 0),
+                        "false_positives": False,  # Would need user feedback
+                    },
+                    vertical="coding",
+                )
+
+                # Record outcome
+                coordinator.record_outcome("semantic_threshold", outcome, "coding")
+
+                # Check if we have a learned threshold recommendation
+                recommendation = coordinator.get_recommendation(
+                    "semantic_threshold",
+                    embedding_model,  # provider param
+                    "code_search",  # model param (tool name)
+                    task_type,
+                )
+
+                if recommendation and recommendation.value is not None:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.debug(
+                        f"RL: Learned threshold {recommendation.value:.2f} "
+                        f"(current: {similarity_threshold:.2f}, "
+                        f"confidence={recommendation.confidence:.2f}) for "
+                        f"{embedding_model}:{task_type}:code_search"
+                    )
+
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.debug(f"Failed to record threshold learning outcome: {e}")
+
+        # Optionally combine with keyword search using hybrid RRF
+        if enable_hybrid and results:
+            try:
+                from victor.codebase.hybrid_search import create_hybrid_search_engine
+
+                # Get keyword search results
+                keyword_results = await _literal_search(query, str(root_path), k * 2, exts=None)
+
+                if keyword_results.get("success"):
+                    # Convert semantic results to dict format for hybrid engine
+                    semantic_dicts = [
+                        {
+                            "file_path": r.get("file_path", ""),
+                            "content": r.get("content", ""),
+                            "score": r.get("score", 0.5),
+                            "line_number": r.get("line_number", 0),
+                            "metadata": r.get("metadata", {}),
+                        }
+                        for r in results
+                    ]
+
+                    # Create hybrid search engine with configured weights
+                    semantic_weight = getattr(settings, "hybrid_search_semantic_weight", 0.6)
+                    keyword_weight = getattr(settings, "hybrid_search_keyword_weight", 0.4)
+                    engine = create_hybrid_search_engine(semantic_weight, keyword_weight)
+
+                    # Combine results using RRF
+                    hybrid_results = engine.combine_results(
+                        semantic_dicts,
+                        keyword_results.get("results", []),
+                        max_results=k
+                    )
+
+                    # Convert back to dict format
+                    results = [
+                        {
+                            "file_path": hr.file_path,
+                            "content": hr.content,
+                            "score": hr.combined_score,
+                            "semantic_score": hr.semantic_score,
+                            "keyword_score": hr.keyword_score,
+                            "line_number": hr.line_number,
+                            "metadata": hr.metadata,
+                            "search_mode": "hybrid",
+                        }
+                        for hr in hybrid_results
+                    ]
+
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"Hybrid search combined semantic + keyword → {len(results)} results")
+
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Hybrid search failed, falling back to semantic: {e}")
+                # Fall back to semantic-only results (already have them)
 
         # Truncate content in results to prevent context overflow
         # Keep enough for context but not entire function bodies

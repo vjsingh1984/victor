@@ -359,7 +359,7 @@ class ModelSpecificPromptRegistry:
         kwargs["suggested_tool"] = "read"
 
         # Time remaining
-        remaining = context.session_time_limit - context.elapsed_time_seconds
+        remaining = context.session_idle_timeout - context.elapsed_time_seconds
         kwargs["remaining_time"] = f"{remaining:.0f}s" if remaining > 0 else "no time"
 
         # Progress summary

@@ -1614,6 +1614,371 @@ async def generate_victor_md_with_llm(
         )
 
 
+def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Summarize embedding/cache health for init.md enrichment."""
+    root = Path(root_path).resolve() if root_path else Path.cwd()
+    try:
+        from victor.cache.embedding_cache_manager import EmbeddingCacheManager
+    except Exception as exc:  # pragma: no cover - optional dependency at runtime
+        logger.debug("Embedding manager unavailable: %s", exc)
+        return None
+
+    try:
+        status = EmbeddingCacheManager.get_instance().get_status()
+    except Exception as exc:  # pragma: no cover - runtime I/O
+        logger.debug("Failed to collect embedding status: %s", exc)
+        return None
+
+    caches: List[Dict[str, Any]] = []
+    for cache in status.caches:
+        caches.append(
+            {
+                "name": cache.name,
+                "type": cache.cache_type.value,
+                "files": cache.file_count,
+                "size": cache.size_str,
+                "age": cache.age_str,
+            }
+        )
+
+    info: Dict[str, Any] = {
+        "total_files": status.total_files,
+        "total_size": status.total_size_str,
+        "caches": caches,
+    }
+
+    # Optional: inspect code embedding store (LanceDB) for metadata richness
+    try:
+        from victor.config.settings import get_project_paths, load_settings
+
+        settings = load_settings()
+        default_dir = get_project_paths(root).embeddings_dir
+        persist_dir = Path(
+            getattr(settings, "codebase_persist_directory", None) or default_dir
+        )
+
+        import lancedb  # type: ignore
+
+        if persist_dir.exists():
+            db = lancedb.connect(str(persist_dir))
+            table_names = db.table_names()
+            table_name = (
+                getattr(settings, "codebase_embedding_table", None)
+                or (table_names[0] if table_names else None)
+            )
+            if table_name:
+                table = db.open_table(table_name)
+                row_count = table.count_rows()
+
+                sample_keys: Dict[str, int] = defaultdict(int)
+                chunk_types: Set[str] = set()
+                span_lengths: List[int] = []
+
+                try:
+                    sample_rows = table.head(min(50, row_count)).to_list()  # small sample
+                except Exception:
+                    sample_rows = []
+
+                for row in sample_rows:
+                    for key, value in row.items():
+                        if key in {"id", "vector"}:
+                            continue
+                        if value not in (None, "", [], {}):
+                            sample_keys[key] += 1
+                        if key == "chunk_type" and isinstance(value, str):
+                            chunk_types.add(value)
+                        if key in {"line_start", "line_end"}:
+                            try:
+                                start = int(row.get("line_start", 0))
+                                end = int(row.get("line_end", 0))
+                                if start and end and end >= start:
+                                    span_lengths.append(end - start + 1)
+                            except Exception:
+                                pass
+
+                info["code_embeddings"] = {
+                    "path": str(persist_dir),
+                    "table": table_name,
+                    "rows": row_count,
+                    "metadata_keys": sorted(sample_keys.items(), key=lambda x: -x[1])[:8],
+                    "chunk_types": sorted(chunk_types)[:6] if chunk_types else [],
+                    "max_span": max(span_lengths) if span_lengths else None,
+                }
+    except Exception as exc:  # pragma: no cover - optional dependency
+        logger.debug("Skipping code embedding metadata inspection: %s", exc)
+
+    return info
+
+
+def _build_analyzer_section(
+    stats: Dict[str, Any],
+    graph_insights: Dict[str, Any],
+    embedding_status: Optional[Dict[str, Any]],
+) -> List[str]:
+    """Construct analyzer coverage section from index + graph data."""
+    if not stats:
+        return []
+
+    lines: List[str] = []
+    lines.append("## Analyzer Coverage\n")
+
+    total_symbols = stats.get("total_symbols", 0)
+    total_files = stats.get("total_files", 0)
+    lines.append(
+        f"- **Symbol index**: {total_symbols} symbols across {total_files} files "
+        "(multi-language tree-sitter + regex fallback, includes call sites and references)"
+    )
+
+    if graph_insights.get("has_graph"):
+        graph_stats = graph_insights.get("stats", {})
+        edge_types = graph_stats.get("edge_types", {})
+        call_edges = edge_types.get("CALLS", 0)
+        ref_edges = edge_types.get("REFERENCES", 0)
+        import_edges = edge_types.get("IMPORTS", 0)
+        inherits = edge_types.get("INHERITS", 0)
+        comp = edge_types.get("COMPOSED_OF", 0)
+
+        lines.append(
+            f"- **Code graph**: {graph_stats.get('total_nodes', 0)} nodes, "
+            f"{graph_stats.get('total_edges', 0)} edges "
+            f"(calls: {call_edges}, refs: {ref_edges}, imports: {import_edges}, "
+            f"inheritance: {inherits}, composition: {comp}); module PageRank and coupling detection ready"
+        )
+
+        # Highlight a few hubs and module ranks for quick navigation
+        hubs = graph_insights.get("hub_classes", [])[:2]
+        if hubs:
+            hub_preview = ", ".join(
+                f"`{hub['name']}` ({hub['degree']} links)" for hub in hubs
+            )
+            lines.append(f"  - Hub classes: {hub_preview}")
+
+        modules = graph_insights.get("important_modules", [])[:3]
+        if modules:
+            module_preview = ", ".join(
+                f"`{mod['module']}` ({mod['role']})" for mod in modules
+            )
+            lines.append(f"  - Module PageRank leaders: {module_preview}")
+
+        languages = graph_insights.get("languages", [])
+        if languages:
+            top_langs = ", ".join(f"{lang} ({count})" for lang, count in languages[:3])
+            lines.append(f"  - Graph coverage by language: {top_langs}")
+
+        if edge_types:
+            missing_edges = graph_insights.get("edge_gaps", [])
+            if missing_edges:
+                lines.append(f"  - Missing edge types: {', '.join(missing_edges)} (re-run index with tree-sitter deps to capture)")
+            elif call_edges == 0:
+                lines.append("  - Calls not captured; verify tree-sitter call extraction is installed.")
+
+        call_hotspots = graph_insights.get("call_hotspots", [])
+        if call_hotspots:
+            hot_preview = ", ".join(
+                f"`{sym['name']}` ({sym['in_degree']} callers)" for sym in call_hotspots[:3]
+            )
+            lines.append(f"  - Call hotspots: {hot_preview}")
+    else:
+        lines.append(
+            "- **Code graph**: not detected yet (run `victor index` to populate tree-sitter call/reference graph)"
+        )
+
+    if embedding_status and embedding_status.get("caches"):
+        cache_preview = ", ".join(
+            f"{cache['name']} ({cache['files']} files, {cache['size']}, {cache['age']})"
+            for cache in embedding_status["caches"][:3]
+        )
+        lines.append(
+            f"- **Semantic embeddings**: {cache_preview} "
+            "(tree-sitter chunking for code spans; tool/intent/conversation caches ready)"
+        )
+        if embedding_status.get("code_embeddings"):
+            ce = embedding_status["code_embeddings"]
+            meta_keys = ", ".join(k for k, _ in ce.get("metadata_keys", [])) or "none"
+            lines.append(
+                f"  - Code embeddings: {ce.get('rows', 0)} vectors @ {ce.get('path')} "
+                f"(metadata keys: {meta_keys})"
+            )
+
+    lines.append("")
+    return lines
+
+
+def _infer_python_requires(root: Path) -> Optional[str]:
+    """Read requires-python from pyproject.toml if present."""
+    pyproject = root / "pyproject.toml"
+    if not pyproject.exists():
+        return None
+    try:
+        content = pyproject.read_text(encoding="utf-8", errors="ignore")
+        match = re.search(r"requires-python\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]", content)
+        if match:
+            return match.group(1)
+    except Exception:
+        return None
+    return None
+
+
+def _infer_commands(root: Path) -> List[str]:
+    """Infer project commands from Makefile, package.json, and common conventions."""
+    commands: List[str] = []
+
+    makefile = root / "Makefile"
+    if makefile.exists():
+        try:
+            make_text = makefile.read_text(encoding="utf-8", errors="ignore")
+            targets = set(re.findall(r"^(\\w+):", make_text, re.MULTILINE))
+            preferred = [
+                ("install-dev", "make install-dev"),
+                ("install", "make install"),
+                ("lint", "make lint"),
+                ("format", "make format"),
+                ("test", "make test"),
+                ("test-all", "make test-all"),
+                ("serve", "make serve"),
+                ("build", "make build"),
+                ("docker", "make docker"),
+            ]
+            for target, cmd in preferred:
+                if target in targets:
+                    commands.append(cmd)
+        except Exception:
+            pass
+
+    pkg = root / "package.json"
+    if pkg.exists():
+        try:
+            import json
+
+            data = json.loads(pkg.read_text(encoding="utf-8", errors="ignore"))
+            scripts = data.get("scripts", {}) or {}
+            for key in ("dev", "start", "build", "test", "lint"):
+                if key in scripts:
+                    commands.append(f"npm run {key}")
+            commands.append("npm install")
+        except Exception:
+            pass
+
+    # Python defaults
+    commands.append('pip install -e ".[dev]"')
+    commands.append("pytest")
+
+    # Docker hints
+    if (root / "docker-compose.yml").exists():
+        commands.append("docker-compose up -d")
+
+    # Server/UI hints
+    if (root / "web" / "server").exists():
+        commands.append("uvicorn web.server.main:app --reload")
+    if (root / "web" / "ui").exists():
+        commands.append("cd web/ui && npm install && npm run dev")
+
+    # Deduplicate preserving order
+    seen: Set[str] = set()
+    deduped: List[str] = []
+    for cmd in commands:
+        if cmd not in seen:
+            deduped.append(cmd)
+            seen.add(cmd)
+    return deduped
+
+
+def _infer_env_vars(root: Path) -> List[str]:
+    """Infer env vars from .env/.env.example (uppercase keys)."""
+    env_files = [root / ".env", root / ".env.example"]
+    vars_found: List[str] = []
+    seen: Set[str] = set()
+    for env_file in env_files:
+        if not env_file.exists():
+            continue
+        try:
+            for line in env_file.read_text(encoding="utf-8", errors="ignore").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key = line.split("=", 1)[0].strip()
+                if key.isupper() and key not in seen:
+                    vars_found.append(key)
+                    seen.add(key)
+        except Exception:
+            continue
+    return vars_found[:10]
+
+
+def _build_quick_start(commands: List[str]) -> List[str]:
+    """Pick a concise quick-start command set."""
+    if not commands:
+        return []
+    quick: List[str] = []
+    # Prefer install, lint/test, serve/dev commands if present
+    priorities = [
+        ("install", ("install", "pip install", "npm install", "make install")),
+        ("lint", ("lint", "ruff", "eslint")),
+        ("test", ("test", "pytest", "npm test", "make test")),
+        ("serve", ("serve", "uvicorn", "run dev", "npm run dev")),
+    ]
+    lower_cmds = [(c.lower(), c) for c in commands]
+    for _label, needles in priorities:
+        for lc, orig in lower_cmds:
+            if any(n in lc for n in needles):
+                if orig not in quick:
+                    quick.append(orig)
+                break
+    # Fallback: first 3 commands
+    for cmd in commands:
+        if len(quick) >= 3:
+            break
+        if cmd not in quick:
+            quick.append(cmd)
+    return quick[:4]
+
+
+def _find_config_files(root: Path) -> List[str]:
+    """Find common config files (json/yaml/toml) while skipping vendor/venv/build artifacts."""
+    exts = {".json", ".yaml", ".yml", ".toml"}
+    results: List[str] = []
+    extra_skip = {"venv", "env", "node_modules", "build", "dist", "out", ".mypy_cache", ".ruff_cache", ".pytest_cache"}
+    skip_parts = {"htmlcov", "htmlcov_lang", "coverage", "__pycache__", "egg-info"}
+
+    for path in root.rglob("*"):
+        if path.suffix not in exts or not path.is_file():
+            continue
+        if should_ignore_path(path, skip_dirs=DEFAULT_SKIP_DIRS, extra_skip_dirs=extra_skip):
+            continue
+        if any(part in skip_parts for part in path.parts):
+            continue
+        rel = str(path.relative_to(root))
+        results.append(rel)
+        if len(results) >= 40:  # cap for speed
+            break
+
+    results.sort()
+    return results[:15]
+
+
+def _find_docs_files(root: Path) -> List[str]:
+    """Find markdown/adoc docs (top-N) while skipping vendor/venv/build artifacts."""
+    results: List[tuple[int, str]] = []
+    extra_skip = {"venv", "env", "node_modules", "build", "dist", "out", ".mypy_cache", ".ruff_cache", ".pytest_cache"}
+    skip_parts = {"htmlcov", "htmlcov_lang", "coverage", "__pycache__", "egg-info"}
+
+    for path in root.rglob("*.md"):
+        if should_ignore_path(path, skip_dirs=DEFAULT_SKIP_DIRS, extra_skip_dirs=extra_skip):
+            continue
+        if any(part in skip_parts for part in path.parts):
+            continue
+        try:
+            size = path.stat().st_size
+        except Exception:
+            size = 0
+        rel = str(path.relative_to(root))
+        results.append((size, rel))
+        if len(results) >= 80:  # reasonable cap
+            break
+    results.sort(reverse=True)  # bigger docs first
+    return [rel for _size, rel in results[:12]]
+
+
 async def generate_victor_md_from_index(
     root_path: Optional[str] = None,
     force: bool = False,
@@ -1655,6 +2020,14 @@ async def generate_victor_md_from_index(
     analyzer._extract_test_coverage()
     enhanced_info = analyzer.analysis
 
+    graph_insights = await extract_graph_insights(root_path)
+    embedding_status = _collect_embedding_status(root_path)
+    env_vars = _infer_env_vars(root)
+    commands_inferred = _infer_commands(root)
+    quick_start = _build_quick_start(commands_inferred)
+    config_files = _find_config_files(root)
+    docs_files = _find_docs_files(root)
+
     sections = []
 
     # Header
@@ -1681,20 +2054,36 @@ async def generate_victor_md_from_index(
     sections.append("| Path | Type | Description |")
     sections.append("|------|------|-------------|")
 
-    # Infer main directories from key components
-    dirs_seen = set()
+    dirs_seen: Set[str] = set()
+
+    def add_dir(path: str, type_label: str, desc: str) -> None:
+        if path in dirs_seen:
+            return
+        if (root / path).exists():
+            sections.append(f"| `{path}/` | {type_label} | {desc} |")
+            dirs_seen.add(path)
+
+    # Core/runtime dirs
+    add_dir("victor", "**ACTIVE**", "Backend / core")
+    add_dir("src", "Active", "Source code")
+    add_dir("web/server", "Active", "Backend server")
+    add_dir("web/ui", "Active", "Web UI")
+    add_dir("vscode-victor", "Active", "Editor extension")
+    add_dir("docs", "Active", "Documentation")
+    add_dir("docs/guides", "Active", "Guides and playbooks")
+    add_dir("examples", "Active", "Examples and sample workflows")
+    add_dir("scripts", "Active", "Automation and helper scripts")
+    add_dir("templates", "Active", "Scaffold and template files")
+    add_dir("tests", "Active", "Unit and integration tests")
+    add_dir("victor_test", "Active", "Lightweight demos")
+    add_dir("archive", "Legacy", "Historical code (frozen)")
+
+    # Infer additional dirs from key components for completeness
     for comp in key_components:
         dir_parts = Path(comp.file_path).parts
         if len(dir_parts) > 1:
             main_dir = dir_parts[0]
-            if main_dir not in dirs_seen:
-                dirs_seen.add(main_dir)
-                sections.append(f"| `{main_dir}/` | **ACTIVE** | Source code |")
-
-    if (root / "tests").is_dir():
-        sections.append("| `tests/` | Active | Unit and integration tests |")
-    if (root / "docs").is_dir():
-        sections.append("| `docs/` | Active | Documentation |")
+            add_dir(main_dir, "**ACTIVE**", "Source code")
 
     sections.append("")
 
@@ -1704,7 +2093,20 @@ async def generate_victor_md_from_index(
         sections.append("| Component | Type | Path | Description |")
         sections.append("|-----------|------|------|-------------|")
 
-        for comp in key_components[:15]:  # Show top 15 (increased from 12)
+        # Prefer runtime components over test-only entries
+        filtered_components = [
+            comp
+            for comp in key_components
+            if not str(comp.file_path).startswith("tests/")
+            and not str(comp.file_path).startswith("vscode-victor/out")
+        ]
+        display_components = filtered_components or key_components
+        seen_components: Set[str] = set()
+
+        for comp in display_components[:15]:  # Show top 15 (increased from 12)
+            if comp.name in seen_components:
+                continue
+            seen_components.add(comp.name)
             raw_desc = (
                 comp.docstring or comp.category.title()
                 if comp.category
@@ -1735,6 +2137,40 @@ async def generate_victor_md_from_index(
             sections.append(f"\n**Dev** ({len(enhanced_info.dependencies['dev'])} packages): {', '.join(dev_deps)}")
         sections.append("")
 
+    # Configuration hints
+    sections.append("## Configuration\n")
+    sections.append(
+        "- Settings: `.env` → `~/.victor/profiles.yaml` → CLI flags (override order)\n"
+        "- Project context: `.victor/init.md` (regenerate with `victor init --update`)"
+    )
+    sections.append("")
+
+    if quick_start:
+        sections.append("## Quick Start\n")
+        sections.append("```bash")
+        for cmd in quick_start:
+            sections.append(cmd)
+        sections.append("```\n")
+
+    if env_vars:
+        sections.append("## Environment Variables\n")
+        sections.append("Likely used (from .env/.env.example):")
+        for var in env_vars:
+            sections.append(f"- `{var}`")
+        sections.append("")
+
+    if config_files:
+        sections.append("## Config Files\n")
+        for cfg in config_files[:12]:
+            sections.append(f"- `{cfg}`")
+        sections.append("")
+
+    if docs_files:
+        sections.append("## Documentation\n")
+        for doc in docs_files[:10]:
+            sections.append(f"- `{doc}`")
+        sections.append("")
+
     # Codebase Stats (LOC, files, coverage)
     if enhanced_info.loc_stats:
         sections.append("## Codebase Stats\n")
@@ -1753,6 +2189,73 @@ async def generate_victor_md_from_index(
             sections.append("- Top files by size:")
             for path, lines in top_files:
                 sections.append(f"  - `{path}` ({lines:,} lines)")
+        sections.append("")
+
+    analyzer_section = _build_analyzer_section(
+        stats=stats, graph_insights=graph_insights, embedding_status=embedding_status
+    )
+    if analyzer_section:
+        sections.extend(analyzer_section)
+
+    if graph_insights.get("has_graph"):
+        graph_stats = graph_insights.get("stats", {})
+        edge_types = graph_stats.get("edge_types", {})
+        sections.append("## Graph Health\n")
+        sections.append(
+            f"- Nodes: {graph_stats.get('total_nodes', 0)}, Edges: {graph_stats.get('total_edges', 0)} "
+            f"(CALLS: {edge_types.get('CALLS', 0)}, REFERENCES: {edge_types.get('REFERENCES', 0)}, "
+            f"IMPORTS: {edge_types.get('IMPORTS', 0)}, INHERITS: {edge_types.get('INHERITS', 0)}, "
+            f"COMPOSED_OF: {edge_types.get('COMPOSED_OF', 0)})"
+        )
+        if graph_insights.get("languages"):
+            lang_preview = ", ".join(
+                f"{lang} ({count})" for lang, count in graph_insights["languages"][:4]
+            )
+            sections.append(f"- Language coverage: {lang_preview}")
+        if graph_insights.get("edge_gaps"):
+            sections.append(
+                f"- Missing edge types: {', '.join(graph_insights['edge_gaps'])} "
+                "(install tree-sitter deps and re-run `victor index`)"
+            )
+        if graph_insights.get("hub_classes"):
+            hubs = ", ".join(
+                f"{hub['name']} ({hub['degree']} links)" for hub in graph_insights["hub_classes"][:3]
+            )
+            sections.append(f"- Hub classes: {hubs}")
+        if graph_insights.get("important_modules"):
+            mods = ", ".join(
+                f"{mod['module']} ({mod['role']})" for mod in graph_insights["important_modules"][:3]
+            )
+            sections.append(f"- Module leaders: {mods}")
+        if graph_insights.get("pagerank"):
+            pr_preview = ", ".join(
+                f"{pr['name']} ({pr['in_degree']}↓/{pr['out_degree']}↑)" for pr in graph_insights["pagerank"][:3]
+            )
+            sections.append(f"- PageRank leaders: {pr_preview}")
+        if graph_insights.get("centrality"):
+            dc_preview = ", ".join(
+                f"{dc['name']} ({dc['degree']} deg)" for dc in graph_insights["centrality"][:3]
+            )
+            sections.append(f"- Centrality leaders: {dc_preview}")
+        if graph_insights.get("components"):
+            comp = graph_insights["components"]
+            details = f"largest {comp[0]} nodes" + (f", next {comp[1:3]}" if len(comp) > 1 else "")
+            sections.append(f"- Connected components: {details}")
+        sections.append("")
+
+    if embedding_status and embedding_status.get("code_embeddings"):
+        ce = embedding_status["code_embeddings"]
+        sections.append("## Embeddings & Chunking\n")
+        sections.append(
+            f"- Code embeddings: {ce.get('rows', 0)} vectors @ `{ce.get('path', '')}` (table: {ce.get('table', '')})"
+        )
+        if ce.get("metadata_keys"):
+            keys = ", ".join(k for k, _ in ce["metadata_keys"])
+            sections.append(f"- Metadata keys: {keys}")
+        if ce.get("chunk_types"):
+            sections.append(f"- Chunk types: {', '.join(ce['chunk_types'])}")
+        if ce.get("max_span"):
+            sections.append(f"- Max chunk span: {ce['max_span']} lines")
         sections.append("")
 
     # Top Imports (most used internal/external modules)
@@ -1809,31 +2312,14 @@ async def generate_victor_md_from_index(
             sections.append(f"- {count} {plural}")
         sections.append("")
 
-    # Common Commands (inferred from detected languages)
-    sections.append("## Common Commands\n")
+    # Setup & Commands (inferred)
+    sections.append("## Setup & Commands\n")
     sections.append("```bash")
-
-    langs = stats.get("files_by_language", {})
-    if "python" in langs:
-        sections.append("# Python project")
-        sections.append('pip install -e ".[dev]"')
-        sections.append("pytest")
-    if "typescript" in langs or "javascript" in langs:
-        sections.append("# Node.js project")
-        sections.append("npm install")
-        sections.append("npm test")
-    if "go" in langs:
-        sections.append("# Go project")
-        sections.append("go build")
-        sections.append("go test ./...")
-    if "rust" in langs:
-        sections.append("# Rust project")
-        sections.append("cargo build")
-        sections.append("cargo test")
-
-    if not any(lang in langs for lang in ["python", "typescript", "javascript", "go", "rust"]):
-        sections.append("# Add your build/run commands here")
-
+    py_requires = _infer_python_requires(root)
+    if py_requires:
+        sections.append(f"# Python >= {py_requires}")
+    for cmd in commands_inferred:
+        sections.append(cmd)
     sections.append("```\n")
 
     # Important Notes
@@ -2031,6 +2517,12 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
         # Module-level insights
         "important_modules": [],
         "module_coupling": [],
+        "languages": [],
+        "call_hotspots": [],
+        "edge_gaps": [],
+        "pagerank": [],
+        "centrality": [],
+        "components": [],
     }
 
     if not graph_db_path.exists():
@@ -2057,6 +2549,10 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             cur = conn.execute("SELECT type, COUNT(*) FROM nodes GROUP BY type")
             node_types = dict(cur.fetchall())
 
+            # Language coverage
+            cur = conn.execute("SELECT lang, COUNT(*) FROM nodes GROUP BY lang")
+            languages = [(row[0], row[1]) for row in cur.fetchall() if row[0]]
+
             # Get edge type distribution
             cur = conn.execute("SELECT type, COUNT(*) FROM edges GROUP BY type")
             edge_types = dict(cur.fetchall())
@@ -2068,6 +2564,10 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                 "node_types": node_types,
                 "edge_types": edge_types,
             }
+            insights["languages"] = languages
+            # Identify missing edge types for debugging coverage
+            expected_edges = {"CALLS", "REFERENCES", "IMPORTS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF"}
+            insights["edge_gaps"] = sorted(list(expected_edges - set(edge_types.keys())))
 
             # Get high-connectivity nodes (hub classes) via SQL
             cur = conn.execute(
@@ -2114,6 +2614,74 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                 for r in important_results
                 if r[4] > 0
             ]
+            insights["call_hotspots"] = insights["important_symbols"][:5]
+
+            # Optional richer graph analytics
+            try:
+                from victor.tools.graph_tool import GraphAnalyzer
+                from victor.codebase.graph.sqlite_store import SQLiteGraphStore
+
+                ga = GraphAnalyzer()
+                store = SQLiteGraphStore(graph_db_path)
+                nodes = await store.get_all_nodes()
+                edges = await store.get_all_edges()
+                for n in nodes:
+                    ga.add_node(n)
+                for e in edges:
+                    ga.add_edge(e)
+
+                pagerank_top = ga.pagerank(
+                    top_k=8,
+                    edge_types=[
+                        "CALLS",
+                        "REFERENCES",
+                        "INHERITS",
+                        "IMPLEMENTS",
+                        "COMPOSED_OF",
+                        "IMPORTS",
+                    ],
+                )
+                centrality_top = ga.degree_centrality(
+                    top_k=8,
+                    edge_types=[
+                        "CALLS",
+                        "REFERENCES",
+                        "INHERITS",
+                        "IMPLEMENTS",
+                        "COMPOSED_OF",
+                        "IMPORTS",
+                    ],
+                )
+
+                # Connected components (undirected view)
+                visited: Set[str] = set()
+                components: List[int] = []
+                for node_id in ga.nodes:
+                    if node_id in visited:
+                        continue
+                    stack = [node_id]
+                    size = 0
+                    while stack:
+                        nid = stack.pop()
+                        if nid in visited:
+                            continue
+                        visited.add(nid)
+                        size += 1
+                        neighbors = [
+                            t for t, _et, _w in ga.outgoing.get(nid, [])
+                        ] + [s for s, _et, _w in ga.incoming.get(nid, [])]
+                        for n2 in neighbors:
+                            if n2 not in visited:
+                                stack.append(n2)
+                    components.append(size)
+
+                components.sort(reverse=True)
+
+                insights["pagerank"] = pagerank_top[:5]
+                insights["centrality"] = centrality_top[:5]
+                insights["components"] = components[:3]
+            except Exception as exc:
+                logger.debug(f"Graph analytics fallback skipped: {exc}")
 
             # Module-level analysis: aggregate to file level
             # Use REFERENCES edges (imports/dependencies) for richer module relationships

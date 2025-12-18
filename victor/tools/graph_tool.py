@@ -1171,6 +1171,7 @@ async def _load_graph(graph_store: GraphStoreProtocol) -> GraphAnalyzer:
 async def graph(
     mode: GraphMode,
     node: Optional[str] = None,
+    source: Optional[str] = None,
     target: Optional[str] = None,
     query: Optional[str] = None,
     file: Optional[str] = None,
@@ -1180,6 +1181,23 @@ async def graph(
     top_k: int = 20,
     direction: Literal["in", "out", "both"] = "both",
     expand: bool = False,
+    exclude_paths: Optional[List[str]] = None,
+    only_runtime: bool = True,
+    runtime_weighted: bool = True,
+    modules_only: bool = False,
+    include_callsites: bool = True,
+    max_callsites: int = 3,
+    structured: bool = True,
+    include_symbols: bool = True,
+    include_modules: bool = True,
+    include_calls: bool = True,
+    include_refs: bool = False,
+    include_callsites_modules: bool = True,
+    max_callsites_modules: int = 3,
+    module_edge_weight_bias: bool = True,
+    include_neighbors: bool = False,
+    neighbors_edge_types: Optional[List[str]] = None,
+    neighbors_limit: int = 3,
 ) -> Dict[str, Any]:
     """[GRAPH] Query codebase STRUCTURE for relationships, impact, and importance.
 
@@ -1215,7 +1233,8 @@ async def graph(
         node: Symbol name or node ID (required for most modes except stats/pagerank/find)
         target: Target symbol for "path" mode
         query: Search query for "find" mode (pattern to match symbol names)
-        file: File path for "file_deps" mode, or filter for "find" mode
+            file: File path for "file_deps" mode, or filter for "find" mode
+            source: Alias for "file" in call_flow mode (source module)
         node_type: Filter by node type ("function", "class", "module") for "find" mode
         edge_types: Filter by edge types. Options:
             - "CALLS": Function call relationships
@@ -1228,6 +1247,17 @@ async def graph(
         top_k: Number of results for ranking/find modes (default: 20)
         direction: Edge direction for neighbors/file_deps - "in", "out", or "both"
         expand: For "find" mode - also return immediate graph neighbors
+        exclude_paths: Optional list of path substrings to exclude (e.g., ["tests/", "node_modules/"])
+        only_runtime: If True (default), automatically down-rank/exclude tests/build/venv/output paths
+        runtime_weighted: If True (default), prefer CALLS/INHERITS/IMPLEMENTS edges over REFERENCES for rankings
+        modules_only: If True, module-level modes/hotspots only (no symbol-level ranks)
+        include_callsites: If True, return sample callsites (file:line) for symbol-level results where available
+        max_callsites: Limit for returned callsites when include_callsites is True
+        structured: If True (default), return separate module vs symbol sections with edge-type breakdowns
+        include_symbols: Include symbol-level ranks (when structured)
+        include_modules: Include module-level ranks (when structured)
+        include_calls: Include CALLS edges in edge-type breakdowns (default: True)
+        include_refs: Include REFERENCES edges in breakdowns (default: False to reduce noise)
 
     Returns:
         Results vary by mode:
@@ -1293,6 +1323,87 @@ async def graph(
         # Load into analyzer
         analyzer = await _load_graph(store)
 
+        default_excludes = [
+            "tests/",
+            "test/",
+            "node_modules/",
+            "build/",
+            "dist/",
+            "out/",
+            "venv/",
+            ".venv/",
+            "env/",
+            "__pycache__",
+            "htmlcov",
+            "coverage",
+            "vscode-victor/out/",
+            "web/ui/node_modules/",
+        ]
+        effective_excludes = set(default_excludes)
+        if exclude_paths:
+            effective_excludes.update(exclude_paths)
+
+        def _skip_path(path: Optional[str]) -> bool:
+            if not path:
+                return False
+            if only_runtime:
+                return any(excl in path for excl in effective_excludes)
+            return any(excl in path for excl in effective_excludes)
+
+        def _add_edge_counts(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            enriched: List[Dict[str, Any]] = []
+            for item in items:
+                nid = item.get("node_id")
+                if not nid:
+                    enriched.append(item)
+                    continue
+                in_edges = analyzer.incoming.get(nid, [])
+                out_edges = analyzer.outgoing.get(nid, [])
+                edge_count = lambda et, edges: len([e for e in edges if e[1] == et])
+                item["edge_counts"] = {
+                    "calls_in": edge_count("CALLS", in_edges) if include_calls else 0,
+                    "calls_out": edge_count("CALLS", out_edges) if include_calls else 0,
+                    "refs_in": edge_count("REFERENCES", in_edges) if include_refs else 0,
+                    "refs_out": edge_count("REFERENCES", out_edges) if include_refs else 0,
+                    "imports": edge_count("IMPORTS", out_edges),
+                    "inherits": edge_count("INHERITS", out_edges),
+                    "implements": edge_count("IMPLEMENTS", out_edges),
+                    "composed_of": edge_count("COMPOSED_OF", out_edges),
+                }
+                enriched.append(item)
+            return enriched
+
+        def _add_callsites(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            if not include_callsites:
+                return items
+            enriched: List[Dict[str, Any]] = []
+            for item in items:
+                nid = item.get("node_id")
+                if not nid:
+                    enriched.append(item)
+                    continue
+                calls = analyzer.get_neighbors(
+                    node_id=nid,
+                    direction="in",
+                    edge_types=["CALLS"],
+                    max_depth=1,
+                )
+                neighbor_calls = []
+                for _depth, neighs in calls.get("neighbors_by_depth", {}).items():
+                    for n in neighs:
+                        if _skip_path(n.get("file")):
+                            continue
+                        line_val = None
+                        target_node = analyzer.nodes.get(n.get("node_id", ""))
+                        if target_node:
+                            line_val = target_node.line
+                        neighbor_calls.append(
+                            {"name": n.get("name"), "file": n.get("file"), "line": line_val}
+                        )
+                item["callsites"] = neighbor_calls[:max_callsites]
+                enriched.append(item)
+            return enriched
+
         if not analyzer.nodes:
             return {
                 "error": "Graph is empty. Run 'victor index' to build the code graph first.",
@@ -1302,27 +1413,86 @@ async def graph(
         # Resolve node name to node_id if needed
         resolved_node = None
         if node:
+            # Normalize bare file paths to file: nodes
+            candidate_node = node
+            if not node.startswith("file:") and any(
+                node.endswith(ext) for ext in (".py", ".ts", ".js", ".rs", ".go", ".java", ".cpp")
+            ):
+                candidate_node = f"file:{node}"
+
             # First try exact match on node_id
-            if node in analyzer.nodes:
-                resolved_node = node
+            if candidate_node in analyzer.nodes:
+                resolved_node = candidate_node
             else:
-                # Search by name
+                # Search by exact name
                 for nid, n in analyzer.nodes.items():
                     if n.name == node:
                         resolved_node = nid
                         break
 
-            if mode not in ("pagerank", "centrality", "stats") and not resolved_node:
-                # Try fuzzy match
-                matches = [n for nid, n in analyzer.nodes.items() if node.lower() in n.name.lower()]
-                if matches:
+            if mode not in ("pagerank", "centrality", "stats", "module_pagerank", "module_centrality") and not resolved_node:
+                # Enhanced fuzzy matching with multiple strategies (SOLID: Strategy Pattern)
+                node_lower = node.lower()
+
+                # Strategy 1: Substring match in name
+                name_matches = [(nid, n) for nid, n in analyzer.nodes.items()
+                               if node_lower in n.name.lower()]
+
+                # Strategy 2: Match against file path (e.g., "DatabaseSchema" matches database_schema.py)
+                # Normalize search term: "DatabaseSchema" -> "database_schema" or "database-schema"
+                normalized_search = ""
+                for i, c in enumerate(node):
+                    if i > 0 and c.isupper():
+                        normalized_search += "_"
+                    normalized_search += c.lower()
+
+                file_matches = [(nid, n) for nid, n in analyzer.nodes.items()
+                               if n.file and (normalized_search in n.file.lower() or
+                                             node_lower.replace("_", "") in n.file.lower().replace("_", ""))]
+
+                # Strategy 3: Partial word match for CamelCase or snake_case variations
+                snake_case_search = normalized_search  # Already converted above
+                partial_matches = [(nid, n) for nid, n in analyzer.nodes.items()
+                                  if snake_case_search in n.name.lower().replace("_", "")]
+
+                # Combine and deduplicate (prioritize name matches)
+                all_matches: Dict[str, GraphNode] = {}
+                for nid, n in name_matches + file_matches + partial_matches:
+                    if nid not in all_matches:
+                        all_matches[nid] = n
+
+                if all_matches:
+                    # If only one match and it's a file match, auto-resolve to help LLM
+                    # This handles "DatabaseSchema" -> nodes in database_schema.py
+                    unique_files = set(n.file for n in all_matches.values() if n.file)
+                    if len(all_matches) == 1:
+                        # Single match - use it directly
+                        resolved_node = list(all_matches.keys())[0]
+                        logger.debug(f"[GraphTool] Auto-resolved '{node}' to '{resolved_node}'")
+                    elif len(unique_files) == 1 and len(all_matches) <= 10:
+                        # All matches from same file - suggest them but also provide hint
+                        return {
+                            "error": f"Node '{node}' not found exactly. Did you mean one of these symbols from {list(unique_files)[0]}?",
+                            "suggestions": [
+                                {"name": m.name, "type": m.type, "file": m.file}
+                                for m in list(all_matches.values())[:10]
+                            ],
+                            "hint": f"Use the exact symbol name from suggestions. For file-level analysis, try: graph(mode='file_deps', file='{list(unique_files)[0]}')"
+                        }
+                    else:
+                        return {
+                            "error": f"Node '{node}' not found exactly",
+                            "suggestions": [
+                                {"name": m.name, "type": m.type, "file": m.file}
+                                for m in list(all_matches.values())[:10]
+                            ],
+                        }
+
+                if not resolved_node:
                     return {
-                        "error": f"Node '{node}' not found exactly",
-                        "suggestions": [
-                            {"name": m.name, "type": m.type, "file": m.file} for m in matches[:5]
-                        ],
+                        "error": f"Node '{node}' not found in graph",
+                        "hint": "Try using graph(mode='find', query='your_search_term') to discover available symbols, or graph(mode='file_deps', file='filename.py') for file-level analysis."
                     }
-                return {"error": f"Node '{node}' not found in graph"}
 
         resolved_target = None
         if target:
@@ -1343,15 +1513,39 @@ async def graph(
             return analyzer.get_neighbors(resolved_node, direction, edge_types, depth)
 
         elif mode == "pagerank":
+            weighted_edges = edge_types
+            if runtime_weighted and not edge_types:
+                weighted_edges = ["CALLS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
+            results = analyzer.pagerank(edge_types=weighted_edges, top_k=top_k)
+            results = [r for r in results if not _skip_path(r.get("file"))]
+            if structured:
+                results = _add_callsites(_add_edge_counts(results))
+                return {
+                    "mode": "pagerank",
+                    "modules": [] if include_modules else [],
+                    "symbols": results if include_symbols else [],
+                }
             return {
                 "mode": "pagerank",
-                "results": analyzer.pagerank(edge_types=edge_types, top_k=top_k),
+                "results": results,
             }
 
         elif mode == "centrality":
+            weighted_edges = edge_types
+            if runtime_weighted and not edge_types:
+                weighted_edges = ["CALLS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
+            results = analyzer.degree_centrality(edge_types=weighted_edges, top_k=top_k)
+            results = [r for r in results if not _skip_path(r.get("file"))]
+            if structured:
+                results = _add_callsites(_add_edge_counts(results))
+                return {
+                    "mode": "centrality",
+                    "modules": [] if include_modules else [],
+                    "symbols": results if include_symbols else [],
+                }
             return {
                 "mode": "centrality",
-                "results": analyzer.degree_centrality(edge_types=edge_types, top_k=top_k),
+                "results": results,
             }
 
         elif mode == "path":
@@ -1362,7 +1556,30 @@ async def graph(
         elif mode == "impact":
             if not resolved_node:
                 return {"error": "node parameter required for 'impact' mode"}
-            return analyzer.impact_analysis(resolved_node, edge_types, depth)
+            impact = analyzer.impact_analysis(resolved_node, edge_types, depth)
+            if include_callsites and isinstance(impact, dict):
+                # Gather incoming CALLS for the node to provide callsites
+                calls = analyzer.get_neighbors(
+                    node_id=resolved_node,
+                    direction="in",
+                    edge_types=["CALLS"],
+                    max_depth=1,
+                )
+                neighbor_calls = []
+                for depth, neighs in calls.get("neighbors_by_depth", {}).items():
+                    for n in neighs:
+                        if _skip_path(n.get("file")):
+                            continue
+                        neighbor_calls.append(
+                            {"name": n.get("name"), "file": n.get("file")}
+                        )
+                impact["callsites"] = neighbor_calls[:max_callsites]
+                if include_neighbors:
+                    impact["neighbors"] = {
+                        "edge_types": neighbors_edge_types or ["CALLS"],
+                        "limit": neighbors_limit,
+                    }
+            return impact
 
         elif mode == "subgraph":
             if not resolved_node:
@@ -1375,7 +1592,7 @@ async def graph(
         elif mode == "find":
             if not query:
                 return {"error": "query parameter required for 'find' mode"}
-            return analyzer.find_symbols(
+            found = analyzer.find_symbols(
                 query=query,
                 node_type=node_type,
                 file_pattern=file,
@@ -1383,6 +1600,31 @@ async def graph(
                 edge_types=edge_types,
                 limit=top_k,
             )
+            if isinstance(found, dict) and "matches" in found:
+                filtered = []
+                for m in found["matches"]:
+                    if _skip_path(m.get("file")):
+                        continue
+                    if include_callsites and m.get("name"):
+                        # Add nearby callsites if available via neighbors
+                        calls = analyzer.get_neighbors(
+                            node_id=m["node_id"] if "node_id" in m else m.get("name", ""),
+                            direction="in",
+                            edge_types=["CALLS"],
+                            max_depth=1,
+                        )
+                        neighbor_calls = []
+                        for depth, neighs in calls.get("neighbors_by_depth", {}).items():
+                            for n in neighs:
+                                if _skip_path(n.get("file")):
+                                    continue
+                                neighbor_calls.append(
+                                    {"name": n.get("name"), "file": n.get("file")}
+                                )
+                        m["callsites"] = neighbor_calls[:max_callsites]
+                    filtered.append(m)
+                found["matches"] = filtered
+            return found
 
         elif mode == "file_deps":
             if not file:
@@ -1403,39 +1645,212 @@ async def graph(
             granularity: Literal["file", "package"] = "file"
             if file and file in ("package", "packages", "directory", "dir"):
                 granularity = "package"
+            weighted_edges = edge_types
+            if runtime_weighted and not edge_types:
+                weighted_edges = ["CALLS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
+            module_results = []
+            module_to_nodes, outgoing_modules, incoming_modules = analyzer._build_module_graph(
+                granularity, weighted_edges
+            )
+            # Build node->module map
+            node_to_module: Dict[str, str] = {}
+            for mod, nodes in module_to_nodes.items():
+                for nid in nodes:
+                    node_to_module[nid] = mod
+
+            # Aggregate edge counts per module by edge type
+            module_edge_counts: Dict[str, Dict[str, int]] = defaultdict(
+                lambda: {
+                    "calls_in": 0,
+                    "calls_out": 0,
+                    "refs_in": 0,
+                    "refs_out": 0,
+                    "imports": 0,
+                    "inherits": 0,
+                    "implements": 0,
+                    "composed_of": 0,
+                }
+            )
+            for src_id, edges in analyzer.outgoing.items():
+                src_mod = node_to_module.get(src_id)
+                if not src_mod or _skip_path(src_mod):
+                    continue
+                for dst_id, etype, _w in edges:
+                    dst_mod = node_to_module.get(dst_id)
+                    if not dst_mod or src_mod == dst_mod or _skip_path(dst_mod):
+                        continue
+                    if etype == "CALLS" and include_calls:
+                        module_edge_counts[src_mod]["calls_out"] += 1
+                        module_edge_counts[dst_mod]["calls_in"] += 1
+                    elif etype == "REFERENCES" and include_refs:
+                        module_edge_counts[src_mod]["refs_out"] += 1
+                        module_edge_counts[dst_mod]["refs_in"] += 1
+                    elif etype == "IMPORTS":
+                        module_edge_counts[src_mod]["imports"] += 1
+                    elif etype == "INHERITS":
+                        module_edge_counts[src_mod]["inherits"] += 1
+                    elif etype == "IMPLEMENTS":
+                        module_edge_counts[src_mod]["implements"] += 1
+                    elif etype == "COMPOSED_OF":
+                        module_edge_counts[src_mod]["composed_of"] += 1
+            for r in analyzer.module_pagerank(
+                granularity=granularity,
+                edge_types=weighted_edges,
+                top_k=top_k,
+            ):
+                module_name = r.get("module")
+                if _skip_path(module_name):
+                    continue
+                in_edges = sum(incoming_modules.get(module_name, {}).values())
+                out_edges = sum(outgoing_modules.get(module_name, {}).values())
+                # Merge aggregated counts with aggregate totals
+                edge_counts = module_edge_counts.get(module_name, {}).copy()
+                edge_counts["imports"] = out_edges  # keep imports total
+                edge_counts.setdefault("calls_in", 0)
+                edge_counts.setdefault("calls_out", 0)
+                edge_counts.setdefault("refs_in", 0)
+                edge_counts.setdefault("refs_out", 0)
+                edge_counts.setdefault("inherits", 0)
+                edge_counts.setdefault("implements", 0)
+                edge_counts.setdefault("composed_of", 0)
+                # Collect callsites (representative nodes in module)
+                callsites = []
+                if include_callsites_modules and module_name in module_to_nodes:
+                    for node_id in list(module_to_nodes[module_name])[: int(max_callsites_modules) * 2]:
+                        for src, et, _w in analyzer.incoming.get(node_id, []):
+                            if et == "CALLS":
+                                src_node = analyzer.nodes.get(src)
+                                if src_node and not _skip_path(src_node.file):
+                                    callsites.append({"name": src_node.name, "file": src_node.file})
+                        if len(callsites) >= int(max_callsites_modules):
+                            break
+
+                r["edge_counts"] = edge_counts
+                if callsites:
+                    r["callsites"] = callsites[:max_callsites_modules]
+                module_results.append(r)
+            if structured:
+                return {
+                    "mode": "module_pagerank",
+                    "granularity": granularity,
+                    "description": "Architectural importance at module level (avoids utility function bias)",
+                    "modules": module_results if include_modules else [],
+                    "symbols": [] if include_symbols else [],
+                }
             return {
                 "mode": "module_pagerank",
                 "granularity": granularity,
                 "description": "Architectural importance at module level (avoids utility function bias)",
-                "results": analyzer.module_pagerank(
-                    granularity=granularity,
-                    edge_types=edge_types,
-                    top_k=top_k,
-                ),
+                "results": module_results,
             }
 
         elif mode == "module_centrality":
             granularity = "file"
             if file and file in ("package", "packages", "directory", "dir"):
                 granularity = "package"
+            weighted_edges = edge_types
+            if runtime_weighted and not edge_types:
+                weighted_edges = ["CALLS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
+            module_results = []
+            module_to_nodes, outgoing_modules, incoming_modules = analyzer._build_module_graph(
+                granularity, weighted_edges
+            )
+            node_to_module: Dict[str, str] = {}
+            for mod, nodes in module_to_nodes.items():
+                for nid in nodes:
+                    node_to_module[nid] = mod
+            module_edge_counts: Dict[str, Dict[str, int]] = defaultdict(
+                lambda: {
+                    "calls_in": 0,
+                    "calls_out": 0,
+                    "refs_in": 0,
+                    "refs_out": 0,
+                    "imports": 0,
+                    "inherits": 0,
+                    "implements": 0,
+                    "composed_of": 0,
+                }
+            )
+            for src_id, edges in analyzer.outgoing.items():
+                src_mod = node_to_module.get(src_id)
+                if not src_mod or _skip_path(src_mod):
+                    continue
+                for dst_id, etype, _w in edges:
+                    dst_mod = node_to_module.get(dst_id)
+                    if not dst_mod or src_mod == dst_mod or _skip_path(dst_mod):
+                        continue
+                    if etype == "CALLS" and include_calls:
+                        module_edge_counts[src_mod]["calls_out"] += 1
+                        module_edge_counts[dst_mod]["calls_in"] += 1
+                    elif etype == "REFERENCES" and include_refs:
+                        module_edge_counts[src_mod]["refs_out"] += 1
+                        module_edge_counts[dst_mod]["refs_in"] += 1
+                    elif etype == "IMPORTS":
+                        module_edge_counts[src_mod]["imports"] += 1
+                    elif etype == "INHERITS":
+                        module_edge_counts[src_mod]["inherits"] += 1
+                    elif etype == "IMPLEMENTS":
+                        module_edge_counts[src_mod]["implements"] += 1
+                    elif etype == "COMPOSED_OF":
+                        module_edge_counts[src_mod]["composed_of"] += 1
+            for r in analyzer.module_centrality(
+                granularity=granularity,
+                edge_types=weighted_edges,
+                top_k=top_k,
+            ):
+                module_name = r.get("module")
+                if _skip_path(module_name):
+                    continue
+                in_edges = sum(incoming_modules.get(module_name, {}).values())
+                out_edges = sum(outgoing_modules.get(module_name, {}).values())
+                edge_counts = module_edge_counts.get(module_name, {}).copy()
+                edge_counts["imports"] = out_edges
+                edge_counts.setdefault("calls_in", 0)
+                edge_counts.setdefault("calls_out", 0)
+                edge_counts.setdefault("refs_in", 0)
+                edge_counts.setdefault("refs_out", 0)
+                edge_counts.setdefault("inherits", 0)
+                edge_counts.setdefault("implements", 0)
+                edge_counts.setdefault("composed_of", 0)
+                callsites = []
+                if include_callsites_modules and module_name in module_to_nodes:
+                    for node_id in list(module_to_nodes[module_name])[: int(max_callsites_modules) * 2]:
+                        for src, et, _w in analyzer.incoming.get(node_id, []):
+                            if et == "CALLS":
+                                src_node = analyzer.nodes.get(src)
+                                if src_node and not _skip_path(src_node.file):
+                                    callsites.append(
+                                        {"name": src_node.name, "file": src_node.file, "line": src_node.line}
+                                    )
+                        if len(callsites) >= int(max_callsites_modules):
+                            break
+                r["edge_counts"] = edge_counts
+                if callsites:
+                    r["callsites"] = callsites[:max_callsites_modules]
+                module_results.append(r)
+            if structured:
+                return {
+                    "mode": "module_centrality",
+                    "granularity": granularity,
+                    "description": "Most connected modules (hub detection)",
+                    "modules": module_results if include_modules else [],
+                    "symbols": [] if include_symbols else [],
+                }
             return {
                 "mode": "module_centrality",
                 "granularity": granularity,
                 "description": "Most connected modules (hub detection)",
-                "results": analyzer.module_centrality(
-                    granularity=granularity,
-                    edge_types=edge_types,
-                    top_k=top_k,
-                ),
+                "results": module_results,
             }
 
         elif mode == "call_flow":
-            if not file:
+            source_module = file or source
+            if not source_module:
                 return {"error": "file parameter required for 'call_flow' mode (source module)"}
             granularity = "file"
             # Use node as target if provided
             return analyzer.call_flow(
-                source_module=file,
+                source_module=source_module,
                 target_module=node,
                 granularity=granularity,
                 edge_types=edge_types,

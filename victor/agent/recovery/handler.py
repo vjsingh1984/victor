@@ -167,7 +167,7 @@ class RecoveryHandler:
         tool_calls: Optional[List[Dict[str, Any]]] = None,
         mentioned_tools: Optional[List[str]] = None,
         elapsed_time: float = 0.0,
-        session_time_limit: float = 240.0,
+        session_idle_timeout: float = 180.0,
         quality_score: float = 0.5,
         consecutive_failures: int = 0,
         recent_responses: Optional[List[str]] = None,
@@ -182,7 +182,7 @@ class RecoveryHandler:
             tool_calls: Tool calls made
             mentioned_tools: Tools mentioned but not called
             elapsed_time: Session elapsed time
-            session_time_limit: Session time limit
+            session_idle_timeout: Session time limit
             quality_score: Response quality score
             consecutive_failures: Count of consecutive failures
             recent_responses: Recent responses for loop detection
@@ -207,7 +207,7 @@ class RecoveryHandler:
             tool_calls=tool_calls,
             mentioned_tools=mentioned_tools,
             elapsed_time=elapsed_time,
-            session_time_limit=session_time_limit,
+            session_idle_timeout=session_idle_timeout,
             quality_score=quality_score,
             consecutive_failures=consecutive_failures,
             recent_responses=recent_responses,
@@ -225,7 +225,7 @@ class RecoveryHandler:
         iteration_count: int = 0,
         max_iterations: int = 50,
         elapsed_time: float = 0.0,
-        session_time_limit: float = 240.0,
+        session_idle_timeout: float = 180.0,
         current_temperature: float = 0.7,
         consecutive_failures: int = 0,
         mentioned_tools: Optional[List[str]] = None,
@@ -277,7 +277,7 @@ class RecoveryHandler:
             iteration_count=iteration_count,
             max_iterations=max_iterations,
             elapsed_time=elapsed_time,
-            session_time_limit=session_time_limit,
+            session_idle_timeout=session_idle_timeout,
             current_temperature=current_temperature,
             consecutive_failures=consecutive_failures,
             mentioned_tools=mentioned_tools,

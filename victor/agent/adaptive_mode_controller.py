@@ -578,19 +578,50 @@ class AdaptiveModeController:
         "general": 8,
     }
 
+    # Provider-aware iteration thresholds for loop detection
+    # Reasoning models (DeepSeek, o1) need more iterations before being considered stuck
+    # Efficient models (Claude, GPT-4, Grok) can be detected as stuck earlier
+    PROVIDER_ITERATION_THRESHOLDS = {
+        "deepseek": {"min_iterations_before_loop": 5, "no_tool_threshold": 3},
+        "anthropic": {"min_iterations_before_loop": 3, "no_tool_threshold": 2},
+        "openai": {"min_iterations_before_loop": 3, "no_tool_threshold": 2},
+        "xai": {"min_iterations_before_loop": 3, "no_tool_threshold": 2},
+        "google": {"min_iterations_before_loop": 4, "no_tool_threshold": 2},
+        "ollama": {"min_iterations_before_loop": 4, "no_tool_threshold": 3},
+        "default": {"min_iterations_before_loop": 3, "no_tool_threshold": 2},
+    }
+
+    # Provider-aware quality thresholds
+    # Reasoning models may produce lower scores due to verbose explanations
+    PROVIDER_QUALITY_THRESHOLDS = {
+        "deepseek": {"min_quality": 0.65, "grounding_threshold": 0.60},
+        "anthropic": {"min_quality": 0.75, "grounding_threshold": 0.70},
+        "openai": {"min_quality": 0.75, "grounding_threshold": 0.70},
+        "xai": {"min_quality": 0.75, "grounding_threshold": 0.70},
+        "google": {"min_quality": 0.70, "grounding_threshold": 0.65},
+        "ollama": {"min_quality": 0.65, "grounding_threshold": 0.60},
+        "default": {"min_quality": 0.70, "grounding_threshold": 0.65},
+    }
+
     def __init__(
         self,
         profile_name: str = "default",
         q_store: Optional[QLearningStore] = None,
+        provider_name: Optional[str] = None,
+        provider_adapter: Optional[Any] = None,
     ):
         """Initialize the adaptive mode controller.
 
         Args:
             profile_name: Profile name for tracking
             q_store: Optional Q-learning store (creates one if not provided)
+            provider_name: Provider name for provider-aware thresholds (e.g., "deepseek", "anthropic")
+            provider_adapter: Optional provider adapter for capability-based thresholds
         """
         self.profile_name = profile_name
         self._q_store = q_store or QLearningStore()
+        self._provider_name = self._normalize_provider_name(provider_name)
+        self._provider_adapter = provider_adapter
 
         # Current state tracking
         self._current_state: Optional[ModeState] = None
@@ -601,6 +632,82 @@ class AdaptiveModeController:
         self._session_start = datetime.now()
         self._mode_history: List[Tuple[AgentMode, datetime]] = []
         self._total_reward = 0.0
+
+        # Consecutive no-tool iterations tracking for loop detection
+        self._no_tool_iterations = 0
+
+    def _normalize_provider_name(self, provider_name: Optional[str]) -> str:
+        """Normalize provider name for threshold lookup.
+
+        Args:
+            provider_name: Raw provider name (may include model info)
+
+        Returns:
+            Normalized provider key for threshold lookup
+        """
+        if not provider_name:
+            return "default"
+
+        # Extract base provider from full names like "deepseek:deepseek-chat"
+        provider = provider_name.lower().split(":")[0].strip()
+
+        # Map common variations
+        provider_map = {
+            "deepseek": "deepseek",
+            "anthropic": "anthropic",
+            "claude": "anthropic",
+            "openai": "openai",
+            "gpt": "openai",
+            "xai": "xai",
+            "grok": "xai",
+            "google": "google",
+            "gemini": "google",
+            "ollama": "ollama",
+            "lmstudio": "ollama",  # Treat LMStudio similar to Ollama
+            "vllm": "ollama",
+        }
+
+        return provider_map.get(provider, "default")
+
+    def get_iteration_thresholds(self) -> Dict[str, int]:
+        """Get provider-specific iteration thresholds for loop detection.
+
+        Returns:
+            Dict with 'min_iterations_before_loop' and 'no_tool_threshold'
+        """
+        return self.PROVIDER_ITERATION_THRESHOLDS.get(
+            self._provider_name,
+            self.PROVIDER_ITERATION_THRESHOLDS["default"]
+        )
+
+    def get_quality_thresholds(self) -> Dict[str, float]:
+        """Get provider-specific quality thresholds.
+
+        Returns:
+            Dict with 'min_quality' and 'grounding_threshold'
+        """
+        # Use provider adapter's capabilities if available
+        if self._provider_adapter:
+            caps = self._provider_adapter.capabilities
+            return {
+                "min_quality": caps.quality_threshold,
+                "grounding_threshold": caps.grounding_strictness,
+            }
+
+        # Fall back to hardcoded provider-specific thresholds
+        return self.PROVIDER_QUALITY_THRESHOLDS.get(
+            self._provider_name,
+            self.PROVIDER_QUALITY_THRESHOLDS["default"]
+        )
+
+    def set_provider(self, provider_name: str) -> None:
+        """Update the provider for threshold selection.
+
+        Args:
+            provider_name: New provider name
+        """
+        self._provider_name = self._normalize_provider_name(provider_name)
+        logger.debug(f"[AdaptiveModeController] Provider set to: {self._provider_name}")
 
     def get_recommended_action(
         self,
@@ -954,12 +1061,27 @@ class AdaptiveModeController:
         quality_score: float,
         iteration_count: int,
         iteration_budget: int,
+        current_tool_calls: int = 0,
     ) -> Tuple[bool, str]:
         """Determine if the agent should continue or stop.
+
+        Uses provider-aware thresholds for better loop detection.
+
+        Args:
+            tool_calls_made: Total tool calls made in session
+            tool_budget: Tool budget limit
+            quality_score: Current quality score (0-1)
+            iteration_count: Current iteration count
+            iteration_budget: Iteration budget limit
+            current_tool_calls: Tool calls made in current iteration (for loop detection)
 
         Returns:
             Tuple of (should_continue, reason)
         """
+        # Get provider-specific thresholds
+        iter_thresholds = self.get_iteration_thresholds()
+        quality_thresholds = self.get_quality_thresholds()
+
         # Hard limits
         if tool_calls_made >= tool_budget:
             return False, "Tool budget exhausted"
@@ -967,9 +1089,18 @@ class AdaptiveModeController:
         if iteration_count >= iteration_budget:
             return False, "Iteration budget exhausted"
 
-        # Quality threshold
-        if quality_score > 0.85:
-            return False, "High quality achieved"
+        # Provider-aware quality threshold
+        quality_threshold = quality_thresholds.get("min_quality", 0.70)
+        if quality_score > quality_threshold + 0.15:  # High quality achieved
+            return False, f"High quality achieved ({quality_score:.2f} > {quality_threshold + 0.15:.2f})"
+
+        # Provider-aware loop detection
+        loop_detected, loop_reason = self.check_loop_detection(
+            iteration_count=iteration_count,
+            current_tool_calls=current_tool_calls,
+        )
+        if loop_detected:
+            return False, loop_reason
 
         # Check for patterns suggesting completion
         if self._current_state:
@@ -983,6 +1114,48 @@ class AdaptiveModeController:
                     return False, "Learned pattern suggests completion"
 
         return True, "Continue processing"
+
+    def check_loop_detection(
+        self,
+        iteration_count: int,
+        current_tool_calls: int,
+    ) -> Tuple[bool, str]:
+        """Check for stuck continuation loops using provider-aware thresholds.
+
+        Args:
+            iteration_count: Current iteration count
+            current_tool_calls: Tool calls made in current iteration
+
+        Returns:
+            Tuple of (is_stuck, reason)
+        """
+        iter_thresholds = self.get_iteration_thresholds()
+        min_iterations = iter_thresholds.get("min_iterations_before_loop", 3)
+        no_tool_threshold = iter_thresholds.get("no_tool_threshold", 2)
+
+        # Track consecutive no-tool iterations
+        if current_tool_calls == 0:
+            self._no_tool_iterations += 1
+        else:
+            self._no_tool_iterations = 0
+
+        # Check if stuck: past minimum iterations and no progress
+        if iteration_count >= min_iterations and self._no_tool_iterations >= no_tool_threshold:
+            logger.warning(
+                f"[AdaptiveModeController] Loop detected for {self._provider_name}: "
+                f"{self._no_tool_iterations} consecutive iterations with no tool calls "
+                f"(threshold: {no_tool_threshold}, provider: {self._provider_name})"
+            )
+            return True, (
+                f"Stuck continuation loop detected: {self._no_tool_iterations} iterations "
+                f"with no tool calls (provider threshold: {no_tool_threshold})"
+            )
+
+        return False, ""
+
+    def reset_loop_tracking(self) -> None:
+        """Reset loop detection tracking for a new conversation."""
+        self._no_tool_iterations = 0
 
     def get_session_stats(self) -> Dict[str, Any]:
         """Get statistics for the current session."""

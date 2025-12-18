@@ -43,6 +43,7 @@ class StreamingChatContext:
 
     # Timing
     start_time: float = field(default_factory=time.time)
+    last_activity_time: float = field(default_factory=time.time)
 
     # Metrics
     stream_metrics: StreamMetrics = field(default_factory=StreamMetrics)
@@ -112,8 +113,20 @@ class StreamingChatContext:
     unique_resources: Set[str] = field(default_factory=set)
 
     def elapsed_time(self) -> float:
-        """Get elapsed time since session start."""
+        """Get idle time since last activity (provider response or tool execution)."""
+        return time.time() - self.last_activity_time
+
+    def total_session_time(self) -> float:
+        """Get total elapsed time since session start."""
         return time.time() - self.start_time
+
+    def reset_activity_timer(self) -> None:
+        """Reset the activity timer to current time.
+
+        Should be called whenever the provider/model responds or a tool executes,
+        to prevent idle timeout during active work.
+        """
+        self.last_activity_time = time.time()
 
     def increment_iteration(self) -> int:
         """Increment and return the iteration count."""
@@ -121,7 +134,11 @@ class StreamingChatContext:
         return self.total_iterations
 
     def is_over_time_limit(self, limit_seconds: float) -> bool:
-        """Check if session has exceeded time limit."""
+        """Check if session has exceeded idle time limit.
+
+        This checks time since last activity (provider response or tool execution),
+        not total session time. This prevents timeout during active work.
+        """
         return self.elapsed_time() > limit_seconds
 
     def is_over_iteration_limit(self) -> bool:

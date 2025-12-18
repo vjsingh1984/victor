@@ -369,6 +369,46 @@ class OpenAIProvider(BaseProvider):
                 raw_error=error,
             )
 
+    async def list_models(self) -> List[Dict[str, Any]]:
+        """List available OpenAI models.
+
+        Queries the OpenAI API to get available models, filtered to chat-capable models.
+
+        Returns:
+            List of available models with metadata
+
+        Raises:
+            ProviderError: If request fails
+        """
+        try:
+            response = await self.client.models.list()
+            # Filter to GPT models and format consistently
+            models = []
+            for model in response.data:
+                model_id = model.id
+                # Filter to chat-capable GPT models
+                if any(
+                    prefix in model_id
+                    for prefix in ["gpt-4", "gpt-3.5", "o1", "o3", "chatgpt"]
+                ):
+                    models.append(
+                        {
+                            "id": model_id,
+                            "name": model_id,
+                            "owned_by": model.owned_by,
+                            "created": model.created,
+                        }
+                    )
+            # Sort by name for consistent output
+            models.sort(key=lambda x: x["id"])
+            return models
+        except Exception as e:
+            raise ProviderError(
+                message=f"Failed to list models: {str(e)}",
+                provider=self.name,
+                raw_error=e,
+            ) from e
+
     async def close(self) -> None:
         """Close HTTP client."""
         await self.client.close()

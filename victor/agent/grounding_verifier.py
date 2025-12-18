@@ -45,7 +45,10 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from victor.protocols.provider_adapter import IProviderAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +139,8 @@ class VerifierConfig:
         max_files_to_check: Limit file checks for performance
         ignore_patterns: Path patterns to ignore
         strict_mode: Fail on any issue (not just severe ones)
+        skip_generated_code: Skip verification for code that appears to be newly generated
+        generated_code_patterns: Patterns indicating generated code (test files, etc.)
     """
 
     min_confidence: float = 0.7
@@ -155,6 +160,16 @@ class VerifierConfig:
         ]
     )
     strict_mode: bool = False
+    skip_generated_code: bool = True  # Skip verification for generated code
+    generated_code_patterns: List[str] = field(
+        default_factory=lambda: [
+            r"test_\w+\.py",  # Test files being created
+            r"tests?/",  # Test directories
+            r"conftest\.py",  # Pytest fixtures
+            r"_test\.py$",  # Alternative test naming
+            r"spec\.py$",  # Spec files
+        ]
+    )
 
 
 class GroundingVerifier:
@@ -195,17 +210,34 @@ class GroundingVerifier:
         self,
         project_root: Optional[str] = None,
         config: Optional[VerifierConfig] = None,
+        provider_adapter: Optional["IProviderAdapter"] = None,
     ):
         """Initialize the grounding verifier.
 
         Args:
             project_root: Root directory of the project to verify against
             config: Verification configuration
+            provider_adapter: Provider adapter for provider-specific grounding settings
         """
         self.project_root = Path(project_root) if project_root else Path.cwd()
+
+        # Use provider-specific grounding settings if available
+        if provider_adapter and config is None:
+            caps = provider_adapter.capabilities
+            config = VerifierConfig(
+                min_confidence=caps.grounding_strictness,
+                strict_mode=caps.grounding_required,
+            )
+            logger.debug(
+                f"GroundingVerifier using provider-specific settings: "
+                f"min_confidence={caps.grounding_strictness}, "
+                f"strict_mode={caps.grounding_required}"
+            )
+
         self.config = config or VerifierConfig()
         self._file_cache: Dict[str, str] = {}
         self._existing_files: Optional[Set[str]] = None
+        self._provider_adapter = provider_adapter
         logger.debug(
             f"GroundingVerifier initialized with project_root={self.project_root}"
         )
@@ -392,11 +424,51 @@ class GroundingVerifier:
                 )
                 result.unverified_references.append(path)
 
+    def _is_generated_code_context(self, context: Optional[Dict[str, Any]]) -> bool:
+        """Check if the context indicates code generation task.
+
+        Args:
+            context: Verification context
+
+        Returns:
+            True if this appears to be a code generation task
+        """
+        if not context:
+            return False
+
+        # Check for explicit code generation indicators
+        task_type = context.get("task_type", "").lower()
+        if task_type in ("code_generation", "create", "create_simple", "test", "testing"):
+            return True
+
+        # Check for test creation task
+        query = context.get("query", "").lower()
+        test_keywords = ["create test", "write test", "pytest", "test suite", "generate test"]
+        if any(kw in query for kw in test_keywords):
+            return True
+
+        return False
+
+    def _is_generated_code_path(self, path: str) -> bool:
+        """Check if a file path matches generated code patterns.
+
+        Args:
+            path: File path to check
+
+        Returns:
+            True if path matches a generated code pattern
+        """
+        for pattern in self.config.generated_code_patterns:
+            if re.search(pattern, path):
+                return True
+        return False
+
     async def verify_code_snippets(
         self,
         snippets: List[Dict[str, Any]],
         file_paths: List[str],
         result: VerificationResult,
+        is_code_generation: bool = False,
     ) -> None:
         """Verify code snippets match actual file content.
 
@@ -404,9 +476,20 @@ class GroundingVerifier:
             snippets: Code snippets to verify
             file_paths: Referenced file paths
             result: Verification result to update
+            is_code_generation: True if this is a code generation task
         """
         for snippet in snippets:
             code = snippet["code"]
+
+            # Skip verification for code generation tasks if configured
+            if self.config.skip_generated_code and is_code_generation:
+                logger.debug(
+                    f"[GroundingVerifier] Skipping verification for generated code snippet"
+                )
+                result.metadata["skipped_generated_snippets"] = (
+                    result.metadata.get("skipped_generated_snippets", 0) + 1
+                )
+                continue
 
             # Try to find this code in referenced files
             found = False
@@ -418,6 +501,17 @@ class GroundingVerifier:
                     break
 
             if not found:
+                # Check if code looks like it's for a test file (generated)
+                if self._looks_like_generated_test(code):
+                    # Skip or use very low severity for test code
+                    logger.debug(
+                        f"[GroundingVerifier] Code looks like generated test - skipping issue"
+                    )
+                    result.metadata["skipped_test_snippets"] = (
+                        result.metadata.get("skipped_test_snippets", 0) + 1
+                    )
+                    continue
+
                 # Check if it looks like fabricated content
                 if self._looks_fabricated(code):
                     result.add_issue(
@@ -440,6 +534,35 @@ class GroundingVerifier:
                             context="May be a new code suggestion",
                         )
                     )
+
+    def _looks_like_generated_test(self, code: str) -> bool:
+        """Check if code looks like a generated test file.
+
+        Args:
+            code: Code snippet to check
+
+        Returns:
+            True if code appears to be test code
+        """
+        # Test file indicators
+        test_indicators = [
+            r"^import pytest",
+            r"^from pytest import",
+            r"def test_\w+",
+            r"class Test\w+",
+            r"@pytest\.",
+            r"@mock\.",
+            r"@patch\(",
+            r"assert\s+\w+",
+            r"mock\.\w+",
+            r"fixture",
+        ]
+
+        for pattern in test_indicators:
+            if re.search(pattern, code, re.MULTILINE):
+                return True
+
+        return False
 
     def _code_matches(self, snippet: str, content: str) -> bool:
         """Check if a code snippet matches file content.
@@ -602,6 +725,16 @@ class GroundingVerifier:
 
         context = context or {}
 
+        # Check if this is a code generation context
+        is_code_generation = self._is_generated_code_context(context)
+        result.metadata["is_code_generation"] = is_code_generation
+
+        if is_code_generation and self.config.skip_generated_code:
+            logger.debug(
+                "[GroundingVerifier] Code generation context detected - using relaxed verification"
+            )
+            result.metadata["verification_mode"] = "relaxed"
+
         # Extract references
         file_paths = self.extract_file_references(response)
         code_snippets = self.extract_code_snippets(response)
@@ -616,15 +749,31 @@ class GroundingVerifier:
             file_paths.extend(context["files_read"])
         file_paths = list(set(file_paths))
 
+        # Filter out generated code paths from verification
+        if self.config.skip_generated_code:
+            original_count = len(file_paths)
+            file_paths = [p for p in file_paths if not self._is_generated_code_path(p)]
+            if len(file_paths) < original_count:
+                result.metadata["skipped_generated_paths"] = original_count - len(file_paths)
+
         # Run verifications
         if self.config.verify_file_paths and file_paths:
             await self.verify_file_paths(file_paths, result)
 
         if self.config.verify_code_snippets and code_snippets:
-            await self.verify_code_snippets(code_snippets, file_paths, result)
+            await self.verify_code_snippets(
+                code_snippets, file_paths, result, is_code_generation=is_code_generation
+            )
 
         if self.config.verify_symbols and symbols:
-            await self.verify_symbols(symbols, file_paths, result)
+            # Skip symbol verification for code generation tasks
+            if not is_code_generation:
+                await self.verify_symbols(symbols, file_paths, result)
+            else:
+                result.metadata["skipped_symbol_verification"] = True
+                logger.debug(
+                    "[GroundingVerifier] Skipping symbol verification for code generation task"
+                )
 
         # Determine if grounded based on confidence
         result.is_grounded = result.confidence >= self.config.min_confidence
@@ -635,7 +784,8 @@ class GroundingVerifier:
 
         logger.debug(
             f"Grounding verification: confidence={result.confidence:.2f}, "
-            f"issues={len(result.issues)}, is_grounded={result.is_grounded}"
+            f"issues={len(result.issues)}, is_grounded={result.is_grounded}, "
+            f"code_generation={is_code_generation}"
         )
 
         return result

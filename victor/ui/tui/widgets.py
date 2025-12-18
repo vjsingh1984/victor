@@ -7,14 +7,14 @@ for the modern chat interface.
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional
 
 from rich.markdown import Markdown
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Input, Label, Static, RichLog
+from textual.widgets import Label, Static, RichLog, TextArea
+from textual.message import Message
 
 if TYPE_CHECKING:
     pass
@@ -41,10 +41,10 @@ def _get_input_history_from_db(limit: int = 100) -> List[str]:
                 WHERE role = 'user'
                   AND content IS NOT NULL
                   AND content != ''
-                  AND LENGTH(content) < 2000  -- Skip very long messages
-                  AND content NOT LIKE '<TOOL_OUTPUT%'  -- Filter tool outputs
-                  AND content NOT LIKE '<%'  -- Filter XML-like tags
-                  AND content NOT LIKE '{%'  -- Filter JSON blobs
+                  AND LENGTH(content) < 4000  # Skip very long messages
+                  AND content NOT LIKE '<TOOL_OUTPUT%'  # Filter tool outputs
+                  AND content NOT LIKE '<%'  # Filter XML-like tags
+                  AND content NOT LIKE '{%'  # Filter JSON blobs
                 ORDER BY timestamp DESC
                 LIMIT ?
                 """,
@@ -65,34 +65,7 @@ class StatusBar(Static):
     helpful keyboard shortcuts.
     """
 
-    DEFAULT_CSS = """
-    StatusBar {
-        dock: top;
-        height: 3;
-        background: #1e1e2e;
-        color: #cdd6f4;
-        padding: 0 2;
-    }
-
-    StatusBar .status-content {
-        width: 100%;
-        height: 100%;
-        align: center middle;
-    }
-
-    StatusBar .provider-info {
-        color: #a6adc8;
-    }
-
-    StatusBar .model-info {
-        color: #bac2de;
-    }
-
-    StatusBar .shortcuts {
-        color: #6c7086;
-        text-align: right;
-    }
-    """
+    DEFAULT_CSS = ""
 
     def __init__(
         self,
@@ -108,20 +81,20 @@ class StatusBar(Static):
         with Horizontal(classes="status-content"):
             yield Label(
                 Text.assemble(
-                    ("Victor ", "bold #89b4fa"),
-                    ("| ", "#6c7086"),
-                    (f"{self.provider}", "#a6adc8"),
-                    (" / ", "#6c7086"),
-                    (f"{self.model}", "#cdd6f4"),
+                    ("Victor ", "bold #7cb7ff"),
+                    "| ",
+                    (f"{self.provider}", ""),
+                    (" / ", ""),
+                    (f"{self.model}", "bold"),
                 ),
                 classes="provider-info",
             )
             yield Label(
                 Text.assemble(
-                    ("Ctrl+C", "bold #cdd6f4"),
-                    (" exit  ", "#6c7086"),
-                    ("Enter", "bold #cdd6f4"),
-                    (" send", "#6c7086"),
+                    ("Ctrl+C", "bold"),
+                    " exit  ",
+                    ("Ctrl+Enter", "bold"),
+                    " send",
                 ),
                 classes="shortcuts",
             )
@@ -130,6 +103,14 @@ class StatusBar(Static):
         """Update provider and model display."""
         self.provider = provider
         self.model = model
+        provider_label = self.query_one(".provider-info")
+        provider_label.update(Text.assemble(
+            ("Victor ", "bold #7cb7ff"),
+            "| ",
+            (f"{self.provider}", ""),
+            (" / ", ""),
+            (f"{self.model}", "bold"),
+        ))
         self.refresh()
 
 
@@ -140,44 +121,7 @@ class MessageWidget(Static):
     styling and markdown rendering for assistant responses.
     """
 
-    DEFAULT_CSS = """
-    MessageWidget {
-        width: 100%;
-        padding: 1 2;
-        margin: 1 0;
-    }
-
-    MessageWidget.user {
-        background: #313244;
-        border: round #45475a;
-    }
-
-    MessageWidget.assistant {
-        background: #1e1e2e;
-        border: round #313244;
-    }
-
-    MessageWidget.system {
-        background: #313244;
-        border: round #585b70;
-        text-style: italic;
-    }
-
-    MessageWidget.error {
-        background: #302030;
-        border: round #f38ba8;
-    }
-
-    MessageWidget .message-header {
-        height: 1;
-        margin-bottom: 1;
-        color: #6c7086;
-    }
-
-    MessageWidget .message-content {
-        width: 100%;
-    }
-    """
+    DEFAULT_CSS = ""
 
     def __init__(
         self,
@@ -198,18 +142,11 @@ class MessageWidget(Static):
             "error": "Error",
         }.get(self.role, self.role.title())
 
-        role_color = {
-            "user": "#a6e3a1",  # Soft green
-            "assistant": "#89b4fa",  # Soft blue
-            "system": "#a6adc8",  # Neutral gray
-            "error": "#f38ba8",  # Soft red
-        }.get(self.role, "#cdd6f4")
+        header = Label(role_label, classes="message-header")
+        header.add_class(self.role)
 
         with Vertical():
-            yield Label(
-                Text(f"{role_label}", style=f"bold {role_color}"),
-                classes="message-header",
-            )
+            yield header
             if self.role == "assistant":
                 yield Static(Markdown(self.content), classes="message-content")
             else:
@@ -232,15 +169,7 @@ class ConversationLog(RichLog):
     for streaming responses.
     """
 
-    DEFAULT_CSS = """
-    ConversationLog {
-        height: 1fr;
-        border: round #313244;
-        background: #11111b;
-        padding: 1 2;
-        scrollbar-gutter: stable;
-    }
-    """
+    DEFAULT_CSS = ""
 
     def __init__(self, **kwargs) -> None:
         super().__init__(
@@ -254,30 +183,30 @@ class ConversationLog(RichLog):
 
     def add_user_message(self, content: str) -> None:
         """Add a user message to the log."""
-        self.write(Text())  # Spacing
-        self.write(Text("You", style="bold #a6e3a1"))  # Soft green
+        self.write(Text())
+        self.write(Text("You", style="bold green"))
         self.write(Text(content))
-        self.write(Text())  # Spacing
+        self.write(Text())
 
     def add_assistant_message(self, content: str) -> None:
         """Add an assistant message to the log."""
-        self.write(Text())  # Spacing
-        self.write(Text("Victor", style="bold #89b4fa"))  # Soft blue
+        self.write(Text())
+        self.write(Text("Victor", style="bold blue"))
         self.write(Markdown(content))
-        self.write(Text())  # Spacing
+        self.write(Text())
 
     def add_system_message(self, content: str) -> None:
         """Add a system/status message to the log."""
-        self.write(Text(f"[{content}]", style="dim italic #a6adc8"))  # Neutral gray
+        self.write(Text(f"[{content}]", style="dim italic"))
 
     def add_error_message(self, content: str) -> None:
         """Add an error message to the log."""
-        self.write(Text(f"Error: {content}", style="bold #f38ba8"))  # Soft red
+        self.write(Text(f"Error: {content}", style="bold red"))
 
     def start_streaming(self) -> None:
         """Start a streaming response."""
-        self.write(Text())  # Spacing
-        self.write(Text("Victor", style="bold #89b4fa"))  # Soft blue
+        self.write(Text())
+        self.write(Text("Victor", style="bold blue"))
         self._streaming_message = ""
 
     def update_streaming(self, content: str) -> None:
@@ -288,54 +217,30 @@ class ConversationLog(RichLog):
         """Finish the streaming response."""
         if self._streaming_message:
             self.write(Markdown(self._streaming_message))
-            self.write(Text())  # Spacing
+            self.write(Text())
         self._streaming_message = None
 
 
 class InputWidget(Static):
     """Input area at the bottom of the screen.
 
-    Uses standard Input widget for reliable slash command support.
+    Uses a multi-line TextArea for better input handling.
+    `Ctrl+Enter` sends the message.
     Up/Down arrows navigate input history loaded from conversation DB.
     """
 
-    DEFAULT_CSS = """
-    InputWidget {
-        dock: bottom;
-        height: 3;
-        padding: 0 1;
-        background: $primary-darken-3;
-        border-top: solid $primary-darken-1;
-    }
+    DEFAULT_CSS = ""
 
-    InputWidget .input-row {
-        width: 100%;
-        height: 1;
-    }
+    class Submitted(Message):
+        """Custom message to bubble up when input is submitted."""
 
-    InputWidget .prompt-indicator {
-        width: 2;
-        color: $success;
-    }
+        def __init__(self, value: str) -> None:
+            super().__init__()
+            self.value = value
 
-    InputWidget Input {
-        width: 1fr;
-        border: none;
-        background: transparent;
-        padding: 0;
-    }
-
-    InputWidget Input:focus {
-        border: none;
-    }
-
-    InputWidget .input-hint {
-        width: 100%;
-        height: 1;
-        color: $text-muted;
-        text-align: right;
-    }
-    """
+    BINDINGS = [
+        ("ctrl+enter", "submit", "Send Message"),
+    ]
 
     # Class-level history shared across instances (persists across sessions)
     _history: list[str] = []
@@ -344,7 +249,7 @@ class InputWidget(Static):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._input: Input | None = None
+        self._input: TextArea | None = None
         self._history_index: int = -1  # -1 means not browsing history
         self._draft: str = ""  # Save current draft when browsing history
 
@@ -352,18 +257,18 @@ class InputWidget(Static):
         with Vertical():
             with Horizontal(classes="input-row"):
                 yield Label("> ", classes="prompt-indicator")
-                yield Input(
+                yield TextArea(
                     placeholder="Type message or /help...",
                     id="message-input",
                 )
             yield Label(
-                "Enter send · ↑↓ history · /exit quit",
+                "Ctrl+Enter send · ↑↓ history · /exit quit",
                 classes="input-hint",
             )
 
     def on_mount(self) -> None:
         """Focus the input on mount and load history from DB."""
-        self._input = self.query_one("#message-input", Input)
+        self._input = self.query_one("#message-input", TextArea)
         self._input.focus()
 
         # Load persistent history from conversation database (once per session)
@@ -384,14 +289,30 @@ class InputWidget(Static):
 
     def on_key(self, event) -> None:
         """Handle up/down arrow keys for history navigation."""
-        if event.key == "up":
+        if not self._input:
+            return
+        # Only trigger history if cursor is at the top of the text area
+        is_at_top = self._input.cursor_location[0] == 0
+
+        if event.key == "up" and is_at_top:
             self._history_prev()
             event.prevent_default()
             event.stop()
         elif event.key == "down":
-            self._history_next()
-            event.prevent_default()
-            event.stop()
+            # Allow "down" to navigate history only if already browsing
+            if self._history_index != -1:
+                is_at_bottom = (
+                    self._input.cursor_location[0] == len(self._input.document.lines) - 1
+                )
+                if is_at_bottom:
+                    self._history_next()
+                    event.prevent_default()
+                    event.stop()
+
+    def action_submit(self) -> None:
+        """Handle submission via Ctrl+Enter."""
+        if self._input and self._input.text:
+            self.post_message(self.Submitted(self._input.text))
 
     def _history_prev(self) -> None:
         """Navigate to previous history entry (Up arrow)."""
@@ -400,7 +321,7 @@ class InputWidget(Static):
 
         if self._history_index == -1:
             # Starting to browse history, save current draft
-            self._draft = self._input.value if self._input else ""
+            self._draft = self._input.text if self._input else ""
             self._history_index = len(InputWidget._history) - 1
         elif self._history_index > 0:
             self._history_index -= 1
@@ -408,8 +329,8 @@ class InputWidget(Static):
             return  # Already at oldest entry
 
         if self._input:
-            self._input.value = InputWidget._history[self._history_index]
-            self._input.cursor_position = len(self._input.value)
+            self._input.load_text(InputWidget._history[self._history_index])
+            self._input.cursor_location = (999, 999)  # Move to end
 
     def _history_next(self) -> None:
         """Navigate to next history entry (Down arrow)."""
@@ -419,26 +340,26 @@ class InputWidget(Static):
         if self._history_index < len(InputWidget._history) - 1:
             self._history_index += 1
             if self._input:
-                self._input.value = InputWidget._history[self._history_index]
-                self._input.cursor_position = len(self._input.value)
+                self._input.load_text(InputWidget._history[self._history_index])
+                self._input.cursor_location = (999, 999)  # Move to end
         else:
             # Return to draft
             self._history_index = -1
             if self._input:
-                self._input.value = self._draft
-                self._input.cursor_position = len(self._input.value)
+                self._input.load_text(self._draft)
+                self._input.cursor_location = (999, 999)  # Move to end
 
     @property
     def value(self) -> str:
         """Get current input value."""
         if self._input:
-            return self._input.value
+            return self._input.text
         return ""
 
     def clear(self) -> None:
         """Clear the input field."""
         if self._input:
-            self._input.value = ""
+            self._input.load_text("")
         self._history_index = -1
         self._draft = ""
 
@@ -468,44 +389,7 @@ class ToolCallWidget(Static):
     during agent tool invocations.
     """
 
-    DEFAULT_CSS = """
-    ToolCallWidget {
-        width: 100%;
-        padding: 0 2;
-        margin: 0 0 1 0;
-        background: $surface-darken-2;
-        border: round $secondary-darken-1;
-    }
-
-    ToolCallWidget.pending {
-        border: round $warning;
-    }
-
-    ToolCallWidget.success {
-        border: round $success;
-    }
-
-    ToolCallWidget.error {
-        border: round $error;
-    }
-
-    ToolCallWidget .tool-header {
-        height: 1;
-        color: $text-muted;
-    }
-
-    ToolCallWidget .tool-status {
-        color: $warning;
-    }
-
-    ToolCallWidget.success .tool-status {
-        color: $success;
-    }
-
-    ToolCallWidget.error .tool-status {
-        color: $error;
-    }
-    """
+    DEFAULT_CSS = ""
 
     def __init__(
         self,
@@ -567,27 +451,7 @@ class ThinkingWidget(Static):
     thinking mode is enabled.
     """
 
-    DEFAULT_CSS = """
-    ThinkingWidget {
-        width: 100%;
-        padding: 1 2;
-        margin: 0 0 1 0;
-        background: $primary-darken-3;
-        border: round $primary-darken-1;
-        color: $text-muted;
-    }
-
-    ThinkingWidget .thinking-header {
-        height: 1;
-        color: $primary;
-        margin-bottom: 1;
-    }
-
-    ThinkingWidget .thinking-content {
-        width: 100%;
-        text-style: italic;
-    }
-    """
+    DEFAULT_CSS = ""
 
     def __init__(self, content: str = "", **kwargs) -> None:
         super().__init__(**kwargs)

@@ -239,3 +239,42 @@ class TestSystemPromptBuilderEdgeCases:
         # Should include base prompt and grounding rules
         assert "expert coding assistant" in result.lower()
         assert "GROUNDING" in result
+
+    def test_build_deepseek_prompt(self):
+        """Test DeepSeek prompt includes anti-repetition and grounding rules."""
+        builder = SystemPromptBuilder(provider_name="deepseek", model="deepseek-coder")
+        result = builder._build_deepseek_prompt()
+        # Should include anti-repetition rules
+        assert "NEVER read the same file twice" in result
+        assert "NEVER call the same tool with identical arguments" in result
+        # Should include grounding rules
+        assert "GROUNDING" in result
+        # Should include tool efficiency guidance
+        assert "TOOL EFFICIENCY" in result or "list_directory" in result
+
+    def test_build_xai_prompt(self):
+        """Test xAI/Grok prompt includes task structure and grounding."""
+        builder = SystemPromptBuilder(provider_name="xai", model="grok-beta")
+        result = builder._build_xai_prompt()
+        # Should include effective tool usage guidance
+        assert "EFFECTIVE TOOL USAGE" in result or "tool" in result.lower()
+        # Should include task approach guidance
+        assert "TASK APPROACH" in result or "analysis" in result.lower()
+        # Should include grounding rules
+        assert "GROUNDING" in result
+
+    def test_build_cloud_prompt_delegates_to_deepseek(self):
+        """Test _build_cloud_prompt uses DeepSeek-specific prompt."""
+        builder = SystemPromptBuilder(provider_name="deepseek", model="deepseek-coder")
+        cloud_result = builder._build_cloud_prompt()
+        deepseek_result = builder._build_deepseek_prompt()
+        # Both should return the same content
+        assert cloud_result == deepseek_result
+
+    def test_build_cloud_prompt_delegates_to_xai(self):
+        """Test _build_cloud_prompt uses xAI-specific prompt."""
+        builder = SystemPromptBuilder(provider_name="xai", model="grok-beta")
+        cloud_result = builder._build_cloud_prompt()
+        xai_result = builder._build_xai_prompt()
+        # Both should return the same content
+        assert cloud_result == xai_result

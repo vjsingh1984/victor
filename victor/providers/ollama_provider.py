@@ -16,6 +16,7 @@
 
 import json
 import logging
+import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Union
 
 import httpx
@@ -29,6 +30,8 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
+from victor.providers.ollama_capability_detector import TOOL_SUPPORT_PATTERNS
 
 logger = logging.getLogger(__name__)
 
@@ -105,75 +108,93 @@ class OllamaProvider(BaseProvider):
         return True
 
     def get_context_window(self, model: str) -> int:
-        """Get context window size for a model by querying Ollama API.
-
-        Queries /api/show to get the actual context length from model metadata.
-        Results are cached per endpoint+model to avoid repeated API calls.
-
-        Args:
-            model: Model name (e.g., 'qwen3-coder-tools:30b')
-
-        Returns:
-            Context window size in tokens (default 32768 if query fails)
-        """
-        # Cache key includes endpoint since same model can have different context on different servers
+        """Get context window size using cached discovery or config fallback."""
         cache_key = f"{self.base_url}:{model}"
 
-        # Check cache first
         if cache_key in self._context_window_cache:
             return self._context_window_cache[cache_key]
 
-        default_context = 32768  # Conservative fallback
+        from victor.config.config_loaders import get_provider_limits
+
+        limits = get_provider_limits("ollama", model)
+        self._context_window_cache[cache_key] = limits.context_window
+        return limits.context_window
+
+    async def discover_capabilities(self, model: str) -> ProviderRuntimeCapabilities:
+        """Async capability discovery using /api/show."""
+        cache_key = f"{self.base_url}:{model}"
+
+        context_window: Optional[int] = None
+        supports_tools = True  # Default: Ollama supports tools for capable models
+        raw_response: Optional[Dict[str, Any]] = None
 
         try:
-            # Synchronous request to /api/show
-            with httpx.Client(base_url=self.base_url, timeout=httpx.Timeout(5)) as client:
-                resp = client.post("/api/show", json={"name": model})
-                resp.raise_for_status()
-                data = resp.json()
+            resp = await self.client.post("/api/show", json={"name": model})
+            resp.raise_for_status()
+            raw_response = resp.json()
 
-                # PRIORITY 1: Check parameters for num_ctx (runtime context limit)
-                # This is the ACTUAL context limit set in the modelfile, which may be
-                # smaller than the model's training context (e.g., 64K vs 262K for VRAM)
-                parameters = data.get("parameters", "")
-                if "num_ctx" in parameters:
-                    # Parse "num_ctx 65536" from parameters string
-                    for line in parameters.split("\n"):
-                        if "num_ctx" in line:
-                            parts = line.split()
-                            if len(parts) >= 2:
-                                try:
-                                    context_window = int(parts[-1])
-                                    self._context_window_cache[cache_key] = context_window
-                                    logger.debug(
-                                        f"Ollama model {model} runtime context (num_ctx): {context_window}"
-                                    )
-                                    return context_window
-                                except ValueError:
-                                    pass
+            context_window = self._parse_context_window(raw_response)
+            template = raw_response.get("template", "") or ""
+            supports_tools = self._detect_tool_support(template)
 
-                # PRIORITY 2: Fall back to context_length in model_info (training context)
-                # Keys are like "qwen3moe.context_length" or "llama.context_length"
-                model_info = data.get("model_info", {})
-                for key, value in model_info.items():
-                    if "context_length" in key.lower():
-                        context_window = int(value)
-                        self._context_window_cache[cache_key] = context_window
-                        logger.debug(
-                            f"Ollama model {model} training context (context_length): {context_window}"
-                        )
-                        return context_window
+        except Exception as exc:
+            logger.warning(
+                f"Failed to discover capabilities for {model} on {self.base_url}: {exc}"
+            )
 
-                logger.warning(
-                    f"Could not determine context window for {model}, using default {default_context}"
-                )
-                self._context_window_cache[cache_key] = default_context
-                return default_context
+        from victor.config.config_loaders import get_provider_limits
 
-        except Exception as e:
-            logger.warning(f"Failed to query Ollama for model info: {e}")
-            self._context_window_cache[cache_key] = default_context
-            return default_context
+        limits = get_provider_limits("ollama", model)
+        resolved_context = context_window or limits.context_window
+
+        self._context_window_cache[cache_key] = resolved_context
+
+        return ProviderRuntimeCapabilities(
+            provider=self.name,
+            model=model,
+            context_window=resolved_context,
+            supports_tools=supports_tools,
+            supports_streaming=True,
+            source="discovered" if context_window else "config",
+            raw=raw_response,
+        )
+
+    def _parse_context_window(self, response_data: Dict[str, Any]) -> Optional[int]:
+        """Extract context window from Ollama /api/show response."""
+        parameters = response_data.get("parameters", "")
+        if "num_ctx" in parameters:
+            for line in parameters.split("\n"):
+                if "num_ctx" in line:
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        try:
+                            return int(parts[-1])
+                        except (ValueError, IndexError):
+                            continue
+
+        model_info = response_data.get("model_info", {})
+        for key, value in model_info.items():
+            if "context_length" in key.lower():
+                try:
+                    return int(value)
+                except (ValueError, TypeError):
+                    continue
+
+        return None
+
+    def _detect_tool_support(self, template: str) -> bool:
+        """Detect native tool support from model template."""
+        if not template:
+            return True  # default optimistic
+
+        for pattern in TOOL_SUPPORT_PATTERNS:
+            try:
+                if pattern and re.search(pattern, template):
+                    return True
+            except Exception:
+                continue
+
+        return False
 
     def _select_base_url(self, base_url: Union[str, List[str], None], timeout: int) -> str:
         """Pick the first reachable Ollama endpoint from a tiered list.

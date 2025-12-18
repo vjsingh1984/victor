@@ -134,7 +134,9 @@ providers:
 
             # Default to "." if no suggestions - scan entire project (cross-platform)
             # "." means current working directory on all platforms
-            default_include = ", ".join(suggested_src) if suggested_src else "."
+            # Default to scanning the whole project (.) even if we detect likely src dirs;
+            # users can narrow scope by entering a comma-separated list.
+            default_include = "."
 
             include_str = Prompt.ask(
                 f"[cyan]Enter comma-separated source directories to include[/]",

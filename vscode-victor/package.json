@@ -493,8 +493,22 @@
         },
         "victor.serverPort": {
           "type": "number",
-          "default": 8000,
-          "description": "Port for the Victor server"
+          "default": 8765,
+          "description": "Primary port for the Victor server"
+        },
+        "victor.serverBackend": {
+          "type": "string",
+          "enum": ["aiohttp", "fastapi"],
+          "default": "aiohttp",
+          "description": "Server backend: 'aiohttp' (legacy) or 'fastapi' (modern with OpenAPI docs at /docs)"
+        },
+        "victor.fallbackPorts": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "default": [8765, 8766, 8767, 8768, 8000],
+          "description": "Fallback ports to try if primary port is in use"
         },
         "victor.serverApiKey": {
           "type": "string",

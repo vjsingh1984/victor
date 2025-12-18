@@ -34,6 +34,7 @@ LANGUAGE_MODULES: Dict[str, tuple] = {
     "tsx": ("tree_sitter_typescript", "language_tsx"),  # TypeScript + JSX
     "java": ("tree_sitter_java", "language"),
     "go": ("tree_sitter_go", "language"),
+    # NOTE: tree-sitter-rust >=0.25.0 is recommended to match tree-sitter >=0.25 API
     "rust": ("tree_sitter_rust", "language"),
     # Additional languages
     "c": ("tree_sitter_c", "language"),
@@ -88,7 +89,9 @@ def get_language(language: str) -> Language:
 
         # Create Language object using the new API
         # In tree-sitter 0.25+, Language() takes a language object from the module
-        lang = Language(lang_func())
+        lang_obj = lang_func()
+        # Some older grammars (e.g., tree_sitter_rust 0.24.x) expose a PyCapsule; wrap via Language
+        lang = Language(lang_obj) if not isinstance(lang_obj, Language) else lang_obj
 
         _language_cache[language] = lang
         return lang

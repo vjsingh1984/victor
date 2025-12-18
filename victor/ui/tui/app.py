@@ -15,8 +15,8 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Vertical
-from textual.widgets import Footer, Input
-
+from textual.widgets import Footer
+from victor.ui.tui.theme import THEME_CSS
 from victor.ui.tui.widgets import (
     ConversationLog,
     InputWidget,
@@ -94,64 +94,219 @@ class VictorTUI(App):
     └─────────────────────────────────────┘
     """
 
-    CSS = """
+    CSS = THEME_CSS + """
     Screen {
-        background: $surface;
+        background: $background;
+        color: $text;
     }
 
     #main-container {
         width: 100%;
         height: 100%;
+        padding: 0 2 1 2;
+        layout: vertical;
+        min-height: 0;
     }
 
     #conversation-area {
         width: 100%;
         height: 1fr;
-        padding: 0 1;
+        min-height: 0;
+        padding: 1 0 1 0;
+        layout: vertical;
     }
 
     ConversationLog {
-        height: 100%;
-        margin: 1 2;
+        height: 1fr;
+        min-height: 0;
+        background: $panel;
+        border: round $border-strong;
+        padding: 1 2;
+        margin: 0 0 1 0;
+        scrollbar-gutter: stable;
     }
 
-    InputWidget {
-        margin: 0 2 1 2;
-    }
-
+    /* Status bar */
     StatusBar {
-        margin: 0 0 0 0;
+        dock: top;
+        height: 2;
+        background: $panel;
+        color: $text;
+        padding: 0 1;
+        border-bottom: solid $border-strong;
+        margin: 0;
     }
 
-    /* Aesthetic improvements */
-    .message-spacing {
+    StatusBar .status-content {
+        width: 100%;
+        height: 100%;
+        align: center middle;
+    }
+
+    StatusBar .provider-info {
+        color: $text-muted;
+        text-style: bold;
+    }
+
+    StatusBar .provider-info .victor-name {
+        color: $primary;
+    }
+
+    StatusBar .shortcuts {
+        color: $text-muted;
+        text-align: right;
+    }
+
+    /* Messages */
+    MessageWidget {
+        width: 100%;
+        padding: 1 2;
+        margin: 1 0;
+        background: $panel;
+        border: round $border-muted;
+    }
+
+    MessageWidget.user {
+        background: $panel-alt;
+        border: round $border-strong;
+    }
+
+    MessageWidget.assistant {
+        background: $panel;
+        border: round $border-muted;
+    }
+
+    MessageWidget.system {
+        background: $panel;
+        border: round $border-muted;
+        text-style: italic;
+    }
+
+    MessageWidget.error {
+        background: $panel;
+        border: round $error;
+    }
+
+    MessageWidget .message-header {
         height: 1;
+        margin-bottom: 1;
+        text-style: bold;
     }
 
-    /* Tool call styling */
-    #tool-calls-container {
+    MessageWidget .message-header.user { color: $success; }
+    MessageWidget .message-header.assistant { color: $primary; }
+    MessageWidget .message-header.system { color: $text-muted; }
+    MessageWidget .message-header.error { color: $error; }
+
+    MessageWidget .message-content {
+        width: 100%;
+        color: $text;
+    }
+
+    /* Input */
+    InputWidget {
+        dock: bottom;
+        height: auto;
+        max-height: 50%;
+        padding: 0 2 1 2;
+        background: $panel;
+        border-top: solid $border-muted;
+        margin: 0;
+    }
+
+    InputWidget .input-row {
         width: 100%;
         height: auto;
-        max-height: 10;
-        padding: 0 2;
-        display: none;
+        padding-top: 1;
     }
 
-    #tool-calls-container.visible {
-        display: block;
+    InputWidget .prompt-indicator {
+        width: 2;
+        height: 1;
+        color: $primary;
     }
 
-    /* Thinking panel */
+    InputWidget TextArea {
+        width: 1fr;
+        height: auto;
+        min-height: 3;
+        max-height: 16;
+        border: round $border-strong;
+        background: $surface;
+        color: $text;
+        padding: 1 1;
+        scrollbar-gutter: stable;
+    }
+
+    InputWidget TextArea:focus {
+        border: round $border-strong;
+        background: $background;
+    }
+
+    InputWidget .input-hint {
+        width: 100%;
+        height: 1;
+        color: $text-muted;
+        text-align: right;
+    }
+
+    /* Tool calls */
+    ToolCallWidget {
+        width: 100%;
+        padding: 1 2;
+        margin: 0 0 1 0;
+        background: $panel;
+        border: round $border-strong;
+    }
+
+    ToolCallWidget.pending { border: round $warning; }
+    ToolCallWidget.success { border: round $success; }
+    ToolCallWidget.error { border: round $error; }
+
+    ToolCallWidget .tool-header { height: 1; color: $text-muted; }
+    ToolCallWidget .tool-status { color: $warning; }
+    ToolCallWidget.success .tool-status { color: $success; }
+    ToolCallWidget.error .tool-status { color: $error; }
+
+    /* Thinking */
+    ThinkingWidget {
+        width: 100%;
+        padding: 1 2;
+        margin: 0 0 1 0;
+        background: $panel;
+        border: round $border-strong;
+        color: $text-muted;
+    }
+
+    ThinkingWidget .thinking-header {
+        height: 1;
+        color: $primary;
+        margin-bottom: 1;
+    }
+
+    ThinkingWidget .thinking-content {
+        width: 100%;
+        text-style: italic;
+    }
+
+    /* Containers */
+    #tool-calls-container,
     #thinking-container {
         width: 100%;
-        height: auto;
-        max-height: 8;
         padding: 0 2;
+        margin: 0 0 1 0;
         display: none;
     }
 
+    #tool-calls-container.visible,
     #thinking-container.visible {
         display: block;
+    }
+
+    Footer {
+        background: $panel;
+        color: $text-muted;
+        border-top: solid $border-muted;
     }
     """
 
@@ -235,11 +390,8 @@ class VictorTUI(App):
         # Focus input
         self._input_widget.focus_input()
 
-    async def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Handle input submission."""
-        if event.input.id != "message-input":
-            return
-
+    async def on_input_widget_submitted(self, event: InputWidget.Submitted) -> None:
+        """Handle input submission from the custom InputWidget."""
         message = event.value.strip()
         if not message:
             return

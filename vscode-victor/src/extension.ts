@@ -822,6 +822,11 @@ function updateServerStatusBar(serverStatusBarItem: vscode.StatusBarItem, status
             icon: '$(error)',
             color: 'statusBarItem.errorBackground',
             tooltip: 'Victor Server: Error\nClick for options'
+        },
+        [ServerStatus.Reconnecting]: {
+            icon: '$(sync~spin)',
+            color: 'statusBarItem.warningBackground',
+            tooltip: 'Victor Server: Reconnecting...'
         }
     };
 

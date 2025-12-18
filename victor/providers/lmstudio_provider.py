@@ -40,6 +40,7 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,7 @@ class LMStudioProvider(BaseProvider):
         self._raw_base_urls = base_url
         self._api_key = api_key
         self._models_available: Optional[bool] = None  # Set during URL discovery
+        self._context_window_cache: Dict[str, int] = {}
 
         # Use httpx directly (not AsyncOpenAI SDK) for consistent behavior with Ollama
         self.client = httpx.AsyncClient(
@@ -146,6 +148,83 @@ class LMStudioProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         """LMStudio supports streaming."""
         return True
+
+    def get_context_window(self, model: str) -> int:
+        """Get context window size using cached discovery or config fallback."""
+        cache_key = f"{self.base_url}:{model}"
+        if cache_key in self._context_window_cache:
+            return self._context_window_cache[cache_key]
+
+        from victor.config.config_loaders import get_provider_limits
+
+        limits = get_provider_limits("lmstudio", model)
+        self._context_window_cache[cache_key] = limits.context_window
+        return limits.context_window
+
+    async def discover_capabilities(self, model: str) -> ProviderRuntimeCapabilities:
+        """Async capability discovery via /v1/models."""
+        cache_key = f"{self.base_url}:{model}"
+
+        context_window: Optional[int] = None
+        supports_tools = True
+        supports_streaming = True
+        raw_response: Optional[Dict[str, Any]] = None
+
+        try:
+            resp = await self.client.get("/models")
+            resp.raise_for_status()
+            raw_response = resp.json()
+
+            models = raw_response.get("data", [])
+            match = next((m for m in models if m.get("id") == model), models[0] if models else None)
+
+            if match:
+                capabilities = match.get("capabilities", {}) or {}
+                supports_tools = bool(
+                    capabilities.get("functions", True) or capabilities.get("tools", True)
+                )
+                supports_streaming = bool(
+                    capabilities.get("streaming", True) or capabilities.get("stream", True)
+                )
+                context_window = self._extract_context_window(match)
+
+        except Exception as exc:
+            logger.warning(
+                f"Failed to discover capabilities for {model} on {self.base_url}: {exc}"
+            )
+
+        from victor.config.config_loaders import get_provider_limits
+
+        limits = get_provider_limits("lmstudio", model)
+        resolved_context = context_window or limits.context_window
+
+        self._context_window_cache[cache_key] = resolved_context
+
+        return ProviderRuntimeCapabilities(
+            provider=self.name,
+            model=model,
+            context_window=resolved_context,
+            supports_tools=supports_tools,
+            supports_streaming=supports_streaming,
+            source="discovered" if context_window else "config",
+            raw=raw_response,
+        )
+
+    def _extract_context_window(self, model_info: Dict[str, Any]) -> Optional[int]:
+        """Extract context window from LMStudio model info."""
+        candidates = [
+            model_info.get("context_length"),
+            model_info.get("max_context_length"),
+            model_info.get("max_context_tokens"),
+        ]
+        for value in candidates:
+            if value is None:
+                continue
+            try:
+                return int(value)
+            except (ValueError, TypeError):
+                continue
+        return None
 
     def _select_base_url(self, base_url: Union[str, List[str], None], timeout: int) -> str:
         """Pick the first reachable LMStudio endpoint from a tiered list.

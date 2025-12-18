@@ -129,6 +129,7 @@ from victor.agent.context_compactor import (
     create_context_compactor,
     calculate_parallel_read_budget,
 )
+from victor.agent.rl.coordinator import get_rl_coordinator
 from victor.agent.usage_analytics import (
     UsageAnalytics,
     AnalyticsConfig,
@@ -310,20 +311,6 @@ def _detect_mentioned_tools(text: str) -> List[str]:
 class AgentOrchestrator:
     """Orchestrates agent interactions, tool execution, and provider communication."""
 
-    # Legacy fallback context windows (in tokens)
-    # Prefer config loader: get_provider_limits(provider, model).context_window
-    PROVIDER_CONTEXT_WINDOWS = {
-        "anthropic": 200000,  # Claude models
-        "openai": 128000,  # GPT-4 Turbo
-        "google": 1000000,  # Gemini 1.5 Pro
-        "xai": 131072,  # Grok models
-        "deepseek": 131072,  # DeepSeek V3
-        "moonshot": 262144,  # Kimi K2
-        "ollama": 32768,  # Local models (conservative)
-        "lmstudio": 32768,  # Local models (conservative)
-        "vllm": 32768,  # Local models (conservative)
-    }
-
     @staticmethod
     def _calculate_max_context_chars(
         settings: "Settings",
@@ -333,8 +320,7 @@ class AgentOrchestrator:
         """Calculate maximum context size in characters for a model.
 
         Uses externalized config from provider_context_limits.yaml with
-        per-provider and per-model overrides. Falls back to hardcoded
-        defaults if config unavailable.
+        per-provider and per-model overrides.
 
         Args:
             settings: Application settings
@@ -361,16 +347,15 @@ class AgentOrchestrator:
         if context_tokens is None:
             provider_name = getattr(provider, "name", "").lower()
             try:
+                from victor.config.config_loaders import get_provider_limits
                 limits = get_provider_limits(provider_name, model)
                 context_tokens = limits.context_window
                 logger.debug(
                     f"Using YAML config for {provider_name}/{model}: {context_tokens} tokens"
                 )
-            except Exception:
-                # Final fallback to hardcoded defaults
-                context_tokens = AgentOrchestrator.PROVIDER_CONTEXT_WINDOWS.get(
-                    provider_name, 100000
-                )
+            except Exception as e:
+                logger.warning(f"Could not load provider limits from config: {e}")
+                context_tokens = 100000  # Final, hardcoded failsafe
 
         # Convert tokens to chars: ~3.5 chars per token with 80% safety margin
         try:
@@ -378,15 +363,12 @@ class AgentOrchestrator:
             token_count = float(context_tokens)
             max_chars = int(token_count * 3.5 * 0.8)
         except Exception:
-            # Fallback to a conservative default if parsing fails (e.g., MagicMock)
-            provider_name = getattr(provider, "name", "").lower()
-            fallback_tokens = AgentOrchestrator.PROVIDER_CONTEXT_WINDOWS.get(provider_name, 100000)
+            # Fallback to a conservative default if parsing fails
             logger.debug(
-                "Could not parse context token value %r; using fallback %d tokens",
+                "Could not parse context token value %r; using failsafe 100k tokens",
                 context_tokens,
-                fallback_tokens,
             )
-            max_chars = int(fallback_tokens * 3.5 * 0.8)
+            max_chars = int(100000 * 3.5 * 0.8)
 
         # Log safely depending on whether context_tokens is numeric
         if isinstance(context_tokens, (int, float)):
@@ -1006,6 +988,18 @@ class AgentOrchestrator:
         )
         self._conversation_controller.set_system_prompt(self._system_prompt)
 
+        # Tool deduplication tracker for preventing redundant calls
+        self._deduplication_tracker = None
+        if getattr(settings, "enable_tool_deduplication", False):
+            try:
+                from victor.agent.tool_deduplication import ToolDeduplicationTracker
+
+                window_size = getattr(settings, "tool_deduplication_window_size", 10)
+                self._deduplication_tracker = ToolDeduplicationTracker(window_size=window_size)
+                logger.info(f"ToolDeduplicationTracker initialized (window: {window_size})")
+            except Exception as e:
+                logger.warning(f"Failed to initialize ToolDeduplicationTracker: {e}")
+
         # ToolPipeline: Coordinates tool execution flow
         self._tool_pipeline = ToolPipeline(
             tool_registry=self.tools,
@@ -1020,6 +1014,7 @@ class AgentOrchestrator:
             argument_normalizer=self.argument_normalizer,
             on_tool_start=self._on_tool_start_callback,
             on_tool_complete=self._on_tool_complete_callback,
+            deduplication_tracker=self._deduplication_tracker,
         )
 
         # StreamingController: Manages streaming sessions and metrics
@@ -1035,15 +1030,25 @@ class AgentOrchestrator:
         # StreamingChatHandler: Testable extraction of streaming loop logic
         # This component encapsulates limit checking, response processing, and iteration control
         # Uses orchestrator as message_adder since we implement add_message()
-        session_time_limit = getattr(settings, "session_time_limit", 240.0)
+        session_idle_timeout = getattr(settings, "session_idle_timeout", 180.0)
         self._streaming_handler = StreamingChatHandler(
             settings=settings,
             message_adder=self,  # Orchestrator implements add_message()
-            session_time_limit=session_time_limit,
+            session_idle_timeout=session_idle_timeout,
         )
 
         # TaskAnalyzer: Unified task analysis facade
         self._task_analyzer = get_task_analyzer()
+
+        # RLCoordinator: Framework-level RL with unified SQLite storage
+        # Manages all learners (continuation_prompts, continuation_patience, etc.)
+        self._rl_coordinator = None
+        if getattr(settings, "enable_continuation_rl_learning", False):
+            try:
+                self._rl_coordinator = get_rl_coordinator()
+                logger.info("RL: Coordinator initialized with unified database")
+            except Exception as e:
+                logger.warning(f"RL: Failed to initialize RL coordinator: {e}")
 
         # ContextCompactor: Proactive context management and tool result truncation
         # This component provides:
@@ -1211,14 +1216,14 @@ class AgentOrchestrator:
     def _send_rl_reward_signal(self, session: StreamingSession) -> None:
         """Send reward signal to RL model selector for Q-value updates.
 
-        Converts StreamingSession data into SessionReward and updates Q-values
+        Converts StreamingSession data into RLOutcome and updates Q-values
         based on session outcome (success, latency, throughput, tool usage).
         """
         try:
-            from victor.agent.rl_model_selector import get_model_selector, SessionReward
+            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.agent.rl.base import RLOutcome
 
-            selector = get_model_selector()
-            if selector is None:
+            if not self._rl_coordinator:
                 return
 
             # Extract metrics from session
@@ -1235,22 +1240,40 @@ class AgentOrchestrator:
             # Determine success: no error and not cancelled
             success = session.error is None and not session.cancelled
 
-            # Create reward signal
-            reward = SessionReward(
-                session_id=session.session_id,
+            # Compute quality score (0-1) based on success and metrics
+            quality_score = 0.5
+            if success:
+                quality_score = 0.8
+                # Bonus for fast responses
+                if session.duration < 10:
+                    quality_score += 0.1
+                # Bonus for tool usage
+                if tool_calls_made > 0:
+                    quality_score += 0.1
+            quality_score = min(1.0, quality_score)
+
+            # Create outcome
+            outcome = RLOutcome(
                 provider=session.provider,
                 model=session.model,
+                task_type=getattr(session, "task_type", "unknown"),
                 success=success,
-                latency_seconds=session.duration,
-                token_count=token_count,
-                tool_calls_made=tool_calls_made,
+                quality_score=quality_score,
+                metadata={
+                    "latency_seconds": session.duration,
+                    "token_count": token_count,
+                    "tool_calls_made": tool_calls_made,
+                    "session_id": session.session_id,
+                },
+                vertical="coding",
             )
 
-            # Update Q-value with reward signal
-            new_q = selector.update_q_value(reward)
+            # Record outcome for model selector
+            self._rl_coordinator.record_outcome("model_selector", outcome, "coding")
+
             logger.debug(
-                f"RL feedback: provider={session.provider} reward={reward.reward:.3f} "
-                f"new_q={new_q:.3f} success={success} duration={session.duration:.1f}s"
+                f"RL feedback: provider={session.provider} success={success} "
+                f"quality={quality_score:.2f} duration={session.duration:.1f}s"
             )
 
         except ImportError:
@@ -1623,12 +1646,70 @@ class AgentOrchestrator:
         for reinforcement learning. This helps the system learn
         optimal mode transitions and tool budgets.
 
+        Also records continuation prompt learning outcomes if RL learner enabled.
+
         Args:
             success: Whether the task was completed successfully
             quality_score: Final quality score (0.0-1.0)
             user_satisfied: Whether user seemed satisfied
             completed: Whether task reached completion
         """
+        # Record RL outcomes for all learners
+        if self._rl_coordinator and hasattr(self, "_current_stream_context"):
+            try:
+                from victor.agent.rl.base import RLOutcome
+
+                ctx = self._current_stream_context
+                # Determine task type from context
+                task_type = "default"
+                if ctx.is_analysis_task:
+                    task_type = "analysis"
+                elif ctx.is_action_task:
+                    task_type = "action"
+
+                # Get continuation prompts used (track from orchestrator state)
+                continuation_prompts_used = getattr(self, "_continuation_prompts", 0)
+                max_prompts_configured = getattr(self, "_max_continuation_prompts_used", 6)
+                stuck_loop_detected = getattr(self, "_stuck_loop_detected", False)
+
+                # Record outcome for continuation_prompts learner
+                outcome = RLOutcome(
+                    provider=self.provider.name,
+                    model=self.model,
+                    task_type=task_type,
+                    success=success and completed,
+                    quality_score=quality_score,
+                    metadata={
+                        "continuation_prompts_used": continuation_prompts_used,
+                        "max_prompts_configured": max_prompts_configured,
+                        "stuck_loop_detected": stuck_loop_detected,
+                        "forced_completion": ctx.force_completion,
+                        "tool_calls_total": self.tool_calls_used,
+                    },
+                    vertical="coding",
+                )
+                self._rl_coordinator.record_outcome("continuation_prompts", outcome, "coding")
+
+                # Also record for continuation_patience learner if we have stuck loop data
+                if continuation_prompts_used > 0:
+                    patience_outcome = RLOutcome(
+                        provider=self.provider.name,
+                        model=self.model,
+                        task_type=task_type,
+                        success=success and completed,
+                        quality_score=quality_score,
+                        metadata={
+                            "flagged_as_stuck": stuck_loop_detected,
+                            "actually_stuck": stuck_loop_detected and not success,
+                            "eventually_made_progress": not stuck_loop_detected and success,
+                        },
+                        vertical="coding",
+                    )
+                    self._rl_coordinator.record_outcome("continuation_patience", patience_outcome, "coding")
+
+            except Exception as e:
+                logger.warning(f"RL: Failed to record RL outcomes: {e}")
+
         integration = self.intelligent_integration
         if not integration:
             return
@@ -3108,15 +3189,60 @@ class AgentOrchestrator:
         # Configuration - use configurable thresholds from settings
         max_asking_input_prompts = 3
         requires_continuation_support = is_analysis_task or is_action_task or intends_to_continue
-        # Get continuation prompt limits from settings (default: 4 for analysis, 3 for action, 2 for others)
-        max_cont_analysis = getattr(self.settings, "max_continuation_prompts_analysis", 4)
-        max_cont_action = getattr(self.settings, "max_continuation_prompts_action", 3)
-        max_cont_default = getattr(self.settings, "max_continuation_prompts_default", 2)
+        # Get continuation prompt limits from settings with provider/model-specific overrides
+        max_cont_analysis = getattr(self.settings, "max_continuation_prompts_analysis", 6)
+        max_cont_action = getattr(self.settings, "max_continuation_prompts_action", 5)
+        max_cont_default = getattr(self.settings, "max_continuation_prompts_default", 3)
+
+        # Check for provider/model-specific overrides (RL-learned or manually configured)
+        provider_model_key = f"{self.provider.name}:{self.model}"
+
+        # First, try RL-learned recommendations if coordinator is enabled
+        if self._rl_coordinator:
+            for task_type_name, default_val in [
+                ("analysis", max_cont_analysis),
+                ("action", max_cont_action),
+                ("default", max_cont_default),
+            ]:
+                recommendation = self._rl_coordinator.get_recommendation(
+                    "continuation_prompts",
+                    self.provider.name,
+                    self.model,
+                    task_type_name
+                )
+                if recommendation and recommendation.value is not None:
+                    learned_val = recommendation.value
+                    if task_type_name == "analysis":
+                        max_cont_analysis = learned_val
+                    elif task_type_name == "action":
+                        max_cont_action = learned_val
+                    else:
+                        max_cont_default = learned_val
+                    logger.debug(
+                        f"RL: Using learned continuation prompt for {provider_model_key}:{task_type_name}: "
+                        f"{default_val} → {learned_val} (confidence={recommendation.confidence:.2f})"
+                    )
+
+        # Then, apply manual overrides (take precedence over RL)
+        overrides = getattr(self.settings, "continuation_prompt_overrides", {})
+        if provider_model_key in overrides:
+            override = overrides[provider_model_key]
+            max_cont_analysis = override.get("analysis", max_cont_analysis)
+            max_cont_action = override.get("action", max_cont_action)
+            max_cont_default = override.get("default", max_cont_default)
+            logger.debug(
+                f"Using manual continuation prompt overrides for {provider_model_key}: "
+                f"analysis={max_cont_analysis}, action={max_cont_action}, default={max_cont_default}"
+            )
+
         max_continuation_prompts = (
             max_cont_analysis
             if is_analysis_task
             else (max_cont_action if is_action_task else max_cont_default)
         )
+
+        # Track for RL learning (what max was actually used this session)
+        self._max_continuation_prompts_used = max_continuation_prompts
 
         # Budget/iteration thresholds
         budget_threshold = (
@@ -3208,8 +3334,8 @@ class AgentOrchestrator:
         )
 
         # CRITICAL FIX: Detect stuck continuation loop pattern
-        # If model keeps saying "let me read" but never calls tools, after 2 prompts
-        # stop prompting and force a summary instead.
+        # If model keeps saying "let me read" but never calls tools, after patience threshold
+        # stop prompting and force a summary instead. Use provider-specific patience.
         # Track tool calls at start of continuation prompting to detect when model is stuck
         # even if it made tool calls earlier in the session.
         if not hasattr(self, "_tool_calls_at_continuation_start"):
@@ -3221,9 +3347,13 @@ class AgentOrchestrator:
         tool_calls_during_continuation = (
             self.tool_calls_used - self._tool_calls_at_continuation_start
         )
+
+        # Use provider-specific patience for continuation loops (e.g., DeepSeek needs more patience)
+        patience_threshold = self.tool_calling_caps.continuation_patience
+
         if (
             intends_to_continue
-            and continuation_prompts >= 2
+            and continuation_prompts >= patience_threshold
             and tool_calls_during_continuation == 0
             and not getattr(self, "_max_prompts_summary_requested", False)
         ):
@@ -3234,6 +3364,7 @@ class AgentOrchestrator:
                 f"intent={intent_result.intent.name}"
             )
             updates["continuation_prompts"] = 99  # Prevent further prompting
+            self._stuck_loop_detected = True  # Track for RL learning
             return {
                 "action": "request_summary",
                 "message": (
@@ -5765,6 +5896,47 @@ class AgentOrchestrator:
 
                     # Handle action: request_summary
                     elif action == "request_summary":
+                        # If summary was already requested once and model still hasn't provided it,
+                        # FORCE completion by disabling tools and getting final response
+                        if getattr(self, "_summary_request_count", 0) >= 1:
+                            logger.warning(
+                                "Model ignored previous summary request - forcing final response with tools disabled"
+                            )
+                            try:
+                                response = await self.provider.chat(
+                                    messages=self.messages + [
+                                        Message(
+                                            role="user",
+                                            content="CRITICAL: Provide your FINAL ANALYSIS NOW. "
+                                            "Do NOT mention any more tools or files. "
+                                            "Summarize what you found from the 20 tool calls you already executed.",
+                                        )
+                                    ],
+                                    model=self.model,
+                                    temperature=self.temperature,
+                                    max_tokens=self.max_tokens,
+                                    tools=None,  # DISABLE tools to force text response
+                                )
+                                if response and response.content:
+                                    sanitized = self._sanitize_response(response.content)
+                                    if sanitized:
+                                        self.add_message("assistant", sanitized)
+                                        yield self._generate_content_chunk_with_handler(sanitized)
+
+                                # Display metrics and exit
+                                elapsed_time = time.time() - stream_ctx.start_time
+                                metrics_line = self._format_completion_metrics_with_handler(
+                                    stream_ctx, elapsed_time
+                                )
+                                yield self._generate_metrics_chunk_with_handler(metrics_line)
+                                yield self._generate_final_marker_chunk_with_handler()
+                                return
+                            except Exception as e:
+                                logger.warning(f"Error forcing final response: {e}")
+                                # Fall through to normal handling
+
+                        # First summary request - track it
+                        self._summary_request_count = getattr(self, "_summary_request_count", 0) + 1
                         self.add_message("user", action_result["message"])
                         skip_rest = True
 
@@ -6243,6 +6415,10 @@ class AgentOrchestrator:
             )
             success = exec_result.success
             error_msg = exec_result.error
+
+            # Reset activity timer after tool execution to prevent idle timeout during active work
+            if hasattr(self, '_current_stream_context') and self._current_stream_context:
+                self._current_stream_context.reset_activity_timer()
 
             # Update counters and tracking
             self.tool_calls_used += 1

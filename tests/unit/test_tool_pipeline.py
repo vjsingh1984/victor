@@ -196,7 +196,13 @@ class TestToolPipeline:
 
     @pytest.mark.asyncio
     async def test_skip_repeated_failures(self, pipeline, mock_tool_executor):
-        """Test that repeated failing calls are skipped."""
+        """Test that repeated failing calls are skipped.
+
+        Note: With batch deduplication enabled (default), identical tool calls
+        in the same batch are deduplicated first, so the skip reason will be
+        'Deduplicated' rather than 'Repeated failing'. The 'Repeated failing'
+        behavior still applies to subsequent batches/iterations.
+        """
         # Make the tool fail
         mock_tool_executor.execute.return_value = ToolExecutionResult(
             tool_name="failing_tool",
@@ -212,10 +218,11 @@ class TestToolPipeline:
 
         result = await pipeline.execute_tool_calls(tool_calls, {})
 
-        # First call fails, second is skipped
+        # First call fails, second is skipped (deduplicated in same batch)
         assert result.failed_calls == 1
         assert result.skipped_calls == 1
-        assert "Repeated failing" in result.results[1].skip_reason
+        # With batch deduplication enabled, duplicates in same batch are deduped first
+        assert "Deduplicated" in result.results[1].skip_reason
 
     @pytest.mark.asyncio
     async def test_argument_normalization(self, pipeline, mock_tool_executor):

@@ -23,6 +23,7 @@ from victor.providers.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerRegistry,
 )
+from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 
 
 class Message(BaseModel):
@@ -175,6 +176,14 @@ class BaseProvider(ABC):
         """Get the circuit breaker for this provider."""
         return self._circuit_breaker
 
+    def supports_tools(self) -> bool:
+        """Whether the provider supports tool calling."""
+        return False
+
+    def supports_streaming(self) -> bool:
+        """Whether the provider supports streaming responses."""
+        return False
+
     def get_circuit_breaker_stats(self) -> Optional[Dict[str, Any]]:
         """Get circuit breaker statistics for monitoring."""
         if self._circuit_breaker:
@@ -247,6 +256,25 @@ class BaseProvider(ABC):
         if False:
             yield StreamChunk()
         raise NotImplementedError
+
+    async def discover_capabilities(self, model: str) -> ProviderRuntimeCapabilities:
+        """Discover capabilities for the given model.
+
+        Default implementation falls back to configured limits and
+        provider-declared support flags. Providers should override
+        with real HTTP-based discovery when available.
+        """
+        from victor.config.config_loaders import get_provider_limits
+
+        limits = get_provider_limits(self.name, model)
+        return ProviderRuntimeCapabilities(
+            provider=self.name,
+            model=model,
+            context_window=limits.context_window,
+            supports_tools=self.supports_tools(),
+            supports_streaming=self.supports_streaming(),
+            source="config",
+        )
 
     async def stream_chat(
         self,

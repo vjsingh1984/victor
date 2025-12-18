@@ -21,9 +21,13 @@ Builds provider-specific system prompts based on:
 """
 
 import logging
-from typing import Optional, Set
+from typing import Optional, Set, List, Dict, Any
 
 from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
+from victor.agent.provider_tool_guidance import (
+    get_tool_guidance_strategy,
+    ToolGuidanceStrategy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +79,10 @@ TASK_TYPE_HINTS = {
     "analysis_deep": """[ANALYSIS] Thorough codebase exploration. Read all relevant modules. Comprehensive output.""",
     "analyze": """[ANALYZE] Examine code carefully. Read related files. Structured findings.""",
     "design": """[ARCHITECTURE] For architecture/component questions:
+USE STRUCTURED GRAPH FIRST:
+- Call architecture_summary to get module pagerank/centrality with edge_counts + 2–3 callsites (runtime-only). Avoid ad-hoc graph/find hops unless data is missing.
+- Keep modules vs symbols separate; cite CALLS/INHERITS/IMPORTS counts and callsites (file:line) per hotspot.
+- Prefer runtime code; ignore tests/venv/build outputs unless explicitly requested.
 DOC-FIRST STRATEGY (mandatory order):
 1. FIRST: Read architecture docs if they exist:
    - read_file CLAUDE.md, .victor/init.md, README.md, ARCHITECTURE.md
@@ -336,6 +344,9 @@ class SystemPromptBuilder:
         tool_adapter: Optional[BaseToolCallingAdapter] = None,
         capabilities: Optional[ToolCallingCapabilities] = None,
         prompt_contributors: Optional[list] = None,
+        tool_guidance_strategy: Optional[ToolGuidanceStrategy] = None,
+        task_type: str = "medium",
+        available_tools: Optional[List[str]] = None,
     ):
         """Initialize the prompt builder.
 
@@ -345,6 +356,9 @@ class SystemPromptBuilder:
             tool_adapter: Optional tool calling adapter for getting hints
             capabilities: Optional pre-computed capabilities
             prompt_contributors: Optional list of PromptContributorProtocol implementations
+            tool_guidance_strategy: Optional provider-specific tool guidance strategy (GAP-5)
+            task_type: Task complexity level (simple, medium, complex) for guidance
+            available_tools: List of available tool names for guidance context
         """
         self.provider_name = (provider_name or "").lower()
         self.model = model or ""
@@ -352,6 +366,15 @@ class SystemPromptBuilder:
         self.tool_adapter = tool_adapter
         self.capabilities = capabilities
         self.prompt_contributors = prompt_contributors or []
+        self.task_type = task_type
+        self.available_tools = available_tools or []
+
+        # Initialize tool guidance strategy (GAP-5: Provider-specific tool guidance)
+        # Use provided strategy or auto-detect based on provider name
+        if tool_guidance_strategy:
+            self._tool_guidance = tool_guidance_strategy
+        else:
+            self._tool_guidance = get_tool_guidance_strategy(self.provider_name)
 
         # Cache merged task hints from vertical contributors
         self._merged_task_hints = None
@@ -428,21 +451,97 @@ class SystemPromptBuilder:
 
         return "\n\n".join(sections) if sections else ""
 
+    def get_provider_tool_guidance(self) -> str:
+        """Get provider-specific tool usage guidance.
+
+        This implements GAP-5: Provider-specific tool guidance (Strategy pattern).
+        Different providers have different tool calling behaviors that benefit from
+        tailored guidance. For example:
+        - DeepSeek tends to over-explore with redundant tool calls
+        - Grok handles tools efficiently with minimal redundancy
+        - Ollama needs stricter guidance due to weaker tool calling
+
+        Returns:
+            Provider-specific tool guidance prompt or empty string if no special guidance needed
+        """
+        if not self._tool_guidance:
+            return ""
+
+        guidance = self._tool_guidance.get_guidance_prompt(
+            task_type=self.task_type,
+            available_tools=self.available_tools
+        )
+
+        if guidance:
+            logger.debug(
+                f"Applied provider tool guidance for {self.provider_name}, "
+                f"task_type={self.task_type}"
+            )
+
+        return guidance
+
+    def get_max_exploration_depth(self) -> int:
+        """Get the maximum exploration depth for the current provider and task complexity.
+
+        Returns:
+            Maximum number of tool calls before synthesis checkpoint
+        """
+        if not self._tool_guidance:
+            return 10  # Default
+
+        return self._tool_guidance.get_max_exploration_depth(self.task_type)
+
+    def should_consolidate_calls(self, tool_history: List[Dict[str, Any]]) -> bool:
+        """Check if tool calls should be consolidated based on history.
+
+        Args:
+            tool_history: List of recent tool calls with 'tool' and 'args' keys
+
+        Returns:
+            True if consolidation/synthesis is recommended
+        """
+        if not self._tool_guidance:
+            return False
+
+        return self._tool_guidance.should_consolidate_calls(tool_history)
+
+    def get_synthesis_checkpoint_prompt(self, tool_count: int) -> str:
+        """Get synthesis checkpoint prompt if we've reached the threshold.
+
+        Args:
+            tool_count: Number of tool calls made so far
+
+        Returns:
+            Synthesis prompt or empty string if not at checkpoint
+        """
+        if not self._tool_guidance:
+            return ""
+
+        return self._tool_guidance.get_synthesis_checkpoint_prompt(tool_count)
+
     def build(self) -> str:
         """Build the system prompt.
 
         Uses adapter hints if available, otherwise falls back to
-        provider-specific prompt construction.
+        provider-specific prompt construction. Includes provider-specific
+        tool guidance (GAP-5) when available.
 
         Returns:
             System prompt string tailored to the provider/model
         """
         # Try adapter-based prompt first
         if self.tool_adapter:
-            return self._build_with_adapter()
+            base_prompt = self._build_with_adapter()
+        else:
+            # Fall back to provider-specific prompt
+            base_prompt = self._build_for_provider()
 
-        # Fall back to provider-specific prompt
-        return self._build_for_provider()
+        # Append provider-specific tool guidance if available (GAP-5)
+        tool_guidance = self.get_provider_tool_guidance()
+        if tool_guidance:
+            return f"{base_prompt}\n\n{tool_guidance}"
+
+        return base_prompt
 
     def _build_with_adapter(self) -> str:
         """Build system prompt using the tool calling adapter.
@@ -505,12 +604,18 @@ class SystemPromptBuilder:
         return self._build_default_prompt()
 
     def _build_cloud_prompt(self) -> str:
-        """Build prompt for cloud providers (Anthropic, OpenAI, xAI).
+        """Build prompt for cloud providers (Anthropic, OpenAI, xAI, DeepSeek).
 
-        Delegates to Google-specific prompt for Gemini models.
+        Delegates to provider-specific prompts for optimal behavior.
         """
         if self.provider_name == "google":
             return self._build_google_prompt()
+
+        if self.provider_name == "deepseek":
+            return self._build_deepseek_prompt()
+
+        if self.provider_name == "xai":
+            return self._build_xai_prompt()
 
         return (
             "You are an expert code analyst with access to tools for exploring "
@@ -544,6 +649,73 @@ class SystemPromptBuilder:
             "• Exploration: Use tools systematically, then summarize\n"
             "• Modification: Read → understand → edit\n"
             "• Actions: Execute fully, report results\n\n"
+            f"{PARALLEL_READ_GUIDANCE}\n\n"
+            f"{GROUNDING_RULES}"
+        )
+
+    def _build_deepseek_prompt(self) -> str:
+        """Build optimized prompt for DeepSeek models.
+
+        DeepSeek models have good tool calling but tend to:
+        - Read the same file multiple times (repetitive tool calls)
+        - Generate code snippets without verification
+        - Need explicit grounding reminders
+
+        This prompt emphasizes:
+        - Anti-repetition rules
+        - Strict grounding requirements
+        - Efficient tool usage patterns
+        """
+        return (
+            "Expert coding assistant with tool access.\n\n"
+            "CRITICAL RULES (MUST FOLLOW):\n"
+            "• NEVER read the same file twice - cache file contents mentally\n"
+            "• NEVER call the same tool with identical arguments\n"
+            "• If you've read a file, use that content for all future references\n"
+            "• Only call tools when you need NEW information\n\n"
+            "GROUNDING (MANDATORY):\n"
+            "• ALL code snippets must be directly from tool output\n"
+            "• Do NOT generate or imagine file contents\n"
+            "• Quote code EXACTLY as it appears in tool output\n"
+            "• If unsure about content, read the file ONCE\n"
+            "• Never cite line numbers you haven't verified\n\n"
+            "TOOL EFFICIENCY:\n"
+            "• list_directory first to understand structure\n"
+            "• read_file ONCE per file, remember contents\n"
+            "• Use semantic_code_search for specific symbols\n"
+            "• Stop tool calls when you have enough info (usually 3-5 calls)\n\n"
+            "TASK EXECUTION:\n"
+            "• Generation: Write code directly without excessive exploration\n"
+            "• Analysis: Read files ONCE, provide grounded analysis\n"
+            "• Modification: Read target file ONCE, then edit\n\n"
+            f"{GROUNDING_RULES_EXTENDED}"
+        )
+
+    def _build_xai_prompt(self) -> str:
+        """Build optimized prompt for xAI/Grok models.
+
+        Grok models are generally good at tool calling but benefit from:
+        - Clear task structure
+        - Explicit completion criteria
+        - Balanced exploration guidance
+        """
+        return (
+            "You are an expert code analyst with access to tools.\n\n"
+            "EFFECTIVE TOOL USAGE:\n"
+            "• Use list_directory to understand project structure first\n"
+            "• Use read_file to examine specific files (one read per file)\n"
+            "• Use semantic_code_search for finding specific code patterns\n"
+            "• Parallel tool calls are allowed for independent operations\n\n"
+            "TASK APPROACH:\n"
+            "• For analysis tasks: Read relevant files, then provide structured findings\n"
+            "• For generation tasks: Write code directly with minimal exploration\n"
+            "• For modification tasks: Read → understand → modify\n"
+            "• Stop exploring when you have sufficient information\n\n"
+            "RESPONSE QUALITY:\n"
+            "• Cite specific file paths and line numbers\n"
+            "• Base all claims on actual tool output\n"
+            "• Provide actionable, concrete suggestions\n"
+            "• Structure responses clearly with headers when appropriate\n\n"
             f"{PARALLEL_READ_GUIDANCE}\n\n"
             f"{GROUNDING_RULES}"
         )

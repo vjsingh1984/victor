@@ -97,6 +97,7 @@ PATTERNS = {
         ),
         (r"\bcomplete\s+(this|the)\s+(function|code|implementation)\b", 1.0, "complete_function"),
         (r"\bshow\s+(me\s+)?(a\s+)?code\s+(example|sample)\b", 0.95, "show_code_example"),
+        (r"\bshow\s+me\s+code\s+for\b", 0.95, "show_code_for"),
         (r"\bimplement\s+(the\s+)?function\s+to\s+pass\b", 0.95, "implement_function"),
         (r"\bdef\s+\w+\s*\([^)]*\)\s*:", 0.95, "function_definition"),
         (r'"""\s*\n.*?>>>', 0.95, "doctest_pattern"),

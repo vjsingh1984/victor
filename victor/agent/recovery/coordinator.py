@@ -232,7 +232,7 @@ class RecoveryCoordinator:
         tool_calls: Optional[List[Dict]] = None,
         mentioned_tools: Optional[List[str]] = None,
         elapsed_time: float = 0.0,
-        session_time_limit: float = 240.0,
+        session_idle_timeout: float = 180.0,
         quality_score: float = 0.5,
         consecutive_failures: int = 0,
         recent_responses: Optional[List[str]] = None,
@@ -249,7 +249,7 @@ class RecoveryCoordinator:
             tool_calls: Tool calls made
             mentioned_tools: Tools mentioned but not called
             elapsed_time: Session elapsed time
-            session_time_limit: Session time limit
+            session_idle_timeout: Session time limit
             quality_score: Response quality (from grounding_verifier)
             consecutive_failures: Count of consecutive failures
             recent_responses: Recent responses for loop detection
@@ -259,7 +259,7 @@ class RecoveryCoordinator:
             FailureType if failure detected, None otherwise
         """
         # Priority 1: Timeout approaching
-        if elapsed_time > session_time_limit * 0.9:
+        if elapsed_time > session_idle_timeout * 0.9:
             return FailureType.TIMEOUT_APPROACHING
 
         # Priority 2: Context overflow (use existing compactor metrics if available)
@@ -359,7 +359,7 @@ class RecoveryCoordinator:
         iteration_count: int = 0,
         max_iterations: int = 50,
         elapsed_time: float = 0.0,
-        session_time_limit: float = 240.0,
+        session_idle_timeout: float = 180.0,
         current_temperature: float = 0.7,
         consecutive_failures: int = 0,
         mentioned_tools: Optional[List[str]] = None,
@@ -380,7 +380,7 @@ class RecoveryCoordinator:
             iteration_count=iteration_count,
             max_iterations=max_iterations,
             elapsed_time_seconds=elapsed_time,
-            session_time_limit=session_time_limit,
+            session_idle_timeout=session_idle_timeout,
             provider_name=provider,
             model_name=model,
             current_temperature=current_temperature,

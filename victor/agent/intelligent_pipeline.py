@@ -77,6 +77,9 @@ from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.providers.base import BaseProvider
 
+from victor.agent.output_deduplicator import OutputDeduplicator
+from victor.protocols.provider_adapter import get_provider_adapter
+
 logger = logging.getLogger(__name__)
 
 
@@ -158,11 +161,18 @@ class IntelligentAgentPipeline:
         self._quality_scorer = None
         self._grounding_verifier = None
         self._resilient_executor = None
+        self._output_deduplicator: Optional[OutputDeduplicator] = None
 
         # State tracking
         self._current_context: Optional[RequestContext] = None
         self._session_start = datetime.now()
         self._stats = PipelineStats(profile_name=profile_name)
+
+        # Provider adapter for capability-based behavior
+        self._provider_adapter = get_provider_adapter(provider_name)
+
+        # Provider-aware deduplication
+        self._deduplication_enabled = self._provider_adapter.capabilities.output_deduplication
 
         # Observers for feedback
         self._observers: List[Callable[[ResponseResult], None]] = []
@@ -226,10 +236,36 @@ class IntelligentAgentPipeline:
             try:
                 from victor.agent.adaptive_mode_controller import AdaptiveModeController
 
-                self._mode_controller = AdaptiveModeController(profile_name=self.profile_name)
+                self._mode_controller = AdaptiveModeController(
+                    profile_name=self.profile_name,
+                    provider_name=self.provider_name,
+                    provider_adapter=self._provider_adapter,
+                )
             except Exception as e:
                 logger.warning(f"[IntelligentPipeline] Mode controller init failed: {e}")
         return self._mode_controller
+
+    def get_provider_quality_thresholds(self) -> dict:
+        """Get provider-specific quality thresholds.
+
+        Returns:
+            Dict with 'min_quality' and 'grounding_threshold' for current provider
+        """
+        # Use provider adapter's capabilities first
+        if self._provider_adapter:
+            caps = self._provider_adapter.capabilities
+            return {
+                "min_quality": caps.quality_threshold,
+                "grounding_threshold": caps.grounding_strictness,
+            }
+
+        # Fall back to mode controller
+        controller = self._get_mode_controller()
+        if controller:
+            return controller.get_quality_thresholds()
+
+        # Default fallback
+        return {"min_quality": 0.70, "grounding_threshold": 0.65}
 
     async def _get_quality_scorer(self):
         """Lazy initialize quality scorer."""
@@ -248,7 +284,10 @@ class IntelligentAgentPipeline:
             try:
                 from victor.agent.grounding_verifier import GroundingVerifier
 
-                self._grounding_verifier = GroundingVerifier(project_root=self.project_root)
+                self._grounding_verifier = GroundingVerifier(
+                    project_root=self.project_root,
+                    provider_adapter=self._provider_adapter,
+                )
             except Exception as e:
                 logger.warning(f"[IntelligentPipeline] Grounding verifier init failed: {e}")
         return self._grounding_verifier
@@ -263,6 +302,47 @@ class IntelligentAgentPipeline:
             except Exception as e:
                 logger.warning(f"[IntelligentPipeline] Resilient executor init failed: {e}")
         return self._resilient_executor
+
+    def _get_output_deduplicator(self) -> OutputDeduplicator:
+        """Lazy initialize output deduplicator."""
+        if self._output_deduplicator is None:
+            self._output_deduplicator = OutputDeduplicator(
+                min_block_length=50,
+                normalize_whitespace=True,
+            )
+        return self._output_deduplicator
+
+    def deduplicate_response(self, response: str) -> tuple[str, dict]:
+        """Apply deduplication to response if enabled for provider.
+
+        This method follows the Strategy Pattern - the deduplication strategy
+        is selected based on the provider configuration.
+
+        Args:
+            response: Raw response from provider
+
+        Returns:
+            Tuple of (deduplicated_response, stats_dict)
+        """
+        if not self._deduplication_enabled or not response:
+            return response, {"deduplication_applied": False}
+
+        dedup = self._get_output_deduplicator()
+        dedup.reset()  # Reset for fresh processing
+
+        deduplicated = dedup.process(response)
+        stats = dedup.get_stats()
+        stats["deduplication_applied"] = True
+        stats["provider"] = self.provider_name
+
+        if stats.get("duplicates_removed", 0) > 0:
+            logger.info(
+                f"[IntelligentPipeline] Deduplication for {self.provider_name}: "
+                f"removed {stats['duplicates_removed']} duplicates, "
+                f"saved ~{stats['bytes_saved']} bytes"
+            )
+
+        return deduplicated, stats
 
     async def prepare_request(
         self,
@@ -420,6 +500,13 @@ class IntelligentAgentPipeline:
             ResponseResult with quality and grounding info
         """
         start_time = time.perf_counter()
+
+        # Step 0: Apply deduplication for providers with repetition issues
+        # This follows the Decorator pattern - wrapping the response processing
+        deduplicated_response, dedup_stats = self.deduplicate_response(response)
+        if dedup_stats.get("deduplication_applied"):
+            # Use deduplicated response for subsequent processing
+            response = deduplicated_response
 
         # Score quality (lazy init)
         quality_score = 0.5

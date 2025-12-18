@@ -54,6 +54,7 @@ from victor.agent.model_switcher import ModelSwitcher, SwitchReason, ModelSwitch
 from victor.agent.tool_calling import ToolCallingAdapterRegistry, ToolCallingCapabilities
 from victor.providers.base import BaseProvider
 from victor.providers.registry import ProviderRegistry
+from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,7 @@ class ProviderState:
     capabilities: Optional[ToolCallingCapabilities] = None
     is_healthy: bool = True
     last_error: Optional[str] = None
+    runtime_capabilities: Optional[ProviderRuntimeCapabilities] = None
 
 
 class ProviderManager:
@@ -113,19 +115,6 @@ class ProviderManager:
     - Switch history tracking
     - Tool capability detection
     """
-
-    # Known provider context windows (in tokens)
-    PROVIDER_CONTEXT_WINDOWS = {
-        "anthropic": 200000,
-        "openai": 128000,
-        "google": 1000000,
-        "xai": 131072,
-        "deepseek": 131072,
-        "moonshot": 262144,
-        "ollama": 32768,
-        "lmstudio": 32768,
-        "vllm": 32768,
-    }
 
     # Cloud providers with robust tool calling
     CLOUD_PROVIDERS = {"anthropic", "openai", "google", "xai", "deepseek", "moonshot", "groq"}
@@ -180,6 +169,9 @@ class ProviderManager:
         # Callbacks for provider changes
         self._on_switch_callbacks: List[Callable[[ProviderState], None]] = []
 
+        # Runtime capability cache (per provider/model)
+        self._capability_cache: Dict[tuple[str, str], ProviderRuntimeCapabilities] = {}
+
         logger.debug(
             f"ProviderManager initialized: {self._current_state.provider_name if self._current_state else 'none'}"
         )
@@ -220,18 +212,34 @@ class ProviderManager:
     def get_context_window(self) -> int:
         """Get context window size for current provider/model.
 
+        Tries to get the context window from the provider first, then falls
+        back to the centralized YAML configuration.
+
         Returns:
             Context window in tokens
         """
-        # Try to get from provider
+        # Try to get from the provider's own implementation first
+        cache_key = (self.provider_name, self.model)
+        if cache_key in self._capability_cache:
+            return self._capability_cache[cache_key].context_window
+
         if self.provider and hasattr(self.provider, "get_context_window"):
             try:
+                # This allows providers like Ollama to dynamically determine the window
                 return self.provider.get_context_window(self.model)
             except Exception:
-                pass
+                logger.warning(
+                    f"Provider {self.provider_name} failed to dynamically get context window."
+                )
 
-        # Fall back to known values
-        return self.PROVIDER_CONTEXT_WINDOWS.get(self.provider_name, 32768)
+        # Fall back to the centralized YAML configuration
+        from victor.config.config_loaders import get_provider_limits
+
+        limits = get_provider_limits(self.provider_name, self.model)
+        logger.debug(
+            f"Using context window from config for {self.provider_name}: {limits.context_window}"
+        )
+        return limits.context_window
 
     def initialize_tool_adapter(self) -> ToolCallingCapabilities:
         """Initialize tool calling adapter for current provider/model.
@@ -259,6 +267,38 @@ class ProviderManager:
         )
 
         return capabilities
+
+    async def _discover_and_cache_capabilities(self) -> Optional[ProviderRuntimeCapabilities]:
+        """Discover provider capabilities asynchronously and cache result."""
+        if not self._current_state:
+            return None
+
+        cache_key = (self.provider_name, self.model)
+        if cache_key in self._capability_cache:
+            return self._capability_cache[cache_key]
+
+        try:
+            discovery = await self.provider.discover_capabilities(self.model)  # type: ignore[union-attr]
+        except Exception as exc:
+            logger.warning(
+                f"Capability discovery failed for {self.provider_name}:{self.model} ({exc}); "
+                "falling back to config."
+            )
+            from victor.config.config_loaders import get_provider_limits
+
+            limits = get_provider_limits(self.provider_name, self.model)
+            discovery = ProviderRuntimeCapabilities(
+                provider=self.provider_name,
+                model=self.model,
+                context_window=limits.context_window,
+                supports_tools=self.provider.supports_tools() if self.provider else False,  # type: ignore[union-attr]
+                supports_streaming=self.provider.supports_streaming() if self.provider else False,  # type: ignore[union-attr]
+                source="config",
+            )
+
+        self._capability_cache[cache_key] = discovery
+        self._current_state.runtime_capabilities = discovery
+        return discovery
 
     async def switch_provider(
         self,
@@ -307,6 +347,9 @@ class ProviderManager:
 
             # Initialize tool adapter
             self.initialize_tool_adapter()
+
+            # Discover runtime capabilities (async, cached)
+            await self._discover_and_cache_capabilities()
 
             # Record switch
             self._model_switcher.switch(
@@ -362,6 +405,9 @@ class ProviderManager:
             # Reinitialize tool adapter
             self.initialize_tool_adapter()
 
+            # Discover runtime capabilities (async, cached)
+            await self._discover_and_cache_capabilities()
+
             # Record switch
             self._model_switcher.switch(
                 provider=self.provider_name,
@@ -396,6 +442,7 @@ class ProviderManager:
             return {"provider": None, "model": None}
 
         caps = self.capabilities
+        runtime_caps = self._capability_cache.get((self.provider_name, self.model))
         return {
             "provider": self.provider_name,
             "model": self.model,
@@ -404,7 +451,7 @@ class ProviderManager:
             "streaming_tool_calls": caps.streaming_tool_calls if caps else False,
             "parallel_tool_calls": caps.parallel_tool_calls if caps else False,
             "thinking_mode": caps.thinking_mode if caps else False,
-            "context_window": self.get_context_window(),
+            "context_window": runtime_caps.context_window if runtime_caps else self.get_context_window(),
             "is_cloud": self.is_cloud_provider(),
             "is_local": self.is_local_provider(),
             "is_healthy": self._current_state.is_healthy,

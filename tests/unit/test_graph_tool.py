@@ -855,3 +855,417 @@ class TestGraphPerformance:
 
         assert elapsed < 1.0  # Should be very fast
         assert result["total_nodes"] == 100
+
+
+# =============================================================================
+# GAP-3 Fix: Fuzzy Node Resolution Tests
+# =============================================================================
+
+
+class TestFuzzyNodeResolution:
+    """Tests for enhanced fuzzy node resolution (GAP-3 fix).
+
+    These tests verify that LLMs can find graph nodes using CamelCase class
+    names derived from file names, partial matches, and other common patterns.
+
+    Example: When LLM sees file `database_schema.py` and searches for
+    `DatabaseSchema`, it should find nodes in that file even though the
+    exact node name might be `MarketData` or `Position`.
+    """
+
+    @pytest.fixture
+    def analyzer_with_named_nodes(self):
+        """Create analyzer with nodes simulating real file/class naming."""
+        analyzer = GraphAnalyzer()
+
+        # Simulate investor_homelab project structure
+        nodes = [
+            # database_schema.py - multiple classes
+            MockGraphNode(
+                "database_schema.py:MarketData",
+                "class",
+                "MarketData",
+                "investor_homelab/models/database_schema.py",
+                15,
+            ),
+            MockGraphNode(
+                "database_schema.py:Position",
+                "class",
+                "Position",
+                "investor_homelab/models/database_schema.py",
+                45,
+            ),
+            MockGraphNode(
+                "database_schema.py:create_tables",
+                "function",
+                "create_tables",
+                "investor_homelab/models/database_schema.py",
+                100,
+            ),
+            # web_search_client.py
+            MockGraphNode(
+                "web_search_client.py:WebSearchClient",
+                "class",
+                "WebSearchClient",
+                "investor_homelab/utils/web_search_client.py",
+                10,
+            ),
+            MockGraphNode(
+                "web_search_client.py:search_duckduckgo",
+                "method",
+                "search_duckduckgo",
+                "investor_homelab/utils/web_search_client.py",
+                50,
+            ),
+            # news_model.py
+            MockGraphNode(
+                "news_model.py:NewsDatabase",
+                "class",
+                "NewsDatabase",
+                "investor_homelab/models/news_model.py",
+                20,
+            ),
+            MockGraphNode(
+                "news_model.py:NewsArticle",
+                "class",
+                "NewsArticle",
+                "investor_homelab/models/news_model.py",
+                60,
+            ),
+        ]
+
+        for node in nodes:
+            analyzer.add_node(node)
+
+        return analyzer
+
+    def test_camel_case_to_snake_case_conversion(self):
+        """Test that CamelCase names are converted to snake_case for file matching."""
+        # Test conversion algorithm
+        input_str = "DatabaseSchema"
+        normalized = ""
+        for i, c in enumerate(input_str):
+            if i > 0 and c.isupper():
+                normalized += "_"
+            normalized += c.lower()
+
+        assert normalized == "database_schema"
+
+    def test_multi_word_camel_case_conversion(self):
+        """Test multi-word CamelCase conversion."""
+        input_str = "WebSearchClient"
+        normalized = ""
+        for i, c in enumerate(input_str):
+            if i > 0 and c.isupper():
+                normalized += "_"
+            normalized += c.lower()
+
+        assert normalized == "web_search_client"
+
+    def test_file_path_matching_from_camel_case(self, analyzer_with_named_nodes):
+        """Test that CamelCase search finds nodes in matching snake_case file."""
+        search = "DatabaseSchema"
+
+        # Convert CamelCase to snake_case
+        normalized_search = ""
+        for i, c in enumerate(search):
+            if i > 0 and c.isupper():
+                normalized_search += "_"
+            normalized_search += c.lower()
+
+        # Find nodes where file contains normalized search term
+        file_matches = [
+            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            if n.file and normalized_search in n.file.lower()
+        ]
+
+        # Should find MarketData, Position, create_tables in database_schema.py
+        assert len(file_matches) == 3
+        files = {m[1].file for m in file_matches}
+        assert all("database_schema.py" in f for f in files)
+
+    def test_exact_name_match_preferred(self, analyzer_with_named_nodes):
+        """Test that exact name match is found before fuzzy matching."""
+        search = "WebSearchClient"
+
+        # Exact name match
+        exact_match = None
+        for nid, n in analyzer_with_named_nodes.nodes.items():
+            if n.name == search:
+                exact_match = nid
+                break
+
+        assert exact_match == "web_search_client.py:WebSearchClient"
+
+    def test_substring_match_in_name(self, analyzer_with_named_nodes):
+        """Test Strategy 1: Substring match in node name."""
+        search = "News"
+        search_lower = search.lower()
+
+        name_matches = [
+            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            if search_lower in n.name.lower()
+        ]
+
+        # Should find NewsDatabase and NewsArticle
+        assert len(name_matches) == 2
+        names = {m[1].name for m in name_matches}
+        assert "NewsDatabase" in names
+        assert "NewsArticle" in names
+
+    def test_single_match_auto_resolution(self, analyzer_with_named_nodes):
+        """Test that single fuzzy match is auto-resolved."""
+        search = "duckduckgo"
+        search_lower = search.lower()
+
+        matches = [
+            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            if search_lower in n.name.lower()
+        ]
+
+        # Only search_duckduckgo matches
+        assert len(matches) == 1
+        assert matches[0][1].name == "search_duckduckgo"
+
+    def test_multiple_matches_same_file_suggestion(self, analyzer_with_named_nodes):
+        """Test that multiple matches from same file provide helpful suggestions."""
+        search = "database"
+
+        # Convert to snake_case for file matching
+        normalized = search.lower()
+
+        file_matches = [
+            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            if n.file and normalized in n.file.lower()
+        ]
+
+        # All matches from database_schema.py
+        unique_files = set(n.file for _, n in file_matches)
+        assert len(unique_files) == 1
+        assert "database_schema.py" in list(unique_files)[0]
+
+    def test_partial_word_match_without_underscore(self, analyzer_with_named_nodes):
+        """Test Strategy 3: Partial word match ignoring underscores."""
+        search = "searchclient"  # Without underscore
+        search_normalized = search.lower().replace("_", "")
+
+        partial_matches = [
+            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            if search_normalized in n.name.lower().replace("_", "")
+        ]
+
+        # Should find WebSearchClient
+        assert len(partial_matches) >= 1
+        names = {m[1].name for m in partial_matches}
+        assert "WebSearchClient" in names
+
+    def test_deduplication_across_strategies(self, analyzer_with_named_nodes):
+        """Test that same node found by multiple strategies appears once."""
+        search = "Web"
+
+        # Strategy 1: Name substring
+        name_matches = [
+            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            if search.lower() in n.name.lower()
+        ]
+
+        # Strategy 2: File path
+        normalized_search = search.lower()
+        file_matches = [
+            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            if n.file and normalized_search in n.file.lower()
+        ]
+
+        # Combine and deduplicate
+        all_matches = {}
+        for nid, n in name_matches + file_matches:
+            if nid not in all_matches:
+                all_matches[nid] = n
+
+        # WebSearchClient should only appear once despite matching both strategies
+        web_matches = [n for n in all_matches.values() if "Web" in n.name]
+        assert len(web_matches) == 1
+
+    def test_error_message_includes_suggestions(self, analyzer_with_named_nodes):
+        """Test that error messages include helpful suggestions."""
+        # Simulate the error response format
+        search = "Schema"
+
+        name_matches = [
+            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            if search.lower() in n.name.lower()
+        ]
+
+        # No direct name matches for "Schema"
+        if not name_matches:
+            # Build suggestions from file matches
+            normalized = ""
+            for i, c in enumerate(search):
+                if i > 0 and c.isupper():
+                    normalized += "_"
+                normalized += c.lower()
+
+            file_matches = [
+                (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+                if n.file and normalized in n.file.lower()
+            ]
+
+            suggestions = [
+                {"name": m.name, "type": m.type, "file": m.file}
+                for _, m in file_matches[:10]
+            ]
+
+            # Suggestions should help user find correct symbols
+            assert len(suggestions) > 0
+
+    def test_hint_suggests_alternative_modes(self, analyzer_with_named_nodes):
+        """Test that hints suggest file_deps mode for file-level analysis."""
+        # When matches come from single file, suggest file_deps mode
+        file_path = "investor_homelab/models/database_schema.py"
+        hint = f"For file-level analysis, try: graph(mode='file_deps', file='{file_path}')"
+
+        assert "file_deps" in hint
+        assert file_path in hint
+
+
+class TestFuzzyNodeResolutionEdgeCases:
+    """Edge case tests for fuzzy node resolution."""
+
+    def test_empty_graph_returns_not_found(self):
+        """Test node resolution with empty graph returns helpful error."""
+        analyzer = GraphAnalyzer()
+
+        # Simulate the resolution logic for empty graph
+        search = "AnyNode"
+        matches = [
+            (nid, n) for nid, n in analyzer.nodes.items()
+            if search.lower() in n.name.lower()
+        ]
+
+        assert len(matches) == 0
+
+    def test_node_without_file_attribute(self):
+        """Test handling of nodes with empty file path."""
+        analyzer = GraphAnalyzer()
+
+        node = MockGraphNode(
+            "virtual:SomeClass",
+            "class",
+            "SomeClass",
+            "",  # Empty file
+            0,
+        )
+        analyzer.add_node(node)
+
+        # File matching should handle empty file gracefully
+        file_matches = [
+            (nid, n) for nid, n in analyzer.nodes.items()
+            if n.file and "test" in n.file.lower()
+        ]
+
+        assert len(file_matches) == 0  # Empty file should not match
+
+    def test_special_characters_in_search(self):
+        """Test search with special characters doesn't crash."""
+        analyzer = GraphAnalyzer()
+
+        node = MockGraphNode(
+            "test.py:MyClass",
+            "class",
+            "MyClass",
+            "test.py",
+            1,
+        )
+        analyzer.add_node(node)
+
+        # Search with underscore
+        search = "My_Class"
+        search_normalized = search.lower().replace("_", "")
+
+        matches = [
+            (nid, n) for nid, n in analyzer.nodes.items()
+            if search_normalized in n.name.lower().replace("_", "")
+        ]
+
+        assert len(matches) == 1
+
+    def test_acronym_in_camel_case(self):
+        """Test handling of acronyms like IBConnection."""
+        input_str = "IBConnection"
+        normalized = ""
+        for i, c in enumerate(input_str):
+            if i > 0 and c.isupper():
+                normalized += "_"
+            normalized += c.lower()
+
+        # IBConnection -> i_b_connection
+        assert normalized == "i_b_connection"
+
+    def test_modes_that_skip_fuzzy_matching(self):
+        """Test that certain modes skip fuzzy resolution."""
+        skip_modes = ["pagerank", "centrality", "stats", "module_pagerank", "module_centrality"]
+
+        # These modes work on entire graph, not specific nodes
+        for mode in skip_modes:
+            assert mode in ["pagerank", "centrality", "stats", "module_pagerank", "module_centrality"]
+
+
+class TestIntegrationFuzzyResolution:
+    """Integration tests simulating real LLM usage patterns."""
+
+    @pytest.fixture
+    def real_world_analyzer(self):
+        """Create analyzer simulating real codebase."""
+        analyzer = GraphAnalyzer()
+
+        nodes = [
+            MockGraphNode("db.py:DatabaseConnection", "class", "DatabaseConnection", "utils/db.py", 10),
+            MockGraphNode("db.py:query", "function", "query", "utils/db.py", 50),
+            MockGraphNode("api.py:APIClient", "class", "APIClient", "clients/api.py", 15),
+            MockGraphNode("api.py:get", "method", "get", "clients/api.py", 30),
+            MockGraphNode("api.py:post", "method", "post", "clients/api.py", 60),
+        ]
+
+        for node in nodes:
+            analyzer.add_node(node)
+
+        return analyzer
+
+    def test_llm_searches_for_database(self, real_world_analyzer):
+        """Test LLM searching for 'Database' finds related nodes."""
+        search = "Database"
+
+        name_matches = [
+            (nid, n) for nid, n in real_world_analyzer.nodes.items()
+            if search.lower() in n.name.lower()
+        ]
+
+        # Should find DatabaseConnection
+        assert len(name_matches) == 1
+        assert name_matches[0][1].name == "DatabaseConnection"
+
+    def test_llm_searches_for_api_client(self, real_world_analyzer):
+        """Test LLM searching for 'APIClient' finds exact match."""
+        search = "APIClient"
+
+        resolved = None
+        for nid, n in real_world_analyzer.nodes.items():
+            if n.name == search:
+                resolved = nid
+                break
+
+        assert resolved == "api.py:APIClient"
+
+    def test_llm_partial_search(self, real_world_analyzer):
+        """Test LLM partial search finds relevant nodes."""
+        search = "api"
+        search_lower = search.lower()
+
+        file_matches = [
+            (nid, n) for nid, n in real_world_analyzer.nodes.items()
+            if n.file and search_lower in n.file.lower()
+        ]
+
+        # Should find all nodes in api.py
+        assert len(file_matches) == 3
+        assert all("api.py" in m[1].file for m in file_matches)

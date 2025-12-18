@@ -105,7 +105,7 @@ class RecoveryContext:
     iteration_count: int = 0
     max_iterations: int = 50
     elapsed_time_seconds: float = 0.0
-    session_time_limit: float = 240.0
+    session_idle_timeout: float = 180.0
 
     # Model info
     provider_name: str = ""
@@ -134,7 +134,7 @@ class RecoveryContext:
         # Discretize continuous values
         budget_ratio = self._discretize_ratio(self.tool_calls_made / max(self.tool_budget, 1))
         iter_ratio = self._discretize_ratio(self.iteration_count / max(self.max_iterations, 1))
-        time_ratio = self._discretize_ratio(self.elapsed_time_seconds / max(self.session_time_limit, 1))
+        time_ratio = self._discretize_ratio(self.elapsed_time_seconds / max(self.session_idle_timeout, 1))
         quality_bucket = self._discretize_quality(self.last_quality_score)
         temp_bucket = self._discretize_temperature(self.current_temperature)
 

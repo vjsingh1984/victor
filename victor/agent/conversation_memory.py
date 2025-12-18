@@ -628,6 +628,11 @@ class ConversationStore:
             version_applied = cursor.fetchone() is not None
 
             if not version_applied:
+                # First, migrate existing sessions table if it exists
+                # This must happen BEFORE _apply_normalized_schema since that creates
+                # indexes on columns that need to exist
+                self._migrate_sessions_table(conn)
+
                 # Apply normalized schema
                 self._apply_normalized_schema(conn)
                 conn.execute(
@@ -639,6 +644,10 @@ class ConversationStore:
             else:
                 # Load ID caches for existing database
                 self._load_lookup_caches(conn)
+
+                # Run migration for any missing columns (in case of partial upgrade)
+                self._migrate_sessions_table(conn)
+                conn.commit()
 
         logger.debug(f"Database initialized at {self.db_path}")
 
@@ -877,6 +886,54 @@ class ConversationStore:
             f"Loaded lookup caches: {len(self._model_family_ids)} families, "
             f"{len(self._provider_ids)} providers"
         )
+
+    def _migrate_sessions_table(self, conn: sqlite3.Connection) -> None:
+        """Add missing columns to sessions table for schema migration.
+
+        This handles the case where an old database exists with a sessions table
+        that was created before the normalized schema was introduced.
+        The CREATE TABLE IF NOT EXISTS doesn't add columns to existing tables,
+        so we need to use ALTER TABLE to add missing columns.
+        """
+        # Check if sessions table exists
+        cursor = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='sessions'"
+        )
+        result = cursor.fetchone()
+        if not result:
+            # No sessions table - nothing to migrate
+            return
+
+        table_sql = result[0]
+
+        # Define columns that need to be added if missing
+        # Format: (column_name, column_definition)
+        new_columns = [
+            ("provider_id", "INTEGER"),
+            ("model_family_id", "INTEGER"),
+            ("model_size_id", "INTEGER"),
+            ("context_size_id", "INTEGER"),
+            ("model_params_b", "REAL"),
+            ("context_tokens", "INTEGER"),
+            ("tool_capable", "INTEGER DEFAULT 0"),
+            ("is_moe", "INTEGER DEFAULT 0"),
+            ("is_reasoning", "INTEGER DEFAULT 0"),
+        ]
+
+        columns_added = []
+        for col_name, col_def in new_columns:
+            # Check if column exists in table definition
+            if col_name not in table_sql:
+                try:
+                    conn.execute(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_def}")
+                    columns_added.append(col_name)
+                except sqlite3.OperationalError as e:
+                    # Column might already exist (race condition or partial migration)
+                    if "duplicate column name" not in str(e).lower():
+                        logger.warning(f"Failed to add column {col_name} to sessions: {e}")
+
+        if columns_added:
+            logger.info(f"Migrated sessions table: added columns {columns_added}")
 
     def _get_or_create_provider_id(
         self, conn: sqlite3.Connection, provider: Optional[str]

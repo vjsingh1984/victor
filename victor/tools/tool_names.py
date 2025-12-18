@@ -204,6 +204,7 @@ class ToolNames:
     AUDIT = "audit"  # audit → audit (codebase auditing)
     IAC = "iac"  # iac_scanner → iac (infrastructure as code)
     GRAPH = "graph"  # graph → graph (code graph analysis: PageRank, dependencies)
+    ARCH_SUMMARY = "arch_summary"  # architecture_summary → arch_summary (architectural hubs/coupling)
 
 
 # =============================================================================
@@ -238,6 +239,7 @@ TOOL_ALIASES: Dict[str, str] = {
     "find_symbol": ToolNames.SYMBOL,
     "find_references": ToolNames.REFS,
     "rename_symbol": ToolNames.RENAME,  # Duplicate → maps to same as refactor_rename_symbol
+    "architecture_summary": ToolNames.ARCH_SUMMARY,
     # Refactoring
     "refactor_rename_symbol": ToolNames.RENAME,
     "refactor_extract_function": ToolNames.EXTRACT,

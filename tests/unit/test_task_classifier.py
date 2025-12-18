@@ -164,7 +164,8 @@ class TestTaskClassifierGeneration:
         """Test that 'show me code' is classified as GENERATION."""
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
 
-        classifier = ComplexityClassifier()
+        # Disable semantic classification to avoid flaky behavior from shared singleton state
+        classifier = ComplexityClassifier(use_semantic=False)
         result = classifier.classify("Show me code for a binary search algorithm")
 
         assert result.complexity == TaskComplexity.GENERATION

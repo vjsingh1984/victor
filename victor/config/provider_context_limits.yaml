@@ -64,21 +64,21 @@ providers:
 
   # Local Providers (no rate limits)
   ollama:
-    context_window: 128000
+    context_window: 65536
     response_reserve: 4096
     supports_extended_context: true
     rate_limit_rpm: 0  # Unlimited
     rate_limit_tpm: 0
 
   lmstudio:
-    context_window: 128000
+    context_window: 65536
     response_reserve: 4096
     supports_extended_context: true
     rate_limit_rpm: 0
     rate_limit_tpm: 0
 
   vllm:
-    context_window: 128000
+    context_window: 65536
     response_reserve: 4096
     supports_extended_context: true
     rate_limit_rpm: 0

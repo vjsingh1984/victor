@@ -80,6 +80,10 @@ CODING_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
     "design": TaskTypeHint(
         task_type="design",
         hint="""[ARCHITECTURE] For architecture/component questions:
+USE STRUCTURED GRAPH FIRST:
+- Call architecture_summary to get module pagerank/centrality with edge_counts + 2–3 callsites (runtime-only). Avoid ad-hoc graph/find hops unless data is missing.
+- Keep modules vs symbols separate; cite CALLS/INHERITS/IMPORTS counts and callsites (file:line) per hotspot.
+- Prefer runtime code; ignore tests/venv/build outputs unless explicitly requested.
 DOC-FIRST STRATEGY (mandatory order):
 1. FIRST: Read architecture docs if they exist:
    - read_file CLAUDE.md, .victor/init.md, README.md, ARCHITECTURE.md

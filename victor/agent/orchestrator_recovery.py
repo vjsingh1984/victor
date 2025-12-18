@@ -241,7 +241,7 @@ class OrchestratorRecoveryIntegration:
 
         # Calculate elapsed time
         elapsed_time = time.time() - self._state.session_start_time
-        session_time_limit = getattr(self._settings, "session_time_limit", 240)
+        session_idle_timeout = getattr(self._settings, "session_idle_timeout", 180)
 
         # Check for normal completion (has content and/or tool calls)
         if (content and len(content) > 50) or tool_calls:
@@ -264,7 +264,7 @@ class OrchestratorRecoveryIntegration:
             tool_calls=tool_calls,
             mentioned_tools=mentioned_tools,
             elapsed_time=elapsed_time,
-            session_time_limit=session_time_limit,
+            session_idle_timeout=session_idle_timeout,
             quality_score=quality_score,
             consecutive_failures=self._state.consecutive_failures,
             recent_responses=self._state.recent_responses,
@@ -301,7 +301,7 @@ class OrchestratorRecoveryIntegration:
             iteration_count=iteration_count,
             max_iterations=max_iterations,
             elapsed_time=elapsed_time,
-            session_time_limit=session_time_limit,
+            session_idle_timeout=session_idle_timeout,
             current_temperature=current_temperature,
             consecutive_failures=self._state.consecutive_failures,
             mentioned_tools=mentioned_tools,

@@ -578,7 +578,7 @@ class SemanticToolSelector:
         "codebase analysis": ["search", "graph", "symbol"],
         "understand": ["search", "read", "symbol"],
         "explore codebase": ["search", "ls", "read"],
-        "architecture": ["search", "graph", "symbol"],
+        "architecture": ["arch_summary", "graph", "search", "symbol"],
     }
 
     # Conceptual query patterns that strongly prefer semantic_code_search over code_search

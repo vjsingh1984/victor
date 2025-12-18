@@ -72,7 +72,7 @@ class StreamingChatHandler:
         settings: "Settings",
         message_adder: MessageAdder,
         tool_executor: Optional[ToolExecutor] = None,
-        session_time_limit: float = 240.0,
+        session_idle_timeout: float = 180.0,
     ):
         """Initialize the streaming handler.
 
@@ -80,15 +80,15 @@ class StreamingChatHandler:
             settings: Application settings
             message_adder: Object that can add messages to conversation
             tool_executor: Optional tool executor for running tools
-            session_time_limit: Maximum session duration in seconds
+            session_idle_timeout: Maximum idle time in seconds (resets on activity)
         """
         self.settings = settings
         self.message_adder = message_adder
         self.tool_executor = tool_executor
-        self.session_time_limit = session_time_limit
+        self.session_idle_timeout = session_idle_timeout
 
     def check_time_limit(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
-        """Check if session time limit has been exceeded.
+        """Check if session idle time limit has been exceeded.
 
         Args:
             ctx: The streaming context
@@ -96,19 +96,19 @@ class StreamingChatHandler:
         Returns:
             IterationResult if limit exceeded, None otherwise
         """
-        if ctx.is_over_time_limit(self.session_time_limit):
+        if ctx.is_over_time_limit(self.session_idle_timeout):
             logger.warning(
-                f"Session time limit ({self.session_time_limit}s) reached - "
-                f"elapsed={ctx.elapsed_time():.1f}s, forcing completion"
+                f"Session idle timeout ({self.session_idle_timeout}s) reached - "
+                f"idle={ctx.elapsed_time():.1f}s, total={ctx.total_session_time():.1f}s, forcing completion"
             )
             result = create_force_completion_result(
-                f"Session time limit ({self.session_time_limit}s) reached. "
+                f"Session idle timeout ({self.session_idle_timeout}s) reached. "
                 "Providing summary of progress so far."
             )
             # Add message to force summary
             self.message_adder.add_message(
                 "user",
-                "TIME LIMIT REACHED. Provide a summary of your findings NOW. "
+                "IDLE TIMEOUT REACHED. Provide a summary of your findings NOW. "
                 "Do NOT call any more tools.",
             )
             ctx.force_completion = True
@@ -198,6 +198,9 @@ class StreamingChatHandler:
         Returns:
             IterationResult with appropriate action
         """
+        # Reset activity timer on provider response to prevent idle timeout
+        ctx.reset_activity_timer()
+
         # Update context with response content
         ctx.accumulate_content(response.content)
         ctx.update_context_message(response.content)
@@ -1289,22 +1292,22 @@ class StreamingChatHandler:
 def create_streaming_handler(
     settings: "Settings",
     orchestrator: "AgentOrchestrator",
-    session_time_limit: Optional[float] = None,
+    session_idle_timeout: Optional[float] = None,
 ) -> StreamingChatHandler:
     """Factory function to create a StreamingChatHandler.
 
     Args:
         settings: Application settings
         orchestrator: The orchestrator (used as message adder)
-        session_time_limit: Optional time limit override
+        session_idle_timeout: Optional idle timeout override (seconds)
 
     Returns:
         Configured StreamingChatHandler
     """
-    limit = session_time_limit or getattr(settings, "session_time_limit", 240.0)
+    limit = session_idle_timeout or getattr(settings, "session_idle_timeout", 180.0)
     return StreamingChatHandler(
         settings=settings,
         message_adder=orchestrator,
         tool_executor=None,  # Tool execution stays in orchestrator for now
-        session_time_limit=limit,
+        session_idle_timeout=limit,
     )

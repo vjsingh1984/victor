@@ -141,10 +141,10 @@ build = [
     "pyinstaller-hooks-contrib>=2024.0",
 ]
 
-# Google Gemini provider (optional due to protobuf version conflicts)
+# Google Gemini provider (using new google-genai SDK)
 # Usage: pip install victor[google]
 google = [
-    "google-generativeai>=0.7",
+    "google-genai>=1.0",
 ]
 
 # Language-specific tree-sitter grammars (optional - install what you need)
@@ -231,6 +231,8 @@ lang-web = [
     "tree-sitter-html>=0.23",
     "tree-sitter-css>=0.23",
     "tree-sitter-json>=0.23",
+    "tree-sitter-javascript>=0.23",
+    "tree-sitter-typescript>=0.23",
 ]
 
 lang-config = [
@@ -238,16 +240,19 @@ lang-config = [
     "tree-sitter-yaml>=0.6",
     "tree-sitter-toml>=0.6",
     "tree-sitter-xml>=0.6",
+    "tree-sitter-markdown>=0.5",
 ]
 
 lang-jvm = [
     "tree-sitter-scala>=0.23",
     "tree-sitter-kotlin>=1.0",
+    "tree-sitter-java>=0.23",
 ]
 
 lang-systems = [
     "tree-sitter-c>=0.23",
     "tree-sitter-bash>=0.23",
+    "tree-sitter-cpp>=0.23",
 ]
 
 lang-apple = [

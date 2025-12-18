@@ -415,12 +415,12 @@ class TimeoutRecovery(BaseRecoveryStrategy):
         if context.failure_type == FailureType.TIMEOUT_APPROACHING:
             return True
         # Also handle preemptively
-        time_ratio = context.elapsed_time_seconds / max(context.session_time_limit, 1)
+        time_ratio = context.elapsed_time_seconds / max(context.session_idle_timeout, 1)
         return time_ratio >= self._warning_threshold
 
     async def recover(self, context: RecoveryContext) -> RecoveryResult:
         """Force completion due to timeout."""
-        remaining = context.session_time_limit - context.elapsed_time_seconds
+        remaining = context.session_idle_timeout - context.elapsed_time_seconds
         remaining_str = f"{remaining:.0f}s" if remaining > 0 else "no time"
 
         return RecoveryResult(

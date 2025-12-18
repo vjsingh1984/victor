@@ -1,0 +1,301 @@
+# P4 Multi-Provider Excellence - Example Profile Configurations
+#
+# This file demonstrates different configuration scenarios for P4 features:
+# 1. Hybrid Search (semantic + keyword with RRF)
+# 2. RL-Based Threshold Learning
+# 3. Tool Call Deduplication
+# 4. Query Expansion
+#
+# Copy relevant sections to your ~/.victor/profiles.yaml
+
+# ==============================================================================
+# Profile 1: P4 All Features Enabled (Recommended Default)
+# ==============================================================================
+# Use this for: General development, balanced performance
+#
+p4_default:
+  provider: anthropic
+  model: claude-sonnet-4-5-latest
+
+  # Hybrid Search: Combines semantic + keyword for best recall
+  enable_hybrid_search: true
+  hybrid_search_semantic_weight: 0.6  # 60% semantic, 40% keyword
+  hybrid_search_keyword_weight: 0.4
+
+  # RL-Based Threshold Learning: Auto-optimizes similarity thresholds
+  enable_semantic_threshold_rl_learning: true
+  semantic_threshold_overrides: {}  # Populated by RL over time
+
+  # Tool Deduplication: Prevents redundant operations
+  enable_tool_deduplication: true
+  tool_deduplication_window_size: 10
+
+  # Query Expansion: Fixes false negatives
+  semantic_similarity_threshold: 0.5
+  semantic_query_expansion_enabled: true
+  semantic_max_query_expansions: 5
+
+# ==============================================================================
+# Profile 2: Code Exploration (Favor Conceptual Understanding)
+# ==============================================================================
+# Use this for: Learning new codebases, architectural analysis
+#
+p4_exploration:
+  provider: anthropic
+  model: claude-sonnet-4-5-latest
+
+  # Heavy semantic weighting for conceptual matches
+  enable_hybrid_search: true
+  hybrid_search_semantic_weight: 0.8
+  hybrid_search_keyword_weight: 0.2
+
+  # Lower threshold for maximum recall
+  semantic_similarity_threshold: 0.45
+  semantic_query_expansion_enabled: true
+  semantic_max_query_expansions: 7  # More variations
+
+  # Standard RL and deduplication
+  enable_semantic_threshold_rl_learning: true
+  enable_tool_deduplication: true
+  tool_deduplication_window_size: 10
+
+# ==============================================================================
+# Profile 3: Bug Hunting (Favor Exact Matches)
+# ==============================================================================
+# Use this for: Finding specific functions, debugging, grep-like searches
+#
+p4_bug_hunting:
+  provider: anthropic
+  model: claude-sonnet-4-5-latest
+
+  # Heavy keyword weighting for exact term matches
+  enable_hybrid_search: true
+  hybrid_search_semantic_weight: 0.3
+  hybrid_search_keyword_weight: 0.7
+
+  # Higher threshold for precision
+  semantic_similarity_threshold: 0.6
+  semantic_query_expansion_enabled: true
+  semantic_max_query_expansions: 3  # Fewer variations
+
+  # Larger deduplication window (bug hunting = repetitive searches)
+  enable_semantic_threshold_rl_learning: true
+  enable_tool_deduplication: true
+  tool_deduplication_window_size: 15
+
+# ==============================================================================
+# Profile 4: Refactoring (High-Volume Searches)
+# ==============================================================================
+# Use this for: Large-scale refactoring, code migration
+#
+p4_refactoring:
+  provider: anthropic
+  model: claude-sonnet-4-5-latest
+
+  # Balanced hybrid search
+  enable_hybrid_search: true
+  hybrid_search_semantic_weight: 0.6
+  hybrid_search_keyword_weight: 0.4
+
+  # Standard threshold
+  semantic_similarity_threshold: 0.5
+  semantic_query_expansion_enabled: true
+  semantic_max_query_expansions: 5
+
+  # Aggressive deduplication (many similar searches)
+  enable_semantic_threshold_rl_learning: true
+  enable_tool_deduplication: true
+  tool_deduplication_window_size: 20  # Larger window
+
+# ==============================================================================
+# Profile 5: Fast Feedback (Optimize for Speed)
+# ==============================================================================
+# Use this for: Interactive development, quick iterations
+#
+p4_fast:
+  provider: anthropic
+  model: claude-sonnet-4-5-latest
+
+  # Disable hybrid search for speed (semantic only)
+  enable_hybrid_search: false
+
+  # Minimal query expansions
+  semantic_similarity_threshold: 0.5
+  semantic_query_expansion_enabled: true
+  semantic_max_query_expansions: 3
+
+  # Smaller deduplication window
+  enable_semantic_threshold_rl_learning: true
+  enable_tool_deduplication: true
+  tool_deduplication_window_size: 5
+
+# ==============================================================================
+# Profile 6: Legacy Compatibility (P4 Disabled)
+# ==============================================================================
+# Use this for: Baseline comparison, A/B testing, compatibility
+#
+p4_disabled:
+  provider: anthropic
+  model: claude-sonnet-4-5-latest
+
+  # All P4 features disabled
+  enable_hybrid_search: false
+  enable_semantic_threshold_rl_learning: false
+  enable_tool_deduplication: false
+
+  # Legacy semantic search settings
+  semantic_similarity_threshold: 0.7  # Original threshold
+  semantic_query_expansion_enabled: false
+
+# ==============================================================================
+# Profile 7: Precision Mode (Minimize False Positives)
+# ==============================================================================
+# Use this for: When you need highly relevant results only
+#
+p4_precision:
+  provider: anthropic
+  model: claude-sonnet-4-5-latest
+
+  # Heavy semantic weighting
+  enable_hybrid_search: true
+  hybrid_search_semantic_weight: 0.9
+  hybrid_search_keyword_weight: 0.1
+
+  # High threshold for precision
+  semantic_similarity_threshold: 0.65
+  semantic_query_expansion_enabled: true
+  semantic_max_query_expansions: 3
+
+  # Standard other features
+  enable_semantic_threshold_rl_learning: true
+  enable_tool_deduplication: true
+  tool_deduplication_window_size: 10
+
+# ==============================================================================
+# Profile 8: Recall Mode (Minimize False Negatives)
+# ==============================================================================
+# Use this for: When you want to find everything related
+#
+p4_recall:
+  provider: anthropic
+  model: claude-sonnet-4-5-latest
+
+  # Balanced hybrid search
+  enable_hybrid_search: true
+  hybrid_search_semantic_weight: 0.5
+  hybrid_search_keyword_weight: 0.5
+
+  # Very low threshold for maximum recall
+  semantic_similarity_threshold: 0.35
+  semantic_query_expansion_enabled: true
+  semantic_max_query_expansions: 10  # Maximum expansions
+
+  # Standard other features
+  enable_semantic_threshold_rl_learning: true
+  enable_tool_deduplication: true
+  tool_deduplication_window_size: 10
+
+# ==============================================================================
+# Profile 9: With Learned Thresholds (Production-Ready)
+# ==============================================================================
+# Use this after: Collecting 100+ searches and exporting learned thresholds
+#
+p4_learned:
+  provider: anthropic
+  model: claude-sonnet-4-5-latest
+
+  # Standard P4 features
+  enable_hybrid_search: true
+  hybrid_search_semantic_weight: 0.6
+  hybrid_search_keyword_weight: 0.4
+  enable_tool_deduplication: true
+  tool_deduplication_window_size: 10
+
+  # RL learning enabled with learned overrides
+  enable_semantic_threshold_rl_learning: true
+  semantic_threshold_overrides:
+    # Example learned thresholds (from scripts/show_semantic_threshold_rl.py --export)
+    "all-MiniLM-L12-v2:search:code_search": 0.47
+    "all-MiniLM-L12-v2:analysis:semantic_code_search": 0.52
+    "bge-small:search:code_search": 0.45
+    "bge-large:search:code_search": 0.55
+
+  # Base threshold (used when no override exists)
+  semantic_similarity_threshold: 0.5
+  semantic_query_expansion_enabled: true
+  semantic_max_query_expansions: 5
+
+# ==============================================================================
+# Profile 10: Per-Provider Optimization
+# ==============================================================================
+# Different providers may benefit from different settings
+#
+# Claude Sonnet (excellent at reasoning)
+p4_claude:
+  provider: anthropic
+  model: claude-sonnet-4-5-latest
+  enable_hybrid_search: true
+  hybrid_search_semantic_weight: 0.7  # Trust semantic understanding
+  hybrid_search_keyword_weight: 0.3
+  semantic_similarity_threshold: 0.5
+  semantic_query_expansion_enabled: true
+  enable_semantic_threshold_rl_learning: true
+  enable_tool_deduplication: true
+
+# GPT-4 (balanced)
+p4_gpt4:
+  provider: openai
+  model: gpt-4-turbo
+  enable_hybrid_search: true
+  hybrid_search_semantic_weight: 0.6  # Balanced
+  hybrid_search_keyword_weight: 0.4
+  semantic_similarity_threshold: 0.5
+  semantic_query_expansion_enabled: true
+  enable_semantic_threshold_rl_learning: true
+  enable_tool_deduplication: true
+
+# Gemini (strong at code analysis)
+p4_gemini:
+  provider: google
+  model: gemini-1.5-pro-latest
+  enable_hybrid_search: true
+  hybrid_search_semantic_weight: 0.8  # Trust code understanding
+  hybrid_search_keyword_weight: 0.2
+  semantic_similarity_threshold: 0.48
+  semantic_query_expansion_enabled: true
+  enable_semantic_threshold_rl_learning: true
+  enable_tool_deduplication: true
+
+# Local models (Ollama, more literal)
+p4_local:
+  provider: ollama
+  model: qwen2.5-coder:32b
+  enable_hybrid_search: true
+  hybrid_search_semantic_weight: 0.4  # Trust keywords more
+  hybrid_search_keyword_weight: 0.6
+  semantic_similarity_threshold: 0.55
+  semantic_query_expansion_enabled: true
+  enable_semantic_threshold_rl_learning: true
+  enable_tool_deduplication: true
+  tool_deduplication_window_size: 15  # Larger (local = more searches)
+
+# ==============================================================================
+# Usage Examples
+# ==============================================================================
+#
+# 1. Use a profile:
+#    victor chat --profile p4_default
+#
+# 2. Compare profiles (A/B testing):
+#    victor chat --profile p4_disabled "find authentication code"
+#    victor chat --profile p4_default "find authentication code"
+#
+# 3. Export learned thresholds:
+#    python scripts/show_semantic_threshold_rl.py --export learned.yaml
+#    # Then merge learned.yaml into this file
+#
+# 4. Monitor learning progress:
+#    python scripts/show_semantic_threshold_rl.py
+#
+# 5. Set as default:
+#    ln -sf p4_default default  # or use victor profiles set-default

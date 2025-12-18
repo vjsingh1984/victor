@@ -672,6 +672,7 @@ class CodebaseIndex:
             "*.pyc",
             "dist/",
             "build/",
+            "out/",
             # Coverage and docs
             "htmlcov/",
             "coverage/",
@@ -1266,6 +1267,24 @@ class CodebaseIndex:
             # If we found edges via AST, return them; otherwise try tree-sitter
             if edges:
                 return edges
+            # Fallback: parse AST directly to extract bases (tree-sitter symbols may not include them)
+            try:
+                import ast as py_ast
+
+                tree = py_ast.parse(file_path.read_text(encoding="utf-8"), filename=str(file_path))
+                for node in py_ast.walk(tree):
+                    if isinstance(node, py_ast.ClassDef):
+                        for base in node.bases:
+                            try:
+                                base_name = py_ast.unparse(base) if hasattr(py_ast, "unparse") else getattr(base, "id", None)
+                            except Exception:
+                                base_name = getattr(base, "id", None)
+                            if base_name:
+                                edges.append((node.name, base_name))
+            except Exception:
+                pass
+            if edges:
+                return edges
 
         query_src = INHERITS_QUERIES.get(language)
         parser = None
@@ -1515,12 +1534,27 @@ class CodebaseIndex:
 
         symbols = self._extract_symbols_with_tree_sitter(file_path, language)
         call_edges = self._extract_calls_with_tree_sitter(file_path, language)
+        imports: List[str] = []
+
+        # Lightweight Python import extraction (tree-sitter path omits imports today)
+        if language == "python":
+            try:
+                tree = ast.parse(content, filename=str(file_path))
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        for alias in node.names:
+                            imports.append(alias.name)
+                    elif isinstance(node, ast.ImportFrom):
+                        if node.module:
+                            imports.append(node.module)
+            except Exception as exc:
+                logger.debug(f"Failed to parse imports for {file_path}: {exc}")
 
         metadata = FileMetadata(
             path=str(file_path.relative_to(self.root)),
             language=language,
             symbols=symbols,
-            imports=[],  # TODO: add richer import extraction per language
+            imports=imports,
             last_modified=stat.st_mtime,
             indexed_at=time.time(),
             size=stat.st_size,
@@ -1670,7 +1704,7 @@ class CodebaseIndex:
                         GraphEdge(
                             src=owner_id,
                             dst=member_id,
-                            type="COMPOSES",
+                            type="COMPOSED_OF",
                             metadata={"path": metadata.path},
                         )
                     )
@@ -1778,7 +1812,7 @@ class CodebaseIndex:
                 GraphEdge(
                     src=owner_id,
                     dst=target_id,
-                    type="COMPOSES",
+                    type="COMPOSED_OF",
                     metadata={"path": file_path, "resolved": True},
                 )
             )
@@ -2007,8 +2041,10 @@ class CodebaseIndex:
         max_results: int = 10,
         filter_metadata: Optional[Dict[str, Any]] = None,
         auto_reindex: bool = True,
+        similarity_threshold: Optional[float] = None,
+        expand_query: bool = True,
     ) -> List[Dict[str, Any]]:
-        """Perform semantic search using embeddings.
+        """Perform semantic search using embeddings with query expansion and threshold filtering.
 
         Automatically reindexes if the index is stale (lazy reindexing).
 
@@ -2017,6 +2053,8 @@ class CodebaseIndex:
             max_results: Maximum number of results
             filter_metadata: Optional metadata filters
             auto_reindex: If True, automatically reindex when stale
+            similarity_threshold: Minimum similarity score [0.0-1.0] to include result
+            expand_query: Enable query expansion with synonyms/related terms
 
         Returns:
             List of search results with file paths, symbols, and relevance scores
@@ -2031,10 +2069,53 @@ class CodebaseIndex:
         if not self.embedding_provider._initialized:
             await self.embedding_provider.initialize()
 
-        # Search using embedding provider
-        results = await self.embedding_provider.search_similar(
-            query=query, limit=max_results, filter_metadata=filter_metadata
-        )
+        # Query expansion to improve recall (fix false negatives)
+        queries_to_search = [query]
+        if expand_query:
+            from victor.codebase.query_expander import expand_query as expand_fn
+
+            queries_to_search = expand_fn(query, max_expansions=5)
+            if len(queries_to_search) > 1:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.debug(
+                    f"Semantic search: expanded '{query}' to {len(queries_to_search)} queries"
+                )
+
+        # Search with all query variations and merge results
+        all_results = []
+        seen_docs = set()  # Deduplicate by (file_path, line_number)
+
+        for search_query in queries_to_search:
+            results = await self.embedding_provider.search_similar(
+                query=search_query,
+                limit=max_results * 2,  # Get more for dedup/filtering
+                filter_metadata=filter_metadata,
+            )
+
+            for result in results:
+                # Deduplicate by file + line
+                doc_key = (result.file_path, result.line_number or 0)
+                if doc_key not in seen_docs:
+                    all_results.append(result)
+                    seen_docs.add(doc_key)
+
+        # Apply similarity threshold if specified
+        if similarity_threshold is not None:
+            all_results = [r for r in all_results if r.score >= similarity_threshold]
+            if not all_results:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.debug(
+                    f"Semantic search: threshold {similarity_threshold:.2f} filtered all results. "
+                    "Consider lowering threshold or checking query."
+                )
+
+        # Sort by score (highest first) and limit
+        all_results.sort(key=lambda r: r.score, reverse=True)
+        all_results = all_results[:max_results]
 
         # Convert to dict format
         return [
@@ -2046,7 +2127,7 @@ class CodebaseIndex:
                 "line_number": result.line_number,
                 "metadata": result.metadata,
             }
-            for result in results
+            for result in all_results
         ]
 
     def _build_symbol_context(self, symbol: Symbol) -> str:
