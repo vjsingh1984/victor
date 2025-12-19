@@ -1893,42 +1893,53 @@ class TestContextLimitCalculation:
         limit = AgentOrchestrator._calculate_max_context_chars(settings, mock_provider, "test-model")
         assert limit == 50000
 
-    def test_provider_context_window_fallback(self, mock_provider):
-        """Falls back to provider context window when no settings override."""
+    @patch("victor.config.config_loaders.get_provider_limits")
+    def test_provider_context_window_fallback(self, mock_get_limits, mock_provider):
+        """Falls back to provider limits config when no settings override."""
         settings = Settings(
             analytics_enabled=False,
             use_semantic_tool_selection=False,
             use_mcp_tools=False,
         )
-        mock_provider.get_context_window.return_value = 100000
+        
+        mock_limits = MagicMock()
+        mock_limits.context_window = 100000
+        mock_get_limits.return_value = mock_limits
+        
         limit = AgentOrchestrator._calculate_max_context_chars(settings, mock_provider, "test-model")
         # 100000 * 3.5 * 0.8 = 280000
         assert limit == 280000
 
-    def test_context_window_exception_handling(self, mock_provider):
-        """Handles exceptions from get_context_window gracefully."""
+    @patch("victor.config.config_loaders.get_provider_limits")
+    def test_context_window_exception_handling(self, mock_get_limits, mock_provider):
+        """Handles exceptions from get_provider_limits gracefully."""
         settings = Settings(
             analytics_enabled=False,
             use_semantic_tool_selection=False,
             use_mcp_tools=False,
         )
-        mock_provider.get_context_window.side_effect = Exception("API error")
-        # Should not raise, falls back to defaults
+        mock_get_limits.side_effect = Exception("Config error")
+        # Should not raise, falls back to defaults (128000 * 3.5 * 0.8 = 358400)
         limit = AgentOrchestrator._calculate_max_context_chars(settings, mock_provider, "test-model")
-        assert limit > 0
+        assert limit == 358400
 
-    def test_context_window_with_mock_value(self, mock_provider):
+    @patch("victor.config.config_loaders.get_provider_limits")
+    def test_context_window_with_mock_value(self, mock_get_limits, mock_provider):
         """Handles non-numeric context window values."""
         settings = Settings(
             analytics_enabled=False,
             use_semantic_tool_selection=False,
             use_mcp_tools=False,
         )
-        mock_provider.get_context_window.return_value = MagicMock()  # Non-numeric
+        mock_limits = MagicMock()
+        mock_limits.context_window = "invalid_value" # Explicitly non-numeric string
+        mock_get_limits.return_value = mock_limits
+
         mock_provider.name = "mock_provider"
-        # Should handle gracefully and fall back
+        # Should handle gracefully and fall back to failsafe (100k tokens)
         limit = AgentOrchestrator._calculate_max_context_chars(settings, mock_provider, "test-model")
-        assert limit > 0
+        # 100000 * 3.5 * 0.8 = 280000
+        assert limit == 280000
 
 
 class TestRecoveryIntegration:
@@ -4894,8 +4905,10 @@ class TestCheckTimeLimitWithHandler:
         import time
 
         ctx = create_stream_context("test message")
-        # Artificially set start_time to way in the past
+        # Artificially set start_time and last_activity_time to way in the past
+        # We need to set last_activity_time because check_time_limit checks idle time
         ctx.start_time = time.time() - 1000  # 1000 seconds ago
+        ctx.last_activity_time = time.time() - 1000
 
         with patch.object(orchestrator, "_record_intelligent_outcome"):
             result = orchestrator._check_time_limit_with_handler(ctx)

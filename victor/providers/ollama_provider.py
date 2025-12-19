@@ -49,20 +49,42 @@ class OllamaProvider(BaseProvider):
         """Initialize Ollama provider.
 
         Args:
-            base_url: Ollama server URL or list/comma-separated URLs (first reachable is used)
+            base_url: Ollama server URL or list/comma-separated URLs.
+                     For synchronous init, the first URL is used without verification.
+                     Use OllamaProvider.create() for async discovery of reachable endpoint.
             timeout: Request timeout (longer for local models)
-            _skip_discovery: Skip endpoint discovery (for async factory)
+            _skip_discovery: Deprecated flag (kept for compatibility).
             **kwargs: Additional configuration
         """
-        if _skip_discovery:
-            # Used by async factory, base_url is already resolved
-            chosen_base = (
-                base_url
-                if isinstance(base_url, str)
-                else str(base_url[0]) if base_url else "http://localhost:11434"
-            )
-        else:
-            chosen_base = self._select_base_url(base_url, timeout)
+        import os
+
+        # Resolve candidates (logic from _select_base_url but without network I/O)
+        candidates: List[str] = []
+        
+        # Check environment variable first
+        env_endpoints = os.environ.get("OLLAMA_ENDPOINTS", "")
+        if env_endpoints:
+            candidates = [u.strip() for u in env_endpoints.split(",") if u.strip()]
+
+        if not candidates:
+            if base_url is None:
+                 candidates = ["http://localhost:11434"]
+            elif isinstance(base_url, (list, tuple)):
+                candidates = [str(u).strip() for u in base_url if str(u).strip()]
+            elif isinstance(base_url, str):
+                if "," in base_url:
+                    candidates = [u.strip() for u in base_url.split(",") if u.strip()]
+                else:
+                    candidates = [base_url]
+            else:
+                candidates = [str(base_url)]
+        
+        if not candidates:
+             candidates = ["http://localhost:11434"]
+
+        # Pick first candidate (blindly)
+        chosen_base = candidates[0]
+
         super().__init__(base_url=chosen_base, timeout=timeout, **kwargs)
         self._raw_base_urls = base_url
         self._models_without_tools: set = set()  # Cache models that don't support tools

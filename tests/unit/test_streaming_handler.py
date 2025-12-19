@@ -52,7 +52,7 @@ def handler(mock_settings, mock_message_adder):
     return StreamingChatHandler(
         settings=mock_settings,
         message_adder=mock_message_adder,
-        session_time_limit=60.0,
+        session_idle_timeout=60.0,
     )
 
 
@@ -79,9 +79,9 @@ class TestStreamingChatHandlerCreation:
         handler = StreamingChatHandler(
             settings=mock_settings,
             message_adder=mock_message_adder,
-            session_time_limit=120.0,
+            session_idle_timeout=120.0,
         )
-        assert handler.session_time_limit == 120.0
+        assert handler.session_idle_timeout == 120.0
 
 
 class TestCheckTimeLimit:
@@ -95,8 +95,8 @@ class TestCheckTimeLimit:
     def test_over_limit_returns_result(self, handler, mock_message_adder):
         """Returns result when over time limit."""
         ctx = StreamingChatContext(user_message="test")
-        ctx.start_time = time.time() - 120  # 2 minutes ago
-        handler.session_time_limit = 60.0  # 1 minute limit
+        ctx.last_activity_time = time.time() - 120  # 2 minutes ago
+        handler.session_idle_timeout = 60.0  # 1 minute limit
 
         result = handler.check_time_limit(ctx)
 

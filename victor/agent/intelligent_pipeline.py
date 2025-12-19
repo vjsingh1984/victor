@@ -82,6 +82,9 @@ from victor.protocols.provider_adapter import get_provider_adapter
 
 logger = logging.getLogger(__name__)
 
+# Providers known to have repetition issues requiring deduplication
+PROVIDERS_WITH_REPETITION_ISSUES = {"xai", "grok", "x-ai"}
+
 
 @dataclass
 class RequestContext:
@@ -311,6 +314,15 @@ class IntelligentAgentPipeline:
                 normalize_whitespace=True,
             )
         return self._output_deduplicator
+
+    def _should_enable_deduplication(self) -> bool:
+        """Check if deduplication should be enabled for current provider.
+
+        Returns:
+            True if the provider is known to have repetition issues, False otherwise
+        """
+        provider_lower = self.provider_name.lower()
+        return provider_lower in PROVIDERS_WITH_REPETITION_ISSUES
 
     def deduplicate_response(self, response: str) -> tuple[str, dict]:
         """Apply deduplication to response if enabled for provider.

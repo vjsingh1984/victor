@@ -94,7 +94,7 @@ class TestProfileConfig:
         assert config.max_tool_calls_per_turn is None
         assert config.tool_cache_enabled is None
         assert config.tool_deduplication_enabled is None
-        assert config.session_time_limit is None
+        assert config.session_idle_timeout is None
         assert config.timeout is None
 
     def test_profile_config_provider_tuning_custom_values(self):
@@ -109,7 +109,7 @@ class TestProfileConfig:
             max_tool_calls_per_turn=5,
             tool_cache_enabled=True,
             tool_deduplication_enabled=True,
-            session_time_limit=300,
+            session_idle_timeout=300,
             timeout=120,
         )
 
@@ -120,7 +120,7 @@ class TestProfileConfig:
         assert config.max_tool_calls_per_turn == 5
         assert config.tool_cache_enabled is True
         assert config.tool_deduplication_enabled is True
-        assert config.session_time_limit == 300
+        assert config.session_idle_timeout == 300
         assert config.timeout == 120
 
     def test_profile_config_xai_tuning(self):
@@ -130,13 +130,13 @@ class TestProfileConfig:
             model="grok-code-fast-1",
             max_continuation_prompts=5,
             quality_threshold=0.5,
-            session_time_limit=300,
+            session_idle_timeout=300,
         )
 
         assert config.provider == "xai"
         assert config.max_continuation_prompts == 5
         assert config.quality_threshold == 0.5
-        assert config.session_time_limit == 300
+        assert config.session_idle_timeout == 300
 
 
 class TestSettings:

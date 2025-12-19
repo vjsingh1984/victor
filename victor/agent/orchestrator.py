@@ -335,27 +335,18 @@ class AgentOrchestrator:
         if settings_max and settings_max > 0:
             return settings_max
 
-        # Try to get context window from provider API
-        context_tokens = None
-        if hasattr(provider, "get_context_window"):
-            try:
-                context_tokens = provider.get_context_window(model)
-            except Exception:
-                pass
-
-        # Fall back to externalized config (YAML-based)
-        if context_tokens is None:
-            provider_name = getattr(provider, "name", "").lower()
-            try:
-                from victor.config.config_loaders import get_provider_limits
-                limits = get_provider_limits(provider_name, model)
-                context_tokens = limits.context_window
-                logger.debug(
-                    f"Using YAML config for {provider_name}/{model}: {context_tokens} tokens"
-                )
-            except Exception as e:
-                logger.warning(f"Could not load provider limits from config: {e}")
-                context_tokens = 100000  # Final, hardcoded failsafe
+        # Use externalized config (YAML-based)
+        provider_name = getattr(provider, "name", "").lower()
+        try:
+            from victor.config.config_loaders import get_provider_limits
+            limits = get_provider_limits(provider_name, model)
+            context_tokens = limits.context_window
+            logger.debug(
+                f"Using YAML config for {provider_name}/{model}: {context_tokens} tokens"
+            )
+        except Exception as e:
+            logger.warning(f"Could not load provider limits from config: {e}")
+            context_tokens = 128000  # Default safe value
 
         # Convert tokens to chars: ~3.5 chars per token with 80% safety margin
         try:
@@ -1875,32 +1866,19 @@ class AgentOrchestrator:
     def _get_model_context_window(self) -> int:
         """Get context window size for the current model.
 
-        Queries the provider for model-specific context window.
-        Falls back to settings or default if provider doesn't support it.
+        Queries the provider limits config for model-specific context window.
 
         Returns:
             Context window size in tokens
         """
-        # Try to get context window from provider
-        if hasattr(self.provider, "get_context_window"):
-            try:
-                return self.provider.get_context_window(self.model)
-            except Exception:
-                pass
+        try:
+            from victor.config.config_loaders import get_provider_limits
 
-        # Known provider defaults (in tokens)
-        provider_defaults = {
-            "anthropic": 200000,  # Claude models
-            "openai": 128000,  # GPT-4 Turbo
-            "google": 1000000,  # Gemini 1.5 Pro
-            "xai": 131072,  # Grok models
-            "deepseek": 131072,  # DeepSeek V3
-            "moonshot": 262144,  # Kimi K2
-            "ollama": 32768,  # Local models (conservative)
-            "lmstudio": 32768,  # Local models (conservative)
-        }
-
-        return provider_defaults.get(self.provider_name, 100000)
+            limits = get_provider_limits(self.provider_name, self.model)
+            return limits.context_window
+        except Exception as e:
+            logger.warning(f"Could not load provider limits from config: {e}")
+            return 128000  # Default safe value
 
     def _get_max_context_chars(self) -> int:
         """Get maximum context size in characters.

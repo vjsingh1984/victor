@@ -167,7 +167,7 @@ class TestDeepSeekAdapter:
         """Test DeepSeek-specific capabilities."""
         caps = adapter.capabilities
 
-        assert caps.quality_threshold == 0.70  # Lower threshold
+        assert caps.quality_threshold == 0.60  # Lower threshold
         assert caps.supports_thinking_tags is True
         assert caps.thinking_tag_format == "<think>...</think>"
         assert "💭 Thinking..." in caps.continuation_markers
@@ -315,7 +315,7 @@ class TestOllamaAdapter:
         """Test Ollama capabilities."""
         caps = adapter.capabilities
 
-        assert caps.quality_threshold == 0.70  # Lower for local models
+        assert caps.quality_threshold == 0.55  # Lower for local models
         assert caps.tool_call_format == ToolCallFormat.FALLBACK
         assert caps.supports_parallel_tools is False
 

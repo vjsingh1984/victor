@@ -33,6 +33,10 @@ class FakeProvider:
         self.raise_on_stream: Exception | None = None
         self.force_overflow = False
 
+    @property
+    def name(self) -> str:
+        return "fake"
+
     def supports_tools(self) -> bool:
         return self._supports_tools
 

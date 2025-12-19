@@ -240,8 +240,8 @@ class TestContextWindow:
 
         window = manager.get_context_window()
 
-        # Should return default
-        assert window == 32768
+        # Should return default from ProviderLimits (128000)
+        assert window == 128000
 
 
 class TestToolAdapter:

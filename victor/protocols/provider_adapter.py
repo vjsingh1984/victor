@@ -1036,6 +1036,7 @@ _ADAPTER_REGISTRY: dict[str, type[BaseProviderAdapter]] = {
     "gemini": GoogleAdapter,  # Alias
     "deepseek": DeepSeekAdapter,
     "xai": GrokAdapter,
+    "x-ai": GrokAdapter,  # Alias
     "grok": GrokAdapter,  # Alias
     "mistral": MistralAdapter,
     "moonshot": MoonshotAdapter,

@@ -36,7 +36,13 @@ warnings.filterwarnings(
 try:
     from google import genai
     from google.genai import types
-    HAS_GOOGLE_GENAI = True
+    # Verify that the Client class is available
+    if not hasattr(genai, 'Client'):
+        HAS_GOOGLE_GENAI = False
+        genai = None
+        types = None
+    else:
+        HAS_GOOGLE_GENAI = True
 except ImportError:
     HAS_GOOGLE_GENAI = False
     genai = None

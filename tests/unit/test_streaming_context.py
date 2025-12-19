@@ -76,8 +76,8 @@ class TestStreamingChatContext:
     def test_is_over_time_limit_true(self):
         """is_over_time_limit returns True when exceeded."""
         ctx = StreamingChatContext(user_message="test")
-        # Set start_time in the past
-        ctx.start_time = time.time() - 10
+        # Set last_activity_time in the past (10 seconds ago)
+        ctx.last_activity_time = time.time() - 10
         assert ctx.is_over_time_limit(5.0) is True
 
     def test_is_over_iteration_limit_false(self):

@@ -31,6 +31,7 @@ Migrated from: victor/codebase/semantic_threshold_learner.py
 """
 
 import logging
+import sqlite3
 from typing import Optional
 
 from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
@@ -119,8 +120,9 @@ class SemanticThresholdLearner(BaseLearner):
         row = cursor.fetchone()
 
         if row:
-            # Update existing
-            stats = dict(row)
+            # Update existing - convert row to dict using column names from cursor description
+            column_names = [description[0] for description in cursor.description]
+            stats = dict(zip(column_names, row))
         else:
             # Initialize new entry
             stats = {

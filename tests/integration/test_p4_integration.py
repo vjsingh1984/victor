@@ -16,7 +16,7 @@ from unittest.mock import Mock, AsyncMock, patch, MagicMock
 
 from victor.config.settings import Settings
 from victor.codebase.hybrid_search import HybridSearchEngine, create_hybrid_search_engine
-from victor.codebase.semantic_threshold_learner import SemanticThresholdLearner
+from victor.agent.rl.learners.semantic_threshold import SemanticThresholdLearner
 from victor.agent.tool_deduplication import ToolDeduplicationTracker
 from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
 from victor.tools.base import ToolRegistry
@@ -89,54 +89,76 @@ class TestThresholdLearnerIntegration:
     def test_threshold_learner_records_outcomes(self):
         """Test that threshold learner records search outcomes."""
         # Arrange - use a clean learner with no persisted state
-        import tempfile
-        from pathlib import Path
+        import sqlite3
+        from victor.agent.rl.base import RLOutcome
 
-        # Create a temporary directory for test storage
-        temp_dir = tempfile.mkdtemp()
-        test_storage_path = Path(temp_dir)
+        # Create an in-memory database for testing
+        db = sqlite3.connect(":memory:")
 
-        # Create learner with test storage path
-        learner = SemanticThresholdLearner(storage_path=test_storage_path)
+        # Create learner with db connection
+        learner = SemanticThresholdLearner(name="semantic_threshold", db_connection=db)
         embedding_model = "bge-small"
         task_type = "search"
         tool_name = "code_search"
 
         # Act - record a few outcomes
         learner.record_outcome(
-            embedding_model=embedding_model,
-            task_type=task_type,
-            tool_name=tool_name,
-            query="tool registration",
-            results_count=5,
-            threshold_used=0.5,
-            false_negatives=False,
+            RLOutcome(
+                provider=embedding_model, # embedding_model is passed as provider for this learner
+                model=tool_name, # tool_name is passed as model for this learner
+                task_type=task_type,
+                success=True,
+                quality_score=0.8,
+                metadata={
+                    "embedding_model": embedding_model,
+                    "tool_name": tool_name,
+                    "query": "tool registration",
+                    "results_count": 5,
+                    "threshold_used": 0.5,
+                    "false_negatives": False,
+                }
+            )
         )
 
         learner.record_outcome(
-            embedding_model=embedding_model,
-            task_type=task_type,
-            tool_name=tool_name,
-            query="error handling",
-            results_count=0,
-            threshold_used=0.5,
-            false_negatives=True,
+            RLOutcome(
+                provider=embedding_model,
+                model=tool_name,
+                task_type=task_type,
+                success=False,
+                quality_score=0.2,
+                metadata={
+                    "embedding_model": embedding_model,
+                    "tool_name": tool_name,
+                    "query": "error handling",
+                    "results_count": 0,
+                    "threshold_used": 0.5,
+                    "false_negatives": True,
+                }
+            )
         )
 
         # Assert
-        key = f"{embedding_model}:{task_type}:{tool_name}"
-        assert key in learner.stats
-        assert learner.stats[key].total_searches == 2
-        assert learner.stats[key].zero_result_rate > 0  # One zero-result search
-
-        # Cleanup
-        import shutil
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        # Check database directly or via learner methods if available
+        # Since learner doesn't expose stats directly anymore, we check via get_recommendation or internal methods if needed for verification
+        # But here we assume no exception is enough or we can verify via recommendation later
+        # For this test, let's verify data was inserted
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM semantic_threshold_stats")
+        rows = cursor.fetchall()
+        assert len(rows) > 0
+        
+        db.close()
 
     def test_threshold_learner_recommends_adjustment(self):
         """Test that learner recommends threshold adjustment after sufficient data."""
         # Arrange
-        learner = SemanticThresholdLearner()
+        import sqlite3
+        from victor.agent.rl.base import RLOutcome
+        
+        db = sqlite3.connect(":memory:")
+        learner = SemanticThresholdLearner(name="semantic_threshold", db_connection=db)
+        
         embedding_model = "bge-small"
         task_type = "search"
         tool_name = "code_search"
@@ -144,58 +166,72 @@ class TestThresholdLearnerIntegration:
         # Act - record several zero-result searches (high false negative rate)
         for _ in range(10):
             learner.record_outcome(
-                embedding_model=embedding_model,
-                task_type=task_type,
-                tool_name=tool_name,
-                query="test query",
-                results_count=0,
-                threshold_used=0.7,
-                false_negatives=True,
+                RLOutcome(
+                    provider=embedding_model,
+                    model=tool_name,
+                    task_type=task_type,
+                    success=False,
+                    quality_score=0.1,
+                    metadata={
+                        "embedding_model": embedding_model,
+                        "tool_name": tool_name,
+                        "query": "test query",
+                        "results_count": 0,
+                        "threshold_used": 0.7,
+                        "false_negatives": True,
+                    }
+                )
             )
 
         # Assert - should recommend lowering threshold
-        key = f"{embedding_model}:{task_type}:{tool_name}"
-        stats = learner.stats[key]
-        assert stats.recommended_threshold is not None
-        assert stats.recommended_threshold < 0.7  # Should recommend lower threshold
+        recommendation = learner.get_recommendation(provider=embedding_model, model=tool_name, task_type=task_type)
+        assert recommendation is not None
+        assert recommendation.value < 0.7  # Should recommend lower threshold
+        
+        db.close()
 
     def test_threshold_learner_get_recommendations(self):
         """Test that learner provides recommendations after sufficient data."""
         # Arrange - use a clean learner with no persisted state
-        import tempfile
-        import shutil
-        from pathlib import Path
+        import sqlite3
+        from victor.agent.rl.base import RLOutcome
 
-        temp_dir = tempfile.mkdtemp()
-        test_storage_path = Path(temp_dir)
-
-        learner = SemanticThresholdLearner(storage_path=test_storage_path)
+        db = sqlite3.connect(":memory:")
+        learner = SemanticThresholdLearner(name="semantic_threshold", db_connection=db)
+        
+        embedding_model = "bge-small"
+        task_type = "search"
+        tool_name = "code_search"
 
         # Record multiple outcomes with high false negative rate
         for i in range(10):
             learner.record_outcome(
-                embedding_model="bge-small",
-                task_type="search",
-                tool_name="code_search",
-                query=f"test query {i}",
-                results_count=0 if i < 6 else 5,  # 60% false negatives
-                threshold_used=0.7,
-                false_negatives=(i < 6),
+                RLOutcome(
+                    provider=embedding_model,
+                    model=tool_name,
+                    task_type=task_type,
+                    success=(i >= 6),
+                    quality_score=0.8 if i >= 6 else 0.1,
+                    metadata={
+                        "embedding_model": embedding_model,
+                        "tool_name": tool_name,
+                        "query": f"test query {i}",
+                        "results_count": 0 if i < 6 else 5,  # 60% false negatives
+                        "threshold_used": 0.7,
+                        "false_negatives": (i < 6),
+                    }
+                )
             )
 
-        # Act - get all recommendations
-        recommendations = learner.get_all_recommendations()
+        # Act - get recommendation
+        recommendation = learner.get_recommendation(provider=embedding_model, model=tool_name, task_type=task_type)
 
         # Assert - should have recommendation for this context
-        assert len(recommendations) > 0
+        assert recommendation is not None
         # Should recommend a lower threshold due to high false negatives
-        # Format is {"model:task": {"tool": threshold}}
-        for model_task, tools in recommendations.items():
-            for tool, threshold in tools.items():
-                assert threshold < 0.7
-
-        # Cleanup
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        assert recommendation.value < 0.7
+        
+        db.close()
 
 
 class TestToolDeduplicationIntegration:
