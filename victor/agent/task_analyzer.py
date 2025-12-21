@@ -228,16 +228,44 @@ class TaskAnalyzer:
         return [m.keyword for m in self.unified_classifier.classify(message).negated_keywords]
 
 
+# Global instance (legacy - prefer DI container)
 _analyzer: Optional[TaskAnalyzer] = None
 
 
 def get_task_analyzer() -> TaskAnalyzer:
+    """Get or create the task analyzer.
+
+    Resolution order:
+    1. Check DI container (preferred)
+    2. Fall back to module-level singleton (legacy)
+
+    Returns:
+        TaskAnalyzer instance
+    """
     global _analyzer
+
+    # Try DI container first
+    try:
+        from victor.core.container import get_container
+        from victor.agent.protocols import TaskAnalyzerProtocol
+
+        container = get_container()
+        if container.is_registered(TaskAnalyzerProtocol):
+            return container.get(TaskAnalyzerProtocol)
+    except Exception:
+        pass  # Fall back to legacy singleton
+
+    # Legacy fallback
     if not _analyzer:
         _analyzer = TaskAnalyzer()
     return _analyzer
 
 
 def reset_task_analyzer() -> None:
+    """Reset the global task analyzer (for testing).
+
+    Note: This only resets the legacy module-level singleton. If using DI
+    container, use reset_container() as well.
+    """
     global _analyzer
     _analyzer = None

@@ -54,7 +54,7 @@ from victor.core.cqrs import (
     CQRSError,
     CommandError,
     QueryError,
-    ValidationError,
+    CommandValidationError,
     # Factories
     create_command_bus,
     create_query_bus,
@@ -450,7 +450,7 @@ class TestCommandMiddleware:
 
         def validate_create(cmd: CreateUserCommand) -> None:
             if not cmd.email or "@" not in cmd.email:
-                raise ValidationError("Invalid email")
+                raise CommandValidationError("Invalid email")
 
         validation_middleware.register_validator(CreateUserCommand, validate_create)
         bus.use(validation_middleware)

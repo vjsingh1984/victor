@@ -827,8 +827,12 @@ class HandlerNotFoundError(CQRSError):
     pass
 
 
-class ValidationError(CQRSError):
-    """Command validation error."""
+class CommandValidationError(CQRSError):
+    """Command validation error.
+
+    Renamed from ValidationError to avoid name collision with
+    victor.core.errors.ValidationError (general validation).
+    """
 
     pass
 

@@ -2,11 +2,22 @@
 
 These exceptions provide clear, actionable error messages for common
 failure scenarios when using the simplified framework API.
+
+Note: ProviderError, ToolError, and ConfigurationError are imported from
+victor.core.errors and wrapped with AgentError for backward compatibility.
+This eliminates duplication while maintaining the framework's user-friendly API.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+
+# Import core error types (single source of truth)
+from victor.core.errors import (
+    ProviderError as CoreProviderError,
+    ToolError as CoreToolError,
+    ConfigurationError as CoreConfigurationError,
+)
 
 
 class AgentError(Exception):
@@ -37,70 +48,115 @@ class AgentError(Exception):
         return self.message
 
 
-class ProviderError(AgentError):
+class ProviderError(CoreProviderError, AgentError):
     """Error from LLM provider communication.
 
     Raised when there's an issue communicating with the LLM provider,
     such as authentication failures, rate limits, or network errors.
 
+    This class wraps victor.core.errors.ProviderError with AgentError
+    for backward compatibility with the framework API.
+
     Attributes:
         provider: Name of the provider that failed
         status_code: HTTP status code if applicable
+        message: Human-readable error description
+        recoverable: Whether the operation can be retried
+        details: Additional context about the error
     """
 
     def __init__(
         self,
         message: str,
         *,
-        provider: str,
+        provider: str = None,
         status_code: Optional[int] = None,
+        recoverable: bool = True,
+        details: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(message, **kwargs)
-        self.provider = provider
-        self.status_code = status_code
+        # Initialize core ProviderError with all its expected parameters
+        CoreProviderError.__init__(
+            self,
+            message=message,
+            provider=provider,
+            status_code=status_code,
+            **kwargs
+        )
+        # Also set AgentError attributes for framework compatibility
+        self.recoverable = recoverable
+        self.details = details or {}
 
     def __str__(self) -> str:
-        if self.status_code:
-            return f"[{self.provider}] {self.message} (status: {self.status_code})"
-        return f"[{self.provider}] {self.message}"
+        # Framework-friendly formatting
+        if hasattr(self, 'provider') and self.provider:
+            if hasattr(self, 'status_code') and self.status_code:
+                return f"[{self.provider}] {self.message} (status: {self.status_code})"
+            return f"[{self.provider}] {self.message}"
+        return self.message
 
 
-class ToolError(AgentError):
+class ToolError(CoreToolError, AgentError):
     """Error from tool execution.
 
     Raised when a tool fails to execute properly, such as
     file not found, permission denied, or invalid arguments.
 
+    This class wraps victor.core.errors.ToolError with AgentError
+    for backward compatibility with the framework API.
+
     Attributes:
         tool_name: Name of the tool that failed
         arguments: Arguments that were passed to the tool
+        message: Human-readable error description
+        recoverable: Whether the operation can be retried
+        details: Additional context about the error
     """
 
     def __init__(
         self,
         message: str,
         *,
-        tool_name: str,
+        tool_name: str = None,
         arguments: Optional[Dict[str, Any]] = None,
+        recoverable: bool = True,
+        details: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(message, **kwargs)
-        self.tool_name = tool_name
+        # Initialize core ToolError
+        CoreToolError.__init__(
+            self,
+            message=message,
+            tool_name=tool_name,
+            **kwargs
+        )
+        # Set framework-specific attributes
         self.arguments = arguments or {}
+        self.recoverable = recoverable
+        self.details = details or {}
 
     def __str__(self) -> str:
-        return f"[{self.tool_name}] {self.message}"
+        # Framework-friendly formatting
+        if hasattr(self, 'tool_name') and self.tool_name:
+            return f"[{self.tool_name}] {self.message}"
+        return self.message
 
 
-class ConfigurationError(AgentError):
+class ConfigurationError(CoreConfigurationError, AgentError):
     """Error in agent configuration.
 
     Raised when the agent is configured with invalid or
     incompatible settings.
 
+    This class wraps victor.core.errors.ConfigurationError with AgentError
+    for backward compatibility with the framework API.
+
     Attributes:
         invalid_fields: List of field names that are invalid
+        config_key: Specific config key that failed (from core)
+        message: Human-readable error description
+        recoverable: Whether the operation can be retried (always False)
+        details: Additional context about the error
     """
 
     def __init__(
@@ -108,12 +164,24 @@ class ConfigurationError(AgentError):
         message: str,
         *,
         invalid_fields: Optional[List[str]] = None,
+        config_key: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(message, recoverable=False, **kwargs)
+        # Initialize core ConfigurationError
+        CoreConfigurationError.__init__(
+            self,
+            message=message,
+            config_key=config_key,
+            **kwargs
+        )
+        # Set framework-specific attributes
         self.invalid_fields = invalid_fields or []
+        self.recoverable = False  # Configuration errors are not recoverable
+        self.details = details or {}
 
     def __str__(self) -> str:
+        # Framework-friendly formatting
         if self.invalid_fields:
             fields = ", ".join(self.invalid_fields)
             return f"{self.message} (invalid fields: {fields})"

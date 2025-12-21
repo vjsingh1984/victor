@@ -55,6 +55,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
 
 from victor.tools.metadata_registry import get_tools_by_stage as registry_get_tools_by_stage
+from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
 
 if TYPE_CHECKING:
     from victor.observability.hooks import StateHookManager
@@ -236,6 +237,7 @@ class ConversationStateMachine:
         hooks: Optional["StateHookManager"] = None,
         track_history: bool = True,
         max_history_size: int = 100,
+        event_bus: Optional[EventBus] = None,
     ) -> None:
         """Initialize the state machine.
 
@@ -243,6 +245,7 @@ class ConversationStateMachine:
             hooks: Optional StateHookManager for transition callbacks.
             track_history: Whether to track transition history.
             max_history_size: Maximum number of transitions to keep in history.
+            event_bus: Optional EventBus instance. If None, uses singleton.
         """
         self.state = ConversationState()
         self._last_transition_time: float = 0.0
@@ -251,6 +254,7 @@ class ConversationStateMachine:
         self._track_history = track_history
         self._max_history_size = max_history_size
         self._transition_history: List[Dict[str, Any]] = []
+        self._event_bus = event_bus or EventBus.get_instance()
 
     def reset(self) -> None:
         """Reset state for a new conversation."""
@@ -463,6 +467,25 @@ class ConversationStateMachine:
             self.state._stage_confidence = confidence
             self._last_transition_time = current_time
             self._transition_count += 1
+
+            # Emit STATE event for stage transition
+            self._event_bus.publish(
+                VictorEvent(
+                    category=EventCategory.STATE,
+                    name="conversation.stage_changed",
+                    data={
+                        "old_stage": old_stage.name,
+                        "new_stage": new_stage.name,
+                        "confidence": confidence,
+                        "transition_count": self._transition_count,
+                        "message_count": self.state.message_count,
+                        "tools_executed": len(self.state.tool_history),
+                        "files_observed": len(self.state.observed_files),
+                        "files_modified": len(self.state.modified_files),
+                    },
+                    source="ConversationStateMachine",
+                )
+            )
 
             # Record transition history
             if self._track_history:

@@ -196,7 +196,7 @@ from victor.core.cqrs import (
     CQRSError,
     CommandError,
     QueryError,
-    ValidationError as CQRSValidationError,
+    CommandValidationError as CQRSValidationError,
     # Factories
     create_command_bus,
     create_query_bus,

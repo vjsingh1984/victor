@@ -33,7 +33,7 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture
 def google_provider():
     """Create GoogleProvider instance for testing."""
-    with patch("victor.providers.google_provider.genai.configure"):
+    with patch("victor.providers.google_provider.genai.Client"):
         provider = GoogleProvider(
             api_key="test-api-key",
             timeout=30,
@@ -44,7 +44,7 @@ def google_provider():
 @pytest.mark.asyncio
 async def test_initialization():
     """Test provider initialization."""
-    with patch("victor.providers.google_provider.genai.configure") as mock_configure:
+    with patch("victor.providers.google_provider.genai.Client") as mock_client:
         provider = GoogleProvider(
             api_key="test-key",
             timeout=45,
@@ -52,7 +52,7 @@ async def test_initialization():
 
         assert provider.api_key == "test-key"
         assert provider.timeout == 45
-        mock_configure.assert_called_once_with(api_key="test-key")
+        mock_client.assert_called_once_with(api_key="test-key")
 
 
 @pytest.mark.asyncio

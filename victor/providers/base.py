@@ -79,53 +79,17 @@ class StreamChunk(BaseModel):
     )
 
 
-# Provider error classes - defined before BaseProvider so they can be referenced
-class ProviderError(Exception):
-    """Base exception for provider-related errors."""
-
-    def __init__(
-        self,
-        message: str,
-        provider: Optional[str] = None,
-        status_code: Optional[int] = None,
-        raw_error: Optional[Any] = None,
-    ):
-        """Initialize error.
-
-        Args:
-            message: Error message
-            provider: Provider name
-            status_code: HTTP status code if applicable
-            raw_error: Raw error from provider
-        """
-        super().__init__(message)
-        self.provider = provider
-        self.status_code = status_code
-        self.raw_error = raw_error
-
-
-class ProviderNotFoundError(ProviderError):
-    """Raised when a provider is not found."""
-
-    pass
-
-
-class ProviderAuthenticationError(ProviderError):
-    """Raised when authentication fails."""
-
-    pass
-
-
-class ProviderRateLimitError(ProviderError):
-    """Raised when rate limit is exceeded."""
-
-    pass
-
-
-class ProviderTimeoutError(ProviderError):
-    """Raised when request times out."""
-
-    pass
+# Provider error classes - re-exported from victor/core/errors for backward compatibility
+# All error classes are defined in victor/core/errors.py as the single source of truth
+from victor.core.errors import (
+    ProviderError,
+    ProviderNotFoundError,
+    ProviderTimeoutError,
+    ProviderRateLimitError,
+    ProviderAuthError as ProviderAuthenticationError,  # Alias for backward compatibility
+    ProviderConnectionError,
+    ProviderInvalidResponseError,
+)
 
 
 class BaseProvider(ABC):

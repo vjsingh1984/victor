@@ -426,8 +426,11 @@ class VictorAgentAdapter:
             timeout=timeout,
         )
 
-        # Create orchestrator
-        orchestrator = AgentOrchestrator(
+        # Create orchestrator - lazy import to break circular dependency
+        # Chain: orchestrator → code_correction_middleware → evaluation → agent_adapter → orchestrator
+        from victor.agent.orchestrator import AgentOrchestrator as Orchestrator
+
+        orchestrator = Orchestrator(
             settings=settings,
             provider=provider,
             model=model,

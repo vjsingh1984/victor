@@ -313,20 +313,47 @@ class ToolDeduplicationTracker:
         return duplicates
 
 
-# Global singleton instance
+# Global singleton instance (legacy - prefer DI container)
 _deduplication_tracker: Optional[ToolDeduplicationTracker] = None
 
 
 def get_deduplication_tracker() -> ToolDeduplicationTracker:
-    """Get or create global ToolDeduplicationTracker instance.
+    """Get or create the tool deduplication tracker.
+
+    Resolution order:
+    1. Check DI container (preferred)
+    2. Fall back to module-level singleton (legacy)
 
     Returns:
-        ToolDeduplicationTracker singleton
+        ToolDeduplicationTracker instance
     """
     global _deduplication_tracker
+
+    # Try DI container first
+    try:
+        from victor.core.container import get_container
+        from victor.agent.protocols import ToolDeduplicationTrackerProtocol
+
+        container = get_container()
+        if container.is_registered(ToolDeduplicationTrackerProtocol):
+            return container.get(ToolDeduplicationTrackerProtocol)
+    except Exception:
+        pass  # Fall back to legacy singleton
+
+    # Legacy fallback
     if _deduplication_tracker is None:
         _deduplication_tracker = ToolDeduplicationTracker()
     return _deduplication_tracker
+
+
+def reset_deduplication_tracker() -> None:
+    """Reset the global deduplication tracker (for testing).
+
+    Note: This only resets the legacy module-level singleton. If using DI
+    container, use reset_container() as well.
+    """
+    global _deduplication_tracker
+    _deduplication_tracker = None
 
 
 def is_redundant_call(tool_name: str, args: Dict[str, Any]) -> bool:

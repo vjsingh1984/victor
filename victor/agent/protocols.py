@@ -48,6 +48,7 @@ from typing import (
     Optional,
     Protocol,
     Set,
+    Tuple,
     runtime_checkable,
 )
 
@@ -688,6 +689,187 @@ class ContextCompactorProtocol(Protocol):
 # =============================================================================
 
 
+# =============================================================================
+# Mode Controller Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class ModeControllerProtocol(Protocol):
+    """Protocol for agent mode control.
+
+    Controls agent modes (BUILD, PLAN, EXPLORE) that modify agent behavior
+    for different operational contexts.
+    """
+
+    @property
+    def current_mode(self) -> Any:
+        """Get the current agent mode."""
+        ...
+
+    @property
+    def config(self) -> Any:
+        """Get the current mode configuration."""
+        ...
+
+    def switch_mode(self, new_mode: Any) -> bool:
+        """Switch to a new mode.
+
+        Args:
+            new_mode: The mode to switch to
+
+        Returns:
+            True if switch was successful
+        """
+        ...
+
+    def is_tool_allowed(self, tool_name: str) -> bool:
+        """Check if a tool is allowed in the current mode.
+
+        Args:
+            tool_name: Name of the tool to check
+
+        Returns:
+            True if the tool is allowed
+        """
+        ...
+
+    def get_tool_priority(self, tool_name: str) -> float:
+        """Get priority adjustment for a tool in current mode.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            Priority multiplier (1.0 = no adjustment)
+        """
+        ...
+
+    def get_system_prompt_addition(self) -> str:
+        """Get additional system prompt text for current mode."""
+        ...
+
+
+# =============================================================================
+# Deduplication Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class ToolDeduplicationTrackerProtocol(Protocol):
+    """Protocol for tool call deduplication tracking.
+
+    Tracks recent tool calls to detect and prevent redundant operations.
+    """
+
+    def add_call(self, tool_name: str, args: Dict[str, Any]) -> None:
+        """Add a tool call to the tracker.
+
+        Args:
+            tool_name: Name of the tool
+            args: Tool arguments
+        """
+        ...
+
+    def is_redundant(
+        self, tool_name: str, args: Dict[str, Any], explain: bool = False
+    ) -> bool:
+        """Check if a tool call is redundant given recent history.
+
+        Args:
+            tool_name: Name of the tool to call
+            args: Tool arguments
+            explain: If True, log explanation for why call is redundant
+
+        Returns:
+            True if the call is likely redundant, False otherwise
+        """
+        ...
+
+    def clear(self) -> None:
+        """Clear all tracked tool calls."""
+        ...
+
+    def get_recent_calls(self, limit: Optional[int] = None) -> List[Any]:
+        """Get recent tool calls.
+
+        Args:
+            limit: Maximum number of calls to return
+
+        Returns:
+            List of recent tool calls (most recent first)
+        """
+        ...
+
+
+# =============================================================================
+# Embedding Store Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class ConversationEmbeddingStoreProtocol(Protocol):
+    """Protocol for conversation embedding storage.
+
+    Provides semantic search over conversation history using embeddings.
+    """
+
+    @property
+    def is_initialized(self) -> bool:
+        """Check if the store is initialized."""
+        ...
+
+    async def initialize(self) -> None:
+        """Initialize the embedding store."""
+        ...
+
+    async def search_similar(
+        self,
+        query: str,
+        session_id: Optional[str] = None,
+        limit: int = 10,
+        min_similarity: float = 0.3,
+        exclude_message_ids: Optional[List[str]] = None,
+    ) -> List[Any]:
+        """Search for semantically similar messages.
+
+        Args:
+            query: Query text to search for
+            session_id: Optional session to scope search
+            limit: Maximum number of results
+            min_similarity: Minimum similarity threshold (0-1)
+            exclude_message_ids: Message IDs to exclude
+
+        Returns:
+            List of search results (message_id + similarity)
+        """
+        ...
+
+    async def delete_session(self, session_id: str) -> int:
+        """Delete all embeddings for a session.
+
+        Args:
+            session_id: Session ID to delete
+
+        Returns:
+            Number of embeddings deleted
+        """
+        ...
+
+    async def get_stats(self) -> Dict[str, Any]:
+        """Get store statistics."""
+        ...
+
+    async def close(self) -> None:
+        """Clean up resources."""
+        ...
+
+
+# =============================================================================
+# Recovery Protocols
+# =============================================================================
+
+
 @runtime_checkable
 class RecoveryHandlerProtocol(Protocol):
     """Protocol for model failure recovery.
@@ -760,6 +942,1063 @@ class RecoveryHandlerProtocol(Protocol):
         ...
 
 
+@runtime_checkable
+class RecoveryCoordinatorProtocol(Protocol):
+    """Protocol for recovery coordination during streaming sessions.
+
+    Centralizes all recovery and error handling logic for streaming chat,
+    including:
+    - Condition checking (time limits, iteration limits, budget, progress)
+    - Action handling (empty responses, blocked tools, forced completion)
+    - Recovery integration (with RecoveryHandler and OrchestratorRecoveryIntegration)
+    - Filtering and truncation (blocked tools, budget limits)
+    - Prompt and message generation (recovery prompts, fallback messages)
+    - Metrics formatting (completion, budget exhausted)
+
+    Extracted from CRITICAL-001 Phase 2A.
+    """
+
+    def check_time_limit(self, ctx: Any) -> Optional[Any]:
+        """Check if session has exceeded time limit.
+
+        Returns:
+            StreamChunk if time limit reached, None otherwise
+        """
+        ...
+
+    def check_iteration_limit(self, ctx: Any) -> Optional[Any]:
+        """Check if session has exceeded iteration limit.
+
+        Returns:
+            StreamChunk if iteration limit reached, None otherwise
+        """
+        ...
+
+    def check_natural_completion(
+        self, ctx: Any, has_tool_calls: bool, content_length: int
+    ) -> Optional[Any]:
+        """Check for natural completion (no tool calls, sufficient content).
+
+        Returns:
+            StreamChunk if natural completion detected, None otherwise
+        """
+        ...
+
+    def check_tool_budget(self, ctx: Any) -> bool:
+        """Check if tool budget has been exhausted.
+
+        Returns:
+            True if budget exhausted, False otherwise
+        """
+        ...
+
+    def check_progress(self, ctx: Any) -> bool:
+        """Check if session is making progress (not looping).
+
+        Returns:
+            True if making progress, False if stuck/looping
+        """
+        ...
+
+    def check_blocked_threshold(
+        self, ctx: Any, all_blocked: bool
+    ) -> Optional[Tuple[Any, bool]]:
+        """Check if too many tools have been blocked.
+
+        Returns:
+            Tuple of (chunk, should_clear_tools) if threshold exceeded, None otherwise
+        """
+        ...
+
+    def check_force_action(self, ctx: Any) -> Tuple[bool, Optional[str]]:
+        """Check if recovery handler recommends force action.
+
+        Returns:
+            Tuple of (should_force, action_type)
+        """
+        ...
+
+    def handle_empty_response(self, ctx: Any) -> Tuple[Optional[Any], bool]:
+        """Handle empty model response.
+
+        Returns:
+            Tuple of (StreamChunk if threshold exceeded, should_force_completion flag)
+        """
+        ...
+
+    def handle_blocked_tool(
+        self, ctx: Any, tool_name: str, tool_args: Dict[str, Any], block_reason: str
+    ) -> Any:
+        """Handle blocked tool call.
+
+        Returns:
+            StreamChunk with block notification
+        """
+        ...
+
+    def handle_force_tool_execution(self, ctx: Any) -> Tuple[bool, Optional[List[Any]]]:
+        """Handle forced tool execution.
+
+        Returns:
+            Tuple of (should_execute, chunks)
+        """
+        ...
+
+    def handle_force_completion(self, ctx: Any) -> Optional[List[Any]]:
+        """Handle forced completion.
+
+        Returns:
+            List of StreamChunks if forced completion, None otherwise
+        """
+        ...
+
+    def handle_loop_warning(self, ctx: Any) -> Optional[List[Any]]:
+        """Handle loop detection warning.
+
+        Returns:
+            List of warning chunks, None if no loop detected
+        """
+        ...
+
+    async def handle_recovery_with_integration(
+        self,
+        ctx: Any,
+        full_content: str,
+        tool_calls: Optional[List[Dict[str, Any]]],
+        mentioned_tools: Optional[List[str]],
+        message_adder: Any,
+    ) -> Any:
+        """Handle response using the recovery integration.
+
+        Returns:
+            RecoveryAction with action to take (continue, retry, abort, force_summary)
+        """
+        ...
+
+    def apply_recovery_action(
+        self, recovery_action: Any, ctx: Any, message_adder: Any
+    ) -> Optional[Any]:
+        """Apply a recovery action from the recovery integration.
+
+        Returns:
+            StreamChunk if action requires immediate yield, None otherwise
+        """
+        ...
+
+    def filter_blocked_tool_calls(
+        self, ctx: Any, tool_calls: List[Dict[str, Any]]
+    ) -> Tuple[List[Dict[str, Any]], List[Any], int]:
+        """Filter out blocked tool calls.
+
+        Returns:
+            Tuple of (filtered_tool_calls, blocked_chunks, blocked_count)
+        """
+        ...
+
+    def truncate_tool_calls(
+        self, ctx: Any, tool_calls: List[Dict[str, Any]], max_calls: int
+    ) -> Tuple[List[Dict[str, Any]], bool]:
+        """Truncate tool calls to budget limit.
+
+        Returns:
+            Tuple of (truncated_tool_calls, was_truncated)
+        """
+        ...
+
+    def get_recovery_prompts(self, ctx: Any) -> List[str]:
+        """Get recovery prompts for current context.
+
+        Returns:
+            List of recovery prompts
+        """
+        ...
+
+    def get_recovery_fallback_message(self, ctx: Any) -> str:
+        """Get fallback message when recovery fails.
+
+        Returns:
+            Fallback message
+        """
+        ...
+
+    def should_use_tools_for_recovery(self, ctx: Any) -> bool:
+        """Determine if tools should be used during recovery.
+
+        Returns:
+            True if tools should be used, False otherwise
+        """
+        ...
+
+    def format_completion_metrics(self, ctx: Any) -> Dict[str, Any]:
+        """Format completion metrics for display.
+
+        Returns:
+            Dictionary of formatted metrics
+        """
+        ...
+
+    def format_budget_exhausted_metrics(self, ctx: Any) -> Dict[str, Any]:
+        """Format budget exhausted metrics.
+
+        Returns:
+            Dictionary of formatted metrics
+        """
+        ...
+
+    def generate_tool_result_chunks(self, results: List[Any], ctx: Any) -> List[Any]:
+        """Generate stream chunks from tool results.
+
+        Returns:
+            List of StreamChunk objects
+        """
+        ...
+
+
+@runtime_checkable
+class ChunkGeneratorProtocol(Protocol):
+    """Protocol for streaming chunk generation.
+
+    Centralizes all streaming chunk generation operations for streaming chat,
+    including:
+    - Tool-related chunks (start, result)
+    - Status chunks (thinking, budget errors, force response)
+    - Content chunks (metrics, content, final markers)
+    - Budget chunks (exhausted warnings)
+
+    Extracted from CRITICAL-001 Phase 2B.
+    """
+
+    def generate_tool_start_chunk(
+        self, tool_name: str, tool_args: Dict[str, Any], status_msg: str
+    ) -> Any:
+        """Generate chunk indicating tool execution start.
+
+        Args:
+            tool_name: Name of the tool being executed
+            tool_args: Tool arguments
+            status_msg: Status message to display
+
+        Returns:
+            StreamChunk with tool start metadata
+        """
+        ...
+
+    def generate_tool_result_chunks(self, result: Dict[str, Any]) -> List[Any]:
+        """Generate chunks for tool execution result.
+
+        Args:
+            result: Tool execution result dictionary
+
+        Returns:
+            List of StreamChunks representing the tool result
+        """
+        ...
+
+    def generate_thinking_status_chunk(self) -> Any:
+        """Generate chunk indicating thinking/processing status.
+
+        Returns:
+            StreamChunk with thinking status metadata
+        """
+        ...
+
+    def generate_budget_error_chunk(self) -> Any:
+        """Generate chunk for budget limit error.
+
+        Returns:
+            StreamChunk with budget limit error message
+        """
+        ...
+
+    def generate_force_response_error_chunk(self) -> Any:
+        """Generate chunk for forced response error.
+
+        Returns:
+            StreamChunk with force response error message
+        """
+        ...
+
+    def generate_final_marker_chunk(self) -> Any:
+        """Generate final marker chunk to signal stream completion.
+
+        Returns:
+            StreamChunk with is_final=True
+        """
+        ...
+
+    def generate_metrics_chunk(
+        self, metrics_line: str, is_final: bool = False, prefix: str = "\n\n"
+    ) -> Any:
+        """Generate chunk for metrics display.
+
+        Args:
+            metrics_line: Formatted metrics line
+            is_final: Whether this is the final chunk
+            prefix: Prefix before metrics line (default: double newline)
+
+        Returns:
+            StreamChunk with formatted metrics content
+        """
+        ...
+
+    def generate_content_chunk(
+        self, content: str, is_final: bool = False, suffix: str = ""
+    ) -> Any:
+        """Generate chunk for content display.
+
+        Args:
+            content: Sanitized content to display
+            is_final: Whether this is the final chunk
+            suffix: Optional suffix to append
+
+        Returns:
+            StreamChunk with content and optional suffix
+        """
+        ...
+
+    def get_budget_exhausted_chunks(self, stream_ctx: Any) -> List[Any]:
+        """Get chunks for budget exhaustion warning.
+
+        Args:
+            stream_ctx: Streaming context
+
+        Returns:
+            List of StreamChunks for budget exhausted warning
+        """
+        ...
+
+
+@runtime_checkable
+class ToolPlannerProtocol(Protocol):
+    """Protocol for tool planning and intent-based filtering.
+
+    Centralizes all tool planning operations, including:
+    - Tool sequence planning using dependency graph
+    - Goal inference from user messages
+    - Intent-based tool filtering
+
+    Extracted from CRITICAL-001 Phase 2C.
+    """
+
+    def plan_tools(
+        self, goals: List[str], available_inputs: Optional[List[str]] = None
+    ) -> List[Any]:
+        """Plan a sequence of tools to satisfy goals.
+
+        Args:
+            goals: List of desired outputs
+            available_inputs: Optional list of inputs already available
+
+        Returns:
+            List of ToolDefinition objects for the planned sequence
+        """
+        ...
+
+    def infer_goals_from_message(self, user_message: str) -> List[str]:
+        """Infer planning goals from user request.
+
+        Args:
+            user_message: The user's input message
+
+        Returns:
+            List of inferred goal outputs
+        """
+        ...
+
+    def filter_tools_by_intent(
+        self, tools: List[Any], current_intent: Optional[Any] = None
+    ) -> List[Any]:
+        """Filter tools based on detected user intent.
+
+        Args:
+            tools: List of tool definitions
+            current_intent: The detected user intent (if None, no filtering)
+
+        Returns:
+            Filtered list of tools
+        """
+        ...
+
+
+@runtime_checkable
+class TaskCoordinatorProtocol(Protocol):
+    """Protocol for task coordination and guidance.
+
+    Centralizes all task coordination operations, including:
+    - Task preparation with complexity detection
+    - Intent-based prompt guards
+    - Task-specific guidance and budget adjustments
+
+    Extracted from CRITICAL-001 Phase 2D.
+    """
+
+    def prepare_task(
+        self,
+        user_message: str,
+        unified_task_type: Any,
+        conversation_controller: Any
+    ) -> tuple[Any, int]:
+        """Prepare task-specific guidance and budget adjustments.
+
+        Args:
+            user_message: The user's input message
+            unified_task_type: Unified task type classification
+            conversation_controller: Conversation controller for message injection
+
+        Returns:
+            Tuple of (task_classification, complexity_tool_budget)
+        """
+        ...
+
+    def apply_intent_guard(
+        self, user_message: str, conversation_controller: Any
+    ) -> None:
+        """Detect intent and inject prompt guards for read-only tasks.
+
+        Args:
+            user_message: The user's input message
+            conversation_controller: Conversation controller for message injection
+        """
+        ...
+
+    def apply_task_guidance(
+        self,
+        user_message: str,
+        unified_task_type: Any,
+        is_analysis_task: bool,
+        is_action_task: bool,
+        needs_execution: bool,
+        max_exploration_iterations: int,
+        conversation_controller: Any,
+    ) -> None:
+        """Apply guidance and budget tweaks for analysis/action tasks.
+
+        Args:
+            user_message: The user's input message
+            unified_task_type: Unified task type classification
+            is_analysis_task: Whether this is an analysis task
+            is_action_task: Whether this is an action-oriented task
+            needs_execution: Whether the task requires execution
+            max_exploration_iterations: Maximum exploration iterations allowed
+            conversation_controller: Conversation controller for message injection
+        """
+        ...
+
+    @property
+    def current_intent(self) -> Any:
+        """Get the current detected intent."""
+        ...
+
+    @property
+    def temperature(self) -> float:
+        """Get the current temperature setting."""
+        ...
+
+    @property
+    def tool_budget(self) -> int:
+        """Get the current tool budget."""
+        ...
+
+    @property
+    def observed_files(self) -> list:
+        """Get the list of observed files."""
+        ...
+
+
+# =============================================================================
+# Utility Service Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class DebugLoggerProtocol(Protocol):
+    """Protocol for debug logging service.
+
+    Provides clean, scannable debug output focused on meaningful events.
+    """
+
+    def reset(self) -> None:
+        """Reset state for new conversation."""
+        ...
+
+    def log_iteration_start(self, iteration: int, **context: Any) -> None:
+        """Log iteration start."""
+        ...
+
+    def log_iteration_end(
+        self, iteration: int, has_tool_calls: bool = False, **context: Any
+    ) -> None:
+        """Log iteration end summary."""
+        ...
+
+    def log_tool_call(
+        self,
+        tool_name: str,
+        args: Dict[str, Any],
+        iteration: int,
+    ) -> None:
+        """Log tool call."""
+        ...
+
+    def log_tool_result(
+        self,
+        tool_name: str,
+        success: bool,
+        output: Any,
+        elapsed_ms: float,
+    ) -> None:
+        """Log tool result."""
+        ...
+
+
+@runtime_checkable
+class TaskTypeHinterProtocol(Protocol):
+    """Protocol for task type hint retrieval.
+
+    Provides task-specific guidance for the LLM.
+    """
+
+    def get_hint(self, task_type: str) -> str:
+        """Get prompt hint for a specific task type.
+
+        Args:
+            task_type: Type of task (edit, search, explain, etc.)
+
+        Returns:
+            Formatted hint string for system prompt
+        """
+        ...
+
+
+@runtime_checkable
+class ReminderManagerProtocol(Protocol):
+    """Protocol for context reminder management.
+
+    Manages intelligent injection of context reminders to reduce token waste.
+    """
+
+    def reset(self) -> None:
+        """Reset state for a new conversation turn."""
+        ...
+
+    def update_state(
+        self,
+        observed_files: Optional[Set[str]] = None,
+        executed_tool: Optional[str] = None,
+        tool_calls: Optional[int] = None,
+        tool_budget: Optional[int] = None,
+        task_complexity: Optional[str] = None,
+        task_hint: Optional[str] = None,
+    ) -> None:
+        """Update the current context state."""
+        ...
+
+    def add_observed_file(self, file_path: str) -> None:
+        """Add a file to the observed files set."""
+        ...
+
+    def get_consolidated_reminder(self, force: bool = False) -> Optional[str]:
+        """Get a consolidated reminder combining all active reminders."""
+        ...
+
+
+@runtime_checkable
+class RLCoordinatorProtocol(Protocol):
+    """Protocol for reinforcement learning coordinator.
+
+    Manages all RL learners with unified SQLite storage.
+    """
+
+    def record_outcome(
+        self,
+        learner_name: str,
+        outcome: Any,
+        vertical: str = "coding",
+    ) -> None:
+        """Record an outcome for a specific learner."""
+        ...
+
+    def get_recommendation(
+        self,
+        learner_name: str,
+        provider: str,
+        model: str,
+        task_type: str,
+    ) -> Optional[Any]:
+        """Get recommendation from a learner."""
+        ...
+
+    def export_metrics(self) -> Dict[str, Any]:
+        """Export all learned values and metrics for monitoring."""
+        ...
+
+    def close(self) -> None:
+        """Close database connection."""
+        ...
+
+
+@runtime_checkable
+class SafetyCheckerProtocol(Protocol):
+    """Protocol for safety checking service.
+
+    Detects dangerous operations and requests confirmation.
+    """
+
+    def is_write_tool(self, tool_name: str) -> bool:
+        """Check if a tool is a write/modify operation."""
+        ...
+
+    async def check_and_confirm(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+    ) -> Tuple[bool, Optional[str]]:
+        """Check operation safety and request confirmation if needed.
+
+        Returns:
+            Tuple of (should_proceed, optional_rejection_reason)
+        """
+        ...
+
+    def add_custom_pattern(
+        self,
+        pattern: str,
+        description: str,
+        risk_level: str = "HIGH",
+        category: str = "custom",
+    ) -> None:
+        """Add a custom safety pattern from vertical extensions."""
+        ...
+
+
+@runtime_checkable
+class AutoCommitterProtocol(Protocol):
+    """Protocol for automatic git commits service.
+
+    Handles automatic git commits for AI-assisted changes.
+    """
+
+    def is_git_repo(self) -> bool:
+        """Check if workspace is a git repository."""
+        ...
+
+    def has_changes(self, files: Optional[List[str]] = None) -> bool:
+        """Check if there are uncommitted changes."""
+        ...
+
+    def commit_changes(
+        self,
+        files: Optional[List[str]] = None,
+        description: str = "AI-assisted changes",
+        change_type: Optional[str] = None,
+        scope: Optional[str] = None,
+        auto_stage: bool = True,
+    ) -> Any:
+        """Commit changes to git."""
+        ...
+
+
+@runtime_checkable
+class MCPBridgeProtocol(Protocol):
+    """Protocol for Model Context Protocol bridge.
+
+    Provides access to MCP tools as Victor tools.
+    """
+
+    def configure_client(self, client: Any, prefix: str = "mcp") -> None:
+        """Configure the MCP client.
+
+        Args:
+            client: MCPClient instance
+            prefix: Prefix for tool names
+        """
+        ...
+
+    def get_tool_definitions(self) -> List[Dict[str, Any]]:
+        """Return MCP tools as Victor tool definitions with a name prefix."""
+        ...
+
+
+# =============================================================================
+# Infrastructure Service Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class ToolDependencyGraphProtocol(Protocol):
+    """Protocol for tool dependency graph.
+
+    Manages tool dependencies for intelligent execution ordering.
+    """
+
+    def add_dependency(self, tool: str, depends_on: str) -> None:
+        """Add a dependency relationship between tools.
+
+        Args:
+            tool: Tool name that has a dependency
+            depends_on: Tool that must be executed first
+        """
+        ...
+
+    def get_dependencies(self, tool: str) -> List[str]:
+        """Get dependencies for a tool.
+
+        Args:
+            tool: Tool name
+
+        Returns:
+            List of tool names that this tool depends on
+        """
+        ...
+
+    def get_execution_order(self, tools: List[str]) -> List[str]:
+        """Get optimal execution order for a list of tools.
+
+        Args:
+            tools: List of tool names
+
+        Returns:
+            Ordered list respecting dependencies
+        """
+        ...
+
+
+@runtime_checkable
+class ToolPluginRegistryProtocol(Protocol):
+    """Protocol for tool plugin registry.
+
+    Manages dynamic tool loading from plugins.
+    """
+
+    def register_plugin(self, plugin_path: str) -> None:
+        """Register a plugin directory.
+
+        Args:
+            plugin_path: Path to plugin directory
+        """
+        ...
+
+    def discover_tools(self) -> List[Any]:
+        """Discover and load tools from registered plugins.
+
+        Returns:
+            List of discovered tool instances
+        """
+        ...
+
+    def reload_plugins(self) -> None:
+        """Reload all registered plugins."""
+        ...
+
+
+@runtime_checkable
+class SemanticToolSelectorProtocol(Protocol):
+    """Protocol for semantic tool selection.
+
+    Uses embeddings to select relevant tools for a task.
+    """
+
+    def select_tools(
+        self,
+        query: str,
+        available_tools: List[Any],
+        max_tools: int = 10,
+        threshold: float = 0.3,
+    ) -> List[Any]:
+        """Select relevant tools using semantic similarity.
+
+        Args:
+            query: User query or task description
+            available_tools: List of available tools
+            max_tools: Maximum number of tools to select
+            threshold: Minimum similarity threshold
+
+        Returns:
+            List of selected tools
+        """
+        ...
+
+    def compute_similarity(self, query: str, tool_description: str) -> float:
+        """Compute semantic similarity between query and tool.
+
+        Args:
+            query: User query
+            tool_description: Tool description
+
+        Returns:
+            Similarity score (0-1)
+        """
+        ...
+
+
+@runtime_checkable
+class ProviderRegistryProtocol(Protocol):
+    """Protocol for provider registry.
+
+    Manages available LLM providers.
+    """
+
+    def register(self, name: str, provider_class: Any) -> None:
+        """Register a provider.
+
+        Args:
+            name: Provider name
+            provider_class: Provider class
+        """
+        ...
+
+    def get(self, name: str) -> Any:
+        """Get a provider class by name.
+
+        Args:
+            name: Provider name
+
+        Returns:
+            Provider class
+        """
+        ...
+
+    def list_providers(self) -> List[str]:
+        """Get list of registered provider names.
+
+        Returns:
+            List of provider names
+        """
+        ...
+
+
+# =============================================================================
+# Analytics & Observability Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class UsageLoggerProtocol(Protocol):
+    """Protocol for usage logging service.
+
+    Logs tool and provider usage for analytics.
+    """
+
+    def log_tool_call(
+        self,
+        tool_name: str,
+        success: bool,
+        duration_ms: float,
+        **metadata: Any,
+    ) -> None:
+        """Log a tool call.
+
+        Args:
+            tool_name: Name of the tool
+            success: Whether the call succeeded
+            duration_ms: Duration in milliseconds
+            **metadata: Additional metadata
+        """
+        ...
+
+    def log_provider_call(
+        self,
+        provider: str,
+        model: str,
+        tokens_used: int,
+        duration_ms: float,
+        **metadata: Any,
+    ) -> None:
+        """Log a provider API call.
+
+        Args:
+            provider: Provider name
+            model: Model identifier
+            tokens_used: Number of tokens consumed
+            duration_ms: Duration in milliseconds
+            **metadata: Additional metadata
+        """
+        ...
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get usage statistics.
+
+        Returns:
+            Dictionary of usage statistics
+        """
+        ...
+
+
+@runtime_checkable
+class StreamingMetricsCollectorProtocol(Protocol):
+    """Protocol for streaming metrics collection.
+
+    Collects real-time metrics during streaming responses.
+    """
+
+    def record_chunk(
+        self,
+        chunk_size: int,
+        timestamp: float,
+        **metadata: Any,
+    ) -> None:
+        """Record a streaming chunk.
+
+        Args:
+            chunk_size: Size of the chunk
+            timestamp: Timestamp of the chunk
+            **metadata: Additional metadata
+        """
+        ...
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get collected metrics.
+
+        Returns:
+            Dictionary of streaming metrics
+        """
+        ...
+
+    def reset(self) -> None:
+        """Reset metrics for new session."""
+        ...
+
+
+@runtime_checkable
+class IntentClassifierProtocol(Protocol):
+    """Protocol for intent classification service.
+
+    Classifies user intents using ML models.
+    """
+
+    def classify(self, text: str) -> Any:
+        """Classify user intent.
+
+        Args:
+            text: User input text
+
+        Returns:
+            Classified intent (IntentType or similar)
+        """
+        ...
+
+    def get_confidence(self, text: str, intent: Any) -> float:
+        """Get confidence score for a specific intent.
+
+        Args:
+            text: User input text
+            intent: Intent to check
+
+        Returns:
+            Confidence score (0-1)
+        """
+        ...
+
+
+# =============================================================================
+# Helper/Adapter Service Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class SystemPromptBuilderProtocol(Protocol):
+    """Protocol for system prompt building service.
+
+    Constructs system prompts from various components.
+    """
+
+    def build(
+        self,
+        base_prompt: str,
+        tool_descriptions: Optional[str] = None,
+        project_context: Optional[str] = None,
+        **kwargs: Any,
+    ) -> str:
+        """Build system prompt from components.
+
+        Args:
+            base_prompt: Base system prompt
+            tool_descriptions: Tool descriptions to include
+            project_context: Project-specific context
+            **kwargs: Additional prompt components
+
+        Returns:
+            Complete system prompt
+        """
+        ...
+
+
+@runtime_checkable
+class ParallelExecutorProtocol(Protocol):
+    """Protocol for parallel tool execution service.
+
+    Executes multiple tools in parallel.
+    """
+
+    async def execute_parallel(
+        self,
+        tool_calls: List[Any],
+        **kwargs: Any,
+    ) -> List[Any]:
+        """Execute multiple tool calls in parallel.
+
+        Args:
+            tool_calls: List of tool calls to execute
+            **kwargs: Additional execution parameters
+
+        Returns:
+            List of tool results
+        """
+        ...
+
+
+@runtime_checkable
+class ResponseCompleterProtocol(Protocol):
+    """Protocol for response completion service.
+
+    Completes partial responses and handles tool failures.
+    """
+
+    async def complete_response(
+        self,
+        partial_response: str,
+        context: Any,
+        **kwargs: Any,
+    ) -> str:
+        """Complete a partial response.
+
+        Args:
+            partial_response: Partial response text
+            context: Completion context
+            **kwargs: Additional completion parameters
+
+        Returns:
+            Completed response
+        """
+        ...
+
+
+@runtime_checkable
+class StreamingHandlerProtocol(Protocol):
+    """Protocol for streaming chat handler service.
+
+    Handles streaming chat responses.
+    """
+
+    async def handle_stream(
+        self,
+        stream: AsyncIterator[Any],
+        context: Any,
+        **kwargs: Any,
+    ) -> AsyncIterator[Any]:
+        """Handle streaming chat response.
+
+        Args:
+            stream: Input stream
+            context: Streaming context
+            **kwargs: Additional handling parameters
+
+        Yields:
+            Processed stream chunks
+        """
+        ...
+
+
 __all__ = [
     # Provider protocols
     "ProviderManagerProtocol",
@@ -799,6 +2038,35 @@ __all__ = [
     "UsageAnalyticsProtocol",
     "ToolSequenceTrackerProtocol",
     "ContextCompactorProtocol",
+    # Mode controller protocols
+    "ModeControllerProtocol",
+    # Deduplication protocols
+    "ToolDeduplicationTrackerProtocol",
+    # Embedding store protocols
+    "ConversationEmbeddingStoreProtocol",
     # Recovery protocols
     "RecoveryHandlerProtocol",
+    "RecoveryCoordinatorProtocol",
+    # Utility service protocols
+    "DebugLoggerProtocol",
+    "TaskTypeHinterProtocol",
+    "ReminderManagerProtocol",
+    "RLCoordinatorProtocol",
+    "SafetyCheckerProtocol",
+    "AutoCommitterProtocol",
+    "MCPBridgeProtocol",
+    # Infrastructure service protocols
+    "ToolDependencyGraphProtocol",
+    "ToolPluginRegistryProtocol",
+    "SemanticToolSelectorProtocol",
+    "ProviderRegistryProtocol",
+    # Analytics & observability protocols
+    "UsageLoggerProtocol",
+    "StreamingMetricsCollectorProtocol",
+    "IntentClassifierProtocol",
+    # Helper/adapter service protocols
+    "SystemPromptBuilderProtocol",
+    "ParallelExecutorProtocol",
+    "ResponseCompleterProtocol",
+    "StreamingHandlerProtocol",
 ]

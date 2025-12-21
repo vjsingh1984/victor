@@ -330,25 +330,54 @@ class AgentModeController:
         ]
 
 
-# Global instance
+# Global instance (legacy - prefer DI container)
 _mode_controller: Optional[AgentModeController] = None
 
 
 def get_mode_controller() -> AgentModeController:
-    """Get or create the global mode controller."""
+    """Get or create the mode controller.
+
+    Resolution order:
+    1. Check DI container (preferred)
+    2. Fall back to module-level singleton (legacy)
+
+    Returns:
+        AgentModeController instance
+    """
     global _mode_controller
+
+    # Try DI container first
+    try:
+        from victor.core.container import get_container
+        from victor.agent.protocols import ModeControllerProtocol
+
+        container = get_container()
+        if container.is_registered(ModeControllerProtocol):
+            return container.get(ModeControllerProtocol)
+    except Exception:
+        pass  # Fall back to legacy singleton
+
+    # Legacy fallback
     if _mode_controller is None:
         _mode_controller = AgentModeController()
     return _mode_controller
 
 
 def set_mode_controller(controller: AgentModeController) -> None:
-    """Set the global mode controller instance."""
+    """Set the global mode controller instance.
+
+    Note: This sets the legacy module-level singleton. If using DI container,
+    use container.register_or_replace() instead.
+    """
     global _mode_controller
     _mode_controller = controller
 
 
 def reset_mode_controller() -> None:
-    """Reset the global mode controller (for testing)."""
+    """Reset the global mode controller (for testing).
+
+    Note: This only resets the legacy module-level singleton. If using DI
+    container, use reset_container() as well.
+    """
     global _mode_controller
     _mode_controller = None
