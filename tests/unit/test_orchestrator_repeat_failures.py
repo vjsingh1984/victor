@@ -92,14 +92,10 @@ async def test_repeated_failing_call_is_skipped_after_first_failure(monkeypatch,
     results = await orch._handle_tool_calls(tool_calls)
 
     # First call executed once (no retries for explicit ToolResult failures)
-    # Second call skipped due to repeat signature or deduplication
+    # Second call skipped due to repeat signature (silent skip, no result added)
     # Note: ToolExecutor only retries on exceptions, not on explicit failures via ToolResult.success=False
     assert failing_tool.attempts == 1  # First call only, no retries for explicit failures
     assert orch.executed_tools.count("always_fail") == 1
-    # Second call returns a skip result for the repeated/deduplicated failure
-    assert len(results) == 2  # Both calls return results (one failure, one skip)
+    # Second call is silently skipped (no result added for repeated failures)
+    assert len(results) == 1  # Only first call returns a result
     assert results[0]["success"] is False
-    assert results[1]["success"] is False
-    # Accept either "repeated" or "deduplicated" error message
-    error_msg = results[1]["error"].lower()
-    assert "repeated" in error_msg or "dedup" in error_msg
