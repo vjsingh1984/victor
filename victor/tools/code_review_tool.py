@@ -52,9 +52,19 @@ _max_complexity: int = 10
 def set_code_review_config(max_complexity: int = 10) -> None:
     """Set code review configuration.
 
+    DEPRECATED: Use ToolConfig via executor context instead.
+    This function will be removed in v2.0.
+
     Args:
         max_complexity: Maximum allowed cyclomatic complexity (default: 10).
     """
+    import warnings
+
+    warnings.warn(
+        "set_code_review_config() is deprecated. Use ToolConfig via executor.update_context() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     global _max_complexity
     _max_complexity = max_complexity
 

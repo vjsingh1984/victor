@@ -69,6 +69,9 @@ def set_teams_config(
 ) -> bool:
     """Set Microsoft Teams configuration.
 
+    DEPRECATED: Use ToolConfig via executor context instead.
+    This function will be removed in v2.0.
+
     Args:
         client_id: Azure AD application client ID
         client_secret: Azure AD application client secret
@@ -77,6 +80,13 @@ def set_teams_config(
     Returns:
         True if configuration was successful, False otherwise
     """
+    import warnings
+
+    warnings.warn(
+        "set_teams_config() is deprecated. Use ToolConfig via executor.update_context() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if not HTTPX_AVAILABLE:
         logger.error("httpx not available. Install with: pip install httpx")
         return False

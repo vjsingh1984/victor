@@ -43,9 +43,19 @@ _max_workers: int = 4
 def set_batch_processor_config(max_workers: int = 4) -> None:
     """Configure batch processor settings.
 
+    DEPRECATED: Use ToolConfig via executor context instead.
+    This function will be removed in v2.0.
+
     Args:
         max_workers: Maximum parallel workers for batch operations.
     """
+    import warnings
+
+    warnings.warn(
+        "set_batch_processor_config() is deprecated. Use ToolConfig via executor.update_context() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     global _max_workers
     _max_workers = max_workers
 

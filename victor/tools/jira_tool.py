@@ -53,6 +53,9 @@ def set_jira_config(
 ) -> bool:
     """Set Jira configuration.
 
+    DEPRECATED: Use ToolConfig via executor context instead.
+    This function will be removed in v2.0.
+
     Args:
         server: Jira server URL (e.g., https://company.atlassian.net)
         username: Jira username (email)
@@ -61,6 +64,13 @@ def set_jira_config(
     Returns:
         True if configuration was successful, False otherwise
     """
+    import warnings
+
+    warnings.warn(
+        "set_jira_config() is deprecated. Use ToolConfig via executor.update_context() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     global _jira_client
 
     if not JIRA_AVAILABLE:

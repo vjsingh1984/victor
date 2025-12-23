@@ -58,10 +58,20 @@ DANGEROUS_PATTERNS = [
 def set_database_config(allow_modifications: bool = False, max_rows: int = 100) -> None:
     """Configure database tool settings.
 
+    DEPRECATED: Use ToolConfig via executor context instead.
+    This function will be removed in v2.0.
+
     Args:
         allow_modifications: Allow INSERT/UPDATE/DELETE operations
         max_rows: Maximum rows to return from queries
     """
+    import warnings
+
+    warnings.warn(
+        "set_database_config() is deprecated. Use ToolConfig via executor.update_context() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     global _allow_modifications, _max_rows
     _allow_modifications = allow_modifications
     _max_rows = max_rows

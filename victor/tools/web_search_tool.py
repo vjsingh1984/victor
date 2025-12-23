@@ -60,10 +60,20 @@ def set_web_tool_defaults(
 def set_web_search_provider(provider, model: Optional[str] = None) -> None:
     """Set the global provider and model for web search AI summarization.
 
+    DEPRECATED: Use ToolConfig via executor context instead.
+    This function will be removed in v2.0.
+
     Args:
         provider: LLM provider instance for summarization
         model: Model identifier to use for summarization
     """
+    import warnings
+
+    warnings.warn(
+        "set_web_search_provider() is deprecated. Use ToolConfig via executor.update_context() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     global _provider, _model
     _provider = provider
     _model = model

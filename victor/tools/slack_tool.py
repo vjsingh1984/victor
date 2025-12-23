@@ -47,12 +47,22 @@ _config: Dict[str, Optional[str]] = {
 def set_slack_config(api_token: Optional[str] = None) -> bool:
     """Set Slack configuration.
 
+    DEPRECATED: Use ToolConfig via executor context instead.
+    This function will be removed in v2.0.
+
     Args:
         api_token: Slack Bot User OAuth Token (xoxb-...)
 
     Returns:
         True if configuration was successful, False otherwise
     """
+    import warnings
+
+    warnings.warn(
+        "set_slack_config() is deprecated. Use ToolConfig via executor.update_context() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     global _slack_client
 
     if not SLACK_AVAILABLE:
