@@ -84,17 +84,15 @@ class VictorTUI(App):
     │ Victor | anthropic / claude-3-5-sonnet │  <- StatusBar
     ├─────────────────────────────────────┤
     │                                     │
-    │  You                                │
-    │  Hello, can you help me?            │
+    │  You                                │  <- ConversationLog
+    │  Hello, can you help me?            │      (scrollable)
     │                                     │
     │  Victor                             │
     │  Of course! I'd be happy to help... │
-    │                                     │  <- ConversationLog
-    │                                     │
     │                                     │
     ├─────────────────────────────────────┤
     │ > Type your message...              │  <- InputWidget
-    │   Enter to send | Ctrl+C to exit    │
+    │   Enter send | Shift+Enter newline  │
     └─────────────────────────────────────┘
     """
 
@@ -640,13 +638,14 @@ class VictorTUI(App):
         """Show help overlay with keyboard shortcuts."""
         help_text = """
 Keyboard Shortcuts:
+  Enter        Send message
+  Shift+Enter  Add newline
   Ctrl+C       Exit
   Ctrl+L       Clear conversation
   Ctrl+T       Toggle thinking panel
   Ctrl+S       Save session
   Ctrl+/       Show this help
   Ctrl+↑/↓     Scroll conversation
-  Ctrl+Enter   Send message
   ↑/↓          Navigate input history
   Escape       Focus input
 

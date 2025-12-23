@@ -103,7 +103,7 @@ class StatusBar(Static):
                 Text.assemble(
                     ("Ctrl+C", "bold"),
                     " exit  ",
-                    ("Ctrl+Enter", "bold"),
+                    ("Enter", "bold"),
                     " send",
                 ),
                 classes="shortcuts",
@@ -235,7 +235,7 @@ class InputWidget(Static):
     """Input area at the bottom of the screen.
 
     Uses a multi-line TextArea for better input handling.
-    `Ctrl+Enter` sends the message.
+    `Enter` sends the message, `Shift+Enter` adds a newline.
     Up/Down arrows navigate input history loaded from conversation DB.
     """
 
@@ -249,7 +249,8 @@ class InputWidget(Static):
             self.value = value
 
     BINDINGS = [
-        ("ctrl+enter", "submit", "Send Message"),
+        ("enter", "submit", "Send Message"),
+        ("ctrl+enter", "submit", "Send Message"),  # Alternative
     ]
 
     # Class-level history shared across instances (persists across sessions)
@@ -272,7 +273,7 @@ class InputWidget(Static):
                     id="message-input",
                 )
             yield Label(
-                "Ctrl+Enter send · ↑↓ history · /exit quit",
+                "Enter send · Shift+Enter newline · ↑↓ history · /help",
                 classes="input-hint",
             )
 
@@ -298,9 +299,28 @@ class InputWidget(Static):
                     InputWidget._history = InputWidget._history[-InputWidget._max_history :]
 
     def on_key(self, event) -> None:
-        """Handle up/down arrow keys for history navigation."""
+        """Handle key events for submission and history navigation.
+
+        - Enter: Submit message
+        - Shift+Enter: Add newline
+        - Up/Down: Navigate history (when at top/bottom of input)
+        """
         if not self._input:
             return
+
+        # Handle Enter key: submit unless Shift is held
+        if event.key == "enter":
+            if event.shift:
+                # Shift+Enter: Allow newline (don't intercept)
+                return
+            else:
+                # Enter: Submit the message
+                if self._input.text.strip():
+                    self.post_message(self.Submitted(self._input.text))
+                event.prevent_default()
+                event.stop()
+                return
+
         # Only trigger history if cursor is at the top of the text area
         is_at_top = self._input.cursor_location[0] == 0
 
