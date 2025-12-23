@@ -239,19 +239,21 @@ class RecoveryCoordinator:
     ) -> Optional[StreamChunk]:
         """Check tool budget and generate warning if approaching limit.
 
+        Warning is triggered when:
+        - Used at least warning_threshold tool calls (e.g., 250)
+        - Budget is not yet exhausted
+
         Args:
             ctx: Recovery context
-            warning_threshold: Number of tool calls before warning
+            warning_threshold: Number of tool calls before warning (default 250)
 
         Returns:
             StreamChunk with warning if approaching limit, None otherwise
         """
-        if ctx.tool_calls_used >= ctx.tool_budget:
-            return None  # Budget exhausted handled elsewhere
-
-        # Check if approaching budget limit (within warning_threshold of limit)
         remaining = ctx.tool_budget - ctx.tool_calls_used
-        if remaining <= warning_threshold and ctx.tool_calls_used > 0:
+
+        # Warn when we've used at least warning_threshold calls and still have remaining
+        if ctx.tool_calls_used >= warning_threshold and remaining > 0:
             return StreamChunk(
                 content=f"[tool] ⚠ Approaching tool budget limit: {ctx.tool_calls_used}/{ctx.tool_budget} calls used\n"
             )

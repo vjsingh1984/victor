@@ -245,16 +245,29 @@ class TestConditionChecking:
 
         result = recovery_coordinator.check_tool_budget(recovery_context, warning_threshold=250)
 
-        assert result is False  # Not exhausted
+        assert result is None  # No warning when far from limit
 
     def test_check_tool_budget_approaching_limit(
         self, recovery_coordinator, recovery_context, mock_streaming_handler
     ):
-        """Test check_tool_budget when at/exceeding limit."""
+        """Test check_tool_budget when approaching limit."""
+        recovery_context.tool_calls_used = 250  # At warning threshold
+        recovery_context.tool_budget = 300     # Still have remaining budget
+
+        result = recovery_coordinator.check_tool_budget(recovery_context, warning_threshold=250)
+
+        # Returns a warning chunk when at or above warning_threshold
+        assert result is not None
+        assert "Approaching tool budget" in result.content
+
+    def test_is_budget_exhausted(
+        self, recovery_coordinator, recovery_context, mock_streaming_handler
+    ):
+        """Test is_budget_exhausted when at/exceeding limit."""
         recovery_context.tool_calls_used = 15
         recovery_context.tool_budget = 15
 
-        result = recovery_coordinator.check_tool_budget(recovery_context, warning_threshold=250)
+        result = recovery_coordinator.is_budget_exhausted(recovery_context)
 
         assert result is True  # Budget exhausted
 
@@ -265,7 +278,7 @@ class TestConditionChecking:
         # Mock the unified_tracker.should_stop() to return not stuck
         recovery_coordinator.unified_tracker.should_stop.return_value = Mock(should_stop=False)
 
-        result = recovery_coordinator.check_progress(recovery_context, base_max=8)
+        result = recovery_coordinator.check_progress(recovery_context)
 
         assert result is True  # Making progress (not stuck)
 
@@ -273,11 +286,12 @@ class TestConditionChecking:
         self, recovery_coordinator, recovery_context, mock_streaming_handler
     ):
         """Test check_progress when stuck."""
-        mock_streaming_handler.check_progress_and_force.return_value = True
+        # Mock the unified_tracker.should_stop() to return stuck
+        recovery_coordinator.unified_tracker.should_stop.return_value = Mock(should_stop=True)
 
-        result = recovery_coordinator.check_progress(recovery_context, base_max=8)
+        result = recovery_coordinator.check_progress(recovery_context)
 
-        assert result is True
+        assert result is False  # Stuck/looping
 
     def test_check_blocked_threshold_not_exceeded(
         self, recovery_coordinator, recovery_context, mock_streaming_handler
@@ -286,7 +300,7 @@ class TestConditionChecking:
         mock_streaming_handler.check_blocked_threshold.return_value = None
 
         result = recovery_coordinator.check_blocked_threshold(
-            recovery_context, all_blocked=False, consecutive_limit=4, total_limit=6
+            recovery_context, all_blocked=False
         )
 
         assert result is None
@@ -301,7 +315,7 @@ class TestConditionChecking:
         mock_streaming_handler.check_blocked_threshold.return_value = mock_result
 
         result = recovery_coordinator.check_blocked_threshold(
-            recovery_context, all_blocked=True, consecutive_limit=4, total_limit=6
+            recovery_context, all_blocked=True
         )
 
         assert result is not None
@@ -657,7 +671,8 @@ class TestMetricsAndFormatting:
         self, recovery_coordinator, recovery_context, mock_streaming_handler
     ):
         """Test format_completion_metrics returns dict with metrics."""
-        result = recovery_coordinator.format_completion_metrics(recovery_context, elapsed_time=10.5)
+        recovery_context.elapsed_time = 10.5
+        result = recovery_coordinator.format_completion_metrics(recovery_context)
 
         assert isinstance(result, dict)
         assert "iterations" in result
