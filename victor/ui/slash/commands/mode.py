@@ -45,7 +45,7 @@ class ModeCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        from victor.agent.modes import AgentMode
+        from victor.agent.adaptive_mode_controller import AgentMode
 
         mode_controller = getattr(ctx.agent, "_mode_controller", None)
 
@@ -160,7 +160,7 @@ class PlanCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        from victor.agent.modes import AgentMode
+        from victor.agent.adaptive_mode_controller import AgentMode
 
         # Switch to plan mode
         mode_controller = getattr(ctx.agent, "_mode_controller", None)

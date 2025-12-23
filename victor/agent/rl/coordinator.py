@@ -384,6 +384,71 @@ class RLCoordinator:
 
         return recommendations
 
+    def list_learners(self) -> list[str]:
+        """List all registered learner names.
+
+        Returns:
+            List of learner names
+        """
+        return list(self._learners.keys())
+
+    def export_all_learner_data(self) -> Dict[str, Any]:
+        """Export all learner data for training/analysis.
+
+        Returns:
+            Dictionary mapping learner name to its exported data
+        """
+        data = {}
+        for name, learner in self._learners.items():
+            try:
+                if hasattr(learner, "export_data"):
+                    data[name] = learner.export_data()
+                elif hasattr(learner, "get_q_table"):
+                    data[name] = {"q_table": learner.get_q_table()}
+                elif hasattr(learner, "export_metrics"):
+                    data[name] = learner.export_metrics()
+                else:
+                    data[name] = {"type": type(learner).__name__}
+            except Exception as e:
+                logger.error(f"RL: Failed to export data for {name}: {e}")
+                data[name] = {"error": str(e)}
+        return data
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get coordinator-level statistics.
+
+        Returns:
+            Dictionary with coordinator statistics
+        """
+        # Count outcomes from database
+        cursor = self.db.cursor()
+        try:
+            cursor.execute("SELECT COUNT(*) FROM rl_outcomes")
+            total_outcomes = cursor.fetchone()[0]
+        except Exception:
+            total_outcomes = 0
+
+        # Gather learner sample counts
+        learner_samples = {}
+        for name, learner in self._learners.items():
+            try:
+                if hasattr(learner, "get_sample_count"):
+                    learner_samples[name] = learner.get_sample_count()
+                elif hasattr(learner, "_sample_count"):
+                    learner_samples[name] = getattr(learner, "_sample_count", 0)
+                else:
+                    learner_samples[name] = 0
+            except Exception:
+                learner_samples[name] = 0
+
+        return {
+            "total_outcomes": total_outcomes,
+            "learner_count": len(self._learners),
+            "learners": list(self._learners.keys()),
+            "learner_samples": learner_samples,
+            "db_path": str(self.db_path),
+        }
+
     def close(self) -> None:
         """Close database connection."""
         if self.db:
