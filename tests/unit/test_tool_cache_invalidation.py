@@ -39,7 +39,7 @@ async def _run_with_invalidation(tmpdir: str) -> int:
         tool_selection_strategy="keyword",
         tool_cache_enabled=True,
         tool_cache_allowlist=["code_search"],
-        tool_cache_dir_override=tmpdir,
+        tool_cache_dir=tmpdir,  # Use correct setting name
     )
     orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
 

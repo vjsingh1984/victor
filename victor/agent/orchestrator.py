@@ -4412,12 +4412,12 @@ class AgentOrchestrator:
         stream_ctx: StreamingChatContext,
         elapsed_time: float,
     ) -> str:
-        """Format completion metrics using the recovery coordinator.
+        """Format completion metrics using the streaming handler.
 
-        DEPRECATED: Use recovery_coordinator.format_completion_metrics() directly.
+        DEPRECATED: Use streaming_handler.format_completion_metrics() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
+        This method delegates to StreamingHandler for proper metrics formatting
+        that includes token counts, cache info, and timing.
 
         Args:
             stream_ctx: The streaming context
@@ -4426,11 +4426,8 @@ class AgentOrchestrator:
         Returns:
             Formatted metrics line string
         """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.format_completion_metrics(recovery_ctx, elapsed_time)
+        # Delegate to StreamingHandler for proper string formatting
+        return self._streaming_handler.format_completion_metrics(stream_ctx, elapsed_time)
 
     def _format_budget_exhausted_metrics_with_handler(
         self,
@@ -4438,12 +4435,11 @@ class AgentOrchestrator:
         elapsed_time: float,
         time_to_first_token: Optional[float] = None,
     ) -> str:
-        """Format budget exhausted metrics using the recovery coordinator.
+        """Format budget exhausted metrics using the streaming handler.
 
-        DEPRECATED: Use recovery_coordinator.format_budget_exhausted_metrics() directly.
+        DEPRECATED: Use streaming_handler.format_budget_exhausted_metrics() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
+        This method delegates to StreamingHandler for proper metrics formatting.
 
         Args:
             stream_ctx: The streaming context
@@ -4453,12 +4449,9 @@ class AgentOrchestrator:
         Returns:
             Formatted metrics line string
         """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.format_budget_exhausted_metrics(
-            recovery_ctx, elapsed_time, time_to_first_token
+        # Delegate to StreamingHandler for proper string formatting
+        return self._streaming_handler.format_budget_exhausted_metrics(
+            stream_ctx, elapsed_time, time_to_first_token
         )
 
     def _generate_tool_result_chunks_with_handler(

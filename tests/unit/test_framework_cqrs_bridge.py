@@ -513,7 +513,7 @@ class TestObservabilityToCQRSBridge:
         assert len(cqrs_events) == 1
         assert bridge.event_count == 1
 
-        await bridge.stop()
+        bridge.stop()  # Sync method, no await
 
     @pytest.mark.asyncio
     async def test_bridge_stops_forwarding_after_stop(self):
@@ -529,7 +529,7 @@ class TestObservabilityToCQRSBridge:
             event_dispatcher=dispatcher,
         )
         bridge.start()
-        await bridge.stop()
+        bridge.stop()  # Sync method, no await
 
         # Publish after stop
         event_bus.emit_tool_start("read_file", {"path": "/tmp/test.txt"})
