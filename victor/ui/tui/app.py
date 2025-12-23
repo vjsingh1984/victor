@@ -205,12 +205,12 @@ class VictorTUI(App):
         color: $text;
     }
 
-    /* Input */
+    /* Input - compact at bottom */
     InputWidget {
         dock: bottom;
         height: auto;
-        max-height: 50%;
-        padding: 0 2 1 2;
+        max-height: 8;
+        padding: 0 1;
         background: $panel;
         border-top: solid $border-muted;
         margin: 0;
@@ -219,7 +219,7 @@ class VictorTUI(App):
     InputWidget .input-row {
         width: 100%;
         height: auto;
-        padding-top: 1;
+        padding: 0;
     }
 
     InputWidget .prompt-indicator {
@@ -228,18 +228,20 @@ class VictorTUI(App):
         color: $primary;
     }
 
+    InputWidget SubmitTextArea,
     InputWidget TextArea {
         width: 1fr;
         height: auto;
-        min-height: 3;
-        max-height: 16;
+        min-height: 1;
+        max-height: 5;
         border: round $border-strong;
         background: $surface;
         color: $text;
-        padding: 1 1;
+        padding: 0 1;
         scrollbar-gutter: stable;
     }
 
+    InputWidget SubmitTextArea:focus,
     InputWidget TextArea:focus {
         border: round $border-strong;
         background: $background;
@@ -250,6 +252,8 @@ class VictorTUI(App):
         height: 1;
         color: $text-muted;
         text-align: right;
+        padding: 0;
+        margin: 0;
     }
 
     /* Tool calls */

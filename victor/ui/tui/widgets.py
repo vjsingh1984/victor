@@ -25,6 +25,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Label, Static, RichLog, TextArea, Button, ProgressBar
 from textual.message import Message
 from textual.reactive import reactive
+from textual.binding import Binding
 
 if TYPE_CHECKING:
     pass
@@ -231,6 +232,33 @@ class ConversationLog(RichLog):
         self._streaming_message = None
 
 
+class SubmitTextArea(TextArea):
+    """Custom TextArea that submits on Enter and allows Shift+Enter for newlines.
+
+    This subclass overrides the default Enter behavior to emit a Submit message
+    instead of inserting a newline. Shift+Enter still inserts newlines.
+    """
+
+    class Submit(Message):
+        """Message emitted when Enter is pressed."""
+
+        def __init__(self, value: str) -> None:
+            super().__init__()
+            self.value = value
+
+    def _on_key(self, event) -> None:
+        """Handle key events before TextArea processes them."""
+        if event.key == "enter" and not event.shift:
+            # Enter without shift: submit instead of newline
+            if self.text.strip():
+                self.post_message(self.Submit(self.text))
+            event.prevent_default()
+            event.stop()
+            return
+        # All other keys (including Shift+Enter) handled normally
+        super()._on_key(event)
+
+
 class InputWidget(Static):
     """Input area at the bottom of the screen.
 
@@ -249,8 +277,7 @@ class InputWidget(Static):
             self.value = value
 
     BINDINGS = [
-        ("enter", "submit", "Send Message"),
-        ("ctrl+enter", "submit", "Send Message"),  # Alternative
+        ("ctrl+enter", "submit", "Send Message"),  # Alternative binding
     ]
 
     # Class-level history shared across instances (persists across sessions)
@@ -260,7 +287,7 @@ class InputWidget(Static):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._input: TextArea | None = None
+        self._input: SubmitTextArea | None = None
         self._history_index: int = -1  # -1 means not browsing history
         self._draft: str = ""  # Save current draft when browsing history
 
@@ -268,7 +295,7 @@ class InputWidget(Static):
         with Vertical():
             with Horizontal(classes="input-row"):
                 yield Label("> ", classes="prompt-indicator")
-                yield TextArea(
+                yield SubmitTextArea(
                     placeholder="Type message or /help...",
                     id="message-input",
                 )
@@ -277,9 +304,14 @@ class InputWidget(Static):
                 classes="input-hint",
             )
 
+    def on_submit_text_area_submit(self, event: SubmitTextArea.Submit) -> None:
+        """Handle submit from the custom TextArea."""
+        if event.value.strip():
+            self.post_message(self.Submitted(event.value))
+
     def on_mount(self) -> None:
         """Focus the input on mount and load history from DB."""
-        self._input = self.query_one("#message-input", TextArea)
+        self._input = self.query_one("#message-input", SubmitTextArea)
         self._input.focus()
 
         # Load persistent history from conversation database (once per session)
@@ -299,27 +331,13 @@ class InputWidget(Static):
                     InputWidget._history = InputWidget._history[-InputWidget._max_history :]
 
     def on_key(self, event) -> None:
-        """Handle key events for submission and history navigation.
+        """Handle key events for history navigation.
 
-        - Enter: Submit message
-        - Shift+Enter: Add newline
         - Up/Down: Navigate history (when at top/bottom of input)
+        Note: Enter/Shift+Enter handled by SubmitTextArea
         """
         if not self._input:
             return
-
-        # Handle Enter key: submit unless Shift is held
-        if event.key == "enter":
-            if event.shift:
-                # Shift+Enter: Allow newline (don't intercept)
-                return
-            else:
-                # Enter: Submit the message
-                if self._input.text.strip():
-                    self.post_message(self.Submitted(self._input.text))
-                event.prevent_default()
-                event.stop()
-                return
 
         # Only trigger history if cursor is at the top of the text area
         is_at_top = self._input.cursor_location[0] == 0
