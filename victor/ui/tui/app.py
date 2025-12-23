@@ -19,10 +19,14 @@ from textual.widgets import Footer
 from victor.ui.tui.theme import THEME_CSS
 from victor.ui.tui.widgets import (
     ConversationLog,
+    EnhancedConversationLog,
     InputWidget,
     StatusBar,
     ThinkingWidget,
     ToolCallWidget,
+    CodeBlock,
+    StreamingMessageBlock,
+    ToolProgressPanel,
 )
 
 if TYPE_CHECKING:

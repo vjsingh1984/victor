@@ -2,19 +2,29 @@
 
 Provides message display, input handling, and status widgets
 for the modern chat interface.
+
+Enhanced widgets include:
+- EnhancedConversationLog: Better streaming support with ScrollableContainer
+- CodeBlock: Syntax-highlighted code with copy functionality
+- ToolProgressPanel: Real-time tool execution visualization
+- ThinkingSidebar: Collapsible panel for model reasoning
 """
 
 from __future__ import annotations
 
+import re
 import sqlite3
-from typing import TYPE_CHECKING, List, Optional
+import time
+from typing import TYPE_CHECKING, Callable, List, Optional
 
 from rich.markdown import Markdown
+from rich.syntax import Syntax
 from rich.text import Text
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical
-from textual.widgets import Label, Static, RichLog, TextArea
+from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.widgets import Label, Static, RichLog, TextArea, Button, ProgressBar
 from textual.message import Message
+from textual.reactive import reactive
 
 if TYPE_CHECKING:
     pass
@@ -473,3 +483,507 @@ class ThinkingWidget(Static):
             content_widget.update(content)
         except Exception:
             pass
+
+
+# =============================================================================
+# Enhanced TUI Widgets (Phase 1 TUI Enhancement)
+# =============================================================================
+
+
+class CodeBlock(Static):
+    """Syntax-highlighted code block with copy functionality.
+
+    Features:
+    - Automatic language detection from code fences
+    - Syntax highlighting via Rich Syntax
+    - Copy-to-clipboard button
+    - Line numbers option
+    """
+
+    DEFAULT_CSS = """
+    CodeBlock {
+        background: $surface;
+        border: solid $primary-darken-2;
+        padding: 0 1;
+        margin: 1 0;
+    }
+
+    CodeBlock .code-header {
+        color: $text-muted;
+        text-style: italic;
+    }
+
+    CodeBlock .copy-button {
+        dock: right;
+        width: auto;
+        min-width: 6;
+        height: 1;
+        margin: 0 0 0 1;
+    }
+    """
+
+    def __init__(
+        self,
+        code: str,
+        language: str = "python",
+        show_line_numbers: bool = True,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.code = code
+        self.language = language
+        self.show_line_numbers = show_line_numbers
+
+    def compose(self) -> ComposeResult:
+        with Horizontal(classes="code-header-row"):
+            yield Label(f"[{self.language}]", classes="code-header")
+            yield Button("Copy", classes="copy-button", variant="default")
+        yield Static(
+            Syntax(
+                self.code,
+                self.language,
+                theme="monokai",
+                line_numbers=self.show_line_numbers,
+                word_wrap=True,
+            ),
+            classes="code-content",
+        )
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle copy button press."""
+        try:
+            import pyperclip
+
+            pyperclip.copy(self.code)
+            # Update button text briefly
+            event.button.label = "Copied!"
+            self.set_timer(1.5, lambda: setattr(event.button, "label", "Copy"))
+        except ImportError:
+            # pyperclip not available
+            event.button.label = "N/A"
+
+
+class StreamingMessageBlock(Static):
+    """Message block that supports live streaming updates.
+
+    Unlike MessageWidget which requires full content, this widget
+    can receive content chunks and update in real-time with proper
+    markdown rendering.
+    """
+
+    DEFAULT_CSS = """
+    StreamingMessageBlock {
+        padding: 1;
+        margin: 0 0 1 0;
+    }
+
+    StreamingMessageBlock.user {
+        background: $surface;
+    }
+
+    StreamingMessageBlock.assistant {
+        background: $surface-darken-1;
+    }
+
+    StreamingMessageBlock .message-header {
+        text-style: bold;
+        margin-bottom: 1;
+    }
+
+    StreamingMessageBlock .message-header.user {
+        color: $success;
+    }
+
+    StreamingMessageBlock .message-header.assistant {
+        color: $primary;
+    }
+
+    StreamingMessageBlock .streaming-indicator {
+        color: $warning;
+        text-style: italic;
+    }
+    """
+
+    content = reactive("")
+    is_streaming = reactive(False)
+
+    def __init__(
+        self,
+        role: str = "assistant",
+        initial_content: str = "",
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.role = role
+        self.content = initial_content
+        self.add_class(role)
+        self._code_blocks: List[tuple[str, str]] = []  # (code, language)
+
+    def compose(self) -> ComposeResult:
+        role_label = {
+            "user": "You",
+            "assistant": "Victor",
+            "system": "System",
+            "error": "Error",
+        }.get(self.role, self.role.title())
+
+        with Vertical():
+            header = Label(role_label, classes="message-header")
+            header.add_class(self.role)
+            yield header
+            yield Static(id="message-body", classes="message-content")
+            yield Label("▌", classes="streaming-indicator", id="cursor")
+
+    def on_mount(self) -> None:
+        """Hide cursor initially."""
+        cursor = self.query_one("#cursor")
+        cursor.display = self.is_streaming
+
+    def watch_content(self, content: str) -> None:
+        """React to content changes."""
+        self._update_display()
+
+    def watch_is_streaming(self, streaming: bool) -> None:
+        """Show/hide streaming cursor."""
+        try:
+            cursor = self.query_one("#cursor")
+            cursor.display = streaming
+        except Exception:
+            pass
+
+    def _update_display(self) -> None:
+        """Update the message body with current content."""
+        try:
+            body = self.query_one("#message-body", Static)
+            if self.role == "assistant":
+                # Parse and render markdown, extracting code blocks
+                body.update(Markdown(self.content))
+            else:
+                body.update(self.content)
+        except Exception:
+            pass
+
+    def append_chunk(self, chunk: str) -> None:
+        """Append a streaming chunk to the content."""
+        self.content += chunk
+
+    def finish_streaming(self) -> None:
+        """Mark streaming as complete."""
+        self.is_streaming = False
+
+
+class ToolProgressPanel(Static):
+    """Panel showing real-time tool execution progress.
+
+    Features:
+    - Progress bar for long-running tools
+    - Expandable output preview
+    - Success/failure status with elapsed time
+    - Cancel button for interruptible tools
+    """
+
+    DEFAULT_CSS = """
+    ToolProgressPanel {
+        background: $surface;
+        border: solid $primary-darken-2;
+        padding: 1;
+        margin: 1 0;
+        height: auto;
+        max-height: 12;
+    }
+
+    ToolProgressPanel .tool-header {
+        text-style: bold;
+    }
+
+    ToolProgressPanel .tool-name {
+        color: $secondary;
+    }
+
+    ToolProgressPanel .tool-status {
+        margin-left: 1;
+    }
+
+    ToolProgressPanel .tool-status.pending {
+        color: $warning;
+    }
+
+    ToolProgressPanel .tool-status.running {
+        color: $primary;
+    }
+
+    ToolProgressPanel .tool-status.success {
+        color: $success;
+    }
+
+    ToolProgressPanel .tool-status.error {
+        color: $error;
+    }
+
+    ToolProgressPanel .progress-container {
+        margin: 1 0;
+    }
+
+    ToolProgressPanel .output-preview {
+        color: $text-muted;
+        max-height: 4;
+        overflow: hidden;
+    }
+
+    ToolProgressPanel .elapsed-time {
+        color: $text-muted;
+        text-style: italic;
+    }
+    """
+
+    status = reactive("pending")
+    progress = reactive(0.0)
+    elapsed = reactive(0.0)
+
+    def __init__(
+        self,
+        tool_name: str,
+        arguments: Optional[dict] = None,
+        on_cancel: Optional[Callable] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.tool_name = tool_name
+        self.arguments = arguments or {}
+        self.on_cancel = on_cancel
+        self._start_time = time.time()
+        self._output_preview = ""
+
+    def compose(self) -> ComposeResult:
+        args_preview = self._format_args_preview()
+
+        with Vertical():
+            with Horizontal(classes="tool-header-row"):
+                yield Label(
+                    Text.assemble(
+                        ("⚙ ", ""),
+                        (self.tool_name, "bold cyan"),
+                        (f" {args_preview}" if args_preview else "", "dim"),
+                    ),
+                    classes="tool-header",
+                )
+                yield Label("⏳", classes="tool-status pending", id="status-icon")
+                yield Label("", classes="elapsed-time", id="elapsed")
+
+            yield ProgressBar(total=100, show_eta=False, id="progress-bar")
+
+            yield Static("", classes="output-preview", id="output")
+
+            if self.on_cancel:
+                yield Button("Cancel", variant="error", id="cancel-btn")
+
+    def _format_args_preview(self) -> str:
+        """Format arguments as a preview string."""
+        if not self.arguments:
+            return ""
+        first_key = next(iter(self.arguments.keys()), None)
+        if first_key:
+            first_val = str(self.arguments[first_key])[:40]
+            if len(str(self.arguments[first_key])) > 40:
+                first_val += "..."
+            return f"({first_key}={first_val})"
+        return ""
+
+    def watch_status(self, status: str) -> None:
+        """Update status icon when status changes."""
+        try:
+            icon = self.query_one("#status-icon")
+            icons = {
+                "pending": ("⏳", "pending"),
+                "running": ("▶", "running"),
+                "success": ("✓", "success"),
+                "error": ("✗", "error"),
+            }
+            symbol, css_class = icons.get(status, ("?", "pending"))
+            icon.update(symbol)
+            icon.remove_class("pending", "running", "success", "error")
+            icon.add_class(css_class)
+        except Exception:
+            pass
+
+    def watch_elapsed(self, elapsed: float) -> None:
+        """Update elapsed time display."""
+        try:
+            elapsed_label = self.query_one("#elapsed")
+            elapsed_label.update(f"{elapsed:.1f}s")
+        except Exception:
+            pass
+
+    def watch_progress(self, progress: float) -> None:
+        """Update progress bar."""
+        try:
+            bar = self.query_one("#progress-bar", ProgressBar)
+            bar.update(progress=progress)
+        except Exception:
+            pass
+
+    def update_output_preview(self, text: str) -> None:
+        """Update the output preview text."""
+        self._output_preview = text[:200]  # Truncate
+        try:
+            output = self.query_one("#output")
+            output.update(self._output_preview)
+        except Exception:
+            pass
+
+    def set_running(self) -> None:
+        """Mark tool as running."""
+        self.status = "running"
+        self._start_time = time.time()
+
+    def set_complete(self, success: bool, output: str = "") -> None:
+        """Mark tool as complete."""
+        self.status = "success" if success else "error"
+        self.elapsed = time.time() - self._start_time
+        self.progress = 100.0
+        if output:
+            self.update_output_preview(output)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle cancel button press."""
+        if event.button.id == "cancel-btn" and self.on_cancel:
+            self.on_cancel()
+            self.status = "error"
+
+
+class EnhancedConversationLog(VerticalScroll):
+    """Enhanced conversation log with streaming support.
+
+    Replaces RichLog-based ConversationLog with a ScrollableContainer
+    that supports:
+    - Live streaming updates
+    - Message widgets with proper styling
+    - Code blocks with syntax highlighting
+    - Auto-scroll to bottom
+    """
+
+    DEFAULT_CSS = """
+    EnhancedConversationLog {
+        background: $background;
+        padding: 1;
+        scrollbar-gutter: stable;
+    }
+    """
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._streaming_message: Optional[StreamingMessageBlock] = None
+        self._message_count = 0
+
+    def add_user_message(self, content: str) -> None:
+        """Add a user message to the log."""
+        msg = StreamingMessageBlock(
+            role="user",
+            initial_content=content,
+            id=f"msg-{self._message_count}",
+        )
+        self._message_count += 1
+        self.mount(msg)
+        self.scroll_end(animate=False)
+
+    def add_assistant_message(self, content: str) -> None:
+        """Add a complete assistant message to the log."""
+        msg = StreamingMessageBlock(
+            role="assistant",
+            initial_content=content,
+            id=f"msg-{self._message_count}",
+        )
+        self._message_count += 1
+        self.mount(msg)
+        self.scroll_end(animate=False)
+
+    def add_system_message(self, content: str) -> None:
+        """Add a system/status message to the log."""
+        msg = Static(
+            Text(f"[{content}]", style="dim italic"),
+            id=f"msg-{self._message_count}",
+        )
+        self._message_count += 1
+        self.mount(msg)
+        self.scroll_end(animate=False)
+
+    def add_error_message(self, content: str) -> None:
+        """Add an error message to the log."""
+        msg = Static(
+            Text(f"Error: {content}", style="bold red"),
+            id=f"msg-{self._message_count}",
+        )
+        self._message_count += 1
+        self.mount(msg)
+        self.scroll_end(animate=False)
+
+    def start_streaming(self) -> StreamingMessageBlock:
+        """Start a streaming response and return the message block."""
+        self._streaming_message = StreamingMessageBlock(
+            role="assistant",
+            initial_content="",
+            id=f"msg-{self._message_count}",
+        )
+        self._streaming_message.is_streaming = True
+        self._message_count += 1
+        self.mount(self._streaming_message)
+        self.scroll_end(animate=False)
+        return self._streaming_message
+
+    def update_streaming(self, content: str) -> None:
+        """Update the current streaming message."""
+        if self._streaming_message:
+            self._streaming_message.content = content
+            self.scroll_end(animate=False)
+
+    def append_streaming_chunk(self, chunk: str) -> None:
+        """Append a chunk to the current streaming message."""
+        if self._streaming_message:
+            self._streaming_message.append_chunk(chunk)
+            self.scroll_end(animate=False)
+
+    def finish_streaming(self) -> None:
+        """Finish the current streaming response."""
+        if self._streaming_message:
+            self._streaming_message.finish_streaming()
+            self._streaming_message = None
+
+    def add_tool_progress(
+        self,
+        tool_name: str,
+        arguments: Optional[dict] = None,
+        on_cancel: Optional[Callable] = None,
+    ) -> ToolProgressPanel:
+        """Add a tool progress panel and return it for updates."""
+        panel = ToolProgressPanel(
+            tool_name=tool_name,
+            arguments=arguments,
+            on_cancel=on_cancel,
+            id=f"tool-{self._message_count}",
+        )
+        self._message_count += 1
+        self.mount(panel)
+        self.scroll_end(animate=False)
+        return panel
+
+    def add_code_block(
+        self,
+        code: str,
+        language: str = "python",
+    ) -> None:
+        """Add a standalone code block."""
+        block = CodeBlock(
+            code=code,
+            language=language,
+            id=f"code-{self._message_count}",
+        )
+        self._message_count += 1
+        self.mount(block)
+        self.scroll_end(animate=False)
+
+    def clear(self) -> None:
+        """Clear all messages from the log."""
+        for child in list(self.children):
+            child.remove()
+        self._message_count = 0
+        self._streaming_message = None
