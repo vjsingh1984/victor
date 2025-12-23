@@ -28,13 +28,10 @@ _tool_capable_patterns_cache: Optional[Dict[str, List[str]]] = None
 def _load_tool_capable_patterns_from_yaml(
     user_profiles_path: Optional[Path] = None,
 ) -> Dict[str, List[str]]:
-    """Load tool-capable model patterns from profiles.yaml.
+    """Load tool-capable model patterns from model_capabilities.yaml.
 
-    SINGLE SOURCE OF TRUTH: ~/.victor/profiles.yaml
-
-    The model_capabilities section in profiles.yaml defines which models
-    support native tool calling. Users get a pre-configured list by copying
-    examples/profiles.yaml.example to ~/.victor/profiles.yaml.
+    PRIMARY SOURCE: victor/config/model_capabilities.yaml
+    OVERRIDE SOURCE: ~/.victor/profiles.yaml (model_capabilities section)
 
     Returns model patterns where native_tool_calls is true, organized by provider.
     Results are cached at module level to avoid repeated file reads.
@@ -47,7 +44,18 @@ def _load_tool_capable_patterns_from_yaml(
 
     result: Dict[str, List[str]] = {}
 
-    # Load from user's profiles.yaml (the single source of truth)
+    # First, load from the main model_capabilities.yaml (bundled with victor)
+    config_dir = Path(__file__).parent
+    model_caps_path = config_dir / "model_capabilities.yaml"
+    if model_caps_path.exists():
+        try:
+            model_caps_data = yaml.safe_load(model_caps_path.read_text()) or {}
+            _extract_tool_capable_patterns(model_caps_data, result)
+            logger.debug(f"Loaded model capabilities from {model_caps_path}")
+        except Exception as e:
+            logger.warning(f"Failed to load model_capabilities.yaml: {e}")
+
+    # Then, load overrides from user's profiles.yaml
     if user_profiles_path is None:
         from victor.config.settings import get_project_paths
 
@@ -60,14 +68,13 @@ def _load_tool_capable_patterns_from_yaml(
             model_caps = user_data.get("model_capabilities", {})
             if model_caps:
                 _extract_tool_capable_patterns(model_caps, result)
-                logger.debug(f"Loaded model capabilities from {user_path}")
+                logger.debug(f"Loaded model capability overrides from {user_path}")
         except Exception as e:
             logger.warning(f"Failed to load profiles.yaml: {e}")
 
-    # If profiles.yaml doesn't have model_capabilities, use minimal built-in defaults
-    # This ensures basic functionality even without a profiles.yaml
+    # If nothing loaded, use minimal built-in defaults
     if not result:
-        logger.debug("No model_capabilities in profiles.yaml, using minimal defaults")
+        logger.debug("No model_capabilities found, using minimal defaults")
         result = _minimal_builtin_defaults()
 
     # Cache for future calls (only for default path)
@@ -113,21 +120,26 @@ def _minimal_builtin_defaults() -> Dict[str, List[str]]:
 
 def _extract_tool_capable_patterns(data: Dict, result: Dict[str, List[str]]) -> None:
     """Extract tool-capable patterns from capability data into result dict."""
-    # Providers with native_tool_calls: true at provider level
-    providers = data.get("providers", {})
-    for provider, caps in providers.items():
+    # Providers with native_tool_calls: true at provider_defaults level
+    provider_defaults = data.get("provider_defaults", {})
+    for provider, caps in provider_defaults.items():
         if isinstance(caps, dict) and caps.get("native_tool_calls", False):
             # This provider supports tools by default (e.g., anthropic, openai)
             result.setdefault(provider.lower(), []).append("*")
 
-    # Model-specific patterns with native_tool_calls: true
+    # Model-specific patterns - check providers.<provider>.native_tool_calls
     models = data.get("models", {})
-    for pattern, caps in models.items():
-        if isinstance(caps, dict) and caps.get("native_tool_calls", False):
-            # Add this pattern to local providers that use model matching
-            for provider in ["ollama", "lmstudio", "vllm"]:
-                if pattern not in result.get(provider.lower(), []):
-                    result.setdefault(provider.lower(), []).append(pattern)
+    for pattern, model_config in models.items():
+        if not isinstance(model_config, dict):
+            continue
+
+        # Check for native_tool_calls in the providers section of each model
+        model_providers = model_config.get("providers", {})
+        for provider, provider_caps in model_providers.items():
+            if isinstance(provider_caps, dict) and provider_caps.get("native_tool_calls", False):
+                provider_l = provider.lower()
+                if pattern not in result.get(provider_l, []):
+                    result.setdefault(provider_l, []).append(pattern)
 
 
 def _flatten_yaml_manifest(data: Dict[str, Iterable]) -> Dict[str, List[str]]:

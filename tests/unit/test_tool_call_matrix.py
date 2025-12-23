@@ -46,23 +46,36 @@ def test_orchestrator_uses_profile_provider_name():
     settings = Settings(
         analytics_enabled=False,
         analytics_log_file="usage.log",
-        tool_calling_models={"lmstudio": ["lm-tool-model"]},
+        tool_calling_models={"ollama": ["specific-tool-model"]},
         tool_cache_dir_override=tempfile.mkdtemp(),
     )
     settings.tool_cache_enabled = False
 
+    # Test: model in tool_calling_models should be recognized
     orch_ok = AgentOrchestrator(
         settings=settings,
         provider=provider,
-        model="lm-tool-model",
-        provider_name="lmstudio",
+        model="specific-tool-model",
+        provider_name="ollama",
     )
     assert orch_ok._model_supports_tool_calls()
 
-    orch_block = AgentOrchestrator(
+    # Test: LMStudio has universal tool support via llama.cpp (provider_defaults),
+    # so even "unknown-model" should be tool-capable on LMStudio
+    orch_lmstudio = AgentOrchestrator(
         settings=settings,
         provider=provider,
         model="unknown-model",
         provider_name="lmstudio",
+    )
+    assert orch_lmstudio._model_supports_tool_calls()
+
+    # Test: Ollama requires specific model patterns, so unknown models are NOT tool-capable
+    # unless they match patterns like llama3.1*, qwen2.5*, mistral*, etc.
+    orch_block = AgentOrchestrator(
+        settings=settings,
+        provider=provider,
+        model="totally-unknown-model-xyz",
+        provider_name="ollama",
     )
     assert not orch_block._model_supports_tool_calls()
