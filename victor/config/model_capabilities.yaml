@@ -56,6 +56,10 @@ defaults:
     # Timeout multiplier: slow local models (30B+ params) need longer timeouts
     # Multiplies provider timeout (default 300s)
     timeout_multiplier: 1.0
+    # Tool reliability rating: how reliably the model produces proper tool calls
+    # Values: high (works reliably), medium (may need retries), low (often fails)
+    # Models with 'low' reliability will use enhanced prompting and fallback parsing
+    tool_reliability: medium
     # Payload size limits (bytes) - prevents HTTP 413 errors
     # Default is generous; providers with strict limits override this
     max_request_payload_bytes: 10485760  # 10MB default
@@ -403,6 +407,8 @@ models:
       argument_format: xml
       # Stricter thresholds for this model
       stage_transition_confidence: 0.75
+      # High reliability - tested and works well with tool calling
+      tool_reliability: high
 
   "qwen3:*":
     # Base Qwen3 (non-coder) - HAS Ollama tool support
@@ -494,6 +500,8 @@ models:
 
   "qwen2.5-coder-tools*":
     # Custom -tools variant with tool template added
+    # NOTE: Qwen 2.5 Coder on Ollama may output PARAMETER syntax instead of JSON.
+    # Use qwen3-coder-tools for more reliable tool calling.
     training:
       tool_calling: true
       code_generation: true
@@ -502,7 +510,7 @@ models:
       ollama:
         native_tool_calls: true   # Custom Modelfile enables it
         parallel_tool_calls: true
-        requires_strict_prompting: false
+        requires_strict_prompting: true  # Need stricter prompting
       lmstudio:
         native_tool_calls: true
       vllm:
@@ -511,8 +519,12 @@ models:
     settings:
       recommended_tool_budget: 15
       argument_format: xml
+      # Low reliability on Ollama - may output PARAMETER syntax instead of proper tool calls
+      tool_reliability: low
 
   # Shorthand naming (qwen25 instead of qwen2.5) - matches user-created models
+  # NOTE: Some qwen25-coder-tools Modelfiles may be missing the .Tools template.
+  # If tool calls fail, check: curl http://localhost:11434/api/show -d '{"name":"MODEL"}'
   "qwen25-coder-tools*":
     training:
       tool_calling: true
@@ -522,7 +534,7 @@ models:
       ollama:
         native_tool_calls: true   # Custom Modelfile enables it
         parallel_tool_calls: true
-        requires_strict_prompting: false
+        requires_strict_prompting: true  # Need stricter prompting
       lmstudio:
         native_tool_calls: true
       vllm:
@@ -531,6 +543,8 @@ models:
     settings:
       recommended_tool_budget: 15
       argument_format: xml
+      # Low reliability - Modelfile may be missing .Tools template
+      tool_reliability: low
 
   # ---------------------------------------------------------------------------
   # LLAMA FAMILY
@@ -579,6 +593,8 @@ models:
       argument_format: json
 
   "llama3.3*":
+    # NOTE: Llama 3.3 on Ollama often describes tools in prose but doesn't
+    # actually call them. Use qwen3-coder-tools for more reliable tool calling.
     training:
       tool_calling: true
       code_generation: true
@@ -587,7 +603,7 @@ models:
       ollama:
         native_tool_calls: true
         parallel_tool_calls: true
-        requires_strict_prompting: false
+        requires_strict_prompting: true  # Need stricter prompting
       lmstudio:
         native_tool_calls: true
       vllm:
@@ -600,6 +616,10 @@ models:
     settings:
       recommended_tool_budget: 15
       argument_format: json
+      # Low reliability on Ollama - often describes tools but doesn't call them
+      tool_reliability: low
+      # 70B models need longer timeouts (300s * 3 = 900s = 15min)
+      timeout_multiplier: 3.0
 
   "codellama*":
     training:
@@ -836,6 +856,9 @@ models:
       recommended_tool_budget: 10
 
   "deepseek-r1-tools*":
+    # NOTE: DeepSeek R1 on Ollama often produces truncated JSON tool calls
+    # like {"tool_call": } or outputs verbose reasoning before tools.
+    # Use qwen3-coder-tools for more reliable tool calling.
     training:
       tool_calling: true
       reasoning: true
@@ -844,7 +867,7 @@ models:
       ollama:
         native_tool_calls: true
         parallel_tool_calls: true
-        requires_strict_prompting: false
+        requires_strict_prompting: true  # Need stricter prompting
       lmstudio:
         native_tool_calls: true
       vllm:
@@ -852,6 +875,10 @@ models:
 
     settings:
       recommended_tool_budget: 15
+      # Low reliability on Ollama - often produces truncated or malformed tool calls
+      tool_reliability: low
+      # 70B models need longer timeouts (300s * 3 = 900s = 15min)
+      timeout_multiplier: 3.0
 
   # ---------------------------------------------------------------------------
   # GOOGLE FAMILY

@@ -61,6 +61,32 @@ class ModelToolSupport:
     tool_response_format: str = "unknown"  # "xml", "json", or "unknown"
     detection_method: str = "template"
     error: Optional[str] = None
+    # Tool reliability rating from model_capabilities.yaml
+    # Values: "high" (works reliably), "medium" (may need retries), "low" (often fails)
+    tool_reliability: str = "medium"
+
+
+# Known low-reliability models - these have .Tools template but don't work well
+# Based on testing with Victor's tool calling system
+LOW_RELIABILITY_MODELS = frozenset([
+    # Llama 3.3 often describes tools in prose but doesn't actually call them
+    "llama3.3",
+    "llama-3.3",
+    # DeepSeek R1 produces truncated JSON like {"tool_call": }
+    "deepseek-r1",
+    # Qwen 2.5 Coder may output PARAMETER syntax instead of JSON
+    "qwen2.5-coder",
+    "qwen25-coder",  # Shorthand naming
+])
+
+# High-reliability models - tested and work well
+HIGH_RELIABILITY_MODELS = frozenset([
+    # Qwen3 Coder with tools template works reliably
+    "qwen3-coder-tools",
+    "qwen3-coder",
+    # Base Qwen3 also works well
+    "qwen3",
+])
 
 
 class OllamaCapabilityDetector:
@@ -105,6 +131,30 @@ class OllamaCapabilityDetector:
         except Exception as e:
             logger.debug(f"Error fetching model info for {model}: {e}")
             return None
+
+    def _get_reliability_for_model(self, model: str) -> str:
+        """Determine tool reliability rating for a model.
+
+        Args:
+            model: Model name (e.g., "qwen3-coder-tools:30b")
+
+        Returns:
+            Reliability rating: "high", "medium", or "low"
+        """
+        model_lower = model.lower()
+
+        # Check high-reliability models first
+        for pattern in HIGH_RELIABILITY_MODELS:
+            if pattern in model_lower:
+                return "high"
+
+        # Check low-reliability models
+        for pattern in LOW_RELIABILITY_MODELS:
+            if pattern in model_lower:
+                return "low"
+
+        # Default to medium
+        return "medium"
 
     def detect_tool_support(self, template: str) -> ModelToolSupport:
         """Analyze template to detect tool support patterns.
@@ -171,10 +221,44 @@ class OllamaCapabilityDetector:
         result = self.detect_tool_support(template)
         result.model = model
 
+        # Add reliability rating
+        result.tool_reliability = self._get_reliability_for_model(model)
+
+        # Log warning for low-reliability models
+        if result.supports_tools and result.tool_reliability == "low":
+            logger.warning(
+                f"Model '{model}' has tool support but LOW reliability. "
+                f"Tool calls may fail or produce malformed output. "
+                f"Consider using qwen3-coder-tools for reliable tool calling."
+            )
+
         # Cache result
         self._cache[model] = result
 
         return result
+
+    def get_tool_reliability(self, model: str) -> str:
+        """Get the tool reliability rating for a model.
+
+        Args:
+            model: Model name
+
+        Returns:
+            "high", "medium", or "low"
+        """
+        return self.get_tool_support(model).tool_reliability
+
+    def is_reliable_for_tools(self, model: str) -> bool:
+        """Check if model is reliable for tool calling.
+
+        Args:
+            model: Model name
+
+        Returns:
+            True if model has high or medium reliability
+        """
+        reliability = self.get_tool_reliability(model)
+        return reliability in ("high", "medium")
 
     def supports_tools(self, model: str) -> bool:
         """Quick check if model supports tools.
