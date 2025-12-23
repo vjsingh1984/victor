@@ -248,14 +248,16 @@ class SubmitTextArea(TextArea):
 
     def _on_key(self, event) -> None:
         """Handle key events before TextArea processes them."""
-        if event.key == "enter" and not event.shift:
-            # Enter without shift: submit instead of newline
+        # Check for plain Enter (not shift+enter)
+        # In Textual, shift+enter appears as "shift+enter" in event.key
+        if event.key == "enter":
+            # Plain Enter: submit instead of newline
             if self.text.strip():
                 self.post_message(self.Submit(self.text))
             event.prevent_default()
             event.stop()
             return
-        # All other keys (including Shift+Enter) handled normally
+        # Shift+Enter and all other keys handled normally by parent
         super()._on_key(event)
 
 
