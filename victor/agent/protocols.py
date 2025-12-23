@@ -113,6 +113,76 @@ class ProviderManagerProtocol(Protocol):
 
 
 # =============================================================================
+# Tool Selection Data Classes
+# =============================================================================
+
+
+from dataclasses import dataclass, field
+
+
+@dataclass
+class ToolSelectionContext:
+    """Context for tool selection decisions.
+
+    Provides conversation history, stage info, and task metadata
+    to tool selectors for intelligent tool filtering.
+    """
+
+    # Conversation stage (e.g., PLANNING, EXECUTING, REVIEWING)
+    stage: Optional[str] = None
+
+    # Conversation stage object (typed version)
+    conversation_stage: Optional[Any] = None
+
+    # Task type from analysis (e.g., "analysis", "action", "create")
+    task_type: str = "default"
+
+    # Recent tool execution history
+    recent_tools: List[str] = field(default_factory=list)
+
+    # Current conversation turn number
+    turn_number: int = 0
+
+    # Whether this is a continuation of previous work
+    is_continuation: bool = False
+
+    # Maximum tools to select
+    max_tools: int = 15
+
+    # Planned tools from dependency planning (tool names pre-selected)
+    planned_tools: Optional[List[str]] = None
+
+    # Additional metadata
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ToolSelectorFeatures:
+    """Features supported by a tool selector implementation.
+
+    Used to advertise capabilities and for feature detection.
+    """
+
+    # ML-based semantic matching (requires embeddings)
+    supports_semantic_matching: bool = False
+
+    # Context-aware selection (conversation stage, history)
+    supports_context_awareness: bool = False
+
+    # Cost-based tool optimization
+    supports_cost_optimization: bool = False
+
+    # Learning from usage patterns
+    supports_usage_learning: bool = False
+
+    # Workflow pattern detection
+    supports_workflow_patterns: bool = False
+
+    # Whether embeddings are required
+    requires_embeddings: bool = False
+
+
+# =============================================================================
 # Tool Protocols
 # =============================================================================
 
@@ -2000,6 +2070,9 @@ class StreamingHandlerProtocol(Protocol):
 
 
 __all__ = [
+    # Tool selection data classes
+    "ToolSelectionContext",
+    "ToolSelectorFeatures",
     # Provider protocols
     "ProviderManagerProtocol",
     # Tool protocols
