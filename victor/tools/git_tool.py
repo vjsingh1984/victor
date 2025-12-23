@@ -37,13 +37,21 @@ _model: Optional[str] = None
 def set_git_provider(provider, model: Optional[str] = None) -> None:
     """Set the global provider and model for git AI operations.
 
-    DEPRECATED: Use ToolConfig via context instead. This function is kept
-    for backward compatibility but will be removed in a future version.
+    DEPRECATED: Use ToolConfig via executor context instead.
+    Tools now receive ToolConfig in their execution context.
+    This function will be removed in v2.0.
 
     Args:
         provider: LLM provider for AI-generated messages
         model: Model to use for message generation
     """
+    import warnings
+
+    warnings.warn(
+        "set_git_provider() is deprecated. Use ToolConfig via executor.update_context() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     global _provider, _model
     _provider = provider
     _model = model

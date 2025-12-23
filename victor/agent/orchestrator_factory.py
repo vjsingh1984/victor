@@ -1207,6 +1207,22 @@ class OrchestratorFactory:
             enable_code_correction=getattr(self.settings, "code_correction_enabled", True),
         )
 
+        # Inject ToolConfig into executor context for DI-style tool configuration
+        # Tools can access this via ToolConfig.from_context(context) instead of globals
+        from victor.tools.base import ToolConfig
+
+        tool_config = ToolConfig(
+            provider=self.provider,
+            model=getattr(self.settings, "model", None),
+            max_complexity=getattr(self.settings, "max_complexity", 10),
+            web_fetch_top=getattr(self.settings, "web_fetch_top", 5),
+            web_fetch_pool=getattr(self.settings, "web_fetch_pool", 3),
+            max_content_length=getattr(self.settings, "max_content_length", 5000),
+            batch_concurrency=getattr(self.settings, "batch_concurrency", 5),
+            batch_max_files=getattr(self.settings, "batch_max_files", 100),
+        )
+        executor.update_context(tool_config=tool_config)
+
         logger.debug(f"ToolExecutor created with validation_mode={validation_mode}")
         return executor
 
