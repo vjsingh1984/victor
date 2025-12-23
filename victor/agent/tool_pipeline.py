@@ -49,6 +49,16 @@ from victor.agent.parameter_enforcer import (
     ParameterInferenceError,
     ParameterValidationError,
 )
+from victor.agent.output_aggregator import (
+    OutputAggregator,
+    AggregationState,
+)
+from victor.agent.synthesis_checkpoint import (
+    SynthesisCheckpoint,
+    CompositeSynthesisCheckpoint,
+    CheckpointResult,
+    get_checkpoint_for_complexity,
+)
 
 if TYPE_CHECKING:
     from victor.tools.base import ToolRegistry
@@ -87,6 +97,11 @@ class ToolPipelineConfig:
     # Batch-level deduplication for providers that send duplicate tool calls
     # (helps DeepSeek, Ollama which sometimes issue identical calls in same batch)
     enable_batch_deduplication: bool = True
+
+    # Output aggregation and synthesis checkpoint settings
+    enable_output_aggregation: bool = True
+    enable_synthesis_checkpoints: bool = True
+    synthesis_checkpoint_complexity: str = "medium"  # simple, medium, complex
 
 
 # Tools that are safe to cache (read-only, deterministic for same arguments)
@@ -136,6 +151,11 @@ class PipelineExecutionResult:
     # Parallel execution metrics
     parallel_execution_used: bool = False
     parallel_speedup: float = 1.0
+    # Output aggregation and synthesis
+    synthesis_recommended: bool = False
+    synthesis_reason: Optional[str] = None
+    synthesis_prompt: Optional[str] = None
+    aggregation_state: Optional[str] = None
 
 
 class ToolPipeline:
@@ -203,6 +223,19 @@ class ToolPipeline:
         # Callbacks
         self.on_tool_start = on_tool_start
         self.on_tool_complete = on_tool_complete
+
+        # Output aggregation and synthesis checkpoints
+        self._output_aggregator: Optional[OutputAggregator] = None
+        self._synthesis_checkpoint: Optional[CompositeSynthesisCheckpoint] = None
+        if self.config.enable_output_aggregation:
+            self._output_aggregator = OutputAggregator(
+                max_results=self.config.tool_budget,
+                stale_threshold_seconds=60.0,
+            )
+        if self.config.enable_synthesis_checkpoints:
+            self._synthesis_checkpoint = get_checkpoint_for_complexity(
+                self.config.synthesis_checkpoint_complexity
+            )
 
         # State tracking
         self._calls_used = 0
@@ -275,6 +308,9 @@ class ToolPipeline:
         self._cache_hits = 0
         self._cache_misses = 0
         self._batch_dedup_count = 0
+        # Reset output aggregator
+        if self._output_aggregator:
+            self._output_aggregator.reset()
 
     def is_valid_tool_name(self, name: str) -> bool:
         """Check if tool name is valid format.
@@ -411,7 +447,7 @@ class ToolPipeline:
             except Exception as e:
                 logger.warning(f"Failed to record to signature store: {e}")
 
-        # Also record in-memory (session-only, backward compatible)
+        # Also record in-memory for current session
         signature = self._get_call_signature(tool_name, args)
         self._failed_signatures.add(signature)
 
@@ -656,11 +692,16 @@ class ToolPipeline:
         # Track results by signature for duplicate resolution
         results_by_signature: Dict[tuple, ToolCallResult] = {}
 
+        # Build tool history for synthesis checkpoint
+        tool_history: List[Dict[str, Any]] = []
+
         for tool_call in unique_calls:
             call_result = await self._execute_single_call(tool_call, context)
             result.results.append(call_result)
 
             # Store result by signature for duplicate resolution (only for dict items)
+            tool_name = ""
+            raw_args: Dict[str, Any] = {}
             if isinstance(tool_call, dict):
                 tool_name = tool_call.get("name", "")
                 raw_args = tool_call.get("arguments", {})
@@ -673,6 +714,24 @@ class ToolPipeline:
                     raw_args = {}
                 signature = self._get_call_signature(tool_name, raw_args)
                 results_by_signature[signature] = call_result
+
+            # Add to output aggregator
+            if self._output_aggregator and tool_name:
+                self._output_aggregator.add_result(
+                    tool_name=tool_name,
+                    result=call_result.result,
+                    success=call_result.success,
+                    metadata={"args": raw_args},
+                )
+
+            # Track for synthesis checkpoint
+            tool_history.append({
+                "tool": tool_name,
+                "args": raw_args,
+                "success": call_result.success,
+                "result": str(call_result.result)[:500] if call_result.result else "",
+                "error": call_result.error,
+            })
 
             if call_result.skipped:
                 result.skipped_calls += 1
@@ -705,6 +764,34 @@ class ToolPipeline:
                 )
                 result.results.append(dup_result)
                 result.skipped_calls += 1
+
+        # Check synthesis checkpoint
+        if self._synthesis_checkpoint and tool_history:
+            task_context = {
+                "elapsed_time": context.get("elapsed_time", 0),
+                "timeout": context.get("timeout", 180),
+                "task_type": context.get("task_type", "unknown"),
+            }
+            checkpoint_result = self._synthesis_checkpoint.check(tool_history, task_context)
+            if checkpoint_result.should_synthesize:
+                result.synthesis_recommended = True
+                result.synthesis_reason = checkpoint_result.reason
+                result.synthesis_prompt = checkpoint_result.suggested_prompt
+                logger.info(f"Synthesis checkpoint triggered: {checkpoint_result.reason}")
+
+        # Set aggregation state
+        if self._output_aggregator:
+            result.aggregation_state = self._output_aggregator.state.value
+            # If aggregator is in a synthesis-ready state, also recommend synthesis
+            if self._output_aggregator.state in (
+                AggregationState.READY_TO_SYNTHESIZE,
+                AggregationState.LOOPING,
+                AggregationState.STUCK,
+            ):
+                if not result.synthesis_recommended:
+                    result.synthesis_recommended = True
+                    result.synthesis_reason = f"Aggregation state: {self._output_aggregator.state.value}"
+                    result.synthesis_prompt = self._output_aggregator.get_synthesis_prompt()
 
         result.total_time_ms = (time.monotonic() - start_time) * 1000
         return result

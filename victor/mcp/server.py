@@ -77,6 +77,7 @@ class MCPServer:
 
         self.initialized = False
         self.resources: List[MCPResource] = []
+        self._running = False  # For graceful shutdown of stdio server
 
     def register_resource(self, resource: MCPResource) -> None:
         """Register a resource with the MCP server.
@@ -293,6 +294,8 @@ class MCPServer:
         Returns:
             Resource content response
         """
+        import asyncio
+
         if not self.initialized:
             return self._create_error(msg_id, -32002, "Server not initialized")
 
@@ -311,7 +314,11 @@ class MCPServer:
                 from pathlib import Path
 
                 file_path = uri.replace("file://", "")
-                content = Path(file_path).read_text()
+                file_obj = Path(file_path)
+
+                # Use run_in_executor to avoid blocking the event loop
+                loop = asyncio.get_running_loop()
+                content = await loop.run_in_executor(None, file_obj.read_text)
 
                 resource_content = MCPResourceContent(
                     uri=uri,
@@ -369,9 +376,10 @@ class MCPServer:
         print(f"Server: {self.name} v{self.version}", file=sys.stderr)
         print("Waiting for messages...", file=sys.stderr)
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
+        self._running = True
 
-        while True:
+        while self._running:
             try:
                 # Read JSON-RPC message from stdin using run_in_executor to avoid blocking
                 try:
@@ -389,16 +397,27 @@ class MCPServer:
                 message = json.loads(line)
                 response = await self.handle_message(message)
 
-                # Write response to stdout
-                print(json.dumps(response), flush=True)
+                # Write response to stdout using run_in_executor to avoid blocking
+                response_json = json.dumps(response)
+                await loop.run_in_executor(
+                    None, lambda: (print(response_json, flush=True))
+                )
 
             except json.JSONDecodeError as e:
                 error_response = self._create_error(None, -32700, f"Parse error: {str(e)}")
-                print(json.dumps(error_response), flush=True)
+                await loop.run_in_executor(
+                    None, lambda r=error_response: print(json.dumps(r), flush=True)
+                )
 
             except Exception as e:
                 error_response = self._create_error(None, -32603, f"Internal error: {str(e)}")
-                print(json.dumps(error_response), flush=True)
+                await loop.run_in_executor(
+                    None, lambda r=error_response: print(json.dumps(r), flush=True)
+                )
+
+    def stop(self) -> None:
+        """Stop the stdio server gracefully."""
+        self._running = False
 
     def get_server_info(self) -> Dict[str, Any]:
         """Get server information.

@@ -1,29 +1,18 @@
 """
-Error Recovery Chain of Responsibility for Tool Execution.
+Error Recovery Chain of Responsibility for Tool Execution Errors.
 
-⚠️ DEPRECATED / SUPERSEDED ⚠️
-This module has been superseded by the more comprehensive recovery system in:
-    victor/agent/recovery/
+This module handles tool-level execution errors such as:
+- Missing required parameters
+- Type conversion errors
+- File not found errors
+- Permission errors
+- Network/timeout errors
 
-The recovery/ module provides:
-- RecoveryManager: Central facade with registry of recovery strategies
-- CircuitBreakerRecoveryStrategy: Circuit breaker pattern with state machine
-- RetryRecoveryStrategy: Exponential backoff with jitter
-- FallbackRecoveryStrategy: Fallback to alternative tools/providers
-- TimeoutRecoveryStrategy: Adaptive timeout handling
-- ErrorClassifier: Rich error taxonomy
+NOTE: This module is COMPLEMENTARY to victor/agent/recovery/, not a duplicate:
+- THIS module: Handles TOOL execution errors (parameter issues, file errors)
+- recovery/ module: Handles LLM response failures (empty responses, stuck loops)
 
-This file is preserved for reference and backward compatibility but
-should NOT be used for new development. All new recovery logic should
-use the victor/agent/recovery/ module instead.
-
-Migration: Replace `from victor.agent.error_recovery import ...` with
-`from victor.agent.recovery import RecoveryManager, ...`
-
-Historical context:
-- Created as GAP-10 implementation during Grok/DeepSeek testing
-- 69 tests in tests/unit/test_error_recovery.py
-- Implements basic Chain of Responsibility pattern
+Both modules implement Chain of Responsibility but for different error domains.
 
 SOLID Principles Applied:
 - Single Responsibility: Each handler handles one type of error
@@ -32,7 +21,7 @@ SOLID Principles Applied:
 - Interface Segregation: ErrorRecoveryHandler defines minimal interface
 - Dependency Inversion: Handlers depend on abstractions, not concrete classes
 
-Addresses GAP-10 from Grok/DeepSeek provider testing.
+Implements GAP-10 from Grok/DeepSeek provider testing.
 """
 
 from abc import ABC, abstractmethod

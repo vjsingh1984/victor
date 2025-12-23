@@ -195,16 +195,20 @@ class MCPClient:
             self._cleanup_process()
             return False
 
-    def _cleanup_process(self) -> None:
-        """Clean up subprocess and its resources."""
+    async def _cleanup_process_async(self) -> None:
+        """Clean up subprocess and its resources asynchronously."""
         # Clean up sandboxed process if used
         if self._sandboxed_process is not None:
             try:
-                asyncio.get_event_loop().run_until_complete(self._sandboxed_process.terminate())
+                await self._sandboxed_process.terminate()
             except Exception as e:
                 logger.debug(f"Error terminating sandboxed process: {e}")
             self._sandboxed_process = None
 
+        self._cleanup_process_sync()
+
+    def _cleanup_process_sync(self) -> None:
+        """Synchronously clean up subprocess resources (for use in sync contexts)."""
         if self.process:
             try:
                 if self.process.stdin:
@@ -220,13 +224,35 @@ class MCPClient:
                 self.process.terminate()
                 self.process.wait(timeout=McpTimeouts.TERMINATE)
             except subprocess.TimeoutExpired:
-                self.process.kill()
-                self.process.wait()
+                try:
+                    self.process.kill()
+                    self.process.wait()
+                except Exception as e:
+                    logger.debug(f"Error killing process during cleanup: {e}")
             except Exception as e:
                 logger.debug(f"Error terminating process during cleanup: {e}")
 
             self.process = None
             self.initialized = False
+
+    def _cleanup_process(self) -> None:
+        """Clean up subprocess and its resources (sync wrapper for backwards compatibility)."""
+        # Handle sandboxed process cleanup synchronously if possible
+        if self._sandboxed_process is not None:
+            try:
+                # Try to get running loop and schedule cleanup
+                loop = asyncio.get_running_loop()
+                # If we're in an async context, schedule the cleanup
+                asyncio.create_task(self._sandboxed_process.terminate())
+            except RuntimeError:
+                # No running loop, we're in sync context
+                try:
+                    asyncio.run(self._sandboxed_process.terminate())
+                except Exception as e:
+                    logger.debug(f"Error terminating sandboxed process: {e}")
+            self._sandboxed_process = None
+
+        self._cleanup_process_sync()
 
     async def initialize(self) -> bool:
         """Initialize MCP connection.
@@ -427,7 +453,7 @@ class MCPClient:
             return False
 
     def disconnect(self, reason: Optional[str] = None) -> None:
-        """Disconnect from MCP server.
+        """Disconnect from MCP server (synchronous).
 
         Args:
             reason: Optional reason for disconnection
@@ -438,6 +464,20 @@ class MCPClient:
         if self._health_task:
             self._health_task.cancel()
             self._health_task = None
+
+        # Clean up sandboxed process if used
+        if self._sandboxed_process is not None:
+            try:
+                # Try to get running loop and schedule cleanup
+                loop = asyncio.get_running_loop()
+                asyncio.create_task(self._sandboxed_process.terminate())
+            except RuntimeError:
+                # No running loop, we're in sync context
+                try:
+                    asyncio.run(self._sandboxed_process.terminate())
+                except Exception as e:
+                    logger.debug(f"Error terminating sandboxed process: {e}")
+            self._sandboxed_process = None
 
         if self.process:
             # Close file handles to prevent resource leaks
@@ -451,12 +491,79 @@ class MCPClient:
             except Exception as e:
                 logger.debug(f"Error closing process pipes: {e}")
 
-            self.process.terminate()
             try:
+                self.process.terminate()
                 self.process.wait(timeout=McpTimeouts.TERMINATE)
             except subprocess.TimeoutExpired:
-                self.process.kill()
-                self.process.wait()
+                try:
+                    self.process.kill()
+                    self.process.wait()
+                except Exception as e:
+                    logger.debug(f"Error killing process: {e}")
+            except Exception as e:
+                logger.debug(f"Error terminating process: {e}")
+
+            self.process = None
+            self.initialized = False
+
+            # Emit disconnect event
+            for callback in self._on_disconnect_callbacks:
+                try:
+                    callback(reason)
+                except Exception as e:
+                    logger.error(f"Disconnect callback error: {e}")
+
+    async def close(self, reason: Optional[str] = None) -> None:
+        """Disconnect from MCP server (async version with proper cleanup).
+
+        Args:
+            reason: Optional reason for disconnection
+        """
+        self._running = False
+
+        # Cancel and await health monitoring task
+        if self._health_task:
+            self._health_task.cancel()
+            try:
+                await self._health_task
+            except asyncio.CancelledError:
+                pass
+            self._health_task = None
+
+        # Clean up sandboxed process if used
+        if self._sandboxed_process is not None:
+            try:
+                await self._sandboxed_process.terminate()
+            except Exception as e:
+                logger.debug(f"Error terminating sandboxed process: {e}")
+            self._sandboxed_process = None
+
+        if self.process:
+            # Close file handles to prevent resource leaks
+            try:
+                if self.process.stdin:
+                    self.process.stdin.close()
+                if self.process.stdout:
+                    self.process.stdout.close()
+                if self.process.stderr:
+                    self.process.stderr.close()
+            except Exception as e:
+                logger.debug(f"Error closing process pipes: {e}")
+
+            try:
+                self.process.terminate()
+                # Use asyncio to wait non-blocking
+                loop = asyncio.get_event_loop()
+                try:
+                    await asyncio.wait_for(
+                        loop.run_in_executor(None, self.process.wait),
+                        timeout=McpTimeouts.TERMINATE,
+                    )
+                except asyncio.TimeoutError:
+                    self.process.kill()
+                    await loop.run_in_executor(None, self.process.wait)
+            except Exception as e:
+                logger.debug(f"Error terminating process: {e}")
 
             self.process = None
             self.initialized = False
@@ -507,7 +614,7 @@ class MCPClient:
             logger.error(
                 f"Max reconnect attempts ({self._max_reconnect_attempts}) exceeded, " "giving up"
             )
-            self.disconnect("max_retries_exceeded")
+            await self.close("max_retries_exceeded")
             return False
 
         logger.info(
@@ -515,13 +622,30 @@ class MCPClient:
             f"(attempt {self._consecutive_failures + 1}/{self._max_reconnect_attempts})"
         )
 
-        # Clean up current connection
+        # Clean up current connection properly (close pipes first)
         if self.process:
-            self.process.terminate()
             try:
+                if self.process.stdin:
+                    self.process.stdin.close()
+                if self.process.stdout:
+                    self.process.stdout.close()
+                if self.process.stderr:
+                    self.process.stderr.close()
+            except Exception as e:
+                logger.debug(f"Error closing process pipes during reconnect: {e}")
+
+            try:
+                self.process.terminate()
                 self.process.wait(timeout=McpTimeouts.KILL)
             except subprocess.TimeoutExpired:
-                self.process.kill()
+                try:
+                    self.process.kill()
+                    self.process.wait()
+                except Exception as e:
+                    logger.debug(f"Error killing process during reconnect: {e}")
+            except Exception as e:
+                logger.debug(f"Error terminating process during reconnect: {e}")
+
             self.process = None
             self.initialized = False
 
@@ -653,5 +777,21 @@ class MCPClient:
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit."""
-        self.disconnect()
+        """Async context manager exit with proper async cleanup."""
+        await self.close()
+
+    def __del__(self):
+        """Destructor to ensure cleanup on garbage collection.
+
+        This is a safety net - prefer using context manager or calling close() explicitly.
+        """
+        if self.process is not None or self._sandboxed_process is not None:
+            logger.debug("MCPClient being garbage collected with active process - cleaning up")
+            # Use sync cleanup as we can't await in __del__
+            self._cleanup_process_sync()
+            if self._sandboxed_process is not None:
+                # Can't await here, but at least log the issue
+                logger.warning(
+                    "MCPClient: sandboxed process not properly closed before garbage collection"
+                )
+                self._sandboxed_process = None
