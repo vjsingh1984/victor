@@ -219,10 +219,10 @@ class RLCoordinator:
                     name=name, db_connection=self.db, learning_rate=0.1
                 )
             elif name == "quality_weights":
-                from victor.agent.rl.learners.quality_weights import QualityWeightsLearner
+                from victor.agent.rl.learners.quality_weights import QualityWeightLearner
 
-                return QualityWeightsLearner(
-                    name=name, db_connection=self.db, learning_rate=0.1
+                return QualityWeightLearner(
+                    name=name, db_connection=self.db, learning_rate=0.05
                 )
             elif name == "tool_selector":
                 from victor.agent.rl.learners.tool_selector import ToolSelectorLearner

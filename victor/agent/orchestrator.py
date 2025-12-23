@@ -4141,12 +4141,9 @@ class AgentOrchestrator:
         # Create recovery context from current state
         recovery_ctx = self._create_recovery_context(stream_ctx)
 
-        # Delegate to RecoveryCoordinator
-        consecutive_limit = getattr(self.settings, "recovery_blocked_consecutive_threshold", 4)
-        total_limit = getattr(self.settings, "recovery_blocked_total_threshold", 6)
-
+        # Delegate to RecoveryCoordinator (thresholds are read from settings internally)
         return self._recovery_coordinator.check_blocked_threshold(
-            recovery_ctx, all_blocked, consecutive_limit, total_limit
+            recovery_ctx, all_blocked
         )
 
     async def _handle_recovery_with_integration(
@@ -4328,14 +4325,22 @@ class AgentOrchestrator:
             stream_ctx: The streaming context
 
         Returns:
-            True if force_completion was set, False otherwise
+            True if stuck/should force completion, False if making progress
         """
         # Create recovery context from current state
         recovery_ctx = self._create_recovery_context(stream_ctx)
 
-        # Delegate to RecoveryCoordinator
-        base_max = getattr(self.settings, "max_consecutive_tool_calls", 8)
-        return self._recovery_coordinator.check_progress(recovery_ctx, base_max)
+        # Delegate to RecoveryCoordinator (uses UnifiedTaskTracker internally)
+        # RecoveryCoordinator.check_progress returns True if making progress,
+        # but callers expect True if stuck. Invert the result.
+        is_making_progress = self._recovery_coordinator.check_progress(recovery_ctx)
+
+        if not is_making_progress:
+            # Stuck - set force_completion flag
+            stream_ctx.force_completion = True
+            return True
+
+        return False
 
     def _truncate_tool_calls_with_handler(
         self,
@@ -5861,6 +5866,16 @@ class AgentOrchestrator:
             tool_name = tool_call.get("name")
             if not tool_name:
                 self.console.print(f"[yellow]⚠ Skipping tool call without name: {tool_call}[/]")
+                # GAP-5 FIX: Add feedback so model learns from missing tool name
+                results.append(
+                    {
+                        "tool_name": "",
+                        "success": False,
+                        "result": None,
+                        "error": "Tool call missing name. Each tool call must include a 'name' field. "
+                        "Please specify which tool you want to use.",
+                    }
+                )
                 continue
 
             # Validate tool name format (reject hallucinated/malformed names)
