@@ -2,9 +2,12 @@
  * Chat View Provider
  *
  * Provides the webview-based chat panel for interacting with Victor.
+ * Supports both legacy HTML mode and modern Svelte-built UI.
  */
 
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 import { VictorClient, ChatMessage, ToolCall } from './victorClient';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
@@ -13,12 +16,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     private _messages: ChatMessage[] = [];
     private _disposables: vscode.Disposable[] = [];
     private _webviewReady = false;
+    private _useSvelteUI = true; // Use Svelte-built UI by default
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
         private readonly _client: VictorClient,
         private readonly _log?: vscode.OutputChannel
-    ) {}
+    ) {
+        // Check if Svelte build exists
+        const webviewPath = vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'index.html');
+        try {
+            fs.accessSync(webviewPath.fsPath);
+            this._useSvelteUI = true;
+            this._log?.appendLine('[Chat] Using Svelte-built UI');
+        } catch {
+            this._useSvelteUI = false;
+            this._log?.appendLine('[Chat] Svelte UI not found, using legacy HTML');
+        }
+    }
 
     public dispose(): void {
         // Clean up all registered event listeners
@@ -39,7 +54,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
             localResourceRoots: [this._extensionUri],
         };
 
-        webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+        webviewView.webview.html = this._useSvelteUI
+            ? this._getSvelteHtml(webviewView.webview)
+            : this._getHtmlForWebview(webviewView.webview);
 
         // Handle messages from the webview - store disposable for cleanup
         const messageListener = webviewView.webview.onDidReceiveMessage(async (data) => {
@@ -185,6 +202,40 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
     }
 
+    /**
+     * Generate HTML for Svelte-built webview UI
+     * Loads the pre-built Svelte application from out/webview/
+     */
+    private _getSvelteHtml(webview: vscode.Webview): string {
+        const nonce = this._getNonce();
+
+        // Get URIs for the built Svelte assets
+        const scriptUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'assets', 'main.js')
+        );
+        const styleUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'assets', 'main.css')
+        );
+
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; img-src ${webview.cspSource} https: data:;">
+    <title>Victor Chat</title>
+    <link rel="stylesheet" href="${styleUri}">
+</head>
+<body>
+    <div id="app"></div>
+    <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
+</body>
+</html>`;
+    }
+
+    /**
+     * Generate legacy HTML (fallback when Svelte build is not available)
+     */
     private _getHtmlForWebview(webview: vscode.Webview): string {
         const nonce = this._getNonce();
 

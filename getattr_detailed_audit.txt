@@ -1,0 +1,59 @@
+# HIGH-003: Detailed getattr() Audit
+# Generated: 2025-12-21
+
+## Summary Statistics
+Total getattr() calls: 444
+
+Top 20 files by frequency:
+1. orchestrator_factory.py: 63 calls - SETTINGS ACCESS
+2. orchestrator.py: 51 calls - SETTINGS + RUNTIME
+3. typed_models.py: 27 calls - FACTORY METHODS (legitimate)
+4. anthropic_provider.py: 24 calls - PROVIDER RESPONSES
+5. service_provider.py: 20 calls - SETTINGS ACCESS
+6. slash_commands.py: 18 calls - SETTINGS + AGENT
+7. code_search_tool.py: 15 calls - TOOL PARAMETERS
+8. google_provider.py: 14 calls - PROVIDER RESPONSES
+9. cqrs_bridge.py: 13 calls - EVENT EXTRACTION
+10. metadata_registry.py: 12 calls - TOOL METADATA
+11. stream_adapter.py: 10 calls - STREAM CHUNKS
+12. payload_limiter.py: 10 calls - PROVIDER RESPONSES
+13. fastapi_server.py: 8 calls - SETTINGS + REQUEST
+14. jira_tool.py: 7 calls - API RESPONSES
+15. tool_registrar.py: 7 calls - PLUGIN DISCOVERY
+16. tool_executor.py: 7 calls - TOOL EXECUTION
+17. resilience.py: 6 calls - PROVIDER RESPONSES
+18. server.py: 6 calls - SETTINGS ACCESS
+19. tool_selection.py: 6 calls - TOOL METADATA
+20. openai_provider.py: 5 calls - PROVIDER RESPONSES
+
+## Priority Classification
+
+### P0 - Critical (Settings Access): ~150 calls
+Files: orchestrator_factory.py, orchestrator.py, service_provider.py, slash_commands.py, fastapi_server.py, server.py
+
+Action: Replace with VictorSettings typed access
+Benefit: Immediate type safety, IDE autocomplete, catches config errors
+
+### P1 - High (Provider Responses): ~60 calls  
+Files: anthropic_provider.py, google_provider.py, openai_provider.py, stream_adapter.py, payload_limiter.py, resilience.py
+
+Action: Create ProviderResponse, StreamChunk typed models
+Benefit: Consistent provider response handling
+
+### P2 - Medium (Tool Metadata): ~30 calls
+Files: metadata_registry.py, tool_selection.py, ui/commands/tools.py
+
+Action: Use existing ToolMetadata.from_tool()
+Benefit: Type-safe tool introspection
+
+### P3 - Low (Keep as-is): ~50 calls
+Files: plugin_registry.py, shared_ast_utils.py, tool_names.py, ui/tui/app.py
+
+Action: Document as legitimate reflection/introspection
+Benefit: None - already correct usage
+
+### P4 - Deferred (Complex refactoring): ~150 calls
+Files: code_search_tool.py, cqrs_bridge.py, jira_tool.py, tool_executor.py, tool_registrar.py
+
+Action: Requires domain-specific typed models
+Benefit: Deferred to follow-on task

@@ -47,9 +47,9 @@ def test_orchestrator_uses_profile_provider_name():
         analytics_enabled=False,
         analytics_log_file="usage.log",
         tool_calling_models={"lmstudio": ["lm-tool-model"]},
+        tool_cache_dir_override=tempfile.mkdtemp(),
     )
     settings.tool_cache_enabled = False
-    settings.tool_cache_dir = tempfile.mkdtemp()
 
     orch_ok = AgentOrchestrator(
         settings=settings,

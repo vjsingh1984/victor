@@ -190,7 +190,8 @@ def test_execution_stage_includes_full_core():
 
 def test_core_readonly_config_override(monkeypatch):
     """Configured core_readonly_tools should extend the curated list."""
-    monkeypatch.setenv("CORE_READONLY_TOOLS", "custom_ro,extra_ro")
+    # pydantic-settings expects JSON list format for List[str] fields
+    monkeypatch.setenv("CORE_READONLY_TOOLS", '["custom_ro", "extra_ro"]')
     metadata_registry._global_registry = None
     registry = metadata_registry.get_global_registry()
     core = registry.get_core_readonly_tools()

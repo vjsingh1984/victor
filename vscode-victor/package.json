@@ -356,6 +356,43 @@
         "command": "victor.clearToolExecutionHistory",
         "title": "Victor: Clear Tool Execution History",
         "icon": "$(trash)"
+      },
+      {
+        "command": "victor.quickAction",
+        "title": "Victor: Quick Actions (Cmd+K)",
+        "icon": "$(wand)"
+      },
+      {
+        "command": "victor.inlineEdit",
+        "title": "Victor: Inline Edit Selection",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "victor.acceptInlineEdit",
+        "title": "Victor: Accept Inline Edit"
+      },
+      {
+        "command": "victor.rejectInlineEdit",
+        "title": "Victor: Reject Inline Edit"
+      },
+      {
+        "command": "victor.newConversation",
+        "title": "Victor: New Conversation",
+        "icon": "$(add)"
+      },
+      {
+        "command": "victor.loadConversation",
+        "title": "Victor: Load Conversation",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "victor.deleteConversation",
+        "title": "Victor: Delete Conversation",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "victor.clearAllConversations",
+        "title": "Victor: Clear All Conversations"
       }
     ],
     "menus": {
@@ -481,6 +518,28 @@
         "command": "victor.search",
         "key": "ctrl+shift+s",
         "mac": "cmd+shift+s"
+      },
+      {
+        "command": "victor.quickAction",
+        "key": "ctrl+k",
+        "mac": "cmd+k",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "victor.inlineEdit",
+        "key": "ctrl+shift+i",
+        "mac": "cmd+shift+i",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "victor.acceptInlineEdit",
+        "key": "tab",
+        "when": "victorInlineEditActive"
+      },
+      {
+        "command": "victor.rejectInlineEdit",
+        "key": "escape",
+        "when": "victorInlineEditActive"
       }
     ],
     "configuration": {
@@ -754,13 +813,16 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run build",
+    "build": "npm run build:webview && npm run compile",
+    "build:webview": "cd webview-ui && npm install && npm run build",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "watch:all": "concurrently \"npm run watch\" \"cd webview-ui && npm run dev\"",
     "pretest": "npm run compile",
     "test": "node ./out/test/runTest.js",
     "lint": "eslint src --ext ts",
-    "package": "vsce package"
+    "package": "npm run build && vsce package"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",

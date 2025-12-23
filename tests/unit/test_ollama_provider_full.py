@@ -289,17 +289,19 @@ class TestOllamaProviderChat:
         }
 
         # Patch _execute_with_circuit_breaker to return the responses
+        # For async patching with side_effect list: exceptions are raised, values are returned directly
         with patch.object(provider, '_execute_with_circuit_breaker', side_effect=[
-            mock_error_400, # First call raises error directly
-            AsyncMock(return_value=mock_response_200)                      # Second call returns success
+            mock_error_400,   # First call raises this exception
+            mock_response_200  # Second call returns this value directly
         ]) as mock_breaker:
             response = await provider.chat(messages, model="test-model", tools=tools)
             assert response.content == "Fallback response"
             assert "test-model" in provider._models_without_tools  # Model should be cached
             assert mock_breaker.call_count == 2
             # Check that the second call had tools=None
-            second_call_kwargs_json = mock_breaker.call_args_list[1].args[2]['json']
-            assert second_call_kwargs_json['tools'] is None
+            # _execute_with_circuit_breaker is called as: (callable, path, json=payload)
+            second_call_payload = mock_breaker.call_args_list[1].kwargs['json']
+            assert second_call_payload.get('tools') is None
 
     @pytest.mark.asyncio
     async def test_chat_tool_call_from_content_fallback(self, mock_async_client):
@@ -391,7 +393,8 @@ class TestOllamaProviderStream:
 
         assert mock_async_client.return_value.stream.call_count == 2
         second_call_kwargs = mock_async_client.return_value.stream.call_args_list[1].kwargs
-        assert second_call_kwargs['json']['tools'] is None
+        # When tools=None, the key may not be present at all, or it may be None
+        assert second_call_kwargs['json'].get('tools') is None
 
     @pytest.mark.asyncio
     async def test_stream_json_decode_error(self, mock_async_client):
@@ -415,7 +418,8 @@ class TestOllamaProviderStream:
         mock_stream_response = mock_async_client.return_value.stream.return_value.__aenter__.return_value
         mock_stream_response.aiter_lines.return_value = async_line_generator([ # Set return_value here
             '{"message": {"content": ""}}',
-            '{"message": {"content": "{\"name\": \"test_tool\", \"arguments\": {\"a\": 1}}"}, "done": true, "model": "test-model"}'
+            # Inner JSON must have escaped quotes for the outer JSON to be valid
+            '{"message": {"content": "{\\"name\\": \\"test_tool\\", \\"arguments\\": {\\"a\\": 1}}"}, "done": true, "model": "test-model"}'
         ])
         messages = [Message(role="user", content="Hi")]
         chunks = [chunk async for chunk in provider.stream(messages, model="test-model")]

@@ -468,7 +468,8 @@ class TestObservabilityToCQRSBridge:
         """Reset EventBus before each test."""
         EventBus.reset_instance()
 
-    def test_bridge_lifecycle(self):
+    @pytest.mark.asyncio
+    async def test_bridge_lifecycle(self):
         """Test bridge start and stop."""
         event_bus = EventBus.get_instance()
         dispatcher = EventDispatcher()
@@ -483,10 +484,11 @@ class TestObservabilityToCQRSBridge:
         bridge.start()
         assert bridge.is_running is True
 
-        bridge.stop()
+        bridge.stop()  # stop() is synchronous
         assert bridge.is_running is False
 
-    def test_bridge_forwards_events(self):
+    @pytest.mark.asyncio
+    async def test_bridge_forwards_events(self):
         """Test bridge forwards observability events to CQRS."""
         import asyncio
 
@@ -506,16 +508,15 @@ class TestObservabilityToCQRSBridge:
         event_bus.emit_tool_start("read_file", {"path": "/tmp/test.txt"})
 
         # Give async dispatch time to complete
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(asyncio.sleep(0.1))
-        loop.close()
+        await asyncio.sleep(0.1)
 
         assert len(cqrs_events) == 1
         assert bridge.event_count == 1
 
-        bridge.stop()
+        await bridge.stop()
 
-    def test_bridge_stops_forwarding_after_stop(self):
+    @pytest.mark.asyncio
+    async def test_bridge_stops_forwarding_after_stop(self):
         """Test bridge stops forwarding after stop()."""
         event_bus = EventBus.get_instance()
         dispatcher = EventDispatcher()
@@ -528,7 +529,7 @@ class TestObservabilityToCQRSBridge:
             event_dispatcher=dispatcher,
         )
         bridge.start()
-        bridge.stop()
+        await bridge.stop()
 
         # Publish after stop
         event_bus.emit_tool_start("read_file", {"path": "/tmp/test.txt"})

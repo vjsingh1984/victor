@@ -688,8 +688,8 @@ A: Professional tier starts at $24k/year. Enterprise tier (24/7, SLA) starts at 
 **Q: Can Victor integrate with our CI/CD?**
 A: Yes. Victor includes tools for GitHub Actions, GitLab CI, CircleCI, Jenkins. Custom integrations available with commercial support.
 
-**Q: What if we're already using Copilot?**
-A: Migration takes 1-2 weeks. We have automated migration tools and offer migration services ($5k-10k depending on team size).
+**Q: What if we're already using another AI coding assistant?**
+A: Migration typically takes 1-2 weeks. Victor can run alongside existing tools during transition. Migration assistance available ($5k-10k depending on team size).
 
 ---
 

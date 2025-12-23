@@ -44,7 +44,7 @@ def _orch():
     return AgentOrchestrator(
         Settings(
             analytics_enabled=False,
-            use_semantic_tool_selection=False,
+            tool_selection_strategy="keyword",
             tool_cache_enabled=False,
         ),
         _DummyProvider(),

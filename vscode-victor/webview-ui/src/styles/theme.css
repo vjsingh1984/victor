@@ -1,0 +1,166 @@
+/**
+ * Victor Chat WebView Theme
+ * Matches TUI theme.py color palette for consistent design language
+ */
+
+:root {
+  /* Base colors - Deep space theme with vibrant accents */
+  --background: #0a0e14;
+  --background-light: #0f1419;
+  --surface: #151b24;
+  --surface-elevated: #1a2330;
+
+  /* Panel variants */
+  --panel: #161d28;
+  --panel-alt: #0d1219;
+  --panel-elevated: #1c2532;
+  --panel-highlight: #212936;
+
+  /* Text hierarchy */
+  --text: #e6edf3;
+  --text-bright: #f0f6fc;
+  --text-muted: #8b949e;
+  --text-subtle: #6e7681;
+
+  /* Primary (blue) */
+  --primary: #58a6ff;
+  --primary-bright: #79c0ff;
+  --primary-dim: #1f6feb;
+  --primary-glow: rgba(88, 166, 255, 0.3);
+
+  /* Success (green) */
+  --success: #3fb950;
+  --success-bright: #56d364;
+  --success-dim: #2ea043;
+  --success-glow: rgba(63, 185, 80, 0.3);
+
+  /* Warning (yellow) */
+  --warning: #d29922;
+  --warning-bright: #e3b341;
+  --warning-dim: #9e6a03;
+  --warning-glow: rgba(210, 153, 34, 0.3);
+
+  /* Error (red) */
+  --error: #f85149;
+  --error-bright: #ff7b72;
+  --error-dim: #da3633;
+  --error-glow: rgba(248, 81, 73, 0.3);
+
+  /* Accents */
+  --accent-purple: #a371f7;
+  --accent-pink: #f778ba;
+  --accent-cyan: #39c5cf;
+  --accent-yellow: #ffc53d;
+
+  /* Message role colors (mental model from PLAN.md) */
+  --user-message-bg: var(--success-dim);
+  --user-message-border: var(--success);
+  --assistant-message-bg: var(--panel);
+  --assistant-message-border: var(--primary-dim);
+  --tool-call-bg: var(--surface);
+  --tool-call-border: var(--accent-cyan);
+  --thinking-bg: var(--panel-alt);
+  --thinking-border: var(--accent-purple);
+  --error-bg: var(--error-dim);
+  --error-border: var(--error);
+
+  /* VS Code integration (fallback to our theme if not in VS Code) */
+  --vscode-editor-background: var(--background);
+  --vscode-editor-foreground: var(--text);
+  --vscode-input-background: var(--surface);
+  --vscode-input-foreground: var(--text);
+  --vscode-input-border: var(--panel-highlight);
+  --vscode-button-background: var(--primary);
+  --vscode-button-foreground: var(--text-bright);
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+
+  /* Font sizes */
+  --font-size-xs: 10px;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+}
+
+/* Global reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--background);
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--panel-highlight);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-subtle);
+}
+
+/* Selection styling */
+::selection {
+  background: var(--primary-glow);
+  color: var(--text-bright);
+}
+
+/* Focus styling */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Animation keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}

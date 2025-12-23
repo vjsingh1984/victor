@@ -47,18 +47,20 @@ This document proposes a sub-agent architecture for Victor that enables hierarch
 4. **No Parallelization**: Cannot execute independent subtasks concurrently
 5. **Workflow Rigidity**: Cannot dynamically spawn helpers for specific needs
 
-### Competitive Landscape
+### Industry Patterns
 
-**Claude Code (Anthropic)**:
+Modern AI coding assistants have evolved different approaches to handling complex tasks:
+
+**Cooperative Sub-Agent Pattern**:
 - Cooperative sub-agents for specialized tasks
 - Main agent delegates to research/execution sub-agents
 - Hierarchical context management
 
-**Cursor**:
+**Multi-Mode Pattern**:
 - Multiple agent modes (chat, apply, fix)
 - Each mode is effectively a specialized sub-agent
 
-**Aider**:
+**Single-Agent Pattern**:
 - Single-agent architecture (no sub-agents)
 - Linear execution only
 

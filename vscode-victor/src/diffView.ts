@@ -2,7 +2,7 @@
  * Diff View Provider
  *
  * Provides inline diff preview and application UI for proposed file changes.
- * Similar to how Claude Code shows file modifications before applying them.
+ * Shows file modifications before applying them with accept/reject controls.
  */
 
 import * as vscode from 'vscode';

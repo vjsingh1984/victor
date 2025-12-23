@@ -109,11 +109,19 @@ class OutputDeduplicator:
             normalize_whitespace: If True, normalize whitespace before hashing
                                  to catch near-duplicates with spacing differences.
         """
+        from victor.core.utils.content_hasher import ContentHasher
+
         self._min_block_length = min_block_length
         self._normalize_whitespace = normalize_whitespace
         self._seen_hashes: Set[str] = set()
         self._stats = DeduplicationStats()
         self._partial_block: str = ""
+        # Use ContentHasher for consistent hashing across components
+        self._hasher = ContentHasher(
+            normalize_whitespace=True,
+            case_insensitive=True,
+            hash_length=12,
+        )
 
     def reset(self) -> None:
         """Reset the deduplicator state for a new response."""
@@ -320,11 +328,19 @@ class StreamingDeduplicator:
             window_size: Number of recent blocks to keep for comparison
             min_block_length: Minimum length for deduplication consideration
         """
+        from victor.core.utils.content_hasher import ContentHasher
+
         self._window_size = window_size
         self._min_block_length = min_block_length
         self._recent_hashes: list[str] = []
         self._buffer: str = ""
         self._stats = DeduplicationStats()
+        # Use ContentHasher for consistent hashing across components
+        self._hasher = ContentHasher(
+            normalize_whitespace=True,
+            case_insensitive=True,
+            hash_length=12,
+        )
 
     def reset(self) -> None:
         """Reset state for a new response."""

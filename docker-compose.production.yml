@@ -1,0 +1,224 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Production Docker Compose with Full Monitoring Stack
+# Usage: docker-compose -f docker-compose.production.yml up -d
+
+services:
+  # Victor - Main application (Production)
+  victor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: victor-production
+    restart: unless-stopped
+    volumes:
+      - victor_data:/home/victor/.victor
+      - victor_logs:/app/logs
+    environment:
+      # Production environment
+      - VICTOR_ENV=production
+      - VICTOR_LOG_LEVEL=INFO
+
+      # API Keys (from environment or .env.production)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - XAI_API_KEY=${XAI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+
+      # Local LLM endpoints (optional)
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
+      - VLLM_API_BASE=${VLLM_API_BASE:-}
+      - LMSTUDIO_BASE_URL=${LMSTUDIO_BASE_URL:-}
+
+      # Victor configuration
+      - VICTOR_GRAPH_STORE=sqlite
+      - VICTOR_ENABLE_OBSERVABILITY=true
+      - VICTOR_ENABLE_PROMETHEUS_EXPORT=true
+      - VICTOR_CACHE_DIR=/home/victor/.victor/cache
+      - VICTOR_MAX_CONCURRENT_TOOLS=5
+      - VICTOR_ENABLE_PARALLEL_EXECUTION=true
+
+      # Monitoring
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus
+
+    networks:
+      - victor-network
+    ports:
+      - "${VICTOR_API_PORT:-8765}:8765"  # API server
+      - "${VICTOR_METRICS_PORT:-9090}:9090"  # Prometheus metrics
+    healthcheck:
+      test: ["CMD", "victor", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Ollama - Local LLM (optional for production)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: victor-ollama-production
+    restart: unless-stopped
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
+    networks:
+      - victor-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    profiles:
+      - with-ollama
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Prometheus - Metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: victor-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "${PROMETHEUS_PORT:-9091}:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - victor-network
+    depends_on:
+      - victor
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Grafana - Visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: victor-grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-victor-metrics}
+      - GF_INSTALL_PLUGINS=
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    networks:
+      - victor-network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # AlertManager - Alert routing (optional)
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: victor-alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    networks:
+      - victor-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - with-alerting
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Node Exporter - System metrics (optional)
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: victor-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - victor-network
+    profiles:
+      - with-system-metrics
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+networks:
+  victor-network:
+    driver: bridge
+    name: victor-production-network
+
+volumes:
+  victor_data:
+    name: victor_production_data
+  victor_logs:
+    name: victor_production_logs
+  ollama_data:
+    name: victor_ollama_production_data
+  prometheus_data:
+    name: victor_prometheus_data
+  grafana_data:
+    name: victor_grafana_data
+  alertmanager_data:
+    name: victor_alertmanager_data

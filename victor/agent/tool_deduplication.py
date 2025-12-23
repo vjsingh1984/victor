@@ -53,9 +53,18 @@ class ToolDeduplicationTracker:
             window_size: Number of recent tool calls to track
             similarity_threshold: Threshold for considering calls similar (0.0-1.0)
         """
+        from victor.core.utils.content_hasher import ContentHasher
+
         self.window_size = window_size
         self.similarity_threshold = similarity_threshold
         self.recent_calls: Deque[ToolCall] = deque(maxlen=window_size)
+        # Use ContentHasher for consistent hashing across components
+        # Tool calls need exact matching (no normalization) for precise deduplication
+        self._hasher = ContentHasher(
+            normalize_whitespace=False,
+            case_insensitive=False,
+            hash_length=16,
+        )
 
         # Query synonyms for semantic matching
         self.query_synonyms: Dict[str, Set[str]] = {

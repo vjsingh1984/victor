@@ -1,0 +1,444 @@
+/Users/vijaysingh/code/codingagent/victor/ui/tui/app.py:66:        return getattr(self._console, name)
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:1170:        urls = getattr(self.settings, "lmstudio_base_urls", [])
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:1215:                    max_vram_gb=getattr(self.settings, "lmstudio_max_vram_gb", None),
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:1338:                profile=getattr(self.settings, "current_profile", "default"),
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:1340:                conversation_state=getattr(self.agent, "conversation_state", None),
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:1581:        mcp_client = getattr(self.agent, "mcp_client", None)
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:2094:                provider = getattr(m, "provider", None) or "?"
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:2095:                model = getattr(m, "model", None) or "?"
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:2096:                tps = getattr(m, "tokens_per_second", 0)
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:2097:                ttft = getattr(m, "time_to_first_token", 0) or 0
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:2098:                duration = getattr(m, "total_duration", 0)
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:2099:                tokens = getattr(m, "total_tokens", 0)
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:2116:        total_requests = getattr(summary, "total_requests", 0) if summary else 0
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:2125:                return getattr(obj, key, default)
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:2366:        integration = getattr(self.agent, "intelligent_integration", None)
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:2378:        pipeline = getattr(integration, "_pipeline", None)
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:2383:        mode_controller = getattr(pipeline, "_mode_controller", None)
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:2582:            web_enabled = not getattr(self.settings, "airgapped_mode", False)
+/Users/vijaysingh/code/codingagent/victor/ui/slash_commands.py:3002:        codebase_index = getattr(self.agent, "codebase_index", None)
+/Users/vijaysingh/code/codingagent/victor/ui/commands/tools.py:57:                    if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
+/Users/vijaysingh/code/codingagent/victor/ui/commands/tools.py:58:                        tool_instance = getattr(obj, "Tool", None)
+/Users/vijaysingh/code/codingagent/victor/ui/commands/tools.py:62:                            cost_tier = getattr(tool_instance, "cost_tier", None)
+/Users/vijaysingh/code/codingagent/victor/ui/commands/tools.py:76:                            cost_tier = getattr(tool_instance, "cost_tier", None)
+/Users/vijaysingh/code/codingagent/victor/ui/commands/serve.py:75:        level=getattr(logging, log_level),
+/Users/vijaysingh/code/codingagent/victor/ui/commands/chat.py:437:            token_count = getattr(usage_stats, "total_tokens", 0) or 0
+/Users/vijaysingh/code/codingagent/victor/ui/commands/embeddings.py:196:                                if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
+/Users/vijaysingh/code/codingagent/victor/ui/commands/mcp.py:45:        level=getattr(logging, log_level),
+/Users/vijaysingh/code/codingagent/victor/ui/commands/mcp.py:74:                    if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
+/Users/vijaysingh/code/codingagent/victor/ui/commands/utils.py:33:        level=getattr(logging, log_level.upper(), logging.WARNING),
+/Users/vijaysingh/code/codingagent/victor/ui/commands/utils.py:76:                    model=getattr(agent.provider, "model", "unknown"),
+/Users/vijaysingh/code/codingagent/victor/tools/plugin_registry.py:434:                mod_file = getattr(mod, "__file__", None)
+/Users/vijaysingh/code/codingagent/victor/tools/shared_ast_utils.py:486:        end_lineno=getattr(node, "end_lineno", None),
+/Users/vijaysingh/code/codingagent/victor/tools/shared_ast_utils.py:548:        end_lineno=getattr(node, "end_lineno", None),
+/Users/vijaysingh/code/codingagent/victor/tools/registry.py:88:            callback=hook, name=name or getattr(hook, "__name__", "hook"), critical=critical
+/Users/vijaysingh/code/codingagent/victor/tools/metadata_registry.py:315:        priority = getattr(tool, "priority", Priority.MEDIUM)
+/Users/vijaysingh/code/codingagent/victor/tools/metadata_registry.py:316:        access_mode = getattr(tool, "access_mode", AccessMode.READONLY)
+/Users/vijaysingh/code/codingagent/victor/tools/metadata_registry.py:317:        danger_level = getattr(tool, "danger_level", DangerLevel.SAFE)
+/Users/vijaysingh/code/codingagent/victor/tools/metadata_registry.py:318:        aliases = getattr(tool, "aliases", set())
+/Users/vijaysingh/code/codingagent/victor/tools/metadata_registry.py:319:        category = getattr(tool, "category", None)
+/Users/vijaysingh/code/codingagent/victor/tools/metadata_registry.py:321:        raw_keywords = getattr(tool, "keywords", None) or []
+/Users/vijaysingh/code/codingagent/victor/tools/metadata_registry.py:337:        raw_stages = getattr(tool, "stages", None) or []
+/Users/vijaysingh/code/codingagent/victor/tools/metadata_registry.py:341:        raw_mandatory = getattr(tool, "mandatory_keywords", None) or []
+/Users/vijaysingh/code/codingagent/victor/tools/metadata_registry.py:345:        raw_task_types = getattr(tool, "task_types", None) or []
+/Users/vijaysingh/code/codingagent/victor/tools/metadata_registry.py:349:        raw_progress_params = getattr(tool, "progress_params", None) or []
+/Users/vijaysingh/code/codingagent/victor/tools/metadata_registry.py:354:            getattr(tool, "execution_category", None) or ExecutionCategory.READ_ONLY
+/Users/vijaysingh/code/codingagent/victor/tools/metadata_registry.py:358:        availability_check = getattr(tool, "_availability_check", None)
+/Users/vijaysingh/code/codingagent/victor/tools/tool_names.py:345:        getattr(ToolNames, attr)
+/Users/vijaysingh/code/codingagent/victor/tools/tool_names.py:347:        if not attr.startswith("_") and isinstance(getattr(ToolNames, attr), str)
+/Users/vijaysingh/code/codingagent/victor/tools/jira_tool.py:160:                    "assignee": getattr(issue.fields.assignee, "displayName", "Unassigned"),
+/Users/vijaysingh/code/codingagent/victor/tools/jira_tool.py:161:                    "priority": getattr(issue.fields.priority, "name", "None"),
+/Users/vijaysingh/code/codingagent/victor/tools/jira_tool.py:198:                        "author": getattr(comment.author, "displayName", "Unknown"),
+/Users/vijaysingh/code/codingagent/victor/tools/jira_tool.py:210:                "assignee": getattr(issue.fields.assignee, "displayName", "Unassigned"),
+/Users/vijaysingh/code/codingagent/victor/tools/jira_tool.py:211:                "reporter": getattr(issue.fields.reporter, "displayName", "Unknown"),
+/Users/vijaysingh/code/codingagent/victor/tools/jira_tool.py:212:                "priority": getattr(issue.fields.priority, "name", "None"),
+/Users/vijaysingh/code/codingagent/victor/tools/jira_tool.py:236:        return {"success": False, "error": str(getattr(e, "text", str(e)))}
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:196:        "vector_store": getattr(settings, "codebase_vector_store", "lancedb"),
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:197:        "embedding_model_type": getattr(
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:200:        "embedding_model_name": getattr(
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:203:            getattr(settings, "unified_embedding_model", "all-MiniLM-L12-v2"),
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:205:        "persist_directory": getattr(settings, "codebase_persist_directory", None)
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:210:    graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:211:    graph_path = getattr(settings, "codebase_graph_path", None)
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:384:        similarity_threshold = getattr(settings, "semantic_similarity_threshold", 0.5)
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:385:        expand_query = getattr(settings, "semantic_query_expansion_enabled", True)
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:386:        enable_hybrid = getattr(settings, "enable_hybrid_search", False)
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:398:        if getattr(settings, "enable_semantic_threshold_rl_learning", False):
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:406:                embedding_model = getattr(
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:409:                    getattr(settings, "unified_embedding_model", "all-MiniLM-L12-v2"),
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:482:                    semantic_weight = getattr(settings, "hybrid_search_semantic_weight", 0.6)
+/Users/vijaysingh/code/codingagent/victor/tools/code_search_tool.py:483:                    keyword_weight = getattr(settings, "hybrid_search_keyword_weight", 0.4)
+/Users/vijaysingh/code/codingagent/victor/context/codebase_analyzer.py:1657:            getattr(settings, "codebase_persist_directory", None) or default_dir
+/Users/vijaysingh/code/codingagent/victor/context/codebase_analyzer.py:1666:                getattr(settings, "codebase_embedding_table", None)
+/Users/vijaysingh/code/codingagent/victor/core/bootstrap.py:80:        log_level = getattr(logging, level.upper(), logging.INFO)
+/Users/vijaysingh/code/codingagent/victor/core/bootstrap.py:384:        vertical_name = getattr(settings, "default_vertical", None) or "coding"
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:17:This module provides type-safe alternatives to getattr() for accessing
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:24:    - No dynamic attribute access via getattr()
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:28:    cost_tier = getattr(tool, "cost_tier", None)
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:83:    Replaces getattr() calls on tool objects with typed access.
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:113:            name=getattr(tool, "name", "unknown"),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:114:            description=getattr(tool, "description", ""),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:115:            priority=getattr(tool, "priority", Priority.MEDIUM),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:116:            access_mode=getattr(tool, "access_mode", AccessMode.READONLY),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:117:            danger_level=getattr(tool, "danger_level", DangerLevel.SAFE),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:118:            execution_category=getattr(tool, "execution_category", ExecutionCategory.READ_ONLY),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:119:            aliases=getattr(tool, "aliases", set()),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:120:            category=getattr(tool, "category", None),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:121:            keywords=getattr(tool, "keywords", []),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:122:            stages=getattr(tool, "stages", []),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:123:            mandatory_keywords=getattr(tool, "mandatory_keywords", []),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:124:            task_types=getattr(tool, "task_types", []),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:125:            progress_params=getattr(tool, "progress_params", []),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:126:            cost_tier=getattr(tool, "cost_tier", None),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:169:    Replaces getattr(delta, "content", "") pattern.
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:196:    Replaces getattr(self.agent, "component", None) pattern.
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:210:            mcp_client=getattr(agent, "mcp_client", None),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:211:            codebase_index=getattr(agent, "codebase_index", None),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:212:            conversation_state=getattr(agent, "conversation_state", None),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:213:            intelligent_integration=getattr(agent, "intelligent_integration", None),
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:226:    Replaces getattr(m, "tokens_per_second", 0) pattern.
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:253:    Replaces getattr(summary, "total_requests", 0) pattern.
+/Users/vijaysingh/code/codingagent/victor/core/typed_models.py:292:    Replaces getattr(cqrs_event, "tool_name", "") pattern.
+/Users/vijaysingh/code/codingagent/victor/core/health.py:391:            details["tool_name"] = getattr(self._tool, "name", None)
+/Users/vijaysingh/code/codingagent/victor/core/event_sourcing.py:304:        handler = getattr(self, handler_name, None)
+/Users/vijaysingh/code/codingagent/victor/core/retry.py:369:        context = RetryContext(max_attempts=getattr(self.strategy, "max_attempts", 3))
+/Users/vijaysingh/code/codingagent/victor/core/retry.py:416:        context = RetryContext(max_attempts=getattr(self.strategy, "max_attempts", 3))
+/Users/vijaysingh/code/codingagent/victor/core/agent_commands.py:496:        handler = getattr(self, handler_name, None)
+/Users/vijaysingh/code/codingagent/victor/core/lazy.py:109:        cached = getattr(obj, self._attr_name, None)
+/Users/vijaysingh/code/codingagent/victor/core/lazy.py:163:        cls = getattr(module, class_name)
+/Users/vijaysingh/code/codingagent/victor/core/lazy.py:167:            return getattr(cls, call_method)()
+/Users/vijaysingh/code/codingagent/victor/core/repository.py:240:        actual = getattr(entity, self.attribute, None)
+/Users/vijaysingh/code/codingagent/victor/framework/protocols.py:572:        hints = getattr(protocol, "__annotations__", {})
+/Users/vijaysingh/code/codingagent/victor/framework/cqrs_bridge.py:130:        data = getattr(cqrs_event, "metadata", {}).get("data", {})
+/Users/vijaysingh/code/codingagent/victor/framework/cqrs_bridge.py:132:    metadata = getattr(cqrs_event, "metadata", {})
+/Users/vijaysingh/code/codingagent/victor/framework/cqrs_bridge.py:146:                "tool_name": getattr(cqrs_event, "tool_name", ""),
+/Users/vijaysingh/code/codingagent/victor/framework/cqrs_bridge.py:147:                "arguments": getattr(cqrs_event, "arguments", {}),
+/Users/vijaysingh/code/codingagent/victor/framework/cqrs_bridge.py:153:                "tool_name": getattr(cqrs_event, "tool_name", ""),
+/Users/vijaysingh/code/codingagent/victor/framework/cqrs_bridge.py:154:                "result": getattr(cqrs_event, "result", ""),
+/Users/vijaysingh/code/codingagent/victor/framework/cqrs_bridge.py:155:                "success": getattr(cqrs_event, "success", True),
+/Users/vijaysingh/code/codingagent/victor/framework/cqrs_bridge.py:161:                "old_stage": getattr(cqrs_event, "from_state", ""),
+/Users/vijaysingh/code/codingagent/victor/framework/cqrs_bridge.py:162:                "new_stage": getattr(cqrs_event, "to_state", ""),
+/Users/vijaysingh/code/codingagent/victor/framework/cqrs_bridge.py:167:                "task_id": getattr(cqrs_event, "task_id", ""),
+/Users/vijaysingh/code/codingagent/victor/framework/cqrs_bridge.py:168:                "provider": getattr(cqrs_event, "provider", ""),
+/Users/vijaysingh/code/codingagent/victor/framework/cqrs_bridge.py:169:                "model": getattr(cqrs_event, "model", ""),
+/Users/vijaysingh/code/codingagent/victor/framework/cqrs_bridge.py:178:                "error": getattr(cqrs_event, "error", "Unknown error"),
+/Users/vijaysingh/code/codingagent/victor/framework/agent.py:240:        provider = getattr(orchestrator.provider, "name", "unknown")
+/Users/vijaysingh/code/codingagent/victor/framework/agent.py:241:        model = getattr(orchestrator, "model", None)
+/Users/vijaysingh/code/codingagent/victor/framework/agent.py:543:        observability = getattr(self._orchestrator, "observability", None)
+/Users/vijaysingh/code/codingagent/victor/framework/agent.py:555:        return getattr(self._orchestrator, "observability", None)
+/Users/vijaysingh/code/codingagent/victor/framework/agent_components.py:1026:        messages = getattr(self._agent._orchestrator, "messages", [])
+/Users/vijaysingh/code/codingagent/victor/framework/shim.py:318:        chain = getattr(self._orchestrator, "middleware_chain", None)
+/Users/vijaysingh/code/codingagent/victor/framework/shim.py:324:            chain = getattr(self._orchestrator, "_middleware_chain", None)
+/Users/vijaysingh/code/codingagent/victor/framework/shim.py:352:        safety_checker = getattr(self._orchestrator, "safety_checker", None)
+/Users/vijaysingh/code/codingagent/victor/framework/state.py:106:    attr = getattr(obj, method_name, None)
+/Users/vijaysingh/code/codingagent/victor/framework/state.py:393:        observability = getattr(self._orchestrator, "observability", None)
+/Users/vijaysingh/code/codingagent/victor/config/settings.py:870:            max_vram_gb if max_vram_gb is not None else getattr(cls, "lmstudio_max_vram_gb", None)
+/Users/vijaysingh/code/codingagent/victor/config/settings.py:943:            urls = getattr(cls, "lmstudio_base_urls", []) or [
+/Users/vijaysingh/code/codingagent/victor/config/settings.py:1064:            api_key = getattr(self, "xai_api_key", None) or get_api_key("xai")
+/Users/vijaysingh/code/codingagent/victor/config/settings.py:1075:            urls = getattr(self, "lmstudio_base_urls", []) or []
+/Users/vijaysingh/code/codingagent/victor/providers/vertex_provider.py:323:                                    "name": getattr(msg, "tool_name", "unknown"),
+/Users/vijaysingh/code/codingagent/victor/providers/health.py:390:                        model=getattr(provider, "default_model", None),
+/Users/vijaysingh/code/codingagent/victor/providers/bedrock_provider.py:336:                                    "toolUseId": getattr(msg, "tool_call_id", ""),
+/Users/vijaysingh/code/codingagent/victor/providers/factory.py:180:        return getattr(self._base_provider, "name", "unknown")
+/Users/vijaysingh/code/codingagent/victor/providers/openai_provider.py:287:        if getattr(delta, "tool_calls", None):
+/Users/vijaysingh/code/codingagent/victor/providers/openai_provider.py:294:                tc_index = getattr(tc, "index", None)
+/Users/vijaysingh/code/codingagent/victor/providers/openai_provider.py:311:                function = getattr(tc, "function", None)
+/Users/vijaysingh/code/codingagent/victor/providers/openai_provider.py:312:                name = getattr(function, "name", None)
+/Users/vijaysingh/code/codingagent/victor/providers/openai_provider.py:313:                arguments = getattr(function, "arguments", "") or ""
+/Users/vijaysingh/code/codingagent/victor/providers/payload_limiter.py:243:            role = getattr(msg, "role", "user")
+/Users/vijaysingh/code/codingagent/victor/providers/payload_limiter.py:400:        start_idx = 1 if messages and getattr(messages[0], "role", "") == "system" else 0
+/Users/vijaysingh/code/codingagent/victor/providers/payload_limiter.py:452:            if getattr(msg, "role", "") == "tool":
+/Users/vijaysingh/code/codingagent/victor/providers/payload_limiter.py:453:                content = getattr(msg, "content", "")
+/Users/vijaysingh/code/codingagent/victor/providers/payload_limiter.py:461:                        tool_call_id=getattr(msg, "tool_call_id", None),
+/Users/vijaysingh/code/codingagent/victor/providers/payload_limiter.py:536:            "role": getattr(msg, "role", "user"),
+/Users/vijaysingh/code/codingagent/victor/providers/payload_limiter.py:537:            "content": getattr(msg, "content", ""),
+/Users/vijaysingh/code/codingagent/victor/providers/payload_limiter.py:552:                "name": getattr(tool, "name", ""),
+/Users/vijaysingh/code/codingagent/victor/providers/payload_limiter.py:553:                "description": getattr(tool, "description", ""),
+/Users/vijaysingh/code/codingagent/victor/providers/payload_limiter.py:554:                "parameters": getattr(tool, "parameters", {}),
+/Users/vijaysingh/code/codingagent/victor/providers/metrics_export.py:268:            latest_results = getattr(self._health_checker, "_latest", {})
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:194:                    event_type = getattr(event, "type", "")
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:198:                        message = getattr(event, "message", None)
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:200:                            msg_usage = getattr(message, "usage", None)
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:203:                                    "prompt_tokens": getattr(msg_usage, "input_tokens", 0),
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:205:                                    "total_tokens": getattr(msg_usage, "input_tokens", 0),
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:208:                                cache_creation = getattr(
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:211:                                cache_read = getattr(msg_usage, "cache_read_input_tokens", None)
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:218:                        block = getattr(event, "content_block", None)
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:219:                        if block and getattr(block, "type", "") == "tool_use":
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:220:                            tc_id = getattr(block, "id", None) or f"tool_{len(tool_calls) + 1}"
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:223:                                "name": getattr(block, "name", ""),
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:224:                                "arguments": getattr(block, "input", {}) or {},
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:226:                            block_index = getattr(
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:227:                                event, "index", getattr(block, "index", len(block_index_to_id))
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:232:                        delta = getattr(event, "delta", None)
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:233:                        delta_type = getattr(delta, "type", "")
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:234:                        block_index = getattr(
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:235:                            event, "index", getattr(event, "content_block_index", None)
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:243:                                    getattr(delta, "partial_json", None)
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:244:                                    or getattr(delta, "text", "")
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:258:                        block_index = getattr(
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:259:                            event, "index", getattr(event, "content_block_index", None)
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:269:                        msg_usage = getattr(event, "usage", None)
+/Users/vijaysingh/code/codingagent/victor/providers/anthropic_provider.py:271:                            output_tokens = getattr(msg_usage, "output_tokens", 0)
+/Users/vijaysingh/code/codingagent/victor/providers/stream_adapter.py:248:                content = getattr(delta, "content", "") or ""
+/Users/vijaysingh/code/codingagent/victor/providers/stream_adapter.py:249:                tool_calls = getattr(delta, "tool_calls", None)
+/Users/vijaysingh/code/codingagent/victor/providers/stream_adapter.py:300:                    delta = getattr(event, "delta", None)
+/Users/vijaysingh/code/codingagent/victor/providers/stream_adapter.py:301:                    text = getattr(delta, "text", "") if delta else ""
+/Users/vijaysingh/code/codingagent/victor/providers/stream_adapter.py:311:                    tool_name = getattr(event, "name", "")
+/Users/vijaysingh/code/codingagent/victor/providers/stream_adapter.py:312:                    tool_input = getattr(event, "input", {})
+/Users/vijaysingh/code/codingagent/victor/providers/stream_adapter.py:349:                    finish_reason = getattr(candidate, "finish_reason", None)
+/Users/vijaysingh/code/codingagent/victor/providers/stream_adapter.py:352:                    content = getattr(candidate, "content", None)
+/Users/vijaysingh/code/codingagent/victor/providers/stream_adapter.py:407:                content = getattr(chunk.message, "content", "")
+/Users/vijaysingh/code/codingagent/victor/providers/stream_adapter.py:408:                done = getattr(chunk, "done", False)
+/Users/vijaysingh/code/codingagent/victor/providers/google_provider.py:213:                    f"Gemini candidate: finish_reason={getattr(candidate, 'finish_reason', 'N/A')}"
+/Users/vijaysingh/code/codingagent/victor/providers/google_provider.py:218:                        f"Gemini content: role={getattr(content, 'role', 'N/A')}, parts_count={len(content.parts) if hasattr(content, 'parts') else 0}"
+/Users/vijaysingh/code/codingagent/victor/providers/google_provider.py:444:            finish_reason = getattr(candidate, "finish_reason", None)
+/Users/vijaysingh/code/codingagent/victor/providers/google_provider.py:451:                safety_ratings = getattr(candidate, "safety_ratings", [])
+/Users/vijaysingh/code/codingagent/victor/providers/google_provider.py:535:                "prompt_tokens": getattr(response.usage_metadata, "prompt_token_count", 0),
+/Users/vijaysingh/code/codingagent/victor/providers/google_provider.py:536:                "completion_tokens": getattr(response.usage_metadata, "candidates_token_count", 0),
+/Users/vijaysingh/code/codingagent/victor/providers/google_provider.py:537:                "total_tokens": getattr(response.usage_metadata, "total_token_count", 0),
+/Users/vijaysingh/code/codingagent/victor/providers/google_provider.py:563:            finish_reason = getattr(candidate, "finish_reason", None)
+/Users/vijaysingh/code/codingagent/victor/providers/google_provider.py:609:                supported_methods = getattr(model, "supported_generation_methods", [])
+/Users/vijaysingh/code/codingagent/victor/providers/google_provider.py:611:                    model_name = getattr(model, "name", "")
+/Users/vijaysingh/code/codingagent/victor/providers/google_provider.py:615:                            "name": getattr(model, "display_name", model_name),
+/Users/vijaysingh/code/codingagent/victor/providers/google_provider.py:616:                            "description": getattr(model, "description", ""),
+/Users/vijaysingh/code/codingagent/victor/providers/google_provider.py:617:                            "input_token_limit": getattr(model, "input_token_limit", 0),
+/Users/vijaysingh/code/codingagent/victor/providers/google_provider.py:618:                            "output_token_limit": getattr(model, "output_token_limit", 0),
+/Users/vijaysingh/code/codingagent/victor/providers/resilience.py:575:        self._provider_name = getattr(provider, "name", "unknown")
+/Users/vijaysingh/code/codingagent/victor/providers/resilience.py:589:            fb_name = getattr(fb, "name", f"fallback_{len(self._fallback_circuits)}")
+/Users/vijaysingh/code/codingagent/victor/providers/resilience.py:617:        return getattr(self.provider, "supports_tools", lambda: False)()
+/Users/vijaysingh/code/codingagent/victor/providers/resilience.py:621:        return getattr(self.provider, "supports_streaming", lambda: False)()
+/Users/vijaysingh/code/codingagent/victor/providers/resilience.py:671:            fb_name = getattr(fallback, "name", "unknown")
+/Users/vijaysingh/code/codingagent/victor/providers/resilience.py:744:                fb_name = getattr(fallback, "name", "unknown")
+/Users/vijaysingh/code/codingagent/victor/completion/registry.py:175:            if getattr(caps, capability, False):
+/Users/vijaysingh/code/codingagent/victor/completion/registry.py:255:                    attr = getattr(module, attr_name)
+/Users/vijaysingh/code/codingagent/victor/completion/providers/ai.py:238:            tokens_used = getattr(response, "usage", {}).get("completion_tokens", 0)
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:596:            enable = getattr(self._settings, "enable_observability", True)
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:697:            enabled = getattr(self._settings, "enable_recovery_system", True)
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:741:            max_history_messages=getattr(self._settings, "max_conversation_history", 100),
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:774:                enable_prometheus_export=getattr(self._settings, "enable_prometheus_export", True),
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:784:            use_predefined=getattr(self._settings, "use_predefined_patterns", True),
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:786:            learning_rate=getattr(self._settings, "sequence_learning_rate", 0.3),
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:795:            enabled=getattr(self._settings, "enable_context_compaction", True),
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:803:        initial_mode_str = getattr(self._settings, "default_agent_mode", "build")
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:818:        similarity_threshold = getattr(self._settings, "dedup_similarity_threshold", 0.7)
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:959:        cache_dir = Path(getattr(self._settings, "cache_dir", ".victor/cache"))
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:992:        log_file = Path(getattr(self._settings, "usage_log_path", ".victor/logs/usage.log"))
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:1032:        log_file = Path(getattr(self._settings, "usage_log_path", ".victor/logs/usage.log"))
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:1034:        enabled = getattr(self._settings, "enable_usage_logging", True)
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:1061:        export_path = Path(getattr(self._settings, "cache_dir", ".victor/cache")) / "streaming_metrics.json"
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:1073:        cache_dir = Path(getattr(self._settings, "cache_dir", ".victor/cache")) / "intent_classifier"
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:1146:        max_concurrent = getattr(self._settings, "max_concurrent_tools", 5)
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:1148:        enable = getattr(self._settings, "enable_parallel_execution", True)
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:1173:        max_retries = getattr(self._settings, "max_response_retries", 3)
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:1174:        force_response = getattr(self._settings, "force_response", True)
+/Users/vijaysingh/code/codingagent/victor/agent/service_provider.py:1194:        session_idle_timeout = getattr(self._settings, "session_idle_timeout", 180.0)
+/Users/vijaysingh/code/codingagent/victor/agent/provider_manager.py:150:            name = provider_name or getattr(initial_provider, "name", "unknown")
+/Users/vijaysingh/code/codingagent/victor/agent/config_loader.py:458:        profiles_yaml = getattr(self.settings, "_profiles_yaml", None)
+/Users/vijaysingh/code/codingagent/victor/agent/subagents/base.py:306:            tool_calls_used = getattr(self.orchestrator, "tool_calls_used", 0)
+/Users/vijaysingh/code/codingagent/victor/agent/subagents/base.py:315:                    "tool_calls": getattr(response, "tool_calls", []) or [],
+/Users/vijaysingh/code/codingagent/victor/agent/subagents/base.py:342:                tool_calls_used = getattr(self.orchestrator, "tool_calls_used", 0)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:393:        if not getattr(self.settings, "enable_observability", True):
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:406:        if not getattr(self.settings, "tool_cache_enabled", True):
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:414:        cache_dir = getattr(self.settings, "tool_cache_dir", None)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:421:            ttl=getattr(self.settings, "tool_cache_ttl", 600),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:422:            allowlist=getattr(self.settings, "tool_cache_allowlist", []),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:474:        if not getattr(self.settings, "conversation_memory_enabled", True):
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:485:            max_context = getattr(self.settings, "max_context_tokens", 100000)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:486:            response_reserve = getattr(self.settings, "response_token_reserve", 4096)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:533:            analytics_log_file, enabled=getattr(self.settings, "analytics_enabled", True)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:546:        code_correction_enabled = getattr(self.settings, "code_correction_enabled", True)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:575:                        code_correction_auto_fix = getattr(
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:578:                        code_correction_max_iterations = getattr(
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:639:        auto_commit_enabled = getattr(self.settings, "auto_commit_enabled", False)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:656:        use_semantic_selection = getattr(self.settings, "use_semantic_tool_selection", False)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:689:        parallel_enabled = getattr(self.settings, "parallel_tool_execution", True)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:690:        max_concurrent = getattr(self.settings, "max_concurrent_tools", 5)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:712:            max_retries=getattr(self.settings, "response_completion_retries", 3),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:713:            force_response=getattr(self.settings, "force_response_on_error", True),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:767:                max_output_chars=getattr(self.settings, "max_tool_output_chars", 15000),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:768:                file_structure_threshold=getattr(
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:973:        compaction_strategy_str = getattr(
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:994:                min_messages_to_keep=getattr(self.settings, "context_min_messages_to_keep", 6),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:995:                tool_result_retention_weight=getattr(
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:998:                recent_message_weight=getattr(self.settings, "context_recency_weight", 2.0),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:999:                semantic_relevance_threshold=getattr(
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1027:        if not getattr(self.settings, "enable_tool_deduplication", False):
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1034:            window_size = getattr(self.settings, "tool_deduplication_window_size", 10)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1056:        session_idle_timeout = getattr(self.settings, "session_idle_timeout", 180.0)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1079:        if not getattr(self.settings, "enable_continuation_rl_learning", False):
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1114:        truncation_strategy_str = getattr(
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1130:            proactive_threshold=getattr(self.settings, "context_proactive_threshold", 0.90),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1131:            min_messages_after_compact=getattr(
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1134:            tool_result_max_chars=getattr(self.settings, "max_tool_output_chars", 8192),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1135:            tool_result_max_lines=getattr(self.settings, "max_tool_output_lines", 200),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1138:            enable_proactive=getattr(self.settings, "context_proactive_compaction", True),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1139:            enable_tool_truncation=getattr(self.settings, "tool_result_truncation", True),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1188:        validation_mode_str = getattr(self.settings, "tool_validation_mode", "lenient").lower()
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1201:            max_retries=getattr(self.settings, "tool_retry_max_attempts", 3),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1202:            retry_delay=getattr(self.settings, "tool_retry_base_delay", 1.0),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1206:            enable_code_correction=getattr(self.settings, "code_correction_enabled", True),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1264:            enable_resilient_calls=getattr(self.settings, "intelligent_pipeline_enabled", True),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1265:            enable_quality_scoring=getattr(self.settings, "intelligent_quality_scoring", True),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1266:            enable_mode_learning=getattr(self.settings, "intelligent_mode_learning", True),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1267:            enable_prompt_optimization=getattr(
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1270:            min_quality_threshold=getattr(self.settings, "intelligent_min_quality_threshold", 0.5),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1271:            grounding_confidence_threshold=getattr(
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1307:                enable_plugins=getattr(self.settings, "plugin_enabled", True),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1308:                enable_mcp=getattr(self.settings, "use_mcp_tools", False),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1310:                airgapped_mode=getattr(self.settings, "airgapped_mode", False),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1311:                plugin_dirs=getattr(self.settings, "plugin_dirs", []),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1312:                disabled_plugins=set(getattr(self.settings, "disabled_plugins", [])),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1313:                plugin_packages=getattr(self.settings, "plugin_packages", []),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1336:        max_history = getattr(self.settings, "max_conversation_history", 100)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1369:        if not getattr(self.settings, "plugin_enabled", True):
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1412:        fallback_max_tools = getattr(self.settings, "fallback_max_tools", 8)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1455:        enabled = getattr(self.settings, "subagent_orchestration_enabled", True)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1469:        use_semantic = getattr(self.settings, "use_semantic_tool_selection", False)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1532:                enable_health_checks=getattr(self.settings, "provider_health_checks", True),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1533:                auto_fallback=getattr(self.settings, "provider_auto_fallback", True),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1534:                fallback_providers=getattr(self.settings, "fallback_providers", []),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1569:        tool_calling_models = getattr(self.settings, "tool_calling_models", {})
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1665:        tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_factory.py:1711:            getattr(self.settings, "debug_logging", False)
+/Users/vijaysingh/code/codingagent/victor/agent/recovery_coordinator.py:280:        consecutive_limit = getattr(self.settings, "recovery_blocked_consecutive_threshold", 4)
+/Users/vijaysingh/code/codingagent/victor/agent/recovery_coordinator.py:281:        total_limit = getattr(self.settings, "recovery_blocked_total_threshold", 6)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_recovery.py:169:        self._empty_response_threshold = getattr(
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_recovery.py:172:        self._max_recovery_attempts = getattr(
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_recovery.py:183:        return self._handler is not None and getattr(self._handler, "enabled", True)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_recovery.py:244:        session_idle_timeout = getattr(self._settings, "session_idle_timeout", 180)
+/Users/vijaysingh/code/codingagent/victor/agent/recovery/handler.py:120:            enabled = getattr(settings, "enable_recovery_system", True)
+/Users/vijaysingh/code/codingagent/victor/agent/recovery/handler.py:129:                cache_dir = getattr(settings, "cache_dir", None)
+/Users/vijaysingh/code/codingagent/victor/agent/tool_selection.py:317:        metadata = getattr(tool, "metadata", None)
+/Users/vijaysingh/code/codingagent/victor/agent/tool_selection.py:324:        description = getattr(tool, "description", "").lower()
+/Users/vijaysingh/code/codingagent/victor/agent/tool_selection.py:770:        tiered_config = getattr(self, "_tiered_config", None)
+/Users/vijaysingh/code/codingagent/victor/agent/tool_selection.py:889:        return getattr(self, "_tiered_config", None)
+/Users/vijaysingh/code/codingagent/victor/agent/tool_selection.py:980:                        keywords = getattr(tool.metadata, 'keywords', []) or []
+/Users/vijaysingh/code/codingagent/victor/agent/tool_selection.py:1400:        tiered_config = getattr(self, "_tiered_config", None)
+/Users/vijaysingh/code/codingagent/victor/agent/tool_registrar.py:224:        if self.config.enable_mcp or getattr(self.settings, "use_mcp_tools", False):
+/Users/vijaysingh/code/codingagent/victor/agent/tool_registrar.py:306:                        if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
+/Users/vijaysingh/code/codingagent/victor/agent/tool_registrar.py:378:            plugin_config = getattr(self.settings, "plugin_config", {})
+/Users/vijaysingh/code/codingagent/victor/agent/tool_registrar.py:420:        mcp_command = getattr(self.settings, "mcp_command", None)
+/Users/vijaysingh/code/codingagent/victor/agent/tool_registrar.py:475:                configure_mcp_client(mcp_client, prefix=getattr(self.settings, "mcp_prefix", "mcp"))
+/Users/vijaysingh/code/codingagent/victor/agent/tool_registrar.py:655:                    "version": getattr(p, "version", "unknown"),
+/Users/vijaysingh/code/codingagent/victor/agent/tool_registrar.py:678:                    "connected": s.name in getattr(self.mcp_registry, "_connected_servers", {}),
+/Users/vijaysingh/code/codingagent/victor/agent/planning/autonomous.py:217:        original_prompt = getattr(self.orchestrator, "_system_prompt_override", None)
+/Users/vijaysingh/code/codingagent/victor/agent/planning/autonomous.py:491:        tool_calls_before = getattr(self.orchestrator, "tool_calls_used", 0)
+/Users/vijaysingh/code/codingagent/victor/agent/planning/autonomous.py:501:            tool_calls = getattr(self.orchestrator, "tool_calls_used", 0) - tool_calls_before
+/Users/vijaysingh/code/codingagent/victor/agent/continuation_strategy.py:233:        max_cont_analysis = getattr(settings, "max_continuation_prompts_analysis", 6)
+/Users/vijaysingh/code/codingagent/victor/agent/continuation_strategy.py:234:        max_cont_action = getattr(settings, "max_continuation_prompts_action", 5)
+/Users/vijaysingh/code/codingagent/victor/agent/continuation_strategy.py:235:        max_cont_default = getattr(settings, "max_continuation_prompts_default", 3)
+/Users/vijaysingh/code/codingagent/victor/agent/continuation_strategy.py:267:        overrides = getattr(settings, "continuation_prompt_overrides", {})
+/Users/vijaysingh/code/codingagent/victor/agent/streaming/handler.py:1307:    limit = session_idle_timeout or getattr(settings, "session_idle_timeout", 180.0)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:269:        val = getattr(ToolNames, attr)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:509:        if self.memory_manager and getattr(settings, "conversation_embeddings_enabled", True):
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:527:        self._intelligent_pipeline_enabled = getattr(settings, "intelligent_pipeline_enabled", True)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:805:                task_type=getattr(session, "task_type", "unknown"),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:888:        return getattr(self, "_observability", None)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:1221:                sticky_budget = getattr(self.unified_tracker, "_sticky_user_budget", False)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:1334:                continuation_prompts_used = getattr(self, "_continuation_prompts", 0)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:1335:                max_prompts_configured = getattr(self, "_max_continuation_prompts_used", 6)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:1336:                stuck_loop_detected = getattr(self, "_stuck_loop_detected", False)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:1517:        return getattr(self, "_middleware_chain", None)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:1565:        settings_max = getattr(self.settings, "max_context_chars", None)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:1957:                    "auto_fix": getattr(self._code_correction_middleware, "auto_fix", True),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:1958:                    "max_iterations": getattr(
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:2265:            sticky_budget = getattr(self.unified_tracker, "_sticky_user_budget", False)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:2270:                self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:2364:            self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:2546:        prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:2579:        current_intent = getattr(self, "_current_intent", None)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:2695:        if getattr(self, "_max_prompts_summary_requested", False):
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:2734:        max_cont_analysis = getattr(self.settings, "max_continuation_prompts_analysis", 6)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:2735:        max_cont_action = getattr(self.settings, "max_continuation_prompts_action", 5)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:2736:        max_cont_default = getattr(self.settings, "max_continuation_prompts_default", 3)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:2768:        overrides = getattr(self.settings, "continuation_prompt_overrides", {})
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:2899:            and not getattr(self, "_max_prompts_summary_requested", False)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:2949:            and not getattr(self, "_max_prompts_summary_requested", False)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:2969:            and not getattr(self, "_final_summary_requested", False)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:3015:            model=getattr(self.settings, "model", None),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:3018:            response_token_reserve=getattr(self.settings, "response_token_reserve", 4096),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:3054:        if getattr(self.settings, "use_mcp_tools", False):
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:3063:        mcp_command = getattr(self.settings, "mcp_command", None)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:3114:                configure_mcp_client(mcp_client, prefix=getattr(self.settings, "mcp_prefix", "mcp"))
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:3363:        provider_key = self.provider_name or getattr(self.provider, "name", "")
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:3439:        max_iterations = getattr(self.settings, "chat_max_iterations", 10)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:4196:        consecutive_limit = getattr(self.settings, "recovery_blocked_consecutive_threshold", 4)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:4197:        total_limit = getattr(self.settings, "recovery_blocked_total_threshold", 6)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:4367:        warning_threshold = getattr(self.settings, "tool_call_budget_warning_threshold", 250)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:4388:        base_max = getattr(self.settings, "max_consecutive_tool_calls", 8)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:4551:        has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:4552:        thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:5454:                    one_shot_mode = getattr(self.settings, "one_shot_mode", False)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:5467:                        max_prompts_summary_requested=getattr(self, "_max_prompts_summary_requested", False),
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:5533:                        if getattr(self, "_summary_request_count", 0) >= 1:
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:5571:                        self._summary_request_count = getattr(self, "_summary_request_count", 0) + 1
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:5808:        retry_enabled = getattr(self.settings, "tool_retry_enabled", True)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:5809:        max_attempts = getattr(self.settings, "tool_retry_max_attempts", 3) if retry_enabled else 1
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:5810:        base_delay = getattr(self.settings, "tool_retry_base_delay", 1.0)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:5811:        max_delay = getattr(self.settings, "tool_retry_max_delay", 10.0)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:6475:        return getattr(self, "tool_calls_used", 0)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:6485:        return getattr(self, "tool_budget", 50)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:6493:        return set(getattr(self, "observed_files", []))
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator.py:6502:            return set(getattr(self.conversation_state.state, "modified_files", []))
+/Users/vijaysingh/code/codingagent/victor/agent/performance_profiler.py:328:        return getattr(self._current_span, "span_id", None)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_utils.py:54:    settings_max = getattr(settings, "max_context_chars", None)
+/Users/vijaysingh/code/codingagent/victor/agent/orchestrator_utils.py:59:    provider_name = getattr(provider, "name", "").lower()
+/Users/vijaysingh/code/codingagent/victor/agent/debug_logger.py:86:        level = getattr(logging, level_upper, logging.INFO)
+/Users/vijaysingh/code/codingagent/victor/agent/task_coordinator.py:90:        self._temperature = getattr(settings, "temperature", 0.7)
+/Users/vijaysingh/code/codingagent/victor/agent/task_coordinator.py:91:        self._tool_budget = getattr(settings, "tool_budget", 15)
+/Users/vijaysingh/code/codingagent/victor/agent/tool_executor.py:304:        access_mode = getattr(tool, "access_mode", AccessMode.READONLY)
+/Users/vijaysingh/code/codingagent/victor/agent/tool_executor.py:305:        category = getattr(tool, "category", "general")
+/Users/vijaysingh/code/codingagent/victor/agent/tool_executor.py:580:        hooks = getattr(self.tools, "_before_hooks", [])
+/Users/vijaysingh/code/codingagent/victor/agent/tool_executor.py:583:            hook_name = hook_obj.name if hook_obj else getattr(before_hook, "__name__", "hook")
+/Users/vijaysingh/code/codingagent/victor/agent/tool_executor.py:604:        hooks = getattr(self.tools, "_after_hooks", [])
+/Users/vijaysingh/code/codingagent/victor/agent/tool_executor.py:607:            hook_name = hook_obj.name if hook_obj else getattr(after_hook, "__name__", "hook")
+/Users/vijaysingh/code/codingagent/victor/agent/tool_executor.py:640:            max_attempts=getattr(self.retry_strategy, "max_attempts", self.max_retries)
+/Users/vijaysingh/code/codingagent/victor/agent/rl/base.py:212:        return getattr(self.provider_adapter.capabilities, param_name, None)
+/Users/vijaysingh/code/codingagent/victor/mcp/server.py:509:                    if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
+/Users/vijaysingh/code/codingagent/victor/protocol/adapters.py:81:                        id=getattr(tc, "id", ""),
+/Users/vijaysingh/code/codingagent/victor/protocol/adapters.py:82:                        name=getattr(tc, "name", ""),
+/Users/vijaysingh/code/codingagent/victor/protocol/adapters.py:83:                        arguments=getattr(tc, "arguments", {}),
+/Users/vijaysingh/code/codingagent/victor/protocol/adapters.py:190:            model=getattr(self._orchestrator.provider, "model", "unknown"),
+/Users/vijaysingh/code/codingagent/victor/observability/cqrs_adapter.py:372:        event_id = getattr(event, "id", None) or str(uuid4())
+/Users/vijaysingh/code/codingagent/victor/observability/cqrs_adapter.py:496:            timestamp=getattr(event, "timestamp", datetime.utcnow()),
+/Users/vijaysingh/code/codingagent/victor/observability/event_bus.py:228:        if getattr(self, "_initialized", False):
+/Users/vijaysingh/code/codingagent/victor/api/server.py:226:            content = getattr(response, "content", None) or ""
+/Users/vijaysingh/code/codingagent/victor/api/server.py:227:            tool_calls = getattr(response, "tool_calls", None) or []
+/Users/vijaysingh/code/codingagent/victor/api/server.py:263:                    content = getattr(chunk, "content", "")
+/Users/vijaysingh/code/codingagent/victor/api/server.py:264:                    tool_calls = getattr(chunk, "tool_calls", None)
+/Users/vijaysingh/code/codingagent/victor/api/server.py:313:            content = getattr(response, "content", None) or ""
+/Users/vijaysingh/code/codingagent/victor/api/server.py:1046:                model=getattr(provider, "model", "unknown"),
+/Users/vijaysingh/code/codingagent/victor/api/fastapi_server.py:306:                    provider_name = getattr(orchestrator.provider, "name", "unknown")
+/Users/vijaysingh/code/codingagent/victor/api/fastapi_server.py:307:                    model_name = getattr(orchestrator.provider, "model", "unknown")
+/Users/vijaysingh/code/codingagent/victor/api/fastapi_server.py:351:            content = getattr(response, "content", None) or ""
+/Users/vijaysingh/code/codingagent/victor/api/fastapi_server.py:352:            tool_calls = getattr(response, "tool_calls", None) or []
+/Users/vijaysingh/code/codingagent/victor/api/fastapi_server.py:369:                            content = getattr(chunk, "content", "")
+/Users/vijaysingh/code/codingagent/victor/api/fastapi_server.py:370:                            tool_calls = getattr(chunk, "tool_calls", None)
+/Users/vijaysingh/code/codingagent/victor/api/fastapi_server.py:412:                content = getattr(response, "content", None) or ""
+/Users/vijaysingh/code/codingagent/victor/api/fastapi_server.py:1771:                model=getattr(provider, "model", "unknown"),
+/Users/vijaysingh/code/codingagent/victor/evaluation/agent_adapter.py:162:                last_call.success = getattr(result, "success", True)
+/Users/vijaysingh/code/codingagent/victor/evaluation/agent_adapter.py:163:                last_call.result = getattr(result, "result", None)
+/Users/vijaysingh/code/codingagent/victor/evaluation/agent_adapter.py:424:            api_key=getattr(profile_config, "api_key", None),
+/Users/vijaysingh/code/codingagent/victor/evaluation/agent_adapter.py:425:            base_url=base_url or getattr(profile_config, "base_url", None),
+/Users/vijaysingh/code/codingagent/victor/evaluation/code_generation_harness.py:206:                tokens_input=getattr(response, "input_tokens", 0),
+/Users/vijaysingh/code/codingagent/victor/evaluation/code_generation_harness.py:207:                tokens_output=getattr(response, "output_tokens", 0),
+/Users/vijaysingh/code/codingagent/victor/evaluation/correction/registry.py:167:                    attr = getattr(module, attr_name)
+/Users/vijaysingh/code/codingagent/victor/codebase/tree_sitter_manager.py:88:        lang_func = getattr(language_module, func_name)
+/Users/vijaysingh/code/codingagent/victor/codebase/indexer.py:1279:                                base_name = py_ast.unparse(base) if hasattr(py_ast, "unparse") else getattr(base, "id", None)
+/Users/vijaysingh/code/codingagent/victor/codebase/indexer.py:1281:                                base_name = getattr(base, "id", None)
+/Users/vijaysingh/code/codingagent/victor/codebase/indexer.py:2010:                    getattr(settings, "codebase_vector_store", "lancedb"),
+/Users/vijaysingh/code/codingagent/victor/codebase/indexer.py:2014:                    getattr(settings, "codebase_embedding_provider", "sentence-transformers"),
+/Users/vijaysingh/code/codingagent/victor/codebase/indexer.py:2018:                    getattr(settings, "codebase_embedding_model", "BAAI/bge-small-en-v1.5"),
+/Users/vijaysingh/code/codingagent/victor/protocols/provider_adapter.py:274:                    id=getattr(call, "id", f"call_{i}"),
+/Users/vijaysingh/code/codingagent/victor/protocols/provider_adapter.py:543:                    id=getattr(call, "id", f"call_{i}"),
+/Users/vijaysingh/code/codingagent/victor/protocols/provider_adapter.py:544:                    name=getattr(fc, "name", ""),
+/Users/vijaysingh/code/codingagent/victor/protocols/provider_adapter.py:545:                    arguments=dict(getattr(fc, "args", {})),
+/Users/vijaysingh/code/codingagent/victor/debug/registry.py:235:                adapter_class = getattr(module, class_name)
+/Users/vijaysingh/code/codingagent/victor/debug/registry.py:276:                        obj = getattr(module, name)
+/Users/vijaysingh/code/codingagent/victor/verticals/vertical_loader.py:133:            vertical_class = getattr(module, class_name)
+/Users/vijaysingh/code/codingagent/victor/verticals/base_service_provider.py:334:            vertical_name=getattr(vertical_class, "name", "unknown"),
+/Users/vijaysingh/code/codingagent/victor/verticals/coding/service_provider.py:102:            enabled = getattr(settings, "enable_code_correction", True)
+/Users/vijaysingh/code/codingagent/victor/verticals/coding/service_provider.py:103:            auto_fix = getattr(settings, "code_correction_auto_fix", True)
+/Users/vijaysingh/code/codingagent/victor/verticals/coding/service_provider.py:143:            use_extended = getattr(settings, "use_extended_grounding", False)
+/Users/vijaysingh/code/codingagent/victor/verticals/coding/service_provider.py:164:            default_mode = getattr(settings, "default_mode", "default")

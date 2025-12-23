@@ -27,10 +27,59 @@ from victor.config.settings import Settings
 
 @pytest.fixture
 def mock_settings():
-    """Create mock settings."""
-    settings = Mock(spec=Settings)
-    settings.temperature = 0.7
+    """Create mock settings with all required attributes."""
+    settings = MagicMock()
+    # Recovery settings
+    settings.recovery_blocked_consecutive_threshold = 4
+    settings.recovery_blocked_total_threshold = 6
+    settings.tool_call_budget_warning_threshold = 250
+    settings.max_consecutive_tool_calls = 8
+    settings.use_recovery_handler = False
+    settings.enable_context_compaction = False
+    settings.enable_recovery_system = False
+    settings.max_recovery_attempts = 3
+    settings.recovery_timeout = 30.0
+    # Tool settings
+    settings.tool_timeout = 30.0
+    settings.tool_call_budget = 300
     settings.tool_budget = 15
+    settings.tool_selection_strategy = "hybrid"
+    settings.semantic_weight = 0.7
+    settings.keyword_weight = 0.3
+    settings.semantic_candidate_count = 10
+    settings.enable_tool_cache = True
+    settings.tool_cache_ttl = 300
+    settings.tool_cache_max_size = 100
+    # Context settings
+    settings.context_window_size = 128000
+    settings.context_compaction_threshold = 0.7
+    settings.context_compaction_target = 0.5
+    settings.enable_smart_compaction = True
+    # Provider settings
+    settings.airgapped_mode = False
+    settings.provider = "anthropic"
+    settings.model = "claude-3-5-sonnet-20241022"
+    settings.temperature = 0.7
+    settings.max_tokens = 4096
+    settings.enable_streaming = True
+    # Session settings
+    settings.max_iterations = 50
+    settings.time_limit = 600.0
+    settings.enable_checkpoints = False
+    settings.session_idle_timeout = 300.0
+    # RL settings
+    settings.enable_rl_learners = False
+    settings.enable_tool_selection_rl = False
+    # Analytics settings
+    settings.enable_usage_analytics = False
+    # Mode controller settings
+    settings.enable_adaptive_mode = False
+    settings.default_mode = "default"
+    # Project settings
+    settings.project_config_file = ".victor.md"
+    # Debug settings
+    settings.debug = False
+    settings.log_level = "INFO"
     return settings
 
 

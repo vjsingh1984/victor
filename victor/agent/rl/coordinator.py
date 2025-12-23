@@ -206,6 +206,42 @@ class RLCoordinator:
                 return ModelSelectorLearner(
                     name=name, db_connection=self.db, learning_rate=0.1
                 )
+            elif name == "cache_eviction":
+                from victor.agent.rl.learners.cache_eviction import CacheEvictionLearner
+
+                return CacheEvictionLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
+            elif name == "grounding_threshold":
+                from victor.agent.rl.learners.grounding_threshold import GroundingThresholdLearner
+
+                return GroundingThresholdLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
+            elif name == "quality_weights":
+                from victor.agent.rl.learners.quality_weights import QualityWeightsLearner
+
+                return QualityWeightsLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
+            elif name == "tool_selector":
+                from victor.agent.rl.learners.tool_selector import ToolSelectorLearner
+
+                return ToolSelectorLearner(
+                    name=name, db_connection=self.db, learning_rate=0.05
+                )
+            elif name == "mode_transition":
+                from victor.agent.rl.learners.mode_transition import ModeTransitionLearner
+
+                return ModeTransitionLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
+            elif name == "prompt_template":
+                from victor.agent.rl.learners.prompt_template import PromptTemplateLearner
+
+                return PromptTemplateLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             else:
                 logger.warning(f"RL: Unknown learner '{name}'")
                 return None

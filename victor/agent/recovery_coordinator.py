@@ -235,7 +235,29 @@ class RecoveryCoordinator:
     def check_tool_budget(
         self,
         ctx: RecoveryContext,
-    ) -> bool:
+        warning_threshold: int = 250,
+    ) -> Optional[StreamChunk]:
+        """Check tool budget and generate warning if approaching limit.
+
+        Args:
+            ctx: Recovery context
+            warning_threshold: Number of tool calls before warning
+
+        Returns:
+            StreamChunk with warning if approaching limit, None otherwise
+        """
+        if ctx.tool_calls_used >= ctx.tool_budget:
+            return None  # Budget exhausted handled elsewhere
+
+        # Check if approaching budget limit (within warning_threshold of limit)
+        remaining = ctx.tool_budget - ctx.tool_calls_used
+        if remaining <= warning_threshold and ctx.tool_calls_used > 0:
+            return StreamChunk(
+                content=f"[tool] ⚠ Approaching tool budget limit: {ctx.tool_calls_used}/{ctx.tool_budget} calls used\n"
+            )
+        return None
+
+    def is_budget_exhausted(self, ctx: RecoveryContext) -> bool:
         """Check if tool budget has been exhausted.
 
         Args:

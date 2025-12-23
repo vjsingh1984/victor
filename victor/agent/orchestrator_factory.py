@@ -635,6 +635,7 @@ class OrchestratorFactory:
             AutoCommitter instance or None
         """
         from victor.agent.protocols import AutoCommitterProtocol
+        from victor.agent.auto_commit import get_auto_committer
 
         auto_commit_enabled = getattr(self.settings, "auto_commit_enabled", False)
 

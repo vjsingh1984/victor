@@ -185,7 +185,7 @@ class TaskAnalyzer:
 
         if include_intent and self.intent_classifier:
             try:
-                intent_result = self.intent_classifier.classify(message)
+                intent_result = self.intent_classifier.classify_intent_sync(message)
                 analysis.intent_type = intent_result.intent_type
                 analysis.continuation_needed = intent_result.needs_continuation
                 analysis.analysis_details["intent_confidence"] = intent_result.confidence
@@ -226,6 +226,20 @@ class TaskAnalyzer:
 
     def get_negated_keywords(self, message: str) -> List[str]:
         return [m.keyword for m in self.unified_classifier.classify(message).negated_keywords]
+
+    def detect_intent(self, message: str) -> Any:
+        """Detect user intent from message using action authorizer.
+
+        This method uses the ActionAuthorizer to detect whether the user
+        intends to read, write, display, or has ambiguous intent.
+
+        Args:
+            message: User message to analyze
+
+        Returns:
+            IntentClassification with intent (ActionIntent), confidence, and prompt_guard
+        """
+        return self.action_authorizer.detect(message)
 
 
 # Global instance (legacy - prefer DI container)

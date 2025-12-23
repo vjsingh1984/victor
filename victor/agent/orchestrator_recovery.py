@@ -132,6 +132,10 @@ class RecoveryAction:
         return self.fallback_provider is not None
 
 
+# Alias for backwards compatibility
+OrchestratorRecoveryAction = RecoveryAction
+
+
 class OrchestratorRecoveryIntegration:
     """Submodule for recovery handling in orchestrator.
 

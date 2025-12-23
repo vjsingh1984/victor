@@ -111,6 +111,8 @@ class OrchestratorServiceProvider:
         Args:
             container: DI container to register services in
         """
+        # Store container reference for factory methods
+        self.container = container
         self.register_singleton_services(container)
         self.register_scoped_services(container)
         logger.info("Registered all orchestrator services")
@@ -541,13 +543,57 @@ class OrchestratorServiceProvider:
 
     def _register_tool_registry(self, container: ServiceContainer) -> None:
         """Register ToolRegistry as singleton."""
-        from victor.agent.protocols import ToolRegistryProtocol
+        from victor.agent.protocols import ToolRegistryProtocol, ToolRegistrarProtocol
         from victor.tools.base import ToolRegistry
 
         container.register(
             ToolRegistryProtocol,
             lambda c: ToolRegistry(),
             ServiceLifetime.SINGLETON,
+        )
+
+        # ToolRegistrar - manages tool registration, plugins, and MCP integration
+        container.register(
+            ToolRegistrarProtocol,
+            lambda c: self._create_tool_registrar(c),
+            ServiceLifetime.SINGLETON,
+        )
+
+    def _create_tool_registrar(self, container: ServiceContainer) -> Any:
+        """Create ToolRegistrar instance.
+
+        ToolRegistrar manages:
+        - Dynamic tool discovery from victor/tools directory
+        - Plugin system management
+        - MCP (Model Context Protocol) integration
+        - Tool dependency graph setup
+
+        Args:
+            container: DI container for resolving dependencies
+
+        Returns:
+            ToolRegistrar instance
+        """
+        from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
+        from victor.agent.protocols import ToolRegistryProtocol
+
+        # Get ToolRegistry from container
+        tool_registry = container.get(ToolRegistryProtocol)
+
+        # Build config from settings
+        config = ToolRegistrarConfig(
+            enable_plugins=getattr(self._settings, "enable_plugins", True),
+            enable_mcp=getattr(self._settings, "use_mcp_tools", False),
+            enable_tool_graph=getattr(self._settings, "enable_tool_graph", True),
+            airgapped_mode=getattr(self._settings, "airgapped_mode", False),
+        )
+
+        return ToolRegistrar(
+            tools=tool_registry,
+            settings=self._settings,
+            provider=None,  # Will be set later by orchestrator
+            model=getattr(self._settings, "model", None),
+            config=config,
         )
 
     def _register_observability(self, container: ServiceContainer) -> None:
@@ -744,12 +790,16 @@ class OrchestratorServiceProvider:
         )
 
     def _create_context_compactor(self) -> Any:
-        """Create ContextCompactor instance."""
-        from victor.agent.context_compactor import create_context_compactor
+        """Create ContextCompactor instance.
 
-        return create_context_compactor(
-            enabled=getattr(self._settings, "enable_context_compaction", True),
-        )
+        Note: This is a placeholder that will be replaced when the orchestrator
+        creates the actual compactor with a ConversationController instance.
+        The DI container registration is primarily for protocol compliance.
+        """
+        # ContextCompactor requires a ConversationController which is not available
+        # at container initialization time. Return None and let the orchestrator
+        # create it via the factory method when the controller is available.
+        return None
 
     def _create_mode_controller(self) -> Any:
         """Create AgentModeController instance."""

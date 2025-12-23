@@ -449,7 +449,7 @@ class TestToolSupportChecks:
 
     def test_model_supports_tool_calls_no_provider(self, orchestrator):
         """Test _model_supports_tool_calls with no provider name (covers lines 959-961)."""
-        orchestrator.provider_name = ""
+        orchestrator._provider_manager._current_state.name = ""
         result = orchestrator._model_supports_tool_calls()
         assert isinstance(result, bool)
 
@@ -458,7 +458,7 @@ class TestToolSupportChecks:
         # Set up to return True
         orchestrator.tool_capabilities = MagicMock()
         orchestrator.tool_capabilities.is_tool_call_supported.return_value = True
-        orchestrator.provider_name = "test"
+        orchestrator._provider_manager._current_state.name = "test"
 
         result = orchestrator._model_supports_tool_calls()
         assert result is True
@@ -468,7 +468,7 @@ class TestToolSupportChecks:
         orchestrator.tool_capabilities = MagicMock()
         orchestrator.tool_capabilities.is_tool_call_supported.return_value = False
         orchestrator.tool_capabilities.get_supported_models.return_value = ["model-a", "model-b"]
-        orchestrator.provider_name = "test"
+        orchestrator._provider_manager._current_state.name = "test"
         orchestrator._tool_capability_warned = False
 
         result = orchestrator._model_supports_tool_calls()
@@ -531,21 +531,24 @@ class TestShutdown:
     @pytest.mark.asyncio
     async def test_shutdown_basic(self, orchestrator):
         """Test shutdown cleans up resources (covers lines 1987-2022)."""
-        orchestrator.provider = AsyncMock()
-        orchestrator.provider.close = AsyncMock()
+        # Mock the provider via _provider_manager (provider is a property)
+        mock_provider = AsyncMock()
+        mock_provider.close = AsyncMock()
+        orchestrator._provider_manager._current_state.provider = mock_provider
         orchestrator.code_manager = MagicMock()
         orchestrator.semantic_selector = None
 
         await orchestrator.shutdown()
 
-        orchestrator.provider.close.assert_called_once()
+        mock_provider.close.assert_called_once()
         orchestrator.code_manager.stop.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_shutdown_with_semantic_selector(self, orchestrator):
         """Test shutdown closes semantic selector (covers lines 2014-2020)."""
-        orchestrator.provider = AsyncMock()
-        orchestrator.provider.close = AsyncMock()
+        mock_provider = AsyncMock()
+        mock_provider.close = AsyncMock()
+        orchestrator._provider_manager._current_state.provider = mock_provider
         orchestrator.code_manager = MagicMock()
 
         mock_selector = AsyncMock()
@@ -559,8 +562,9 @@ class TestShutdown:
     @pytest.mark.asyncio
     async def test_shutdown_handles_provider_error(self, orchestrator):
         """Test shutdown handles provider close error (covers lines 2003-2004)."""
-        orchestrator.provider = AsyncMock()
-        orchestrator.provider.close = AsyncMock(side_effect=Exception("Close error"))
+        mock_provider = AsyncMock()
+        mock_provider.close = AsyncMock(side_effect=Exception("Close error"))
+        orchestrator._provider_manager._current_state.provider = mock_provider
         orchestrator.code_manager = MagicMock()
         orchestrator.semantic_selector = None
 
@@ -570,8 +574,9 @@ class TestShutdown:
     @pytest.mark.asyncio
     async def test_shutdown_handles_code_manager_error(self, orchestrator):
         """Test shutdown handles code manager error (covers lines 2011-2012)."""
-        orchestrator.provider = AsyncMock()
-        orchestrator.provider.close = AsyncMock()
+        mock_provider = AsyncMock()
+        mock_provider.close = AsyncMock()
+        orchestrator._provider_manager._current_state.provider = mock_provider
         orchestrator.code_manager = MagicMock()
         orchestrator.code_manager.stop.side_effect = Exception("Stop error")
         orchestrator.semantic_selector = None
@@ -582,8 +587,9 @@ class TestShutdown:
     @pytest.mark.asyncio
     async def test_shutdown_handles_selector_error(self, orchestrator):
         """Test shutdown handles selector close error (covers lines 2019-2020)."""
-        orchestrator.provider = AsyncMock()
-        orchestrator.provider.close = AsyncMock()
+        mock_provider = AsyncMock()
+        mock_provider.close = AsyncMock()
+        orchestrator._provider_manager._current_state.provider = mock_provider
         orchestrator.code_manager = MagicMock()
 
         mock_selector = AsyncMock()
@@ -855,9 +861,12 @@ class TestHandleToolCalls:
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_no_name(self, orchestrator):
-        """Test _handle_tool_calls with tool call without name (covers lines 1795-1797)."""
+        """Test _handle_tool_calls with tool call without name returns error feedback (GAP-5 fix)."""
         result = await orchestrator._handle_tool_calls([{"arguments": {}}])
-        assert result == []
+        # GAP-5 FIX: Missing name now returns error feedback instead of being silently skipped
+        assert len(result) == 1
+        assert result[0]["success"] is False
+        assert "missing name" in result[0]["error"].lower()
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_invalid_name(self, orchestrator):
@@ -884,21 +893,26 @@ class TestHandleToolCalls:
         assert len(result) == 1
         assert result[0]["tool_name"] == "nonexistent_tool"
         assert result[0]["success"] is False
-        assert "not available" in result[0]["error"]
+        # Error message contains "disabled" or "unknown"
+        assert "disabled" in result[0]["error"].lower() or "unknown" in result[0]["error"].lower()
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_budget_reached(self, orchestrator):
-        """Test _handle_tool_calls when budget reached (covers lines 1811-1815)."""
-        orchestrator.tool_calls_used = 100
-        orchestrator.tool_budget = 10
+        """Test _handle_tool_calls when budget reached (covers pipeline budget enforcement)."""
+        # Set the ToolPipeline's internal state to simulate budget exhaustion
+        orchestrator._tool_pipeline._calls_used = 100
+        orchestrator._tool_pipeline.config.tool_budget = 10
 
         # Use a valid tool name
         orchestrator.sanitizer.is_valid_tool_name = MagicMock(return_value=True)
         orchestrator.tools.is_tool_enabled = MagicMock(return_value=True)
 
         result = await orchestrator._handle_tool_calls([{"name": "read", "arguments": {}}])
-        # Should skip because budget reached
-        assert result == []
+        # Should skip because budget reached - pipeline returns skipped result with error
+        # The result contains an error message about budget exhaustion
+        assert len(result) == 1
+        assert result[0]["success"] is False
+        assert "budget" in result[0]["error"].lower()
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_json_string_arguments(
@@ -927,7 +941,7 @@ class TestHandleToolCalls:
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_none_arguments(self, mock_provider, orchestrator_settings):
-        """Test _handle_tool_calls with None arguments (covers lines 1828-1829)."""
+        """Test _handle_tool_calls with None arguments returns error for missing required params."""
         with patch("victor.agent.orchestrator.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
@@ -935,21 +949,19 @@ class TestHandleToolCalls:
                 model="test-model",
             )
 
-            # Mock tool execution
-            orch.tool_executor.execute = AsyncMock(
-                return_value=MagicMock(success=True, result="done", error=None)
-            )
-
+            # Call with None arguments - 'read' requires 'path' parameter
             result = await orch._handle_tool_calls([{"name": "read", "arguments": None}])
 
+            # Should fail because required 'path' parameter is missing
             assert len(result) == 1
-            assert result[0]["success"] is True
+            assert result[0]["success"] is False
+            assert "path" in result[0]["error"].lower() or "missing" in result[0]["error"].lower()
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_repeated_failure_skip(
         self, mock_provider, orchestrator_settings
     ):
-        """Test _handle_tool_calls skips repeated failing calls (covers lines 1841-1845)."""
+        """Test _handle_tool_calls skips repeated failing calls (covers pipeline deduplication)."""
         with patch("victor.agent.orchestrator.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
@@ -957,18 +969,26 @@ class TestHandleToolCalls:
                 model="test-model",
             )
 
-            # Add to failed signatures
-            import json
+            # Mock failed tool execution first - executor is stored as 'executor' on pipeline
+            orch._tool_pipeline.executor.execute = AsyncMock(
+                return_value=MagicMock(success=False, result=None, error="Simulated failure")
+            )
 
             args = {"path": "/test.py"}
-            signature = ("read", json.dumps(args, sort_keys=True, default=str))
-            orch.failed_tool_signatures.add(signature)
 
-            # Try same call again
-            result = await orch._handle_tool_calls([{"name": "read", "arguments": args}])
+            # First call fails and records the signature
+            result1 = await orch._handle_tool_calls([{"name": "read", "arguments": args}])
+            assert len(result1) == 1
+            assert result1[0]["success"] is False
+            # Signature should now be recorded
+            assert len(orch._tool_pipeline._failed_signatures) == 1
 
-            # Should be skipped
-            assert result == []
+            # Second call should be skipped due to repeated failure
+            result2 = await orch._handle_tool_calls([{"name": "read", "arguments": args}])
+            assert len(result2) == 1
+            assert result2[0]["success"] is False
+            # Check for skip reason in error message
+            assert "repeated" in result2[0]["error"].lower() or "fail" in result2[0]["error"].lower()
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_success(self, mock_provider, orchestrator_settings):
@@ -997,7 +1017,7 @@ class TestHandleToolCalls:
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_failure(self, mock_provider, orchestrator_settings):
-        """Test _handle_tool_calls failed execution (covers lines 1928-1941)."""
+        """Test _handle_tool_calls failed execution (covers pipeline failure tracking)."""
         with patch("victor.agent.orchestrator.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
@@ -1005,8 +1025,8 @@ class TestHandleToolCalls:
                 model="test-model",
             )
 
-            # Mock failed tool execution
-            orch.tool_executor.execute = AsyncMock(
+            # Mock failed tool execution on the pipeline's executor
+            orch._tool_pipeline.executor.execute = AsyncMock(
                 return_value=MagicMock(success=False, result=None, error="File not found")
             )
 
@@ -1017,8 +1037,8 @@ class TestHandleToolCalls:
             assert len(result) == 1
             assert result[0]["success"] is False
             assert result[0]["error"] == "File not found"
-            # Signature should be added to failed set
-            assert len(orch.failed_tool_signatures) == 1
+            # Signature should be added to pipeline's failed set
+            assert len(orch._tool_pipeline._failed_signatures) == 1
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_read_file_tracking(self, mock_provider, orchestrator_settings):
@@ -1900,12 +1920,13 @@ class TestContextLimitCalculation:
             analytics_enabled=False,
             use_semantic_tool_selection=False,
             use_mcp_tools=False,
+            max_context_chars=0,  # Disable settings override to test fallback
         )
-        
+
         mock_limits = MagicMock()
         mock_limits.context_window = 100000
         mock_get_limits.return_value = mock_limits
-        
+
         limit = AgentOrchestrator._calculate_max_context_chars(settings, mock_provider, "test-model")
         # 100000 * 3.5 * 0.8 = 280000
         assert limit == 280000
@@ -1917,8 +1938,9 @@ class TestContextLimitCalculation:
             analytics_enabled=False,
             use_semantic_tool_selection=False,
             use_mcp_tools=False,
+            max_context_chars=0,  # Disable settings override to test fallback
         )
-        mock_get_limits.side_effect = Exception("Config error")
+        mock_get_limits.side_effect = RuntimeError("Config error")
         # Should not raise, falls back to defaults (128000 * 3.5 * 0.8 = 358400)
         limit = AgentOrchestrator._calculate_max_context_chars(settings, mock_provider, "test-model")
         assert limit == 358400
@@ -1929,6 +1951,7 @@ class TestContextLimitCalculation:
         settings = Settings(
             analytics_enabled=False,
             use_semantic_tool_selection=False,
+            max_context_chars=0,  # Disable settings override to test fallback
             use_mcp_tools=False,
         )
         mock_limits = MagicMock()
@@ -3230,21 +3253,24 @@ class TestGetThinkingDisabledPrompt:
 
     def test_no_prefix_returns_base_prompt(self, orchestrator):
         """Test returns base prompt when no thinking disable prefix."""
-        orchestrator.tool_calling_caps = MagicMock(spec=[])  # No thinking_disable_prefix
+        mock_caps = MagicMock(spec=[])  # No thinking_disable_prefix
+        orchestrator._provider_manager._current_state.capabilities = mock_caps
         result = orchestrator._get_thinking_disabled_prompt("Hello world")
         assert result == "Hello world"
 
     def test_with_prefix_prepends_to_prompt(self, orchestrator):
         """Test prepends prefix when thinking disable prefix available."""
-        orchestrator.tool_calling_caps = MagicMock()
-        orchestrator.tool_calling_caps.thinking_disable_prefix = "/no_think"
+        mock_caps = MagicMock()
+        mock_caps.thinking_disable_prefix = "/no_think"
+        orchestrator._provider_manager._current_state.capabilities = mock_caps
         result = orchestrator._get_thinking_disabled_prompt("Hello world")
         assert result == "/no_think\nHello world"
 
     def test_with_none_prefix(self, orchestrator):
         """Test returns base prompt when prefix is None."""
-        orchestrator.tool_calling_caps = MagicMock()
-        orchestrator.tool_calling_caps.thinking_disable_prefix = None
+        mock_caps = MagicMock()
+        mock_caps.thinking_disable_prefix = None
+        orchestrator._provider_manager._current_state.capabilities = mock_caps
         result = orchestrator._get_thinking_disabled_prompt("Test prompt")
         assert result == "Test prompt"
 
@@ -3762,14 +3788,16 @@ class TestCreateBackgroundTask:
 class TestSwitchModel:
     """Tests for switch_model method."""
 
-    def test_switch_model_returns_bool(self, orchestrator):
+    @pytest.mark.asyncio
+    async def test_switch_model_returns_bool(self, orchestrator):
         """Test switch_model returns boolean."""
-        # Mock the provider to prevent actual model switch
-        orchestrator.provider = MagicMock()
-        orchestrator.provider.name = "mock_provider"
+        # Mock the provider via _provider_manager (provider is a property)
+        mock_provider = MagicMock()
+        mock_provider.name = "mock_provider"
+        orchestrator._provider_manager._current_state.provider = mock_provider
 
         # May succeed or fail depending on model availability
-        result = orchestrator.switch_model("claude-3-sonnet")
+        result = await orchestrator.switch_model("claude-3-sonnet")
         assert isinstance(result, bool)
 
 
@@ -5182,6 +5210,9 @@ class TestCheckProgressWithHandler:
         ctx = create_stream_context("test")
         ctx.tool_calls_used = 5  # Below base threshold
         ctx.unique_resources = set()
+
+        # Set threshold explicitly to be above tool_calls_used
+        orchestrator.settings.max_consecutive_tool_calls = 10
 
         result = orchestrator._check_progress_with_handler(ctx)
         assert result is False

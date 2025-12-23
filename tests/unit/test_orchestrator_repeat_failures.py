@@ -54,12 +54,12 @@ class AlwaysFailTool(BaseTool):
 
 
 @pytest.mark.asyncio
-async def test_repeated_failing_call_is_skipped_after_first_failure(monkeypatch):
+async def test_repeated_failing_call_is_skipped_after_first_failure(monkeypatch, tmp_path):
     """Orchestrator should skip identical failing tool calls to break loops."""
     settings = Settings(
         analytics_enabled=False,
-        analytics_log_file=str(Path("tmp_usage.log")),
-        tool_cache_dir=str(Path("tmp_cache")),
+        analytics_log_file=str(tmp_path / "tmp_usage.log"),
+        tool_cache_dir_override=str(tmp_path / "tmp_cache"),
     )
     settings.tool_cache_enabled = False
     provider = DummyProvider()
@@ -73,12 +73,14 @@ async def test_repeated_failing_call_is_skipped_after_first_failure(monkeypatch)
         max_tokens=10,
     )
 
-    # Inject a failing tool into both tools registry and tool_executor
+    # Inject a failing tool into the tools registry and pipeline
     failing_tool = AlwaysFailTool()
     orch.tools = ToolRegistry()
     orch.tools.register(failing_tool)
-    # Update tool_executor to use the new registry
+    # Update all components that reference the tools registry
     orch.tool_executor.tools = orch.tools
+    orch._tool_pipeline.tools = orch.tools  # Pipeline's registry
+    orch._tool_pipeline.executor.tools = orch.tools  # Pipeline's executor registry
 
     # Simulate a single tool call repeated twice
     tool_calls = [
@@ -90,9 +92,14 @@ async def test_repeated_failing_call_is_skipped_after_first_failure(monkeypatch)
     results = await orch._handle_tool_calls(tool_calls)
 
     # First call executed once (no retries for explicit ToolResult failures)
-    # Second call skipped due to repeat signature
+    # Second call skipped due to repeat signature or deduplication
     # Note: ToolExecutor only retries on exceptions, not on explicit failures via ToolResult.success=False
     assert failing_tool.attempts == 1  # First call only, no retries for explicit failures
     assert orch.executed_tools.count("always_fail") == 1
-    assert len(results) == 1  # second call skipped pre-execution
+    # Second call returns a skip result for the repeated/deduplicated failure
+    assert len(results) == 2  # Both calls return results (one failure, one skip)
     assert results[0]["success"] is False
+    assert results[1]["success"] is False
+    # Accept either "repeated" or "deduplicated" error message
+    error_msg = results[1]["error"].lower()
+    assert "repeated" in error_msg or "dedup" in error_msg

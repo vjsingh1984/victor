@@ -222,34 +222,34 @@ This document provides an exhaustive evaluation of Victor against published codi
 
 ---
 
-## 5. Competitive Comparison
+## 5. Victor Feature Summary
 
-### 5.1 Feature Matrix vs Competition
+### 5.1 Key Differentiators
 
-| Feature | Victor | Cursor | Claude Code | GitHub Copilot | Amazon Q |
-|---------|--------|--------|-------------|----------------|----------|
-| Multi-LLM support | ✅ 7+ providers | ❌ GPT-4/Claude | ❌ Claude only | ❌ OpenAI only | ❌ Amazon only |
-| Air-gapped mode | ✅ Full support | ❌ | ❌ | ❌ | ❌ |
-| Tool calling | ✅ 42 tools | ✅ ~20 tools | ✅ ~15 tools | ⚠️ Limited | ✅ ~30 tools |
-| Semantic search | ✅ BGE embeddings | ✅ | ✅ | ⚠️ | ✅ |
-| MCP support | ✅ Client+Server | ❌ | ✅ Native | ❌ | ❌ |
-| Custom plugins | ✅ | ❌ | ❌ | ✅ Extensions | ❌ |
-| CI/CD analysis | ✅ pipeline_analyzer | ⚠️ | ❌ | ❌ | ✅ |
-| IaC scanning | ✅ iac_scanner | ❌ | ❌ | ❌ | ⚠️ |
-| Audit/compliance | ✅ audit tool | ❌ | ❌ | Enterprise only | ✅ |
-| Local execution | ✅ Ollama/LMStudio | ❌ | ❌ | ❌ | ❌ |
+| Feature | Victor Status | Notes |
+|---------|---------------|-------|
+| Multi-LLM support | ✅ 7+ providers | Cloud (Anthropic, OpenAI, Google, etc.) + Local (Ollama, LMStudio, vLLM) |
+| Air-gapped mode | ✅ Full support | Complete offline operation with local models |
+| Tool calling | ✅ 42 tools | Comprehensive enterprise toolset |
+| Semantic search | ✅ BGE embeddings | Codebase-wide semantic code search |
+| MCP support | ✅ Client+Server | Full Model Context Protocol implementation |
+| Custom plugins | ✅ Plugin system | Extensible tool architecture |
+| CI/CD analysis | ✅ pipeline_analyzer | GitHub Actions, GitLab CI, CircleCI support |
+| IaC scanning | ✅ iac_scanner | Terraform, Kubernetes security analysis |
+| Audit/compliance | ✅ audit tool | Enterprise audit trail and logging |
+| Local execution | ✅ Ollama/LMStudio | Run models on your own infrastructure |
 
-### 5.2 Estimated Performance vs SWE-bench Leaders
+### 5.2 Performance Considerations
 
-| System | SWE-bench Verified | Notes |
-|--------|-------------------|-------|
-| Claude 3.5 Sonnet (Anthropic) | ~49% | Best public model |
-| GPT-4o + SWE-agent | ~33% | With agentic scaffolding |
-| Amazon Q Developer | ~30% | Enterprise focus |
-| **Victor (estimated)** | **25-35%** | Depends on base model |
-| Open source models | ~15-25% | Llama, Qwen, etc. |
+Victor's performance on coding benchmarks depends on the underlying LLM model:
 
-*Note: Victor's performance depends heavily on the underlying LLM model used.*
+| Model Category | Expected SWE-bench Range | Notes |
+|----------------|--------------------------|-------|
+| Frontier models (Claude, GPT-4) | 30-50%+ | Best performance via cloud APIs |
+| Local models (Llama, Qwen) | 15-30% | Air-gapped compatible |
+| **Victor's role** | N/A | Orchestration layer, not the model itself |
+
+*Victor provides the tooling and orchestration; actual benchmark scores depend on the chosen LLM provider.*
 
 ---
 

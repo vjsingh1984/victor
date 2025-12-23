@@ -37,10 +37,10 @@ async def _run_twice_with_cache(tmpdir: str) -> int:
     # Only allowlist code_search to hit cache for this test
     settings = Settings(
         analytics_enabled=False,
-        use_semantic_tool_selection=False,
+        tool_selection_strategy="keyword",
         tool_cache_enabled=True,
         tool_cache_allowlist=["code_search"],
-        tool_cache_dir=tmpdir,
+        tool_cache_dir_override=tmpdir,
     )
     orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
 
@@ -60,7 +60,7 @@ async def _run_twice_with_cache(tmpdir: str) -> int:
     # Second call should hit cache, not invoke fake_execute again
     await orch._execute_tool_with_retry("code_search", args, context={})
 
-    orch.shutdown()
+    await orch.shutdown()
     return call_count["count"]
 
 

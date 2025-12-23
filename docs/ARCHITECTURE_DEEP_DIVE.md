@@ -589,8 +589,8 @@ if getattr(settings, "use_mcp_tools", False):  # ← Requires manual config!
 **Current Reality**: This is NOT implemented.
 
 **Why it matters**:
-- Claude Desktop can use MCP servers
-- VS Code (with Cline extension) can use MCP servers
+- Desktop AI clients can use MCP servers
+- VS Code extensions can use MCP servers
 - But when you use Victor with Ollama, the MCP server functionality is unused
 - The LLM sees Victor's tools as native tool calls, not via MCP
 

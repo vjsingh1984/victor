@@ -295,8 +295,14 @@ class TestSemanticCodeSearch:
                 mock_get.return_value = (mock_index, True)
                 # Set up cache entry
                 _INDEX_CACHE[root_key] = {"indexed_at": 123456}
+                # Create mock settings with proper values to avoid RL recording issues
+                mock_settings = MagicMock()
+                mock_settings.enable_semantic_threshold_rl_learning = False
+                mock_settings.semantic_similarity_threshold = 0.5
+                mock_settings.semantic_query_expansion_enabled = False
+                mock_settings.enable_hybrid_search = False
                 try:
-                    result = await code_search("hello", path=tmpdir, _exec_ctx={"settings": MagicMock()})
+                    result = await code_search("hello", path=tmpdir, _exec_ctx={"settings": mock_settings})
                     assert result["success"] is True
                     assert result["count"] == 1
                 finally:
@@ -353,12 +359,14 @@ class TestGetOrBuildIndex:
             mock_index_instance = MagicMock()
             mock_index_instance.index_codebase = AsyncMock()
 
-            mock_settings = MagicMock(spec=[])
+            mock_settings = MagicMock()
             mock_settings.codebase_vector_store = "lancedb"
             mock_settings.codebase_embedding_provider = "sentence-transformers"
             mock_settings.codebase_embedding_model = "all-MiniLM-L12-v2"
             mock_settings.unified_embedding_model = "all-MiniLM-L12-v2"
             mock_settings.codebase_persist_directory = None
+            mock_settings.codebase_graph_store = "sqlite"
+            mock_settings.codebase_graph_path = ".victor/graph"
 
             with patch("victor.codebase.indexer.CodebaseIndex") as MockCodebaseIndex:
                 MockCodebaseIndex.return_value = mock_index_instance
@@ -396,12 +404,14 @@ class TestGetOrBuildIndex:
             mock_new_index = MagicMock()
             mock_new_index.index_codebase = AsyncMock()
 
-            mock_settings = MagicMock(spec=[])
+            mock_settings = MagicMock()
             mock_settings.codebase_vector_store = "lancedb"
             mock_settings.codebase_embedding_provider = "sentence-transformers"
             mock_settings.codebase_embedding_model = "all-MiniLM-L12-v2"
             mock_settings.unified_embedding_model = "all-MiniLM-L12-v2"
             mock_settings.codebase_persist_directory = None
+            mock_settings.codebase_graph_store = "sqlite"
+            mock_settings.codebase_graph_path = ".victor/graph"
 
             with patch("victor.codebase.indexer.CodebaseIndex") as MockCodebaseIndex:
                 MockCodebaseIndex.return_value = mock_new_index
