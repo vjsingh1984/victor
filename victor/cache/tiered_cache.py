@@ -45,14 +45,20 @@ class TieredCache:
     Note: Previously named `CacheManager`. Alias kept for backward compatibility.
     """
 
-    def __init__(self, config: Optional[CacheConfig] = None):
+    def __init__(
+        self,
+        config: Optional[CacheConfig] = None,
+        cache_eviction_learner: Optional[Any] = None,
+    ):
         """Initialize tiered cache.
 
         Args:
             config: Cache configuration (uses defaults if None)
+            cache_eviction_learner: Optional CacheEvictionLearner for RL-based eviction
         """
         self.config = config or CacheConfig()
         self._lock = threading.RLock()
+        self._cache_eviction_learner = cache_eviction_learner
 
         # Statistics
         self._stats: Dict[str, float | int] = {
@@ -62,7 +68,11 @@ class TieredCache:
             "disk_misses": 0,
             "sets": 0,
             "evictions": 0,
+            "rl_evictions": 0,
         }
+
+        # Metadata for RL learning (key -> tool_name, set_time, hit_count)
+        self._entry_metadata: Dict[str, Dict[str, Any]] = {}
 
         # Initialize L1 memory cache
         if self.config.enable_memory:
@@ -81,6 +91,9 @@ class TieredCache:
             )
         else:
             self._disk_cache = None
+
+        if cache_eviction_learner:
+            logger.info("RL: TieredCache using unified CacheEvictionLearner")
 
         logger.info(
             "Cache initialized: memory=%s, disk=%s",
@@ -298,6 +311,247 @@ class TieredCache:
                 stats["disk_volume"] = self._disk_cache.volume()
 
             return stats
+
+    def set_with_tool(
+        self,
+        key: str,
+        value: Any,
+        tool_name: str,
+        namespace: str = "default",
+        ttl: Optional[int] = None,
+    ) -> bool:
+        """Set value in cache with tool metadata for RL learning.
+
+        Args:
+            key: Cache key
+            value: Value to cache
+            tool_name: Name of the tool that produced this result
+            namespace: Cache namespace
+            ttl: Custom TTL in seconds
+
+        Returns:
+            True if successfully cached
+        """
+        import time
+
+        cache_key = self._make_key(key, namespace)
+
+        # Store metadata for RL learning
+        self._entry_metadata[cache_key] = {
+            "tool_name": tool_name,
+            "set_time": time.time(),
+            "hit_count": 0,
+        }
+
+        return self.set(key, value, namespace, ttl)
+
+    def get_with_rl(
+        self,
+        key: str,
+        namespace: str = "default",
+        tool_name: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Get value from cache and record hit/miss for RL learning.
+
+        Args:
+            key: Cache key
+            namespace: Cache namespace
+            tool_name: Tool name for RL tracking (optional)
+
+        Returns:
+            Cached value or None
+        """
+        import time
+
+        cache_key = self._make_key(key, namespace)
+        value = self.get(key, namespace)
+
+        # Update metadata and record to RL learner
+        if cache_key in self._entry_metadata:
+            meta = self._entry_metadata[cache_key]
+            meta["hit_count"] += 1
+
+            # Record hit to RL learner
+            self._record_cache_hit(
+                cache_key=cache_key,
+                tool_name=meta.get("tool_name", tool_name or "unknown"),
+                age_seconds=time.time() - meta.get("set_time", time.time()),
+            )
+        elif value is None and tool_name:
+            # Record miss
+            self._record_cache_miss(tool_name=tool_name)
+
+        return value
+
+    def _record_cache_hit(
+        self,
+        cache_key: str,
+        tool_name: str,
+        age_seconds: float,
+    ) -> None:
+        """Record cache hit to RL learner."""
+        if not self._cache_eviction_learner:
+            return
+
+        try:
+            from victor.agent.rl.base import RLOutcome
+
+            # Get current utilization
+            utilization = self._get_utilization()
+
+            meta = self._entry_metadata.get(cache_key, {})
+            hit_count = meta.get("hit_count", 1)
+
+            outcome = RLOutcome(
+                success=True,
+                quality_score=1.0,
+                task_type="cache",
+                metadata={
+                    "state_key": self._build_state_key(utilization, age_seconds, hit_count, tool_name),
+                    "action": "keep",
+                    "tool_name": tool_name,
+                    "hit_after": 1,
+                },
+            )
+            self._cache_eviction_learner.record_outcome(outcome)
+            logger.debug(f"RL: Recorded cache hit for {tool_name}")
+
+        except Exception as e:
+            logger.debug(f"RL: Failed to record cache hit: {e}")
+
+    def _record_cache_miss(self, tool_name: str) -> None:
+        """Record cache miss to RL learner."""
+        if not self._cache_eviction_learner:
+            return
+
+        try:
+            from victor.agent.rl.base import RLOutcome
+
+            outcome = RLOutcome(
+                success=False,
+                quality_score=0.0,
+                task_type="cache",
+                metadata={
+                    "state_key": f"miss:{tool_name}",
+                    "action": "evict",  # Entry was evicted (or never cached)
+                    "tool_name": tool_name,
+                    "hit_after": 0,
+                },
+            )
+            self._cache_eviction_learner.record_outcome(outcome)
+            logger.debug(f"RL: Recorded cache miss for {tool_name}")
+
+        except Exception as e:
+            logger.debug(f"RL: Failed to record cache miss: {e}")
+
+    def _get_utilization(self) -> float:
+        """Get current cache utilization (0-1)."""
+        if self._memory_cache is not None:
+            return len(self._memory_cache) / max(self.config.memory_max_size, 1)
+        return 0.0
+
+    def _build_state_key(
+        self,
+        utilization: float,
+        age_seconds: float,
+        hit_count: int,
+        tool_name: str,
+    ) -> str:
+        """Build state key for RL learner."""
+        # Discretize utilization
+        if utilization < 0.25:
+            util_bucket = "low"
+        elif utilization < 0.5:
+            util_bucket = "mid_low"
+        elif utilization < 0.75:
+            util_bucket = "mid_high"
+        else:
+            util_bucket = "high"
+
+        # Discretize age
+        if age_seconds < 60:
+            age_bucket = "fresh"
+        elif age_seconds < 300:
+            age_bucket = "recent"
+        elif age_seconds < 900:
+            age_bucket = "aging"
+        else:
+            age_bucket = "old"
+
+        # Discretize hits
+        if hit_count == 0:
+            hit_bucket = "cold"
+        elif hit_count <= 2:
+            hit_bucket = "warm"
+        else:
+            hit_bucket = "hot"
+
+        # Get tool type
+        tool_type = tool_name.split("_")[0] if "_" in tool_name else tool_name
+
+        return f"{util_bucket}:{age_bucket}:{hit_bucket}:{tool_type}"
+
+    def smart_evict(self, count: int = 1) -> int:
+        """Evict entries using RL-learned policy.
+
+        Uses the CacheEvictionLearner to decide which entries to evict
+        based on learned value estimates.
+
+        Args:
+            count: Number of entries to evict
+
+        Returns:
+            Number of entries actually evicted
+        """
+        import time
+
+        if not self._cache_eviction_learner:
+            return 0
+
+        evicted = 0
+
+        with self._lock:
+            if self._memory_cache is None:
+                return 0
+
+            # Score all entries using RL
+            candidates = []
+            for cache_key in list(self._memory_cache.keys()):
+                meta = self._entry_metadata.get(cache_key, {})
+                tool_name = meta.get("tool_name", "unknown")
+                age_seconds = time.time() - meta.get("set_time", time.time())
+                hit_count = meta.get("hit_count", 0)
+
+                # Get eviction decision from RL
+                action, confidence = self._cache_eviction_learner.get_eviction_decision(
+                    utilization=self._get_utilization(),
+                    age_seconds=age_seconds,
+                    hit_count=hit_count,
+                    tool_name=tool_name,
+                )
+
+                if action == "evict":
+                    candidates.append((cache_key, confidence))
+
+            # Sort by confidence (higher confidence = more sure about eviction)
+            candidates.sort(key=lambda x: x[1], reverse=True)
+
+            # Evict top candidates
+            for cache_key, _ in candidates[:count]:
+                try:
+                    del self._memory_cache[cache_key]
+                    if cache_key in self._entry_metadata:
+                        del self._entry_metadata[cache_key]
+                    evicted += 1
+                    self._stats["evictions"] += 1
+                    self._stats["rl_evictions"] += 1
+                except KeyError:
+                    pass
+
+            if evicted > 0:
+                logger.info(f"RL: Smart eviction removed {evicted} entries")
+
+        return evicted
 
     def _make_key(self, key: str, namespace: str) -> str:
         """Create cache key with namespace.

@@ -211,6 +211,7 @@ class GroundingVerifier:
         project_root: Optional[str] = None,
         config: Optional[VerifierConfig] = None,
         provider_adapter: Optional["IProviderAdapter"] = None,
+        grounding_threshold_learner: Optional[Any] = None,
     ):
         """Initialize the grounding verifier.
 
@@ -218,6 +219,7 @@ class GroundingVerifier:
             project_root: Root directory of the project to verify against
             config: Verification configuration
             provider_adapter: Provider adapter for provider-specific grounding settings
+            grounding_threshold_learner: Optional GroundingThresholdLearner for RL-based thresholds
         """
         self.project_root = Path(project_root) if project_root else Path.cwd()
 
@@ -238,9 +240,87 @@ class GroundingVerifier:
         self._file_cache: Dict[str, str] = {}
         self._existing_files: Optional[Set[str]] = None
         self._provider_adapter = provider_adapter
+        self._grounding_threshold_learner = grounding_threshold_learner
+
+        if grounding_threshold_learner:
+            logger.info("RL: GroundingVerifier using unified GroundingThresholdLearner")
+
         logger.debug(
             f"GroundingVerifier initialized with project_root={self.project_root}"
         )
+
+    def _get_rl_threshold(self, provider: str, response_type: str) -> Optional[float]:
+        """Get RL-recommended threshold for given context.
+
+        Args:
+            provider: Provider name
+            response_type: Type of response (code_generation, explanation, etc.)
+
+        Returns:
+            Recommended threshold or None if learner unavailable
+        """
+        if not self._grounding_threshold_learner:
+            return None
+
+        try:
+            rec = self._grounding_threshold_learner.get_recommendation(
+                provider=provider,
+                model="",
+                task_type=response_type,
+            )
+            if rec and rec.confidence > 0.4:  # Only use if reasonably confident
+                logger.debug(
+                    f"RL: Using learned threshold {rec.value:.2f} for {provider}/{response_type} "
+                    f"(confidence={rec.confidence:.2f})"
+                )
+                return float(rec.value) if isinstance(rec.value, (int, float)) else None
+        except Exception as e:
+            logger.debug(f"RL: Could not get threshold recommendation: {e}")
+
+        return None
+
+    def _record_verification_outcome(
+        self,
+        provider: str,
+        response_type: str,
+        threshold_used: float,
+        actual_hallucination: bool,
+        detected_hallucination: bool,
+    ) -> None:
+        """Record verification outcome to RL learner.
+
+        Args:
+            provider: Provider name
+            response_type: Type of response
+            threshold_used: Threshold that was used
+            actual_hallucination: Whether there was actually a hallucination
+            detected_hallucination: Whether hallucination was detected
+        """
+        if not self._grounding_threshold_learner:
+            return
+
+        try:
+            from victor.agent.rl.base import RLOutcome
+
+            outcome = RLOutcome(
+                success=not actual_hallucination,  # Success if no actual hallucination
+                quality_score=1.0 if not actual_hallucination else 0.0,
+                provider=provider,
+                task_type=response_type,
+                metadata={
+                    "response_type": response_type,
+                    "threshold_used": threshold_used,
+                    "actual_hallucination": actual_hallucination,
+                    "detected_hallucination": detected_hallucination,
+                },
+            )
+            self._grounding_threshold_learner.record_outcome(outcome)
+            logger.debug(
+                f"RL: Recorded grounding outcome for {provider}: "
+                f"actual={actual_hallucination}, detected={detected_hallucination}"
+            )
+        except Exception as e:
+            logger.debug(f"RL: Failed to record grounding outcome: {e}")
 
     def _get_existing_files(self) -> Set[str]:
         """Get set of existing files in project (cached)."""
@@ -775,8 +855,19 @@ class GroundingVerifier:
                     "[GroundingVerifier] Skipping symbol verification for code generation task"
                 )
 
+        # Get provider and response type for RL
+        provider = context.get("provider", "unknown")
+        response_type = "code_generation" if is_code_generation else context.get("task_type", "general")
+
+        # Try RL-learned threshold, fall back to config
+        threshold = self._get_rl_threshold(provider, response_type)
+        if threshold is None:
+            threshold = self.config.min_confidence
+        result.metadata["threshold_used"] = threshold
+        result.metadata["threshold_source"] = "rl" if threshold != self.config.min_confidence else "config"
+
         # Determine if grounded based on confidence
-        result.is_grounded = result.confidence >= self.config.min_confidence
+        result.is_grounded = result.confidence >= threshold
 
         # In strict mode, any issue fails
         if self.config.strict_mode and result.issues:
@@ -784,8 +875,24 @@ class GroundingVerifier:
 
         logger.debug(
             f"Grounding verification: confidence={result.confidence:.2f}, "
+            f"threshold={threshold:.2f} ({result.metadata['threshold_source']}), "
             f"issues={len(result.issues)}, is_grounded={result.is_grounded}, "
             f"code_generation={is_code_generation}"
+        )
+
+        # Record outcome to RL learner for future threshold optimization
+        # Note: actual_hallucination would need external feedback; for now, we estimate
+        # based on issue severity (HIGH/CRITICAL issues suggest actual hallucination)
+        actual_hallucination = any(
+            issue.severity in (IssueSeverity.HIGH, IssueSeverity.CRITICAL)
+            for issue in result.issues
+        )
+        self._record_verification_outcome(
+            provider=provider,
+            response_type=response_type,
+            threshold_used=threshold,
+            actual_hallucination=actual_hallucination,
+            detected_hallucination=not result.is_grounded,
         )
 
         return result

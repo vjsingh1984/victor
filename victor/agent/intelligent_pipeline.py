@@ -239,10 +239,21 @@ class IntelligentAgentPipeline:
             try:
                 from victor.agent.adaptive_mode_controller import AdaptiveModeController
 
+                # Get ModeTransitionLearner from RLCoordinator for unified RL
+                mode_transition_learner = None
+                try:
+                    from victor.agent.rl.coordinator import get_rl_coordinator
+
+                    coordinator = get_rl_coordinator()
+                    mode_transition_learner = coordinator.get_learner("mode_transition")
+                except Exception as e:
+                    logger.debug(f"[IntelligentPipeline] Could not get mode_transition learner: {e}")
+
                 self._mode_controller = AdaptiveModeController(
                     profile_name=self.profile_name,
                     provider_name=self.provider_name,
                     provider_adapter=self._provider_adapter,
+                    mode_transition_learner=mode_transition_learner,
                 )
             except Exception as e:
                 logger.warning(f"[IntelligentPipeline] Mode controller init failed: {e}")
@@ -287,9 +298,20 @@ class IntelligentAgentPipeline:
             try:
                 from victor.agent.grounding_verifier import GroundingVerifier
 
+                # Get GroundingThresholdLearner from RLCoordinator for adaptive thresholds
+                grounding_threshold_learner = None
+                try:
+                    from victor.agent.rl.coordinator import get_rl_coordinator
+
+                    coordinator = get_rl_coordinator()
+                    grounding_threshold_learner = coordinator.get_learner("grounding_threshold")
+                except Exception as e:
+                    logger.debug(f"[IntelligentPipeline] Could not get grounding_threshold learner: {e}")
+
                 self._grounding_verifier = GroundingVerifier(
                     project_root=self.project_root,
                     provider_adapter=self._provider_adapter,
+                    grounding_threshold_learner=grounding_threshold_learner,
                 )
             except Exception as e:
                 logger.warning(f"[IntelligentPipeline] Grounding verifier init failed: {e}")

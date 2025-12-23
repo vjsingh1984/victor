@@ -609,6 +609,7 @@ class AdaptiveModeController:
         q_store: Optional[QLearningStore] = None,
         provider_name: Optional[str] = None,
         provider_adapter: Optional[Any] = None,
+        mode_transition_learner: Optional[Any] = None,
     ):
         """Initialize the adaptive mode controller.
 
@@ -617,11 +618,13 @@ class AdaptiveModeController:
             q_store: Optional Q-learning store (creates one if not provided)
             provider_name: Provider name for provider-aware thresholds (e.g., "deepseek", "anthropic")
             provider_adapter: Optional provider adapter for capability-based thresholds
+            mode_transition_learner: Optional ModeTransitionLearner for unified RL tracking
         """
         self.profile_name = profile_name
         self._q_store = q_store or QLearningStore()
         self._provider_name = self._normalize_provider_name(provider_name)
         self._provider_adapter = provider_adapter
+        self._mode_transition_learner = mode_transition_learner
 
         # Current state tracking
         self._current_state: Optional[ModeState] = None
@@ -635,6 +638,9 @@ class AdaptiveModeController:
 
         # Consecutive no-tool iterations tracking for loop detection
         self._no_tool_iterations = 0
+
+        if mode_transition_learner:
+            logger.info("RL: AdaptiveModeController using unified ModeTransitionLearner")
 
     def _normalize_provider_name(self, provider_name: Optional[str]) -> str:
         """Normalize provider name for threshold lookup.
@@ -999,6 +1005,16 @@ class AdaptiveModeController:
             budget_exhausted=budget_exhausted and not success,  # Only counts as exhaustion failure if not successful
         )
 
+        # Record to unified ModeTransitionLearner for centralized observability
+        self._record_to_rl_learner(
+            success=success,
+            quality_score=quality_score,
+            completed=completed,
+            state_key=state_key,
+            action_key=action_key,
+            reward=reward,
+        )
+
         logger.debug(
             f"[AdaptiveModeController] Recorded outcome: "
             f"success={success}, quality={quality_score:.2f}, reward={reward:.2f}, "
@@ -1006,6 +1022,64 @@ class AdaptiveModeController:
         )
 
         return reward
+
+    def _record_to_rl_learner(
+        self,
+        success: bool,
+        quality_score: float,
+        completed: bool,
+        state_key: str,
+        action_key: str,
+        reward: float,
+    ) -> None:
+        """Record outcome to unified ModeTransitionLearner for centralized RL tracking.
+
+        Args:
+            success: Whether action was successful
+            quality_score: Quality score of result
+            completed: Whether task was completed
+            state_key: State key for Q-learning
+            action_key: Action key for Q-learning
+            reward: Calculated reward value
+        """
+        if not self._mode_transition_learner:
+            return
+
+        try:
+            from victor.agent.rl.base import RLOutcome
+
+            # Build outcome for the learner
+            from_mode = (
+                self._pending_transition.from_mode.value
+                if self._pending_transition
+                else (self._current_state.mode.value if self._current_state else "explore")
+            )
+            to_mode = (
+                self._pending_transition.to_mode.value
+                if self._pending_transition
+                else (self._current_action.target_mode.value if self._current_action else "explore")
+            )
+
+            outcome = RLOutcome(
+                success=success,
+                quality_score=quality_score,
+                task_type=self._current_state.task_type if self._current_state else "general",
+                metadata={
+                    "from_mode": from_mode,
+                    "to_mode": to_mode,
+                    "state_key": state_key,
+                    "action_key": action_key,
+                    "task_completed": completed,
+                    "tool_budget_used": self._current_state.tool_calls_made if self._current_state else 0,
+                    "tool_budget_total": self._current_state.tool_budget if self._current_state else 10,
+                },
+            )
+
+            self._mode_transition_learner.record_outcome(outcome)
+            logger.debug(f"RL: Recorded mode transition to unified learner: {from_mode}→{to_mode}")
+
+        except Exception as e:
+            logger.warning(f"RL: Failed to record to ModeTransitionLearner: {e}")
 
     def _calculate_reward(
         self,
@@ -1050,9 +1124,37 @@ class AdaptiveModeController:
         return reward
 
     def get_optimal_tool_budget(self, task_type: str) -> int:
-        """Get learned optimal tool budget for a task type."""
-        stats = self._q_store.get_task_stats(task_type)
-        return stats.get("optimal_tool_budget", self.DEFAULT_TOOL_BUDGETS.get(task_type, 10))
+        """Get learned optimal tool budget for a task type.
+
+        Consults both local QLearningStore and unified ModeTransitionLearner,
+        preferring learner's recommendation if it has more samples.
+        """
+        # Get from local store
+        local_stats = self._q_store.get_task_stats(task_type)
+        local_budget = local_stats.get(
+            "optimal_tool_budget", self.DEFAULT_TOOL_BUDGETS.get(task_type, 10)
+        )
+        local_samples = local_stats.get("sample_count", 0)
+
+        # Try unified learner if available
+        if self._mode_transition_learner:
+            try:
+                learner_budget = self._mode_transition_learner.get_optimal_budget(task_type)
+                learner_stats = self._mode_transition_learner.get_task_stats(task_type)
+                learner_samples = learner_stats.get("sample_count", 0)
+
+                # Prefer source with more samples
+                if learner_samples > local_samples:
+                    logger.debug(
+                        f"RL: Using ModeTransitionLearner budget ({learner_budget}) "
+                        f"over local ({local_budget}) for {task_type}"
+                    )
+                    return learner_budget
+
+            except Exception as e:
+                logger.debug(f"RL: Could not get budget from learner: {e}")
+
+        return local_budget
 
     def should_continue(
         self,

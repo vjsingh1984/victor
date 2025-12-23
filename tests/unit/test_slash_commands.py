@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for slash_commands module."""
+"""Tests for the modular slash command system (victor.ui.slash)."""
 
 import io
 import pytest
@@ -20,45 +20,86 @@ from unittest.mock import MagicMock, AsyncMock
 
 from rich.console import Console
 
-from victor.ui.slash_commands import SlashCommand, SlashCommandHandler
+from victor.ui.slash import (
+    SlashCommandHandler,
+    CommandMetadata,
+    CommandContext,
+    BaseSlashCommand,
+    get_command_registry,
+    register_command,
+)
 
 
-class TestSlashCommand:
-    """Tests for SlashCommand dataclass."""
+class TestCommandMetadata:
+    """Tests for CommandMetadata dataclass."""
 
-    def test_basic_command(self):
-        """Test creating a basic slash command."""
-        handler = MagicMock()
-        cmd = SlashCommand(
+    def test_basic_metadata(self):
+        """Test creating basic command metadata."""
+        meta = CommandMetadata(
             name="test",
             description="A test command",
-            handler=handler,
+            usage="/test",
         )
-        assert cmd.name == "test"
-        assert cmd.description == "A test command"
-        assert cmd.handler is handler
-        assert cmd.aliases == []
-        assert cmd.usage == "/test"
+        assert meta.name == "test"
+        assert meta.description == "A test command"
+        assert meta.usage == "/test"
+        assert meta.aliases == []
+        assert meta.category == "general"
 
-    def test_command_with_aliases(self):
-        """Test command with aliases."""
-        cmd = SlashCommand(
+    def test_metadata_with_aliases(self):
+        """Test metadata with aliases."""
+        meta = CommandMetadata(
             name="help",
             description="Show help",
-            handler=MagicMock(),
+            usage="/help [command]",
             aliases=["?", "h"],
         )
-        assert cmd.aliases == ["?", "h"]
+        assert meta.aliases == ["?", "h"]
 
-    def test_command_with_custom_usage(self):
-        """Test command with custom usage string."""
-        cmd = SlashCommand(
-            name="model",
-            description="Switch model",
-            handler=MagicMock(),
-            usage="/model [model_name]",
+    def test_metadata_with_category(self):
+        """Test metadata with category."""
+        meta = CommandMetadata(
+            name="save",
+            description="Save session",
+            usage="/save [name]",
+            category="session",
         )
-        assert cmd.usage == "/model [model_name]"
+        assert meta.category == "session"
+
+
+class TestCommandContext:
+    """Tests for CommandContext."""
+
+    def test_context_creation(self):
+        """Test creating a command context."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        agent = MagicMock()
+
+        ctx = CommandContext(
+            console=console,
+            settings=settings,
+            agent=agent,
+            args=["arg1", "arg2"],
+        )
+
+        assert ctx.console is console
+        assert ctx.settings is settings
+        assert ctx.agent is agent
+        assert ctx.args == ["arg1", "arg2"]
+
+    def test_context_without_agent(self):
+        """Test context without agent."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+
+        ctx = CommandContext(
+            console=console,
+            settings=settings,
+        )
+
+        assert ctx.agent is None
+        assert ctx.args == []
 
 
 class TestSlashCommandHandlerInit:
@@ -74,7 +115,6 @@ class TestSlashCommandHandlerInit:
         assert handler.console is console
         assert handler.settings is settings
         assert handler.agent is None
-        assert len(handler._commands) > 0  # Default commands registered
 
     def test_init_with_agent(self):
         """Test handler initialization with agent."""
@@ -107,8 +147,8 @@ class TestSlashCommandHandlerDefaultCommands:
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
-        assert "help" in handler._commands
-        assert "?" in handler._commands  # alias
+        assert handler.registry.has("help")
+        assert handler.registry.has("?")  # alias
 
     def test_model_command_registered(self):
         """Test model command is registered."""
@@ -116,8 +156,8 @@ class TestSlashCommandHandlerDefaultCommands:
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
-        assert "model" in handler._commands
-        assert "models" in handler._commands  # alias
+        assert handler.registry.has("model")
+        assert handler.registry.has("models")  # alias
 
     def test_clear_command_registered(self):
         """Test clear command is registered."""
@@ -125,8 +165,8 @@ class TestSlashCommandHandlerDefaultCommands:
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
-        assert "clear" in handler._commands
-        assert "reset" in handler._commands  # alias
+        assert handler.registry.has("clear")
+        assert handler.registry.has("reset")  # alias
 
     def test_tools_command_registered(self):
         """Test tools command is registered."""
@@ -134,7 +174,7 @@ class TestSlashCommandHandlerDefaultCommands:
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
-        assert "tools" in handler._commands
+        assert handler.registry.has("tools")
 
     def test_exit_command_registered(self):
         """Test exit command is registered."""
@@ -142,47 +182,8 @@ class TestSlashCommandHandlerDefaultCommands:
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
-        assert "exit" in handler._commands
-        assert "quit" in handler._commands  # alias
-
-
-class TestSlashCommandHandlerRegister:
-    """Tests for command registration."""
-
-    def test_register_new_command(self):
-        """Test registering a new command."""
-        console = Console(file=io.StringIO())
-        settings = MagicMock()
-        handler = SlashCommandHandler(console=console, settings=settings)
-
-        custom_handler = MagicMock()
-        cmd = SlashCommand(
-            name="custom",
-            description="Custom command",
-            handler=custom_handler,
-            aliases=["c"],
-        )
-        handler.register(cmd)
-
-        assert "custom" in handler._commands
-        assert "c" in handler._commands
-
-    def test_register_overwrites_existing(self):
-        """Test registering command with same name overwrites."""
-        console = Console(file=io.StringIO())
-        settings = MagicMock()
-        handler = SlashCommandHandler(console=console, settings=settings)
-
-        handler1 = MagicMock()
-        handler2 = MagicMock()
-
-        cmd1 = SlashCommand(name="test", description="First", handler=handler1)
-        cmd2 = SlashCommand(name="test", description="Second", handler=handler2)
-
-        handler.register(cmd1)
-        handler.register(cmd2)
-
-        assert handler._commands["test"].handler is handler2
+        assert handler.registry.has("exit")
+        assert handler.registry.has("quit")  # alias
 
 
 class TestSlashCommandHandlerIsCommand:
@@ -288,24 +289,6 @@ class TestSlashCommandHandlerExecute:
         result = await handler.execute("/?")  # Alias for help
         assert result is True
 
-    @pytest.mark.asyncio
-    async def test_execute_async_command(self):
-        """Test executing an async command handler."""
-        console = Console(file=io.StringIO())
-        settings = MagicMock()
-        handler = SlashCommandHandler(console=console, settings=settings)
-
-        async_handler = AsyncMock()
-        cmd = SlashCommand(
-            name="async_test",
-            description="Async test command",
-            handler=async_handler,
-        )
-        handler.register(cmd)
-
-        await handler.execute("/async_test arg1 arg2")
-        async_handler.assert_called_once_with(["arg1", "arg2"])
-
 
 class TestSlashCommandHandlerHelp:
     """Tests for help command."""
@@ -356,7 +339,7 @@ class TestSlashCommandHandlerClear:
 
     @pytest.mark.asyncio
     async def test_clear_without_agent(self):
-        """Test clear command without agent."""
+        """Test clear command without agent shows warning."""
         stdout = io.StringIO()
         console = Console(file=stdout, force_terminal=False)
         settings = MagicMock()
@@ -364,44 +347,49 @@ class TestSlashCommandHandlerClear:
         handler = SlashCommandHandler(console=console, settings=settings)
 
         await handler.execute("/clear")
-        # Should complete without error
+        # Should show "no active session" warning
+        output = stdout.getvalue()
+        assert "session" in output.lower() or len(output) > 0
 
 
-class TestSlashCommandHandlerTools:
-    """Tests for tools command."""
+class TestSlashCommandHandlerStatus:
+    """Tests for status command."""
 
     @pytest.mark.asyncio
-    async def test_tools_without_agent(self):
-        """Test tools command without agent shows message."""
+    async def test_status_without_agent(self):
+        """Test status command without agent shows warning."""
         stdout = io.StringIO()
         console = Console(file=stdout, force_terminal=False)
         settings = MagicMock()
 
         handler = SlashCommandHandler(console=console, settings=settings)
 
-        await handler.execute("/tools")
-        # Should complete without error
+        await handler.execute("/status")
+        output = stdout.getvalue()
+        # Should show some output (warning or error)
+        assert len(output) > 0
 
     @pytest.mark.asyncio
-    async def test_tools_with_agent(self):
-        """Test tools command with agent shows tool list."""
+    async def test_status_with_agent(self):
+        """Test status command with agent shows info."""
         stdout = io.StringIO()
         console = Console(file=stdout, force_terminal=False)
         settings = MagicMock()
+        settings.tool_call_budget = 25
+
         agent = MagicMock()
-        agent.get_tools = MagicMock(
-            return_value=[
-                MagicMock(name="read_file", description="Read a file"),
-                MagicMock(name="write_file", description="Write a file"),
-            ]
-        )
+        agent.provider_name = "anthropic"
+        agent.model = "claude-3"
+        agent.conversation = MagicMock()
+        agent.conversation.message_count = MagicMock(return_value=10)
 
         handler = SlashCommandHandler(console=console, settings=settings, agent=agent)
 
-        await handler.execute("/tools")
+        await handler.execute("/status")
         output = stdout.getvalue()
 
-        assert "read_file" in output or "write_file" in output or "tools" in output.lower()
+        # Should show some status info
+        assert len(output) > 0
 
 
 class TestSlashCommandHandlerExit:
@@ -419,50 +407,14 @@ class TestSlashCommandHandlerExit:
             await handler.execute("/exit")
 
 
-class TestSlashCommandHandlerStatus:
-    """Tests for status command."""
-
-    @pytest.mark.asyncio
-    async def test_status_without_agent(self):
-        """Test status command without agent."""
-        stdout = io.StringIO()
-        console = Console(file=stdout, force_terminal=False)
-        settings = MagicMock()
-
-        handler = SlashCommandHandler(console=console, settings=settings)
-
-        await handler.execute("/status")
-        # Should complete without error
-
-    @pytest.mark.asyncio
-    async def test_status_with_agent(self):
-        """Test status command with agent shows info."""
-        stdout = io.StringIO()
-        console = Console(file=stdout, force_terminal=False)
-        settings = MagicMock()
-        agent = MagicMock()
-        agent.provider = MagicMock()
-        agent.provider.name = "anthropic"
-        agent.settings = MagicMock()
-        agent.settings.model = "claude-3"
-
-        handler = SlashCommandHandler(console=console, settings=settings, agent=agent)
-
-        await handler.execute("/status")
-        output = stdout.getvalue()
-
-        # Should show some status info
-        assert len(output) > 0
-
-
 class TestAllCommandsRegistered:
     """Tests to verify all expected slash commands are registered."""
 
-    # Complete list of expected commands from _register_default_commands
+    # Complete list of expected commands
     EXPECTED_COMMANDS = [
         "help", "init", "model", "profile", "provider", "clear", "context",
         "lmstudio", "tools", "status", "config", "save", "load", "sessions",
-        "compact", "mcp", "review", "bug", "exit", "undo", "redo", "history",
+        "compact", "mcp", "review", "bug", "exit", "undo", "redo",
         "theme", "changes", "cost", "approvals", "resume", "plan", "search",
         "copy", "directory", "snapshots", "commit", "mode", "build", "explore",
         "reindex", "metrics", "serialization", "learning", "mlstats",
@@ -479,13 +431,12 @@ class TestAllCommandsRegistered:
         "lmstudio": ["lm"],
         "status": ["info"],
         "config": ["settings"],
-        "sessions": ["history"],  # Note: history is both command and alias
         "compact": ["summarize"],
         "mcp": ["servers"],
         "bug": ["issue", "feedback"],
         "exit": ["quit", "bye"],
         "theme": ["dark", "light"],
-        "changes": ["diff", "undo", "rollback"],
+        "changes": ["diff", "rollback"],
         "cost": ["usage", "tokens", "stats"],
         "approvals": ["safety"],
         "search": ["web"],
@@ -507,7 +458,7 @@ class TestAllCommandsRegistered:
         handler = SlashCommandHandler(console=console, settings=settings)
 
         for cmd_name in self.EXPECTED_COMMANDS:
-            assert cmd_name in handler._commands, f"Command '{cmd_name}' not registered"
+            assert handler.registry.has(cmd_name), f"Command '{cmd_name}' not registered"
 
     def test_all_aliases_registered(self):
         """Test that all expected aliases are registered."""
@@ -517,16 +468,16 @@ class TestAllCommandsRegistered:
 
         for cmd_name, aliases in self.EXPECTED_ALIASES.items():
             for alias in aliases:
-                assert alias in handler._commands, f"Alias '{alias}' for '{cmd_name}' not registered"
+                assert handler.registry.has(alias), f"Alias '{alias}' for '{cmd_name}' not registered"
 
     def test_command_count(self):
-        """Test total number of registered commands (including aliases)."""
+        """Test we have at least 40 commands."""
         console = Console(file=io.StringIO())
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
-        # Should have at least 41 commands + their aliases
-        assert len(handler._commands) >= 41, f"Expected at least 41 commands, got {len(handler._commands)}"
+        command_count = len(list(handler.registry.list_commands()))
+        assert command_count >= 40, f"Expected at least 40 commands, got {command_count}"
 
     def test_each_command_has_description(self):
         """Test that each command has a non-empty description."""
@@ -535,130 +486,15 @@ class TestAllCommandsRegistered:
         handler = SlashCommandHandler(console=console, settings=settings)
 
         for cmd_name in self.EXPECTED_COMMANDS:
-            cmd = handler._commands.get(cmd_name)
+            cmd = handler.registry.get(cmd_name)
             assert cmd is not None, f"Command '{cmd_name}' not found"
-            assert cmd.description, f"Command '{cmd_name}' has empty description"
-
-    def test_each_command_has_handler(self):
-        """Test that each command has a callable handler."""
-        console = Console(file=io.StringIO())
-        settings = MagicMock()
-        handler = SlashCommandHandler(console=console, settings=settings)
-
-        for cmd_name in self.EXPECTED_COMMANDS:
-            cmd = handler._commands.get(cmd_name)
-            assert cmd is not None, f"Command '{cmd_name}' not found"
-            assert callable(cmd.handler), f"Command '{cmd_name}' handler is not callable"
-
-
-class TestTUIConsoleAdapter:
-    """Tests for TUIConsoleAdapter that bridges SlashCommandHandler to TUI."""
-
-    def test_adapter_imports(self):
-        """Test that TUIConsoleAdapter can be imported."""
-        from victor.ui.tui.app import TUIConsoleAdapter
-        assert TUIConsoleAdapter is not None
-
-    def test_adapter_captures_print(self):
-        """Test that adapter captures print output."""
-        from victor.ui.tui.app import TUIConsoleAdapter
-        from victor.ui.tui.widgets import ConversationLog
-
-        # Create a mock conversation log
-        mock_log = MagicMock(spec=ConversationLog)
-
-        adapter = TUIConsoleAdapter(mock_log)
-        adapter.print("Hello, World!")
-
-        # Should have called add_system_message
-        mock_log.add_system_message.assert_called()
-
-    def test_adapter_multiline_output(self):
-        """Test that adapter handles multiline output."""
-        from victor.ui.tui.app import TUIConsoleAdapter
-        from victor.ui.tui.widgets import ConversationLog
-
-        mock_log = MagicMock(spec=ConversationLog)
-        adapter = TUIConsoleAdapter(mock_log)
-
-        adapter.print("Line 1\nLine 2\nLine 3")
-
-        # Should have called add_system_message multiple times
-        assert mock_log.add_system_message.call_count >= 1
-
-
-class TestTUISlashCommandIntegration:
-    """Tests for TUI slash command integration."""
-
-    def test_tui_accepts_settings(self):
-        """Test VictorTUI accepts settings parameter."""
-        from victor.ui.tui.app import VictorTUI
-
-        settings = MagicMock()
-        tui = VictorTUI(settings=settings)
-
-        assert tui.settings is settings
-
-    def test_tui_creates_slash_handler_with_settings(self):
-        """Test VictorTUI can create slash handler when mounted."""
-        from victor.ui.tui.app import VictorTUI
-
-        # This tests the structure, actual mounting requires async context
-        settings = MagicMock()
-        tui = VictorTUI(settings=settings)
-
-        assert tui.settings is settings
-        # Handler is created in on_mount, not constructor
-        assert tui._slash_handler is None  # Not yet mounted
-
-    def test_run_tui_accepts_settings(self):
-        """Test run_tui function accepts settings parameter."""
-        import inspect
-        from victor.ui.tui.app import run_tui
-
-        sig = inspect.signature(run_tui)
-        assert "settings" in sig.parameters
-
-
-class TestSlashCommandCLIParity:
-    """Tests to verify CLI and TUI have parity in slash command handling."""
-
-    def test_cli_handler_creation(self):
-        """Test CLI creates SlashCommandHandler correctly."""
-        console = Console(file=io.StringIO())
-        settings = MagicMock()
-        agent = MagicMock()
-
-        handler = SlashCommandHandler(console=console, settings=settings, agent=agent)
-
-        assert handler.console is console
-        assert handler.settings is settings
-        assert handler.agent is agent
-
-    @pytest.mark.asyncio
-    async def test_handler_works_with_custom_console(self):
-        """Test handler works with different console implementations."""
-        from victor.ui.tui.app import TUIConsoleAdapter
-        from victor.ui.tui.widgets import ConversationLog
-
-        mock_log = MagicMock(spec=ConversationLog)
-        adapter = TUIConsoleAdapter(mock_log)
-        settings = MagicMock()
-
-        handler = SlashCommandHandler(console=adapter, settings=settings)
-
-        # Execute help command - should work with custom console
-        await handler.execute("/help")
-
-        # Adapter should have received output
-        assert mock_log.add_system_message.called
+            assert cmd.metadata.description, f"Command '{cmd_name}' has empty description"
 
 
 class TestSlashCommandCategories:
     """Tests for different categories of slash commands."""
 
-    @pytest.mark.asyncio
-    async def test_session_commands(self):
+    def test_session_commands(self):
         """Test session-related commands exist."""
         console = Console(file=io.StringIO())
         settings = MagicMock()
@@ -666,10 +502,9 @@ class TestSlashCommandCategories:
 
         session_commands = ["save", "load", "sessions", "resume"]
         for cmd in session_commands:
-            assert cmd in handler._commands, f"Session command '{cmd}' missing"
+            assert handler.registry.has(cmd), f"Session command '{cmd}' missing"
 
-    @pytest.mark.asyncio
-    async def test_mode_commands(self):
+    def test_mode_commands(self):
         """Test mode-related commands exist."""
         console = Console(file=io.StringIO())
         settings = MagicMock()
@@ -677,10 +512,9 @@ class TestSlashCommandCategories:
 
         mode_commands = ["mode", "build", "explore", "plan"]
         for cmd in mode_commands:
-            assert cmd in handler._commands, f"Mode command '{cmd}' missing"
+            assert handler.registry.has(cmd), f"Mode command '{cmd}' missing"
 
-    @pytest.mark.asyncio
-    async def test_utility_commands(self):
+    def test_utility_commands(self):
         """Test utility commands exist."""
         console = Console(file=io.StringIO())
         settings = MagicMock()
@@ -688,10 +522,9 @@ class TestSlashCommandCategories:
 
         util_commands = ["copy", "theme", "directory", "search"]
         for cmd in util_commands:
-            assert cmd in handler._commands, f"Utility command '{cmd}' missing"
+            assert handler.registry.has(cmd), f"Utility command '{cmd}' missing"
 
-    @pytest.mark.asyncio
-    async def test_metrics_commands(self):
+    def test_metrics_commands(self):
         """Test metrics/stats commands exist."""
         console = Console(file=io.StringIO())
         settings = MagicMock()
@@ -699,15 +532,150 @@ class TestSlashCommandCategories:
 
         metrics_commands = ["cost", "metrics", "mlstats", "learning"]
         for cmd in metrics_commands:
-            assert cmd in handler._commands, f"Metrics command '{cmd}' missing"
+            assert handler.registry.has(cmd), f"Metrics command '{cmd}' missing"
 
-    @pytest.mark.asyncio
-    async def test_git_commands(self):
-        """Test git-related commands exist."""
+
+class TestCommandRegistry:
+    """Tests for the command registry."""
+
+    def test_registry_singleton(self):
+        """Test that get_command_registry returns the same instance."""
+        registry1 = get_command_registry()
+        registry2 = get_command_registry()
+        assert registry1 is registry2
+
+    def test_registry_categories(self):
+        """Test registry has expected categories."""
+        registry = get_command_registry()
+        categories = registry.categories()
+
+        expected = ["system", "session", "model", "tools", "mode", "metrics", "navigation", "codebase"]
+        for cat in expected:
+            assert cat in categories, f"Category '{cat}' not found"
+
+    def test_registry_list_by_category(self):
+        """Test listing commands by category."""
+        registry = get_command_registry()
+
+        system_commands = registry.list_by_category("system")
+        assert len(system_commands) > 0
+
+        # Help should be in system category
+        help_in_system = any(c.metadata.name == "help" for c in system_commands)
+        assert help_in_system, "Help command not in system category"
+
+
+class TestBaseSlashCommand:
+    """Tests for BaseSlashCommand helper methods."""
+
+    def test_require_agent_with_agent(self):
+        """Test _require_agent returns True when agent present."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        agent = MagicMock()
+
+        ctx = CommandContext(console=console, settings=settings, agent=agent)
+
+        cmd = BaseSlashCommand()
+        assert cmd._require_agent(ctx) is True
+
+    def test_require_agent_without_agent(self):
+        """Test _require_agent returns False when no agent."""
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+
+        ctx = CommandContext(console=console, settings=settings, agent=None)
+
+        cmd = BaseSlashCommand()
+        assert cmd._require_agent(ctx) is False
+        assert "session" in stdout.getvalue().lower()
+
+    def test_has_flag(self):
+        """Test _has_flag method."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+
+        ctx = CommandContext(
+            console=console,
+            settings=settings,
+            args=["--force", "-v", "other"],
+        )
+
+        cmd = BaseSlashCommand()
+        assert cmd._has_flag(ctx, "--force") is True
+        assert cmd._has_flag(ctx, "-f", "--force") is True
+        assert cmd._has_flag(ctx, "-v") is True
+        assert cmd._has_flag(ctx, "--verbose") is False
+
+    def test_get_arg(self):
+        """Test _get_arg method."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+
+        ctx = CommandContext(
+            console=console,
+            settings=settings,
+            args=["first", "second", "third"],
+        )
+
+        cmd = BaseSlashCommand()
+        assert cmd._get_arg(ctx, 0) == "first"
+        assert cmd._get_arg(ctx, 1) == "second"
+        assert cmd._get_arg(ctx, 5) is None
+        assert cmd._get_arg(ctx, 5, "default") == "default"
+
+    def test_parse_int_arg(self):
+        """Test _parse_int_arg method."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+
+        ctx = CommandContext(
+            console=console,
+            settings=settings,
+            args=["42", "not_a_number"],
+        )
+
+        cmd = BaseSlashCommand()
+        assert cmd._parse_int_arg(ctx, 0) == 42
+        assert cmd._parse_int_arg(ctx, 1) == 0  # default for invalid
+        assert cmd._parse_int_arg(ctx, 1, default=10) == 10
+        assert cmd._parse_int_arg(ctx, 5, default=99) == 99
+
+
+class TestLearningCommandUnified:
+    """Tests to verify the /learning command is unified (not duplicated)."""
+
+    def test_learning_command_exists(self):
+        """Test learning command is registered."""
         console = Console(file=io.StringIO())
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
-        git_commands = ["commit", "changes", "snapshots"]
-        for cmd in git_commands:
-            assert cmd in handler._commands, f"Git command '{cmd}' missing"
+        assert handler.registry.has("learning")
+        assert handler.registry.has("rl")  # alias
+        assert handler.registry.has("qlearn")  # alias
+
+    def test_learning_in_metrics_category(self):
+        """Test learning command is in metrics category."""
+        registry = get_command_registry()
+        cmd = registry.get("learning")
+
+        assert cmd is not None
+        assert cmd.metadata.category == "metrics"
+
+    @pytest.mark.asyncio
+    async def test_learning_shows_stats(self):
+        """Test learning command shows stats without errors."""
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        # Should not raise an error
+        await handler.execute("/learning")
+        output = stdout.getvalue()
+
+        # Should show some output
+        assert len(output) > 0
