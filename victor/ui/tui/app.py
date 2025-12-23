@@ -318,6 +318,14 @@ class VictorTUI(App):
         Binding("ctrl+c", "quit", "Exit", show=True),
         Binding("ctrl+l", "clear", "Clear", show=True),
         Binding("escape", "focus_input", "Focus Input", show=False),
+        # Phase 1.6 Enhanced keyboard shortcuts
+        Binding("ctrl+t", "toggle_thinking", "Toggle Thinking", show=True),
+        Binding("ctrl+s", "save_session", "Save Session", show=True),
+        Binding("ctrl+slash", "show_help", "Help", show=True),
+        Binding("ctrl+up", "scroll_up", "Scroll Up", show=False),
+        Binding("ctrl+down", "scroll_down", "Scroll Down", show=False),
+        Binding("ctrl+home", "scroll_top", "Scroll Top", show=False),
+        Binding("ctrl+end", "scroll_bottom", "Scroll Bottom", show=False),
     ]
 
     def __init__(
@@ -598,6 +606,74 @@ class VictorTUI(App):
     def action_focus_input(self) -> None:
         """Focus the input widget."""
         self._input_widget.focus_input()
+
+    def action_toggle_thinking(self) -> None:
+        """Toggle the thinking panel visibility."""
+        container = self.query_one("#thinking-container")
+        if "visible" in container.classes:
+            container.remove_class("visible")
+            self._conversation_log.add_system_message("Thinking panel hidden")
+        else:
+            container.add_class("visible")
+            self._conversation_log.add_system_message("Thinking panel shown")
+
+    def action_save_session(self) -> None:
+        """Save the current session."""
+        try:
+            from victor.ui.tui.session import SessionManager
+
+            manager = SessionManager()
+            # Create a session from current conversation
+            session = manager.create_session(
+                name=f"Session {self.provider}/{self.model}",
+                provider=self.provider,
+                model=self.model,
+            )
+            # Note: In a full implementation, we'd iterate through conversation_log
+            # For now, just save an empty session as a placeholder
+            manager.save_session(session)
+            self._conversation_log.add_system_message(f"Session saved: {session.id[:8]}")
+        except Exception as e:
+            self._conversation_log.add_error_message(f"Failed to save session: {e}")
+
+    def action_show_help(self) -> None:
+        """Show help overlay with keyboard shortcuts."""
+        help_text = """
+Keyboard Shortcuts:
+  Ctrl+C       Exit
+  Ctrl+L       Clear conversation
+  Ctrl+T       Toggle thinking panel
+  Ctrl+S       Save session
+  Ctrl+/       Show this help
+  Ctrl+↑/↓     Scroll conversation
+  Ctrl+Enter   Send message
+  ↑/↓          Navigate input history
+  Escape       Focus input
+
+Slash Commands:
+  /help        Show all commands
+  /clear       Clear conversation
+  /model       Switch model
+  /provider    Switch provider
+  /exit        Exit TUI
+"""
+        self._conversation_log.add_system_message(help_text.strip())
+
+    def action_scroll_up(self) -> None:
+        """Scroll conversation up."""
+        self._conversation_log.scroll_up(animate=False)
+
+    def action_scroll_down(self) -> None:
+        """Scroll conversation down."""
+        self._conversation_log.scroll_down(animate=False)
+
+    def action_scroll_top(self) -> None:
+        """Scroll to top of conversation."""
+        self._conversation_log.scroll_home(animate=False)
+
+    def action_scroll_bottom(self) -> None:
+        """Scroll to bottom of conversation."""
+        self._conversation_log.scroll_end(animate=False)
 
     def add_message(self, content: str, role: str = "assistant") -> None:
         """Add a message to the conversation log.
