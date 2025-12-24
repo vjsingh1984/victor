@@ -132,11 +132,19 @@ class MistralProvider(BaseProvider):
             timeout: Request timeout
             **kwargs: Additional configuration
         """
+        # Try provided key, then env var, then keyring/api_keys.yaml
         self._api_key = api_key or os.environ.get("MISTRAL_API_KEY", "")
+        if not self._api_key:
+            try:
+                from victor.config.api_keys import get_api_key
+
+                self._api_key = get_api_key("mistral") or ""
+            except ImportError:
+                pass
         if not self._api_key:
             logger.warning(
                 "Mistral API key not provided. Set MISTRAL_API_KEY environment variable "
-                "or pass api_key parameter."
+                "or add to keyring with: victor keys --set mistral --keyring"
             )
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)
@@ -404,7 +412,18 @@ class MistralProvider(BaseProvider):
 
         choice = choices[0]
         message = choice.get("message", {})
-        content = message.get("content", "") or ""
+        raw_content = message.get("content", "") or ""
+
+        # Handle structured content (list of content blocks)
+        if isinstance(raw_content, list):
+            text_parts = []
+            for block in raw_content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text_parts.append(block.get("text", ""))
+            content = "".join(text_parts)
+        else:
+            content = raw_content
+
         tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
 
         usage = None
@@ -469,7 +488,19 @@ class MistralProvider(BaseProvider):
 
         choice = choices[0]
         delta = choice.get("delta", {})
-        content = delta.get("content", "") or ""
+        raw_content = delta.get("content", "") or ""
+
+        # Handle structured content (list of content blocks)
+        if isinstance(raw_content, list):
+            # Extract text from content blocks
+            text_parts = []
+            for block in raw_content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text_parts.append(block.get("text", ""))
+            content = "".join(text_parts)
+        else:
+            content = raw_content
+
         finish_reason = choice.get("finish_reason")
 
         tool_call_deltas = delta.get("tool_calls", [])

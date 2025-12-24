@@ -12,7 +12,7 @@ console = Console()
 logger = logging.getLogger(__name__)
 
 # Supported providers for model listing
-SUPPORTED_PROVIDERS = ["ollama", "lmstudio", "llamacpp", "vllm", "anthropic", "openai", "google", "cerebras"]
+SUPPORTED_PROVIDERS = ["ollama", "lmstudio", "llamacpp", "vllm", "anthropic", "openai", "google", "cerebras", "groqcloud"]
 
 
 @models_app.command("list")
@@ -77,6 +77,8 @@ async def list_models_async(provider: str, endpoint: str = None) -> None:
             await _list_google_models(settings)
         elif provider == "cerebras":
             await _list_cerebras_models(settings)
+        elif provider == "groqcloud":
+            await _list_groqcloud_models(settings)
 
     except Exception as e:
         console.print(f"[red]Error:[/] {e}")
@@ -614,3 +616,77 @@ async def _list_cerebras_models(settings) -> None:
         console.print(f"[red]Error listing models:[/] {e}")
     finally:
         await cerebras.close()
+
+
+async def _list_groqcloud_models(settings) -> None:
+    """List Groq Cloud models with capabilities.
+
+    Shows available models on Groq's ultra-fast LPU hardware.
+    """
+    import os
+    from victor.providers.groq_provider import GroqProvider, GROQ_MODELS
+
+    # Try multiple sources for API key: groqcloud settings, groq settings, or env vars
+    provider_settings = settings.get_provider_settings("groqcloud") or {}
+    api_key = provider_settings.get("api_key")
+    if not api_key:
+        provider_settings = settings.get_provider_settings("groq") or {}
+        api_key = provider_settings.get("api_key")
+    if not api_key:
+        api_key = os.environ.get("GROQ_API_KEY") or os.environ.get("GROQCLOUD_API_KEY")
+
+    if not api_key:
+        console.print("[red]Groq API key not configured[/]")
+        console.print("Set GROQ_API_KEY or use: [bold]victor keys set groq[/bold]")
+        return
+
+    # Use API key in provider settings
+    provider_settings["api_key"] = api_key
+
+    try:
+        groq = GroqProvider(**provider_settings)
+    except Exception as e:
+        console.print(f"[red]Failed to initialize Groq provider:[/] {e}")
+        return
+
+    try:
+        # Fetch models from API
+        models_list = await groq.list_models()
+
+        if not models_list:
+            console.print("[yellow]No models found[/]")
+            return
+
+        table = Table(title="Groq Cloud Models (Ultra-Fast LPU Inference)", show_header=True)
+        table.add_column("Model ID", style="cyan", no_wrap=True)
+        table.add_column("Description", style="yellow")
+        table.add_column("Context", style="green")
+        table.add_column("Tools", style="magenta")
+        table.add_column("Status", style="dim")
+
+        for model_info in models_list:
+            model_id = model_info.get("id", "unknown")
+            # Get additional info from our model registry
+            local_info = GROQ_MODELS.get(model_id, {})
+            description = local_info.get("description", model_info.get("description", "-"))
+            context = local_info.get("context_window", 131072)
+            supports_tools = "✓" if local_info.get("supports_tools", True) else "-"
+            is_preview = "preview" if local_info.get("preview", False) else "stable"
+
+            table.add_row(
+                model_id,
+                description[:50] if len(description) > 50 else description,
+                f"{context:,}",
+                supports_tools,
+                is_preview,
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]Found {len(models_list)} models[/]")
+        console.print("[dim]Groq provides ultra-fast inference (100+ tok/s)[/]")
+        console.print("[dim]Use with: [bold]victor chat --profile groq[/bold][/]")
+
+    except Exception as e:
+        console.print(f"[red]Error listing models:[/] {e}")
+    finally:
+        await groq.close()

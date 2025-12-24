@@ -150,15 +150,23 @@ class GroqProvider(BaseProvider):
             timeout: Request timeout (default: 60s - Groq is fast)
             **kwargs: Additional configuration
         """
-        # Get API key from parameter or environment
+        # Try provided key, then env vars, then keyring/api_keys.yaml
         # Support both GROQ_API_KEY and GROQCLOUD_API_KEY for flexibility
         self._api_key = (
             api_key or os.environ.get("GROQ_API_KEY") or os.environ.get("GROQCLOUD_API_KEY", "")
         )
         if not self._api_key:
+            try:
+                from victor.config.api_keys import get_api_key
+
+                # Try both groqcloud and groq aliases
+                self._api_key = get_api_key("groqcloud") or get_api_key("groq") or ""
+            except ImportError:
+                pass
+        if not self._api_key:
             logger.warning(
                 "Groq API key not provided. Set GROQ_API_KEY environment variable "
-                "or pass api_key parameter."
+                "or add to keyring with: victor keys --set groqcloud --keyring"
             )
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)

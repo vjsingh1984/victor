@@ -173,9 +173,17 @@ victor chat
 <summary><b>Cloud Provider</b></summary>
 
 ```bash
-export ANTHROPIC_API_KEY="your-key"  # or OPENAI_API_KEY, etc.
+# Option 1: Store API key securely in system keyring (recommended)
+victor keys --set anthropic --keyring
+
+# Option 2: Use environment variable
+export ANTHROPIC_API_KEY="your-key"
+
+# Start chatting
 victor chat --provider anthropic --model claude-sonnet-4-5
 ```
+
+**Supported providers**: `anthropic`, `openai`, `google`, `xai`, `deepseek`, `groqcloud`, `mistral`, `moonshot`, `cerebras`, `openrouter`
 </details>
 
 ---
@@ -186,11 +194,19 @@ victor chat --provider anthropic --model claude-sonnet-4-5
 
 Works with cloud APIs and local inference engines:
 
-| Type | Providers | Notes |
-|------|-----------|-------|
-| **Cloud** | Anthropic, OpenAI, Google, xAI, DeepSeek, Groq, Mistral, Together, Fireworks, Perplexity | API key required |
-| **Local** | Ollama (100+ models), LMStudio, vLLM, OpenRouter | Free, private |
-| **Enterprise** | Azure OpenAI, AWS Bedrock, Vertex AI | SSO/SAML support |
+| Category | Providers | Status |
+|----------|-----------|--------|
+| **Cloud (Tested)** | Anthropic (Claude), OpenAI (GPT-4), Google (Gemini), xAI (Grok), DeepSeek, Groq, Mistral, Moonshot (Kimi), Cerebras, OpenRouter | ✅ Ready |
+| **Cloud (Untested)** | Together ($25 free), Fireworks ($1 free), HuggingFace | API compatible |
+| **Local** | Ollama (100+ models), LMStudio, vLLM, llama.cpp | ✅ Free, Private |
+| **Enterprise** | Azure OpenAI, AWS Bedrock, Google Vertex AI | SSO/SAML support |
+
+**Free Tier Providers** (no credit card required):
+- **Groq**: Ultra-fast LPU inference, Llama 3.3 70B
+- **Cerebras**: Fastest inference (1000+ tok/s), Llama/Qwen
+- **Mistral**: 500K tokens/min, Mistral Large/Codestral
+- **OpenRouter**: 350+ models, includes free tier models
+- **DeepSeek**: Affordable DeepSeek-V3 at $0.14/1M tokens
 
 ### Domain Verticals
 

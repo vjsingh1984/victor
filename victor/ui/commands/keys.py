@@ -20,6 +20,26 @@ from victor.config.api_keys import (
 )
 
 keys_app = typer.Typer(name="keys", help="Manage API keys for cloud providers.")
+
+# Aliases map to their primary provider (matching providers.py)
+PROVIDER_ALIASES = {
+    "grok": "xai",
+    "kimi": "moonshot",
+    "vertexai": "vertex",
+    "azure-openai": "azure",
+    "aws": "bedrock",
+    "hf": "huggingface",
+}
+
+# Primary provider to aliases mapping (for display)
+PROVIDER_ALIAS_DISPLAY = {
+    "xai": "grok",
+    "moonshot": "kimi",
+    "vertex": "vertexai",
+    "azure": "azure-openai",
+    "bedrock": "aws",
+    "huggingface": "hf",
+}
 console = Console()
 
 
@@ -179,27 +199,42 @@ def _list_keys():
     table.add_column("Status")
     table.add_column("Source")
     table.add_column("Env Var")
+    table.add_column("Aliases", style="dim")
 
-    for prov, env_var in sorted(PROVIDER_ENV_VARS.items()):
-        if prov in ("kimi",):  # Skip aliases
-            continue
+    # Filter out aliases, show only primary providers
+    primary_providers = {k: v for k, v in PROVIDER_ENV_VARS.items() if k not in PROVIDER_ALIASES}
 
-        # Determine source
+    for prov, env_var in sorted(primary_providers.items()):
+        # Determine source - check both primary and alias
         source = "[dim]--[/]"
+        is_configured = prov in configured
+
+        # Check alias too (e.g., grok for xai)
+        alias = PROVIDER_ALIAS_DISPLAY.get(prov)
+        if alias and alias in configured:
+            is_configured = True
+
         if os.environ.get(env_var):
             source = "[green]env[/]"
         elif is_keyring_available() and _get_key_from_keyring(prov):
             source = "[blue]keyring[/]"
-        elif prov in configured:
+        elif is_configured:
             source = "[yellow]file[/]"
 
-        status = "[green]✓ Configured[/]" if prov in configured else "[dim]Not set[/]"
-        table.add_row(prov, status, source, env_var)
+        status = "[green]✓ Configured[/]" if is_configured else "[dim]Not set[/]"
+        aliases = PROVIDER_ALIAS_DISPLAY.get(prov, "")
+        table.add_row(prov, status, source, env_var, aliases)
 
     console.print(table)
 
+    # Count stats
+    configured_count = sum(1 for p in primary_providers if p in configured or PROVIDER_ALIAS_DISPLAY.get(p, "") in configured)
+    total_count = len(primary_providers)
+    alias_count = len(PROVIDER_ALIASES)
+
+    console.print(f"\n[dim]Configured: {configured_count}/{total_count} providers ({alias_count} aliases hidden)[/]")
+
     # Show keyring status
-    console.print()
     backend_name, status = _get_keyring_info()
     keyring_status = (
         "[green]✓ Available[/]" if is_keyring_available() else "[yellow]Not installed[/]"
