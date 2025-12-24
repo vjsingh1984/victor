@@ -12,7 +12,7 @@ console = Console()
 logger = logging.getLogger(__name__)
 
 # Supported providers for model listing
-SUPPORTED_PROVIDERS = ["ollama", "lmstudio", "llamacpp", "vllm", "anthropic", "openai", "google"]
+SUPPORTED_PROVIDERS = ["ollama", "lmstudio", "llamacpp", "vllm", "anthropic", "openai", "google", "cerebras"]
 
 
 @models_app.command("list")
@@ -75,6 +75,8 @@ async def list_models_async(provider: str, endpoint: str = None) -> None:
             await _list_openai_models(settings)
         elif provider == "google":
             await _list_google_models(settings)
+        elif provider == "cerebras":
+            await _list_cerebras_models(settings)
 
     except Exception as e:
         console.print(f"[red]Error:[/] {e}")
@@ -538,3 +540,77 @@ async def _list_google_models(settings) -> None:
         console.print(f"[red]Error listing models:[/] {e}")
     finally:
         await google.close()
+
+
+async def _list_cerebras_models(settings) -> None:
+    """List Cerebras models with capabilities.
+
+    Shows available models on Cerebras cloud inference.
+    """
+    from victor.providers.cerebras_provider import CerebrasProvider, CEREBRAS_MODELS
+
+    provider_settings = settings.get_provider_settings("cerebras")
+    api_key = provider_settings.get("api_key")
+
+    if not api_key:
+        console.print("[red]Cerebras API key not configured[/]")
+        console.print("Set CEREBRAS_API_KEY or use: [bold]victor keys set cerebras[/bold]")
+        return
+
+    try:
+        cerebras = CerebrasProvider(**provider_settings)
+    except Exception as e:
+        console.print(f"[red]Failed to initialize Cerebras provider:[/] {e}")
+        return
+
+    try:
+        # List models from API
+        import httpx
+        async with httpx.AsyncClient(
+            base_url="https://api.cerebras.ai/v1",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=30,
+        ) as client:
+            response = await client.get("/models")
+            response.raise_for_status()
+            models_data = response.json().get("data", [])
+
+        if not models_data:
+            console.print("[yellow]No models found[/]")
+            return
+
+        table = Table(title="Cerebras Models (Ultra-Fast Inference)", show_header=True)
+        table.add_column("Model ID", style="cyan", no_wrap=True)
+        table.add_column("Description", style="yellow")
+        table.add_column("Context", style="green")
+        table.add_column("Tools", style="magenta")
+
+        for model_info in models_data:
+            model_id = model_info.get("id", "unknown")
+            # Get additional info from our model registry
+            local_info = CEREBRAS_MODELS.get(model_id, {})
+            description = local_info.get("description", "-")
+            context = local_info.get("context_window", 131072)
+            supports_tools = "✓" if local_info.get("supports_tools", True) else "-"
+
+            table.add_row(
+                model_id,
+                description,
+                f"{context:,}",
+                supports_tools,
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]Found {len(models_data)} models[/]")
+        console.print("[dim]Cerebras provides ultra-fast inference (1000+ tok/s)[/]")
+        console.print("[dim]Use with: [bold]victor chat --profile cerebras[/bold][/]")
+
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 401:
+            console.print("[red]Invalid Cerebras API key[/]")
+        else:
+            console.print(f"[red]API error:[/] {e.response.status_code}")
+    except Exception as e:
+        console.print(f"[red]Error listing models:[/] {e}")
+    finally:
+        await cerebras.close()

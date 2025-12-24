@@ -1055,8 +1055,10 @@ class CerebrasAdapter(BaseProviderAdapter):
     """Adapter for Cerebras wafer-scale inference.
 
     Handles:
-    - Ultra-fast inference
-    - Large context support
+    - Ultra-fast inference (1000+ tokens/sec)
+    - Large context support (128K)
+    - Qwen-3 thinking content filtering
+    - Output deduplication for verbose models
     """
 
     @property
@@ -1066,16 +1068,17 @@ class CerebrasAdapter(BaseProviderAdapter):
     @property
     def capabilities(self) -> ProviderCapabilities:
         return ProviderCapabilities(
-            quality_threshold=0.75,
-            supports_thinking_tags=False,
+            quality_threshold=0.78,  # High quality models
+            supports_thinking_tags=True,  # Qwen-3 has inline thinking
             max_continuation_attempts=4,
             tool_call_format=ToolCallFormat.OPENAI,
+            output_deduplication=True,  # Some models repeat content
             supports_parallel_tools=True,
             grounding_required=True,  # Verify citations
             grounding_strictness=0.75,  # Moderate strictness
             continuation_patience=3,  # Standard patience
-            thinking_tokens_budget=450,  # Standard budget
-            requires_thinking_time=False,  # Ultra-fast
+            thinking_tokens_budget=600,  # Higher for Qwen-3 reasoning
+            requires_thinking_time=False,  # Ultra-fast inference
         )
 
 

@@ -700,9 +700,11 @@ class TestCerebrasAdapter:
         """Test Cerebras-specific capabilities."""
         caps = adapter.capabilities
 
-        assert caps.quality_threshold == 0.75
+        assert caps.quality_threshold == 0.78  # High quality models
         assert caps.tool_call_format == ToolCallFormat.OPENAI
         assert caps.supports_parallel_tools is True
+        assert caps.output_deduplication is True  # Some models repeat content
+        assert caps.supports_thinking_tags is True  # Qwen-3 has inline thinking
 
 
 class TestHuggingFaceAdapter:

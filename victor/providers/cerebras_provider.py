@@ -36,7 +36,8 @@ References:
 import json
 import logging
 import os
-from typing import Any, AsyncIterator, Dict, List, Optional
+import re
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
 import httpx
 
@@ -75,19 +76,106 @@ CEREBRAS_MODELS = {
         "supports_tools": True,
         "rate_limit": "30 req/min, 150K tokens/min",
     },
-    "qwen-2.5-32b": {
-        "description": "Qwen 2.5 32B - Strong reasoning",
+    "qwen-3-32b": {
+        "description": "Qwen 3 32B - Strong reasoning with thinking",
+        "context_window": 131072,
+        "max_output": 8192,
+        "supports_tools": True,
+        "has_thinking": True,
+    },
+    "qwen-3-235b-a22b-instruct-2507": {
+        "description": "Qwen 3 235B - Largest Qwen model",
+        "context_window": 131072,
+        "max_output": 8192,
+        "supports_tools": True,
+        "has_thinking": True,
+    },
+    "gpt-oss-120b": {
+        "description": "GPT-OSS 120B - Largest open model, clean output",
         "context_window": 131072,
         "max_output": 8192,
         "supports_tools": True,
     },
-    "qwen-2.5-coder-32b": {
-        "description": "Qwen 2.5 Coder 32B - Code specialized",
+    "zai-glm-4.6": {
+        "description": "ZAI GLM 4.6 - Chinese/English bilingual",
         "context_window": 131072,
         "max_output": 8192,
         "supports_tools": True,
     },
 }
+
+# Models that output thinking/reasoning inline (need filtering)
+THINKING_MODELS = {"qwen-3-32b", "qwen-3-235b-a22b-instruct-2507"}
+
+# Patterns that indicate start of thinking content in Qwen-3 models
+QWEN3_THINKING_PATTERNS = [
+    r"^Okay,?\s+(?:the\s+)?(?:user\s+)?(?:is\s+)?(?:asking|wants?|needs?|said)",
+    r"^(?:Let\s+me\s+)?(?:think|see|check|analyze|consider)",
+    r"^(?:Hmm|Well|So),?\s+",
+    r"^(?:First|Now),?\s+(?:I\s+)?(?:need|should|will|'ll)",
+    r"^(?:The\s+)?(?:user|question|task|request)\s+(?:is|asks?|wants?)",
+    r"^(?:I\s+)?(?:need|should|will|'ll)\s+(?:first|start|begin)",
+]
+
+
+def _is_thinking_model(model: str) -> bool:
+    """Check if model outputs inline thinking content."""
+    model_lower = model.lower()
+    return any(pattern in model_lower for pattern in ["qwen-3", "qwen3"])
+
+
+def _extract_qwen3_thinking(content: str) -> Tuple[str, str]:
+    """Extract thinking content from Qwen-3 model output.
+
+    Qwen-3 models output their reasoning inline without special tags.
+    This function detects and separates thinking from the actual response.
+
+    Args:
+        content: Raw response content
+
+    Returns:
+        Tuple of (thinking_content, main_content)
+    """
+    if not content:
+        return "", ""
+
+    lines = content.split("\n")
+    thinking_lines = []
+    main_lines = []
+    in_thinking = True
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Check if this line looks like thinking
+        is_thinking_line = False
+        if in_thinking and stripped:
+            for pattern in QWEN3_THINKING_PATTERNS:
+                if re.match(pattern, stripped, re.IGNORECASE):
+                    is_thinking_line = True
+                    break
+
+            # Also check for continuation of thinking
+            if not is_thinking_line and thinking_lines:
+                # If previous was thinking and this continues the thought
+                if stripped.startswith(("Although", "Since", "Because", "However", "But", "And", "Or", "So", "This", "That", "These", "Those", "None", "The")):
+                    is_thinking_line = True
+
+        if is_thinking_line:
+            thinking_lines.append(line)
+        else:
+            # Once we hit non-thinking content, stop looking for thinking
+            in_thinking = False
+            main_lines.append(line)
+
+    thinking = "\n".join(thinking_lines).strip()
+    main = "\n".join(main_lines).strip()
+
+    # If everything was classified as thinking, return it as main content
+    if not main and thinking:
+        return "", thinking
+
+    return thinking, main
 
 
 class CerebrasProvider(BaseProvider):
@@ -300,7 +388,17 @@ class CerebrasProvider(BaseProvider):
 
         choice = choices[0]
         message = choice.get("message", {})
+        content = message.get("content", "") or ""
         tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
+
+        # Extract thinking content for Qwen-3 models
+        metadata = {}
+        if content and _is_thinking_model(model):
+            thinking, main_content = _extract_qwen3_thinking(content)
+            if thinking:
+                metadata["reasoning_content"] = thinking
+                content = main_content
+                logger.debug(f"Cerebras: Extracted {len(thinking)} chars of thinking content")
 
         usage = None
         if usage_data := result.get("usage"):
@@ -315,13 +413,14 @@ class CerebrasProvider(BaseProvider):
                 usage["total_time_ms"] = int(time_info.get("total_time", 0) * 1000)
 
         return CompletionResponse(
-            content=message.get("content", "") or "",
+            content=content,
             role="assistant",
             tool_calls=tool_calls,
             stop_reason=choice.get("finish_reason"),
             usage=usage,
             model=model,
             raw_response=result,
+            metadata=metadata if metadata else None,
         )
 
     def _normalize_tool_calls(self, tool_calls) -> Optional[List[Dict[str, Any]]]:
