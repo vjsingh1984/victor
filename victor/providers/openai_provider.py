@@ -37,6 +37,9 @@ from victor.providers.openai_compat import (
 class OpenAIProvider(BaseProvider):
     """Provider for OpenAI GPT models."""
 
+    # O-series reasoning models have different parameter requirements
+    O_SERIES_MODELS = {"o1", "o1-pro", "o3", "o3-mini"}
+
     def __init__(
         self,
         api_key: str,
@@ -67,6 +70,23 @@ class OpenAIProvider(BaseProvider):
             max_retries=max_retries,
         )
 
+    def _is_o_series_model(self, model: str) -> bool:
+        """Check if model is an O-series reasoning model.
+
+        O-series models have different parameter requirements:
+        - Use max_completion_tokens instead of max_tokens
+        - Don't support temperature parameter
+        - Don't support tools/function calling
+
+        Args:
+            model: Model name
+
+        Returns:
+            True if model is O-series
+        """
+        model_lower = model.lower()
+        return any(model_lower.startswith(prefix) for prefix in ["o1", "o3"])
+
     @property
     def name(self) -> str:
         """Provider name."""
@@ -94,10 +114,10 @@ class OpenAIProvider(BaseProvider):
 
         Args:
             messages: Conversation messages
-            model: Model name (e.g., "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo")
-            temperature: Sampling temperature
+            model: Model name (e.g., "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo", "o1", "o3")
+            temperature: Sampling temperature (ignored for O-series)
             max_tokens: Maximum tokens to generate
-            tools: Available tools
+            tools: Available tools (not supported for O-series)
             **kwargs: Additional OpenAI parameters
 
         Returns:
@@ -110,18 +130,30 @@ class OpenAIProvider(BaseProvider):
             # Convert messages to OpenAI format
             openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
+            # Check if O-series reasoning model
+            is_o_series = self._is_o_series_model(model)
+
             # Build request parameters
             request_params = {
                 "model": model,
                 "messages": openai_messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
                 **kwargs,
             }
 
-            if tools:
-                request_params["tools"] = self._convert_tools(tools)
-                request_params["tool_choice"] = "auto"
+            if is_o_series:
+                # O-series models use max_completion_tokens instead of max_tokens
+                # and don't support temperature or tools
+                request_params["max_completion_tokens"] = max_tokens
+                # Remove any temperature if passed in kwargs
+                request_params.pop("temperature", None)
+            else:
+                # Standard models use max_tokens and temperature
+                request_params["temperature"] = temperature
+                request_params["max_tokens"] = max_tokens
+
+                if tools:
+                    request_params["tools"] = self._convert_tools(tools)
+                    request_params["tool_choice"] = "auto"
 
             # Make API call with circuit breaker protection
             response: ChatCompletion = await self._execute_with_circuit_breaker(
@@ -148,9 +180,9 @@ class OpenAIProvider(BaseProvider):
         Args:
             messages: Conversation messages
             model: Model name
-            temperature: Sampling temperature
+            temperature: Sampling temperature (ignored for O-series)
             max_tokens: Maximum tokens to generate
-            tools: Available tools
+            tools: Available tools (not supported for O-series)
             **kwargs: Additional parameters
 
         Yields:
@@ -163,21 +195,32 @@ class OpenAIProvider(BaseProvider):
             # Convert messages
             openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
+            # Check if O-series reasoning model
+            is_o_series = self._is_o_series_model(model)
+
             # Build request parameters
             request_params = {
                 "model": model,
                 "messages": openai_messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
                 "stream": True,
                 # Request usage info in final chunk
                 "stream_options": {"include_usage": True},
                 **kwargs,
             }
 
-            if tools:
-                request_params["tools"] = self._convert_tools(tools)
-                request_params["tool_choice"] = "auto"
+            if is_o_series:
+                # O-series models use max_completion_tokens instead of max_tokens
+                request_params["max_completion_tokens"] = max_tokens
+                # Remove any temperature if passed in kwargs
+                request_params.pop("temperature", None)
+            else:
+                # Standard models use max_tokens and temperature
+                request_params["temperature"] = temperature
+                request_params["max_tokens"] = max_tokens
+
+                if tools:
+                    request_params["tools"] = self._convert_tools(tools)
+                    request_params["tool_choice"] = "auto"
 
             # Accumulate tool calls across streaming deltas to avoid emitting partial JSON
             tool_call_accumulator: Dict[str, Dict[str, Any]] = {}
@@ -388,8 +431,7 @@ class OpenAIProvider(BaseProvider):
                 model_id = model.id
                 # Filter to chat-capable GPT models
                 if any(
-                    prefix in model_id
-                    for prefix in ["gpt-4", "gpt-3.5", "o1", "o3", "chatgpt"]
+                    prefix in model_id for prefix in ["gpt-4", "gpt-3.5", "o1", "o3", "chatgpt"]
                 ):
                     models.append(
                         {
