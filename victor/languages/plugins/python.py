@@ -25,7 +25,9 @@ from victor.languages.base import (
     LanguageCapabilities,
     LanguageConfig,
     Linter,
+    QueryPattern,
     TestRunner,
+    TreeSitterQueries,
 )
 
 
@@ -80,6 +82,46 @@ class PythonPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        """Create tree-sitter queries for Python symbol/call extraction."""
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern("class", "(class_definition name: (identifier) @name)"),
+                QueryPattern("function", "(function_definition name: (identifier) @name)"),
+            ],
+            calls="""
+                (call function: (identifier) @callee)
+                (call function: (attribute attribute: (identifier) @callee))
+            """,
+            references="""
+                (call function: (identifier) @name)
+                (call function: (attribute attribute: (identifier) @name))
+                (attribute object: (_) attribute: (identifier) @name)
+                (identifier) @name
+            """,
+            inheritance="""
+                (class_definition
+                    name: (identifier) @child
+                    superclasses: (argument_list (identifier) @base))
+            """,
+            composition="""
+                (class_definition
+                    name: (identifier) @owner
+                    body: (block
+                        (function_definition
+                            name: (identifier) @_init (#eq? @_init "__init__")
+                            body: (block
+                                (expression_statement
+                                    (assignment
+                                        left: (attribute object: (identifier) @_self (#eq? @_self "self"))
+                                        right: (call function: (identifier) @type)))))))
+            """,
+            enclosing_scopes=[
+                ("function_definition", "name"),
+                ("class_definition", "name"),
+            ],
         )
 
     def get_test_runner(self, project_root: Path) -> Optional[TestRunner]:

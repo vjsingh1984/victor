@@ -27,10 +27,12 @@ Output location: .victor/init.md (configurable via settings.py)
 import ast
 import logging
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
+from victor.codebase.ignore_patterns import DEFAULT_SKIP_DIRS, is_hidden_path, should_ignore_path
 from victor.config.settings import VICTOR_CONTEXT_FILE, get_project_paths
 
 logger = logging.getLogger(__name__)
@@ -74,6 +76,13 @@ class CodebaseAnalysis:
     cli_commands: List[str] = field(default_factory=list)
     architecture_patterns: List[str] = field(default_factory=list)
     config_files: List[Tuple[str, str]] = field(default_factory=list)  # (path, description)
+    # Enhanced fields
+    dependencies: Dict[str, List[str]] = field(default_factory=dict)  # {category: [dep1, dep2]}
+    test_coverage: Optional[float] = None  # Coverage percentage if available
+    loc_stats: Dict[str, int] = field(default_factory=dict)  # {total_lines, total_files, largest_file}
+    top_imports: List[Tuple[str, int]] = field(default_factory=list)  # [(module, import_count)]
+    method_count: int = 0
+    protocol_count: int = 0  # Python Protocol/ABC count
 
 
 class CodebaseAnalyzer:
@@ -119,35 +128,32 @@ class CodebaseAnalyzer:
         ".svelte": "Svelte",
     }
 
-    # Files to skip during analysis
-    SKIP_DIRS = {
-        "__pycache__",
-        ".git",
-        ".pytest_cache",
-        "venv",
-        "env",
-        ".venv",
-        "node_modules",
-        ".tox",
-        "build",
-        "dist",
-        "egg-info",
-        ".next",
-        ".nuxt",
-        "target",
-        "out",
-        "coverage",
-        ".cache",
-    }
+    # Use shared default skip directories from ignore_patterns module
+    # Hidden directories (starting with '.') are excluded automatically
+    # by the shared should_ignore_path() utility
+    SKIP_DIRS = DEFAULT_SKIP_DIRS
 
-    def __init__(self, root_path: Optional[str] = None):
+    def __init__(
+        self,
+        root_path: Optional[str] = None,
+        include_dirs: Optional[List[str]] = None,
+        exclude_dirs: Optional[List[str]] = None,
+    ):
         """Initialize analyzer.
 
         Args:
             root_path: Root directory to analyze. Defaults to current directory.
+            include_dirs: List of directories to include in the analysis.
+            exclude_dirs: List of directories to exclude from the analysis.
         """
-        self.root = Path(root_path) if root_path else Path.cwd()
+        self.root = Path(root_path).resolve() if root_path else Path.cwd()
         self.analysis = CodebaseAnalysis(project_name=self.root.name, root_path=self.root)
+        self.include_dirs = include_dirs
+
+        # Combine default and user-provided exclude dirs
+        self.effective_skip_dirs = self.SKIP_DIRS.copy()
+        if exclude_dirs:
+            self.effective_skip_dirs.update(exclude_dirs)
 
     def analyze(self) -> CodebaseAnalysis:
         """Perform full codebase analysis (language-agnostic).
@@ -175,6 +181,18 @@ class CodebaseAnalyzer:
         # Step 6: Find config files
         self._find_config_files()
 
+        # Step 7: Extract dependencies from pyproject.toml/package.json
+        self._extract_dependencies()
+
+        # Step 8: Calculate LOC stats
+        self._calculate_loc_stats()
+
+        # Step 9: Extract top imports
+        self._extract_top_imports()
+
+        # Step 10: Try to get test coverage
+        self._extract_test_coverage()
+
         return self.analysis
 
     def _detect_package_layout(self) -> None:
@@ -197,7 +215,8 @@ class CodebaseAnalyzer:
         python_packages = []
 
         for item in self.root.iterdir():
-            if item.name in self.SKIP_DIRS or item.name.startswith("."):
+            # Use shared ignore logic for consistency
+            if should_ignore_path(item, skip_dirs=self.effective_skip_dirs):
                 continue
             if is_python_package(item):
                 python_packages.append(item.name)
@@ -234,23 +253,26 @@ class CodebaseAnalyzer:
 
     def _analyze_source_files(self) -> None:
         """Analyze source files across all supported languages."""
-        # Determine search paths
         search_paths = []
-        if self.analysis.main_package:
-            main_path = self.root / self.analysis.main_package.replace("/", "/")
-            if main_path.exists():
-                search_paths.append(main_path)
-
-        # Also search common source directories if no main package
-        if not search_paths:
-            for common_dir in ["src", "lib", "app", "components", "pages", "api"]:
-                path = self.root / common_dir
-                if path.exists():
+        if self.include_dirs:
+            for d in self.include_dirs:
+                path = self.root / d
+                if path.exists() and path.is_dir():
                     search_paths.append(path)
 
-        # If still nothing, search root (but limit depth)
         if not search_paths:
-            search_paths.append(self.root)
+            # Fallback to original logic if no include_dirs provided or none exist
+            if self.analysis.main_package:
+                main_path = self.root / self.analysis.main_package.replace("/", "/")
+                if main_path.exists():
+                    search_paths.append(main_path)
+            if not search_paths:
+                for common_dir in ["src", "lib", "app", "components", "pages", "api"]:
+                    path = self.root / common_dir
+                    if path.exists():
+                        search_paths.append(path)
+            if not search_paths:
+                search_paths.append(self.root)
 
         for search_path in search_paths:
             self._scan_directory_for_sources(search_path)
@@ -259,7 +281,8 @@ class CodebaseAnalyzer:
         """Scan directory for source files of any language."""
         for ext, lang in self.LANGUAGE_EXTENSIONS.items():
             for source_file in directory.rglob(f"*{ext}"):
-                if any(skip in source_file.parts for skip in self.SKIP_DIRS):
+                # Use shared ignore logic (handles hidden dirs and skip dirs)
+                if should_ignore_path(source_file, skip_dirs=self.effective_skip_dirs):
                     continue
 
                 # Check depth
@@ -466,10 +489,23 @@ class CodebaseAnalyzer:
     def _identify_key_components(self) -> None:
         """Identify the most important classes in the codebase."""
         all_classes: List[ClassInfo] = []
+        method_count = 0
+        protocol_count = 0
 
         for modules in self.analysis.packages.values():
             for module in modules:
                 all_classes.extend(module.classes)
+                # Count methods (top-level functions are tracked separately)
+                method_count += len(module.functions)
+                # Count protocols/ABCs
+                for cls in module.classes:
+                    if cls.is_abstract or "Protocol" in cls.name or any(
+                        base in ("Protocol", "ABC") for base in cls.base_classes
+                    ):
+                        protocol_count += 1
+
+        self.analysis.method_count = method_count
+        self.analysis.protocol_count = protocol_count
 
         # Priority scoring for key components
         def score_class(cls: ClassInfo) -> int:
@@ -494,8 +530,8 @@ class CodebaseAnalyzer:
         scored = [(score_class(c), c) for c in all_classes if c.category]
         scored.sort(key=lambda x: -x[0])
 
-        # Take top 15 most important
-        self.analysis.key_components = [c for _, c in scored[:15]]
+        # Take top 20 most important (increased from 15)
+        self.analysis.key_components = [c for _, c in scored[:20]]
 
     def _extract_entry_points(self) -> None:
         """Extract CLI entry points from pyproject.toml."""
@@ -598,8 +634,207 @@ class CodebaseAnalyzer:
                 if (self.root / pattern).exists():
                     self.analysis.config_files.append((pattern, description))
 
+    def _extract_dependencies(self) -> None:
+        """Extract dependencies from pyproject.toml or package.json."""
+        # Try pyproject.toml first (Python)
+        pyproject = self.root / "pyproject.toml"
+        if pyproject.exists():
+            try:
+                content = pyproject.read_text(encoding="utf-8")
+                deps: Dict[str, List[str]] = {"core": [], "dev": [], "optional": []}
 
-def generate_smart_victor_md(root_path: Optional[str] = None) -> str:
+                # Parse [project.dependencies]
+                deps_match = re.search(
+                    r"\[project\].*?dependencies\s*=\s*\[(.*?)\]", content, re.DOTALL
+                )
+                if deps_match:
+                    deps_text = deps_match.group(1)
+                    for line in deps_text.split(","):
+                        dep = line.strip().strip('"\'')
+                        if dep and not dep.startswith("#"):
+                            # Extract package name (before version specifier)
+                            pkg_name = re.split(r"[<>=~!]", dep)[0].strip()
+                            if pkg_name:
+                                deps["core"].append(pkg_name)
+
+                # Parse [project.optional-dependencies]
+                opt_deps_match = re.search(
+                    r"\[project\.optional-dependencies\](.*?)(?=\[|\Z)", content, re.DOTALL
+                )
+                if opt_deps_match:
+                    opt_section = opt_deps_match.group(1)
+                    # Extract dev dependencies
+                    dev_match = re.search(r'dev\s*=\s*\[(.*?)\]', opt_section, re.DOTALL)
+                    if dev_match:
+                        for line in dev_match.group(1).split(","):
+                            dep = line.strip().strip('"\'')
+                            if dep and not dep.startswith("#"):
+                                pkg_name = re.split(r"[<>=~!]", dep)[0].strip()
+                                if pkg_name:
+                                    deps["dev"].append(pkg_name)
+
+                self.analysis.dependencies = deps
+
+            except Exception as e:
+                logger.debug(f"Failed to parse pyproject.toml dependencies: {e}")
+
+        # Try package.json (Node.js)
+        package_json = self.root / "package.json"
+        if package_json.exists() and not self.analysis.dependencies:
+            try:
+                import json
+                data = json.loads(package_json.read_text(encoding="utf-8"))
+                deps: Dict[str, List[str]] = {"core": [], "dev": []}
+
+                if "dependencies" in data:
+                    deps["core"] = list(data["dependencies"].keys())[:15]
+                if "devDependencies" in data:
+                    deps["dev"] = list(data["devDependencies"].keys())[:10]
+
+                self.analysis.dependencies = deps
+
+            except Exception as e:
+                logger.debug(f"Failed to parse package.json dependencies: {e}")
+
+    def _calculate_loc_stats(self) -> None:
+        """Calculate lines of code statistics."""
+        total_lines = 0
+        total_files = 0
+        largest_file = ""
+        largest_file_lines = 0
+        file_sizes: List[Tuple[str, int]] = []
+
+        # Scan all source files
+        for ext in self.LANGUAGE_EXTENSIONS.keys():
+            search_dirs = [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
+            for search_dir in search_dirs:
+                if not search_dir.is_dir():
+                    continue
+                for source_file in search_dir.rglob(f"*{ext}"):
+                    if should_ignore_path(source_file, skip_dirs=self.effective_skip_dirs):
+                        continue
+                    try:
+                        content = source_file.read_text(encoding="utf-8", errors="ignore")
+                        lines = len(content.splitlines())
+                        total_lines += lines
+                        total_files += 1
+                        rel_path = str(source_file.relative_to(self.root))
+                        file_sizes.append((rel_path, lines))
+                        if lines > largest_file_lines:
+                            largest_file_lines = lines
+                            largest_file = rel_path
+                    except Exception:
+                        pass
+
+        # Sort by size and get top 5
+        file_sizes.sort(key=lambda x: -x[1])
+        top_files = file_sizes[:5]
+
+        self.analysis.loc_stats = {
+            "total_lines": total_lines,
+            "total_files": total_files,
+            "largest_file": largest_file,
+            "largest_file_lines": largest_file_lines,
+            "top_files": top_files,
+        }
+
+    def _extract_top_imports(self) -> None:
+        """Extract the most commonly imported modules (Python only)."""
+        import_counts: Dict[str, int] = defaultdict(int)
+
+        # Only scan Python files
+        search_dirs = [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
+        for search_dir in search_dirs:
+            if not search_dir.is_dir():
+                continue
+            for source_file in search_dir.rglob("*.py"):
+                if should_ignore_path(source_file, skip_dirs=self.effective_skip_dirs):
+                    continue
+                try:
+                    content = source_file.read_text(encoding="utf-8", errors="ignore")
+                    tree = ast.parse(content)
+
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.Import):
+                            for alias in node.names:
+                                # Get top-level module
+                                module = alias.name.split(".")[0]
+                                import_counts[module] += 1
+                        elif isinstance(node, ast.ImportFrom):
+                            if node.module:
+                                module = node.module.split(".")[0]
+                                import_counts[module] += 1
+
+                except Exception:
+                    pass
+
+        # Filter out standard library and sort by count
+        # Common stdlib modules to exclude from "top imports" (not exhaustive)
+        stdlib = {
+            "os", "sys", "re", "json", "typing", "dataclasses", "pathlib",
+            "collections", "functools", "itertools", "logging", "abc",
+            "datetime", "time", "asyncio", "contextlib", "copy", "enum",
+            "hashlib", "io", "math", "random", "shutil", "subprocess",
+            "tempfile", "threading", "traceback", "unittest", "uuid", "warnings"
+        }
+
+        # Filter and sort
+        filtered = [(mod, count) for mod, count in import_counts.items() if mod not in stdlib]
+        filtered.sort(key=lambda x: -x[1])
+
+        self.analysis.top_imports = filtered[:10]
+
+    def _extract_test_coverage(self) -> None:
+        """Try to extract test coverage from coverage reports."""
+        # Check for coverage.xml
+        coverage_file = self.root / "coverage.xml"
+        if coverage_file.exists():
+            try:
+                content = coverage_file.read_text(encoding="utf-8")
+                # Parse line-rate attribute (0.0 to 1.0)
+                match = re.search(r'line-rate="([0-9.]+)"', content)
+                if match:
+                    coverage_pct = float(match.group(1)) * 100
+                    self.analysis.test_coverage = round(coverage_pct, 1)
+                    return
+            except Exception:
+                pass
+
+        # Check for .coverage SQLite database
+        coverage_db = self.root / ".coverage"
+        if coverage_db.exists():
+            try:
+                import sqlite3
+                conn = sqlite3.connect(str(coverage_db))
+                cursor = conn.cursor()
+                # Get line counts
+                cursor.execute("SELECT SUM(num_statements), SUM(num_statements - missing_lines) FROM file_summary")
+                row = cursor.fetchone()
+                if row and row[0]:
+                    total, covered = row[0], row[1] or 0
+                    self.analysis.test_coverage = round((covered / total) * 100, 1)
+                conn.close()
+            except Exception:
+                pass
+
+        # Check htmlcov/index.html for coverage percentage
+        htmlcov = self.root / "htmlcov" / "index.html"
+        if htmlcov.exists():
+            try:
+                content = htmlcov.read_text(encoding="utf-8")
+                # Look for coverage percentage in the HTML
+                match = re.search(r'(\d+)%\s*</span>\s*</h1>', content)
+                if match:
+                    self.analysis.test_coverage = float(match.group(1))
+            except Exception:
+                pass
+
+
+def generate_smart_victor_md(
+    root_path: Optional[str] = None,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
+) -> str:
     """Generate comprehensive project context using codebase analysis.
 
     Works with Python projects (AST-based analysis) and falls back to
@@ -607,16 +842,20 @@ def generate_smart_victor_md(root_path: Optional[str] = None) -> str:
 
     Args:
         root_path: Root directory to analyze. Defaults to current directory.
+        include_dirs: List of directories to include in the analysis.
+        exclude_dirs: List of directories to exclude from the analysis.
 
     Returns:
         Generated markdown content for .victor/init.md.
     """
-    analyzer = CodebaseAnalyzer(root_path)
+    analyzer = CodebaseAnalyzer(root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs)
     analysis = analyzer.analyze()
 
     # If no Python package found, use language-agnostic analysis
     if not analysis.main_package and not analysis.key_components:
-        return _generate_generic_victor_md(root_path)
+        return _generate_generic_victor_md(
+            root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs
+        )
 
     sections = []
 
@@ -730,17 +969,25 @@ def generate_smart_victor_md(root_path: Optional[str] = None) -> str:
     return "\n".join(sections)
 
 
-def _generate_generic_victor_md(root_path: Optional[str] = None) -> str:
+def _generate_generic_victor_md(
+    root_path: Optional[str] = None,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
+) -> str:
     """Generate init.md for non-Python projects using language-agnostic analysis.
 
     Args:
         root_path: Root directory to analyze. Defaults to current directory.
+        include_dirs: List of directories to include in the analysis.
+        exclude_dirs: List of directories to exclude from the analysis.
 
     Returns:
         Generated markdown content.
     """
-    context = gather_project_context(root_path, max_files=100)
-    _root = Path(root_path) if root_path else Path.cwd()
+    context = gather_project_context(
+        root_path, max_files=100, include_dirs=include_dirs, exclude_dirs=exclude_dirs
+    )
+    _root = Path(root_path).resolve() if root_path else Path.cwd()
 
     sections = []
 
@@ -893,7 +1140,7 @@ def create_context_symlinks(
     Returns:
         Dict mapping alias name to status ('created', 'exists', 'failed', 'skipped')
     """
-    root = Path(root_path) if root_path else Path.cwd()
+    root = Path(root_path).resolve() if root_path else Path.cwd()
     # Use settings-driven path by default
     if source_file is None:
         paths = get_project_paths(root)
@@ -950,7 +1197,7 @@ def remove_context_symlinks(
     Returns:
         Dict mapping alias name to status ('removed', 'not_symlink', 'not_found')
     """
-    root = Path(root_path) if root_path else Path.cwd()
+    root = Path(root_path).resolve() if root_path else Path.cwd()
     results: Dict[str, str] = {}
 
     target_aliases = aliases if aliases is not None else list(CONTEXT_FILE_ALIASES.keys())
@@ -992,8 +1239,14 @@ def _extract_readme_description(root: Path) -> str:
                         continue
                     if stripped.startswith("[") and stripped.endswith(")"):
                         continue
-                    # Found a text paragraph
-                    return stripped[:300]
+                    # Skip lines that are only italics (like "*Any model. Any provider.*")
+                    if stripped.startswith("*") and stripped.endswith("*") and "\n" not in stripped:
+                        continue
+                    # Strip markdown bold/italic markers to avoid formatting conflicts
+                    result = stripped[:300]
+                    result = result.strip("*_")  # Remove leading/trailing emphasis markers
+                    result = result.replace("**", "").replace("__", "")  # Remove bold
+                    return result
             except Exception:
                 pass
 
@@ -1005,7 +1258,12 @@ def _extract_readme_description(root: Path) -> str:
 # =============================================================================
 
 
-def gather_project_context(root_path: Optional[str] = None, max_files: int = 50) -> Dict[str, any]:
+def gather_project_context(
+    root_path: Optional[str] = None,
+    max_files: int = 50,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
+) -> Dict[str, any]:
     """Gather project context for LLM analysis (works with any language).
 
     This function collects structural information about any project type
@@ -1014,11 +1272,13 @@ def gather_project_context(root_path: Optional[str] = None, max_files: int = 50)
     Args:
         root_path: Root directory to analyze. Defaults to current directory.
         max_files: Maximum number of source files to list.
+        include_dirs: List of directories to include in the analysis.
+        exclude_dirs: List of directories to exclude from the analysis.
 
     Returns:
         Dict containing project structure information.
     """
-    root = Path(root_path) if root_path else Path.cwd()
+    root = Path(root_path).resolve() if root_path else Path.cwd()
 
     # Directories to skip
     skip_dirs = {
@@ -1038,6 +1298,8 @@ def gather_project_context(root_path: Optional[str] = None, max_files: int = 50)
         "coverage",
         ".cache",
     }
+    if exclude_dirs:
+        skip_dirs.update(exclude_dirs)
 
     # Project type detection by config files
     project_indicators = {
@@ -1138,27 +1400,73 @@ def gather_project_context(root_path: Optional[str] = None, max_files: int = 50)
             pass
         return dirs
 
-    context["directory_structure"] = walk_dirs(root)[:100]  # Limit to 100 dirs
+    if include_dirs:
+        # Walk only included directories
+        all_found_dirs = []
+        for d in include_dirs:
+            dir_path = root / d
+            if dir_path.is_dir():
+                all_found_dirs.extend(walk_dirs(dir_path))
+        context["directory_structure"] = all_found_dirs[:100]
+    else:
+        context["directory_structure"] = walk_dirs(root)[:100]
 
     # Collect source files with extensions
     file_count = 0
     lang_counts: Dict[str, int] = {}
-    for item in root.rglob("*"):
+
+    search_paths = [root / d for d in include_dirs] if include_dirs else [root]
+
+    for search_path in search_paths:
+        if not search_path.is_dir():
+            continue
+        for item in search_path.rglob("*"):
+            if file_count >= max_files:
+                break
+            if any(skip in item.parts for skip in skip_dirs):
+                continue
+            if item.is_file() and item.suffix in source_extensions:
+                rel_path = str(item.relative_to(root))
+                context["source_files"].append(rel_path)
+                lang = source_extensions[item.suffix]
+                lang_counts[lang] = lang_counts.get(lang, 0) + 1
+                file_count += 1
         if file_count >= max_files:
             break
-        if any(skip in item.parts for skip in skip_dirs):
-            continue
-        if item.is_file() and item.suffix in source_extensions:
-            rel_path = str(item.relative_to(root))
-            context["source_files"].append(rel_path)
-            lang = source_extensions[item.suffix]
-            lang_counts[lang] = lang_counts.get(lang, 0) + 1
-            file_count += 1
 
     # Add detected languages from file extensions
     for lang, count in sorted(lang_counts.items(), key=lambda x: -x[1]):
         if lang not in context["detected_languages"]:
             context["detected_languages"].append(f"{lang} ({count} files)")
+
+    # Add content of key files
+    context["key_files_content"] = {}
+
+    # Prioritize key files
+    key_file_candidates = []
+    main_files = [
+        f
+        for f in context["source_files"]
+        if "main" in f or "app" in f or "server" in f or "index" in f
+    ]
+    key_file_candidates.extend(main_files)
+
+    # Add some of the largest files
+    large_files = sorted(
+        context["source_files"], key=lambda f: (root / f).stat().st_size, reverse=True
+    )
+    for f in large_files:
+        if f not in key_file_candidates:
+            key_file_candidates.append(f)
+
+    key_files_to_read = key_file_candidates[:5]  # Read up to 5 key files
+
+    for file_path in key_files_to_read:
+        try:
+            content = (root / file_path).read_text(encoding="utf-8")
+            context["key_files_content"][file_path] = content[:8192]  # Limit content size (fits 10-12 parallel reads)
+        except Exception:
+            pass
 
     return context
 
@@ -1172,46 +1480,82 @@ def build_llm_prompt_for_victor_md(context: Dict[str, any]) -> str:
     Returns:
         Prompt string for the LLM.
     """
-    prompt = f"""Analyze this project and generate a comprehensive {VICTOR_CONTEXT_FILE} file.
 
-PROJECT: {context['project_name']}
-DETECTED LANGUAGES: {', '.join(context['detected_languages']) or 'Unknown'}
+    # Static part of the prompt (the "80%")
+    prompt_header = f"""You are an expert software architect tasked with creating a high-level "user manual" for an AI coding assistant named Victor.
+This manual, named {VICTOR_CONTEXT_FILE}, will help Victor understand the project's structure, purpose, and conventions.
+Your analysis must be comprehensive, distilling the provided information into a clear and actionable guide.
 
-CONFIG FILES FOUND:
-{chr(10).join('- ' + f for f in context['config_files']) or 'None detected'}
+Analyze the following project data and generate the {VICTOR_CONTEXT_FILE} file.
 
-DIRECTORY STRUCTURE:
-{chr(10).join(context['directory_structure'][:50]) or 'Unable to determine'}
-
-SOURCE FILES (sample):
-{chr(10).join(context['source_files'][:30]) or 'No source files found'}
-
-README CONTENT:
-{context['readme_content'][:1500] or '[No README found]'}
-
-MAIN CONFIG CONTENT:
-{context['main_config_content'][:2000] or '[No config found]'}
+**Output Rules:**
+1.  **Start with the Header**: The response MUST begin with `# {VICTOR_CONTEXT_FILE}`.
+2.  **Use Markdown**: Format the entire output in clean, readable Markdown. Use tables for structured data.
+3.  **Be Factual**: Base your analysis exclusively on the provided context. Do not infer or add information not present in the data.
+4.  **Be Concise**: Provide high-level summaries. Focus on the "what" and "why," not implementation details.
+5.  **Follow the Structure**: Generate all of the requested sections.
 
 ---
+"""
 
-Generate a {VICTOR_CONTEXT_FILE} file with these sections:
-1. **Project Overview**: Brief description of what the project does
-2. **Package Layout**: Table showing important directories (use | Path | Status | Description | format)
-3. **Key Components**: Main modules, classes, or files with their purposes
-4. **Common Commands**: Build, test, run commands based on the detected build system
-5. **Architecture**: High-level architecture notes (if determinable)
-6. **Important Notes**: Any special considerations, deprecated paths, etc.
+    # Dynamic part of the prompt (the "20%")
+    dynamic_context = f"""
+**Project Name**: {context['project_name']}
+**Detected Languages**: {', '.join(context['detected_languages']) or 'Unknown'}
 
-IMPORTANT:
-- Be concise but comprehensive
-- Include file paths where relevant
-- Use markdown tables for structured data
-- Don't make up information - only document what's evident from the structure
-- Start with "# {VICTOR_CONTEXT_FILE}" header
+**Configuration Files**:
+{chr(10).join('- ' + f for f in context['config_files']) or 'None detected'}
 
-Output ONLY the {VICTOR_CONTEXT_FILE} content, no explanations."""
+**Directory Structure Overview**:
+```
+{chr(10).join(context['directory_structure'][:50]) or 'Unable to determine'}
+```
 
-    return prompt
+**Sample of Source Files**:
+```
+{chr(10).join(context['source_files'][:30]) or 'No source files found'}
+```
+"""
+
+    if context.get("key_files_content"):
+        dynamic_context += "\n**Content of Key Files**:\n"
+        for file_path, content in context["key_files_content"].items():
+            dynamic_context += f"--- `{file_path}` ---\n```\n{content}\n```\n\n"
+
+    # Static part of the prompt (continued)
+    prompt_footer = f"""
+---
+
+**Generation Task**:
+
+Generate the full content for the `{VICTOR_CONTEXT_FILE}` file, adhering to all rules above. Create the following sections:
+
+1.  `## Project Overview`
+    -   Write a one-paragraph summary of the project's purpose, based on the README and file structure.
+
+2.  `## Package Layout`
+    -   Create a Markdown table with columns: `| Path | Status | Description |`.
+    -   List the most important top-level directories.
+    -   Infer the purpose of each directory (e.g., source code, tests, docs). Mark the main source directory as `**ACTIVE**`.
+
+3.  `## Key Components`
+    -   Identify 5-7 key files or classes from the provided context.
+    -   Create a Markdown table with columns: `| Component | Path | Description |`.
+    -   Provide a one-sentence description for each component.
+
+4.  `## Common Commands`
+    -   Based on the configuration files (e.g., `package.json`, `pyproject.toml`), list the essential commands for building, testing, and running the project inside a `bash` code block.
+
+5.  `## Architecture Notes`
+    -   From the file names and structure, infer 2-3 high-level architectural patterns. (e.g., "Provider Pattern for multiple LLMs", "REST API with FastAPI", "CLI application using Typer").
+
+6.  `## Important Notes`
+    -   Add 2-3 bullet points for an AI assistant to remember, such as "Always use `victor/` for core source code" or "Check `pyproject.toml` for dependencies".
+
+Remember, output ONLY the generated `{VICTOR_CONTEXT_FILE}` content, starting with the `# {VICTOR_CONTEXT_FILE}` header.
+"""
+
+    return prompt_header + dynamic_context + prompt_footer
 
 
 async def generate_victor_md_with_llm(
@@ -1219,6 +1563,8 @@ async def generate_victor_md_with_llm(
     model: str,
     root_path: Optional[str] = None,
     max_files: int = 50,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
 ) -> str:
     """Generate project context file using an LLM provider.
 
@@ -1230,6 +1576,8 @@ async def generate_victor_md_with_llm(
         model: Model identifier to use for generation
         root_path: Root directory to analyze. Defaults to current directory.
         max_files: Maximum source files to include in context.
+        include_dirs: List of directories to include in the analysis.
+        exclude_dirs: List of directories to exclude from the analysis.
 
     Returns:
         Generated content for .victor/init.md.
@@ -1237,7 +1585,9 @@ async def generate_victor_md_with_llm(
     from victor.providers.base import Message
 
     # Gather project context
-    context = gather_project_context(root_path, max_files)
+    context = gather_project_context(
+        root_path, max_files, include_dirs=include_dirs, exclude_dirs=exclude_dirs
+    )
 
     # Build prompt
     prompt = build_llm_prompt_for_victor_md(context)
@@ -1253,16 +1603,388 @@ async def generate_victor_md_with_llm(
 
         # Ensure it starts with the header
         if not content.startswith(expected_header):
-            content = f"{expected_header}\n\n" + content
+            content = f"{expected_header}\\n\\n" + content
 
         return content
     except Exception as e:
         logger.error(f"LLM generation failed: {e}")
         # Fall back to basic generation
-        return generate_smart_victor_md(root_path)
+        return generate_smart_victor_md(
+            root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs
+        )
 
 
-async def generate_victor_md_from_index(root_path: Optional[str] = None) -> str:
+def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Summarize embedding/cache health for init.md enrichment."""
+    root = Path(root_path).resolve() if root_path else Path.cwd()
+    try:
+        from victor.cache.embedding_cache_manager import EmbeddingCacheManager
+    except Exception as exc:  # pragma: no cover - optional dependency at runtime
+        logger.debug("Embedding manager unavailable: %s", exc)
+        return None
+
+    try:
+        status = EmbeddingCacheManager.get_instance().get_status()
+    except Exception as exc:  # pragma: no cover - runtime I/O
+        logger.debug("Failed to collect embedding status: %s", exc)
+        return None
+
+    caches: List[Dict[str, Any]] = []
+    for cache in status.caches:
+        caches.append(
+            {
+                "name": cache.name,
+                "type": cache.cache_type.value,
+                "files": cache.file_count,
+                "size": cache.size_str,
+                "age": cache.age_str,
+            }
+        )
+
+    info: Dict[str, Any] = {
+        "total_files": status.total_files,
+        "total_size": status.total_size_str,
+        "caches": caches,
+    }
+
+    # Optional: inspect code embedding store (LanceDB) for metadata richness
+    try:
+        from victor.config.settings import get_project_paths, load_settings
+
+        settings = load_settings()
+        default_dir = get_project_paths(root).embeddings_dir
+        persist_dir = Path(
+            getattr(settings, "codebase_persist_directory", None) or default_dir
+        )
+
+        import lancedb  # type: ignore
+
+        if persist_dir.exists():
+            db = lancedb.connect(str(persist_dir))
+            table_names = db.table_names()
+            table_name = (
+                getattr(settings, "codebase_embedding_table", None)
+                or (table_names[0] if table_names else None)
+            )
+            if table_name:
+                table = db.open_table(table_name)
+                row_count = table.count_rows()
+
+                sample_keys: Dict[str, int] = defaultdict(int)
+                chunk_types: Set[str] = set()
+                span_lengths: List[int] = []
+
+                try:
+                    sample_rows = table.head(min(50, row_count)).to_list()  # small sample
+                except Exception:
+                    sample_rows = []
+
+                for row in sample_rows:
+                    for key, value in row.items():
+                        if key in {"id", "vector"}:
+                            continue
+                        if value not in (None, "", [], {}):
+                            sample_keys[key] += 1
+                        if key == "chunk_type" and isinstance(value, str):
+                            chunk_types.add(value)
+                        if key in {"line_start", "line_end"}:
+                            try:
+                                start = int(row.get("line_start", 0))
+                                end = int(row.get("line_end", 0))
+                                if start and end and end >= start:
+                                    span_lengths.append(end - start + 1)
+                            except Exception:
+                                pass
+
+                info["code_embeddings"] = {
+                    "path": str(persist_dir),
+                    "table": table_name,
+                    "rows": row_count,
+                    "metadata_keys": sorted(sample_keys.items(), key=lambda x: -x[1])[:8],
+                    "chunk_types": sorted(chunk_types)[:6] if chunk_types else [],
+                    "max_span": max(span_lengths) if span_lengths else None,
+                }
+    except Exception as exc:  # pragma: no cover - optional dependency
+        logger.debug("Skipping code embedding metadata inspection: %s", exc)
+
+    return info
+
+
+def _build_analyzer_section(
+    stats: Dict[str, Any],
+    graph_insights: Dict[str, Any],
+    embedding_status: Optional[Dict[str, Any]],
+) -> List[str]:
+    """Construct analyzer coverage section from index + graph data."""
+    if not stats:
+        return []
+
+    lines: List[str] = []
+    lines.append("## Analyzer Coverage\n")
+
+    total_symbols = stats.get("total_symbols", 0)
+    total_files = stats.get("total_files", 0)
+    lines.append(
+        f"- **Symbol index**: {total_symbols} symbols across {total_files} files "
+        "(multi-language tree-sitter + regex fallback, includes call sites and references)"
+    )
+
+    if graph_insights.get("has_graph"):
+        graph_stats = graph_insights.get("stats", {})
+        edge_types = graph_stats.get("edge_types", {})
+        call_edges = edge_types.get("CALLS", 0)
+        ref_edges = edge_types.get("REFERENCES", 0)
+        import_edges = edge_types.get("IMPORTS", 0)
+        inherits = edge_types.get("INHERITS", 0)
+        comp = edge_types.get("COMPOSED_OF", 0)
+
+        lines.append(
+            f"- **Code graph**: {graph_stats.get('total_nodes', 0)} nodes, "
+            f"{graph_stats.get('total_edges', 0)} edges "
+            f"(calls: {call_edges}, refs: {ref_edges}, imports: {import_edges}, "
+            f"inheritance: {inherits}, composition: {comp}); module PageRank and coupling detection ready"
+        )
+
+        # Highlight a few hubs and module ranks for quick navigation
+        hubs = graph_insights.get("hub_classes", [])[:2]
+        if hubs:
+            hub_preview = ", ".join(
+                f"`{hub['name']}` ({hub['degree']} links)" for hub in hubs
+            )
+            lines.append(f"  - Hub classes: {hub_preview}")
+
+        modules = graph_insights.get("important_modules", [])[:3]
+        if modules:
+            module_preview = ", ".join(
+                f"`{mod['module']}` ({mod['role']})" for mod in modules
+            )
+            lines.append(f"  - Module PageRank leaders: {module_preview}")
+
+        languages = graph_insights.get("languages", [])
+        if languages:
+            top_langs = ", ".join(f"{lang} ({count})" for lang, count in languages[:3])
+            lines.append(f"  - Graph coverage by language: {top_langs}")
+
+        if edge_types:
+            missing_edges = graph_insights.get("edge_gaps", [])
+            if missing_edges:
+                lines.append(f"  - Missing edge types: {', '.join(missing_edges)} (re-run index with tree-sitter deps to capture)")
+            elif call_edges == 0:
+                lines.append("  - Calls not captured; verify tree-sitter call extraction is installed.")
+
+        call_hotspots = graph_insights.get("call_hotspots", [])
+        if call_hotspots:
+            hot_preview = ", ".join(
+                f"`{sym['name']}` ({sym['in_degree']} callers)" for sym in call_hotspots[:3]
+            )
+            lines.append(f"  - Call hotspots: {hot_preview}")
+    else:
+        lines.append(
+            "- **Code graph**: not detected yet (run `victor index` to populate tree-sitter call/reference graph)"
+        )
+
+    if embedding_status and embedding_status.get("caches"):
+        cache_preview = ", ".join(
+            f"{cache['name']} ({cache['files']} files, {cache['size']}, {cache['age']})"
+            for cache in embedding_status["caches"][:3]
+        )
+        lines.append(
+            f"- **Semantic embeddings**: {cache_preview} "
+            "(tree-sitter chunking for code spans; tool/intent/conversation caches ready)"
+        )
+        if embedding_status.get("code_embeddings"):
+            ce = embedding_status["code_embeddings"]
+            meta_keys = ", ".join(k for k, _ in ce.get("metadata_keys", [])) or "none"
+            lines.append(
+                f"  - Code embeddings: {ce.get('rows', 0)} vectors @ {ce.get('path')} "
+                f"(metadata keys: {meta_keys})"
+            )
+
+    lines.append("")
+    return lines
+
+
+def _infer_python_requires(root: Path) -> Optional[str]:
+    """Read requires-python from pyproject.toml if present."""
+    pyproject = root / "pyproject.toml"
+    if not pyproject.exists():
+        return None
+    try:
+        content = pyproject.read_text(encoding="utf-8", errors="ignore")
+        match = re.search(r"requires-python\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]", content)
+        if match:
+            return match.group(1)
+    except Exception:
+        return None
+    return None
+
+
+def _infer_commands(root: Path) -> List[str]:
+    """Infer project commands from Makefile, package.json, and common conventions."""
+    commands: List[str] = []
+
+    makefile = root / "Makefile"
+    if makefile.exists():
+        try:
+            make_text = makefile.read_text(encoding="utf-8", errors="ignore")
+            targets = set(re.findall(r"^(\\w+):", make_text, re.MULTILINE))
+            preferred = [
+                ("install-dev", "make install-dev"),
+                ("install", "make install"),
+                ("lint", "make lint"),
+                ("format", "make format"),
+                ("test", "make test"),
+                ("test-all", "make test-all"),
+                ("serve", "make serve"),
+                ("build", "make build"),
+                ("docker", "make docker"),
+            ]
+            for target, cmd in preferred:
+                if target in targets:
+                    commands.append(cmd)
+        except Exception:
+            pass
+
+    pkg = root / "package.json"
+    if pkg.exists():
+        try:
+            import json
+
+            data = json.loads(pkg.read_text(encoding="utf-8", errors="ignore"))
+            scripts = data.get("scripts", {}) or {}
+            for key in ("dev", "start", "build", "test", "lint"):
+                if key in scripts:
+                    commands.append(f"npm run {key}")
+            commands.append("npm install")
+        except Exception:
+            pass
+
+    # Python defaults
+    commands.append('pip install -e ".[dev]"')
+    commands.append("pytest")
+
+    # Docker hints
+    if (root / "docker-compose.yml").exists():
+        commands.append("docker-compose up -d")
+
+    # Server/UI hints
+    if (root / "web" / "server").exists():
+        commands.append("uvicorn web.server.main:app --reload")
+    if (root / "web" / "ui").exists():
+        commands.append("cd web/ui && npm install && npm run dev")
+
+    # Deduplicate preserving order
+    seen: Set[str] = set()
+    deduped: List[str] = []
+    for cmd in commands:
+        if cmd not in seen:
+            deduped.append(cmd)
+            seen.add(cmd)
+    return deduped
+
+
+def _infer_env_vars(root: Path) -> List[str]:
+    """Infer env vars from .env/.env.example (uppercase keys)."""
+    env_files = [root / ".env", root / ".env.example"]
+    vars_found: List[str] = []
+    seen: Set[str] = set()
+    for env_file in env_files:
+        if not env_file.exists():
+            continue
+        try:
+            for line in env_file.read_text(encoding="utf-8", errors="ignore").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key = line.split("=", 1)[0].strip()
+                if key.isupper() and key not in seen:
+                    vars_found.append(key)
+                    seen.add(key)
+        except Exception:
+            continue
+    return vars_found[:10]
+
+
+def _build_quick_start(commands: List[str]) -> List[str]:
+    """Pick a concise quick-start command set."""
+    if not commands:
+        return []
+    quick: List[str] = []
+    # Prefer install, lint/test, serve/dev commands if present
+    priorities = [
+        ("install", ("install", "pip install", "npm install", "make install")),
+        ("lint", ("lint", "ruff", "eslint")),
+        ("test", ("test", "pytest", "npm test", "make test")),
+        ("serve", ("serve", "uvicorn", "run dev", "npm run dev")),
+    ]
+    lower_cmds = [(c.lower(), c) for c in commands]
+    for _label, needles in priorities:
+        for lc, orig in lower_cmds:
+            if any(n in lc for n in needles):
+                if orig not in quick:
+                    quick.append(orig)
+                break
+    # Fallback: first 3 commands
+    for cmd in commands:
+        if len(quick) >= 3:
+            break
+        if cmd not in quick:
+            quick.append(cmd)
+    return quick[:4]
+
+
+def _find_config_files(root: Path) -> List[str]:
+    """Find common config files (json/yaml/toml) while skipping vendor/venv/build artifacts."""
+    exts = {".json", ".yaml", ".yml", ".toml"}
+    results: List[str] = []
+    extra_skip = {"venv", "env", "node_modules", "build", "dist", "out", ".mypy_cache", ".ruff_cache", ".pytest_cache"}
+    skip_parts = {"htmlcov", "htmlcov_lang", "coverage", "__pycache__", "egg-info"}
+
+    for path in root.rglob("*"):
+        if path.suffix not in exts or not path.is_file():
+            continue
+        if should_ignore_path(path, skip_dirs=DEFAULT_SKIP_DIRS, extra_skip_dirs=extra_skip):
+            continue
+        if any(part in skip_parts for part in path.parts):
+            continue
+        rel = str(path.relative_to(root))
+        results.append(rel)
+        if len(results) >= 40:  # cap for speed
+            break
+
+    results.sort()
+    return results[:15]
+
+
+def _find_docs_files(root: Path) -> List[str]:
+    """Find markdown/adoc docs (top-N) while skipping vendor/venv/build artifacts."""
+    results: List[tuple[int, str]] = []
+    extra_skip = {"venv", "env", "node_modules", "build", "dist", "out", ".mypy_cache", ".ruff_cache", ".pytest_cache"}
+    skip_parts = {"htmlcov", "htmlcov_lang", "coverage", "__pycache__", "egg-info"}
+
+    for path in root.rglob("*.md"):
+        if should_ignore_path(path, skip_dirs=DEFAULT_SKIP_DIRS, extra_skip_dirs=extra_skip):
+            continue
+        if any(part in skip_parts for part in path.parts):
+            continue
+        try:
+            size = path.stat().st_size
+        except Exception:
+            size = 0
+        rel = str(path.relative_to(root))
+        results.append((size, rel))
+        if len(results) >= 80:  # reasonable cap
+            break
+    results.sort(reverse=True)  # bigger docs first
+    return [rel for _size, rel in results[:12]]
+
+
+async def generate_victor_md_from_index(
+    root_path: Optional[str] = None,
+    force: bool = False,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
+) -> str:
     """Generate init.md from the SymbolStore (pre-indexed symbols).
 
     This uses the SQLite symbol store for fast, accurate init.md generation.
@@ -1271,23 +1993,40 @@ async def generate_victor_md_from_index(root_path: Optional[str] = None) -> str:
 
     Args:
         root_path: Root directory. Defaults to current directory.
+        force: If True, re-index all files ignoring cache.
 
     Returns:
         Generated markdown content for .victor/init.md.
     """
     from victor.codebase.symbol_store import SymbolStore
 
-    root = Path(root_path) if root_path else Path.cwd()
-    store = SymbolStore(str(root))
+    root = Path(root_path).resolve() if root_path else Path.cwd()
+    store = SymbolStore(str(root), include_dirs=include_dirs, exclude_dirs=exclude_dirs)
 
-    # Index if needed (quick operation if already indexed)
-    await store.index_codebase()
+    # Index if needed (quick operation if already indexed, unless force=True)
+    await store.index_codebase(force=force)
 
     stats = store.get_stats()
-    key_components = store.find_key_components(limit=15)
+    key_components = store.find_key_components(limit=20)  # Increased from 15 for more context
     patterns = store.get_detected_patterns()
     named_impls = store.find_named_implementations()
     perf_hints = store.find_performance_hints()
+
+    # Also run CodebaseAnalyzer for enhanced info (dependencies, LOC, imports, coverage)
+    analyzer = CodebaseAnalyzer(str(root), include_dirs=include_dirs, exclude_dirs=exclude_dirs)
+    analyzer._extract_dependencies()
+    analyzer._calculate_loc_stats()
+    analyzer._extract_top_imports()
+    analyzer._extract_test_coverage()
+    enhanced_info = analyzer.analysis
+
+    graph_insights = await extract_graph_insights(root_path)
+    embedding_status = _collect_embedding_status(root_path)
+    env_vars = _infer_env_vars(root)
+    commands_inferred = _infer_commands(root)
+    quick_start = _build_quick_start(commands_inferred)
+    config_files = _find_config_files(root)
+    docs_files = _find_docs_files(root)
 
     sections = []
 
@@ -1315,20 +2054,36 @@ async def generate_victor_md_from_index(root_path: Optional[str] = None) -> str:
     sections.append("| Path | Type | Description |")
     sections.append("|------|------|-------------|")
 
-    # Infer main directories from key components
-    dirs_seen = set()
+    dirs_seen: Set[str] = set()
+
+    def add_dir(path: str, type_label: str, desc: str) -> None:
+        if path in dirs_seen:
+            return
+        if (root / path).exists():
+            sections.append(f"| `{path}/` | {type_label} | {desc} |")
+            dirs_seen.add(path)
+
+    # Core/runtime dirs
+    add_dir("victor", "**ACTIVE**", "Backend / core")
+    add_dir("src", "Active", "Source code")
+    add_dir("web/server", "Active", "Backend server")
+    add_dir("web/ui", "Active", "Web UI")
+    add_dir("vscode-victor", "Active", "Editor extension")
+    add_dir("docs", "Active", "Documentation")
+    add_dir("docs/guides", "Active", "Guides and playbooks")
+    add_dir("examples", "Active", "Examples and sample workflows")
+    add_dir("scripts", "Active", "Automation and helper scripts")
+    add_dir("templates", "Active", "Scaffold and template files")
+    add_dir("tests", "Active", "Unit and integration tests")
+    add_dir("victor_test", "Active", "Lightweight demos")
+    add_dir("archive", "Legacy", "Historical code (frozen)")
+
+    # Infer additional dirs from key components for completeness
     for comp in key_components:
         dir_parts = Path(comp.file_path).parts
         if len(dir_parts) > 1:
             main_dir = dir_parts[0]
-            if main_dir not in dirs_seen:
-                dirs_seen.add(main_dir)
-                sections.append(f"| `{main_dir}/` | **ACTIVE** | Source code |")
-
-    if (root / "tests").is_dir():
-        sections.append("| `tests/` | Active | Unit and integration tests |")
-    if (root / "docs").is_dir():
-        sections.append("| `docs/` | Active | Documentation |")
+            add_dir(main_dir, "**ACTIVE**", "Source code")
 
     sections.append("")
 
@@ -1338,17 +2093,177 @@ async def generate_victor_md_from_index(root_path: Optional[str] = None) -> str:
         sections.append("| Component | Type | Path | Description |")
         sections.append("|-----------|------|------|-------------|")
 
-        for comp in key_components[:12]:
-            desc = (
+        # Prefer runtime components over test-only entries
+        filtered_components = [
+            comp
+            for comp in key_components
+            if not str(comp.file_path).startswith("tests/")
+            and not str(comp.file_path).startswith("vscode-victor/out")
+        ]
+        display_components = filtered_components or key_components
+        seen_components: Set[str] = set()
+
+        for comp in display_components[:15]:  # Show top 15 (increased from 12)
+            if comp.name in seen_components:
+                continue
+            seen_components.add(comp.name)
+            raw_desc = (
                 comp.docstring or comp.category.title()
                 if comp.category
                 else comp.symbol_type.title()
             )
+            # Truncate to first sentence or 120 chars, whichever is shorter
+            desc = raw_desc.split("\n")[0][:120].strip()
+            if len(raw_desc) > 120 and "." in desc:
+                # Truncate at last sentence boundary
+                desc = desc.rsplit(".", 1)[0] + "."
             path_with_line = f"`{comp.file_path}:{comp.line_number}`"
             sections.append(
-                f"| {comp.name} | {comp.symbol_type} | {path_with_line} | {desc[:50]} |"
+                f"| {comp.name} | {comp.symbol_type} | {path_with_line} | {desc} |"
             )
 
+        sections.append("")
+
+    # Dependencies (from pyproject.toml/package.json)
+    if enhanced_info.dependencies:
+        sections.append("## Dependencies\n")
+        if enhanced_info.dependencies.get("core"):
+            core_deps = enhanced_info.dependencies["core"][:12]
+            sections.append(f"**Core** ({len(enhanced_info.dependencies['core'])} packages): {', '.join(core_deps)}")
+            if len(enhanced_info.dependencies["core"]) > 12:
+                sections.append(f"  ...and {len(enhanced_info.dependencies['core']) - 12} more")
+        if enhanced_info.dependencies.get("dev"):
+            dev_deps = enhanced_info.dependencies["dev"][:8]
+            sections.append(f"\n**Dev** ({len(enhanced_info.dependencies['dev'])} packages): {', '.join(dev_deps)}")
+        sections.append("")
+
+    # Configuration hints
+    sections.append("## Configuration\n")
+    sections.append(
+        "- Settings: `.env` → `~/.victor/profiles.yaml` → CLI flags (override order)\n"
+        "- Project context: `.victor/init.md` (regenerate with `victor init --update`)"
+    )
+    sections.append("")
+
+    if quick_start:
+        sections.append("## Quick Start\n")
+        sections.append("```bash")
+        for cmd in quick_start:
+            sections.append(cmd)
+        sections.append("```\n")
+
+    if env_vars:
+        sections.append("## Environment Variables\n")
+        sections.append("Likely used (from .env/.env.example):")
+        for var in env_vars:
+            sections.append(f"- `{var}`")
+        sections.append("")
+
+    if config_files:
+        sections.append("## Config Files\n")
+        for cfg in config_files[:12]:
+            sections.append(f"- `{cfg}`")
+        sections.append("")
+
+    if docs_files:
+        sections.append("## Documentation\n")
+        for doc in docs_files[:10]:
+            sections.append(f"- `{doc}`")
+        sections.append("")
+
+    # Codebase Stats (LOC, files, coverage)
+    if enhanced_info.loc_stats:
+        sections.append("## Codebase Stats\n")
+        loc = enhanced_info.loc_stats
+        stats_line = f"- **{loc.get('total_lines', 0):,}** lines of code across **{loc.get('total_files', 0)}** files"
+        if enhanced_info.test_coverage is not None:
+            stats_line += f" ({enhanced_info.test_coverage}% test coverage)"
+        sections.append(stats_line)
+
+        if loc.get("largest_file"):
+            sections.append(f"- Largest file: `{loc['largest_file']}` ({loc.get('largest_file_lines', 0):,} lines)")
+
+        # Show top 3 largest files
+        top_files = loc.get("top_files", [])[:3]
+        if top_files:
+            sections.append("- Top files by size:")
+            for path, lines in top_files:
+                sections.append(f"  - `{path}` ({lines:,} lines)")
+        sections.append("")
+
+    analyzer_section = _build_analyzer_section(
+        stats=stats, graph_insights=graph_insights, embedding_status=embedding_status
+    )
+    if analyzer_section:
+        sections.extend(analyzer_section)
+
+    if graph_insights.get("has_graph"):
+        graph_stats = graph_insights.get("stats", {})
+        edge_types = graph_stats.get("edge_types", {})
+        sections.append("## Graph Health\n")
+        sections.append(
+            f"- Nodes: {graph_stats.get('total_nodes', 0)}, Edges: {graph_stats.get('total_edges', 0)} "
+            f"(CALLS: {edge_types.get('CALLS', 0)}, REFERENCES: {edge_types.get('REFERENCES', 0)}, "
+            f"IMPORTS: {edge_types.get('IMPORTS', 0)}, INHERITS: {edge_types.get('INHERITS', 0)}, "
+            f"COMPOSED_OF: {edge_types.get('COMPOSED_OF', 0)})"
+        )
+        if graph_insights.get("languages"):
+            lang_preview = ", ".join(
+                f"{lang} ({count})" for lang, count in graph_insights["languages"][:4]
+            )
+            sections.append(f"- Language coverage: {lang_preview}")
+        if graph_insights.get("edge_gaps"):
+            sections.append(
+                f"- Missing edge types: {', '.join(graph_insights['edge_gaps'])} "
+                "(install tree-sitter deps and re-run `victor index`)"
+            )
+        if graph_insights.get("hub_classes"):
+            hubs = ", ".join(
+                f"{hub['name']} ({hub['degree']} links)" for hub in graph_insights["hub_classes"][:3]
+            )
+            sections.append(f"- Hub classes: {hubs}")
+        if graph_insights.get("important_modules"):
+            mods = ", ".join(
+                f"{mod['module']} ({mod['role']})" for mod in graph_insights["important_modules"][:3]
+            )
+            sections.append(f"- Module leaders: {mods}")
+        if graph_insights.get("pagerank"):
+            pr_preview = ", ".join(
+                f"{pr['name']} ({pr['in_degree']}↓/{pr['out_degree']}↑)" for pr in graph_insights["pagerank"][:3]
+            )
+            sections.append(f"- PageRank leaders: {pr_preview}")
+        if graph_insights.get("centrality"):
+            dc_preview = ", ".join(
+                f"{dc['name']} ({dc['degree']} deg)" for dc in graph_insights["centrality"][:3]
+            )
+            sections.append(f"- Centrality leaders: {dc_preview}")
+        if graph_insights.get("components"):
+            comp = graph_insights["components"]
+            details = f"largest {comp[0]} nodes" + (f", next {comp[1:3]}" if len(comp) > 1 else "")
+            sections.append(f"- Connected components: {details}")
+        sections.append("")
+
+    if embedding_status and embedding_status.get("code_embeddings"):
+        ce = embedding_status["code_embeddings"]
+        sections.append("## Embeddings & Chunking\n")
+        sections.append(
+            f"- Code embeddings: {ce.get('rows', 0)} vectors @ `{ce.get('path', '')}` (table: {ce.get('table', '')})"
+        )
+        if ce.get("metadata_keys"):
+            keys = ", ".join(k for k, _ in ce["metadata_keys"])
+            sections.append(f"- Metadata keys: {keys}")
+        if ce.get("chunk_types"):
+            sections.append(f"- Chunk types: {', '.join(ce['chunk_types'])}")
+        if ce.get("max_span"):
+            sections.append(f"- Max chunk span: {ce['max_span']} lines")
+        sections.append("")
+
+    # Top Imports (most used internal/external modules)
+    if enhanced_info.top_imports:
+        sections.append("## Most Imported Modules\n")
+        sections.append("*Non-stdlib modules imported most frequently*\n")
+        for module, count in enhanced_info.top_imports[:8]:
+            sections.append(f"- `{module}` ({count} imports)")
         sections.append("")
 
     # Named Implementations (grouped by domain)
@@ -1357,11 +2272,14 @@ async def generate_victor_md_from_index(root_path: Optional[str] = None) -> str:
         for domain, impls in sorted(named_impls.items()):
             if impls:
                 sections.append(f"### {domain}\n")
-                sections.append("| Name | Path | Description |")
-                sections.append("|------|------|-------------|")
+                sections.append("| Name | Location | Description |")
+                sections.append("|------|----------|-------------|")
                 for impl in sorted(impls, key=lambda x: x["name"]):
                     desc = impl.get("description", "") or impl.get("primary_symbol", "")
-                    sections.append(f"| **{impl['name']}** | `{impl['path']}` | {desc} |")
+                    # Format: SymbolName (file.py:line) for LLM navigation
+                    line_ref = f":{impl['line']}" if impl.get("line") else ""
+                    location = f"`{impl['path']}{line_ref}`"
+                    sections.append(f"| **{impl['name']}** | {location} | {desc} |")
                 sections.append("")
 
     # Performance Hints (extracted from docstrings)
@@ -1394,31 +2312,14 @@ async def generate_victor_md_from_index(root_path: Optional[str] = None) -> str:
             sections.append(f"- {count} {plural}")
         sections.append("")
 
-    # Common Commands (inferred from detected languages)
-    sections.append("## Common Commands\n")
+    # Setup & Commands (inferred)
+    sections.append("## Setup & Commands\n")
     sections.append("```bash")
-
-    langs = stats.get("files_by_language", {})
-    if "python" in langs:
-        sections.append("# Python project")
-        sections.append('pip install -e ".[dev]"')
-        sections.append("pytest")
-    if "typescript" in langs or "javascript" in langs:
-        sections.append("# Node.js project")
-        sections.append("npm install")
-        sections.append("npm test")
-    if "go" in langs:
-        sections.append("# Go project")
-        sections.append("go build")
-        sections.append("go test ./...")
-    if "rust" in langs:
-        sections.append("# Rust project")
-        sections.append("cargo build")
-        sections.append("cargo test")
-
-    if not any(lang in langs for lang in ["python", "typescript", "javascript", "go", "rust"]):
-        sections.append("# Add your build/run commands here")
-
+    py_requires = _infer_python_requires(root)
+    if py_requires:
+        sections.append(f"# Python >= {py_requires}")
+    for cmd in commands_inferred:
+        sections.append(cmd)
     sections.append("```\n")
 
     # Important Notes
@@ -1450,7 +2351,7 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
     import sqlite3
     from collections import Counter
 
-    root = Path(root_path) if root_path else Path.cwd()
+    root = Path(root_path).resolve() if root_path else Path.cwd()
     db_path = root / ".victor" / "conversation.db"
 
     if not db_path.exists():
@@ -1583,11 +2484,313 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
     return insights
 
 
+async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, Any]:
+    """Extract insights from the code graph for init.md enrichment.
+
+    Analyzes the code graph to detect:
+    - Design patterns (Provider, Factory, Facade, etc.)
+    - Most important symbols (PageRank)
+    - Hub classes (high centrality)
+    - File dependencies
+    - Graph statistics
+
+    Args:
+        root_path: Root directory containing .victor/graph
+
+    Returns:
+        Dictionary with graph insights
+    """
+    from pathlib import Path
+    from victor.tools.graph_tool import GraphAnalyzer, _load_graph
+    from victor.codebase.graph.registry import create_graph_store
+
+    root = Path(root_path).resolve() if root_path else Path.cwd()
+    graph_dir = root / ".victor" / "graph"
+    graph_db_path = graph_dir / "graph.db"
+
+    insights: Dict[str, Any] = {
+        "has_graph": False,
+        "patterns": [],
+        "important_symbols": [],
+        "hub_classes": [],
+        "stats": {},
+        # Module-level insights
+        "important_modules": [],
+        "module_coupling": [],
+        "languages": [],
+        "call_hotspots": [],
+        "edge_gaps": [],
+        "pagerank": [],
+        "centrality": [],
+        "components": [],
+    }
+
+    if not graph_db_path.exists():
+        return insights
+
+    try:
+        # Use direct SQL queries for fast stats instead of loading entire graph
+        import sqlite3
+        import json
+
+        conn = sqlite3.connect(graph_db_path)
+        try:
+            # Get basic stats
+            cur = conn.execute("SELECT COUNT(*) FROM nodes")
+            total_nodes = cur.fetchone()[0]
+
+            if total_nodes == 0:
+                return insights
+
+            cur = conn.execute("SELECT COUNT(*) FROM edges")
+            total_edges = cur.fetchone()[0]
+
+            # Get node type distribution
+            cur = conn.execute("SELECT type, COUNT(*) FROM nodes GROUP BY type")
+            node_types = dict(cur.fetchall())
+
+            # Language coverage
+            cur = conn.execute("SELECT lang, COUNT(*) FROM nodes GROUP BY lang")
+            languages = [(row[0], row[1]) for row in cur.fetchall() if row[0]]
+
+            # Get edge type distribution
+            cur = conn.execute("SELECT type, COUNT(*) FROM edges GROUP BY type")
+            edge_types = dict(cur.fetchall())
+
+            insights["has_graph"] = True
+            insights["stats"] = {
+                "total_nodes": total_nodes,
+                "total_edges": total_edges,
+                "node_types": node_types,
+                "edge_types": edge_types,
+            }
+            insights["languages"] = languages
+            # Identify missing edge types for debugging coverage
+            expected_edges = {"CALLS", "REFERENCES", "IMPORTS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF"}
+            insights["edge_gaps"] = sorted(list(expected_edges - set(edge_types.keys())))
+
+            # Get high-connectivity nodes (hub classes) via SQL
+            cur = conn.execute(
+                """
+                SELECT n.name, n.type, n.file, n.line,
+                       (SELECT COUNT(*) FROM edges WHERE src = n.node_id) +
+                       (SELECT COUNT(*) FROM edges WHERE dst = n.node_id) as degree
+                FROM nodes n
+                WHERE n.type IN ('class', 'struct', 'interface')
+                ORDER BY degree DESC
+                LIMIT 5
+            """
+            )
+            hub_results = cur.fetchall()
+            insights["hub_classes"] = [
+                {"name": r[0], "type": r[1], "file": r[2], "line": r[3], "degree": r[4]}
+                for r in hub_results
+                if r[4] >= 5
+            ][:3]
+
+            # Get most-called symbols (important functions)
+            cur = conn.execute(
+                """
+                SELECT n.name, n.type, n.file, n.line,
+                       (SELECT COUNT(*) FROM edges WHERE dst = n.node_id AND type = 'CALLS') as in_calls,
+                       (SELECT COUNT(*) FROM edges WHERE src = n.node_id AND type = 'CALLS') as out_calls
+                FROM nodes n
+                WHERE n.type IN ('function', 'method', 'class')
+                ORDER BY in_calls DESC
+                LIMIT 8
+            """
+            )
+            important_results = cur.fetchall()
+            insights["important_symbols"] = [
+                {
+                    "name": r[0],
+                    "type": r[1],
+                    "file": r[2],
+                    "line": r[3],
+                    "in_degree": r[4],
+                    "out_degree": r[5],
+                    "score": r[4] / max(total_edges, 1),  # Simplified score
+                }
+                for r in important_results
+                if r[4] > 0
+            ]
+            insights["call_hotspots"] = insights["important_symbols"][:5]
+
+            # Optional richer graph analytics
+            try:
+                from victor.tools.graph_tool import GraphAnalyzer
+                from victor.codebase.graph.sqlite_store import SQLiteGraphStore
+
+                ga = GraphAnalyzer()
+                store = SQLiteGraphStore(graph_db_path)
+                nodes = await store.get_all_nodes()
+                edges = await store.get_all_edges()
+                for n in nodes:
+                    ga.add_node(n)
+                for e in edges:
+                    ga.add_edge(e)
+
+                pagerank_top = ga.pagerank(
+                    top_k=8,
+                    edge_types=[
+                        "CALLS",
+                        "REFERENCES",
+                        "INHERITS",
+                        "IMPLEMENTS",
+                        "COMPOSED_OF",
+                        "IMPORTS",
+                    ],
+                )
+                centrality_top = ga.degree_centrality(
+                    top_k=8,
+                    edge_types=[
+                        "CALLS",
+                        "REFERENCES",
+                        "INHERITS",
+                        "IMPLEMENTS",
+                        "COMPOSED_OF",
+                        "IMPORTS",
+                    ],
+                )
+
+                # Connected components (undirected view)
+                visited: Set[str] = set()
+                components: List[int] = []
+                for node_id in ga.nodes:
+                    if node_id in visited:
+                        continue
+                    stack = [node_id]
+                    size = 0
+                    while stack:
+                        nid = stack.pop()
+                        if nid in visited:
+                            continue
+                        visited.add(nid)
+                        size += 1
+                        neighbors = [
+                            t for t, _et, _w in ga.outgoing.get(nid, [])
+                        ] + [s for s, _et, _w in ga.incoming.get(nid, [])]
+                        for n2 in neighbors:
+                            if n2 not in visited:
+                                stack.append(n2)
+                    components.append(size)
+
+                components.sort(reverse=True)
+
+                insights["pagerank"] = pagerank_top[:5]
+                insights["centrality"] = centrality_top[:5]
+                insights["components"] = components[:3]
+            except Exception as exc:
+                logger.debug(f"Graph analytics fallback skipped: {exc}")
+
+            # Module-level analysis: aggregate to file level
+            # Use REFERENCES edges (imports/dependencies) for richer module relationships
+            # CALLS edges are sparse as they only track explicit function calls
+            # Note: Hidden directories (.*) and archive/ are filtered at index time
+            cur = conn.execute(
+                """
+                SELECT
+                    src_n.file as src_module,
+                    dst_n.file as dst_module,
+                    COUNT(*) as ref_count
+                FROM edges e
+                JOIN nodes src_n ON e.src = src_n.node_id
+                JOIN nodes dst_n ON e.dst = dst_n.node_id
+                WHERE e.type = 'REFERENCES'
+                  AND src_n.file != dst_n.file
+                  AND src_n.file IS NOT NULL
+                  AND dst_n.file IS NOT NULL
+                  AND src_n.file NOT LIKE 'tests/%'
+                  AND dst_n.file NOT LIKE 'tests/%'
+                GROUP BY src_n.file, dst_n.file
+                HAVING ref_count >= 2
+                """
+            )
+            module_edges = cur.fetchall()
+
+            if module_edges:
+                # Build module adjacency for PageRank calculation
+                module_in_degree: Dict[str, int] = defaultdict(int)
+                module_out_degree: Dict[str, int] = defaultdict(int)
+                module_weighted_in: Dict[str, int] = defaultdict(int)
+                all_modules: Set[str] = set()
+
+                for src_mod, dst_mod, count in module_edges:
+                    all_modules.add(src_mod)
+                    all_modules.add(dst_mod)
+                    module_out_degree[src_mod] += 1
+                    module_in_degree[dst_mod] += 1
+                    module_weighted_in[dst_mod] += count
+
+                # Sort by weighted in-degree (approximation of module importance)
+                module_importance = [
+                    (mod, module_weighted_in[mod], module_in_degree[mod], module_out_degree[mod])
+                    for mod in all_modules
+                ]
+                module_importance.sort(key=lambda x: x[1], reverse=True)
+
+                # Classify module roles
+                insights["important_modules"] = []
+                for mod, weighted_in, in_deg, out_deg in module_importance[:8]:
+                    # Determine role
+                    if in_deg > out_deg * 2 and in_deg >= 3:
+                        role = "service"  # Many callers, few outgoing
+                    elif out_deg > in_deg * 2 and out_deg >= 3:
+                        role = "orchestrator"  # Calls many modules
+                    elif in_deg >= 2 and out_deg >= 2:
+                        role = "intermediary"  # Both caller and callee
+                    elif in_deg > 0 and out_deg == 0:
+                        role = "leaf"  # Terminal module
+                    elif out_deg > 0 and in_deg == 0:
+                        role = "entry"  # Entry point
+                    else:
+                        role = "peripheral"
+
+                    insights["important_modules"].append({
+                        "module": mod,
+                        "weighted_importance": weighted_in,
+                        "in_degree": in_deg,
+                        "out_degree": out_deg,
+                        "role": role,
+                    })
+
+                # Module coupling detection (high fan-in/fan-out)
+                coupling_issues = []
+                for mod, weighted_in, in_deg, out_deg in module_importance:
+                    total_degree = in_deg + out_deg
+                    if total_degree >= 8:  # High connectivity threshold
+                        if in_deg > 5 and out_deg > 5:
+                            pattern = "hub"
+                        elif in_deg > 5:
+                            pattern = "high_fan_in"
+                        else:
+                            pattern = "high_fan_out"
+                        coupling_issues.append({
+                            "module": mod,
+                            "pattern": pattern,
+                            "in_degree": in_deg,
+                            "out_degree": out_deg,
+                        })
+
+                insights["module_coupling"] = coupling_issues[:5]
+
+        finally:
+            conn.close()
+
+    except Exception as e:
+        logger.warning(f"Failed to extract graph insights: {e}")
+
+    return insights
+
+
 async def generate_enhanced_init_md(
     root_path: Optional[str] = None,
     use_llm: bool = False,
     include_conversations: bool = True,
     on_progress: Optional[callable] = None,
+    force: bool = False,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
 ) -> str:
     """Generate init.md using symbol index, conversation insights, and optional LLM.
 
@@ -1598,6 +2801,7 @@ async def generate_enhanced_init_md(
         use_llm: Whether to use LLM for enhancement (default: False)
         include_conversations: Whether to include conversation insights (default: True)
         on_progress: Optional callback: fn(stage: str, message: str)
+        force: If True, re-index all files ignoring cache.
 
     Returns:
         Enhanced init.md content. Falls back gracefully if LLM fails.
@@ -1623,7 +2827,9 @@ async def generate_enhanced_init_md(
 
     # Step 1: Index - Use SymbolStore for base content
     progress("index", "Building symbol index...")
-    base_content = await generate_victor_md_from_index(root_path)
+    base_content = await generate_victor_md_from_index(
+        root_path, force=force, include_dirs=include_dirs, exclude_dirs=exclude_dirs
+    )
     progress("index", "Symbol index built", complete=True)
 
     # Step 2: Learn - Add conversation insights
@@ -1669,6 +2875,117 @@ async def generate_enhanced_init_md(
                 )
             else:
                 base_content += "\n" + "\n".join(enhancements)
+
+    # Step 2.5: Graph - Add graph-based insights (design patterns, important symbols)
+    progress("graph", "Analyzing code graph...")
+    graph_insights = await extract_graph_insights(root_path)
+    if graph_insights.get("has_graph"):
+        progress(
+            "graph",
+            f"Graph analyzed ({graph_insights['stats'].get('total_nodes', 0)} nodes)",
+            complete=True,
+        )
+
+        graph_section = ["\n## Code Graph Insights\n"]
+        graph_section.append(
+            f"*{graph_insights['stats'].get('total_nodes', 0)} symbols, {graph_insights['stats'].get('total_edges', 0)} relationships*\n"
+        )
+
+        # Design patterns detected
+        if graph_insights.get("patterns"):
+            graph_section.append("### Detected Design Patterns\n")
+            for p in graph_insights["patterns"][:5]:
+                details = p.get("details", {})
+                if p["pattern"] == "provider_strategy":
+                    impls = details.get("implementations", [])
+                    graph_section.append(
+                        f"- **{p['name']}**: `{details.get('base_class', '')}` with {len(impls)} implementations"
+                    )
+                elif p["pattern"] == "facade":
+                    graph_section.append(
+                        f"- **{p['name']}**: `{details.get('class', '')}` ({details.get('incoming_calls', 0)} callers → {details.get('outgoing_calls', 0)} delegates)"
+                    )
+                elif p["pattern"] == "composition":
+                    composed = details.get("composed_of", [])
+                    graph_section.append(
+                        f"- **{p['name']}**: `{details.get('class', '')}` composed of {len(composed)} components"
+                    )
+                elif p["pattern"] == "factory":
+                    graph_section.append(
+                        f"- **{p['name']}**: `{details.get('class', '')}` creates {details.get('creates', 0)} types"
+                    )
+                else:
+                    graph_section.append(
+                        f"- **{p['name']}**: `{details.get('class', details.get('base_class', ''))}`"
+                    )
+            graph_section.append("")
+
+        # Most important symbols (PageRank)
+        if graph_insights.get("important_symbols"):
+            graph_section.append("### Most Important Symbols (PageRank)\n")
+            graph_section.append("| Symbol | Type | Connections |")
+            graph_section.append("|--------|------|-------------|")
+            for sym in graph_insights["important_symbols"][:6]:
+                conns = f"↓{sym['in_degree']} ↑{sym['out_degree']}"
+                # Format: SymbolName (file.py:line) for LLM navigation
+                line_ref = f":{sym['line']}" if sym.get("line") else ""
+                location = f"({sym['file']}{line_ref})"
+                graph_section.append(f"| `{sym['name']}` {location} | {sym['type']} | {conns} |")
+            graph_section.append("")
+
+        # Hub classes
+        if graph_insights.get("hub_classes"):
+            graph_section.append("### Hub Classes (High Connectivity)\n")
+            for hub in graph_insights["hub_classes"]:
+                # Format: ClassName (file.py:line) for LLM navigation
+                line_ref = f":{hub['line']}" if hub.get("line") else ""
+                location = f"({hub['file']}{line_ref})"
+                graph_section.append(f"- `{hub['name']}` {location} - {hub['degree']} connections")
+            graph_section.append("")
+
+        # Module-level architecture (more meaningful than symbol-level for codebase navigation)
+        if graph_insights.get("important_modules"):
+            graph_section.append("### Key Modules (Architecture)\n")
+            graph_section.append("| Module | Role | Connections |")
+            graph_section.append("|--------|------|-------------|")
+            for mod in graph_insights["important_modules"][:6]:
+                role_emoji = {
+                    "service": "🔧",
+                    "orchestrator": "🎛️",
+                    "intermediary": "↔️",
+                    "leaf": "🍃",
+                    "entry": "🚀",
+                    "peripheral": "📦",
+                }.get(mod["role"], "")
+                conns = f"↓{mod['in_degree']} ↑{mod['out_degree']}"
+                graph_section.append(
+                    f"| `{mod['module']}` | {role_emoji} {mod['role']} | {conns} |"
+                )
+            graph_section.append("")
+
+        # Module coupling warnings
+        if graph_insights.get("module_coupling"):
+            graph_section.append("### Coupling Hotspots\n")
+            for coupling in graph_insights["module_coupling"][:3]:
+                pattern_desc = {
+                    "hub": "⚠️ High fan-in AND fan-out",
+                    "high_fan_in": "Many callers",
+                    "high_fan_out": "Calls many modules",
+                }.get(coupling["pattern"], coupling["pattern"])
+                graph_section.append(
+                    f"- `{coupling['module']}` - {pattern_desc} "
+                    f"(↓{coupling['in_degree']} ↑{coupling['out_degree']})"
+                )
+            graph_section.append("")
+
+        # Insert before Important Notes
+        if "## Important Notes" in base_content:
+            parts = base_content.split("## Important Notes")
+            base_content = parts[0] + "\n".join(graph_section) + "\n## Important Notes" + parts[1]
+        else:
+            base_content += "\n" + "\n".join(graph_section)
+    else:
+        progress("graph", "No graph data (run 'victor index' first)", complete=True)
 
     # Step 3: Deep - Use LLM to enhance content
     if not use_llm:

@@ -31,14 +31,97 @@ Resolution order:
 
 import fnmatch
 import logging
+import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
 from victor.agent.tool_calling.base import ToolCallingCapabilities, ToolCallFormat
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# MODEL NAME NORMALIZATION
+# =============================================================================
+# Handles common model naming variants to ensure capability lookup succeeds.
+# E.g., "qwen25-coder" → "qwen2.5-coder", "llama33" → "llama3.3"
+
+# Pre-compiled regex patterns for better performance
+_COMPILED_ALIASES = [
+    (re.compile(r"qwen25([^0-9])", re.IGNORECASE), r"qwen2.5\1"),
+    (re.compile(r"qwen25$", re.IGNORECASE), r"qwen2.5"),
+    (re.compile(r"llama33([^0-9])", re.IGNORECASE), r"llama3.3\1"),
+    (re.compile(r"llama33$", re.IGNORECASE), r"llama3.3"),
+    (re.compile(r"llama31([^0-9])", re.IGNORECASE), r"llama3.1\1"),
+    (re.compile(r"llama31$", re.IGNORECASE), r"llama3.1"),
+    (re.compile(r"llama32([^0-9])", re.IGNORECASE), r"llama3.2\1"),
+    (re.compile(r"llama32$", re.IGNORECASE), r"llama3.2"),
+    (re.compile(r"deepseekr1", re.IGNORECASE), r"deepseek-r1"),
+    (re.compile(r"deepseek_r1", re.IGNORECASE), r"deepseek-r1"),
+    (re.compile(r"deepseekcoder", re.IGNORECASE), r"deepseek-coder"),
+]
+
+# Cache for normalized model names
+_NORMALIZATION_CACHE: Dict[str, str] = {}
+
+
+def normalize_model_name(model_name: str) -> str:
+    """Normalize model name to canonical form for capability lookup.
+
+    Applies alias patterns to handle common naming variants:
+    - qwen25-coder → qwen2.5-coder
+    - llama33:70b → llama3.3:70b
+    - deepseekr1 → deepseek-r1
+
+    Args:
+        model_name: Original model name (e.g., "qwen25-coder-tools:14b-64K")
+
+    Returns:
+        Normalized model name (e.g., "qwen2.5-coder-tools:14b-64K")
+    """
+    if not model_name:
+        return model_name
+
+    # Check cache first
+    if model_name in _NORMALIZATION_CACHE:
+        return _NORMALIZATION_CACHE[model_name]
+
+    normalized = model_name.lower()
+    original_lower = normalized
+
+    for pattern, replacement in _COMPILED_ALIASES:
+        normalized = pattern.sub(replacement, normalized)
+
+    # Cache the result
+    _NORMALIZATION_CACHE[model_name] = normalized
+
+    if normalized != original_lower:
+        logger.debug(f"Normalized model name: {model_name} → {normalized}")
+
+    return normalized
+
+
+def get_model_name_variants(model_name: str) -> List[str]:
+    """Get all naming variants for a model to try during lookup.
+
+    Returns both the original name and normalized form(s) to maximize
+    matching against capability patterns.
+
+    Args:
+        model_name: Original model name
+
+    Returns:
+        List of model name variants to try (original first, then normalized)
+    """
+    variants = [model_name.lower()]
+
+    normalized = normalize_model_name(model_name)
+    if normalized not in variants:
+        variants.append(normalized)
+
+    return variants
 
 
 class ModelCapabilityLoader:
@@ -117,45 +200,55 @@ class ModelCapabilityLoader:
 
         config_dict = self._config or {}
         provider_lower = provider.lower()
-        model_lower = model.lower() if model else ""
 
         # Start building resolved config
         resolved = {}
 
         # 1. Apply global defaults
-        defaults = config_dict.get("defaults", {})
-        self._apply_defaults(resolved, defaults)
+        defaults = config_dict.get("defaults")
+        if defaults:
+            self._apply_defaults(resolved, defaults)
 
         # 2. Apply provider defaults
-        provider_defaults = config_dict.get("provider_defaults", {}).get(provider_lower, {})
+        provider_defaults = config_dict.get("provider_defaults", {}).get(provider_lower)
         if provider_defaults:
             logger.debug(f"Applying provider_defaults for '{provider_lower}'")
             resolved.update(provider_defaults)
 
         # 3-5. Find and apply matching model configuration
-        if model_lower:
-            models = config_dict.get("models", {})
-            matching = self._find_matching_model(models, model_lower)
+        if model:
+            models = config_dict.get("models")
+            if models:
+                # Get all name variants to try
+                model_variants = get_model_name_variants(model)
+                matching = None
+                for variant in model_variants:
+                    matching = self._find_matching_model(models, variant)
+                    if matching:
+                        logger.debug(f"Found capability match using variant: {variant}")
+                        break
 
-            for pattern, model_config in matching:
-                logger.debug(f"Applying model pattern '{pattern}'")
+                if matching:
+                    for pattern, model_config in matching:
+                        logger.debug(f"Applying model pattern '{pattern}'")
 
-                # 3. Apply training capabilities (maps to native capability flags)
-                training = model_config.get("training", {})
-                if training:
-                    self._apply_training(resolved, training)
+                        # 3. Apply training capabilities
+                        training = model_config.get("training")
+                        if training:
+                            self._apply_training(resolved, training)
 
-                # 4. Apply provider-specific overrides
-                providers = model_config.get("providers", {})
-                provider_config = providers.get(provider_lower, {})
-                if provider_config:
-                    logger.debug(f"Applying model.providers.{provider_lower}")
-                    resolved.update(provider_config)
+                        # 4. Apply provider-specific overrides
+                        providers = model_config.get("providers")
+                        if providers:
+                            provider_config = providers.get(provider_lower)
+                            if provider_config:
+                                logger.debug(f"Applying model.providers.{provider_lower}")
+                                resolved.update(provider_config)
 
-                # 5. Apply model settings
-                settings = model_config.get("settings", {})
-                if settings:
-                    resolved.update(settings)
+                        # 5. Apply model settings
+                        settings = model_config.get("settings")
+                        if settings:
+                            resolved.update(settings)
 
         # Convert to ToolCallingCapabilities
         return self._config_to_capabilities(resolved, format_hint)
@@ -195,18 +288,18 @@ class ModelCapabilityLoader:
         matching = []
 
         for pattern, config in models.items():
-            if not isinstance(config, dict):
-                continue
+            if isinstance(config, dict):
+                pattern_lower = pattern.lower()
+                if self._matches_pattern(model_lower, pattern_lower):
+                    # Score by specificity (longer patterns are more specific)
+                    specificity = len(pattern.replace("*", ""))
+                    matching.append((specificity, pattern, config))
 
-            pattern_lower = pattern.lower()
-            if self._matches_pattern(model_lower, pattern_lower):
-                # Score by specificity (longer patterns are more specific)
-                specificity = len(pattern.replace("*", ""))
-                matching.append((specificity, pattern, config))
+        if not matching:
+            return []
 
         # Sort by specificity (least specific first, so more specific overrides)
         matching.sort(key=lambda x: x[0])
-
         return [(pattern, config) for _, pattern, config in matching]
 
     def _matches_pattern(self, model_name: str, pattern: str) -> bool:
@@ -250,6 +343,8 @@ class ModelCapabilityLoader:
             # Model-specific exploration behavior
             exploration_multiplier=config.get("exploration_multiplier", 1.0),
             continuation_patience=config.get("continuation_patience", 3),
+            # Model-specific timeout settings
+            timeout_multiplier=config.get("timeout_multiplier", 1.0),
         )
 
     # =========================================================================

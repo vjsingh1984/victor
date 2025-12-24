@@ -57,44 +57,39 @@ ollama pull codellama:13b
 
 ## First Run
 
-### Interactive Mode (TUI - Default)
-
-Victor features a modern **Text User Interface (TUI)** with a rich terminal experience:
+### Streaming CLI (Default)
 
 ```bash
-# Start interactive TUI mode (default)
+# Start streaming chat (Rich output by default)
 victor chat
-
-# Or simply
-victor
 ```
 
-**TUI Features:**
-- Modern terminal interface with colors and formatting
-- Status bar showing provider, model, and tool budget
-- Message history with user/assistant distinction
-- Keyboard shortcuts (Ctrl+C to cancel, Ctrl+D to quit)
-- Logs written to `~/.victor/logs/victor.log`
-
-![TUI Screenshot](../../assets/victor-tui.png)
-
-### CLI Mode (For Debugging)
-
-Use `--no-tui` or `--cli` flag for classic console output with visible logs:
+### Plain/Debug Output
 
 ```bash
-# CLI mode with debug logging
-victor chat --no-tui --log-level DEBUG
-
-# Or use the shorter alias
-victor chat --cli --log-level DEBUG
+# Force plain text and show debug logs
+victor chat --renderer text --log-level DEBUG
 ```
 
-**When to use CLI mode:**
+**When to use plain mode:**
 - Debugging issues (see all log output in console)
 - Running in non-interactive terminals
 - Piping output to files
 - CI/CD environments
+
+### Provider/Model Overrides
+
+```bash
+# Override provider/model (bypass profiles.yaml) and set endpoint for local providers
+victor chat --provider ollama --model qwen3-coder:30b --endpoint http://localhost:11434
+```
+
+### Modes and Budgets
+
+```bash
+# Start in explore mode with tighter budgets
+victor chat --mode explore --tool-budget 20 --max-iterations 60
+```
 
 ### One-Shot Command
 
@@ -254,25 +249,57 @@ profiles:
 
 Use with: `victor --profile llama`
 
-### 2. Add API Keys for Frontier Models
+### 2. Add API Keys for Cloud Providers
 
-Create `.env` file:
+**Option A: Secure Keyring Storage (Recommended)**
 ```bash
-ANTHROPIC_API_KEY=your_key_here
-OPENAI_API_KEY=your_key_here
-GOOGLE_API_KEY=your_key_here
+# Store keys in system keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+victor keys --set anthropic --keyring
+victor keys --set openai --keyring
+victor keys --set google --keyring
+victor keys --set groqcloud --keyring
+victor keys --set mistral --keyring
+victor keys --set openrouter --keyring
+
+# List configured providers
+victor keys
 ```
 
-Update profiles.yaml:
+**Option B: Environment Variables**
+```bash
+export ANTHROPIC_API_KEY=your_key_here
+export OPENAI_API_KEY=your_key_here
+export GOOGLE_API_KEY=your_key_here
+```
+
+**Free Tier Providers** (no credit card required):
+```bash
+# Groq - Ultra-fast inference, Llama 3.3 70B
+victor keys --set groqcloud --keyring
+victor chat --provider groqcloud --model llama-3.3-70b-versatile
+
+# Cerebras - Fastest inference (1000+ tok/s)
+victor keys --set cerebras --keyring
+victor chat --provider cerebras --model llama-3.3-70b
+
+# Mistral - 500K tokens/min free
+victor keys --set mistral --keyring
+victor chat --provider mistral --model mistral-large-latest
+
+# OpenRouter - 350+ models, free tier
+victor keys --set openrouter --keyring
+victor chat --provider openrouter --model nvidia/nemotron-3-nano-30b-a3b:free
+```
+
+Update profiles.yaml for quick access:
 ```yaml
 profiles:
   claude:
     provider: anthropic
     model: claude-sonnet-4-5
-
-providers:
-  anthropic:
-    api_key: ${ANTHROPIC_API_KEY}
+  groq:
+    provider: groqcloud
+    model: llama-3.3-70b-versatile
 ```
 
 ### 3. Explore Examples
@@ -361,15 +388,31 @@ victor "Analyze the test failures in test_results.txt and fix the issues"
 
 ## What's Implemented
 
-Victor already includes these features:
-- [x] **Anthropic Claude integration** - Claude 3.5 Sonnet/Opus/Haiku
-- [x] **OpenAI GPT integration** - GPT-4o, GPT-4o-mini
-- [x] **Google Gemini integration** - Gemini 2.5 Pro with configurable safety settings
-- [x] **xAI Grok integration** - Grok Beta and Vision
-- [x] **LMStudio and vLLM support** - OpenAI-compatible API
-- [x] **MCP (Model Context Protocol)** - Client and server support
+Victor includes these production-ready features:
+
+**Cloud Providers (Tested)**
+- [x] **Anthropic** - Claude 3.5/4, Sonnet/Opus/Haiku
+- [x] **OpenAI** - GPT-4.1, GPT-4o, o1/o3 reasoning models
+- [x] **Google** - Gemini 2.5/3.0 Pro/Flash
+- [x] **xAI** - Grok 2/3 with vision
+- [x] **DeepSeek** - DeepSeek-V3, affordable at $0.14/1M tokens
+- [x] **Groq** - Ultra-fast LPU inference (free tier)
+- [x] **Cerebras** - Fastest inference 1000+ tok/s (free tier)
+- [x] **Mistral** - Mistral Large/Codestral (500K tokens/min free)
+- [x] **Moonshot** - Kimi K2 with 256K context
+- [x] **OpenRouter** - 350+ models, unified gateway (free tier)
+
+**Local Inference**
+- [x] **Ollama** - 100+ models, tool calling support
+- [x] **LMStudio** - GUI-based local inference
+- [x] **vLLM** - High-throughput production serving
+- [x] **llama.cpp** - CPU/GPU GGUF models
+
+**Core Features**
+- [x] **Secure API Key Storage** - System keyring (Keychain/Credential Manager)
+- [x] **MCP Protocol** - Client and server support
 - [x] **Context caching** - Tiered memory + disk caching
-- [x] **50+ Enterprise tools** - File ops, git, testing, CI/CD, refactoring, security
+- [x] **45+ Enterprise tools** - File ops, git, testing, CI/CD, refactoring, security
 - [x] **Semantic code search** - Air-gapped mode with local embeddings
 - [x] **Multi-file editing** - Atomic transactions with rollback
 
@@ -378,7 +421,7 @@ Victor already includes these features:
 Planned features:
 - [ ] Web UI
 - [ ] Multi-agent collaboration
-- [ ] More provider integrations (Cohere, Mistral)
+- [ ] More provider integrations (Together, Fireworks, HuggingFace)
 
 Contributions are welcome!
 

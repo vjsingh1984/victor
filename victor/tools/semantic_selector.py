@@ -35,6 +35,7 @@ from victor.embeddings.service import EmbeddingService
 from victor.agent.tool_sequence_tracker import ToolSequenceTracker, create_sequence_tracker
 from victor.agent.debug_logger import TRACE  # Import TRACE level
 from victor.tools.metadata_registry import (
+    get_core_readonly_tools,
     get_tools_matching_mandatory_keywords,
     get_tools_by_task_type,
 )
@@ -282,6 +283,10 @@ class SemanticToolSelector:
             f"Tool embeddings computed and cached for {len(self._tool_embedding_cache)} tools"
         )
 
+    # Cache version - aligned with Victor version, increment on breaking cache format changes
+    # Format: "{victor_version}.{cache_revision}" e.g., "0.1.0.1" for first revision of 0.1.0
+    CACHE_VERSION = "0.1.0"
+
     def _calculate_tools_hash(self, tools: ToolRegistry) -> str:
         """Calculate hash of all tool definitions to detect changes.
 
@@ -289,19 +294,48 @@ class SemanticToolSelector:
             tools: Tool registry
 
         Returns:
-            SHA256 hash of tool definitions
+            SHA256 hash of tool definitions including count and version
         """
         # Create deterministic string from all tool definitions
+        tool_list = sorted(tools.list_tools(), key=lambda t: t.name)
+        tool_count = len(tool_list)
+        tool_names = sorted([t.name for t in tool_list])
+
         tool_strings = []
-        for tool in sorted(tools.list_tools(), key=lambda t: t.name):
+        for tool in tool_list:
             tool_string = f"{tool.name}:{tool.description}:{tool.parameters}"
             tool_strings.append(tool_string)
 
-        combined = "|".join(tool_strings)
+        # Include tool count, names, and cache version in hash for robustness
+        # This ensures ANY change (add, remove, rename, modify) triggers rebuild
+        combined = (
+            f"v{self.CACHE_VERSION}|count:{tool_count}|names:{','.join(tool_names)}|"
+            + "|".join(tool_strings)
+        )
         return hashlib.sha256(combined.encode()).hexdigest()
+
+    def _delete_cache(self, reason: str) -> None:
+        """Delete corrupted or stale cache file.
+
+        Args:
+            reason: Reason for deletion (for logging)
+        """
+        try:
+            if self.cache_file.exists():
+                self.cache_file.unlink()
+                logger.info(f"Tool embeddings: deleted stale cache ({reason})")
+        except Exception as e:
+            logger.warning(f"Tool embeddings: failed to delete cache: {e}")
 
     def _load_from_cache(self, tools_hash: str) -> bool:
         """Load embeddings from pickle cache if valid.
+
+        Performs robust validation:
+        1. Cache version check (breaking format changes)
+        2. Tools hash check (tool definition changes)
+        3. Model name check (embedding model changes)
+        4. Embedding dimension validation (model dimension mismatch)
+        5. Data integrity check (corrupt numpy arrays)
 
         Args:
             tools_hash: Current hash of tool definitions
@@ -310,42 +344,119 @@ class SemanticToolSelector:
             True if loaded successfully, False otherwise
         """
         if not self.cache_file.exists():
+            logger.debug("No embedding cache file found, will rebuild")
             return False
 
         try:
             with open(self.cache_file, "rb") as f:
                 cache_data = pickle.load(f)
 
-            # Verify cache is for same tools
+            # 1. Check cache version first (breaking changes)
+            cached_version = cache_data.get("cache_version", 1)
+            if cached_version != self.CACHE_VERSION:
+                logger.info(
+                    f"Cache version mismatch (cached: v{cached_version}, current: v{self.CACHE_VERSION}), "
+                    "rebuilding embeddings"
+                )
+                self._delete_cache("version mismatch")
+                return False
+
+            # 2. Verify cache is for same tools (hash includes count, names, and definitions)
             if cache_data.get("tools_hash") != tools_hash:
-                logger.info("Tool definitions changed, cache invalidated")
+                cached_count = cache_data.get("tool_count", "?")
+                cached_names = set(cache_data.get("tool_names", []))
+                # The current tool names are embedded in the hash calculation
+                logger.info(
+                    f"Tool definitions changed (cached {cached_count} tools), "
+                    "rebuilding embeddings"
+                )
+                # Log specific changes if available
+                if cached_names:
+                    current_names = set(cache_data.get("embeddings", {}).keys())
+                    added = cached_names - current_names
+                    removed = current_names - cached_names
+                    if added:
+                        logger.debug(f"Tools added since cache: {added}")
+                    if removed:
+                        logger.debug(f"Tools removed since cache: {removed}")
                 return False
 
-            # Verify cache is for same embedding model
+            # 3. Verify cache is for same embedding model
             if cache_data.get("embedding_model") != self.embedding_model:
-                logger.info("Embedding model changed, cache invalidated")
+                logger.info(
+                    f"Embedding model changed (cached: {cache_data.get('embedding_model')}, "
+                    f"current: {self.embedding_model}), rebuilding embeddings"
+                )
+                self._delete_cache("model mismatch")
                 return False
 
-            # Load embeddings
-            self._tool_embedding_cache = cache_data["embeddings"]
+            # 4. Validate embeddings exist and have correct structure
+            embeddings = cache_data.get("embeddings", {})
+            if not embeddings:
+                logger.warning("Tool embeddings: cache missing embeddings dict")
+                self._delete_cache("missing embeddings")
+                return False
+
+            # 5. Validate embedding dimensions and integrity
+            expected_dim = None
+            for tool_name, embedding in embeddings.items():
+                if not isinstance(embedding, np.ndarray):
+                    logger.warning(f"Tool embeddings: '{tool_name}' is not a numpy array")
+                    self._delete_cache("invalid type")
+                    return False
+
+                if len(embedding.shape) != 1:
+                    logger.warning(
+                        f"Tool embeddings: '{tool_name}' has wrong shape: {embedding.shape}"
+                    )
+                    self._delete_cache("invalid shape")
+                    return False
+
+                if expected_dim is None:
+                    expected_dim = embedding.shape[0]
+                elif embedding.shape[0] != expected_dim:
+                    logger.warning(
+                        f"Tool embeddings: dimension mismatch for '{tool_name}' "
+                        f"(got {embedding.shape[0]}, expected {expected_dim})"
+                    )
+                    self._delete_cache("dimension inconsistency")
+                    return False
+
+                # Check for NaN or Inf (corruption detection)
+                if not np.isfinite(embedding).all():
+                    logger.warning(f"Tool embeddings: '{tool_name}' contains NaN or Inf values")
+                    self._delete_cache("corrupted embeddings")
+                    return False
+
+            # All checks passed - load embeddings
+            self._tool_embedding_cache = embeddings
             self._tools_hash = tools_hash
 
             return True
 
+        except (pickle.UnpicklingError, EOFError) as e:
+            logger.warning(f"Tool embeddings: cache file corrupted: {e}")
+            self._delete_cache("unpickling error")
+            return False
         except Exception as e:
-            logger.warning(f"Failed to load embedding cache: {e}")
+            logger.warning(f"Failed to load embedding cache (corrupted?): {e}, will rebuild")
+            self._delete_cache("load error")
             return False
 
     def _save_to_cache(self, tools_hash: str) -> None:
-        """Save embeddings to pickle cache.
+        """Save embeddings to pickle cache with full metadata for robust invalidation.
 
         Args:
             tools_hash: Hash of tool definitions
         """
         try:
+            tool_names = sorted(self._tool_embedding_cache.keys())
             cache_data = {
+                "cache_version": self.CACHE_VERSION,
                 "embedding_model": self.embedding_model,
                 "tools_hash": tools_hash,
+                "tool_count": len(tool_names),
+                "tool_names": tool_names,  # Explicit list for debugging
                 "embeddings": self._tool_embedding_cache,
             }
 
@@ -353,14 +464,18 @@ class SemanticToolSelector:
                 pickle.dump(cache_data, f)
 
             cache_size = self.cache_file.stat().st_size / 1024  # KB
-            logger.info(f"Saved embedding cache to {self.cache_file} ({cache_size:.1f} KB)")
+            logger.info(
+                f"Saved embedding cache to {self.cache_file} "
+                f"({cache_size:.1f} KB, {len(tool_names)} tools, v{self.CACHE_VERSION})"
+            )
 
         except Exception as e:
             logger.warning(f"Failed to save embedding cache: {e}")
 
-    # Category alias mappings: maps semantic category names to registry categories
+    # DEPRECATED: Category alias mappings (migrate to @tool(execution_category=...) metadata)
     # This enables using logical names (file_ops, git_ops) that map to
     # auto-generated metadata categories (filesystem, git, etc.)
+    # TODO: Remove once all tools have proper execution_category in @tool decorator
     CATEGORY_ALIASES = {
         "file_ops": ["filesystem", "code"],
         "git_ops": ["git", "merge"],
@@ -377,8 +492,9 @@ class SemanticToolSelector:
         "audit": ["audit"],
     }
 
-    # Fallback tools for each logical category (used when registry has no matches)
-    # These are deprecated and will be removed once all tools have proper metadata
+    # DEPRECATED: Fallback tools for each logical category
+    # Migrate to ToolMetadataRegistry.get_fallback_tools_for_category() instead.
+    # These will be removed once all tools have proper metadata in @tool decorator.
     # NOTE: Uses canonical short names for token efficiency
     FALLBACK_CATEGORY_TOOLS = {
         "file_ops": ["read", "write", "edit", "ls"],
@@ -421,7 +537,11 @@ class SemanticToolSelector:
         # Fallback to hardcoded list (deprecated)
         return self.FALLBACK_CATEGORY_TOOLS.get(logical_category, [])
 
-    # Mandatory tools for specific keywords (Phase 1)
+    # DEPRECATED: Mandatory tools for specific keywords
+    # Migrate to @tool(mandatory_keywords=["diff", "show changes"]) decorator metadata.
+    # Use ToolMetadataRegistry.get_tools_matching_mandatory_keywords() for primary lookup.
+    # This static dict is used as fallback for tools not yet migrated.
+    # TODO: Remove once all tools have mandatory_keywords in @tool decorator
     # NOTE: Uses canonical short names for token efficiency
     MANDATORY_TOOL_KEYWORDS = {
         "diff": ["shell"],
@@ -452,6 +572,13 @@ class SemanticToolSelector:
         # Count operations are more efficient with shell
         "count": ["shell", "ls"],
         "how many": ["shell", "ls"],
+        # Analysis tasks need semantic search tools for codebase understanding
+        "analyze": ["search", "grep", "symbol", "graph"],
+        "analyze codebase": ["search", "graph", "symbol"],
+        "codebase analysis": ["search", "graph", "symbol"],
+        "understand": ["search", "read", "symbol"],
+        "explore codebase": ["search", "ls", "read"],
+        "architecture": ["arch_summary", "graph", "search", "symbol"],
     }
 
     # Conceptual query patterns that strongly prefer semantic_code_search over code_search
@@ -482,6 +609,15 @@ class SemanticToolSelector:
         "validation",  # conceptual search
         "similar to",  # conceptual search
         "related to",  # conceptual search
+        # Analysis/exploration patterns - trigger semantic search
+        "analyze",  # "analyze codebase", "analyze this code"
+        "understand",  # "understand architecture"
+        "architecture",  # "show architecture", "explain architecture"
+        "structure",  # "codebase structure"
+        "overview",  # "codebase overview"
+        "how does",  # "how does X work"
+        "what is the",  # "what is the architecture"
+        "explore",  # "explore codebase"
     ]
 
     # Tools for conceptual queries - forces semantic search as primary
@@ -674,6 +810,12 @@ class SemanticToolSelector:
 
         return list(set(relevant_tools))
 
+    def _is_analysis_query(self, query: str) -> bool:
+        """Heuristic check for analysis/review intents."""
+        query_lower = query.lower()
+        analysis_keywords = ["analyze", "analysis", "review", "check", "scan", "audit", "inspect"]
+        return any(kw in query_lower for kw in analysis_keywords)
+
     def _extract_pending_actions(self, conversation_history: List[Dict[str, Any]]) -> List[str]:
         """Extract actions mentioned in original request but not yet completed.
 
@@ -699,15 +841,17 @@ class SemanticToolSelector:
         pending = []
 
         # Action keywords to check
+        # NOTE: Be specific to avoid false positives. Generic words like "check"
+        # or "examine" in analysis tasks shouldn't trigger pending actions.
         action_patterns = {
-            "edit": ["edit", "modify", "change", "update"],
-            "show_diff": ["diff", "show changes", "show diff", "compare"],
-            "read": ["read", "examine", "look at", "check"],
-            "propose": ["propose", "suggest", "recommend"],
-            "create": ["create", "generate", "make"],
-            "test": ["test", "verify", "validate"],
-            "commit": ["commit"],
-            "pr": ["pull request", "pr"],
+            "edit": ["edit the file", "modify the file", "change the code", "update the file"],
+            "show_diff": ["show diff", "show the diff", "git diff", "compare changes"],
+            "read": ["read the file", "read this file", "show me the file"],
+            "propose": ["propose changes", "suggest changes", "recommend changes"],
+            "create": ["create a file", "create new file", "generate a file", "make a file"],
+            "test": ["run tests", "run the tests", "execute tests"],
+            "commit": ["commit the changes", "make a commit", "git commit"],
+            "pr": ["create a pull request", "open a pr", "make a pr", "raise a pr"],
         }
 
         # Check which actions were requested
@@ -725,6 +869,8 @@ class SemanticToolSelector:
     def _was_action_completed(self, action: str, history: List[Dict[str, Any]]) -> bool:
         """Check if an action was completed based on conversation history.
 
+        Checks both tool calls made and text content for completion indicators.
+
         Args:
             action: Action type to check
             history: Conversation history
@@ -732,31 +878,44 @@ class SemanticToolSelector:
         Returns:
             True if action was completed, False otherwise
         """
-        # Look for tool results in assistant messages
+        # Map action types to tool names that complete them
+        action_to_tools = {
+            "show_diff": ["git", "shell", "shell_readonly"],
+            "edit": ["edit", "write", "patch"],
+            "read": ["read", "symbol", "search", "overview", "ls"],
+            "create": ["write", "scaffold"],
+            "test": ["test", "shell"],
+            "commit": ["git", "commit_msg"],
+            "pr": ["pr", "git"],
+        }
+
+        # Check if any tool that completes this action was called
+        tools_for_action = action_to_tools.get(action, [])
         for msg in history:
             if msg.get("role") == "assistant":
-                content = str(msg.get("content", "")).lower()
+                # Check tool_calls in the message
+                tool_calls = msg.get("tool_calls", [])
+                for tc in tool_calls:
+                    tool_name = tc.get("name", "") or tc.get("function", {}).get("name", "")
+                    if tool_name in tools_for_action:
+                        return True
 
-                # Check based on action type
-                if action == "show_diff":
-                    if "diff" in content or "git diff" in content:
-                        return True
-                elif action == "edit":
-                    if "modified" in content or "edited" in content or "updated" in content:
-                        # Check if the specific file mentioned was edited
-                        return True
-                elif action == "read":
-                    if "read" in content or "file contents" in content:
-                        return True
-                elif action == "create":
-                    if "created" in content or "written" in content:
-                        return True
-                elif action == "test":
-                    if "test" in content and ("passed" in content or "failed" in content):
-                        return True
-                elif action == "commit":
-                    if "committed" in content or "commit" in content:
-                        return True
+                # Also check content for tool result markers
+                content = str(msg.get("content", "")).lower()
+                if action == "show_diff" and ("diff" in content or "git diff" in content):
+                    return True
+                elif action == "test" and "test" in content and ("passed" in content or "failed" in content):
+                    return True
+
+        # Check user messages for tool output markers (TOOL_OUTPUT tags)
+        for msg in history:
+            if msg.get("role") == "user":
+                content = str(msg.get("content", ""))
+                if "<TOOL_OUTPUT" in content:
+                    # Check if any relevant tool output exists
+                    for tool_name in tools_for_action:
+                        if f'tool="{tool_name}"' in content or f"tool='{tool_name}'" in content:
+                            return True
 
         return False
 
@@ -1163,6 +1322,10 @@ class SemanticToolSelector:
         # Phase 1: Get mandatory tools (including those for pending actions)
         mandatory_tool_names = self._get_mandatory_tools(enhanced_query)
 
+        # Always include core read-only tools for analysis-style queries.
+        if self._is_analysis_query(enhanced_query):
+            mandatory_tool_names.extend(get_core_readonly_tools())
+
         # Add mandatory tools for pending actions
         # NOTE: Uses canonical short names for token efficiency
         pending_action_tools = {
@@ -1316,6 +1479,10 @@ class SemanticToolSelector:
         mandatory_tool_names = self._get_mandatory_tools(user_message)
         if mandatory_tool_names:
             logger.debug(f"Mandatory tools: {mandatory_tool_names}")
+
+        # Always include core read-only tools for analysis-style queries.
+        if self._is_analysis_query(user_message):
+            mandatory_tool_names.extend(get_core_readonly_tools())
 
         # Phase 1: Get relevant categories
         category_tools = self._get_relevant_categories(user_message)
@@ -1573,7 +1740,10 @@ class SemanticToolSelector:
     # Classification-Aware Tool Selection (UnifiedTaskClassifier Integration)
     # ========================================================================
 
-    # Task type to logical category mapping
+    # DEPRECATED: Task type to logical category mapping
+    # Migrate to @tool(task_types=["analysis", "action"]) decorator metadata.
+    # Use ToolMetadataRegistry.get_tools_by_task_type() for primary lookup.
+    # TODO: Remove once all tools have task_types in @tool decorator
     TASK_TYPE_CATEGORIES = {
         "analysis": ["analysis", "code_intel", "file_ops"],
         "action": ["execution", "git_ops", "file_ops"],
@@ -1583,7 +1753,11 @@ class SemanticToolSelector:
         "default": ["file_ops", "execution"],
     }
 
-    # Tools to exclude based on negated keywords
+    # DEPRECATED: Tools to exclude based on negated keywords
+    # This mapping is used for negation detection to exclude irrelevant tools.
+    # Migrate to @tool(keywords=["analyze", "review"]) decorator metadata.
+    # The negation logic will use ToolMetadataRegistry.get_tools_by_keywords() instead.
+    # TODO: Remove once negation uses registry-based keyword lookup
     # NOTE: Uses canonical short names for token efficiency
     KEYWORD_TOOL_MAPPING = {
         "analyze": ["docs_coverage", "metrics", "review"],

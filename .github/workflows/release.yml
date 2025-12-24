@@ -3,12 +3,18 @@
 #
 # Triggers:
 #   - Push tag: v* (e.g., v0.1.0, v1.0.0-beta)
+#   - Manual dispatch for testing
 #
 # Outputs:
-#   - PyPI package
-#   - Standalone binaries (macOS, Linux, Windows)
-#   - Docker image
-#   - GitHub Release
+#   - PyPI package (and TestPyPI for pre-releases)
+#   - Standalone binaries (macOS ARM64/x64, Linux x64/ARM64, Windows)
+#   - Docker image (multi-arch)
+#   - GitHub Release with checksums
+#
+# Installation:
+#   pip install victor
+#   pipx install victor
+#   brew install vijayksingh/tap/victor
 
 name: Release
 
@@ -16,6 +22,13 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      publish_testpypi:
+        description: 'Publish to TestPyPI only'
+        required: false
+        default: false
+        type: boolean
 
 env:
   PYTHON_VERSION: '3.12'
@@ -89,23 +102,40 @@ jobs:
     needs: test
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
+          # Linux x64
           - os: ubuntu-latest
             platform: linux
             arch: x64
+          # Linux ARM64 (via QEMU)
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
+            qemu: true
+          # macOS ARM64 (M1/M2/M3)
           - os: macos-latest
             platform: macos
             arch: arm64
+          # macOS x64 (Intel)
           - os: macos-13
             platform: macos
             arch: x64
+          # Windows x64
           - os: windows-latest
             platform: windows
             arch: x64
 
     steps:
       - uses: actions/checkout@v4
+
+      # Set up QEMU for ARM64 cross-compilation
+      - name: Set up QEMU
+        if: matrix.qemu
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -119,6 +149,9 @@ jobs:
       - name: Build binary
         run: |
           python scripts/build_binary.py --onefile --output victor
+        env:
+          # For ARM64 cross-compilation
+          PYINSTALLER_CROSS_COMPILE: ${{ matrix.arch == 'arm64' && matrix.platform == 'linux' && 'arm64' || '' }}
 
       - name: Create archive (Unix)
         if: runner.os != 'Windows'
@@ -207,11 +240,62 @@ jobs:
         # Uses trusted publishing - no API token needed
 
   # ==========================================================================
+  # Publish to TestPyPI (for pre-releases or manual testing)
+  # ==========================================================================
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: build-python
+    if: github.event.inputs.publish_testpypi == 'true' || contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc')
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/victor/
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package
+          path: dist/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  # ==========================================================================
+  # Generate checksums for all artifacts
+  # ==========================================================================
+  generate-checksums:
+    name: Generate Checksums
+    needs: [build-python, build-binary]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd artifacts
+          find . -type f \( -name "*.whl" -o -name "*.tar.gz" -o -name "*.zip" \) -exec sha256sum {} \; > ../checksums.txt
+          cat ../checksums.txt
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: checksums.txt
+
+  # ==========================================================================
   # Create GitHub Release
   # ==========================================================================
   create-release:
     name: Create GitHub Release
-    needs: [build-python, build-binary, build-docker]
+    needs: [build-python, build-binary, build-docker, generate-checksums]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -231,18 +315,54 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          echo "## What's Changed" > CHANGELOG.md
-          echo "" >> CHANGELOG.md
+          cat > CHANGELOG.md << 'RELEASE_NOTES'
+          ## What's Changed
+
+          RELEASE_NOTES
           # Get commits since last tag
-          git log --oneline $(git describe --tags --abbrev=0 HEAD^)..HEAD >> CHANGELOG.md || true
-          echo "" >> CHANGELOG.md
-          echo "## Installation" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo '```bash' >> CHANGELOG.md
-          echo "pip install victor==${{ steps.version.outputs.VERSION }}" >> CHANGELOG.md
-          echo '```' >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "Or download binaries below." >> CHANGELOG.md
+          git log --oneline $(git describe --tags --abbrev=0 HEAD^)..HEAD >> CHANGELOG.md || echo "- Initial release" >> CHANGELOG.md
+          cat >> CHANGELOG.md << RELEASE_NOTES
+
+          ## Installation
+
+          ### Using pip (recommended)
+          \`\`\`bash
+          pip install victor==${{ steps.version.outputs.VERSION }}
+          \`\`\`
+
+          ### Using pipx (isolated environment)
+          \`\`\`bash
+          pipx install victor==${{ steps.version.outputs.VERSION }}
+          \`\`\`
+
+          ### Using Homebrew (macOS/Linux)
+          \`\`\`bash
+          brew install vijayksingh/tap/victor
+          \`\`\`
+
+          ### Using Docker
+          \`\`\`bash
+          docker pull vijayksingh/victor:${{ steps.version.outputs.VERSION }}
+          docker run -it --rm vijayksingh/victor:${{ steps.version.outputs.VERSION }}
+          \`\`\`
+
+          ## Platform Binaries
+
+          | Platform | Architecture | Download |
+          |----------|--------------|----------|
+          | Linux | x64 | \`victor-linux-x64.tar.gz\` |
+          | Linux | ARM64 | \`victor-linux-arm64.tar.gz\` |
+          | macOS | ARM64 (M1/M2/M3) | \`victor-macos-arm64.tar.gz\` |
+          | macOS | x64 (Intel) | \`victor-macos-x64.tar.gz\` |
+          | Windows | x64 | \`victor-windows-x64.zip\` |
+
+          ## Verification
+
+          Verify downloads using checksums in \`checksums.txt\`:
+          \`\`\`bash
+          sha256sum -c checksums.txt
+          \`\`\`
+          RELEASE_NOTES
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -254,6 +374,7 @@ jobs:
           files: |
             artifacts/python-package/*
             artifacts/binary-*/*
+            artifacts/checksums/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

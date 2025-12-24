@@ -23,6 +23,7 @@ from victor.agent.task_analyzer import (
 )
 from victor.agent.complexity_classifier import TaskComplexity
 from victor.agent.action_authorizer import ActionIntent
+from victor.core.container import reset_container
 
 
 class TestTaskAnalysis:
@@ -201,7 +202,10 @@ class TestGlobalAnalyzer:
 
     def test_reset_task_analyzer(self):
         """Test resetting global analyzer."""
+        reset_container()
+        reset_task_analyzer()
         analyzer1 = get_task_analyzer()
+        reset_container()
         reset_task_analyzer()
         analyzer2 = get_task_analyzer()
 

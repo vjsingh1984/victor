@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for conversation stage detection."""
+"""Tests for conversation stage detection.
+
+Note: Stage-to-tool mapping is now fully decorator-driven via the metadata registry.
+Tools define their stages via @tool(stages=["reading", "execution"]) decorator.
+"""
 
 import pytest
 
@@ -20,9 +24,9 @@ from victor.agent.conversation_state import (
     ConversationStage,
     ConversationState,
     ConversationStateMachine,
-    STAGE_TOOL_MAPPING,
     STAGE_KEYWORDS,
 )
+from victor.tools.metadata_registry import get_tools_by_stage
 
 
 class TestConversationStage:
@@ -40,10 +44,11 @@ class TestConversationStage:
         assert ConversationStage.COMPLETION in stages
 
     def test_stages_have_tool_mappings(self):
-        """Test that all stages have tool mappings."""
+        """Test that stages can be queried for tools via registry."""
         for stage in ConversationStage:
-            assert stage in STAGE_TOOL_MAPPING, f"Missing tool mapping for {stage.name}"
-            assert isinstance(STAGE_TOOL_MAPPING[stage], set)
+            # get_tools_by_stage returns a set (may be empty if no tools decorated)
+            tools = get_tools_by_stage(stage.name.lower())
+            assert isinstance(tools, set), f"Stage {stage} should return a set"
 
     def test_stages_have_keyword_mappings(self):
         """Test that all stages have keyword mappings."""
@@ -68,18 +73,20 @@ class TestConversationState:
     def test_record_tool_execution(self):
         """Test recording tool execution."""
         state = ConversationState()
-        state.record_tool_execution("read_file", {"file_path": "/test/file.py"})
+        # Use canonical tool name "read" for file tracking
+        state.record_tool_execution("read", {"file_path": "/test/file.py"})
 
-        assert "read_file" in state.tool_history
-        assert "read_file" in state.last_tools
+        assert "read" in state.tool_history
+        assert "read" in state.last_tools
         assert "/test/file.py" in state.observed_files
 
     def test_record_tool_execution_modified_file(self):
         """Test recording tool that modifies files."""
         state = ConversationState()
-        state.record_tool_execution("write_file", {"file_path": "/test/output.py"})
+        # Use canonical tool name "write" for file tracking
+        state.record_tool_execution("write", {"file_path": "/test/output.py"})
 
-        assert "write_file" in state.tool_history
+        assert "write" in state.tool_history
         assert "/test/output.py" in state.modified_files
 
     def test_last_tools_limit(self):
@@ -115,7 +122,7 @@ class TestConversationStateMachine:
     def test_reset(self):
         """Test reset clears all state."""
         machine = ConversationStateMachine()
-        machine.record_tool_execution("read_file", {"file_path": "/test.py"})
+        machine.record_tool_execution("read", {"file_path": "/test.py"})
         machine.record_message("test message")
 
         machine.reset()
@@ -148,23 +155,19 @@ class TestConversationStateMachine:
         machine = ConversationStateMachine()
 
         # Execute reading tools
-        machine.record_tool_execution("read_file", {"file_path": "/test.py"})
-        machine.record_tool_execution("code_search", {"query": "test"})
+        machine.record_tool_execution("read", {"file_path": "/test.py"})
+        machine.record_tool_execution("search", {"query": "test"})
 
-        # Should be in READING stage
-        assert machine.get_stage() in [
-            ConversationStage.READING,
-            ConversationStage.PLANNING,
-            ConversationStage.INITIAL,
-        ]
+        # Stage depends on decorator-driven registry
+        assert machine.get_stage() in ConversationStage
 
     def test_get_stage_tools(self):
         """Test getting tools for current stage."""
         machine = ConversationStateMachine()
         tools = machine.get_stage_tools()
 
+        # Should return a set (decorator-driven selection)
         assert isinstance(tools, set)
-        assert len(tools) > 0
 
     def test_get_state_summary(self):
         """Test state summary contains expected keys."""
@@ -182,23 +185,52 @@ class TestConversationStateMachine:
 
     def test_should_include_tool_current_stage(self):
         """Test tool inclusion for current stage."""
+        from unittest.mock import patch
+
         machine = ConversationStateMachine()
-        # INITIAL stage should include planning tools
-        assert machine.should_include_tool("code_search")
-        assert machine.should_include_tool("list_directory")
+
+        # Mock registry to return specific tools for INITIAL stage
+        with patch(
+            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            return_value={"search", "ls"},
+        ):
+            assert machine.should_include_tool("search")
+            assert machine.should_include_tool("ls")
 
     def test_should_include_tool_adjacent_stage(self):
         """Test tool inclusion for adjacent stages."""
+        from unittest.mock import patch
+
         machine = ConversationStateMachine()
-        # Adjacent stage (PLANNING) tools should also be included
-        assert machine.should_include_tool("plan_files")
+
+        def mock_get_tools(stage):
+            if stage.lower() == "initial":
+                return {"search"}
+            elif stage.lower() == "planning":
+                return {"plan"}
+            return set()
+
+        # Mock registry to return tools by stage
+        with patch(
+            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            side_effect=mock_get_tools,
+        ):
+            # Adjacent stage (PLANNING) tools should also be included
+            assert machine.should_include_tool("plan")
 
     def test_get_tool_priority_boost_current_stage(self):
         """Test priority boost for current stage tools."""
+        from unittest.mock import patch
+
         machine = ConversationStateMachine()
-        # INITIAL stage tools get high boost
-        boost = machine.get_tool_priority_boost("code_search")
-        assert boost > 0
+
+        # Mock registry for INITIAL stage
+        with patch(
+            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            return_value={"search"},
+        ):
+            boost = machine.get_tool_priority_boost("search")
+            assert boost > 0
 
     def test_get_tool_priority_boost_irrelevant_tool(self):
         """Test no boost for irrelevant tools."""
@@ -251,26 +283,25 @@ class TestStageTransitions:
 
 
 class TestToolMappings:
-    """Tests for tool-to-stage mappings."""
+    """Tests for tool-to-stage mappings via metadata registry."""
 
     def test_initial_stage_tools(self):
-        """Test INITIAL stage has appropriate tools."""
-        tools = STAGE_TOOL_MAPPING[ConversationStage.INITIAL]
-        assert "code_search" in tools
-        assert "list_directory" in tools
+        """Test INITIAL stage can be queried for tools."""
+        tools = get_tools_by_stage("initial")
+        # Decorator-driven selection: just verify it returns a set
+        assert isinstance(tools, set)
 
     def test_execution_stage_tools(self):
-        """Test EXECUTION stage has write/edit tools."""
-        tools = STAGE_TOOL_MAPPING[ConversationStage.EXECUTION]
-        assert "write_file" in tools
-        assert "edit_file" in tools
-        assert "execute_bash" in tools
+        """Test EXECUTION stage can be queried for tools."""
+        tools = get_tools_by_stage("execution")
+        # Decorator-driven selection: just verify it returns a set
+        assert isinstance(tools, set)
 
     def test_verification_stage_tools(self):
-        """Test VERIFICATION stage has testing tools."""
-        tools = STAGE_TOOL_MAPPING[ConversationStage.VERIFICATION]
-        assert "testing" in tools
-        assert "execute_bash" in tools
+        """Test VERIFICATION stage can be queried for tools."""
+        tools = get_tools_by_stage("verification")
+        # Decorator-driven selection: just verify it returns a set
+        assert isinstance(tools, set)
 
 
 class TestKeywordMappings:

@@ -269,8 +269,8 @@ class TestBaseToolCallingAdapterNormalizeArguments:
         adapter = ConcreteToolCallingAdapter()
         args = {"path": "/test", "content": "hello"}
         result = adapter.normalize_arguments(args, "write_file")
+        # Result should contain same key/values (but may be a new dict due to filtering)
         assert result == args
-        assert result is args  # Should be same object
 
 
 class TestBaseToolCallingAdapterIsValidToolName:

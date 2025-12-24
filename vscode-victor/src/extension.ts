@@ -20,6 +20,15 @@ import { TerminalProvider, TerminalHistoryProvider, registerTerminalCommands } f
 import { registerCodeActionCommands } from './codeActions';
 import { DiagnosticsViewProvider, registerDiagnosticsCommands } from './diagnosticsView';
 import { SettingsViewProvider, registerSettingsCommands } from './settingsView';
+import { WorkspaceInsightsViewProvider, registerWorkspaceInsightsCommands } from './workspaceInsightsView';
+import { McpViewProvider, registerMcpCommands } from './mcpView';
+import { ToolApprovalService, registerToolApprovalCommands } from './toolApprovalService';
+import { ProviderSettingsService, registerProviderSettingsCommands } from './providerSettingsService';
+import { VictorCodeLensProvider, registerCodeLensCommands } from './codeLensProvider';
+import { VictorCodeActionProvider, registerCodeActionProviderCommands } from './codeActionProvider';
+import { VictorHoverProvider, registerHoverCommands } from './hoverProvider';
+import { ToolExecutionService, registerToolExecutionCommands } from './toolExecutionService';
+import { RLService, registerRLCommands } from './rlService';
 import { getStore, selectors, AgentMode, ModelInfo } from './state';
 
 // Provider instances (managed centrally, accessed via module)
@@ -39,6 +48,15 @@ interface ExtensionProviders {
     terminalHistoryProvider: TerminalHistoryProvider;
     diagnosticsViewProvider: DiagnosticsViewProvider;
     settingsViewProvider: SettingsViewProvider;
+    workspaceInsightsViewProvider: WorkspaceInsightsViewProvider;
+    mcpViewProvider: McpViewProvider;
+    toolApprovalService: ToolApprovalService;
+    providerSettingsService: ProviderSettingsService;
+    codeLensProvider: VictorCodeLensProvider;
+    codeActionProvider: VictorCodeActionProvider;
+    hoverProvider: VictorHoverProvider;
+    toolExecutionService: ToolExecutionService;
+    rlService: RLService;
     statusBarItem: vscode.StatusBarItem;
     serverStatusBarItem: vscode.StatusBarItem;
 }
@@ -74,7 +92,17 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     // Initialize the Victor client with server URL from state
-    const victorClient = new VictorClient(store.select(selectors.serverUrl));
+    const apiKey = config.get<string>('serverApiKey') || undefined;
+    const victorClient = new VictorClient(store.select(selectors.serverUrl), undefined, apiKey);
+    // Pre-fetch session token when API key is configured; ignore failures (server may be offline)
+    victorClient.prefetchSessionToken().catch(() => {});
+    // Keep Victor client auth in sync with configuration updates
+    context.subscriptions.push(
+        store.subscribe('settings', (_state) => {
+            const latestKey = store.select(selectors.serverApiKey) || undefined;
+            victorClient.setApiToken(latestKey);
+        })
+    );
 
     // Create mode status bar item
     const statusBarItem = vscode.window.createStatusBarItem(
@@ -94,17 +122,24 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     // Initialize providers
-    const chatViewProvider = new ChatViewProvider(context.extensionUri, victorClient);
+    const clientOutput = vscode.window.createOutputChannel('Victor Client');
+    clientOutput.appendLine('[Victor] Extension activated');
+    context.subscriptions.push(clientOutput);
+
+    const chatViewProvider = new ChatViewProvider(context.extensionUri, victorClient, clientOutput);
     const semanticSearchProvider = new SemanticSearchProvider(victorClient);
     const inlineCompletionProvider = new InlineCompletionProvider(victorClient);
     const historyViewProvider = new HistoryViewProvider(victorClient);
     const toolsViewProvider = new ToolsViewProvider();
 
+    clientOutput.appendLine('[Victor] Providers initialized');
+
     // Register chat view
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
             'victor.chatView',
-            chatViewProvider
+            chatViewProvider,
+            { webviewOptions: { retainContextWhenHidden: true } }
         )
     );
 
@@ -166,6 +201,7 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     // Helper function to send messages to chat
     const sendToChat = async (message: string) => {
+        clientOutput.appendLine(`[Chat] Queued send from command (${message.length} chars)`);
         await chatViewProvider.sendMessage(message);
         await vscode.commands.executeCommand('victor.chatView.focus');
     };
@@ -185,6 +221,86 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     registerSettingsCommands(context);
 
+    // Initialize workspace insights view
+    const workspaceInsightsViewProvider = new WorkspaceInsightsViewProvider();
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider(
+            'victor.workspaceInsightsView',
+            workspaceInsightsViewProvider
+        )
+    );
+    registerWorkspaceInsightsCommands(context, workspaceInsightsViewProvider);
+
+    // Initialize MCP view
+    const mcpViewProvider = new McpViewProvider();
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider(
+            'victor.mcpView',
+            mcpViewProvider
+        )
+    );
+    registerMcpCommands(context, mcpViewProvider);
+
+    // Initialize tool approval service
+    const toolApprovalService = new ToolApprovalService(victorClient, context);
+    context.subscriptions.push(toolApprovalService);
+    registerToolApprovalCommands(context, toolApprovalService);
+
+    // Initialize provider settings service
+    const providerSettingsService = new ProviderSettingsService(context);
+    context.subscriptions.push(providerSettingsService);
+    registerProviderSettingsCommands(context, providerSettingsService);
+
+    // Initialize provider settings
+    await providerSettingsService.initialize();
+
+    // Initialize CodeLens provider
+    const codeLensProvider = new VictorCodeLensProvider();
+    context.subscriptions.push(
+        vscode.languages.registerCodeLensProvider(
+            { pattern: '**/*.{ts,tsx,js,jsx,py,java,cs,go,rs,cpp,c,rb,php,swift,kt}' },
+            codeLensProvider
+        )
+    );
+    registerCodeLensCommands(context, sendToChat);
+    context.subscriptions.push({ dispose: () => codeLensProvider.dispose() });
+
+    // Initialize Code Action provider (lightbulb menu)
+    const codeActionProvider = new VictorCodeActionProvider();
+    context.subscriptions.push(
+        vscode.languages.registerCodeActionsProvider(
+            { pattern: '**/*.{ts,tsx,js,jsx,py,java,cs,go,rs,cpp,c,rb,php,swift,kt}' },
+            codeActionProvider,
+            {
+                providedCodeActionKinds: VictorCodeActionProvider.providedCodeActionKinds,
+            }
+        )
+    );
+    registerCodeActionProviderCommands(context, sendToChat);
+
+    // Initialize Hover provider for AI tooltips
+    const hoverProvider = new VictorHoverProvider();
+    hoverProvider.setVictorClient(victorClient);
+    context.subscriptions.push(
+        vscode.languages.registerHoverProvider(
+            { pattern: '**/*.{ts,tsx,js,jsx,py,java,cs,go,rs,cpp,c,rb,php,swift,kt}' },
+            hoverProvider
+        )
+    );
+    registerHoverCommands(context);
+    context.subscriptions.push({ dispose: () => hoverProvider.dispose() });
+
+    // Initialize Tool Execution Service for progress visibility
+    const toolExecutionService = new ToolExecutionService();
+    toolExecutionService.setVictorClient(victorClient);
+    registerToolExecutionCommands(context, toolExecutionService);
+    context.subscriptions.push(toolExecutionService);
+
+    // Initialize RL Model Selector Service
+    const rlService = new RLService();
+    registerRLCommands(context, rlService);
+    context.subscriptions.push(rlService);
+
     // Store all providers in centralized object
     providers = {
         victorClient,
@@ -202,6 +318,15 @@ export async function activate(context: vscode.ExtensionContext) {
         terminalHistoryProvider,
         diagnosticsViewProvider,
         settingsViewProvider,
+        workspaceInsightsViewProvider,
+        mcpViewProvider,
+        toolApprovalService,
+        providerSettingsService,
+        codeLensProvider,
+        codeActionProvider,
+        hoverProvider,
+        toolExecutionService,
+        rlService,
         statusBarItem,
         serverStatusBarItem,
     };
@@ -422,21 +547,41 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
         })
     );
 
-    // Switch model - now uses state store
+    // Switch model - dynamically fetches available models from server
     context.subscriptions.push(
         vscode.commands.registerCommand('victor.switchModel', async () => {
-            const models: Array<{ label: string; value: string; provider: string }> = [
-                { label: 'Claude Sonnet 4', value: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-                { label: 'Claude Opus 4.5', value: 'claude-opus-4-5-20251101', provider: 'anthropic' },
-                { label: 'GPT-4 Turbo', value: 'gpt-4-turbo', provider: 'openai' },
-                { label: 'GPT-4o', value: 'gpt-4o', provider: 'openai' },
-                { label: 'Gemini 2.0 Flash', value: 'gemini-2.0-flash', provider: 'google' },
-                { label: 'Qwen 2.5 Coder (Local)', value: 'qwen2.5-coder:14b', provider: 'ollama' },
-                { label: 'Llama 3.1 (Local)', value: 'llama3.1:8b', provider: 'ollama' },
-            ];
+            // Show loading indicator while fetching models
+            const models = await vscode.window.withProgress(
+                {
+                    location: vscode.ProgressLocation.Notification,
+                    title: 'Fetching available models...',
+                    cancellable: false
+                },
+                async () => {
+                    try {
+                        const serverModels = await victorClient.getModels();
+                        if (serverModels.length > 0) {
+                            return serverModels.map(m => ({
+                                label: `${m.is_local ? '$(server-environment) ' : '$(cloud) '}${m.display_name}`,
+                                description: m.provider,
+                                detail: m.model_id,
+                                value: m.model_id,
+                                provider: m.provider,
+                                displayName: m.display_name,
+                            }));
+                        }
+                        // Fallback to default models if server returns empty
+                        return getDefaultModels();
+                    } catch {
+                        return getDefaultModels();
+                    }
+                }
+            );
 
             const selected = await vscode.window.showQuickPick(models, {
-                placeHolder: 'Select AI model'
+                placeHolder: 'Select AI model',
+                matchOnDescription: true,
+                matchOnDetail: true,
             });
 
             if (selected) {
@@ -447,16 +592,29 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
                     await store.setModel({
                         provider: selected.provider as ModelInfo['provider'],
                         modelId: selected.value,
-                        displayName: selected.label,
+                        displayName: selected.displayName,
                     });
 
-                    vscode.window.showInformationMessage(`Switched to ${selected.label}`);
+                    vscode.window.showInformationMessage(`Switched to ${selected.displayName}`);
                 } catch (error) {
                     vscode.window.showErrorMessage(`Failed to switch model: ${error}`);
                 }
             }
         })
     );
+
+    // Helper function for fallback models
+    function getDefaultModels() {
+        return [
+            { label: '$(cloud) Claude Sonnet 4', description: 'anthropic', detail: 'claude-sonnet-4-20250514', value: 'claude-sonnet-4-20250514', provider: 'anthropic', displayName: 'Claude Sonnet 4' },
+            { label: '$(cloud) Claude Opus 4.5', description: 'anthropic', detail: 'claude-opus-4-5-20251101', value: 'claude-opus-4-5-20251101', provider: 'anthropic', displayName: 'Claude Opus 4.5' },
+            { label: '$(cloud) GPT-4 Turbo', description: 'openai', detail: 'gpt-4-turbo', value: 'gpt-4-turbo', provider: 'openai', displayName: 'GPT-4 Turbo' },
+            { label: '$(cloud) GPT-4o', description: 'openai', detail: 'gpt-4o', value: 'gpt-4o', provider: 'openai', displayName: 'GPT-4o' },
+            { label: '$(cloud) Gemini 2.0 Flash', description: 'google', detail: 'gemini-2.0-flash', value: 'gemini-2.0-flash', provider: 'google', displayName: 'Gemini 2.0 Flash' },
+            { label: '$(server-environment) Qwen 2.5 Coder', description: 'ollama', detail: 'qwen2.5-coder:14b', value: 'qwen2.5-coder:14b', provider: 'ollama', displayName: 'Qwen 2.5 Coder' },
+            { label: '$(server-environment) Llama 3.1', description: 'ollama', detail: 'llama3.1:8b', value: 'llama3.1:8b', provider: 'ollama', displayName: 'Llama 3.1' },
+        ];
+    }
 
     // Switch mode - now uses state store
     context.subscriptions.push(
@@ -584,6 +742,55 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
             serverManager.showOutput();
         })
     );
+
+    // Export conversation
+    context.subscriptions.push(
+        vscode.commands.registerCommand('victor.exportConversation', async () => {
+            const exportOption = await vscode.window.showQuickPick([
+                { label: 'Export as Markdown', value: 'markdown' },
+                { label: 'Export as JSON', value: 'json' },
+                { label: 'Copy to Clipboard', value: 'clipboard' },
+            ], {
+                placeHolder: 'Choose export format',
+            });
+
+            if (!exportOption) {
+                return;
+            }
+
+            try {
+                // For clipboard, use markdown format
+                const format = exportOption.value === 'clipboard' ? 'markdown' : exportOption.value;
+                const content = await victorClient.exportConversation(format as 'json' | 'markdown');
+
+                if (exportOption.value === 'clipboard') {
+                    await vscode.env.clipboard.writeText(content);
+                    vscode.window.showInformationMessage('Conversation copied to clipboard');
+                } else {
+                    // Show save dialog
+                    const extension = exportOption.value === 'markdown' ? 'md' : 'json';
+                    const defaultUri = vscode.Uri.file(`conversation.${extension}`);
+
+                    const saveUri = await vscode.window.showSaveDialog({
+                        defaultUri,
+                        filters: {
+                            [exportOption.value === 'markdown' ? 'Markdown' : 'JSON']: [extension],
+                        },
+                    });
+
+                    if (saveUri) {
+                        await vscode.workspace.fs.writeFile(
+                            saveUri,
+                            Buffer.from(content, 'utf-8')
+                        );
+                        vscode.window.showInformationMessage(`Conversation exported to ${saveUri.fsPath}`);
+                    }
+                }
+            } catch (error) {
+                vscode.window.showErrorMessage(`Export failed: ${error}`);
+            }
+        })
+    );
 }
 
 function updateStatusBar(statusBarItem: vscode.StatusBarItem, mode: string): void {
@@ -615,6 +822,11 @@ function updateServerStatusBar(serverStatusBarItem: vscode.StatusBarItem, status
             icon: '$(error)',
             color: 'statusBarItem.errorBackground',
             tooltip: 'Victor Server: Error\nClick for options'
+        },
+        [ServerStatus.Reconnecting]: {
+            icon: '$(sync~spin)',
+            color: 'statusBarItem.warningBackground',
+            tooltip: 'Victor Server: Reconnecting...'
         }
     };
 
@@ -652,6 +864,15 @@ export function deactivate() {
         }
         if (providers.diffViewProvider) {
             providers.diffViewProvider.dispose();
+        }
+        if (providers.codeLensProvider) {
+            providers.codeLensProvider.dispose();
+        }
+        if (providers.hoverProvider) {
+            providers.hoverProvider.dispose();
+        }
+        if (providers.toolExecutionService) {
+            providers.toolExecutionService.dispose();
         }
         providers = null;
     }

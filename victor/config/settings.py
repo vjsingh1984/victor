@@ -22,6 +22,7 @@ import yaml
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
+from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
 
 
 # =============================================================================
@@ -141,6 +142,11 @@ class ProjectPaths:
         return self.project_victor_dir / "embeddings"
 
     @property
+    def graph_dir(self) -> Path:
+        """Get project-local graph directory."""
+        return self.project_victor_dir / "graph"
+
+    @property
     def index_metadata(self) -> Path:
         """Get codebase index metadata file path."""
         return self.project_victor_dir / "index_metadata.json"
@@ -217,6 +223,7 @@ class ProjectPaths:
         """Create project-local directories if they don't exist."""
         self.project_victor_dir.mkdir(parents=True, exist_ok=True)
         self.embeddings_dir.mkdir(parents=True, exist_ok=True)
+        self.graph_dir.mkdir(parents=True, exist_ok=True)
         self.backups_dir.mkdir(parents=True, exist_ok=True)
         self.changes_dir.mkdir(parents=True, exist_ok=True)
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
@@ -314,6 +321,48 @@ class ProfileConfig(BaseSettings):
         None, description="Tool selection configuration for adaptive thresholds"
     )
 
+    # -------------------------------------------------------------------------
+    # Provider Tuning Options (P3-1)
+    # -------------------------------------------------------------------------
+    # These settings allow fine-tuning agent behavior per provider/model.
+    # Override defaults from Settings for provider-specific optimizations.
+
+    # Loop detection thresholds - controls when to detect repetitive tool calls
+    loop_repeat_threshold: Optional[int] = Field(
+        None, description="Number of identical calls before triggering loop detection"
+    )
+    max_continuation_prompts: Optional[int] = Field(
+        None, description="Max consecutive continuation prompts before forcing completion"
+    )
+
+    # Quality thresholds - controls response quality requirements
+    quality_threshold: Optional[float] = Field(
+        None, ge=0.0, le=1.0, description="Minimum quality score to accept response"
+    )
+    grounding_threshold: Optional[float] = Field(
+        None, ge=0.0, le=1.0, description="Confidence threshold for grounding verification"
+    )
+
+    # Tool behavior - controls tool usage patterns
+    max_tool_calls_per_turn: Optional[int] = Field(
+        None, gt=0, description="Maximum tool calls allowed in single model turn"
+    )
+    tool_cache_enabled: Optional[bool] = Field(
+        None, description="Enable/disable tool result caching for this profile"
+    )
+    tool_deduplication_enabled: Optional[bool] = Field(
+        None, description="Enable/disable tool call deduplication"
+    )
+
+    # Timeout and session limits
+    session_idle_timeout: Optional[int] = Field(
+        None, gt=0, description="Maximum idle time in seconds (resets on provider response/tool execution)"
+    )
+    # Future: session_time_limit for total session duration cap (regardless of activity)
+    timeout: Optional[int] = Field(
+        None, gt=0, description="Request timeout in seconds"
+    )
+
     @field_validator("tool_selection")
     @classmethod
     def validate_tool_selection(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -331,13 +380,13 @@ class ProfileConfig(BaseSettings):
         if v is None:
             return None
 
-        # Predefined model size tiers for convenience
+        # Predefined model size tiers for convenience (from orchestrator_constants)
         TIER_PRESETS = {
-            "tiny": {"base_threshold": 0.35, "base_max_tools": 5},  # 0.5B-3B
-            "small": {"base_threshold": 0.25, "base_max_tools": 7},  # 7B-8B
-            "medium": {"base_threshold": 0.20, "base_max_tools": 10},  # 13B-15B
-            "large": {"base_threshold": 0.15, "base_max_tools": 12},  # 30B+
-            "cloud": {"base_threshold": 0.18, "base_max_tools": 10},  # Claude/GPT
+            "tiny": TOOL_SELECTION_PRESETS.tiny,  # 0.5B-3B
+            "small": TOOL_SELECTION_PRESETS.small,  # 7B-8B
+            "medium": TOOL_SELECTION_PRESETS.medium,  # 13B-15B
+            "large": TOOL_SELECTION_PRESETS.large,  # 30B+
+            "cloud": TOOL_SELECTION_PRESETS.cloud,  # Claude/GPT
         }
 
         # Expand tier shortcuts
@@ -410,12 +459,52 @@ class Settings(BaseSettings):
     # Privacy and Security
     airgapped_mode: bool = False
 
+    # ==========================================================================
+    # Vertical Configuration
+    # ==========================================================================
+    # Verticals are domain-specific configurations that customize Victor's behavior.
+    # Available verticals: coding, research, devops (extensible via plugins)
+    default_vertical: str = "coding"  # Default vertical when --vertical not specified
+    auto_detect_vertical: bool = False  # Auto-detect vertical from project context (experimental)
+
+    # Server Security (FastAPI/WebSocket layer)
+    # When set, API key is required for HTTP + WebSocket requests (Authorization: Bearer <token>)
+    server_api_key: Optional[str] = None
+    # HMAC secret for issuing/verifying session tokens (defaults to random per-process secret)
+    server_session_secret: Optional[str] = None
+    # Hard cap on simultaneous sessions to avoid resource exhaustion
+    server_max_sessions: int = 100
+    # Maximum inbound message payload size (bytes) for WebSocket messages
+    server_max_message_bytes: int = 32768
+    # Session token time-to-live in seconds
+    server_session_ttl_seconds: int = 86400
+    # Diagram rendering limits
+    render_max_payload_bytes: int = 20000
+    render_timeout_seconds: int = 10
+    render_max_concurrency: int = 2
+
+    # Code execution sandbox defaults (used by code_executor_tool)
+    code_executor_network_disabled: bool = True
+    code_executor_memory_limit: Optional[str] = "512m"
+    code_executor_cpu_shares: Optional[int] = 256
+
     # Write Approval Mode (safety for autonomous/task mode)
     # Controls when user confirmation is required for file modifications:
     #   - "off": Never require approval (dangerous, testing only)
     #   - "risky_only": Only for HIGH/CRITICAL risk operations (default)
     #   - "all_writes": Require for ALL write operations (recommended for task mode)
     write_approval_mode: str = "risky_only"
+
+    # Headless Mode Settings (for CI/CD and automation)
+    # These can be set via CLI flags or environment variables:
+    #   - VICTOR_HEADLESS_MODE=true
+    #   - VICTOR_DRY_RUN_MODE=true
+    #   - VICTOR_MAX_FILE_CHANGES=10
+    headless_mode: bool = False  # Run without prompts, auto-approve safe actions
+    dry_run_mode: bool = False  # Preview changes without applying them
+    auto_approve_safe: bool = False  # Auto-approve read-only and LOW risk operations
+    max_file_changes: Optional[int] = None  # Limit file modifications per session
+    one_shot_mode: bool = False  # Exit after completing a single request
 
     # Unified Embedding Model (Optimized for Memory + Cache Efficiency)
     # Using same model for tool selection AND codebase search provides:
@@ -445,11 +534,33 @@ class Settings(BaseSettings):
     codebase_persist_directory: Optional[str] = None  # Default: ~/.victor/embeddings/codebase
     codebase_dimension: int = 384  # Embedding dimension
     codebase_batch_size: int = 32  # Batch size for embedding generation
+    codebase_graph_store: str = "sqlite"  # Graph backend (sqlite default)
+    codebase_graph_path: Optional[str] = None  # Optional explicit graph db path
+    core_readonly_tools: Optional[List[str]] = None  # Override/extend curated read-only tool set
+
+    # Semantic Search Quality Improvements (P4.X - Multi-Provider Excellence)
+    semantic_similarity_threshold: float = 0.5  # Min score [0.1-0.9], lowered from 0.7 to reduce false negatives
+    semantic_query_expansion_enabled: bool = True  # Expand queries with synonyms/related terms
+    semantic_max_query_expansions: int = 5  # Max query variations to try (including original)
+
+    # Hybrid Search (Semantic + Keyword with RRF)
+    enable_hybrid_search: bool = False  # Enable hybrid search combining semantic + keyword
+    hybrid_search_semantic_weight: float = 0.6  # Weight for semantic search (0.0-1.0)
+    hybrid_search_keyword_weight: float = 0.4  # Weight for keyword search (0.0-1.0)
+
+    # RL-based threshold learning per (embedding_model, task_type, tool_context)
+    enable_semantic_threshold_rl_learning: bool = False  # Enable automatic threshold learning
+    semantic_threshold_overrides: dict = {}  # Format: {"model:task:tool": threshold}
+
+    # Tool call deduplication
+    enable_tool_deduplication: bool = False  # Enable deduplication tracker
+    tool_deduplication_window_size: int = 10  # Number of recent calls to track
 
     # UI
     theme: str = "monokai"
     show_token_count: bool = True
     stream_responses: bool = True
+    use_emojis: bool = True  # Enable emoji indicators in output (✓, ✗, etc.)
 
     # Interaction Mode
     # When True (one-shot mode), auto-continue when model asks for user input
@@ -462,10 +573,10 @@ class Settings(BaseSettings):
     mcp_prefix: str = "mcp"
 
     # Tool Execution Settings
-    tool_call_budget: int = (
-        300  # Maximum tool calls per session (increased from 20 for long operations)
-    )
-    tool_call_budget_warning_threshold: int = 250  # Warn when approaching budget limit
+    tool_call_budget: int = BUDGET_LIMITS.max_session_budget  # Maximum tool calls per session
+    tool_call_budget_warning_threshold: int = int(
+        BUDGET_LIMITS.max_session_budget * BUDGET_LIMITS.warning_threshold_pct
+    )  # Warn when approaching budget limit
 
     # Models known to support structured tool calls per provider
     # Loaded from model_capabilities.yaml, can be extended in profiles.yaml
@@ -540,6 +651,51 @@ class Settings(BaseSettings):
     max_research_iterations: int = 6  # Force synthesis after N consecutive web searches
 
     # ==========================================================================
+    # Recovery & Loop Detection Thresholds
+    # ==========================================================================
+    # These control when Victor forces completion after detecting stuck behavior.
+    # Lower values = faster recovery but may cut off legitimate long operations.
+    # Higher values = more patience but may waste tokens on stuck loops.
+
+    # Empty response recovery: Force after N consecutive empty responses from model
+    recovery_empty_response_threshold: int = (
+        5  # Default: force after 5 empty responses (3 * 1.5 = 4.5 → 5)
+    )
+
+    # Loop detection patience: How many consecutive blocked attempts before forcing completion
+    # This is separate from the per-task loop_repeat_threshold (which controls when to warn/block)
+    recovery_blocked_consecutive_threshold: int = (
+        6  # Default: force after 6 consecutive blocks (4 * 1.5 = 6)
+    )
+    recovery_blocked_total_threshold: int = (
+        9  # Default: force after 9 total blocked attempts (6 * 1.5 = 9)
+    )
+
+    # Continuation prompts: How many times to prompt model to continue before forcing
+    # These are global defaults - can be overridden per provider/model via RL learning
+    max_continuation_prompts_analysis: int = 6  # For analysis tasks (4 * 1.5 = 6)
+    max_continuation_prompts_action: int = 5  # For action tasks (3 * 1.5 = 4.5 → 5)
+    max_continuation_prompts_default: int = 3  # For other tasks (2 * 1.5 = 3)
+
+    # Provider/model-specific continuation prompt overrides (learned via RL)
+    # Format: {"provider:model": {"analysis": N, "action": N, "default": N}}
+    # Example: {"ollama:qwen3-coder-tools:30b": {"analysis": 8, "action": 6, "default": 4}}
+    continuation_prompt_overrides: dict = {}
+
+    # Enable RL-based learning of optimal continuation prompts per provider/model
+    # Tracks success rates and adjusts limits automatically (future feature)
+    enable_continuation_rl_learning: bool = False
+
+    # Session idle timeout: Maximum seconds of inactivity before forcing completion
+    # Timer resets on each provider response or tool execution
+    # Set below provider timeout (300s default) to provide graceful completion
+    # Can be overridden per profile in profiles.yaml
+    session_idle_timeout: int = 180  # 3 minutes idle time, leaves 120s buffer for summary
+
+    # Future: session_time_limit will be separate config for total session duration
+    # regardless of activity (for sub-task agents, resource limits, etc.)
+
+    # ==========================================================================
     # Conversation Memory (Multi-turn Context Retention)
     # ==========================================================================
     conversation_memory_enabled: bool = True  # Enable SQLite-backed conversation persistence
@@ -591,6 +747,29 @@ class Settings(BaseSettings):
     serialization_enabled: bool = True  # Enable token-optimized serialization
     serialization_default_format: Optional[str] = None  # None = auto-select best format
     serialization_min_savings_threshold: float = 0.15  # Min savings to use alternative format
+
+    # ==========================================================================
+    # Intelligent Agent Pipeline (RL-based Learning, Quality Scoring)
+    # ==========================================================================
+    # Controls the intelligent agent features including:
+    # - Q-learning based mode transitions (explore -> plan -> build -> review)
+    # - Response quality scoring (coherence, completeness, relevance, grounding)
+    # - Provider resilience integration (circuit breaker, retries)
+    # - Embedding-based prompt optimization
+    intelligent_pipeline_enabled: bool = True  # Master switch for intelligent features
+    intelligent_quality_scoring: bool = True  # Enable multi-dimensional quality scoring
+    intelligent_mode_learning: bool = True  # Enable Q-learning for mode transitions
+    intelligent_prompt_optimization: bool = True  # Enable embedding-based prompt selection
+    intelligent_grounding_verification: bool = True  # Enable hallucination detection
+
+    # Quality thresholds
+    intelligent_min_quality_threshold: float = 0.5  # Minimum quality to accept response
+    intelligent_grounding_threshold: float = 0.7  # Confidence threshold for grounding
+
+    # Learning rate for Q-learning (default exploration rate = 0.3, decay = 0.995)
+    intelligent_exploration_rate: float = 0.3  # Initial exploration vs exploitation
+    intelligent_learning_rate: float = 0.1  # Q-learning alpha parameter
+    intelligent_discount_factor: float = 0.9  # Q-learning gamma parameter
     serialization_include_format_hint: bool = True  # Include format description in output
     serialization_min_rows_for_tabular: int = 3  # Min rows to consider tabular formats
     serialization_debug_mode: bool = False  # Include data characteristics in output

@@ -174,9 +174,7 @@ def goodbye():
             temp_path = f.name
 
         try:
-            result = await metrics(
-                path=temp_path, metrics_list=["complexity", "maintainability"]
-            )
+            result = await metrics(path=temp_path, metrics_list=["complexity", "maintainability"])
             assert result["success"] is True
         finally:
             Path(temp_path).unlink(missing_ok=True)

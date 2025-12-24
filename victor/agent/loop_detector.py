@@ -70,6 +70,7 @@ class TaskType(Enum):
 # Tools that indicate research activity
 RESEARCH_TOOLS = frozenset({"web_search", "web_fetch", "tavily_search", "search_web", "fetch_url"})
 
+
 def get_progress_params_for_tool(tool_name: str) -> List[str]:
     """Get progress parameters for a tool from the decorator-driven registry.
 
@@ -205,6 +206,7 @@ class LoopDetector:
     This class handles reactive loop detection and budget enforcement:
     - Tool call counting and budget enforcement
     - True loop detection (repeated signatures)
+    - **Content loop detection (repeated text phrases in streaming)**
     - Progress tracking (unique files read)
     - Task-type aware thresholds
     - Research loop detection
@@ -218,11 +220,23 @@ class LoopDetector:
         detector.record_tool_call("read_file", {"path": "test.py"})
         detector.record_iteration(content_length=len(response))
 
+        # For streaming content loop detection:
+        detector.record_content_chunk("Let me analyze...")
+        if detector.check_content_loop():
+            # Content loop detected, stop streaming
+            break
+
         if detector.should_stop().should_stop:
             # Force completion
             break
 
     """
+
+    # Default content loop detection settings
+    CONTENT_PHRASE_MIN_LENGTH = 15  # Minimum phrase length to track
+    CONTENT_PHRASE_MAX_LENGTH = 80  # Maximum phrase length to track
+    CONTENT_REPEAT_THRESHOLD = 5  # Number of repetitions to detect loop
+    CONTENT_BUFFER_SIZE = 5000  # Rolling buffer size for content analysis
 
     def __init__(
         self,
@@ -261,6 +275,11 @@ class LoopDetector:
         self._loop_warning_given: bool = False  # Track if we've warned about impending loop
         self._warned_signature: Optional[str] = None  # The signature we warned about
 
+        # Content loop detection (for streaming "thinking" loops)
+        self._content_buffer: str = ""
+        self._content_loop_detected: bool = False
+        self._content_loop_phrase: Optional[str] = None
+
         # Manual stop
         self._forced_stop: Optional[str] = None
 
@@ -276,6 +295,9 @@ class LoopDetector:
         self._consecutive_research_calls = 0
         self._loop_warning_given = False
         self._warned_signature = None
+        self._content_buffer = ""
+        self._content_loop_detected = False
+        self._content_loop_phrase = None
         self._forced_stop = None
 
     @property
@@ -781,6 +803,125 @@ class LoopDetector:
             "unique_resources": len(self._unique_resources),
             "task_type": self.task_type.value,
         }
+
+    # ================================================================
+    # Content Loop Detection (for streaming "thinking" loops)
+    # ================================================================
+
+    def record_content_chunk(self, chunk: str) -> None:
+        """Record a content chunk for loop detection during streaming.
+
+        This method should be called for each content chunk received during
+        streaming to detect repetitive "thinking" loops common in reasoning
+        models like DeepSeek R1.
+
+        Args:
+            chunk: Content chunk from the streaming response
+        """
+        if not chunk:
+            return
+
+        # Append to rolling buffer
+        self._content_buffer += chunk
+
+        # Trim buffer if too large (keep last CONTENT_BUFFER_SIZE chars)
+        if len(self._content_buffer) > self.CONTENT_BUFFER_SIZE:
+            self._content_buffer = self._content_buffer[-self.CONTENT_BUFFER_SIZE :]
+
+    def check_content_loop(self) -> Optional[str]:
+        """Check if content shows a repetitive loop pattern.
+
+        Returns:
+            Description of the loop if detected, None otherwise
+        """
+        if self._content_loop_detected:
+            return f"Content loop already detected: {self._content_loop_phrase}"
+
+        if (
+            len(self._content_buffer)
+            < self.CONTENT_PHRASE_MIN_LENGTH * self.CONTENT_REPEAT_THRESHOLD
+        ):
+            return None
+
+        # Look for repeated phrases in the content buffer
+        detected = self._find_repeated_phrase()
+        if detected:
+            self._content_loop_detected = True
+            self._content_loop_phrase = detected
+            logger.warning(f"Content loop detected: '{detected[:50]}...' repeated excessively")
+            return f"Repetitive content detected: '{detected[:50]}...'"
+
+        return None
+
+    def _find_repeated_phrase(self) -> Optional[str]:
+        """Find repeated phrases in the content buffer.
+
+        Uses a sliding window approach to detect phrases that appear
+        multiple times in succession.
+
+        Returns:
+            The repeated phrase if found, None otherwise
+        """
+        text = self._content_buffer
+
+        # Try different phrase lengths, starting with longer phrases
+        # (longer = more specific = better detection)
+        for phrase_len in range(
+            self.CONTENT_PHRASE_MAX_LENGTH,
+            self.CONTENT_PHRASE_MIN_LENGTH - 1,
+            -5,  # Step down by 5 chars
+        ):
+            if len(text) < phrase_len * self.CONTENT_REPEAT_THRESHOLD:
+                continue
+
+            # Extract candidate phrases and count occurrences
+            # Use a sliding window with step size to avoid excessive computation
+            step = max(1, phrase_len // 4)
+            phrase_counts: Counter[str] = Counter()
+
+            for i in range(0, len(text) - phrase_len, step):
+                phrase = text[i : i + phrase_len]
+                # Skip phrases that are mostly whitespace or punctuation
+                if not self._is_meaningful_phrase(phrase):
+                    continue
+                phrase_counts[phrase] += 1
+
+            # Check if any phrase exceeds the repeat threshold
+            for phrase, count in phrase_counts.most_common(5):
+                if count >= self.CONTENT_REPEAT_THRESHOLD:
+                    return phrase
+
+        return None
+
+    def _is_meaningful_phrase(self, phrase: str) -> bool:
+        """Check if a phrase is meaningful (not just whitespace/punctuation).
+
+        Args:
+            phrase: The phrase to check
+
+        Returns:
+            True if the phrase is meaningful
+        """
+        # Count alphanumeric characters
+        alpha_count = sum(1 for c in phrase if c.isalnum())
+        # Phrase should be at least 50% alphanumeric
+        return alpha_count >= len(phrase) * 0.5
+
+    @property
+    def content_loop_detected(self) -> bool:
+        """Whether a content loop has been detected."""
+        return self._content_loop_detected
+
+    @property
+    def content_loop_phrase(self) -> Optional[str]:
+        """The repeated phrase if a content loop was detected."""
+        return self._content_loop_phrase
+
+    def reset_content_tracking(self) -> None:
+        """Reset just the content tracking state (for new response)."""
+        self._content_buffer = ""
+        self._content_loop_detected = False
+        self._content_loop_phrase = None
 
 
 def create_tracker_from_classification(

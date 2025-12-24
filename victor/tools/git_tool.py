@@ -37,13 +37,21 @@ _model: Optional[str] = None
 def set_git_provider(provider, model: Optional[str] = None) -> None:
     """Set the global provider and model for git AI operations.
 
-    DEPRECATED: Use ToolConfig via context instead. This function is kept
-    for backward compatibility but will be removed in a future version.
+    DEPRECATED: Use ToolConfig via executor context instead.
+    Tools now receive ToolConfig in their execution context.
+    This function will be removed in v2.0.
 
     Args:
         provider: LLM provider for AI-generated messages
         model: Model to use for message generation
     """
+    import warnings
+
+    warnings.warn(
+        "set_git_provider() is deprecated. Use ToolConfig via executor.update_context() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     global _provider, _model
     _provider = provider
     _model = model
@@ -105,7 +113,7 @@ def _run_git(*args: str, env_overrides: Optional[Dict[str, str]] = None) -> Tupl
     access_mode=AccessMode.MIXED,  # Reads repo state and writes commits
     danger_level=DangerLevel.MEDIUM,  # Repository modifications
     # Registry-driven metadata for tool selection and cache management
-    stages=["executing", "verification"],  # Conversation stages where relevant
+    stages=["execution", "verification", "completion"],  # Conversation stages where relevant
     task_types=["action", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.MIXED,  # Can both read and write
     progress_params=["operation", "files", "branch"],  # Params indicating different operations
@@ -145,6 +153,7 @@ def _run_git(*args: str, env_overrides: Optional[Dict[str, str]] = None) -> Tupl
         "Supports custom author name and email for commits",
         "Can stage individual files or all changes",
     ],
+    mandatory_keywords=["commit", "git commit", "git status", "git diff"],  # From MANDATORY_TOOL_KEYWORDS
 )
 async def git(
     operation: str,
@@ -655,5 +664,3 @@ async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     analysis.append("4. Continue: git merge --continue or git rebase --continue")
 
     return {"success": True, "output": "\n".join(analysis), "error": ""}
-
-

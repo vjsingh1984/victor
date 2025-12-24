@@ -18,28 +18,31 @@
 | `fetch` | Fetch and extract main text content from a URL. |
 | `git` | Unified git operations: status, diff, stage, commit, log, branch. Operations: status, diff (staged=True for staged), stage (files or all), commit (message required), log (limit), branch (list/create/switch). Supports custom author_name/author_email for commits. |
 | `http` | Unified HTTP operations for requests and API testing. Modes: - "request": Standard HTTP request (default) - "test": API testing with validation |
-| `iac_scanner` | Scan IaC files (Terraform, Docker, K8s) for security issues. Actions: scan, scan_file, summary, detect. Detects: secrets, IAM misconfig, missing encryption, network exposure. |
+| `iac` | Scan IaC files (Terraform, Docker, K8s) for security issues. Actions: scan, scan_file, summary, detect. Detects: secrets, IAM misconfig, missing encryption, network exposure. |
 | `inline` | Inline a variable by replacing usages with its assigned value. |
+| `jira` | Perform operations on Jira issues. |
 | `ls` | List directory contents. |
 | `lsp` | Language Server Protocol operations for code intelligence. Actions: status, start, stop, completions, hover, definition, references, diagnostics. Position-based actions require: file_path, line, character. |
 | `mcp` | Call an MCP tool by name (prefixed with the MCP namespace). |
-| `merge_conflicts` | Detect and resolve git merge conflicts. Actions: detect, analyze, resolve (auto), apply (ours/theirs), abort. Smart strategies: trivial (whitespace), import (sort/combine), union. |
+| `merge` | Detect and resolve git merge conflicts. Actions: detect, analyze, resolve (auto), apply (ours/theirs), abort. Smart strategies: trivial (whitespace), import (sort/combine), union. |
 | `metrics` | Comprehensive code metrics and quality analysis. Analyzes code quality metrics including complexity, maintainability, technical debt, and code structure. Consolidates multiple metric types into a single unified interface. |
 | `organize_imports` | Organize imports: sort into groups (stdlib/third-party/local), remove duplicates. |
 | `overview` | Get a curated project overview for initial exploration. Provides: 1. Directory structure at max_depth (default: 2 levels) 2. Top documentation files (README*, ARCHITECTURE*, INDEX*, etc.) 3. Largest source files by size (helps identify core modules) |
 | `patch` | Unified patch operations: create diffs or apply patches. Operations: - "apply": Apply a unified diff patch to files (default) - "create": Create a unified diff from file and new content |
-| `pipeline_analyzer` | Analyze CI/CD pipelines (GitHub Actions, GitLab) and coverage. Actions: analyze, coverage, compare_coverage, summary, detect. Coverage formats: Cobertura, LCOV, JaCoCo. |
+| `pipeline` | Analyze CI/CD pipelines (GitHub Actions, GitLab) and coverage. Actions: analyze, coverage, compare_coverage, summary, detect. Coverage formats: Cobertura, LCOV, JaCoCo. |
 | `pr` | Create a GitHub pull request with auto-generated or custom content. Creates a pull request using GitHub CLI (gh). Automatically pushes the current branch to origin if needed. If title or description are not provided and an AI provider is configured, generates them from the commit history and diff. |
 | `read` | Read text/code file. Binary files rejected. |
 | `refs` | [AST-AWARE] Find all references to a symbol using tree-sitter parsing. Scans Python files and identifies exact identifier matches using AST analysis. More accurate than grep for finding symbol usages (won't match substrings). |
 | `rename` | [AST-AWARE] Rename symbols safely using word-boundary matching. Uses AST parsing + word boundaries to rename symbols without false positives. SAFE: Won't rename 'get_user' to 'fetch_user' inside 'get_username'. Use this for Python symbol refactoring. Use edit() for non-code text changes. |
-| `review` | Comprehensive code review for automated quality analysis. Performs code review including security checks, complexity analysis, best practices validation, and documentation coverage. Consolidates multiple review aspects into a single unified interface. |
+| `review` | Comprehensive code review for automated quality analysis. Performs code review including security checks, complexity analysis, best practices validation, and documentation coverage. Consolidates multiple review aspects into a single unified interface. Supports 20+ programming languages: Python, JavaScript, TypeScript, Java, Go, Rust, C, C++, C#, Ruby, PHP, Kotlin, Swift, Scala, Bash, SQL, Lua, Elixir, Haskell, R. |
 | `sandbox` | Unified sandbox operations for code execution in isolated Docker container. Operations: - "execute": Run Python code in the sandbox - "upload": Upload local files to the sandbox |
 | `scaffold` | Unified project scaffolding tool. Performs scaffolding operations including creating projects from templates, listing available templates, adding files, and initializing git repositories. Consolidates all scaffolding functionality into a single interface. |
 | `scan` | Comprehensive security scanning for code analysis. Performs security scans including secret detection, dependency vulnerability checks, and configuration security analysis. Consolidates multiple scan types into a single unified interface. |
 | `search` | Unified code search with multiple modes. Modes: - "semantic": Embedding-based search. Best for concepts, patterns, inheritance. - "literal": Keyword matching (like grep). Best for exact text/identifiers. |
 | `shell` | Run shell command with safety checks. Returns stdout/stderr/return_code. |
+| `slack` | Perform operations on Slack. |
 | `symbol` | [AST-AWARE] Find function/class definition using tree-sitter parsing. Uses AST analysis for accurate symbol lookup. For Python code analysis only. Use this instead of grep/text search when you need precise symbol definitions. |
+| `teams` | Perform operations on Microsoft Teams. |
 | `test` | Runs tests using pytest and returns a structured summary of the results. This tool runs pytest on the specified path and captures the output in JSON format, providing a clean summary of test outcomes. |
 | `web` | Search the web using DuckDuckGo. Optionally summarize with AI. Purpose: - Find links, docs, references on the public web. - Return titles, URLs, and snippets for relevance checking. - Optionally use AI to summarize search results. - Ideal when the user says "search the web", "find online", "lookup", "docs", "articles". |
 | `workflow` | Runs a pre-defined, multi-step workflow to automate a complex task. |

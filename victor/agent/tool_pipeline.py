@@ -44,11 +44,27 @@ from victor.agent.parallel_executor import (
     ParallelToolExecutor,
     ParallelExecutionConfig,
 )
+from victor.agent.parameter_enforcer import (
+    get_enforcer_for_tool,
+    ParameterInferenceError,
+    ParameterValidationError,
+)
+from victor.agent.output_aggregator import (
+    OutputAggregator,
+    AggregationState,
+)
+from victor.agent.synthesis_checkpoint import (
+    SynthesisCheckpoint,
+    CompositeSynthesisCheckpoint,
+    CheckpointResult,
+    get_checkpoint_for_complexity,
+)
 
 if TYPE_CHECKING:
     from victor.tools.base import ToolRegistry
     from victor.cache.tool_cache import ToolCache
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
+    from victor.agent.signature_store import SignatureStore
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +88,33 @@ class ToolPipelineConfig:
     max_concurrent_tools: int = 5
     parallel_batch_size: int = 10
     parallel_timeout_per_tool: float = 60.0
+
+    # Session-level result caching for idempotent tools
+    # This prevents re-reading same files during a session (helps DeepSeek, Ollama)
+    enable_idempotent_caching: bool = True
+    idempotent_cache_max_size: int = 100  # Max entries in cache
+
+    # Batch-level deduplication for providers that send duplicate tool calls
+    # (helps DeepSeek, Ollama which sometimes issue identical calls in same batch)
+    enable_batch_deduplication: bool = True
+
+    # Output aggregation and synthesis checkpoint settings
+    enable_output_aggregation: bool = True
+    enable_synthesis_checkpoints: bool = True
+    synthesis_checkpoint_complexity: str = "medium"  # simple, medium, complex
+
+
+# Tools that are safe to cache (read-only, deterministic for same arguments)
+IDEMPOTENT_TOOLS = frozenset({
+    "read",
+    "list_directory",
+    "grep",
+    "code_search",
+    "semantic_code_search",
+    "graph",  # Graph queries are read-only
+    "refs",  # Reference lookup is read-only
+    "ls",  # Directory listing
+})
 
 
 @dataclass
@@ -108,6 +151,11 @@ class PipelineExecutionResult:
     # Parallel execution metrics
     parallel_execution_used: bool = False
     parallel_speedup: float = 1.0
+    # Output aggregation and synthesis
+    synthesis_recommended: bool = False
+    synthesis_reason: Optional[str] = None
+    synthesis_prompt: Optional[str] = None
+    aggregation_state: Optional[str] = None
 
 
 class ToolPipeline:
@@ -144,8 +192,10 @@ class ToolPipeline:
         tool_cache: Optional["ToolCache"] = None,
         argument_normalizer: Optional[ArgumentNormalizer] = None,
         code_correction_middleware: Optional["CodeCorrectionMiddleware"] = None,
+        signature_store: Optional["SignatureStore"] = None,
         on_tool_start: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         on_tool_complete: Optional[Callable[[ToolCallResult], None]] = None,
+        deduplication_tracker: Optional[Any] = None,
     ):
         """Initialize tool pipeline.
 
@@ -156,8 +206,10 @@ class ToolPipeline:
             tool_cache: Optional cache for tool results
             argument_normalizer: Optional argument normalizer
             code_correction_middleware: Optional middleware for code validation/fixing
+            signature_store: Optional persistent storage for failed signatures (cross-session learning)
             on_tool_start: Callback when tool execution starts
             on_tool_complete: Callback when tool execution completes
+            deduplication_tracker: Optional tracker for detecting redundant tool calls
         """
         self.tools = tool_registry
         self.executor = tool_executor
@@ -165,13 +217,30 @@ class ToolPipeline:
         self.tool_cache = tool_cache
         self.normalizer = argument_normalizer or ArgumentNormalizer()
         self.code_correction_middleware = code_correction_middleware
+        self.signature_store = signature_store
+        self.deduplication_tracker = deduplication_tracker
 
         # Callbacks
         self.on_tool_start = on_tool_start
         self.on_tool_complete = on_tool_complete
 
+        # Output aggregation and synthesis checkpoints
+        self._output_aggregator: Optional[OutputAggregator] = None
+        self._synthesis_checkpoint: Optional[CompositeSynthesisCheckpoint] = None
+        if self.config.enable_output_aggregation:
+            self._output_aggregator = OutputAggregator(
+                max_results=self.config.tool_budget,
+                stale_threshold_seconds=60.0,
+            )
+        if self.config.enable_synthesis_checkpoints:
+            self._synthesis_checkpoint = get_checkpoint_for_complexity(
+                self.config.synthesis_checkpoint_complexity
+            )
+
         # State tracking
         self._calls_used = 0
+        # In-memory failed signatures for session-only tracking (backward compatible)
+        # When signature_store is provided, it's used for persistent cross-session tracking
         self._failed_signatures: Set[tuple] = set()
         self._executed_tools: List[str] = []
 
@@ -180,6 +249,15 @@ class ToolPipeline:
 
         # Parallel executor (lazy initialized)
         self._parallel_executor: Optional[ParallelToolExecutor] = None
+
+        # Session-level idempotent tool result cache
+        # Prevents DeepSeek/Ollama from re-reading same files multiple times
+        self._idempotent_cache: Dict[tuple, ToolCallResult] = {}
+        self._cache_hits = 0
+        self._cache_misses = 0
+
+        # Batch-level deduplication tracking
+        self._batch_dedup_count = 0  # Total duplicates skipped
 
     @property
     def calls_used(self) -> int:
@@ -203,7 +281,6 @@ class ToolPipeline:
             parallel_config = ParallelExecutionConfig(
                 max_concurrent=self.config.max_concurrent_tools,
                 enable_parallel=self.config.enable_parallel_execution,
-                batch_size=self.config.parallel_batch_size,
                 timeout_per_tool=self.config.parallel_timeout_per_tool,
             )
             self._parallel_executor = ParallelToolExecutor(
@@ -226,6 +303,14 @@ class ToolPipeline:
         self._calls_used = 0
         self._failed_signatures.clear()
         self._executed_tools.clear()
+        # Clear idempotent cache (new session may have different file contents)
+        self._idempotent_cache.clear()
+        self._cache_hits = 0
+        self._cache_misses = 0
+        self._batch_dedup_count = 0
+        # Reset output aggregator
+        if self._output_aggregator:
+            self._output_aggregator.reset()
 
     def is_valid_tool_name(self, name: str) -> bool:
         """Check if tool name is valid format.
@@ -243,13 +328,14 @@ class ToolPipeline:
         return bool(self.VALID_TOOL_NAME_PATTERN.match(name))
 
     def _normalize_arguments(
-        self, tool_name: str, arguments: Any
+        self, tool_name: str, arguments: Any, context: Optional[Dict[str, Any]] = None
     ) -> tuple[Dict[str, Any], NormalizationStrategy]:
-        """Normalize tool arguments.
+        """Normalize tool arguments with parameter enforcement.
 
         Args:
             tool_name: Name of the tool
             arguments: Raw arguments (may be string, dict, or None)
+            context: Optional context for parameter inference
 
         Returns:
             Tuple of (normalized_args, strategy_used)
@@ -266,8 +352,33 @@ class ToolPipeline:
         elif arguments is None:
             arguments = {}
 
-        # Apply normalizer
-        return self.normalizer.normalize_arguments(arguments, tool_name)
+        # Apply basic normalizer first
+        normalized_args, strategy = self.normalizer.normalize_arguments(arguments, tool_name)
+
+        # Apply parameter enforcement if available for this tool
+        # This handles missing required parameters and type coercion (GAP-9)
+        enforcer = get_enforcer_for_tool(tool_name)
+        if enforcer is not None:
+            try:
+                enforced_args = enforcer.enforce(normalized_args, context=context or {})
+                if enforced_args != normalized_args:
+                    logger.debug(
+                        f"Parameter enforcer modified args for {tool_name}: "
+                        f"{set(enforced_args.keys()) - set(normalized_args.keys())} added"
+                    )
+                    normalized_args = enforced_args
+                    # Update strategy to indicate enforcement was applied
+                    if strategy == NormalizationStrategy.NO_CHANGE:
+                        strategy = NormalizationStrategy.TOOL_SPECIFIC
+            except ParameterInferenceError as e:
+                # Could not infer required parameter - log but don't fail here
+                # The tool execution will fail with a more meaningful error
+                logger.warning(f"Could not infer required parameter for {tool_name}: {e}")
+            except ParameterValidationError as e:
+                # Invalid parameter value - log warning
+                logger.warning(f"Parameter validation failed for {tool_name}: {e}")
+
+        return normalized_args, strategy
 
     def _get_call_signature(self, tool_name: str, args: Dict[str, Any]) -> tuple:
         """Generate signature for deduplication.
@@ -284,6 +395,278 @@ class ToolPipeline:
         except Exception:
             args_str = str(args)
         return (tool_name, args_str)
+
+    def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool:
+        """Check if a tool call is known to fail.
+
+        Uses persistent SignatureStore when available for cross-session learning,
+        falls back to in-memory set for session-only tracking.
+
+        Args:
+            tool_name: Name of the tool
+            args: Tool arguments
+
+        Returns:
+            True if this call has failed before
+        """
+        if not self.config.enable_failed_signature_tracking:
+            return False
+
+        # Check persistent store first (cross-session)
+        if self.signature_store is not None:
+            try:
+                if self.signature_store.is_known_failure(tool_name, args):
+                    logger.debug(f"Tool call is known failure (persistent): {tool_name}")
+                    return True
+            except Exception as e:
+                logger.warning(f"Signature store check failed: {e}")
+
+        # Fall back to in-memory check (session-only)
+        signature = self._get_call_signature(tool_name, args)
+        return signature in self._failed_signatures
+
+    def record_failure(self, tool_name: str, args: Dict[str, Any], error_message: str) -> None:
+        """Record a failed tool call.
+
+        Uses persistent SignatureStore when available for cross-session learning,
+        also records in-memory for current session.
+
+        Args:
+            tool_name: Name of the tool
+            args: Tool arguments
+            error_message: Error message from the failure
+        """
+        if not self.config.enable_failed_signature_tracking:
+            return
+
+        # Record in persistent store (cross-session)
+        if self.signature_store is not None:
+            try:
+                self.signature_store.record_failure(tool_name, args, error_message)
+                logger.debug(f"Recorded failure to persistent store: {tool_name}")
+            except Exception as e:
+                logger.warning(f"Failed to record to signature store: {e}")
+
+        # Also record in-memory for current session
+        signature = self._get_call_signature(tool_name, args)
+        self._failed_signatures.add(signature)
+
+    def clear_failure(self, tool_name: str, args: Dict[str, Any]) -> bool:
+        """Clear a specific failure signature (e.g., after a fix).
+
+        Args:
+            tool_name: Name of the tool
+            args: Tool arguments
+
+        Returns:
+            True if signature was found and cleared
+        """
+        cleared = False
+
+        # Clear from persistent store
+        if self.signature_store is not None:
+            try:
+                if self.signature_store.clear_signature(tool_name, args):
+                    cleared = True
+                    logger.debug(f"Cleared failure from persistent store: {tool_name}")
+            except Exception as e:
+                logger.warning(f"Failed to clear from signature store: {e}")
+
+        # Clear from in-memory
+        signature = self._get_call_signature(tool_name, args)
+        if signature in self._failed_signatures:
+            self._failed_signatures.discard(signature)
+            cleared = True
+
+        return cleared
+
+    def is_idempotent_tool(self, tool_name: str) -> bool:
+        """Check if a tool is idempotent (safe to cache results).
+
+        Idempotent tools are read-only and produce the same output for
+        the same input arguments. Results can be safely cached within a session.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            True if tool is idempotent
+        """
+        return tool_name in IDEMPOTENT_TOOLS
+
+    def get_cached_result(
+        self, tool_name: str, args: Dict[str, Any]
+    ) -> Optional[ToolCallResult]:
+        """Get cached result for an idempotent tool call.
+
+        Args:
+            tool_name: Name of the tool
+            args: Tool arguments
+
+        Returns:
+            Cached ToolCallResult if found, None otherwise
+        """
+        if not self.config.enable_idempotent_caching:
+            return None
+
+        if not self.is_idempotent_tool(tool_name):
+            return None
+
+        signature = self._get_call_signature(tool_name, args)
+        cached = self._idempotent_cache.get(signature)
+        if cached is not None:
+            self._cache_hits += 1
+            logger.debug(f"Cache hit for {tool_name}: {signature[:100]}...")
+        return cached
+
+    def cache_result(self, tool_name: str, args: Dict[str, Any], result: ToolCallResult) -> None:
+        """Cache result for an idempotent tool call.
+
+        Only successful results from idempotent tools are cached.
+
+        Args:
+            tool_name: Name of the tool
+            args: Tool arguments
+            result: Tool call result to cache
+        """
+        if not self.config.enable_idempotent_caching:
+            return
+
+        if not self.is_idempotent_tool(tool_name):
+            return
+
+        if not result.success:
+            return  # Don't cache failures
+
+        # Enforce max cache size with simple FIFO eviction
+        if len(self._idempotent_cache) >= self.config.idempotent_cache_max_size:
+            # Remove oldest entry
+            oldest_key = next(iter(self._idempotent_cache))
+            del self._idempotent_cache[oldest_key]
+
+        signature = self._get_call_signature(tool_name, args)
+        # Mark as cached in the result
+        cached_result = ToolCallResult(
+            tool_name=result.tool_name,
+            arguments=result.arguments,
+            success=result.success,
+            result=result.result,
+            error=result.error,
+            execution_time_ms=0.0,  # Cached results have ~0 execution time
+            cached=True,  # Mark as from cache
+            normalization_applied=result.normalization_applied,
+        )
+        self._idempotent_cache[signature] = cached_result
+        self._cache_misses += 1
+        logger.debug(f"Cached result for {tool_name} (cache size: {len(self._idempotent_cache)})")
+
+    def invalidate_file_cache(self, file_path: str) -> int:
+        """Invalidate cached results that involve a specific file path.
+
+        Call this after a file is modified to ensure subsequent reads
+        get fresh content.
+
+        Args:
+            file_path: Path of the modified file
+
+        Returns:
+            Number of cache entries invalidated
+        """
+        if not self.config.enable_idempotent_caching:
+            return 0
+
+        # Find and remove all cache entries involving this file
+        to_remove = []
+        for sig, result in self._idempotent_cache.items():
+            # Check if file path is in arguments
+            if file_path in str(result.arguments):
+                to_remove.append(sig)
+
+        for sig in to_remove:
+            del self._idempotent_cache[sig]
+
+        if to_remove:
+            logger.debug(f"Invalidated {len(to_remove)} cache entries for {file_path}")
+
+        return len(to_remove)
+
+    def get_cache_stats(self) -> Dict[str, int]:
+        """Get cache statistics.
+
+        Returns:
+            Dict with cache_hits, cache_misses, cache_size, batch_dedup_count
+        """
+        return {
+            "cache_hits": self._cache_hits,
+            "cache_misses": self._cache_misses,
+            "cache_size": len(self._idempotent_cache),
+            "hit_rate": (
+                self._cache_hits / (self._cache_hits + self._cache_misses)
+                if (self._cache_hits + self._cache_misses) > 0
+                else 0.0
+            ),
+            "batch_dedup_count": self._batch_dedup_count,
+        }
+
+    def deduplicate_tool_calls(
+        self,
+        tool_calls: List[Dict[str, Any]],
+    ) -> tuple[List[Dict[str, Any]], List[tuple[int, tuple]]]:
+        """Deduplicate identical tool calls within a batch.
+
+        Some providers (DeepSeek, Ollama) sometimes issue duplicate tool calls
+        in the same response. This method detects and removes duplicates,
+        returning deduplicated results for the duplicates that use the first
+        occurrence's result.
+
+        Args:
+            tool_calls: List of tool call requests
+
+        Returns:
+            Tuple of (unique_calls, duplicate_info) where duplicate_info
+            contains (original_index, signature) tuples for duplicates
+        """
+        if not self.config.enable_batch_deduplication:
+            return tool_calls, []
+
+        seen_signatures: Dict[tuple, int] = {}  # signature -> index in unique_calls
+        unique_calls: List[Dict[str, Any]] = []
+        duplicate_indices: List[tuple[int, tuple]] = []  # (original_index, signature)
+
+        for i, tc in enumerate(tool_calls):
+            # Skip invalid structures - let execute_tool_calls handle them
+            if not isinstance(tc, dict):
+                unique_calls.append(tc)
+                continue
+
+            tool_name = tc.get("name", "")
+            raw_args = tc.get("arguments", {})
+
+            # Normalize arguments for signature comparison
+            if isinstance(raw_args, str):
+                try:
+                    raw_args = json.loads(raw_args)
+                except Exception:
+                    raw_args = {"value": raw_args}
+            elif raw_args is None:
+                raw_args = {}
+
+            signature = self._get_call_signature(tool_name, raw_args)
+
+            if signature in seen_signatures:
+                # Duplicate found
+                duplicate_indices.append((i, signature))
+                self._batch_dedup_count += 1
+                logger.info(
+                    f"[Pipeline] Deduplicating {tool_name} call "
+                    f"(duplicate #{self._batch_dedup_count})"
+                )
+            else:
+                # First occurrence
+                seen_signatures[signature] = len(unique_calls)
+                unique_calls.append(tc)
+
+        return unique_calls, duplicate_indices
 
     async def execute_tool_calls(
         self,
@@ -303,9 +686,52 @@ class ToolPipeline:
         result = PipelineExecutionResult(total_calls=len(tool_calls))
         start_time = time.monotonic()
 
-        for tool_call in tool_calls:
+        # Batch-level deduplication to handle providers that send duplicate calls
+        unique_calls, duplicate_info = self.deduplicate_tool_calls(tool_calls)
+
+        # Track results by signature for duplicate resolution
+        results_by_signature: Dict[tuple, ToolCallResult] = {}
+
+        # Build tool history for synthesis checkpoint
+        tool_history: List[Dict[str, Any]] = []
+
+        for tool_call in unique_calls:
             call_result = await self._execute_single_call(tool_call, context)
             result.results.append(call_result)
+
+            # Store result by signature for duplicate resolution (only for dict items)
+            tool_name = ""
+            raw_args: Dict[str, Any] = {}
+            if isinstance(tool_call, dict):
+                tool_name = tool_call.get("name", "")
+                raw_args = tool_call.get("arguments", {})
+                if isinstance(raw_args, str):
+                    try:
+                        raw_args = json.loads(raw_args)
+                    except Exception:
+                        raw_args = {"value": raw_args}
+                elif raw_args is None:
+                    raw_args = {}
+                signature = self._get_call_signature(tool_name, raw_args)
+                results_by_signature[signature] = call_result
+
+            # Add to output aggregator
+            if self._output_aggregator and tool_name:
+                self._output_aggregator.add_result(
+                    tool_name=tool_name,
+                    result=call_result.result,
+                    success=call_result.success,
+                    metadata={"args": raw_args},
+                )
+
+            # Track for synthesis checkpoint
+            tool_history.append({
+                "tool": tool_name,
+                "args": raw_args,
+                "success": call_result.success,
+                "result": str(call_result.result)[:500] if call_result.result else "",
+                "error": call_result.error,
+            })
 
             if call_result.skipped:
                 result.skipped_calls += 1
@@ -319,6 +745,53 @@ class ToolPipeline:
                 result.budget_exhausted = True
                 # Skip remaining calls
                 break
+
+        # Add skipped results for duplicates (reuse first occurrence's result)
+        for original_idx, signature in duplicate_info:
+            if signature in results_by_signature:
+                original_result = results_by_signature[signature]
+                # Create a copy marked as from deduplication
+                dup_result = ToolCallResult(
+                    tool_name=original_result.tool_name,
+                    arguments=original_result.arguments,
+                    success=original_result.success,
+                    result=original_result.result,
+                    error=original_result.error,
+                    execution_time_ms=0.0,  # Deduplicated, no execution time
+                    cached=True,  # Mark as effectively cached
+                    skipped=True,
+                    skip_reason="Deduplicated (duplicate call in batch)",
+                )
+                result.results.append(dup_result)
+                result.skipped_calls += 1
+
+        # Check synthesis checkpoint
+        if self._synthesis_checkpoint and tool_history:
+            task_context = {
+                "elapsed_time": context.get("elapsed_time", 0),
+                "timeout": context.get("timeout", 180),
+                "task_type": context.get("task_type", "unknown"),
+            }
+            checkpoint_result = self._synthesis_checkpoint.check(tool_history, task_context)
+            if checkpoint_result.should_synthesize:
+                result.synthesis_recommended = True
+                result.synthesis_reason = checkpoint_result.reason
+                result.synthesis_prompt = checkpoint_result.suggested_prompt
+                logger.info(f"Synthesis checkpoint triggered: {checkpoint_result.reason}")
+
+        # Set aggregation state
+        if self._output_aggregator:
+            result.aggregation_state = self._output_aggregator.state.value
+            # If aggregator is in a synthesis-ready state, also recommend synthesis
+            if self._output_aggregator.state in (
+                AggregationState.READY_TO_SYNTHESIZE,
+                AggregationState.LOOPING,
+                AggregationState.STUCK,
+            ):
+                if not result.synthesis_recommended:
+                    result.synthesis_recommended = True
+                    result.synthesis_reason = f"Aggregation state: {self._output_aggregator.state.value}"
+                    result.synthesis_prompt = self._output_aggregator.get_synthesis_prompt()
 
         result.total_time_ms = (time.monotonic() - start_time) * 1000
         return result
@@ -534,6 +1007,26 @@ class ToolPipeline:
         normalized_args, strategy = self._normalize_arguments(tool_name, raw_args)
         normalization_applied = None if strategy == NormalizationStrategy.DIRECT else strategy.value
 
+        # Check idempotent cache for read-only tools
+        # This prevents DeepSeek/Ollama from re-reading the same file multiple times
+        cached_result = self.get_cached_result(tool_name, normalized_args)
+        if cached_result is not None:
+            logger.info(f"[Pipeline] Returning cached result for {tool_name}")
+            # Still count as a tool call for tracking, but don't execute
+            self._executed_tools.append(tool_name)
+            # Notify callbacks about cached result
+            if self.on_tool_start:
+                try:
+                    self.on_tool_start(tool_name, normalized_args)
+                except Exception as e:
+                    logger.warning(f"on_tool_start callback failed: {e}")
+            if self.on_tool_complete:
+                try:
+                    self.on_tool_complete(cached_result)
+                except Exception as e:
+                    logger.warning(f"on_tool_complete callback failed: {e}")
+            return cached_result
+
         # Code correction middleware - validate and fix code arguments
         code_corrected = False
         code_validation_errors: Optional[List[str]] = None
@@ -582,6 +1075,25 @@ class ToolPipeline:
                     normalization_applied=normalization_applied,
                 )
 
+        # Check for redundant tool calls using deduplication tracker
+        if self.deduplication_tracker is not None:
+            try:
+                if self.deduplication_tracker.is_redundant(tool_name, normalized_args):
+                    logger.info(
+                        f"[Pipeline] Skipping redundant tool call: {tool_name} "
+                        f"(semantic overlap with recent calls)"
+                    )
+                    return ToolCallResult(
+                        tool_name=tool_name,
+                        arguments=normalized_args,
+                        success=False,
+                        skipped=True,
+                        skip_reason="Redundant call (semantic overlap with recent operations)",
+                        normalization_applied=normalization_applied,
+                    )
+            except Exception as e:
+                logger.warning(f"Deduplication tracker check failed: {e}")
+
         # Notify start
         if self.on_tool_start:
             try:
@@ -619,6 +1131,17 @@ class ToolPipeline:
         if not exec_result.success and self.config.enable_failed_signature_tracking:
             signature = self._get_call_signature(tool_name, normalized_args)
             self._failed_signatures.add(signature)
+
+        # Cache successful results for idempotent tools
+        if call_result.success:
+            self.cache_result(tool_name, normalized_args, call_result)
+
+        # Record successful tool call in deduplication tracker
+        if call_result.success and self.deduplication_tracker is not None:
+            try:
+                self.deduplication_tracker.add_call(tool_name, normalized_args)
+            except Exception as e:
+                logger.warning(f"Failed to record call in deduplication tracker: {e}")
 
         # Update analytics
         if self.config.enable_analytics:

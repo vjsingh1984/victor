@@ -30,6 +30,56 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from victor.providers.base import ToolDefinition
 
 
+# =============================================================================
+# HALLUCINATED ARGUMENT FILTERING
+# =============================================================================
+# These are argument names that smaller LLMs commonly hallucinate but are NOT
+# valid parameters for most tools. They should be silently filtered out during
+# argument normalization to prevent tool execution failures.
+#
+# Examples of hallucinations observed in benchmarks:
+# - qwen25-coder:14b adding "max_results", "depth", "limit" to read/search tools
+# - deepseek-r1:14b adding "timeout", "verbose", "output_format" to filesystem tools
+# - gpt-oss:20b adding "recursive", "encoding", "follow_symlinks" arbitrarily
+# =============================================================================
+
+HALLUCINATED_ARGUMENTS: set[str] = {
+    # Search/filtering params that models hallucinate
+    "max_results",
+    "limit",
+    "top_k",
+    "max_items",
+    "num_results",
+    # Depth/recursion params
+    "depth",
+    "max_depth",
+    "recursive",
+    "follow_symlinks",
+    # Output formatting
+    "output_format",
+    "format",
+    "verbose",
+    "silent",
+    "quiet",
+    # Encoding/charset
+    "encoding",
+    "charset",
+    # Timeouts
+    "timeout",
+    "max_time",
+    # Context/window
+    "context",
+    "context_lines",
+    "window_size",
+    # Misc common hallucinations
+    "include_hidden",
+    "show_hidden",
+    "force",
+    "dry_run",
+    "confirm",
+}
+
+
 class ToolCallFormat(Enum):
     """Supported tool call formats across providers."""
 
@@ -79,7 +129,11 @@ class ToolCallingCapabilities:
     # Model-specific exploration behavior
     # Models that need more "thinking" turns get higher exploration_multiplier
     exploration_multiplier: float = 1.0  # Multiplies max_exploration_iterations
-    continuation_patience: int = 3  # Empty turns to allow before forcing completion
+    continuation_patience: int = 10  # Empty turns to allow before forcing completion
+
+    # Model-specific timeout settings
+    # Slow local models (30B+ params on CPU) need longer timeouts
+    timeout_multiplier: float = 1.0  # Multiplies provider timeout (default 300s)
 
 
 @dataclass
@@ -239,6 +293,7 @@ class FallbackParsingMixin:
         """Parse JSON tool calls from content (fallback).
 
         Looks for JSON objects with 'name' and 'arguments' or 'parameters'.
+        Handles JSON in markdown code fences (```json ... ```) as well as raw JSON.
 
         Args:
             content: Response content to parse
@@ -251,26 +306,38 @@ class FallbackParsingMixin:
         if not content:
             return ToolCallParseResult()
 
-        try:
-            data = json.loads(content)
-            if isinstance(data, dict) and "name" in data:
-                name = data.get("name", "")
+        # Try to extract JSON from markdown code fences first
+        # Pattern matches ```json ... ``` or ``` ... ```
+        code_fence_pattern = r"```(?:json)?\s*\n?(.*?)\n?```"
+        code_fence_match = re.search(code_fence_pattern, content, re.DOTALL)
 
-                # Validate name if validator provided
-                if validate_name_fn and not validate_name_fn(name):
-                    return ToolCallParseResult(remaining_content=content)
+        json_candidates = []
+        if code_fence_match:
+            json_candidates.append(code_fence_match.group(1).strip())
+        # Also try the raw content (might be pure JSON without fences)
+        json_candidates.append(content)
 
-                args = data.get("arguments") or data.get("parameters", {})
-                parsed_args, _ = self.parse_json_arguments(args)
+        for json_str in json_candidates:
+            try:
+                data = json.loads(json_str)
+                if isinstance(data, dict) and "name" in data:
+                    name = data.get("name", "")
 
-                return ToolCallParseResult(
-                    tool_calls=[ToolCall(name=name, arguments=parsed_args)],
-                    remaining_content="",
-                    parse_method="json_fallback",
-                    confidence=0.9,
-                )
-        except json.JSONDecodeError:
-            pass
+                    # Validate name if validator provided
+                    if validate_name_fn and not validate_name_fn(name):
+                        continue  # Try next candidate
+
+                    args = data.get("arguments") or data.get("parameters", {})
+                    parsed_args, _ = self.parse_json_arguments(args)
+
+                    return ToolCallParseResult(
+                        tool_calls=[ToolCall(name=name, arguments=parsed_args)],
+                        remaining_content="",
+                        parse_method="json_fallback",
+                        confidence=0.9,
+                    )
+            except json.JSONDecodeError:
+                continue  # Try next candidate
 
         return ToolCallParseResult(remaining_content=content)
 
@@ -493,6 +560,39 @@ class BaseToolCallingAdapter(ABC):
 
         return "\n".join(hints)
 
+    # =============================================================================
+    # ARGUMENT ALIASES
+    # =============================================================================
+    # Maps alternate argument names to canonical names that tools expect.
+    # LLMs often hallucinate alternate names for common parameters.
+    # Key: (tool_name, alias_name), Value: canonical_name
+    # Use None as tool_name for global aliases that apply to all tools.
+    ARGUMENT_ALIASES: Dict[tuple, str] = {
+        # Shell tool: LLMs often use 'command' instead of 'cmd'
+        ("shell", "command"): "cmd",
+        ("execute_bash", "command"): "cmd",
+        # Read tool: 'file_path' or 'filename' instead of 'path'
+        ("read", "file_path"): "path",
+        ("read", "filename"): "path",
+        ("read_file", "file_path"): "path",
+        # Write tool: 'file_path' or 'filename' instead of 'path'
+        ("write", "file_path"): "path",
+        ("write", "filename"): "path",
+        ("write_file", "file_path"): "path",
+        # Edit tool: 'file_path' instead of 'path'
+        ("edit", "file_path"): "path",
+        ("edit_file", "file_path"): "path",
+        # Grep/search: 'pattern' instead of 'query'
+        ("grep", "pattern"): "query",
+        ("grep", "search"): "query",
+        ("search", "pattern"): "query",
+        ("code_search", "pattern"): "query",
+        # Ls tool: 'directory' instead of 'path'
+        ("ls", "directory"): "path",
+        ("ls", "dir"): "path",
+        ("list_directory", "directory"): "path",
+    }
+
     # Default values for required parameters that providers may omit.
     # These are sensible defaults that preserve expected tool behavior.
     # Key: tool_name, Value: dict of parameter defaults
@@ -501,23 +601,65 @@ class BaseToolCallingAdapter(ABC):
         # Canonical short names
         "ls": {"path": "."},
         "read": {"path": ""},  # Empty string will fail gracefully
-        "shell": {"command": ""},
+        "shell": {"cmd": ""},  # Note: canonical param is 'cmd', not 'command'
         "grep": {"query": "", "path": "."},
         "search": {"query": "", "path": "."},
         # Legacy names (backward compatibility - LLMs may still use these)
         "list_directory": {"path": "."},
         "read_file": {"path": ""},
-        "execute_bash": {"command": ""},
+        "execute_bash": {"cmd": ""},  # Note: canonical param is 'cmd'
         "code_search": {"query": "", "path": "."},
         "semantic_code_search": {"query": "", "path": "."},
     }
 
+    # Common hallucinated arguments that models generate but tools don't accept.
+    # These are filtered out silently to prevent tool execution failures.
+    # Models like gpt-oss:20b and smaller models frequently hallucinate these.
+    HALLUCINATED_ARGUMENTS: set = {
+        # Common pagination/limit params that tools don't support
+        "max_results",
+        "limit",
+        "offset",
+        "page",
+        "page_size",
+        "top_k",
+        "num_results",
+        # Directory traversal params that tools don't use
+        "depth",
+        "max_depth",
+        "recursive",
+        "follow_symlinks",
+        # Format params that tools don't accept
+        "format",
+        "output_format",
+        "response_format",
+        # Context/search params
+        "context",
+        "ctx",
+        "context_lines",
+        "before",
+        "after",
+        # Misc hallucinated params
+        "verbose",
+        "debug",
+        "silent",
+        "quiet",
+        "timeout",
+        "async",
+    }
+
     def normalize_arguments(self, arguments: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
-        """Normalize tool arguments with sensible defaults.
+        """Normalize tool arguments with sensible defaults and filter hallucinations.
+
+        This method:
+        1. Applies argument aliases (e.g., 'command' -> 'cmd' for shell tool)
+        2. Filters out common hallucinated arguments that models generate
+        3. Fills in sensible defaults for missing required parameters
 
         Providers may omit required parameters (e.g., Gemini returning empty args
-        for list_directory when it means "current directory"). This method fills
-        in sensible defaults to prevent tool execution failures.
+        for list_directory when it means "current directory"). Models may also
+        generate non-existent parameters (e.g., gpt-oss:20b generating "max_results",
+        "depth", "limit" for the search tool). This method handles both cases.
 
         Design Principle:
             Tools define their contracts (required params). Adapters bridge the gap
@@ -529,20 +671,50 @@ class BaseToolCallingAdapter(ABC):
             tool_name: Name of the tool
 
         Returns:
-            Normalized arguments with defaults applied
+            Normalized arguments with defaults applied and hallucinations filtered
         """
-        # Get defaults for this tool
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        # Step 1: Apply argument aliases (e.g., 'command' -> 'cmd' for shell)
+        aliased = {}
+        aliased_keys = []
+        for key, value in arguments.items():
+            # Check for tool-specific alias
+            alias_key = (tool_name, key)
+            if alias_key in self.ARGUMENT_ALIASES:
+                canonical = self.ARGUMENT_ALIASES[alias_key]
+                # Only apply alias if canonical key doesn't already exist with a value
+                if canonical not in aliased or not aliased[canonical]:
+                    aliased[canonical] = value
+                    aliased_keys.append(f"{key}->{canonical}")
+            else:
+                # No alias, keep original key
+                aliased[key] = value
+
+        if aliased_keys:
+            logger.debug(f"Applied argument aliases for {tool_name}: {aliased_keys}")
+
+        # Step 2: Filter out hallucinated arguments
+        filtered = {}
+        filtered_out = []
+        for key, value in aliased.items():
+            if key in self.HALLUCINATED_ARGUMENTS:
+                filtered_out.append(key)
+            else:
+                filtered[key] = value
+
+        if filtered_out:
+            logger.debug(f"Filtered hallucinated arguments for {tool_name}: {filtered_out}")
+
+        # Step 3: Apply defaults for missing required parameters
         defaults = self.TOOL_ARGUMENT_DEFAULTS.get(tool_name, {})
-        if not defaults:
-            return arguments
-
-        # Apply defaults for missing required parameters
-        normalized = dict(arguments)  # Copy to avoid mutation
         for param, default_value in defaults.items():
-            if param not in normalized or normalized[param] is None:
-                normalized[param] = default_value
+            if param not in filtered or filtered[param] is None:
+                filtered[param] = default_value
 
-        return normalized
+        return filtered
 
     def is_valid_tool_name(self, name: str) -> bool:
         """Check if a tool name is valid.

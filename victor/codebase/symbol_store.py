@@ -49,6 +49,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from victor.codebase.ignore_patterns import DEFAULT_SKIP_DIRS, should_ignore_path
+
 logger = logging.getLogger(__name__)
 
 
@@ -136,34 +138,31 @@ class SymbolStore:
         ".svelte": "svelte",
     }
 
-    # Directories to skip
-    SKIP_DIRS = {
-        "__pycache__",
-        ".git",
-        ".pytest_cache",
-        "venv",
-        ".venv",
-        "env",
-        "node_modules",
-        ".tox",
-        "build",
-        "dist",
-        "target",
-        ".next",
-        ".nuxt",
-        "coverage",
-        ".cache",
-        "out",
-        "vendor",
-    }
+    # Use shared default skip directories from ignore_patterns module
+    # Hidden directories (starting with '.') are excluded automatically
+    # by the shared should_ignore_path() utility
+    SKIP_DIRS = DEFAULT_SKIP_DIRS
 
-    def __init__(self, root_path: str):
+    def __init__(
+        self,
+        root_path: str,
+        include_dirs: Optional[List[str]] = None,
+        exclude_dirs: Optional[List[str]] = None,
+    ):
         """Initialize symbol store.
 
         Args:
             root_path: Root directory of the codebase
+            include_dirs: List of directories to include in the analysis.
+            exclude_dirs: List of directories to exclude from the analysis.
         """
         self.root = Path(root_path).resolve()
+        self.include_dirs = include_dirs
+
+        self.effective_skip_dirs = self.SKIP_DIRS.copy()
+        if exclude_dirs:
+            self.effective_skip_dirs.update(exclude_dirs)
+
         self._init_db()
 
     @property
@@ -250,8 +249,12 @@ class SymbolStore:
             )
 
     def should_ignore(self, path: Path) -> bool:
-        """Check if path should be ignored."""
-        return any(skip in path.parts for skip in self.SKIP_DIRS)
+        """Check if path should be ignored.
+
+        Uses shared ignore logic from ignore_patterns module.
+        Automatically excludes hidden directories (starting with '.').
+        """
+        return should_ignore_path(path, skip_dirs=self.effective_skip_dirs)
 
     def detect_language(self, path: Path) -> Optional[str]:
         """Detect language from file extension."""
@@ -298,11 +301,18 @@ class SymbolStore:
         # Collect all current source files
         current_files: Set[str] = set()
         source_files = []
-        for ext in self.LANGUAGE_EXTENSIONS:
-            for file_path in self.root.rglob(f"*{ext}"):
-                if not self.should_ignore(file_path) and file_path.is_file():
-                    source_files.append(file_path)
-                    current_files.add(str(file_path.relative_to(self.root)))
+        search_paths = (
+            [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
+        )
+
+        for search_path in search_paths:
+            if not search_path.is_dir():
+                continue
+            for ext in self.LANGUAGE_EXTENSIONS:
+                for file_path in search_path.rglob(f"*{ext}"):
+                    if not self.should_ignore(file_path) and file_path.is_file():
+                        source_files.append(file_path)
+                        current_files.add(str(file_path.relative_to(self.root)))
 
         print(f"Found {len(source_files)} source files")
 
@@ -414,11 +424,13 @@ class SymbolStore:
             # Show summary of failed files if any (helps users fix their code)
             if stats["files_failed"] > 0 and stats["files_failed"] <= 10:
                 print("  ⚠️  Failed files:")
-                for path, error_type, error_msg in stats["errors"]:
+                for path, error_type, _error_msg in stats["errors"]:
                     if error_type != "parse_error":
                         print(f"     {path}: {error_type}")
             elif stats["files_failed"] > 10:
-                print(f"  ⚠️  {stats['files_failed']} files failed to index (run with --verbose for details)")
+                print(
+                    f"  ⚠️  {stats['files_failed']} files failed to index (run with --verbose for details)"
+                )
         else:
             print(f"✅ Index up to date ({stats['files_skipped']} files unchanged)")
 
@@ -535,7 +547,6 @@ class SymbolStore:
             symbols, imports = self._extract_generic_symbols(content, rel_path, language)
 
         return symbols, imports, parse_error
-
 
     def _extract_python_symbols_robust(
         self, content: str, rel_path: str
@@ -709,9 +720,7 @@ class SymbolStore:
         """
         # Try tree-sitter first for better accuracy
         try:
-            symbols, imports = self._extract_generic_symbols_treesitter(
-                content, rel_path, language
-            )
+            symbols, imports = self._extract_generic_symbols_treesitter(content, rel_path, language)
             if symbols:  # Got results, use them
                 return symbols, imports
         except Exception as e:
@@ -1118,14 +1127,14 @@ class SymbolStore:
         with sqlite3.connect(str(self._db_path)) as conn:
             # Get all struct/class symbols with their paths
             cursor = conn.execute(
-                """SELECT DISTINCT file_path, name, symbol_type, docstring
+                """SELECT DISTINCT file_path, name, symbol_type, docstring, line_number
                    FROM symbols
                    WHERE symbol_type IN ('struct', 'class', 'trait', 'interface')
                    ORDER BY file_path"""
             )
 
             for row in cursor:
-                file_path, name, sym_type, docstring = row
+                file_path, name, sym_type, docstring, line_number = row
                 path_lower = file_path.lower()
                 parts = file_path.split("/")
 
@@ -1228,6 +1237,7 @@ class SymbolStore:
                         {
                             "name": impl_name,
                             "path": file_path,
+                            "line": line_number,
                             "description": (docstring or "")[:60] if docstring else "",
                             "primary_symbol": name,
                         }

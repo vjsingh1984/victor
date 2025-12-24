@@ -19,6 +19,8 @@ LMStudio provides an OpenAI-compatible API but requires specialized handling:
 - Tiered URL fallback for multiple LMStudio hosts
 - Longer timeouts (300s) for local model inference
 - Direct httpx client (not AsyncOpenAI SDK)
+- Thinking tag extraction for Qwen3/DeepSeek-R1 models
+- Model-aware tool calling capability detection
 
 References:
 - https://lmstudio.ai/docs/api/openai-api
@@ -27,6 +29,7 @@ References:
 
 import json
 import logging
+import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
 
 import httpx
@@ -40,8 +43,63 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 
 logger = logging.getLogger(__name__)
+
+
+# Models that output <think>...</think> tags
+THINKING_TAG_MODELS = [
+    "qwen3",
+    "deepseek-r1",
+    "deepseek-reasoner",
+]
+
+# Models with native tool calling support
+TOOL_CAPABLE_MODELS = [
+    "-tools",  # Suffix pattern (e.g., qwen3-coder-tools-30b)
+    "qwen2.5-coder",
+    "qwen3-coder",
+    "llama3.1-tools",
+    "llama3.3-tools",
+    "deepseek-coder-tools",
+    "deepseek-r1-tools",
+    "deepseek-coder-v2-tools",
+]
+
+
+def _model_uses_thinking_tags(model: str) -> bool:
+    """Check if a model outputs thinking tags."""
+    model_lower = model.lower()
+    return any(pattern in model_lower for pattern in THINKING_TAG_MODELS)
+
+
+def _model_supports_tools(model: str) -> bool:
+    """Check if a model supports native tool calling."""
+    model_lower = model.lower()
+    return any(pattern in model_lower for pattern in TOOL_CAPABLE_MODELS)
+
+
+def _extract_thinking_content(response: str) -> Tuple[str, str]:
+    """Extract <think>...</think> tags from response.
+
+    Args:
+        response: Raw response text
+
+    Returns:
+        Tuple of (thinking_content, main_content)
+    """
+    if not response:
+        return ("", "")
+
+    # Match <think>...</think> tags (case insensitive, multiline)
+    think_pattern = r"<think>(.*?)</think>"
+    matches = re.findall(think_pattern, response, re.DOTALL | re.IGNORECASE)
+
+    thinking = "\n".join(matches) if matches else ""
+    content = re.sub(think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE).strip()
+
+    return (thinking, content)
 
 
 class LMStudioProvider(BaseProvider):
@@ -52,6 +110,8 @@ class LMStudioProvider(BaseProvider):
     - Async factory for non-blocking initialization
     - Native tool calling support for hammer-badge models
     - JSON fallback parsing for other models
+    - Thinking tag extraction for Qwen3/DeepSeek-R1 models
+    - Model-aware capability detection
     """
 
     # Default timeout matches Ollama (local models need more time)
@@ -59,6 +119,9 @@ class LMStudioProvider(BaseProvider):
 
     # Default LMStudio port
     DEFAULT_PORT = 1234
+
+    # Initial request timeout (for model loading)
+    INITIAL_REQUEST_TIMEOUT = 180  # 3 minutes for first request (model loading)
 
     def __init__(
         self,
@@ -91,6 +154,9 @@ class LMStudioProvider(BaseProvider):
         self._raw_base_urls = base_url
         self._api_key = api_key
         self._models_available: Optional[bool] = None  # Set during URL discovery
+        self._context_window_cache: Dict[str, int] = {}
+        self._current_model: Optional[str] = None  # Track current model for capability detection
+        self._model_tool_support_cache: Dict[str, bool] = {}  # Cache tool support per model
 
         # Use httpx directly (not AsyncOpenAI SDK) for consistent behavior with Ollama
         self.client = httpx.AsyncClient(
@@ -139,13 +205,167 @@ class LMStudioProvider(BaseProvider):
         """Provider name."""
         return "lmstudio"
 
-    def supports_tools(self) -> bool:
-        """LMStudio supports tool calling for compatible models."""
-        return True
+    def supports_tools(self, model: Optional[str] = None) -> bool:
+        """Check if model supports tool calling.
+
+        Args:
+            model: Model name to check. If None, uses current model or returns True.
+
+        Returns:
+            True if model supports native tool calling
+        """
+        check_model = model or self._current_model
+        if not check_model:
+            return True  # Optimistic default
+
+        # Check cache first
+        if check_model in self._model_tool_support_cache:
+            return self._model_tool_support_cache[check_model]
+
+        # Check model name patterns
+        supports = _model_supports_tools(check_model)
+        self._model_tool_support_cache[check_model] = supports
+
+        if not supports:
+            logger.debug(f"LMStudio: Model {check_model} does not support native tool calling")
+
+        return supports
 
     def supports_streaming(self) -> bool:
         """LMStudio supports streaming."""
         return True
+
+    def model_uses_thinking_tags(self, model: Optional[str] = None) -> bool:
+        """Check if model outputs thinking tags.
+
+        Args:
+            model: Model name to check. If None, uses current model.
+
+        Returns:
+            True if model outputs <think>...</think> tags
+        """
+        check_model = model or self._current_model
+        if not check_model:
+            return False
+        return _model_uses_thinking_tags(check_model)
+
+    async def check_model_status(self, model: str) -> Dict[str, Any]:
+        """Check if a model is loaded and ready.
+
+        Args:
+            model: Model name to check
+
+        Returns:
+            Status dict with 'loaded', 'loading', 'error' keys
+        """
+        try:
+            response = await self.client.get("/models")
+            response.raise_for_status()
+            data = response.json()
+
+            models = data.get("data", [])
+            model_info = next((m for m in models if m.get("id") == model), None)
+
+            if model_info:
+                return {
+                    "loaded": True,
+                    "loading": False,
+                    "model": model,
+                    "info": model_info,
+                }
+
+            # Model not in list - might need to be loaded
+            return {
+                "loaded": False,
+                "loading": False,
+                "model": model,
+                "available_models": [m.get("id") for m in models],
+            }
+
+        except Exception as e:
+            return {
+                "loaded": False,
+                "loading": False,
+                "error": str(e),
+                "model": model,
+            }
+
+    def get_context_window(self, model: str) -> int:
+        """Get context window size using cached discovery or config fallback."""
+        cache_key = f"{self.base_url}:{model}"
+        if cache_key in self._context_window_cache:
+            return self._context_window_cache[cache_key]
+
+        from victor.config.config_loaders import get_provider_limits
+
+        limits = get_provider_limits("lmstudio", model)
+        self._context_window_cache[cache_key] = limits.context_window
+        return limits.context_window
+
+    async def discover_capabilities(self, model: str) -> ProviderRuntimeCapabilities:
+        """Async capability discovery via /v1/models."""
+        cache_key = f"{self.base_url}:{model}"
+
+        context_window: Optional[int] = None
+        supports_tools = True
+        supports_streaming = True
+        raw_response: Optional[Dict[str, Any]] = None
+
+        try:
+            resp = await self.client.get("/models")
+            resp.raise_for_status()
+            raw_response = resp.json()
+
+            models = raw_response.get("data", [])
+            match = next((m for m in models if m.get("id") == model), models[0] if models else None)
+
+            if match:
+                capabilities = match.get("capabilities", {}) or {}
+                supports_tools = bool(
+                    capabilities.get("functions", True) or capabilities.get("tools", True)
+                )
+                supports_streaming = bool(
+                    capabilities.get("streaming", True) or capabilities.get("stream", True)
+                )
+                context_window = self._extract_context_window(match)
+
+        except Exception as exc:
+            logger.warning(
+                f"Failed to discover capabilities for {model} on {self.base_url}: {exc}"
+            )
+
+        from victor.config.config_loaders import get_provider_limits
+
+        limits = get_provider_limits("lmstudio", model)
+        resolved_context = context_window or limits.context_window
+
+        self._context_window_cache[cache_key] = resolved_context
+
+        return ProviderRuntimeCapabilities(
+            provider=self.name,
+            model=model,
+            context_window=resolved_context,
+            supports_tools=supports_tools,
+            supports_streaming=supports_streaming,
+            source="discovered" if context_window else "config",
+            raw=raw_response,
+        )
+
+    def _extract_context_window(self, model_info: Dict[str, Any]) -> Optional[int]:
+        """Extract context window from LMStudio model info."""
+        candidates = [
+            model_info.get("context_length"),
+            model_info.get("max_context_length"),
+            model_info.get("max_context_tokens"),
+        ]
+        for value in candidates:
+            if value is None:
+                continue
+            try:
+                return int(value)
+            except (ValueError, TypeError):
+                continue
+        return None
 
     def _select_base_url(self, base_url: Union[str, List[str], None], timeout: int) -> str:
         """Pick the first reachable LMStudio endpoint from a tiered list.
@@ -322,6 +542,9 @@ class LMStudioProvider(BaseProvider):
         Raises:
             ProviderError: If request fails or no models loaded
         """
+        # Track current model for capability detection
+        self._current_model = model
+
         # Early check: fail fast if no models are loaded
         if self._models_available is False:
             raise ProviderError(
@@ -330,13 +553,22 @@ class LMStudioProvider(BaseProvider):
                 f"Server URL: {self.base_url}"
             )
 
+        # Filter tools if model doesn't support them
+        effective_tools = tools
+        if tools and not self.supports_tools(model):
+            logger.debug(
+                f"LMStudio: Model {model} doesn't support native tool calling, "
+                "falling back to text-based parsing"
+            )
+            effective_tools = None
+
         try:
             payload = self._build_request_payload(
                 messages=messages,
                 model=model,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                tools=tools,
+                tools=effective_tools,
                 stream=False,
                 **kwargs,
             )
@@ -351,9 +583,16 @@ class LMStudioProvider(BaseProvider):
             return self._parse_response(result, model)
 
         except httpx.TimeoutException as e:
+            # Enhanced timeout error with helpful suggestions
             raise ProviderTimeoutError(
-                message=f"LMStudio request timed out after {self.timeout}s. "
-                f"Ensure the model is loaded and server is responding.",
+                message=(
+                    f"LMStudio request timed out after {self.timeout}s. "
+                    f"Possible causes:\n"
+                    f"  1. Model '{model}' is still loading (first request takes longer)\n"
+                    f"  2. Model is too large for available VRAM\n"
+                    f"  3. Server is overloaded\n"
+                    f"Try: Increase timeout or wait for model to finish loading."
+                ),
                 provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
@@ -362,10 +601,36 @@ class LMStudioProvider(BaseProvider):
                 error_body = e.response.text[:500]
             except Exception:
                 pass
+
+            # Enhanced error classification
+            status_code = e.response.status_code
+            if status_code == 503:
+                message = (
+                    f"LMStudio server unavailable (503). "
+                    f"The model may still be loading. "
+                    f"Server: {self.base_url}"
+                )
+            elif status_code == 500 and "out of memory" in error_body.lower():
+                message = (
+                    f"LMStudio out of memory loading model '{model}'. "
+                    f"Try a smaller model or free up VRAM."
+                )
+            else:
+                message = f"LMStudio HTTP error {status_code}: {error_body}"
+
             raise ProviderError(
-                message=f"LMStudio HTTP error {e.response.status_code}: {error_body}",
+                message=message,
                 provider=self.name,
-                status_code=e.response.status_code,
+                status_code=status_code,
+                raw_error=e,
+            ) from e
+        except httpx.ConnectError as e:
+            raise ProviderError(
+                message=(
+                    f"Cannot connect to LMStudio server at {self.base_url}. "
+                    f"Ensure LMStudio is running and the server is enabled."
+                ),
+                provider=self.name,
                 raw_error=e,
             ) from e
         except Exception as e:
@@ -401,6 +666,9 @@ class LMStudioProvider(BaseProvider):
         Raises:
             ProviderError: If request fails or no models loaded
         """
+        # Track current model for capability detection
+        self._current_model = model
+
         # Early check: fail fast if no models are loaded
         if self._models_available is False:
             raise ProviderError(
@@ -409,19 +677,32 @@ class LMStudioProvider(BaseProvider):
                 f"Server URL: {self.base_url}"
             )
 
+        # Filter tools if model doesn't support them
+        effective_tools = tools
+        if tools and not self.supports_tools(model):
+            logger.debug(
+                f"LMStudio: Model {model} doesn't support native tool calling, "
+                "falling back to text-based parsing"
+            )
+            effective_tools = None
+
+        # Check if model uses thinking tags
+        uses_thinking = self.model_uses_thinking_tags(model)
+
         try:
             payload = self._build_request_payload(
                 messages=messages,
                 model=model,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                tools=tools,
+                tools=effective_tools,
                 stream=True,
                 **kwargs,
             )
-            num_tools = len(tools) if tools else 0
+            num_tools = len(effective_tools) if effective_tools else 0
             logger.debug(
-                f"LMStudio streaming request: model={model}, msgs={len(messages)}, tools={num_tools}"
+                f"LMStudio streaming request: model={model}, msgs={len(messages)}, "
+                f"tools={num_tools}, thinking_model={uses_thinking}"
             )
 
             async with self.client.stream("POST", "/chat/completions", json=payload) as response:
@@ -442,7 +723,17 @@ class LMStudioProvider(BaseProvider):
                         data_str = line[6:]  # Remove "data: " prefix
 
                         if data_str.strip() == "[DONE]":
-                            # Final chunk
+                            # Final chunk - extract thinking content if any
+                            final_metadata = None
+
+                            if uses_thinking and accumulated_content:
+                                thinking, _ = _extract_thinking_content(accumulated_content)
+                                if thinking:
+                                    final_metadata = {"reasoning_content": thinking}
+                                    logger.debug(
+                                        f"LMStudio: Extracted {len(thinking)} chars of thinking"
+                                    )
+
                             logger.debug(f"LMStudio stream complete after {line_count} lines")
                             yield StreamChunk(
                                 content="",
@@ -451,12 +742,15 @@ class LMStudioProvider(BaseProvider):
                                 ),
                                 stop_reason="stop",
                                 is_final=True,
+                                metadata=final_metadata,
                             )
                             break
 
                         try:
                             chunk_data = json.loads(data_str)
-                            chunk = self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
+                            chunk = self._parse_stream_chunk(
+                                chunk_data, accumulated_tool_calls, model
+                            )
                             if chunk.content:
                                 accumulated_content += chunk.content
                             yield chunk
@@ -466,7 +760,10 @@ class LMStudioProvider(BaseProvider):
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
-                message=f"LMStudio stream timed out after {self.timeout}s",
+                message=(
+                    f"LMStudio stream timed out after {self.timeout}s. "
+                    f"Model '{model}' may still be loading."
+                ),
                 provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
@@ -475,10 +772,30 @@ class LMStudioProvider(BaseProvider):
                 error_body = e.response.text[:500]
             except Exception:
                 pass
+
+            # Enhanced error classification
+            status_code = e.response.status_code
+            if status_code == 503:
+                message = (
+                    "LMStudio server unavailable (503) during streaming. "
+                    "The model may still be loading."
+                )
+            else:
+                message = f"LMStudio streaming HTTP error {status_code}: {error_body}"
+
             raise ProviderError(
-                message=f"LMStudio streaming HTTP error {e.response.status_code}: {error_body}",
+                message=message,
                 provider=self.name,
-                status_code=e.response.status_code,
+                status_code=status_code,
+                raw_error=e,
+            ) from e
+        except httpx.ConnectError as e:
+            raise ProviderError(
+                message=(
+                    f"Cannot connect to LMStudio server at {self.base_url}. "
+                    f"Ensure LMStudio is running and the server is enabled."
+                ),
+                provider=self.name,
                 raw_error=e,
             ) from e
         except Exception as e:
@@ -654,6 +971,8 @@ class LMStudioProvider(BaseProvider):
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
         """Parse LMStudio API response (OpenAI-compatible format).
 
+        Handles thinking tag extraction for Qwen3/DeepSeek-R1 models.
+
         Args:
             result: Raw API response
             model: Model name
@@ -672,8 +991,20 @@ class LMStudioProvider(BaseProvider):
 
         choice = choices[0]
         message = choice.get("message", {})
-        content = message.get("content", "") or ""
+        raw_content = message.get("content", "") or ""
         tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
+
+        # Extract thinking content for thinking-enabled models
+        content = raw_content
+        metadata = None
+        if self.model_uses_thinking_tags(model) and raw_content:
+            thinking, main_content = _extract_thinking_content(raw_content)
+            if thinking:
+                metadata = {"reasoning_content": thinking}
+                content = main_content
+                logger.debug(
+                    f"LMStudio: Extracted {len(thinking)} chars of thinking from {model}"
+                )
 
         # Fallback: Check if content contains JSON tool call
         if not tool_calls and content:
@@ -703,16 +1034,21 @@ class LMStudioProvider(BaseProvider):
             usage=usage,
             model=model,
             raw_response=result,
+            metadata=metadata,
         )
 
     def _parse_stream_chunk(
-        self, chunk_data: Dict[str, Any], accumulated_tool_calls: List[Dict[str, Any]]
+        self,
+        chunk_data: Dict[str, Any],
+        accumulated_tool_calls: List[Dict[str, Any]],
+        model: Optional[str] = None,
     ) -> StreamChunk:
         """Parse streaming chunk from LMStudio (OpenAI-compatible SSE format).
 
         Args:
             chunk_data: Raw chunk data
             accumulated_tool_calls: List to accumulate tool call deltas
+            model: Model name for thinking tag detection
 
         Returns:
             Normalized StreamChunk

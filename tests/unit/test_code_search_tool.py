@@ -24,7 +24,7 @@ from victor.tools.code_search_tool import (
     _latest_mtime,
     _gather_files,
     _keyword_score,
-    search,
+    code_search,
 )
 
 
@@ -127,7 +127,7 @@ class TestLiteralSearch:
             Path(f"{tmpdir}/test.py").write_text("def hello():\n    pass")
             Path(f"{tmpdir}/other.py").write_text("def world():\n    pass")
 
-            result = await search("hello", path=tmpdir, k=5, mode="literal")
+            result = await code_search("hello", path=tmpdir, k=5, mode="literal")
             assert result["success"] is True
             assert result["count"] >= 1
 
@@ -137,7 +137,7 @@ class TestLiteralSearch:
         with tempfile.TemporaryDirectory() as tmpdir:
             Path(f"{tmpdir}/test.py").write_text("def foo():\n    pass")
 
-            result = await search("nonexistent_query_xyz", path=tmpdir, k=5, mode="literal")
+            result = await code_search("nonexistent_query_xyz", path=tmpdir, k=5, mode="literal")
             assert result["success"] is True
             assert result["count"] == 0
 
@@ -148,7 +148,7 @@ class TestLiteralSearch:
             Path(f"{tmpdir}/test.py").write_text("hello python")
             Path(f"{tmpdir}/test.js").write_text("hello javascript")
 
-            result = await search("hello", path=tmpdir, exts=[".py"], k=5, mode="literal")
+            result = await code_search("hello", path=tmpdir, exts=[".py"], k=5, mode="literal")
             assert result["success"] is True
 
     @pytest.mark.asyncio
@@ -165,7 +165,7 @@ class TestLiteralSearch:
                 return original_open(path, *args, **kwargs)
 
             with patch("builtins.open", mock_open_error):
-                result = await search("hello", path=tmpdir, k=5, mode="literal")
+                result = await code_search("hello", path=tmpdir, k=5, mode="literal")
                 # Should still succeed but with no results
                 assert result["success"] is True
 
@@ -173,7 +173,7 @@ class TestLiteralSearch:
     async def test_literal_search_empty_dir(self):
         """Test literal search with empty directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = await search("query", path=tmpdir, k=5, mode="literal")
+            result = await code_search("query", path=tmpdir, k=5, mode="literal")
             assert result["success"] is True
             assert result["count"] == 0
 
@@ -184,7 +184,7 @@ class TestLiteralSearch:
             for i in range(20):
                 Path(f"{tmpdir}/file{i}.py").write_text(f"hello {i}")
 
-            result = await search("hello", path=tmpdir, k=10, mode="literal")
+            result = await code_search("hello", path=tmpdir, k=10, mode="literal")
             assert result["success"] is True
             # With internal limit 200, should find all 20 files
             assert result["count"] <= 20
@@ -196,7 +196,7 @@ class TestLiteralSearch:
             Path(f"{tmpdir}/low.py").write_text("hello")
             Path(f"{tmpdir}/high.py").write_text("hello hello hello hello")
 
-            result = await search("hello", path=tmpdir, k=5, mode="literal")
+            result = await code_search("hello", path=tmpdir, k=5, mode="literal")
             assert result["success"] is True
             if result["count"] >= 2:
                 assert result["results"][0]["score"] >= result["results"][1]["score"]
@@ -206,7 +206,7 @@ class TestLiteralSearch:
         """Test literal search handles general exceptions."""
         with patch("victor.tools.code_search_tool._gather_files") as mock_gather:
             mock_gather.side_effect = OSError("Permission denied")
-            result = await search("query", path="/some/path", k=5, mode="literal")
+            result = await code_search("query", path="/some/path", k=5, mode="literal")
 
             assert result["success"] is False
             assert "error" in result
@@ -218,7 +218,7 @@ class TestLiteralSearch:
         with tempfile.TemporaryDirectory() as tmpdir:
             Path(f"{tmpdir}/test.py").write_text("def hello():\n    pass")
 
-            result = await search("hello", path=tmpdir, k=5, mode="literal")
+            result = await code_search("hello", path=tmpdir, k=5, mode="literal")
             assert result["success"] is True
             assert result["count"] >= 1
 
@@ -228,7 +228,7 @@ class TestLiteralSearch:
         with tempfile.TemporaryDirectory() as tmpdir:
             Path(f"{tmpdir}/test.py").write_text("unique_marker_xyz")
 
-            result = await search("unique_marker_xyz", path=tmpdir, k=5, mode="literal")
+            result = await code_search("unique_marker_xyz", path=tmpdir, k=5, mode="literal")
             assert result["success"] is True
             assert result["count"] >= 1
             assert result.get("mode") == "literal"
@@ -240,8 +240,8 @@ class TestSemanticCodeSearch:
     @pytest.mark.asyncio
     async def test_semantic_search_no_root(self):
         """Test semantic search with non-existent root."""
-        result = await search(
-            "query", path="/nonexistent/path/xyz", context={"settings": MagicMock()}
+        result = await code_search(
+            "query", path="/nonexistent/path/xyz", _exec_ctx={"settings": MagicMock()}
         )
         assert result["success"] is False
         assert "not found" in result["error"].lower()
@@ -249,14 +249,14 @@ class TestSemanticCodeSearch:
     @pytest.mark.asyncio
     async def test_semantic_search_no_settings(self):
         """Test semantic search without settings."""
-        result = await search("query", path=".", context={})
+        result = await code_search("query", path=".", _exec_ctx={})
         assert result["success"] is False
         assert "settings" in result["error"].lower()
 
     @pytest.mark.asyncio
     async def test_semantic_search_no_context(self):
         """Test semantic search without context."""
-        result = await search("query", path=".", context=None)
+        result = await code_search("query", path=".", _exec_ctx=None)
         assert result["success"] is False
         assert "settings" in result["error"].lower()
 
@@ -266,9 +266,7 @@ class TestSemanticCodeSearch:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("victor.tools.code_search_tool._get_or_build_index") as mock_index:
                 mock_index.side_effect = ImportError("lancedb not installed")
-                result = await search(
-                    "query", path=tmpdir, context={"settings": MagicMock()}
-                )
+                result = await code_search("query", path=tmpdir, _exec_ctx={"settings": MagicMock()})
                 assert result["success"] is False
                 assert "dependencies" in result["error"].lower()
 
@@ -278,9 +276,7 @@ class TestSemanticCodeSearch:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("victor.tools.code_search_tool._get_or_build_index") as mock_index:
                 mock_index.side_effect = Exception("Some error")
-                result = await search(
-                    "query", path=tmpdir, context={"settings": MagicMock()}
-                )
+                result = await code_search("query", path=tmpdir, _exec_ctx={"settings": MagicMock()})
                 assert result["success"] is False
 
     @pytest.mark.asyncio
@@ -299,10 +295,14 @@ class TestSemanticCodeSearch:
                 mock_get.return_value = (mock_index, True)
                 # Set up cache entry
                 _INDEX_CACHE[root_key] = {"indexed_at": 123456}
+                # Create mock settings with proper values to avoid RL recording issues
+                mock_settings = MagicMock()
+                mock_settings.enable_semantic_threshold_rl_learning = False
+                mock_settings.semantic_similarity_threshold = 0.5
+                mock_settings.semantic_query_expansion_enabled = False
+                mock_settings.enable_hybrid_search = False
                 try:
-                    result = await search(
-                        "hello", path=tmpdir, context={"settings": MagicMock()}
-                    )
+                    result = await code_search("hello", path=tmpdir, _exec_ctx={"settings": mock_settings})
                     assert result["success"] is True
                     assert result["count"] == 1
                 finally:
@@ -359,12 +359,14 @@ class TestGetOrBuildIndex:
             mock_index_instance = MagicMock()
             mock_index_instance.index_codebase = AsyncMock()
 
-            mock_settings = MagicMock(spec=[])
+            mock_settings = MagicMock()
             mock_settings.codebase_vector_store = "lancedb"
             mock_settings.codebase_embedding_provider = "sentence-transformers"
             mock_settings.codebase_embedding_model = "all-MiniLM-L12-v2"
             mock_settings.unified_embedding_model = "all-MiniLM-L12-v2"
             mock_settings.codebase_persist_directory = None
+            mock_settings.codebase_graph_store = "sqlite"
+            mock_settings.codebase_graph_path = ".victor/graph"
 
             with patch("victor.codebase.indexer.CodebaseIndex") as MockCodebaseIndex:
                 MockCodebaseIndex.return_value = mock_index_instance
@@ -402,12 +404,14 @@ class TestGetOrBuildIndex:
             mock_new_index = MagicMock()
             mock_new_index.index_codebase = AsyncMock()
 
-            mock_settings = MagicMock(spec=[])
+            mock_settings = MagicMock()
             mock_settings.codebase_vector_store = "lancedb"
             mock_settings.codebase_embedding_provider = "sentence-transformers"
             mock_settings.codebase_embedding_model = "all-MiniLM-L12-v2"
             mock_settings.unified_embedding_model = "all-MiniLM-L12-v2"
             mock_settings.codebase_persist_directory = None
+            mock_settings.codebase_graph_store = "sqlite"
+            mock_settings.codebase_graph_path = ".victor/graph"
 
             with patch("victor.codebase.indexer.CodebaseIndex") as MockCodebaseIndex:
                 MockCodebaseIndex.return_value = mock_new_index

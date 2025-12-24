@@ -1,6 +1,9 @@
 # Victor AI - VS Code Extension
 
-AI-powered coding assistant with multi-provider support, semantic code search, and 54+ enterprise tools.
+AI-powered coding assistant with multi-provider support, semantic code search, and 46 enterprise tools.
+
+[![GitHub](https://img.shields.io/badge/GitHub-vjsingh1984%2Fvictor-blue)](https://github.com/vjsingh1984/victor)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/vjsingh1984/victor/blob/main/LICENSE)
 
 ## Features
 
@@ -69,6 +72,13 @@ npm install
 npm run compile
 ```
 
+### Connecting to a secured server
+
+If your Victor server sets `VICTOR_SERVER_API_KEY`:
+- In VS Code settings, set `victor.serverApiKey` to the same token.
+- Set `victor.serverPort` or `victor.serverUrl` to point at your server (default `http://localhost:8000` if you started `uvicorn web.server.main:app --port 8000`).
+- The extension will send `Authorization: Bearer <token>`, prefetch a signed `session_token`, and reuse it for WebSocket reconnects automatically.
+
 ## Commands
 
 | Command | Keybinding | Description |
@@ -96,13 +106,14 @@ Open Settings (`Ctrl+,`) and search for "Victor":
 
 ```json
 {
-  "victor.serverPort": 8765,
-  "victor.autoStart": true,
+  "victor.serverPort": 8000,
+  "victor.serverUrl": "http://127.0.0.1:8000",
+  "victor.autoStart": false,
+  "victor.pythonPath": "/Users/you/path/to/repo/venv/bin/python",
   "victor.provider": "anthropic",
   "victor.model": "claude-sonnet-4-20250514",
   "victor.mode": "build",
   "victor.showInlineCompletions": true,
-  "victor.pythonPath": "",
   "victor.victorPath": "",
   "victor.semanticSearch.enabled": true,
   "victor.semanticSearch.maxResults": 10
@@ -111,8 +122,8 @@ Open Settings (`Ctrl+,`) and search for "Victor":
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| `serverPort` | Port for Victor server | `8765` |
-| `autoStart` | Auto-start server on activation | `true` |
+| `serverPort` | Port for Victor server | `8000` |
+| `autoStart` | Auto-start server on activation | `false` |
 | `provider` | Default LLM provider | `anthropic` |
 | `model` | Default model | `claude-sonnet-4-20250514` |
 | `mode` | Agent mode (build/plan/explore) | `build` |
@@ -134,7 +145,7 @@ When `victor.autoStart` is `true`:
 
 Set `victor.autoStart` to `false`, then:
 - Use Command Palette → "Victor: Start Server"
-- Or run in terminal: `victor serve --port 8765`
+- Or run in terminal: `uvicorn web.server.main:app --host 127.0.0.1 --port 8000`
 
 ### Status Bar
 

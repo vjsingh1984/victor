@@ -240,8 +240,8 @@ class TestContextWindow:
 
         window = manager.get_context_window()
 
-        # Should return default
-        assert window == 32768
+        # Should return default from ProviderLimits (128000)
+        assert window == 128000
 
 
 class TestToolAdapter:
@@ -305,9 +305,18 @@ class TestProviderSwitching:
         self, mock_adapter_registry, mock_provider_registry, manager
     ):
         """Test successful provider switch."""
-        # Mock new provider
+        # Mock new provider with async discover_capabilities
         new_provider = MagicMock()
         new_provider.supports_tools.return_value = True
+        new_provider.supports_streaming.return_value = True
+        new_provider.discover_capabilities = AsyncMock(return_value=MagicMock(
+            provider="openai",
+            model="gpt-4-turbo",
+            context_window=128000,
+            supports_tools=True,
+            supports_streaming=True,
+            source="runtime",
+        ))
         mock_provider_registry.create.return_value = new_provider
 
         # Mock adapter
@@ -347,6 +356,7 @@ class TestProviderSwitching:
         settings = MagicMock()
         settings.get_provider_settings.return_value = {}
         provider = MagicMock()
+        provider.discover_capabilities = AsyncMock(return_value=MagicMock())
 
         config = ProviderManagerConfig(
             enable_health_checks=True,
@@ -362,9 +372,11 @@ class TestProviderSwitching:
             config=config,
         )
 
-        # Mock providers
+        # Mock providers with async discover_capabilities
         new_provider = MagicMock()
         new_provider.supports_tools.return_value = True
+        new_provider.supports_streaming.return_value = True
+        new_provider.discover_capabilities = AsyncMock(return_value=MagicMock())
         mock_provider_registry.create.return_value = new_provider
 
         # Mock adapter
@@ -377,7 +389,7 @@ class TestProviderSwitching:
         mock_adapter_registry.get_adapter.return_value = mock_adapter
 
         # Mock health check to fail then succeed
-        with patch.object(manager, "_check_provider_health", side_effect=[False, True]):
+        with patch.object(manager, "_check_provider_health", new=AsyncMock(side_effect=[False, True])):
             result = await manager.switch_provider("google")
 
         # Should have fallen back
@@ -393,6 +405,8 @@ class TestModelSwitching:
         settings = MagicMock()
         provider = MagicMock()
         provider.supports_tools.return_value = True
+        provider.supports_streaming.return_value = True
+        provider.discover_capabilities = AsyncMock(return_value=MagicMock())
 
         return ProviderManager(
             settings=settings,
@@ -479,6 +493,8 @@ class TestSwitchHistory:
         settings.get_provider_settings.return_value = {}
         provider = MagicMock()
         provider.supports_tools.return_value = True
+        provider.supports_streaming.return_value = True
+        provider.discover_capabilities = AsyncMock(return_value=MagicMock())
 
         return ProviderManager(
             settings=settings,
@@ -497,6 +513,8 @@ class TestSwitchHistory:
         """Test that switch history is recorded."""
         new_provider = MagicMock()
         new_provider.supports_tools.return_value = True
+        new_provider.supports_streaming.return_value = True
+        new_provider.discover_capabilities = AsyncMock(return_value=MagicMock())
         mock_provider_registry.create.return_value = new_provider
 
         mock_adapter = MagicMock()
@@ -523,6 +541,8 @@ class TestSwitchCallbacks:
         settings.get_provider_settings.return_value = {}
         provider = MagicMock()
         provider.supports_tools.return_value = True
+        provider.supports_streaming.return_value = True
+        provider.discover_capabilities = AsyncMock(return_value=MagicMock())
 
         return ProviderManager(
             settings=settings,
@@ -541,6 +561,8 @@ class TestSwitchCallbacks:
         """Test that callbacks are called on switch."""
         new_provider = MagicMock()
         new_provider.supports_tools.return_value = True
+        new_provider.supports_streaming.return_value = True
+        new_provider.discover_capabilities = AsyncMock(return_value=MagicMock())
         mock_provider_registry.create.return_value = new_provider
 
         mock_adapter = MagicMock()

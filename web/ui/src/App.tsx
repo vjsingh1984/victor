@@ -14,6 +14,7 @@ interface ChatSession {
   id: string;
   title: string;
   messages: ChatMessage[];
+  token?: string;
 }
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
@@ -24,6 +25,7 @@ const WELCOME: ChatMessage = {
 };
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
+const API_TOKEN = import.meta.env.VITE_API_TOKEN;
 const RECONNECT_INTERVAL = 2000; // 2 seconds
 const MAX_RECONNECT_ATTEMPTS = 5;
 
@@ -32,7 +34,10 @@ function loadInitialSessions(): ChatSession[] {
     const saved = localStorage.getItem('chatSessions');
     if (saved) {
       const parsed: ChatSession[] = JSON.parse(saved);
-      if (parsed.length) return parsed;
+      if (parsed.length) {
+        // Drop any persisted tokens for security; they should be reissued
+        return parsed.map(({ token, ...rest }) => ({ ...rest }));
+      }
     }
   } catch (error) {
     console.error("Failed to parse chat sessions from localStorage", error);
@@ -76,11 +81,50 @@ function App() {
   useEffect(() => {
     scrollToBottom();
     try {
-      localStorage.setItem('chatSessions', JSON.stringify(sessions));
+      // Strip tokens before persisting to localStorage
+      const toPersist = sessions.map(({ token, ...rest }) => rest);
+      localStorage.setItem('chatSessions', JSON.stringify(toPersist));
     } catch (error) {
       console.error("Failed to save chat sessions to localStorage", error);
     }
   }, [sessions]);
+
+  // Prefetch a server-issued session token when an API token is configured
+  useEffect(() => {
+    const shouldPrefetch = API_TOKEN && selectedSession && !selectedSession.token;
+    if (!shouldPrefetch) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await fetch(`${WS_URL.replace('ws', 'http')}/session/token`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${API_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (cancelled) return;
+        const token = data?.session_token as string | undefined;
+        if (token) {
+          setSessions((prev) =>
+            prev.map((sess) =>
+              sess.id === selectedSession.id ? { ...sess, token } : sess
+            )
+          );
+        }
+      } catch (err) {
+        // Silently ignore prefetch failures (server may be offline)
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSession?.id, selectedSession?.token, API_TOKEN]);
 
   // Online/offline detection
   useEffect(() => {
@@ -123,8 +167,17 @@ function App() {
       ws.current.close();
     }
 
+    const params = new URLSearchParams();
+    if (selectedSession.token) {
+      params.set("session_token", selectedSession.token);
+    }
+    if (API_TOKEN) {
+      params.set("api_key", API_TOKEN);
+    }
+    const urlWithParams = params.toString() ? `${WS_URL}?${params.toString()}` : WS_URL;
+
     setConnectionStatus('connecting');
-    const socket = new WebSocket(`${WS_URL}?session_id=${selectedSession.id}`);
+    const socket = new WebSocket(urlWithParams);
     ws.current = socket;
     wsSessionIdRef.current = selectedSession.id;
 
@@ -148,6 +201,12 @@ function App() {
 
       // Handle special messages
       if (data.startsWith("[session]")) {
+        const token = data.replace("[session]", "").trim();
+        setSessions((prev) =>
+          prev.map((sess) =>
+            sess.id === selectedSession?.id ? { ...sess, token } : sess
+          )
+        );
         return;
       }
 

@@ -510,8 +510,9 @@ class TestProgressiveParams:
     def test_progress_params_for_search_tools(self):
         """Test search tools have query-related progress params."""
         self._ensure_tools_loaded()
-        # 'search' function in code_search_tool.py has query and path
-        search_params = get_progress_params_for_tool("search")
+        # The code_search function in code_search_tool.py is registered as 'grep'
+        # due to TOOL_ALIASES resolving code_search -> grep (keyword search)
+        search_params = get_progress_params_for_tool("grep")
         assert len(search_params) > 0
         assert "query" in search_params
 

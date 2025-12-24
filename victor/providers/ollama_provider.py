@@ -16,6 +16,7 @@
 
 import json
 import logging
+import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Union
 
 import httpx
@@ -29,6 +30,8 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
+from victor.providers.ollama_capability_detector import TOOL_SUPPORT_PATTERNS
 
 logger = logging.getLogger(__name__)
 
@@ -46,20 +49,42 @@ class OllamaProvider(BaseProvider):
         """Initialize Ollama provider.
 
         Args:
-            base_url: Ollama server URL or list/comma-separated URLs (first reachable is used)
+            base_url: Ollama server URL or list/comma-separated URLs.
+                     For synchronous init, the first URL is used without verification.
+                     Use OllamaProvider.create() for async discovery of reachable endpoint.
             timeout: Request timeout (longer for local models)
-            _skip_discovery: Skip endpoint discovery (for async factory)
+            _skip_discovery: Deprecated flag (kept for compatibility).
             **kwargs: Additional configuration
         """
-        if _skip_discovery:
-            # Used by async factory, base_url is already resolved
-            chosen_base = (
-                base_url
-                if isinstance(base_url, str)
-                else str(base_url[0]) if base_url else "http://localhost:11434"
-            )
-        else:
-            chosen_base = self._select_base_url(base_url, timeout)
+        import os
+
+        # Resolve candidates (logic from _select_base_url but without network I/O)
+        candidates: List[str] = []
+        
+        # Check environment variable first
+        env_endpoints = os.environ.get("OLLAMA_ENDPOINTS", "")
+        if env_endpoints:
+            candidates = [u.strip() for u in env_endpoints.split(",") if u.strip()]
+
+        if not candidates:
+            if base_url is None:
+                 candidates = ["http://localhost:11434"]
+            elif isinstance(base_url, (list, tuple)):
+                candidates = [str(u).strip() for u in base_url if str(u).strip()]
+            elif isinstance(base_url, str):
+                if "," in base_url:
+                    candidates = [u.strip() for u in base_url.split(",") if u.strip()]
+                else:
+                    candidates = [base_url]
+            else:
+                candidates = [str(base_url)]
+        
+        if not candidates:
+             candidates = ["http://localhost:11434"]
+
+        # Pick first candidate (blindly)
+        chosen_base = candidates[0]
+
         super().__init__(base_url=chosen_base, timeout=timeout, **kwargs)
         self._raw_base_urls = base_url
         self._models_without_tools: set = set()  # Cache models that don't support tools
@@ -105,71 +130,93 @@ class OllamaProvider(BaseProvider):
         return True
 
     def get_context_window(self, model: str) -> int:
-        """Get context window size for a model by querying Ollama API.
-
-        Queries /api/show to get the actual context length from model metadata.
-        Results are cached per endpoint+model to avoid repeated API calls.
-
-        Args:
-            model: Model name (e.g., 'qwen3-coder-tools:30b')
-
-        Returns:
-            Context window size in tokens (default 32768 if query fails)
-        """
-        # Cache key includes endpoint since same model can have different context on different servers
+        """Get context window size using cached discovery or config fallback."""
         cache_key = f"{self.base_url}:{model}"
 
-        # Check cache first
         if cache_key in self._context_window_cache:
             return self._context_window_cache[cache_key]
 
-        default_context = 32768  # Conservative fallback
+        from victor.config.config_loaders import get_provider_limits
+
+        limits = get_provider_limits("ollama", model)
+        self._context_window_cache[cache_key] = limits.context_window
+        return limits.context_window
+
+    async def discover_capabilities(self, model: str) -> ProviderRuntimeCapabilities:
+        """Async capability discovery using /api/show."""
+        cache_key = f"{self.base_url}:{model}"
+
+        context_window: Optional[int] = None
+        supports_tools = True  # Default: Ollama supports tools for capable models
+        raw_response: Optional[Dict[str, Any]] = None
 
         try:
-            # Synchronous request to /api/show
-            with httpx.Client(base_url=self.base_url, timeout=httpx.Timeout(5)) as client:
-                resp = client.post("/api/show", json={"name": model})
-                resp.raise_for_status()
-                data = resp.json()
+            resp = await self.client.post("/api/show", json={"name": model})
+            resp.raise_for_status()
+            raw_response = resp.json()
 
-                # Look for context_length in model_info
-                # Keys are like "qwen3moe.context_length" or "llama.context_length"
-                model_info = data.get("model_info", {})
-                for key, value in model_info.items():
-                    if "context_length" in key.lower():
-                        context_window = int(value)
-                        self._context_window_cache[cache_key] = context_window
-                        logger.debug(f"Ollama model {model} context window: {context_window}")
-                        return context_window
+            context_window = self._parse_context_window(raw_response)
+            template = raw_response.get("template", "") or ""
+            supports_tools = self._detect_tool_support(template)
 
-                # Fallback: check parameters for num_ctx
-                parameters = data.get("parameters", "")
-                if "num_ctx" in parameters:
-                    # Parse "num_ctx 262144" from parameters string
-                    for line in parameters.split("\n"):
-                        if "num_ctx" in line:
-                            parts = line.split()
-                            if len(parts) >= 2:
-                                try:
-                                    context_window = int(parts[-1])
-                                    self._context_window_cache[cache_key] = context_window
-                                    logger.debug(
-                                        f"Ollama model {model} context window (from params): {context_window}"
-                                    )
-                                    return context_window
-                                except ValueError:
-                                    pass
+        except Exception as exc:
+            logger.warning(
+                f"Failed to discover capabilities for {model} on {self.base_url}: {exc}"
+            )
 
-                logger.warning(
-                    f"Could not determine context window for {model}, using default {default_context}"
-                )
-                self._context_window_cache[cache_key] = default_context
-                return default_context
+        from victor.config.config_loaders import get_provider_limits
 
-        except Exception as e:
-            logger.warning(f"Failed to query Ollama for model info: {e}")
-            self._context_window_cache[cache_key] = default_context
-            return default_context
+        limits = get_provider_limits("ollama", model)
+        resolved_context = context_window or limits.context_window
+
+        self._context_window_cache[cache_key] = resolved_context
+
+        return ProviderRuntimeCapabilities(
+            provider=self.name,
+            model=model,
+            context_window=resolved_context,
+            supports_tools=supports_tools,
+            supports_streaming=True,
+            source="discovered" if context_window else "config",
+            raw=raw_response,
+        )
+
+    def _parse_context_window(self, response_data: Dict[str, Any]) -> Optional[int]:
+        """Extract context window from Ollama /api/show response."""
+        parameters = response_data.get("parameters", "")
+        if "num_ctx" in parameters:
+            for line in parameters.split("\n"):
+                if "num_ctx" in line:
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        try:
+                            return int(parts[-1])
+                        except (ValueError, IndexError):
+                            continue
+
+        model_info = response_data.get("model_info", {})
+        for key, value in model_info.items():
+            if "context_length" in key.lower():
+                try:
+                    return int(value)
+                except (ValueError, TypeError):
+                    continue
+
+        return None
+
+    def _detect_tool_support(self, template: str) -> bool:
+        """Detect native tool support from model template."""
+        if not template:
+            return True  # default optimistic
+
+        for pattern in TOOL_SUPPORT_PATTERNS:
+            try:
+                if pattern and re.search(pattern, template):
+                    return True
+            except Exception:
+                continue
+
+        return False
 
     def _select_base_url(self, base_url: Union[str, List[str], None], timeout: int) -> str:
         """Pick the first reachable Ollama endpoint from a tiered list.
@@ -396,6 +443,34 @@ class OllamaProvider(BaseProvider):
         Raises:
             ProviderError: If request fails
         """
+        # Check if we've already learned this model doesn't support tools
+        effective_tools = tools
+        if model in self._models_without_tools and tools:
+            logger.debug(f"Model {model} cached as not supporting tools, skipping tools")
+            effective_tools = None
+
+        async for chunk in self._stream_impl(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=effective_tools,
+            retry_without_tools=(tools is not None and effective_tools is not None),
+            **kwargs,
+        ):
+            yield chunk
+
+    async def _stream_impl(
+        self,
+        messages: List[Message],
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        tools: Optional[List[ToolDefinition]],
+        retry_without_tools: bool = False,
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamChunk]:
+        """Internal stream implementation with retry logic."""
         try:
             payload = self._build_request_payload(
                 messages=messages,
@@ -410,8 +485,42 @@ class OllamaProvider(BaseProvider):
             logger.debug(
                 f"Streaming request: model={model}, msgs={len(messages)}, tools={num_tools}"
             )
+            # Debug: log first tool for inspection if tools are provided
+            if tools and num_tools > 0:
+                logger.debug(f"First tool schema sample: {payload.get('tools', [{}])[0]}")
 
             async with self.client.stream("POST", "/api/chat", json=payload) as response:
+                # Check for HTTP 400 "does not support tools" error
+                if response.status_code == 400 and tools and retry_without_tools:
+                    error_body = await response.aread()
+                    error_text = error_body.decode()
+                    logger.debug(f"Ollama error response (400): {error_text}")
+
+                    if "does not support tools" in error_text.lower():
+                        logger.warning(
+                            f"Model {model} doesn't support tools via Ollama API. "
+                            "Retrying stream without tools (will use fallback parsing)."
+                        )
+                        # Cache that this model doesn't support tools
+                        self._models_without_tools.add(model)
+                        # Retry without tools - use recursive call
+                        async for chunk in self._stream_impl(
+                            messages=messages,
+                            model=model,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            tools=None,  # No tools
+                            retry_without_tools=False,  # Don't retry again
+                            **kwargs,
+                        ):
+                            yield chunk
+                        return
+
+                if response.status_code >= 400:
+                    error_body = await response.aread()
+                    logger.error(
+                        f"Ollama error response ({response.status_code}): {error_body.decode()}"
+                    )
                 response.raise_for_status()
 
                 line_count = 0

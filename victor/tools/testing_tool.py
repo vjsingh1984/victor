@@ -29,7 +29,7 @@ from victor.tools.decorators import tool
     keywords=["test", "pytest", "unittest", "tests", "testing", "check", "validate"],
     mandatory_keywords=["run tests", "run test", "execute tests"],  # Force inclusion
     task_types=["testing", "verification"],  # Classification-aware selection
-    stages=["verification", "testing"],  # Conversation stages where relevant
+    stages=["verification"],  # Conversation stages where relevant
 )
 async def test(
     path: Optional[str] = None, pytest_args: Optional[List[str]] = None
@@ -129,5 +129,3 @@ def _summarize_report(report: Dict[str, Any]) -> Dict[str, Any]:
         },
         "failures": failures,
     }
-
-

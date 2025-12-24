@@ -47,12 +47,21 @@ class ArgumentNormalizer:
     - Graceful degradation (multiple fallback strategies)
     - Complete transparency (log all normalizations)
     - Provider-aware (can customize per provider)
+    - Alias normalization (model-specific param names → standard names)
 
     Usage:
         normalizer = ArgumentNormalizer(provider_name="ollama")
         normalized_args, strategy = normalizer.normalize_arguments(
             arguments={"operations": "[{'type': 'modify', ...}]"},
             tool_name="edit_files"
+        )
+
+        # With parameter aliases (e.g., gpt-oss uses line_start instead of offset)
+        normalizer = ArgumentNormalizer(
+            provider_name="ollama",
+            config={"parameter_aliases": {
+                "read": {"line_start": "offset", "line_end": "_line_end"}
+            }}
         )
     """
 
@@ -63,15 +72,70 @@ class ArgumentNormalizer:
         Args:
             provider_name: Name of the LLM provider (for logging/metrics)
             config: Optional configuration overrides
+                - parameter_aliases: Dict[tool_name, Dict[model_param, standard_param]]
         """
         self.provider_name = provider_name
         self.config = config or {}
+        self.parameter_aliases: Dict[str, Dict[str, str]] = self.config.get("parameter_aliases", {})
         self.stats: NormalizationStats = {
             "total_calls": 0,
             "normalizations": {strategy.value: 0 for strategy in NormalizationStrategy},
             "failures": 0,
             "by_tool": {},
         }
+        self._alias_stats = {"total": 0, "aliased": 0, "by_tool": {}}
+
+    def normalize_parameter_aliases(
+        self, arguments: Dict[str, Any], tool_name: str
+    ) -> Tuple[Dict[str, Any], bool]:
+        """
+        Normalize model-specific parameter names to standard tool parameter names.
+
+        Some models (e.g., gpt-oss) use different parameter names than what the
+        tools expect. This method maps those aliases to standard names.
+
+        Example:
+            Input:  {"line_start": 10, "line_end": 50} for tool "read"
+            Output: {"offset": 10, "_line_end": 50} (with _line_end for special handling)
+
+        Args:
+            arguments: Raw arguments from model
+            tool_name: Name of the tool being called
+
+        Returns:
+            (normalized_arguments, was_aliased) - returns original if no aliases apply
+        """
+        tool_aliases = self.parameter_aliases.get(tool_name, {})
+        if not tool_aliases:
+            return arguments, False
+
+        normalized = {}
+        was_aliased = False
+
+        for param, value in arguments.items():
+            if param in tool_aliases:
+                standard_param = tool_aliases[param]
+                normalized[standard_param] = value
+                was_aliased = True
+                logger.debug(
+                    f"[{self.provider_name}] {tool_name}: Aliased '{param}' -> '{standard_param}'"
+                )
+            else:
+                normalized[param] = value
+
+        if was_aliased:
+            self._alias_stats["total"] += 1
+            self._alias_stats["aliased"] += 1
+            if tool_name not in self._alias_stats["by_tool"]:
+                self._alias_stats["by_tool"][tool_name] = 0
+            self._alias_stats["by_tool"][tool_name] += 1
+            logger.info(
+                f"[{self.provider_name}] Normalized parameter aliases for {tool_name}: "
+                f"{list(set(arguments.keys()) - set(normalized.keys()))} -> "
+                f"{list(set(normalized.keys()) - set(arguments.keys()))}"
+            )
+
+        return normalized, was_aliased
 
     def normalize_arguments(
         self, arguments: Dict[str, Any], tool_name: str
@@ -92,6 +156,10 @@ class ArgumentNormalizer:
         if tool_name not in self.stats["by_tool"]:
             self.stats["by_tool"][tool_name] = {"calls": 0, "normalizations": 0}
         self.stats["by_tool"][tool_name]["calls"] += 1
+
+        # Layer 0: Normalize parameter aliases (model-specific -> standard names)
+        # This runs first so subsequent layers work with standard param names
+        arguments, was_aliased = self.normalize_parameter_aliases(arguments, tool_name)
 
         # AGGRESSIVE APPROACH: Check if any values look like JSON and try normalization FIRST
         # This ensures we catch malformed JSON even if basic validation passes
@@ -410,6 +478,7 @@ class ArgumentNormalizer:
             "failures": self.stats["failures"],
             "success_rate": round(success_rate, 2),
             "by_tool": self.stats["by_tool"],
+            "alias_stats": self._alias_stats,
         }
 
     def reset_stats(self) -> None:
@@ -420,6 +489,7 @@ class ArgumentNormalizer:
             "failures": 0,
             "by_tool": {},
         }
+        self._alias_stats = {"total": 0, "aliased": 0, "by_tool": {}}
 
     def log_stats(self) -> None:
         """Log current statistics."""

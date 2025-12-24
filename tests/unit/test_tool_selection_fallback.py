@@ -57,12 +57,14 @@ class _DummyProvider(BaseProvider):
 
 @pytest.fixture()
 def orchestrator() -> AgentOrchestrator:
-    settings = Settings(analytics_enabled=False, use_semantic_tool_selection=False)
+    settings = Settings(analytics_enabled=False, tool_selection_strategy="keyword")
     orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
     try:
         yield orch
     finally:
-        orch.shutdown()
+        import asyncio
+
+        asyncio.run(orch.shutdown())
 
 
 def test_prioritize_tools_stage_minimizes_broadcast(orchestrator: AgentOrchestrator) -> None:

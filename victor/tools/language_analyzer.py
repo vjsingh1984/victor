@@ -577,7 +577,7 @@ SECURITY_PATTERNS: Dict[str, List[SecurityPattern]] = {
             "unquoted_variable",
             r"\$\w+(?!['\"])",
             "medium",
-            "Always quote variables: \"$var\" instead of $var",
+            'Always quote variables: "$var" instead of $var',
         ),
         SecurityPattern(
             "hardcoded_password",
@@ -1493,15 +1493,11 @@ class LanguageAnalyzer(Protocol):
         """Return supported file extensions."""
         ...
 
-    def check_security(
-        self, content: str, file_path: Path
-    ) -> List[AnalysisIssue]:
+    def check_security(self, content: str, file_path: Path) -> List[AnalysisIssue]:
         """Check for security vulnerabilities."""
         ...
 
-    def check_code_smells(
-        self, content: str, file_path: Path
-    ) -> List[AnalysisIssue]:
+    def check_code_smells(self, content: str, file_path: Path) -> List[AnalysisIssue]:
         """Check for code smells and anti-patterns."""
         ...
 
@@ -1511,15 +1507,11 @@ class LanguageAnalyzer(Protocol):
         """Calculate cyclomatic complexity for functions."""
         ...
 
-    def check_documentation(
-        self, content: str, file_path: Path
-    ) -> List[AnalysisIssue]:
+    def check_documentation(self, content: str, file_path: Path) -> List[AnalysisIssue]:
         """Check documentation coverage."""
         ...
 
-    def analyze(
-        self, content: str, file_path: Path, aspects: List[str]
-    ) -> AnalysisResult:
+    def analyze(self, content: str, file_path: Path, aspects: List[str]) -> AnalysisResult:
         """Run full analysis on content."""
         ...
 
@@ -1581,9 +1573,7 @@ class BaseLanguageAnalyzer(ABC):
         """Get code smell patterns for this language."""
         return CODE_SMELL_PATTERNS.get(self.language, [])
 
-    def check_security(
-        self, content: str, file_path: Path
-    ) -> List[AnalysisIssue]:
+    def check_security(self, content: str, file_path: Path) -> List[AnalysisIssue]:
         """Check for security vulnerabilities using regex patterns."""
         issues = []
         lines = content.split("\n")
@@ -1606,9 +1596,7 @@ class BaseLanguageAnalyzer(ABC):
 
         return issues
 
-    def check_code_smells(
-        self, content: str, file_path: Path
-    ) -> List[AnalysisIssue]:
+    def check_code_smells(self, content: str, file_path: Path) -> List[AnalysisIssue]:
         """Check for code smells using regex patterns."""
         issues = []
         lines = content.split("\n")
@@ -1695,7 +1683,6 @@ class BaseLanguageAnalyzer(ABC):
         Override in subclasses for language-specific traversal.
         """
         results = []
-        complexity_types = COMPLEXITY_NODE_TYPES.get(self.language, set())
 
         def visit(node):
             # Check if this is a function node
@@ -1824,9 +1811,43 @@ class BaseLanguageAnalyzer(ABC):
             "rust": ["if ", "else ", "for ", "while ", "loop ", "match ", "&&", "||"],
             "c": ["if ", "else ", "for ", "while ", "switch ", "case ", "&&", "||"],
             "cpp": ["if ", "else ", "for ", "while ", "switch ", "case ", "&&", "||", "catch "],
-            "c_sharp": ["if ", "else ", "for ", "foreach ", "while ", "switch ", "case ", "&&", "||", "catch "],
-            "ruby": ["if ", "else ", "unless ", "for ", "while ", "until ", "case ", "when ", "rescue ", "&&", "||"],
-            "php": ["if ", "else ", "for ", "foreach ", "while ", "switch ", "case ", "&&", "||", "catch "],
+            "c_sharp": [
+                "if ",
+                "else ",
+                "for ",
+                "foreach ",
+                "while ",
+                "switch ",
+                "case ",
+                "&&",
+                "||",
+                "catch ",
+            ],
+            "ruby": [
+                "if ",
+                "else ",
+                "unless ",
+                "for ",
+                "while ",
+                "until ",
+                "case ",
+                "when ",
+                "rescue ",
+                "&&",
+                "||",
+            ],
+            "php": [
+                "if ",
+                "else ",
+                "for ",
+                "foreach ",
+                "while ",
+                "switch ",
+                "case ",
+                "&&",
+                "||",
+                "catch ",
+            ],
             "kotlin": ["if ", "else ", "for ", "while ", "when ", "->", "&&", "||"],
             "swift": ["if ", "else ", "for ", "while ", "switch ", "case ", "guard ", "&&", "||"],
             "scala": ["if ", "else ", "for ", "while ", "match ", "case ", "=>", "&&", "||"],
@@ -1846,9 +1867,7 @@ class BaseLanguageAnalyzer(ABC):
         # Rough estimate - no function-level breakdown
         return [], []
 
-    def check_documentation(
-        self, content: str, file_path: Path
-    ) -> List[AnalysisIssue]:
+    def check_documentation(self, content: str, file_path: Path) -> List[AnalysisIssue]:
         """Check documentation coverage using tree-sitter."""
         issues = []
         parser = self._get_parser()
@@ -1881,9 +1900,7 @@ class BaseLanguageAnalyzer(ABC):
 
         return issues
 
-    def analyze(
-        self, content: str, file_path: Path, aspects: List[str]
-    ) -> AnalysisResult:
+    def analyze(self, content: str, file_path: Path, aspects: List[str]) -> AnalysisResult:
         """Run full analysis on content.
 
         Args:
@@ -2482,9 +2499,7 @@ class LanguageRegistry:
         return list(EXTENSION_TO_LANGUAGE.keys())
 
     @classmethod
-    def register_analyzer(
-        cls, language: str, analyzer_class: Type[BaseLanguageAnalyzer]
-    ) -> None:
+    def register_analyzer(cls, language: str, analyzer_class: Type[BaseLanguageAnalyzer]) -> None:
         """Register a custom language analyzer.
 
         Args:
@@ -2513,7 +2528,9 @@ def get_analyzer(language: str, max_complexity: int = 10) -> Optional[BaseLangua
     return LanguageRegistry.get_analyzer(language, max_complexity)
 
 
-def get_analyzer_for_file(file_path: Path, max_complexity: int = 10) -> Optional[BaseLanguageAnalyzer]:
+def get_analyzer_for_file(
+    file_path: Path, max_complexity: int = 10
+) -> Optional[BaseLanguageAnalyzer]:
     """Get analyzer based on file extension.
 
     Args:

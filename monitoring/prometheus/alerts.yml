@@ -1,0 +1,118 @@
+# Prometheus Alert Rules for Victor Production
+
+groups:
+  - name: victor_alerts
+    interval: 30s
+    rules:
+      # High error rate alert
+      - alert: HighErrorRate
+        expr: rate(victor_errors_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      # Critical error rate
+      - alert: CriticalErrorRate
+        expr: rate(victor_errors_total[5m]) > 0.10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      # High response time (p95)
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(victor_request_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time (p95)"
+          description: "95th percentile response time is {{ $value }}s (threshold: 5s)"
+
+      # Critical response time (p95)
+      - alert: CriticalResponseTime
+        expr: histogram_quantile(0.95, rate(victor_request_duration_seconds_bucket[5m])) > 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical response time (p95)"
+          description: "95th percentile response time is {{ $value }}s (threshold: 10s)"
+
+      # Provider failures
+      - alert: HighProviderFailureRate
+        expr: rate(victor_provider_failures_total[10m]) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High provider failure rate"
+          description: "Provider {{ $labels.provider }} failure rate is {{ $value | humanizePercentage }}"
+
+      # Tool execution failures
+      - alert: HighToolFailureRate
+        expr: rate(victor_tool_failures_total[10m]) > 0.15
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High tool failure rate"
+          description: "Tool {{ $labels.tool }} failure rate is {{ $value | humanizePercentage }}"
+
+      # Memory usage
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / 1024 / 1024 / 1024 > 4
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}GB (threshold: 4GB)"
+
+      # Service down
+      - alert: VictorServiceDown
+        expr: up{job="victor"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Victor service is down"
+          description: "Victor application is not responding to health checks"
+
+      # Low request rate (potential issue)
+      - alert: LowRequestRate
+        expr: rate(victor_requests_total[5m]) < 0.01
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low request rate"
+          description: "Request rate is {{ $value }} req/s (may indicate service issue or low usage)"
+
+  - name: system_alerts
+    interval: 60s
+    rules:
+      # Disk usage (if node-exporter enabled)
+      - alert: HighDiskUsage
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage"
+          description: "Disk usage is above 85% on {{ $labels.instance }}"
+
+      # CPU usage (if node-exporter enabled)
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"

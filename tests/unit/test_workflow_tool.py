@@ -48,9 +48,7 @@ class TestRunWorkflow:
     async def test_run_workflow_no_registry(self):
         """Test handling of missing workflow registry."""
         context = {}
-        result = await workflow(
-            workflow_name="test_workflow", context=context, workflow_args={}
-        )
+        result = await workflow(workflow_name="test_workflow", context=context, workflow_args={})
 
         assert "error" in result
         assert "WorkflowRegistry not found" in result["error"]
@@ -80,9 +78,7 @@ class TestRunWorkflow:
         mock_registry.get.return_value = mock_workflow
 
         context = {"workflow_registry": mock_registry}
-        result = await workflow(
-            workflow_name="failing_workflow", context=context, workflow_args={}
-        )
+        result = await workflow(workflow_name="failing_workflow", context=context, workflow_args={})
 
         assert "error" in result
         assert "unexpected error" in result["error"]

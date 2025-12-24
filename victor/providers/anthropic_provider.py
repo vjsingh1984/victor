@@ -393,6 +393,56 @@ class AnthropicProvider(BaseProvider):
                 raw_error=error,
             )
 
+    async def list_models(self) -> List[Dict[str, Any]]:
+        """List available Anthropic Claude models.
+
+        Returns a curated list of currently available Claude models.
+        Note: Anthropic doesn't have a public models endpoint, so this returns
+        a static list of known available models.
+
+        Returns:
+            List of available models with metadata
+        """
+        # Anthropic doesn't provide a public API for listing models
+        # Return the known Claude models with their metadata
+        return [
+            {
+                "id": "claude-opus-4-5-20251101",
+                "name": "Claude Opus 4.5",
+                "description": "Most capable model for complex tasks",
+                "context_window": 200000,
+                "max_output_tokens": 32768,
+            },
+            {
+                "id": "claude-sonnet-4-20250514",
+                "name": "Claude Sonnet 4",
+                "description": "Balanced performance and cost",
+                "context_window": 200000,
+                "max_output_tokens": 64000,
+            },
+            {
+                "id": "claude-3-5-sonnet-20241022",
+                "name": "Claude 3.5 Sonnet",
+                "description": "Fast and efficient for everyday tasks",
+                "context_window": 200000,
+                "max_output_tokens": 8192,
+            },
+            {
+                "id": "claude-3-5-haiku-20241022",
+                "name": "Claude 3.5 Haiku",
+                "description": "Fastest model for quick responses",
+                "context_window": 200000,
+                "max_output_tokens": 8192,
+            },
+            {
+                "id": "claude-3-opus-20240229",
+                "name": "Claude 3 Opus",
+                "description": "Previous generation flagship model",
+                "context_window": 200000,
+                "max_output_tokens": 4096,
+            },
+        ]
+
     async def close(self) -> None:
         """Close HTTP client."""
         await self.client.close()

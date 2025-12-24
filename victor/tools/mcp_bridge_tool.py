@@ -66,5 +66,3 @@ async def mcp(name: str, arguments: Optional[Dict[str, Any]] = None) -> Dict[str
         }
     except Exception as exc:
         return {"success": False, "error": str(exc)}
-
-

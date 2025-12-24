@@ -66,11 +66,13 @@ def _auto_register_tool(tool_instance: BaseTool) -> None:
 
     try:
         from victor.tools.metadata_registry import register_tool_metadata
+
         register_tool_metadata(tool_instance)
         logger.debug(f"Auto-registered tool '{tool_instance.name}' with metadata registry")
     except ImportError:
         # metadata_registry not available (e.g., during early import stages)
         logger.debug(f"Could not auto-register tool '{tool_instance.name}': registry not available")
+
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +112,7 @@ def resolve_tool_name(name: str, warn_on_legacy: bool = False) -> str:
     """
     try:
         from victor.tools.tool_names import get_canonical_name, TOOL_ALIASES
+
         canonical = get_canonical_name(name)
 
         # Check if this was a legacy name
@@ -199,6 +202,8 @@ def tool(
     progress_params: Optional[List[str]] = None,
     # NEW: Execution category for parallel execution
     execution_category: Optional[str] = None,
+    # NEW: Availability check for optional tools requiring configuration
+    availability_check: Optional[Callable[[], bool]] = None,
 ) -> Union[Callable, Callable[[Callable], Callable]]:
     """
     A decorator that converts a Python function into a Victor tool.
@@ -256,6 +261,12 @@ def tool(
         execution_category: Category for parallel execution. Valid values:
                            "read_only", "write", "compute", "network", "execute", "mixed".
                            Determines which tools can safely run concurrently.
+        availability_check: Optional callable that returns True if the tool is available.
+                           Use this for tools that require external configuration
+                           (e.g., Slack, Teams, Jira). When provided, the tool's
+                           is_available() method will call this function. Unavailable
+                           tools are excluded from tool selection and system prompts.
+                           Example: availability_check=is_slack_configured
 
     The docstring should follow the Google Python Style Guide format.
 
@@ -299,6 +310,7 @@ def tool(
         "task_types": task_types,
         "progress_params": progress_params,
         "execution_category": execution_category,
+        "availability_check": availability_check,
     }
 
     # Capture selection/approval metadata parameters
@@ -362,6 +374,7 @@ def _resolve_tool_name(func_name: str, explicit_name: Optional[str] = None) -> s
     # Try to auto-resolve from registry
     try:
         from victor.tools.tool_names import get_canonical_name
+
         return get_canonical_name(func_name)
     except ImportError:
         # Registry not available, use function name
@@ -457,6 +470,7 @@ def _create_tool_class(
     _mandatory_keywords = _metadata_params.get("mandatory_keywords") or []
     _task_types = _metadata_params.get("task_types") or []
     _progress_params = _metadata_params.get("progress_params") or []
+    _availability_check = _metadata_params.get("availability_check")
 
     # Parse execution_category from string to enum
     _exec_cat_str = _metadata_params.get("execution_category")
@@ -510,6 +524,8 @@ def _create_tool_class(
             self._task_types = _task_types
             self._progress_params = _progress_params
             self._execution_category = _execution_category or ExecutionCategory.READ_ONLY
+            # Availability check for optional tools requiring configuration
+            self._availability_check = _availability_check
 
         @property
         def name(self) -> str:
@@ -641,6 +657,35 @@ def _create_tool_class(
             """Check if this tool is safe (readonly, no danger)."""
             return self._access_mode.is_safe and self._danger_level == DangerLevel.SAFE
 
+        @property
+        def requires_configuration(self) -> bool:
+            """Check if this tool requires external configuration.
+
+            Returns True if an availability_check was provided in the decorator,
+            indicating this tool needs configuration (API keys, credentials, etc.)
+            before it can be used. Examples: Slack, Teams, Jira.
+            """
+            return self._availability_check is not None
+
+        def is_available(self) -> bool:
+            """Check if this tool is currently available for use.
+
+            For tools without an availability_check, always returns True.
+            For tools with an availability_check (e.g., Slack, Teams), calls
+            the provided function to check if the tool is properly configured.
+
+            Returns:
+                True if the tool is available, False if it requires configuration
+                that hasn't been completed.
+            """
+            if self._availability_check is None:
+                return True
+            try:
+                return self._availability_check()
+            except Exception as e:
+                logger.warning(f"Availability check for tool '{self._name}' raised exception: {e}")
+                return False
+
         def get_warning_message(self) -> str:
             """Get appropriate warning message for this tool's danger level."""
             return self._danger_level.warning_message
@@ -679,12 +724,13 @@ def _create_tool_class(
                 cost_tier=self._cost_tier,
             )
 
-        async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
+        async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
             try:
-                # Check if the target function wants the context
+                # Check if the target function wants the framework execution context
+                # Note: We use _exec_ctx to avoid collision with tool parameters named 'context'
                 sig = inspect.signature(self._fn)
-                if "context" in sig.parameters:
-                    kwargs["context"] = context
+                if "_exec_ctx" in sig.parameters:
+                    kwargs["_exec_ctx"] = _exec_ctx
 
                 if inspect.iscoroutinefunction(self._fn):
                     result = await self._fn(**kwargs)

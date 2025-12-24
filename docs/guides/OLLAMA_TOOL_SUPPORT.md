@@ -380,7 +380,7 @@ For models using fallback parsing:
 Enable debug logging to see how Victor is handling tool calls:
 
 ```bash
-victor chat --no-tui --debug
+victor chat --renderer text --log-level DEBUG
 ```
 
 Look for log messages about:

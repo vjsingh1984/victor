@@ -13,8 +13,12 @@
 # limitations under the License.
 
 
-from typing import Dict
-from tree_sitter import Language, Parser
+from typing import TYPE_CHECKING, Dict, List
+
+from tree_sitter import Language, Parser, Query, QueryCursor
+
+if TYPE_CHECKING:
+    from tree_sitter import Node, Tree
 
 
 # Language package mapping for tree-sitter 0.25+
@@ -30,6 +34,7 @@ LANGUAGE_MODULES: Dict[str, tuple] = {
     "tsx": ("tree_sitter_typescript", "language_tsx"),  # TypeScript + JSX
     "java": ("tree_sitter_java", "language"),
     "go": ("tree_sitter_go", "language"),
+    # NOTE: tree-sitter-rust >=0.25.0 is recommended to match tree-sitter >=0.25 API
     "rust": ("tree_sitter_rust", "language"),
     # Additional languages
     "c": ("tree_sitter_c", "language"),
@@ -84,7 +89,9 @@ def get_language(language: str) -> Language:
 
         # Create Language object using the new API
         # In tree-sitter 0.25+, Language() takes a language object from the module
-        lang = Language(lang_func())
+        lang_obj = lang_func()
+        # Some older grammars (e.g., tree_sitter_rust 0.24.x) expose a PyCapsule; wrap via Language
+        lang = Language(lang_obj) if not isinstance(lang_obj, Language) else lang_obj
 
         _language_cache[language] = lang
         return lang
@@ -117,3 +124,33 @@ def get_parser(language: str) -> Parser:
 
     _parser_cache[language] = parser
     return parser
+
+
+def run_query(tree: "Tree", query_src: str, language: str) -> Dict[str, List["Node"]]:
+    """Run a tree-sitter query using the modern QueryCursor API.
+
+    This is the preferred way to run queries in tree-sitter 0.25+.
+    The old `query.captures(node)` method returns List[Tuple[Node, str]],
+    but the new QueryCursor API returns Dict[str, List[Node]].
+
+    Args:
+        tree: Parsed tree-sitter tree
+        query_src: Query source string (S-expression syntax)
+        language: Language name (e.g., "python", "javascript")
+
+    Returns:
+        Dictionary mapping capture names to lists of matching nodes.
+        For example, for query `(function_definition name: (identifier) @name)`,
+        returns {"name": [<node>, <node>, ...]}.
+
+    Example:
+        >>> parser = get_parser("python")
+        >>> tree = parser.parse(b"def foo(): pass")
+        >>> captures = run_query(tree, "(function_definition name: (identifier) @name)", "python")
+        >>> captures["name"][0].text
+        b'foo'
+    """
+    lang = get_language(language)
+    query = Query(lang, query_src)
+    cursor = QueryCursor(query)
+    return cursor.captures(tree.root_node)

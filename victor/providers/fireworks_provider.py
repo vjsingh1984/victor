@@ -60,28 +60,28 @@ FIREWORKS_MODELS = {
         "context_window": 131072,
         "supports_tools": True,
     },
-    "accounts/fireworks/models/llama-v3p1-405b-instruct": {
-        "description": "Llama 3.1 405B - Largest open model",
+    "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct": {
+        "description": "Qwen3 Coder 480B - Large code model",
         "context_window": 131072,
         "supports_tools": True,
     },
-    "accounts/fireworks/models/qwen2p5-72b-instruct": {
-        "description": "Qwen 2.5 72B - Strong reasoning",
+    "accounts/fireworks/models/qwen3-235b-a22b-instruct-2507": {
+        "description": "Qwen3 235B - Strong reasoning",
         "context_window": 131072,
         "supports_tools": True,
     },
-    "accounts/fireworks/models/mixtral-8x22b-instruct": {
-        "description": "Mixtral 8x22B - Large MoE",
-        "context_window": 65536,
-        "supports_tools": True,
-    },
-    "accounts/fireworks/models/deepseek-v3": {
-        "description": "DeepSeek V3 - 671B MoE",
+    "accounts/fireworks/models/deepseek-v3p2": {
+        "description": "DeepSeek V3.2 - Latest MoE",
         "context_window": 131072,
         "supports_tools": True,
     },
-    "accounts/fireworks/models/qwen2p5-coder-32b-instruct": {
-        "description": "Qwen 2.5 Coder 32B",
+    "accounts/fireworks/models/deepseek-r1-0528": {
+        "description": "DeepSeek R1 - Reasoning model",
+        "context_window": 131072,
+        "supports_tools": True,
+    },
+    "accounts/fireworks/models/llama4-maverick-instruct-basic": {
+        "description": "Llama 4 Maverick - Latest Llama",
         "context_window": 131072,
         "supports_tools": True,
     },
@@ -115,10 +115,19 @@ class FireworksProvider(BaseProvider):
             timeout: Request timeout
             **kwargs: Additional configuration
         """
+        # Try provided key, then env var, then keyring/api_keys.yaml
         self._api_key = api_key or os.environ.get("FIREWORKS_API_KEY", "")
         if not self._api_key:
+            try:
+                from victor.config.api_keys import get_api_key
+
+                self._api_key = get_api_key("fireworks") or ""
+            except ImportError:
+                pass
+        if not self._api_key:
             logger.warning(
-                "Fireworks API key not provided. Set FIREWORKS_API_KEY environment variable."
+                "Fireworks API key not provided. Set FIREWORKS_API_KEY environment variable "
+                "or add to keyring with: victor keys --set fireworks --keyring"
             )
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)

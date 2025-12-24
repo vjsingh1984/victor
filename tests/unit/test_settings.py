@@ -82,6 +82,62 @@ class TestProfileConfig:
         assert config.temperature == 0.5
         assert config.max_tokens == 8192
 
+    def test_profile_config_provider_tuning_defaults(self):
+        """Test ProfileConfig provider tuning options default to None."""
+        config = ProfileConfig(provider="deepseek", model="deepseek-chat")
+
+        # All tuning options should default to None
+        assert config.loop_repeat_threshold is None
+        assert config.max_continuation_prompts is None
+        assert config.quality_threshold is None
+        assert config.grounding_threshold is None
+        assert config.max_tool_calls_per_turn is None
+        assert config.tool_cache_enabled is None
+        assert config.tool_deduplication_enabled is None
+        assert config.session_idle_timeout is None
+        assert config.timeout is None
+
+    def test_profile_config_provider_tuning_custom_values(self):
+        """Test ProfileConfig with custom provider tuning options."""
+        config = ProfileConfig(
+            provider="deepseek",
+            model="deepseek-chat",
+            loop_repeat_threshold=2,
+            max_continuation_prompts=4,
+            quality_threshold=0.6,
+            grounding_threshold=0.8,
+            max_tool_calls_per_turn=5,
+            tool_cache_enabled=True,
+            tool_deduplication_enabled=True,
+            session_idle_timeout=300,
+            timeout=120,
+        )
+
+        assert config.loop_repeat_threshold == 2
+        assert config.max_continuation_prompts == 4
+        assert config.quality_threshold == 0.6
+        assert config.grounding_threshold == 0.8
+        assert config.max_tool_calls_per_turn == 5
+        assert config.tool_cache_enabled is True
+        assert config.tool_deduplication_enabled is True
+        assert config.session_idle_timeout == 300
+        assert config.timeout == 120
+
+    def test_profile_config_xai_tuning(self):
+        """Test ProfileConfig with xAI/Grok tuning options."""
+        config = ProfileConfig(
+            provider="xai",
+            model="grok-code-fast-1",
+            max_continuation_prompts=5,
+            quality_threshold=0.5,
+            session_idle_timeout=300,
+        )
+
+        assert config.provider == "xai"
+        assert config.max_continuation_prompts == 5
+        assert config.quality_threshold == 0.5
+        assert config.session_idle_timeout == 300
+
 
 class TestSettings:
     """Tests for Settings class."""

@@ -56,6 +56,22 @@ from victor.agent.task_analyzer import (
     reset_task_analyzer,
 )
 
+# Intelligent agent components (RL-based learning, quality scoring, prompt optimization)
+from victor.agent.intelligent_pipeline import (
+    IntelligentAgentPipeline,
+    RequestContext,
+    ResponseResult,
+    PipelineStats,
+    get_pipeline,
+    clear_pipeline_cache,
+)
+from victor.agent.orchestrator_integration import (
+    OrchestratorIntegration,
+    IntegrationConfig,
+    IntegrationMetrics,
+    enhance_orchestrator,
+)
+
 __all__ = [
     "AgentOrchestrator",
     "ArgumentNormalizer",
@@ -96,4 +112,16 @@ __all__ = [
     "TaskAnalysis",
     "get_task_analyzer",
     "reset_task_analyzer",
+    # Intelligent Pipeline
+    "IntelligentAgentPipeline",
+    "RequestContext",
+    "ResponseResult",
+    "PipelineStats",
+    "get_pipeline",
+    "clear_pipeline_cache",
+    # Orchestrator Integration
+    "OrchestratorIntegration",
+    "IntegrationConfig",
+    "IntegrationMetrics",
+    "enhance_orchestrator",
 ]

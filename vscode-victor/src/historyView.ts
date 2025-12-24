@@ -23,8 +23,8 @@ export class HistoryViewProvider implements vscode.TreeDataProvider<HistoryItem>
     private _refreshInterval: NodeJS.Timeout | null = null;
 
     constructor(private readonly _client: VictorClient) {
-        // Auto-refresh every 10 seconds
-        this._refreshInterval = setInterval(() => this.refresh(), 10000);
+        // Auto-refresh every 60 seconds to reduce server chatter
+        this._refreshInterval = setInterval(() => this.refresh(), 60000);
     }
 
     async refresh(): Promise<void> {

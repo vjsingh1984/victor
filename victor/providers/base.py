@@ -23,6 +23,7 @@ from victor.providers.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerRegistry,
 )
+from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 
 
 class Message(BaseModel):
@@ -78,53 +79,17 @@ class StreamChunk(BaseModel):
     )
 
 
-# Provider error classes - defined before BaseProvider so they can be referenced
-class ProviderError(Exception):
-    """Base exception for provider-related errors."""
-
-    def __init__(
-        self,
-        message: str,
-        provider: Optional[str] = None,
-        status_code: Optional[int] = None,
-        raw_error: Optional[Any] = None,
-    ):
-        """Initialize error.
-
-        Args:
-            message: Error message
-            provider: Provider name
-            status_code: HTTP status code if applicable
-            raw_error: Raw error from provider
-        """
-        super().__init__(message)
-        self.provider = provider
-        self.status_code = status_code
-        self.raw_error = raw_error
-
-
-class ProviderNotFoundError(ProviderError):
-    """Raised when a provider is not found."""
-
-    pass
-
-
-class ProviderAuthenticationError(ProviderError):
-    """Raised when authentication fails."""
-
-    pass
-
-
-class ProviderRateLimitError(ProviderError):
-    """Raised when rate limit is exceeded."""
-
-    pass
-
-
-class ProviderTimeoutError(ProviderError):
-    """Raised when request times out."""
-
-    pass
+# Provider error classes - re-exported from victor/core/errors for backward compatibility
+# All error classes are defined in victor/core/errors.py as the single source of truth
+from victor.core.errors import (
+    ProviderError,
+    ProviderNotFoundError,
+    ProviderTimeoutError,
+    ProviderRateLimitError,
+    ProviderAuthError as ProviderAuthenticationError,  # Alias for backward compatibility
+    ProviderConnectionError,
+    ProviderInvalidResponseError,
+)
 
 
 class BaseProvider(ABC):
@@ -174,6 +139,14 @@ class BaseProvider(ABC):
     def circuit_breaker(self) -> Optional[CircuitBreaker]:
         """Get the circuit breaker for this provider."""
         return self._circuit_breaker
+
+    def supports_tools(self) -> bool:
+        """Whether the provider supports tool calling."""
+        return False
+
+    def supports_streaming(self) -> bool:
+        """Whether the provider supports streaming responses."""
+        return False
 
     def get_circuit_breaker_stats(self) -> Optional[Dict[str, Any]]:
         """Get circuit breaker statistics for monitoring."""
@@ -247,6 +220,25 @@ class BaseProvider(ABC):
         if False:
             yield StreamChunk()
         raise NotImplementedError
+
+    async def discover_capabilities(self, model: str) -> ProviderRuntimeCapabilities:
+        """Discover capabilities for the given model.
+
+        Default implementation falls back to configured limits and
+        provider-declared support flags. Providers should override
+        with real HTTP-based discovery when available.
+        """
+        from victor.config.config_loaders import get_provider_limits
+
+        limits = get_provider_limits(self.name, model)
+        return ProviderRuntimeCapabilities(
+            provider=self.name,
+            model=model,
+            context_window=limits.context_window,
+            supports_tools=self.supports_tools(),
+            supports_streaming=self.supports_streaming(),
+            source="config",
+        )
 
     async def stream_chat(
         self,

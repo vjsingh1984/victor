@@ -32,9 +32,10 @@ suite('Extension Test Suite', () => {
         const config = vscode.workspace.getConfiguration('victor');
 
         // Check default configuration values
-        assert.strictEqual(config.get('serverPort'), 8765);
+        assert.strictEqual(config.get('serverPort'), 8000);
         assert.strictEqual(config.get('provider'), 'anthropic');
         assert.strictEqual(config.get('mode'), 'build');
-        assert.strictEqual(config.get('autoStart'), true);
+        assert.strictEqual(config.get('autoStart'), false);
+        assert.strictEqual(config.get('serverApiKey'), '');
     });
 });

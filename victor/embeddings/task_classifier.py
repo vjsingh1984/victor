@@ -59,6 +59,45 @@ class TaskType(Enum):
     ACTION = "action"  # Git operations, test runs, script execution
     ANALYSIS_DEEP = "analysis_deep"  # Comprehensive codebase analysis
 
+    # DevOps task types (infrastructure, containers, CI/CD)
+    INFRASTRUCTURE = "infrastructure"  # Kubernetes, Terraform, Docker, cloud config
+    CI_CD = "ci_cd"  # CI/CD pipelines, GitHub Actions, Jenkins
+
+    # Data Analysis task types
+    DATA_ANALYSIS = "data_analysis"  # Statistical analysis, data exploration
+    VISUALIZATION = "visualization"  # Charts, graphs, dashboards
+
+    # Research task types
+    FACT_CHECK = "fact_check"  # Verify claims with sources
+    LITERATURE_REVIEW = "literature_review"  # Systematic review of knowledge
+    COMPETITIVE_ANALYSIS = "competitive_analysis"  # Compare products/services
+    TREND_RESEARCH = "trend_research"  # Identify patterns and emerging developments
+    TECHNICAL_RESEARCH = "technical_research"  # Deep dive into technical topics
+
+    # Coding vertical granular task types
+    CODE_GENERATION = "code_generation"  # Write new code from scratch
+    REFACTOR = "refactor"  # Restructure existing code
+    DEBUG = "debug"  # Find and fix bugs
+    TEST = "test"  # Write or run tests
+
+    # DevOps vertical granular task types
+    DOCKERFILE = "dockerfile"  # Create or optimize Dockerfiles
+    DOCKER_COMPOSE = "docker_compose"  # Docker Compose configuration
+    KUBERNETES = "kubernetes"  # Kubernetes manifests and config
+    TERRAFORM = "terraform"  # Infrastructure as Code with Terraform
+    MONITORING = "monitoring"  # Observability and monitoring setup
+
+    # Data Analysis vertical granular task types
+    DATA_PROFILING = "data_profiling"  # Comprehensive data profiling
+    STATISTICAL_ANALYSIS = "statistical_analysis"  # Statistical tests and analysis
+    CORRELATION_ANALYSIS = "correlation_analysis"  # Analyze variable relationships
+    REGRESSION = "regression"  # Build predictive regression models
+    CLUSTERING = "clustering"  # Segment data with clustering
+    TIME_SERIES = "time_series"  # Analyze temporal data
+
+    # Research vertical granular task types
+    GENERAL_QUERY = "general_query"  # General research questions
+
 
 @dataclass
 class TaskTypeResult:
@@ -309,6 +348,537 @@ NUDGE_RULES: List[NudgeRule] = [
         ),
         target_type=TaskType.ACTION,
         min_confidence_boost=0.15,
+    ),
+    # DevOps: Infrastructure task types (Kubernetes, Terraform, Docker)
+    NudgeRule(
+        name="kubernetes_config",
+        pattern=re.compile(
+            r"\b(kubernetes|k8s)\s+(deployment|service|ingress|config|manifest|pod|statefulset)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.INFRASTRUCTURE,
+        override=True,
+    ),
+    NudgeRule(
+        name="create_k8s",
+        pattern=re.compile(
+            r"\b(create|write|generate)\s+(a\s+)?(kubernetes|k8s)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.INFRASTRUCTURE,
+        override=True,
+    ),
+    NudgeRule(
+        name="terraform_infra",
+        pattern=re.compile(
+            r"\b(terraform|tf)\s+(module|resource|plan|apply|config)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.INFRASTRUCTURE,
+        override=True,
+    ),
+    NudgeRule(
+        name="create_terraform",
+        pattern=re.compile(
+            r"\b(create|write)\s+(a\s+)?(terraform|infrastructure)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.INFRASTRUCTURE,
+        override=True,
+    ),
+    NudgeRule(
+        name="dockerfile_create",
+        pattern=re.compile(
+            r"\b(create|write|optimize)\s+(a\s+)?dockerfile\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.INFRASTRUCTURE,
+        override=True,
+    ),
+    NudgeRule(
+        name="docker_compose",
+        pattern=re.compile(
+            r"\b(docker[-_]?compose|compose\.ya?ml)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.INFRASTRUCTURE,
+        min_confidence_boost=0.2,
+    ),
+    NudgeRule(
+        name="helm_chart",
+        pattern=re.compile(
+            r"\bhelm\s+(chart|template|install|upgrade)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.INFRASTRUCTURE,
+        override=True,
+    ),
+    NudgeRule(
+        name="aws_azure_gcp",
+        pattern=re.compile(
+            r"\b(aws|azure|gcp|cloudformation|arm\s+template|pulumi)\s+(resource|config|setup)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.INFRASTRUCTURE,
+        min_confidence_boost=0.15,
+    ),
+    # DevOps: CI/CD task types
+    NudgeRule(
+        name="github_actions",
+        pattern=re.compile(
+            r"\bgithub\s+(actions?|workflow)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.CI_CD,
+        override=True,
+    ),
+    NudgeRule(
+        name="ci_cd_pipeline",
+        pattern=re.compile(
+            r"\b(ci[/-]?cd|pipeline|jenkins|gitlab[-_]?ci|circleci)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.CI_CD,
+        min_confidence_boost=0.2,
+    ),
+    NudgeRule(
+        name="create_workflow",
+        pattern=re.compile(
+            r"\b(create|write|setup)\s+(a\s+)?(ci|cd|deployment|build)\s+(pipeline|workflow)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.CI_CD,
+        override=True,
+    ),
+    # Data Analysis task types
+    NudgeRule(
+        name="statistical_analysis",
+        pattern=re.compile(
+            r"\b(statistical|stats)\s+(analysis|test|correlation|regression)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.DATA_ANALYSIS,
+        override=True,
+    ),
+    NudgeRule(
+        name="analyze_data",
+        pattern=re.compile(
+            r"\banalyze\s+(the\s+)?(data|dataset|dataframe|csv|excel)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.DATA_ANALYSIS,
+        override=True,
+    ),
+    NudgeRule(
+        name="pandas_numpy",
+        pattern=re.compile(
+            r"\b(pandas|numpy|scipy|sklearn)\s+(analysis|processing|transform)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.DATA_ANALYSIS,
+        min_confidence_boost=0.15,
+    ),
+    NudgeRule(
+        name="correlation_distribution",
+        pattern=re.compile(
+            r"\b(correlation|distribution|histogram|mean|median|variance)\s+(analysis|of|for)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.DATA_ANALYSIS,
+        min_confidence_boost=0.2,
+    ),
+    # Visualization task types
+    NudgeRule(
+        name="create_visualization",
+        pattern=re.compile(
+            r"\b(create|generate|make)\s+(a\s+)?(chart|graph|plot|visualization|dashboard)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.VISUALIZATION,
+        override=True,
+    ),
+    NudgeRule(
+        name="matplotlib_seaborn",
+        pattern=re.compile(
+            r"\b(matplotlib|seaborn|plotly|bokeh|altair)\s+(chart|plot|figure)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.VISUALIZATION,
+        min_confidence_boost=0.15,
+    ),
+    NudgeRule(
+        name="data_viz",
+        pattern=re.compile(
+            r"\b(visualize|plot|chart)\s+(the\s+)?(data|results|trends|metrics)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.VISUALIZATION,
+        override=True,
+    ),
+    # Research task types
+    NudgeRule(
+        name="fact_check",
+        pattern=re.compile(
+            r"\b(fact[-_]?check|verify|validate)\s+(the\s+)?(claim|statement|information|facts?)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.FACT_CHECK,
+        override=True,
+    ),
+    NudgeRule(
+        name="literature_review",
+        pattern=re.compile(
+            r"\b(literature|systematic)\s+(review|survey|analysis)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.LITERATURE_REVIEW,
+        override=True,
+    ),
+    NudgeRule(
+        name="research_review",
+        pattern=re.compile(
+            r"\b(review|survey)\s+(the\s+)?(research|literature|papers?|studies)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.LITERATURE_REVIEW,
+        min_confidence_boost=0.2,
+    ),
+    NudgeRule(
+        name="competitive_analysis",
+        pattern=re.compile(
+            r"\b(competitive|competitor|comparison)\s+(analysis|review|research)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.COMPETITIVE_ANALYSIS,
+        override=True,
+    ),
+    NudgeRule(
+        name="compare_products",
+        pattern=re.compile(
+            r"\b(compare|comparison|versus|vs)\s+(products?|services?|tools?|solutions?)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.COMPETITIVE_ANALYSIS,
+        min_confidence_boost=0.2,
+    ),
+    NudgeRule(
+        name="trend_research",
+        pattern=re.compile(
+            r"\b(trend|emerging|market)\s+(research|analysis|report)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.TREND_RESEARCH,
+        override=True,
+    ),
+    NudgeRule(
+        name="identify_trends",
+        pattern=re.compile(
+            r"\b(identify|find|discover)\s+(trends?|patterns?|developments?)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.TREND_RESEARCH,
+        min_confidence_boost=0.2,
+    ),
+    NudgeRule(
+        name="technical_research",
+        pattern=re.compile(
+            r"\b(technical|deep[-_]?dive)\s+(research|investigation|analysis)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.TECHNICAL_RESEARCH,
+        override=True,
+    ),
+    NudgeRule(
+        name="research_technology",
+        pattern=re.compile(
+            r"\b(research|investigate|explore)\s+(the\s+)?(technology|framework|library|protocol)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.TECHNICAL_RESEARCH,
+        min_confidence_boost=0.2,
+    ),
+    # Coding vertical granular task types
+    NudgeRule(
+        name="code_generation",
+        pattern=re.compile(
+            r"\b(generate|create|write)\s+(new\s+)?(code|implementation|class|module)\s+(for|that)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.CODE_GENERATION,
+        min_confidence_boost=0.15,
+    ),
+    NudgeRule(
+        name="implement_feature",
+        pattern=re.compile(
+            r"\bimplement\s+(a\s+)?(new\s+)?(feature|functionality|system)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.CODE_GENERATION,
+        min_confidence_boost=0.15,
+    ),
+    NudgeRule(
+        name="refactor_code",
+        pattern=re.compile(
+            r"\brefactor\s+(the\s+)?(code|function|class|module|implementation)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.REFACTOR,
+        override=True,
+    ),
+    NudgeRule(
+        name="refactor_file",
+        pattern=re.compile(
+            r"\brefactor\s+(the\s+)?[\w_/.-]+\.(py|js|ts|java|go|rs|cpp|c|rb)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.REFACTOR,
+        override=True,
+    ),
+    NudgeRule(
+        name="refactor_to_pattern",
+        pattern=re.compile(
+            r"\brefactor\s+.{1,50}\s+(to\s+use|using)\s+(a\s+)?(strategy|factory|singleton|observer|decorator|adapter)\s+pattern\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.REFACTOR,
+        override=True,
+    ),
+    NudgeRule(
+        name="restructure_code",
+        pattern=re.compile(
+            r"\b(restructure|reorganize|clean\s*up)\s+(the\s+)?(code|module|class)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.REFACTOR,
+        min_confidence_boost=0.2,
+    ),
+    NudgeRule(
+        name="debug_issue",
+        pattern=re.compile(
+            r"\bdebug\s+(the\s+)?(issue|error|problem|bug|code)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.DEBUG,
+        override=True,
+    ),
+    NudgeRule(
+        name="find_bug",
+        pattern=re.compile(
+            r"\b(find|locate|identify)\s+(the\s+)?(bug|error|issue|root\s*cause)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.DEBUG,
+        min_confidence_boost=0.2,
+    ),
+    NudgeRule(
+        name="test_code",
+        pattern=re.compile(
+            r"\b(write|create|add)\s+(unit\s+)?(tests?|test\s+cases?)\s+(for|to)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.TEST,
+        override=True,
+    ),
+    NudgeRule(
+        name="test_coverage",
+        pattern=re.compile(
+            r"\b(increase|improve|add)\s+(test\s+)?coverage\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.TEST,
+        min_confidence_boost=0.2,
+    ),
+    # DevOps vertical granular task types
+    NudgeRule(
+        name="dockerfile_granular",
+        pattern=re.compile(
+            r"\b(write|create|optimize|improve)\s+(a\s+)?(multi[-_]?stage\s+)?dockerfile\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.DOCKERFILE,
+        override=True,
+    ),
+    NudgeRule(
+        name="dockerfile_for_app",
+        pattern=re.compile(
+            r"\b(create|write|make|build)\s+(a\s+)?dockerfile\s+(for|to)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.DOCKERFILE,
+        override=True,
+    ),
+    NudgeRule(
+        name="dockerfile_mention",
+        pattern=re.compile(
+            r"\bdockerfile\b.*\b(python|flask|django|node|react|java|go|rust)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.DOCKERFILE,
+        min_confidence_boost=0.25,
+    ),
+    NudgeRule(
+        name="docker_compose_granular",
+        pattern=re.compile(
+            r"\b(create|write|configure)\s+(a\s+)?(docker[-_]?compose|compose)\s+(file|config|yaml)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.DOCKER_COMPOSE,
+        override=True,
+    ),
+    NudgeRule(
+        name="docker_compose_for_app",
+        pattern=re.compile(
+            r"\b(create|write|set\s*up)\s+(a\s+)?(docker[-_]?)?compose\s+(for|to|with)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.DOCKER_COMPOSE,
+        override=True,
+    ),
+    NudgeRule(
+        name="kubernetes_granular",
+        pattern=re.compile(
+            r"\b(create|write|configure)\s+(a\s+)?(kubernetes|k8s)\s+(manifest|deployment|service|config)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.KUBERNETES,
+        override=True,
+    ),
+    NudgeRule(
+        name="terraform_granular",
+        pattern=re.compile(
+            r"\b(create|write)\s+(a\s+)?(terraform)\s+(module|config|resource)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.TERRAFORM,
+        override=True,
+    ),
+    NudgeRule(
+        name="monitoring_setup",
+        pattern=re.compile(
+            r"\b(set\s*up|configure|create)\s+(monitoring|observability|alerting|prometheus|grafana)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.MONITORING,
+        override=True,
+    ),
+    # Data Analysis vertical granular task types
+    NudgeRule(
+        name="data_profiling",
+        pattern=re.compile(
+            r"\b(profile|profiling)\s+(the\s+)?(data|dataset|dataframe)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.DATA_PROFILING,
+        override=True,
+    ),
+    NudgeRule(
+        name="statistical_analysis_granular",
+        pattern=re.compile(
+            r"\b(perform|run|conduct)\s+(statistical|hypothesis)\s+(test|analysis)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.STATISTICAL_ANALYSIS,
+        override=True,
+    ),
+    NudgeRule(
+        name="correlation_analysis",
+        pattern=re.compile(
+            r"\b(analyze|calculate|compute)\s+(correlation|covariance)\s+(matrix|between)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.CORRELATION_ANALYSIS,
+        override=True,
+    ),
+    NudgeRule(
+        name="correlation_between",
+        pattern=re.compile(
+            r"\b(analyze|find|check|examine)\s+(the\s+)?(correlations?|relationships?)\s+(between|among)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.CORRELATION_ANALYSIS,
+        override=True,
+    ),
+    NudgeRule(
+        name="correlation_variables",
+        pattern=re.compile(
+            r"\bcorrelations?\s+(between|among|in)\s+(my\s+)?(variables?|data|dataset|columns?)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.CORRELATION_ANALYSIS,
+        override=True,
+    ),
+    NudgeRule(
+        name="regression_model",
+        pattern=re.compile(
+            r"\b(build|create|fit)\s+(a\s+)?(linear|logistic|regression)\s+(model|analysis)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.REGRESSION,
+        override=True,
+    ),
+    NudgeRule(
+        name="clustering_analysis",
+        pattern=re.compile(
+            r"\b(perform|apply|run)\s+(k[-_]?means|hierarchical|dbscan)?\s*clustering\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.CLUSTERING,
+        override=True,
+    ),
+    NudgeRule(
+        name="time_series_analysis",
+        pattern=re.compile(
+            r"\b(analyze|forecast|decompose)\s+(the\s+)?(time\s*series|temporal)\s+(data|patterns?)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.TIME_SERIES,
+        override=True,
+    ),
+    # Research vertical granular task type
+    NudgeRule(
+        name="general_query",
+        pattern=re.compile(
+            r"\b(what\s+is|explain|tell\s+me\s+about|describe)\s+(the\s+)?(concept|idea|topic|subject)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.GENERAL_QUERY,
+        min_confidence_boost=0.15,
+    ),
+    NudgeRule(
+        name="latest_trends",
+        pattern=re.compile(
+            r"\b(latest|current|recent)\s+(trends?|developments?|news|advances?)\s+(in|for|about)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.TREND_RESEARCH,
+        override=True,
+    ),
+    NudgeRule(
+        name="trends_research",
+        pattern=re.compile(
+            r"\b(what\s+are|research)\s+(the\s+)?(latest|current|new)\s+(trends?|developments?)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.TREND_RESEARCH,
+        override=True,
+    ),
+    NudgeRule(
+        name="technical_deep_dive",
+        pattern=re.compile(
+            r"\b(research|investigate|explore|deep\s*dive)\s+(into\s+)?(how|the\s+)?(technology|framework|library|protocol|algorithm)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.TECHNICAL_RESEARCH,
+        override=True,
+    ),
+    NudgeRule(
+        name="ai_safety_research",
+        pattern=re.compile(
+            r"\b(ai\s+safety|ml\s+safety|alignment)\s+(research|developments?|trends?)\b",
+            re.IGNORECASE,
+        ),
+        target_type=TaskType.TECHNICAL_RESEARCH,
+        override=True,
     ),
 ]
 
@@ -898,6 +1468,584 @@ ANALYSIS_DEEP_PHRASES = [
     "identify technical debt",
 ]
 
+# Infrastructure/DevOps phrases: Kubernetes, Terraform, Docker, cloud config
+INFRASTRUCTURE_PHRASES = [
+    # Kubernetes patterns
+    "create a kubernetes deployment",
+    "write a kubernetes manifest",
+    "create a k8s deployment",
+    "write k8s configuration",
+    "create kubernetes service",
+    "define kubernetes pod",
+    "write a statefulset manifest",
+    "create a configmap",
+    "write kubernetes ingress",
+    "create kubernetes secret",
+    "configure kubernetes resources",
+    "set up kubernetes cluster",
+    "create k8s namespace",
+    "write kubernetes yaml",
+    "define kubernetes deployment",
+    "create kubernetes deployment for",
+    "write a kubernetes deployment configuration",
+    # Terraform patterns
+    "create terraform configuration",
+    "write terraform module",
+    "create terraform resource",
+    "write terraform infrastructure",
+    "configure terraform provider",
+    "create terraform plan",
+    "write infrastructure as code",
+    "define terraform variables",
+    "create terraform backend",
+    "write terraform state",
+    "terraform for aws",
+    "terraform for azure",
+    "terraform for gcp",
+    # Docker patterns
+    "create a dockerfile",
+    "write a dockerfile",
+    "optimize dockerfile",
+    "create docker image",
+    "build docker container",
+    "configure docker compose",
+    "write docker-compose file",
+    "create multi-stage dockerfile",
+    "optimize docker build",
+    "create docker network",
+    "configure docker volumes",
+    # Helm patterns
+    "create helm chart",
+    "write helm template",
+    "configure helm values",
+    "deploy with helm",
+    "helm chart for",
+    # Cloud infrastructure
+    "create aws infrastructure",
+    "configure azure resources",
+    "set up gcp infrastructure",
+    "create cloudformation template",
+    "write pulumi configuration",
+    "configure cloud resources",
+    "set up cloud infrastructure",
+]
+
+# CI/CD pipeline phrases: GitHub Actions, Jenkins, GitLab CI
+CI_CD_PHRASES = [
+    # GitHub Actions patterns
+    "create github actions workflow",
+    "write github action",
+    "configure github actions",
+    "create github workflow",
+    "set up github actions",
+    "github actions for",
+    "github actions ci",
+    "github actions cd",
+    "github actions pipeline",
+    # Generic CI/CD patterns
+    "create ci cd pipeline",
+    "configure ci pipeline",
+    "set up continuous integration",
+    "create deployment pipeline",
+    "configure continuous deployment",
+    "build and deploy pipeline",
+    "create build pipeline",
+    "set up automated deployment",
+    "configure release pipeline",
+    # Jenkins patterns
+    "create jenkins pipeline",
+    "write jenkinsfile",
+    "configure jenkins job",
+    "create jenkins build",
+    "jenkins pipeline for",
+    # GitLab CI patterns
+    "create gitlab ci",
+    "write gitlab-ci yaml",
+    "configure gitlab pipeline",
+    "gitlab ci for",
+    # Other CI tools
+    "create circleci config",
+    "configure travis ci",
+    "set up azure pipelines",
+    "create tekton pipeline",
+    "configure argo cd",
+]
+
+# Data Analysis phrases: statistical analysis, data exploration
+DATA_ANALYSIS_PHRASES = [
+    # Statistical analysis patterns
+    "analyze the data",
+    "perform statistical analysis",
+    "calculate statistics for",
+    "run statistical tests",
+    "compute correlation",
+    "analyze correlation between",
+    "calculate regression",
+    "perform hypothesis testing",
+    "compute descriptive statistics",
+    "analyze distribution",
+    # Data exploration patterns
+    "explore the dataset",
+    "analyze the dataframe",
+    "investigate data patterns",
+    "examine data trends",
+    "profile the data",
+    "summarize the data",
+    "analyze data quality",
+    "check for outliers",
+    "analyze missing values",
+    "clean the data",
+    # Pandas/NumPy patterns
+    "analyze with pandas",
+    "process dataframe",
+    "transform the data",
+    "aggregate data",
+    "pivot the data",
+    "group by and analyze",
+    "merge datasets",
+    "join dataframes",
+    # Domain-specific analysis
+    "analyze sales data",
+    "analyze user data",
+    "analyze log data",
+    "analyze time series",
+    "analyze financial data",
+    "analyze metrics",
+    "analyze performance data",
+    "analyze sensor data",
+]
+
+# Visualization phrases: charts, graphs, dashboards
+VISUALIZATION_PHRASES = [
+    # Chart creation patterns
+    "create a chart",
+    "generate a graph",
+    "make a plot",
+    "create visualization",
+    "build a dashboard",
+    "design a chart",
+    "create data visualization",
+    "generate visualizations",
+    # Specific chart types
+    "create bar chart",
+    "make line chart",
+    "create scatter plot",
+    "generate histogram",
+    "create pie chart",
+    "make box plot",
+    "create heatmap",
+    "generate treemap",
+    "create area chart",
+    "make bubble chart",
+    # Library-specific patterns
+    "matplotlib chart",
+    "seaborn plot",
+    "plotly visualization",
+    "bokeh dashboard",
+    "altair chart",
+    "create with matplotlib",
+    "plot with seaborn",
+    "interactive plotly",
+    # Dashboard patterns
+    "create dashboard",
+    "build analytics dashboard",
+    "design data dashboard",
+    "create monitoring dashboard",
+    "build reporting dashboard",
+    # Visualization tasks
+    "visualize the data",
+    "plot the results",
+    "chart the trends",
+    "graph the metrics",
+    "display the analysis",
+    "show data visually",
+    "illustrate the findings",
+]
+
+# Research phrases: fact checking, literature review, competitive analysis, etc.
+FACT_CHECK_PHRASES = [
+    # Fact checking patterns
+    "fact check this claim",
+    "verify the claim",
+    "validate the statement",
+    "check if this is true",
+    "verify the information",
+    "fact check the statement",
+    "is this claim accurate",
+    "verify these facts",
+    "check the accuracy of",
+    "validate the information",
+    # Source verification
+    "find sources for",
+    "verify with sources",
+    "cross-reference this claim",
+    "check multiple sources",
+    "find authoritative sources",
+    "verify against official sources",
+]
+
+LITERATURE_REVIEW_PHRASES = [
+    # Literature review patterns
+    "literature review on",
+    "systematic review of",
+    "review the literature",
+    "survey the research",
+    "review existing studies",
+    "academic literature on",
+    "research review on",
+    "scholarly review of",
+    "review the papers on",
+    "survey existing work",
+    # Bibliography/citation
+    "find papers about",
+    "search academic literature",
+    "review published research",
+    "synthesize the research",
+    "summarize the literature",
+    "bibliography on",
+]
+
+COMPETITIVE_ANALYSIS_PHRASES = [
+    # Competitive analysis patterns
+    "competitive analysis of",
+    "compare competitors",
+    "competitor analysis",
+    "comparison analysis",
+    "compare products",
+    "compare services",
+    "analyze competitors",
+    "evaluate competitors",
+    "competitive landscape",
+    "market comparison",
+    # Product/service comparison
+    "compare features of",
+    "compare pricing of",
+    "analyze market position",
+    "compare tools",
+    "evaluate alternatives",
+    "compare solutions",
+    "analyze product differences",
+    "feature comparison",
+]
+
+TREND_RESEARCH_PHRASES = [
+    # Trend research patterns
+    "trend research on",
+    "identify trends in",
+    "emerging trends",
+    "market trends",
+    "industry trends",
+    "research trends",
+    "analyze trends",
+    "trend analysis",
+    "find emerging patterns",
+    "track industry developments",
+    # Future/emerging
+    "emerging technologies",
+    "future developments",
+    "upcoming trends",
+    "new developments in",
+    "what's new in",
+    "latest developments",
+]
+
+TECHNICAL_RESEARCH_PHRASES = [
+    # Technical research patterns
+    "technical research on",
+    "deep dive into",
+    "technical analysis of",
+    "research the technology",
+    "investigate the framework",
+    "explore the library",
+    "technical investigation",
+    "protocol research",
+    "architecture research",
+    "implementation research",
+    # Technology exploration
+    "research API for",
+    "explore the documentation",
+    "understand the technology",
+    "technical deep dive",
+    "research the stack",
+    "investigate the solution",
+]
+
+# Coding vertical granular task phrases
+CODE_GENERATION_PHRASES = [
+    # Generate code patterns
+    "generate code for",
+    "generate implementation",
+    "generate new class",
+    "generate new module",
+    "create implementation for",
+    "implement new feature",
+    "implement new functionality",
+    "implement new system",
+    "write new code for",
+    "build new feature",
+    "develop new component",
+    "code the solution",
+    "implement the solution",
+    "create the implementation",
+    "build the component",
+    "develop the feature",
+]
+
+REFACTOR_PHRASES = [
+    # Refactoring patterns
+    "refactor the code",
+    "refactor this function",
+    "refactor the class",
+    "refactor the module",
+    "refactor the implementation",
+    "restructure the code",
+    "reorganize the code",
+    "clean up the code",
+    "simplify the implementation",
+    "extract the method",
+    "rename the variable",
+    "improve code structure",
+    "optimize the code",
+    "reduce code duplication",
+    "make code more readable",
+    "apply design pattern",
+]
+
+DEBUG_PHRASES = [
+    # Debugging patterns
+    "debug the issue",
+    "debug the error",
+    "debug the problem",
+    "debug this code",
+    "find the bug",
+    "locate the error",
+    "identify the issue",
+    "trace the error",
+    "investigate the bug",
+    "diagnose the problem",
+    "troubleshoot the issue",
+    "find root cause",
+    "what's causing this error",
+    "why is this failing",
+    "fix the crash",
+    "track down the bug",
+]
+
+TEST_PHRASES = [
+    # Testing patterns
+    "write tests for",
+    "write unit tests",
+    "create test cases",
+    "add tests to",
+    "write test for function",
+    "add unit test",
+    "increase test coverage",
+    "improve test coverage",
+    "create integration tests",
+    "add test coverage",
+    "test the function",
+    "test the class",
+    "write pytest tests",
+    "create mock tests",
+    "test edge cases",
+    "write test suite",
+]
+
+# DevOps vertical granular task phrases
+DOCKERFILE_PHRASES = [
+    # Dockerfile patterns
+    "create a dockerfile",
+    "write a dockerfile",
+    "optimize dockerfile",
+    "multi-stage dockerfile",
+    "improve dockerfile",
+    "create docker image",
+    "build docker container",
+    "docker build file",
+    "dockerfile for python",
+    "dockerfile for node",
+    "create container image",
+    "containerize the application",
+]
+
+DOCKER_COMPOSE_PHRASES = [
+    # Docker Compose patterns
+    "create docker compose",
+    "write docker-compose file",
+    "configure docker compose",
+    "docker compose yaml",
+    "compose file for",
+    "multi-container docker",
+    "docker compose services",
+    "compose configuration",
+    "docker compose network",
+    "compose volumes",
+    "orchestrate containers",
+    "docker compose setup",
+]
+
+KUBERNETES_PHRASES = [
+    # Kubernetes patterns
+    "create kubernetes manifest",
+    "write k8s deployment",
+    "kubernetes service config",
+    "create k8s config",
+    "kubernetes pod spec",
+    "k8s deployment yaml",
+    "create statefulset",
+    "kubernetes configmap",
+    "k8s secret",
+    "kubernetes ingress",
+    "create k8s namespace",
+    "kubernetes resource",
+]
+
+TERRAFORM_PHRASES = [
+    # Terraform patterns
+    "create terraform module",
+    "write terraform config",
+    "terraform resource",
+    "terraform provider",
+    "infrastructure as code",
+    "terraform plan",
+    "terraform for aws",
+    "terraform for azure",
+    "terraform state",
+    "terraform variables",
+    "terraform backend",
+    "terraform output",
+]
+
+MONITORING_PHRASES = [
+    # Monitoring/observability patterns
+    "set up monitoring",
+    "configure alerting",
+    "create prometheus config",
+    "grafana dashboard",
+    "set up observability",
+    "monitoring setup",
+    "create alerts",
+    "configure metrics",
+    "logging setup",
+    "tracing configuration",
+    "set up datadog",
+    "cloudwatch monitoring",
+]
+
+# Data Analysis vertical granular task phrases
+DATA_PROFILING_PHRASES = [
+    # Data profiling patterns
+    "profile the data",
+    "data profiling",
+    "profile dataset",
+    "analyze data quality",
+    "data quality check",
+    "profile dataframe",
+    "examine data structure",
+    "data exploration",
+    "summarize dataset",
+    "describe data",
+    "check data types",
+    "identify missing values",
+]
+
+STATISTICAL_ANALYSIS_PHRASES = [
+    # Statistical analysis patterns
+    "statistical analysis",
+    "perform statistical test",
+    "hypothesis testing",
+    "significance test",
+    "t-test analysis",
+    "anova analysis",
+    "chi-square test",
+    "statistical inference",
+    "compute p-value",
+    "statistical significance",
+    "parametric test",
+    "non-parametric test",
+]
+
+CORRELATION_ANALYSIS_PHRASES = [
+    # Correlation analysis patterns
+    "correlation analysis",
+    "correlation matrix",
+    "calculate correlation",
+    "pearson correlation",
+    "spearman correlation",
+    "analyze relationships",
+    "correlation heatmap",
+    "variable correlation",
+    "covariance analysis",
+    "correlation between",
+    "cross-correlation",
+    "multicollinearity check",
+]
+
+REGRESSION_PHRASES = [
+    # Regression analysis patterns
+    "regression analysis",
+    "linear regression",
+    "logistic regression",
+    "build regression model",
+    "fit regression",
+    "multiple regression",
+    "regression coefficients",
+    "predict with regression",
+    "regression line",
+    "least squares",
+    "polynomial regression",
+    "ridge regression",
+]
+
+CLUSTERING_PHRASES = [
+    # Clustering analysis patterns
+    "clustering analysis",
+    "k-means clustering",
+    "hierarchical clustering",
+    "dbscan clustering",
+    "cluster the data",
+    "segment customers",
+    "cluster analysis",
+    "find clusters",
+    "clustering algorithm",
+    "silhouette score",
+    "elbow method",
+    "cluster centers",
+]
+
+TIME_SERIES_PHRASES = [
+    # Time series analysis patterns
+    "time series analysis",
+    "analyze time series",
+    "forecast time series",
+    "time series forecasting",
+    "seasonal decomposition",
+    "trend analysis",
+    "arima model",
+    "temporal analysis",
+    "time series data",
+    "seasonality analysis",
+    "autocorrelation",
+    "moving average",
+]
+
+# Research vertical granular task phrase
+GENERAL_QUERY_PHRASES = [
+    # General query patterns
+    "what is",
+    "explain the concept",
+    "tell me about",
+    "describe the",
+    "how does X work",
+    "what are the benefits",
+    "define the term",
+    "explain how",
+    "overview of",
+    "introduction to",
+    "summary of",
+    "basics of",
+]
+
 
 class TaskTypeClassifier:
     """Semantic task type classifier using embeddings.
@@ -987,6 +2135,38 @@ class TaskTypeClassifier:
             TaskType.GENERAL: GENERAL_PHRASES,
             TaskType.ACTION: ACTION_PHRASES,
             TaskType.ANALYSIS_DEEP: ANALYSIS_DEEP_PHRASES,
+            # DevOps task types (main)
+            TaskType.INFRASTRUCTURE: INFRASTRUCTURE_PHRASES,
+            TaskType.CI_CD: CI_CD_PHRASES,
+            # Data Analysis task types (main)
+            TaskType.DATA_ANALYSIS: DATA_ANALYSIS_PHRASES,
+            TaskType.VISUALIZATION: VISUALIZATION_PHRASES,
+            # Research task types
+            TaskType.FACT_CHECK: FACT_CHECK_PHRASES,
+            TaskType.LITERATURE_REVIEW: LITERATURE_REVIEW_PHRASES,
+            TaskType.COMPETITIVE_ANALYSIS: COMPETITIVE_ANALYSIS_PHRASES,
+            TaskType.TREND_RESEARCH: TREND_RESEARCH_PHRASES,
+            TaskType.TECHNICAL_RESEARCH: TECHNICAL_RESEARCH_PHRASES,
+            # Coding vertical granular task types
+            TaskType.CODE_GENERATION: CODE_GENERATION_PHRASES,
+            TaskType.REFACTOR: REFACTOR_PHRASES,
+            TaskType.DEBUG: DEBUG_PHRASES,
+            TaskType.TEST: TEST_PHRASES,
+            # DevOps vertical granular task types
+            TaskType.DOCKERFILE: DOCKERFILE_PHRASES,
+            TaskType.DOCKER_COMPOSE: DOCKER_COMPOSE_PHRASES,
+            TaskType.KUBERNETES: KUBERNETES_PHRASES,
+            TaskType.TERRAFORM: TERRAFORM_PHRASES,
+            TaskType.MONITORING: MONITORING_PHRASES,
+            # Data Analysis vertical granular task types
+            TaskType.DATA_PROFILING: DATA_PROFILING_PHRASES,
+            TaskType.STATISTICAL_ANALYSIS: STATISTICAL_ANALYSIS_PHRASES,
+            TaskType.CORRELATION_ANALYSIS: CORRELATION_ANALYSIS_PHRASES,
+            TaskType.REGRESSION: REGRESSION_PHRASES,
+            TaskType.CLUSTERING: CLUSTERING_PHRASES,
+            TaskType.TIME_SERIES: TIME_SERIES_PHRASES,
+            # Research vertical granular task type
+            TaskType.GENERAL_QUERY: GENERAL_QUERY_PHRASES,
         }
 
         # Single unified collection for all task phrases (1 file instead of 9)

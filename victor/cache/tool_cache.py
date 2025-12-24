@@ -23,10 +23,25 @@ class ToolCache:
         ttl: int,
         allowlist: Optional[list[str]] = None,
         cache_config: Optional[CacheConfig] = None,
+        cache_eviction_learner: Optional[Any] = None,
     ) -> None:
         self.ttl = ttl
         self.allowlist = set(allowlist or [])
-        self.cache = TieredCache(cache_config or CacheConfig())
+
+        # Get CacheEvictionLearner from RLCoordinator if not provided
+        if cache_eviction_learner is None:
+            try:
+                from victor.agent.rl.coordinator import get_rl_coordinator
+
+                coordinator = get_rl_coordinator()
+                cache_eviction_learner = coordinator.get_learner("cache_eviction")
+            except Exception:
+                pass  # Graceful fallback to non-RL caching
+
+        self.cache = TieredCache(
+            cache_config or CacheConfig(),
+            cache_eviction_learner=cache_eviction_learner,
+        )
         # track keys by touched paths for selective invalidation
         self._path_index: Dict[str, set[str]] = {}
 
@@ -37,13 +52,15 @@ class ToolCache:
         if tool_name not in self.allowlist:
             return None
         name, hashed = self._key(tool_name, args)
-        return self.cache.get(hashed, namespace=name)
+        # Use RL-aware get if learner is available
+        return self.cache.get_with_rl(hashed, namespace=name, tool_name=tool_name)
 
     def set(self, tool_name: str, args: Dict[str, Any], value: Any) -> None:
         if tool_name not in self.allowlist:
             return
         name, hashed = self._key(tool_name, args)
-        self.cache.set(hashed, value, namespace=name, ttl=self.ttl)
+        # Use RL-aware set with tool metadata
+        self.cache.set_with_tool(hashed, value, tool_name=tool_name, namespace=name, ttl=self.ttl)
         # index by path if provided
         path = args.get("path") or args.get("root")
         paths = args.get("paths")

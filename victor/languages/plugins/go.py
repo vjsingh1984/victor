@@ -25,7 +25,9 @@ from victor.languages.base import (
     LanguageCapabilities,
     LanguageConfig,
     Linter,
+    QueryPattern,
     TestRunner,
+    TreeSitterQueries,
 )
 
 
@@ -80,6 +82,41 @@ class GoPlugin(BaseLanguagePlugin):
             supports_formatting=True,
             supports_linting=True,
             supports_completion=True,
+        )
+
+    def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        """Create tree-sitter queries for Go symbol/call extraction."""
+        return TreeSitterQueries(
+            symbols=[
+                QueryPattern("function", "(function_declaration name: (identifier) @name)"),
+                QueryPattern("function", "(method_declaration name: (field_identifier) @name)"),
+                QueryPattern(
+                    "class", "(type_declaration (type_spec name: (type_identifier) @name))"
+                ),
+            ],
+            calls="""
+                (call_expression function: (identifier) @callee)
+                (call_expression function: (selector_expression field: (field_identifier) @callee))
+                (type_conversion_expression type: (type_identifier) @callee)
+            """,
+            references="""
+                (call_expression function: (identifier) @name)
+                (call_expression function: (selector_expression field: (field_identifier) @name))
+                (selector_expression field: (field_identifier) @name)
+                (identifier) @name
+            """,
+            composition="""
+                (type_declaration
+                    (type_spec
+                        name: (type_identifier) @owner
+                        type: (struct_type
+                            (field_declaration
+                                type: (type_identifier) @type))))
+            """,
+            enclosing_scopes=[
+                ("function_declaration", "name"),
+                ("method_declaration", "name"),
+            ],
         )
 
     def get_test_runner(self, project_root: Path) -> Optional[TestRunner]:

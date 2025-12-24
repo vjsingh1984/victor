@@ -27,7 +27,7 @@ import logging
 import traceback
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, TypeVar
@@ -118,7 +118,7 @@ class VictorError(Exception):
         self.recovery_hint = recovery_hint
         self.correlation_id = correlation_id or str(uuid.uuid4())[:8]
         self.cause = cause
-        self.timestamp = datetime.utcnow()
+        self.timestamp = datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -147,6 +147,8 @@ class ProviderError(VictorError):
         message: str,
         provider: Optional[str] = None,
         model: Optional[str] = None,
+        status_code: Optional[int] = None,
+        raw_error: Optional[Any] = None,
         **kwargs: Any,
     ):
         super().__init__(message, **kwargs)
@@ -154,6 +156,11 @@ class ProviderError(VictorError):
         self.model = model
         self.details["provider"] = provider
         self.details["model"] = model
+        # Backward compatibility with providers/base.py signature
+        self.status_code = status_code
+        self.raw_error = raw_error
+        if status_code is not None:
+            self.details["status_code"] = status_code
 
 
 class ProviderConnectionError(ProviderError):
@@ -205,6 +212,89 @@ class ProviderRateLimitError(ProviderError):
         )
         self.retry_after = retry_after
         self.details["retry_after"] = retry_after
+
+
+class ProviderTimeoutError(ProviderError):
+    """Provider request timeout."""
+
+    def __init__(
+        self,
+        message: str,
+        provider: Optional[str] = None,
+        timeout: Optional[int] = None,
+        status_code: Optional[int] = None,
+        raw_error: Optional[Any] = None,
+        **kwargs: Any,
+    ):
+        super().__init__(
+            message,
+            provider=provider,
+            category=ErrorCategory.PROVIDER_CONNECTION,
+            recovery_hint=(
+                f"Request timed out after {timeout} seconds. Try increasing timeout or check provider status."
+                if timeout
+                else "Request timed out. Check provider status and network connection."
+            ),
+            **kwargs,
+        )
+        self.timeout = timeout
+        self.details["timeout"] = timeout
+        # Backward compatibility with base.py signature
+        self.status_code = status_code
+        self.raw_error = raw_error
+
+
+class ProviderNotFoundError(ProviderError):
+    """Provider not found in registry."""
+
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        provider: Optional[str] = None,
+        available_providers: Optional[List[str]] = None,
+        status_code: Optional[int] = None,
+        raw_error: Optional[Any] = None,
+        **kwargs: Any,
+    ):
+        # Generate message if not provided
+        if message is None:
+            message = f"Provider not found: {provider}"
+            if available_providers:
+                message += f". Available: {', '.join(available_providers[:5])}"
+        super().__init__(
+            message,
+            provider=provider,
+            category=ErrorCategory.CONFIG_INVALID,
+            recovery_hint="Check provider name spelling. Use 'victor providers' to list available providers.",
+            **kwargs,
+        )
+        self.available_providers = available_providers or []
+        self.details["available_providers"] = self.available_providers
+        # Backward compatibility with base.py signature
+        self.status_code = status_code
+        self.raw_error = raw_error
+
+
+class ProviderInvalidResponseError(ProviderError):
+    """Provider returned invalid or unexpected response."""
+
+    def __init__(
+        self,
+        message: str,
+        provider: Optional[str] = None,
+        response_data: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ):
+        super().__init__(
+            message,
+            provider=provider,
+            category=ErrorCategory.PROVIDER_INVALID_RESPONSE,
+            recovery_hint="The provider returned an unexpected response format. Try again or use a different provider.",
+            **kwargs,
+        )
+        self.response_data = response_data
+        if response_data:
+            self.details["response_keys"] = list(response_data.keys())[:10]
 
 
 class ToolError(VictorError):

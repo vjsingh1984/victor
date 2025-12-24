@@ -120,8 +120,16 @@ def _register_default_providers() -> None:
     # LMStudio uses dedicated provider (similar to Ollama)
     # with httpx, tiered URL selection, and 300s timeout
     ProviderRegistry.register("lmstudio", LMStudioProvider)
-    # vLLM uses OpenAI-compatible endpoints
-    ProviderRegistry.register("vllm", OpenAIProvider)
+    # vLLM high-throughput inference server
+    from victor.providers.vllm_provider import VLLMProvider
+
+    ProviderRegistry.register("vllm", VLLMProvider)
+    # llama.cpp server (CPU-friendly local inference)
+    from victor.providers.llamacpp_provider import LlamaCppProvider
+
+    ProviderRegistry.register("llamacpp", LlamaCppProvider)
+    ProviderRegistry.register("llama-cpp", LlamaCppProvider)  # Alias
+    ProviderRegistry.register("llama.cpp", LlamaCppProvider)  # Alias
     ProviderRegistry.register("google", GoogleProvider)
     ProviderRegistry.register("xai", XAIProvider)
     ProviderRegistry.register("grok", XAIProvider)  # Alias for xai

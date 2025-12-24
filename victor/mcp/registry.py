@@ -592,14 +592,19 @@ class MCPRegistry:
     # Configuration loading
 
     @classmethod
-    def discover_servers(cls) -> "MCPRegistry":
+    def discover_servers(cls, include_claude_desktop: bool = True) -> "MCPRegistry":
         """Auto-discover MCP servers from standard locations.
 
-        Searches for MCP configuration in:
+        Comprehensive discovery that searches:
         1. Environment variable VICTOR_MCP_CONFIG
         2. {project}/.victor/mcp.yaml (project-local)
         3. ~/.victor/mcp.yaml (global)
         4. ~/.config/mcp/servers.yaml (XDG standard)
+        5. Claude Desktop MCP configuration (if include_claude_desktop=True)
+        6. Well-known MCP server executables in PATH
+
+        Args:
+            include_claude_desktop: Whether to discover Claude Desktop's MCP servers
 
         Returns:
             Configured MCPRegistry with discovered servers
@@ -638,10 +643,277 @@ class MCPRegistry:
         for config_path in search_paths:
             if config_path.exists():
                 logger.info(f"Loading MCP config from: {config_path}")
-                return cls.from_config(config_path)
+                registry = cls.from_config(config_path)
+                break
 
-        logger.debug("No MCP configuration found in standard locations")
+        # Discover Claude Desktop servers
+        if include_claude_desktop:
+            claude_servers = cls._discover_claude_desktop_servers()
+            for server in claude_servers:
+                if server.name not in {s.config.name for s in registry._servers.values()}:
+                    registry.register_server(server)
+                    logger.info(f"Discovered Claude Desktop MCP server: {server.name}")
+
+        # Discover well-known MCP server executables
+        discovered_executables = cls._discover_mcp_executables()
+        for server in discovered_executables:
+            if server.name not in {s.config.name for s in registry._servers.values()}:
+                registry.register_server(server)
+                logger.info(f"Discovered MCP server executable: {server.name}")
+
+        if not registry._servers:
+            logger.debug("No MCP servers discovered")
+        else:
+            logger.info(f"Discovered {len(registry._servers)} MCP servers")
+
         return registry
+
+    @classmethod
+    def _discover_claude_desktop_servers(cls) -> List[MCPServerConfig]:
+        """Discover MCP servers configured in Claude Desktop.
+
+        Claude Desktop stores MCP server config in:
+        - macOS: ~/Library/Application Support/Claude/claude_desktop_config.json
+        - Windows: %APPDATA%/Claude/claude_desktop_config.json
+        - Linux: ~/.config/Claude/claude_desktop_config.json
+
+        Returns:
+            List of discovered MCPServerConfig instances
+        """
+        import json
+        import platform
+
+        servers: List[MCPServerConfig] = []
+
+        try:
+            from victor.config.secure_paths import get_secure_home
+
+            home = get_secure_home()
+        except ImportError:
+            home = Path.home()
+
+        # Platform-specific Claude Desktop config locations
+        system = platform.system()
+        config_paths: List[Path] = []
+
+        if system == "Darwin":  # macOS
+            config_paths.append(
+                home / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+            )
+        elif system == "Windows":
+            import os
+
+            appdata = os.environ.get("APPDATA", "")
+            if appdata:
+                config_paths.append(Path(appdata) / "Claude" / "claude_desktop_config.json")
+        else:  # Linux and others
+            config_paths.append(home / ".config" / "Claude" / "claude_desktop_config.json")
+
+        for config_path in config_paths:
+            if not config_path.exists():
+                continue
+
+            try:
+                config = json.loads(config_path.read_text())
+                mcp_servers = config.get("mcpServers", {})
+
+                for name, server_config in mcp_servers.items():
+                    command = server_config.get("command", "")
+                    args = server_config.get("args", [])
+                    env = server_config.get("env", {})
+
+                    if command:
+                        full_command = [command] + args if args else [command]
+                        servers.append(
+                            MCPServerConfig(
+                                name=f"claude_{name}",
+                                command=full_command,
+                                description=f"Claude Desktop MCP server: {name}",
+                                env=env,
+                                tags=["claude-desktop", "auto-discovered"],
+                                auto_connect=False,  # Don't auto-connect by default
+                            )
+                        )
+                        logger.debug(f"Found Claude Desktop MCP server: {name}")
+
+            except json.JSONDecodeError as e:
+                logger.warning(f"Invalid JSON in Claude Desktop config {config_path}: {e}")
+            except Exception as e:
+                logger.debug(f"Error reading Claude Desktop config {config_path}: {e}")
+
+        return servers
+
+    @classmethod
+    def _discover_mcp_executables(cls) -> List[MCPServerConfig]:
+        """Discover well-known MCP server executables in PATH.
+
+        Searches for common MCP server packages that may be installed:
+        - mcp-server-* (npm packages)
+        - mcp_server_* (Python packages)
+
+        Returns:
+            List of discovered MCPServerConfig instances
+        """
+        import shutil
+
+        servers: List[MCPServerConfig] = []
+
+        # Well-known MCP server executables and their configurations
+        known_servers = {
+            # NPM-based servers (typically installed globally)
+            "mcp-server-filesystem": {
+                "description": "MCP Filesystem Server - file operations",
+                "tags": ["filesystem", "npm"],
+            },
+            "mcp-server-github": {
+                "description": "MCP GitHub Server - repository operations",
+                "tags": ["github", "npm"],
+            },
+            "mcp-server-sqlite": {
+                "description": "MCP SQLite Server - database operations",
+                "tags": ["database", "sqlite", "npm"],
+            },
+            "mcp-server-postgres": {
+                "description": "MCP PostgreSQL Server - database operations",
+                "tags": ["database", "postgres", "npm"],
+            },
+            "mcp-server-memory": {
+                "description": "MCP Memory Server - key-value storage",
+                "tags": ["memory", "npm"],
+            },
+            "mcp-server-brave-search": {
+                "description": "MCP Brave Search Server - web search",
+                "tags": ["search", "web", "npm"],
+            },
+            "mcp-server-puppeteer": {
+                "description": "MCP Puppeteer Server - browser automation",
+                "tags": ["browser", "puppeteer", "npm"],
+            },
+            "mcp-server-slack": {
+                "description": "MCP Slack Server - Slack integration",
+                "tags": ["slack", "chat", "npm"],
+            },
+            "mcp-server-google-maps": {
+                "description": "MCP Google Maps Server - location services",
+                "tags": ["maps", "google", "npm"],
+            },
+            # NPX-runnable servers
+            "@anthropics/mcp-server-fetch": {
+                "command_template": ["npx", "-y", "@anthropics/mcp-server-fetch"],
+                "description": "Anthropic MCP Fetch Server - HTTP requests",
+                "tags": ["fetch", "http", "anthropic"],
+            },
+        }
+
+        for server_name, config in known_servers.items():
+            # Check if executable exists in PATH
+            command_template = config.get("command_template")
+            if command_template:
+                # NPX-based server - check if npx is available
+                if shutil.which("npx"):
+                    servers.append(
+                        MCPServerConfig(
+                            name=server_name.replace("@", "").replace("/", "_"),
+                            command=command_template,
+                            description=config.get("description", f"MCP Server: {server_name}"),
+                            tags=["auto-discovered"] + config.get("tags", []),
+                            auto_connect=False,
+                        )
+                    )
+            else:
+                # Direct executable
+                executable_path = shutil.which(server_name)
+                if executable_path:
+                    servers.append(
+                        MCPServerConfig(
+                            name=server_name.replace("-", "_"),
+                            command=[executable_path],
+                            description=config.get("description", f"MCP Server: {server_name}"),
+                            tags=["auto-discovered"] + config.get("tags", []),
+                            auto_connect=False,
+                        )
+                    )
+
+        # Also check for Python-based MCP servers
+        python_servers = [
+            "mcp_server_git",
+            "mcp_server_time",
+            "mcp_server_fetch",
+        ]
+
+        for server_name in python_servers:
+            # Try to import and check if module exists
+            try:
+                import importlib.util
+
+                spec = importlib.util.find_spec(server_name)
+                if spec:
+                    servers.append(
+                        MCPServerConfig(
+                            name=server_name,
+                            command=["python", "-m", server_name],
+                            description=f"Python MCP Server: {server_name}",
+                            tags=["auto-discovered", "python"],
+                            auto_connect=False,
+                        )
+                    )
+            except Exception:
+                pass
+
+        return servers
+
+    @classmethod
+    def list_discovered_servers(cls) -> Dict[str, Any]:
+        """List all discoverable MCP servers without connecting.
+
+        This is useful for showing users what servers are available
+        before deciding which to connect to.
+
+        Returns:
+            Dictionary with discovered servers organized by source
+        """
+        result: Dict[str, Any] = {
+            "config_files": [],
+            "claude_desktop": [],
+            "executables": [],
+        }
+
+        # Check config file locations
+        import os
+
+        from victor.config.settings import get_project_paths
+
+        paths = get_project_paths()
+        config_locations = [
+            ("env", os.environ.get("VICTOR_MCP_CONFIG")),
+            ("project", str(paths.project_victor_dir / "mcp.yaml")),
+            ("global", str(paths.global_victor_dir / "mcp.yaml")),
+        ]
+
+        for source, path in config_locations:
+            if path and Path(path).exists():
+                result["config_files"].append({"source": source, "path": path})
+
+        # Discover Claude Desktop servers
+        claude_servers = cls._discover_claude_desktop_servers()
+        for server in claude_servers:
+            result["claude_desktop"].append({
+                "name": server.name,
+                "command": server.command,
+                "description": server.description,
+            })
+
+        # Discover executables
+        exec_servers = cls._discover_mcp_executables()
+        for server in exec_servers:
+            result["executables"].append({
+                "name": server.name,
+                "command": server.command,
+                "description": server.description,
+                "tags": server.tags,
+            })
+
+        return result
 
     @classmethod
     def from_config(cls, config_path: Path) -> "MCPRegistry":

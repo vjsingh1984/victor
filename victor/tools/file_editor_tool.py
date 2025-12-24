@@ -33,7 +33,7 @@ from victor.tools.decorators import tool
     danger_level=DangerLevel.LOW,  # Changes are undoable via transaction system
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["ops"],  # Different operations indicate progress, not loops
-    stages=["executing"],  # Conversation stages where relevant
+    stages=["execution"],  # Conversation stages where relevant
     task_types=["edit", "action"],  # Task types for classification-aware selection
     execution_category="write",  # Cannot run in parallel with conflicting ops
     keywords=["edit", "modify", "replace", "create", "delete", "rename", "file", "text"],
@@ -73,7 +73,55 @@ async def edit(
     # Allow callers (models) to pass ops as a JSON string; normalize to list[dict]
     if isinstance(ops, str):
         import json
-        import re
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        def _fix_json_control_chars(json_str: str) -> str:
+            """Fix raw control characters inside JSON strings.
+
+            Models sometimes embed literal newlines/tabs inside JSON strings instead
+            of using \\n and \\t escape sequences. This function identifies string
+            regions and escapes control characters within them.
+            """
+            result = []
+            in_string = False
+            escape_next = False
+            i = 0
+
+            while i < len(json_str):
+                char = json_str[i]
+
+                if escape_next:
+                    # Previous char was \, so this char is escaped
+                    result.append(char)
+                    escape_next = False
+                elif char == "\\":
+                    result.append(char)
+                    escape_next = True
+                elif char == '"' and not escape_next:
+                    # Toggle string state
+                    in_string = not in_string
+                    result.append(char)
+                elif in_string:
+                    # Inside a string - escape control characters
+                    if char == "\n":
+                        result.append("\\n")
+                    elif char == "\t":
+                        result.append("\\t")
+                    elif char == "\r":
+                        result.append("\\r")
+                    elif ord(char) < 32:  # Other control characters
+                        result.append(f"\\u{ord(char):04x}")
+                    else:
+                        result.append(char)
+                else:
+                    # Outside string - newlines/whitespace are OK in JSON
+                    result.append(char)
+
+                i += 1
+
+            return "".join(result)
 
         # Try to parse the JSON, with recovery for common issues
         try:
@@ -90,16 +138,12 @@ async def edit(
                 )
                 # Try to fix by escaping control characters in strings
                 try:
-                    fixed = re.sub(
-                        r'(?<!\\)\n(?=(?:[^"]*"[^"]*")*[^"]*"[^"]*$)', r"\\n", ops
-                    )
-                    fixed = re.sub(r'(?<!\\)\t(?=(?:[^"]*"[^"]*")*[^"]*"[^"]*$)', r"\\t", fixed)
+                    fixed = _fix_json_control_chars(ops)
                     ops = json.loads(fixed)
                     # If fixed, log and continue
-                    import logging
-
-                    logging.getLogger(__name__).info("Auto-fixed JSON control characters")
-                except json.JSONDecodeError:
+                    logger.info("Auto-fixed JSON control characters in edit ops")
+                except json.JSONDecodeError as fix_exc:
+                    logger.debug(f"JSON fix attempt failed: {fix_exc}")
                     pass  # Recovery failed, use original error
 
             if isinstance(ops, str):  # Still a string = parsing failed
@@ -402,5 +446,3 @@ async def edit(
             "by_type": by_type,
             "message": f"Queued {operations_queued} operations (not applied, commit=False)",
         }
-
-

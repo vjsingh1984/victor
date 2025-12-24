@@ -211,14 +211,22 @@ class TestUnifiedTaskClassifier:
         # Should not be classified as analysis due to negation
         assert result.is_analysis_task is False or result.negated_keywords
 
-    def test_analysis_precedence_over_action(self, classifier):
-        """Test that analysis takes precedence when both present."""
+    def test_position_based_precedence(self, classifier):
+        """Test position-based priority when both analysis and action present."""
+        # When action keyword ("create") appears AFTER analysis ("analyze"),
+        # action takes precedence since it's the end goal
         result = classifier.classify("Analyze the code and create a report")
         # Both analysis and action keywords present
         assert result.is_analysis_task is True
         assert result.is_action_task is True
-        # But analysis should win
-        assert result.task_type == TaskType.ANALYSIS
+        # Action (generation) should win since "create" appears last
+        assert result.task_type == TaskType.GENERATION
+
+        # When analysis appears last, it should win
+        result2 = classifier.classify("Create initial draft and analyze it thoroughly")
+        assert result2.is_analysis_task is True
+        assert result2.is_action_task is True
+        assert result2.task_type == TaskType.ANALYSIS
 
     def test_confidence_scoring(self, classifier):
         """Test that confidence scores are reasonable."""

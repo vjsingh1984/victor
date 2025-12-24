@@ -15,7 +15,9 @@
 """Filesystem tools for reading, writing, and listing contents."""
 
 import logging
-from dataclasses import dataclass
+import threading
+import time
+from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Callable, Tuple
@@ -26,6 +28,309 @@ from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priori
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# SESSION-LEVEL FILE CONTENT CACHE (P3-2)
+# ============================================================================
+# Prevents redundant file reads within a session. Especially helpful for
+# providers like DeepSeek that tend to re-read the same files repeatedly.
+# Cache is keyed by normalized absolute path and tracks modification time.
+
+
+@dataclass
+class CachedFileContent:
+    """Cached file content with metadata for invalidation."""
+
+    content: str
+    mtime: float  # File modification time when cached
+    cached_at: float  # When the cache entry was created
+    size: int  # File size in bytes
+    hits: int = 0  # Number of cache hits
+
+
+@dataclass
+class FileContentCacheStats:
+    """Statistics for the file content cache."""
+
+    hits: int = 0
+    misses: int = 0
+    invalidations: int = 0
+    evictions: int = 0
+    total_bytes_cached: int = 0
+    total_bytes_saved: int = 0  # Bytes not re-read due to cache hits
+
+
+class FileContentCache:
+    """Session-level cache for file contents.
+
+    Features:
+    - Caches file contents keyed by normalized absolute path
+    - Auto-invalidates when file modification time changes
+    - Thread-safe operations
+    - Memory-bounded with LRU eviction
+    - Tracks hit/miss statistics
+
+    Usage:
+        cache = FileContentCache(max_entries=100, max_total_bytes=10_000_000)
+        content = cache.get("/path/to/file")  # Returns None on miss
+        cache.set("/path/to/file", content, mtime, size)
+        cache.invalidate("/path/to/file")  # On write
+        cache.clear()  # On session end
+    """
+
+    def __init__(
+        self,
+        max_entries: int = 100,
+        max_total_bytes: int = 10_000_000,  # 10MB default
+        ttl_seconds: int = 300,  # 5 minute TTL
+    ):
+        """Initialize file content cache.
+
+        Args:
+            max_entries: Maximum number of files to cache
+            max_total_bytes: Maximum total bytes to cache (soft limit)
+            ttl_seconds: Time-to-live for cache entries
+        """
+        self._cache: Dict[str, CachedFileContent] = {}
+        self._lock = threading.RLock()
+        self._max_entries = max_entries
+        self._max_total_bytes = max_total_bytes
+        self._ttl_seconds = ttl_seconds
+        self._stats = FileContentCacheStats()
+        self._access_order: List[str] = []  # For LRU eviction
+
+    def _normalize_path(self, path: str) -> str:
+        """Normalize path to absolute resolved form."""
+        return str(Path(path).expanduser().resolve())
+
+    def get(self, path: str) -> Optional[str]:
+        """Get cached content if valid.
+
+        Validates:
+        - File still exists
+        - Modification time hasn't changed
+        - TTL hasn't expired
+
+        Args:
+            path: File path (will be normalized)
+
+        Returns:
+            Cached content or None if miss/invalid
+        """
+        normalized = self._normalize_path(path)
+
+        with self._lock:
+            entry = self._cache.get(normalized)
+            if entry is None:
+                self._stats.misses += 1
+                return None
+
+            # Check TTL
+            if time.time() - entry.cached_at > self._ttl_seconds:
+                self._invalidate_entry(normalized, reason="ttl_expired")
+                self._stats.misses += 1
+                return None
+
+            # Check if file still exists and mtime matches
+            try:
+                file_path = Path(normalized)
+                if not file_path.exists():
+                    self._invalidate_entry(normalized, reason="file_deleted")
+                    self._stats.misses += 1
+                    return None
+
+                current_mtime = file_path.stat().st_mtime
+                if current_mtime != entry.mtime:
+                    self._invalidate_entry(normalized, reason="mtime_changed")
+                    self._stats.misses += 1
+                    return None
+
+            except OSError:
+                self._invalidate_entry(normalized, reason="os_error")
+                self._stats.misses += 1
+                return None
+
+            # Cache hit!
+            entry.hits += 1
+            self._stats.hits += 1
+            self._stats.total_bytes_saved += entry.size
+
+            # Update access order for LRU
+            if normalized in self._access_order:
+                self._access_order.remove(normalized)
+            self._access_order.append(normalized)
+
+            logger.debug(
+                "File cache HIT: %s (hits=%d, saved=%d bytes)",
+                normalized,
+                entry.hits,
+                entry.size,
+            )
+            return entry.content
+
+    def set(self, path: str, content: str, mtime: float, size: int) -> bool:
+        """Cache file content.
+
+        May trigger LRU eviction if cache is full.
+
+        Args:
+            path: File path (will be normalized)
+            content: File content to cache
+            mtime: File modification time
+            size: File size in bytes
+
+        Returns:
+            True if cached successfully
+        """
+        normalized = self._normalize_path(path)
+
+        with self._lock:
+            # Check if we need to evict entries
+            self._maybe_evict(size)
+
+            # Store the entry
+            self._cache[normalized] = CachedFileContent(
+                content=content,
+                mtime=mtime,
+                cached_at=time.time(),
+                size=size,
+                hits=0,
+            )
+            self._stats.total_bytes_cached += size
+
+            # Update access order
+            if normalized in self._access_order:
+                self._access_order.remove(normalized)
+            self._access_order.append(normalized)
+
+            logger.debug("File cache SET: %s (%d bytes)", normalized, size)
+            return True
+
+    def invalidate(self, path: str) -> bool:
+        """Invalidate a cache entry.
+
+        Call this when a file is written to ensure fresh reads.
+
+        Args:
+            path: File path to invalidate
+
+        Returns:
+            True if entry was found and invalidated
+        """
+        normalized = self._normalize_path(path)
+        with self._lock:
+            return self._invalidate_entry(normalized, reason="explicit_invalidate")
+
+    def _invalidate_entry(self, normalized: str, reason: str = "") -> bool:
+        """Internal invalidation (already holds lock)."""
+        entry = self._cache.pop(normalized, None)
+        if entry:
+            self._stats.invalidations += 1
+            self._stats.total_bytes_cached -= entry.size
+            if normalized in self._access_order:
+                self._access_order.remove(normalized)
+            logger.debug("File cache INVALIDATE: %s (reason=%s)", normalized, reason)
+            return True
+        return False
+
+    def _maybe_evict(self, incoming_bytes: int) -> None:
+        """Evict entries if necessary (already holds lock)."""
+        # Check entry count
+        while len(self._cache) >= self._max_entries and self._access_order:
+            oldest = self._access_order.pop(0)
+            entry = self._cache.pop(oldest, None)
+            if entry:
+                self._stats.evictions += 1
+                self._stats.total_bytes_cached -= entry.size
+                logger.debug("File cache EVICT (count): %s", oldest)
+
+        # Check total bytes (soft limit - only evict if significantly over)
+        while (
+            self._stats.total_bytes_cached + incoming_bytes > self._max_total_bytes * 1.2
+            and self._access_order
+        ):
+            oldest = self._access_order.pop(0)
+            entry = self._cache.pop(oldest, None)
+            if entry:
+                self._stats.evictions += 1
+                self._stats.total_bytes_cached -= entry.size
+                logger.debug("File cache EVICT (bytes): %s", oldest)
+
+    def clear(self) -> None:
+        """Clear all cache entries."""
+        with self._lock:
+            count = len(self._cache)
+            self._cache.clear()
+            self._access_order.clear()
+            self._stats.total_bytes_cached = 0
+            logger.info("File cache CLEARED: %d entries removed", count)
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get cache statistics."""
+        with self._lock:
+            hit_rate = (
+                self._stats.hits / (self._stats.hits + self._stats.misses) * 100
+                if (self._stats.hits + self._stats.misses) > 0
+                else 0.0
+            )
+            return {
+                "hits": self._stats.hits,
+                "misses": self._stats.misses,
+                "hit_rate_percent": round(hit_rate, 1),
+                "invalidations": self._stats.invalidations,
+                "evictions": self._stats.evictions,
+                "entries": len(self._cache),
+                "total_bytes_cached": self._stats.total_bytes_cached,
+                "total_bytes_saved": self._stats.total_bytes_saved,
+                "max_entries": self._max_entries,
+                "max_total_bytes": self._max_total_bytes,
+            }
+
+    def __len__(self) -> int:
+        """Return number of cached entries."""
+        return len(self._cache)
+
+
+# Global file content cache instance (session-level)
+# This is shared across all filesystem tool invocations within a session
+_file_content_cache: Optional[FileContentCache] = None
+_cache_enabled: bool = True  # Can be disabled via settings
+
+
+def get_file_content_cache() -> FileContentCache:
+    """Get or create the global file content cache."""
+    global _file_content_cache
+    if _file_content_cache is None:
+        _file_content_cache = FileContentCache()
+    return _file_content_cache
+
+
+def clear_file_content_cache(reset_stats: bool = True) -> None:
+    """Clear the global file content cache (call on session end).
+
+    Args:
+        reset_stats: If True (default), also reset statistics.
+                     Set to False to preserve stats across clear.
+    """
+    global _file_content_cache
+    if _file_content_cache is not None:
+        _file_content_cache.clear()
+        if reset_stats:
+            # Reset the stats for a fresh session
+            _file_content_cache._stats = FileContentCacheStats()
+
+
+def set_file_cache_enabled(enabled: bool) -> None:
+    """Enable or disable the file content cache."""
+    global _cache_enabled
+    _cache_enabled = enabled
+    logger.info("File content cache %s", "enabled" if enabled else "disabled")
+
+
+def is_file_cache_enabled() -> bool:
+    """Check if file content cache is enabled."""
+    return _cache_enabled
 
 
 # ============================================================================
@@ -630,7 +935,7 @@ TEXT_EXTENSIONS = {
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["path", "offset", "limit"],  # Params indicating exploration progress
-    stages=["reading", "initial", "analysis"],  # Conversation stages where relevant
+    stages=["reading", "initial", "analysis", "verification"],  # Conversation stages where relevant
     task_types=["analysis", "search"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
@@ -662,12 +967,21 @@ TEXT_EXTENSIONS = {
         "search for 'def calculate' in utils.py",
         "show first 50 lines of main.py",
     ],
-    mandatory_keywords=["read file", "show file", "explain this code", "what does this"],  # Force inclusion
+    mandatory_keywords=[
+        "read file",
+        "show file",
+        "explain this code",
+        "what does this",
+        # Additional keywords from MANDATORY_TOOL_KEYWORDS
+        "explain", "describe", "what does",
+    ],  # Force inclusion
     priority_hints=[
+        "TRUNCATION: Output limited to ~15,000 chars. Use offset/limit for large files.",
+        "PAGINATION: For files >100KB, use limit=200-500 and increment offset to read in chunks.",
         "Use for TEXT and CODE files only (.py, .js, .json, .yaml, .md, etc.)",
         "NOT for binary files (.pdf, .docx, .db, .pyc, images, archives)",
         "Use search parameter for efficient grep-like targeted lookups",
-        "Use ls first if unsure what files exist",
+        "Use ls first to check file sizes before reading",
     ],
 )
 async def read(
@@ -677,20 +991,39 @@ async def read(
     search: str = "",
     ctx: int = 2,
     regex: bool = False,
+    # Parameter aliases for models that use different names (e.g., gpt-oss)
+    line_start: int = None,
+    line_end: int = None,
 ) -> str:
     """Read text/code file. Binary files rejected.
 
+    IMPORTANT: Output is truncated to ~15,000 chars (~500 lines). For large files:
+    - Use offset/limit for paginated reads: read(path, offset=0, limit=200), then offset=200, etc.
+    - Use search param to find specific content without reading entire file
+
     Args:
         path: File path
-        offset: Start line (0=beginning)
-        limit: Max lines (0=all)
-        search: Grep pattern
+        offset: Start line (0=beginning). Use for pagination of large files.
+        limit: Max lines to read (0=all, but truncated at ~500 lines).
+               Recommended: Use limit=200-500 for large files and paginate.
+        search: Grep pattern - efficient for finding specific content
         ctx: Context lines around matches
         regex: Pattern is regex
+        line_start: Alias for offset (some models use this name)
+        line_end: Alias for limit (some models use this name)
 
     Returns:
-        File content or matching lines.
+        File content (truncated if >15,000 chars). Use offset to continue reading.
     """
+    # Handle parameter aliases from models that use different names
+    if line_start is not None and offset == 0:
+        offset = line_start
+    if line_end is not None and limit == 0:
+        # Convert line_end to limit (line_end is absolute, limit is count)
+        if line_start is not None:
+            limit = max(0, line_end - line_start)
+        else:
+            limit = line_end
     file_path = Path(path).expanduser().resolve()
 
     if not file_path.exists():
@@ -878,22 +1211,49 @@ async def read(
         )
 
     # =========================================================================
-    # TEXT FILE READING
+    # TEXT FILE READING (with session-level caching)
     # =========================================================================
-    # Try to read the file, handling encoding errors gracefully
-    try:
-        async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
-            content = await f.read()
-    except UnicodeDecodeError as e:
-        # File contains binary content - provide helpful message
-        file_size = file_path.stat().st_size
-        raise ValueError(
-            f"Cannot read file: {path}\n"
-            f"Reason: Contains binary/non-UTF-8 content (error at byte {e.start})\n"
-            f"Size: {file_size:,} bytes\n"
-            f"Suggestion: This file appears to be binary despite its extension. "
-            f"Check if it's the correct file, or look for a text-based alternative."
-        )
+    # Check session cache first (prevents redundant reads for providers like DeepSeek)
+    content: Optional[str] = None
+    cache_hit = False
+
+    if is_file_cache_enabled():
+        cache = get_file_content_cache()
+        cached_content = cache.get(str(file_path))
+        if cached_content is not None:
+            content = cached_content
+            cache_hit = True
+            logger.debug("File read from cache: %s", path)
+
+    # Try to read the file if not in cache
+    if content is None:
+        try:
+            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+                content = await f.read()
+        except UnicodeDecodeError as e:
+            # File contains binary content - provide helpful message
+            file_size = file_path.stat().st_size
+            raise ValueError(
+                f"Cannot read file: {path}\n"
+                f"Reason: Contains binary/non-UTF-8 content (error at byte {e.start})\n"
+                f"Size: {file_size:,} bytes\n"
+                f"Suggestion: This file appears to be binary despite its extension. "
+                f"Check if it's the correct file, or look for a text-based alternative."
+            )
+
+        # Cache the content for future reads
+        if is_file_cache_enabled() and not cache_hit:
+            try:
+                file_stat = file_path.stat()
+                cache = get_file_content_cache()
+                cache.set(
+                    str(file_path),
+                    content,
+                    mtime=file_stat.st_mtime,
+                    size=file_stat.st_size,
+                )
+            except OSError:
+                pass  # Don't fail if we can't cache
 
     # Normalize parameters (handle non-int input from model)
     def _to_int(val, default: int) -> int:
@@ -954,7 +1314,7 @@ async def read(
     danger_level=DangerLevel.LOW,  # Minor risk, easily undoable
     # Registry-driven metadata for tool selection and cache invalidation
     progress_params=["path"],  # Same file = loop, regardless of content
-    stages=["executing"],  # Conversation stages where relevant
+    stages=["execution"],  # Conversation stages where relevant
     task_types=["edit", "generation", "action"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.WRITE,  # Cannot run in parallel with conflicting ops
     keywords=[
@@ -1034,6 +1394,11 @@ async def write(path: str, content: str) -> str:
 
     tracker.commit_change_group()
 
+    # Invalidate file content cache (ensures fresh reads after write)
+    if is_file_cache_enabled():
+        cache = get_file_content_cache()
+        cache.invalidate(str(file_path))
+
     action = "created" if change_type == ChangeType.CREATE else "modified"
     return f"Successfully {action} {path} ({len(content)} characters). Use /undo to revert."
 
@@ -1045,7 +1410,7 @@ async def write(path: str, content: str) -> str:
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["path", "depth", "pattern"],  # Params indicating exploration progress
-    stages=["initial", "reading"],  # Conversation stages where relevant
+    stages=["initial", "planning", "reading", "analysis"],  # Conversation stages where relevant
     task_types=["search", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
@@ -1074,30 +1439,41 @@ async def write(path: str, content: str) -> str:
         "find all test files",
         "list directories only",
     ],
-    mandatory_keywords=["list files", "show files", "how many files", "count files"],  # Force inclusion
+    mandatory_keywords=[
+        "list files",
+        "show files",
+        "how many files",
+        "count files",
+    ],  # Force inclusion
     priority_hints=[
-        "Use for browsing directory contents",
+        "Use for browsing directory contents (default depth=2 shows subdirectories)",
         "Use pattern parameter for filtering (e.g., '*.py', 'test_*')",
+        "For searching specific files, use find(name='filename') instead",
     ],
 )
 async def ls(
     path: str,
     recursive: bool = False,
-    depth: int = 1,
+    depth: int = 2,
     pattern: str = "",
     limit: int = 1000,
 ) -> List[Dict[str, Any]]:
-    """List directory contents.
+    """List directory contents with file sizes.
 
     Args:
         path: Directory path
         recursive: All levels (ignores depth)
-        depth: Levels to explore (1=children)
+        depth: Levels to explore (default=2 for subdirectory visibility)
         pattern: Glob filter (*.py, test_*)
         limit: Max entries
 
     Returns:
-        List of {name/path, type, depth}.
+        List of {name/path, type, depth, size, hint}.
+        - size: File size in bytes (files only)
+        - hint: For large files (>100KB), pagination instruction
+
+    Tip: Default depth=2 shows contents of immediate subdirectories.
+         Use depth=1 for just the top level, or recursive=True for all.
     """
     import fnmatch
 
@@ -1175,28 +1551,187 @@ async def ls(
             if pattern and not fnmatch.fnmatch(name, pattern):
                 continue
 
-            items.append(
-                {
-                    "path" if use_relative_paths else "name": name,
-                    "type": "directory" if is_dir else "file",
-                    "depth": entry_depth,
-                }
-            )
-            count += 1
+            # Compute full path relative to cwd for use in subsequent tool calls
+            try:
+                full_path = str(p.relative_to(Path.cwd()))
+            except ValueError:
+                # If path is not relative to cwd, use absolute
+                full_path = str(p)
 
-        # Add metadata if filtered or truncated
-        if pattern or count >= limit:
-            return {
-                "items": items,
-                "count": len(items),
-                "truncated": count >= limit,
-                "filter": pattern or None,
+            item = {
+                "path" if use_relative_paths else "name": name,
+                "full_path": full_path,  # Full path for model to use in subsequent calls
+                "type": "directory" if is_dir else "file",
+                "depth": entry_depth,
             }
 
-        return items
+            # Add file size for files (helps LLM plan read operations)
+            if not is_dir:
+                try:
+                    size = p.stat().st_size
+                    item["size"] = size
+                    # Direct hint for large files - tell LLM exactly what to do
+                    if size > 100_000:
+                        item["hint"] = "USE read(offset=0,limit=500) to paginate"
+                except OSError:
+                    pass  # Skip size on permission errors
+
+            items.append(item)
+            count += 1
+
+        # Build result with cwd context for better LLM orientation
+        cwd = str(Path.cwd())
+
+        # Try to express the target path relative to cwd for clarity
+        try:
+            relative_target = str(dir_path.relative_to(Path.cwd()))
+        except ValueError:
+            relative_target = str(dir_path)  # Use absolute if outside cwd
+
+        # Always include cwd context and relative target path in response
+        result = {
+            "cwd": cwd,
+            "target": relative_target if relative_target != "." else ".",
+            "items": items,
+            "count": len(items),
+        }
+
+        # Add optional metadata
+        if pattern:
+            result["filter"] = pattern
+        if count >= limit:
+            result["truncated"] = True
+
+        return result
 
     except Exception as e:
         # Let the decorator handle the exception and format it
+        raise e
+
+
+@tool(
+    category="filesystem",
+    priority=Priority.HIGH,  # Very useful for file discovery
+    access_mode=AccessMode.READONLY,  # Only searches files
+    danger_level=DangerLevel.SAFE,  # No side effects
+    keywords=[
+        "find",
+        "search",
+        "locate",
+        "where",
+        "which",
+        "discover",
+        "lookup",
+    ],
+    use_cases=[
+        "finding files by name pattern",
+        "locating a specific file",
+        "discovering where a file exists",
+        "searching for files recursively",
+    ],
+    examples=[
+        "find tool_executor.py",
+        "where is the config file",
+        "locate all test files",
+        "find files named *_tool.py",
+    ],
+)
+async def find(
+    name: str,
+    path: str = ".",
+    type: str = "all",
+    limit: int = 50,
+) -> List[Dict[str, Any]]:
+    """Find files by name pattern (like Unix find -name).
+
+    Searches recursively through the directory tree to locate files
+    matching the given name pattern. Supports glob patterns.
+
+    Args:
+        name: File name pattern to find (supports glob: *.py, *test*, tool_*.py)
+        path: Root directory to search from (default: current directory)
+        type: Filter by type: 'file', 'dir', or 'all' (default: all)
+        limit: Maximum results to return (default: 50)
+
+    Returns:
+        List of matching files with path, type, and size.
+
+    Examples:
+        find("tool_executor.py")  # Find exact filename anywhere
+        find("*_tool.py")         # Find files ending in _tool.py
+        find("test*", type="dir") # Find directories starting with 'test'
+    """
+    import fnmatch
+
+    try:
+        base_path = Path(path).expanduser().resolve()
+
+        if not base_path.exists():
+            raise FileNotFoundError(f"Path not found: {path}")
+
+        results = []
+        count = 0
+
+        # Walk the directory tree
+        for root, dirs, files in base_path.walk():
+            # Skip hidden and common excluded directories
+            dirs[:] = [
+                d
+                for d in dirs
+                if not d.startswith(".")
+                and d not in {"node_modules", "__pycache__", "venv", ".venv", "build", "dist"}
+            ]
+
+            # Check directories if type allows
+            if type in ("all", "dir"):
+                for d in dirs:
+                    if fnmatch.fnmatch(d, name) or fnmatch.fnmatch(d.lower(), name.lower()):
+                        dir_path = root / d
+                        results.append(
+                            {
+                                "path": str(dir_path.relative_to(base_path)),
+                                "type": "directory",
+                                "size": 0,
+                            }
+                        )
+                        count += 1
+                        if count >= limit:
+                            break
+
+            # Check files if type allows
+            if type in ("all", "file") and count < limit:
+                for f in files:
+                    if fnmatch.fnmatch(f, name) or fnmatch.fnmatch(f.lower(), name.lower()):
+                        file_path = root / f
+                        try:
+                            size = file_path.stat().st_size
+                        except OSError:
+                            size = 0
+                        results.append(
+                            {
+                                "path": str(file_path.relative_to(base_path)),
+                                "type": "file",
+                                "size": size,
+                            }
+                        )
+                        count += 1
+                        if count >= limit:
+                            break
+
+            if count >= limit:
+                break
+
+        if not results:
+            return [
+                {
+                    "message": f"No files matching '{name}' found in {path}",
+                    "suggestion": "Try a broader pattern like '*{name}*' or search from project root with path='.'",
+                }
+            ]
+
+        return results
+
+    except Exception as e:
         raise e
 
 
@@ -1224,7 +1759,7 @@ IMPORTANT_DOC_PATTERNS = [
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["path", "max_depth"],  # Params indicating exploration progress
-    stages=["initial"],  # Best used at start of conversation
+    stages=["initial", "planning", "reading", "analysis"],  # Best used at start of conversation
     task_types=["analysis", "search"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
@@ -1277,7 +1812,13 @@ async def overview(
         if not root.exists():
             raise FileNotFoundError(f"Directory not found: {path}")
         if not root.is_dir():
-            raise NotADirectoryError(f"Path is not a directory: {path}")
+            # GAP-14 FIX: If a file path is given, use its parent directory
+            # This is a common model mistake - be helpful and auto-correct
+            parent = root.parent
+            if parent.is_dir():
+                root = parent
+            else:
+                raise NotADirectoryError(f"Path is not a directory: {path}. Use the parent directory or a directory path.")
 
         # Excluded directories
         exclude_dirs = {
@@ -1409,5 +1950,3 @@ async def overview(
 
     except Exception as e:
         raise e
-
-

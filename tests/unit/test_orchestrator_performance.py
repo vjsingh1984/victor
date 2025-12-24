@@ -35,7 +35,7 @@ async def test_embedding_preloading_reduces_latency():
     )
 
     with patch(
-        "victor.agent.orchestrator.SemanticToolSelector", return_value=mock_selector_instance
+        "victor.tools.semantic_selector.SemanticToolSelector", return_value=mock_selector_instance
     ):
         settings = Settings(use_semantic_tool_selection=True, embedding_model="test-model")
         mock_provider = MagicMock()

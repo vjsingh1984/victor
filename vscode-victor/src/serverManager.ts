@@ -3,12 +3,19 @@
  *
  * Handles automatic spawning, lifecycle management, and health monitoring
  * of the Victor Python backend server.
+ *
+ * Phase 3 Optimizations:
+ * - Server discovery: Detect existing servers on multiple ports
+ * - Port fallback: Try alternate ports if primary is occupied
+ * - Exponential backoff: Improved reconnection with backoff strategy
+ * - Multi-window sharing: PID file for server coordination across VS Code windows
  */
 
 import * as vscode from 'vscode';
 import * as cp from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 
 export interface ServerConfig {
     host: string;
@@ -16,14 +23,36 @@ export interface ServerConfig {
     autoStart: boolean;
     pythonPath?: string;
     victorPath?: string;
+    backend?: 'aiohttp' | 'fastapi';
+    fallbackPorts?: number[];
 }
 
 export enum ServerStatus {
     Stopped = 'stopped',
     Starting = 'starting',
     Running = 'running',
+    Reconnecting = 'reconnecting',
     Error = 'error'
 }
+
+interface ServerPidFile {
+    pid: number;
+    port: number;
+    host: string;
+    startTime: number;
+    workspacePath?: string;
+}
+
+// Exponential backoff configuration
+const BACKOFF_CONFIG = {
+    initialDelayMs: 100,
+    maxDelayMs: 30000,
+    multiplier: 2,
+    maxRetries: 10
+};
+
+// Fallback ports to try
+const DEFAULT_FALLBACK_PORTS = [8765, 8766, 8767, 8768, 8000];
 
 export class ServerManager {
     private serverProcess: cp.ChildProcess | null = null;
@@ -32,10 +61,19 @@ export class ServerManager {
     private config: ServerConfig;
     private outputChannel: vscode.OutputChannel;
     private healthCheckInterval: NodeJS.Timeout | null = null;
+    private reconnectAttempt: number = 0;
+    private activePort: number;
+    private isExternalServer: boolean = false;
+    private pidFilePath: string;
 
     constructor(config: ServerConfig) {
-        this.config = config;
+        this.config = {
+            ...config,
+            fallbackPorts: config.fallbackPorts || DEFAULT_FALLBACK_PORTS
+        };
+        this.activePort = config.port;
         this.outputChannel = vscode.window.createOutputChannel('Victor Server');
+        this.pidFilePath = path.join(os.homedir(), '.victor', 'server.pid');
     }
 
     /**
@@ -43,6 +81,20 @@ export class ServerManager {
      */
     getStatus(): ServerStatus {
         return this.status;
+    }
+
+    /**
+     * Get the active port (may differ from config if fallback was used)
+     */
+    getActivePort(): number {
+        return this.activePort;
+    }
+
+    /**
+     * Check if connected to an external (not self-spawned) server
+     */
+    isExternal(): boolean {
+        return this.isExternalServer;
     }
 
     /**
@@ -56,15 +108,16 @@ export class ServerManager {
      * Get the server URL
      */
     getServerUrl(): string {
-        return `http://${this.config.host}:${this.config.port}`;
+        return `http://${this.config.host}:${this.activePort}`;
     }
 
     /**
      * Check if server is running by hitting health endpoint
      */
-    async checkHealth(): Promise<boolean> {
+    async checkHealth(port?: number): Promise<boolean> {
+        const targetPort = port || this.activePort;
         try {
-            const response = await fetch(`${this.getServerUrl()}/health`, {
+            const response = await fetch(`http://${this.config.host}:${targetPort}/health`, {
                 method: 'GET',
                 signal: AbortSignal.timeout(2000)
             });
@@ -75,18 +128,121 @@ export class ServerManager {
     }
 
     /**
-     * Start the server
+     * Discover an existing running server
+     * Checks configured port and fallback ports
+     */
+    async discoverExistingServer(): Promise<number | null> {
+        const portsToCheck = [this.config.port, ...(this.config.fallbackPorts || [])];
+        const uniquePorts = [...new Set(portsToCheck)];
+
+        this.log(`Discovering existing servers on ports: ${uniquePorts.join(', ')}`);
+
+        // First check PID file for existing server
+        const pidInfo = this.readPidFile();
+        if (pidInfo && await this.checkHealth(pidInfo.port)) {
+            this.log(`Found existing server from PID file on port ${pidInfo.port}`);
+            return pidInfo.port;
+        }
+
+        // Check each port in parallel
+        const checks = uniquePorts.map(async (port) => {
+            const healthy = await this.checkHealth(port);
+            return { port, healthy };
+        });
+
+        const results = await Promise.all(checks);
+        const runningServer = results.find(r => r.healthy);
+
+        if (runningServer) {
+            this.log(`Discovered existing server on port ${runningServer.port}`);
+            return runningServer.port;
+        }
+
+        return null;
+    }
+
+    /**
+     * Find an available port from fallback list
+     */
+    async findAvailablePort(): Promise<number | null> {
+        const portsToCheck = [this.config.port, ...(this.config.fallbackPorts || [])];
+        const uniquePorts = [...new Set(portsToCheck)];
+
+        for (const port of uniquePorts) {
+            const inUse = await this.isPortInUse(port);
+            if (!inUse) {
+                return port;
+            }
+            this.log(`Port ${port} is in use, trying next...`);
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if a port is in use
+     */
+    private async isPortInUse(port: number): Promise<boolean> {
+        return new Promise((resolve) => {
+            const net = require('net');
+            const server = net.createServer();
+
+            server.once('error', (err: NodeJS.ErrnoException) => {
+                if (err.code === 'EADDRINUSE') {
+                    resolve(true);
+                } else {
+                    resolve(false);
+                }
+            });
+
+            server.once('listening', () => {
+                server.close();
+                resolve(false);
+            });
+
+            server.listen(port, this.config.host);
+        });
+    }
+
+    /**
+     * Start or connect to server
+     * First tries to discover existing server, then spawns new one if needed
      */
     async start(): Promise<boolean> {
-        // First check if server is already running
-        if (await this.checkHealth()) {
+        // First, try to discover an existing server
+        const existingPort = await this.discoverExistingServer();
+        if (existingPort !== null) {
+            this.activePort = existingPort;
+            this.isExternalServer = true;
             this.setStatus(ServerStatus.Running);
-            this.log('Server already running');
+            this.log(`Connected to existing server on port ${existingPort}`);
+            this.startHealthCheck();
             return true;
         }
 
+        // No existing server, spawn a new one
+        this.isExternalServer = false;
+        return this.spawnServer();
+    }
+
+    /**
+     * Spawn a new server process
+     */
+    private async spawnServer(): Promise<boolean> {
+        // Find an available port
+        const availablePort = await this.findAvailablePort();
+        if (availablePort === null) {
+            this.setStatus(ServerStatus.Error);
+            this.log('ERROR: No available ports found');
+            vscode.window.showErrorMessage(
+                'Victor: No available ports. Please stop other servers or configure different ports.'
+            );
+            return false;
+        }
+
+        this.activePort = availablePort;
         this.setStatus(ServerStatus.Starting);
-        this.log('Starting Victor server...');
+        this.log(`Starting Victor server on port ${availablePort}...`);
 
         // Find the victor executable
         const victorCommand = await this.findVictorCommand();
@@ -105,9 +261,14 @@ export class ServerManager {
         const args = [
             'serve',
             '--host', this.config.host,
-            '--port', this.config.port.toString(),
+            '--port', availablePort.toString(),
             '--log-level', 'INFO'
         ];
+
+        // Add backend flag if configured
+        if (this.config.backend) {
+            args.push('--backend', this.config.backend);
+        }
 
         try {
             // Spawn the server process
@@ -119,6 +280,9 @@ export class ServerManager {
                 },
                 cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
             });
+
+            // Write PID file for multi-window coordination
+            this.writePidFile(availablePort);
 
             // Handle stdout
             this.serverProcess.stdout?.on('data', (data: Buffer) => {
@@ -134,6 +298,7 @@ export class ServerManager {
             this.serverProcess.on('exit', (code, signal) => {
                 this.log(`Server process exited (code: ${code}, signal: ${signal})`);
                 this.serverProcess = null;
+                this.removePidFile();
                 this.setStatus(ServerStatus.Stopped);
                 this.stopHealthCheck();
             });
@@ -148,7 +313,8 @@ export class ServerManager {
             const ready = await this.waitForServer(15000);
             if (ready) {
                 this.setStatus(ServerStatus.Running);
-                this.log('Server started successfully');
+                this.log(`Server started successfully on port ${availablePort}`);
+                this.reconnectAttempt = 0;
                 this.startHealthCheck();
                 return true;
             } else {
@@ -170,6 +336,13 @@ export class ServerManager {
      */
     async stop(): Promise<void> {
         this.stopHealthCheck();
+
+        // Don't stop external servers
+        if (this.isExternalServer) {
+            this.log('Disconnecting from external server (not stopping it)');
+            this.setStatus(ServerStatus.Stopped);
+            return;
+        }
 
         if (this.serverProcess) {
             this.log('Stopping Victor server...');
@@ -198,6 +371,7 @@ export class ServerManager {
             }
 
             this.serverProcess = null;
+            this.removePidFile();
         }
 
         this.setStatus(ServerStatus.Stopped);
@@ -210,6 +384,57 @@ export class ServerManager {
     async restart(): Promise<boolean> {
         await this.stop();
         return this.start();
+    }
+
+    /**
+     * Attempt reconnection with exponential backoff
+     */
+    private async attemptReconnect(): Promise<void> {
+        if (this.reconnectAttempt >= BACKOFF_CONFIG.maxRetries) {
+            this.log(`Max reconnection attempts (${BACKOFF_CONFIG.maxRetries}) reached`);
+            this.setStatus(ServerStatus.Error);
+            vscode.window.showWarningMessage(
+                'Victor server connection lost. Click to restart.',
+                'Restart Server'
+            ).then(selection => {
+                if (selection === 'Restart Server') {
+                    this.restart();
+                }
+            });
+            return;
+        }
+
+        this.reconnectAttempt++;
+        const delay = Math.min(
+            BACKOFF_CONFIG.initialDelayMs * Math.pow(BACKOFF_CONFIG.multiplier, this.reconnectAttempt - 1),
+            BACKOFF_CONFIG.maxDelayMs
+        );
+
+        this.log(`Reconnection attempt ${this.reconnectAttempt}/${BACKOFF_CONFIG.maxRetries} in ${delay}ms`);
+        this.setStatus(ServerStatus.Reconnecting);
+
+        await this.sleep(delay);
+
+        // Try to reconnect
+        if (await this.checkHealth()) {
+            this.log('Server reconnected');
+            this.setStatus(ServerStatus.Running);
+            this.reconnectAttempt = 0;
+        } else {
+            // If external server, try to discover another
+            if (this.isExternalServer) {
+                const newPort = await this.discoverExistingServer();
+                if (newPort !== null) {
+                    this.activePort = newPort;
+                    this.log(`Found server on new port ${newPort}`);
+                    this.setStatus(ServerStatus.Running);
+                    this.reconnectAttempt = 0;
+                    return;
+                }
+            }
+            // Continue retry loop
+            this.attemptReconnect();
+        }
     }
 
     /**
@@ -231,6 +456,7 @@ export class ServerManager {
                 // Ignore errors during cleanup
             }
             this.serverProcess = null;
+            this.removePidFile();
         }
 
         this.setStatus(ServerStatus.Stopped);
@@ -242,6 +468,53 @@ export class ServerManager {
      */
     showOutput(): void {
         this.outputChannel.show();
+    }
+
+    // --- PID File Management ---
+
+    private writePidFile(port: number): void {
+        try {
+            const pidDir = path.dirname(this.pidFilePath);
+            if (!fs.existsSync(pidDir)) {
+                fs.mkdirSync(pidDir, { recursive: true });
+            }
+
+            const pidInfo: ServerPidFile = {
+                pid: this.serverProcess?.pid || 0,
+                port: port,
+                host: this.config.host,
+                startTime: Date.now(),
+                workspacePath: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+            };
+
+            fs.writeFileSync(this.pidFilePath, JSON.stringify(pidInfo, null, 2));
+            this.log(`PID file written: ${this.pidFilePath}`);
+        } catch (error) {
+            this.log(`Warning: Could not write PID file: ${error}`);
+        }
+    }
+
+    private readPidFile(): ServerPidFile | null {
+        try {
+            if (fs.existsSync(this.pidFilePath)) {
+                const content = fs.readFileSync(this.pidFilePath, 'utf-8');
+                return JSON.parse(content);
+            }
+        } catch {
+            // Ignore read errors
+        }
+        return null;
+    }
+
+    private removePidFile(): void {
+        try {
+            if (fs.existsSync(this.pidFilePath)) {
+                fs.unlinkSync(this.pidFilePath);
+                this.log('PID file removed');
+            }
+        } catch {
+            // Ignore removal errors
+        }
     }
 
     // --- Private methods ---
@@ -265,6 +538,11 @@ export class ServerManager {
      * Tries: victor in PATH, python -m victor.ui.cli, bundled binary
      */
     private async findVictorCommand(): Promise<string | null> {
+        // Prefer configured or detected pythonPath first
+        if (this.config.pythonPath) {
+            return `${this.config.pythonPath} -m victor.ui.cli`;
+        }
+
         // 1. Check if victor is in PATH
         if (await this.commandExists('victor')) {
             return 'victor';
@@ -284,7 +562,7 @@ export class ServerManager {
         if (await this.commandExists('python3')) {
             // Verify victor module is installed
             try {
-                const result = cp.execSync('python3 -c "import victor"', { timeout: 5000 });
+                cp.execSync('python3 -c "import victor"', { timeout: 5000 });
                 return 'python3 -m victor.ui.cli';
             } catch {
                 // Victor not installed
@@ -294,7 +572,7 @@ export class ServerManager {
         // 5. Try python -m victor.ui.cli
         if (await this.commandExists('python')) {
             try {
-                const result = cp.execSync('python -c "import victor"', { timeout: 5000 });
+                cp.execSync('python -c "import victor"', { timeout: 5000 });
                 return 'python -m victor.ui.cli';
             } catch {
                 // Victor not installed
@@ -340,18 +618,19 @@ export class ServerManager {
     }
 
     /**
-     * Start periodic health checks
+     * Start periodic health checks with exponential backoff on failure
      */
     private startHealthCheck(): void {
         this.stopHealthCheck();
         this.healthCheckInterval = setInterval(async () => {
             const healthy = await this.checkHealth();
             if (!healthy && this.status === ServerStatus.Running) {
-                this.log('WARNING: Health check failed');
-                this.setStatus(ServerStatus.Error);
-            } else if (healthy && this.status === ServerStatus.Error) {
-                this.log('Server recovered');
+                this.log('WARNING: Health check failed, attempting reconnection...');
+                this.attemptReconnect();
+            } else if (healthy && this.status === ServerStatus.Reconnecting) {
+                this.log('Server recovered during health check');
                 this.setStatus(ServerStatus.Running);
+                this.reconnectAttempt = 0;
             }
         }, 30000); // Check every 30 seconds
     }
@@ -377,11 +656,42 @@ export class ServerManager {
 export function createServerManager(): ServerManager {
     const config = vscode.workspace.getConfiguration('victor');
 
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const detectedPython = detectWorkspacePython(workspacePath);
+    const configuredPython = config.get<string>('pythonPath') || undefined;
+    const pythonPath = configuredPython || detectedPython;
+
+    // Get backend preference (default to aiohttp for backward compatibility)
+    const backend = config.get<'aiohttp' | 'fastapi'>('serverBackend', 'aiohttp');
+
     return new ServerManager({
         host: '127.0.0.1',
         port: config.get('serverPort', 8765),
-        autoStart: config.get('autoStart', true),
-        pythonPath: config.get('pythonPath'),
-        victorPath: config.get('victorPath')
+        autoStart: config.get('autoStart', false),
+        pythonPath,
+        victorPath: config.get('victorPath'),
+        backend,
+        fallbackPorts: config.get('fallbackPorts', DEFAULT_FALLBACK_PORTS)
     });
+}
+
+/**
+ * Detect a workspace-local Python (common venv layouts)
+ */
+function detectWorkspacePython(workspacePath?: string): string | undefined {
+    if (!workspacePath) return undefined;
+
+    const candidates = [
+        path.join(workspacePath, 'venv', 'bin', 'python'),
+        path.join(workspacePath, '.venv', 'bin', 'python'),
+        path.join(workspacePath, 'venv', 'Scripts', 'python.exe'),
+        path.join(workspacePath, '.venv', 'Scripts', 'python.exe'),
+    ];
+
+    for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+            return candidate;
+        }
+    }
+    return undefined;
 }

@@ -64,11 +64,11 @@ class TestExtractToolCapablePatterns:
     """Tests for _extract_tool_capable_patterns function."""
 
     def test_extracts_provider_level_patterns(self):
-        """Should extract patterns from provider-level native_tool_calls."""
+        """Should extract patterns from provider_defaults-level native_tool_calls."""
         from victor.config.model_capabilities import _extract_tool_capable_patterns
 
         data = {
-            "providers": {
+            "provider_defaults": {
                 "anthropic": {"native_tool_calls": True},
                 "openai": {"native_tool_calls": True},
             }
@@ -80,13 +80,23 @@ class TestExtractToolCapablePatterns:
         assert "*" in result.get("openai", [])
 
     def test_extracts_model_level_patterns(self):
-        """Should extract patterns from model-level native_tool_calls."""
+        """Should extract patterns from model-level providers.<provider>.native_tool_calls."""
         from victor.config.model_capabilities import _extract_tool_capable_patterns
 
         data = {
             "models": {
-                "llama3.1*": {"native_tool_calls": True},
-                "qwen2.5*": {"native_tool_calls": True},
+                "llama3.1*": {
+                    "providers": {
+                        "ollama": {"native_tool_calls": True},
+                        "lmstudio": {"native_tool_calls": True},
+                        "vllm": {"native_tool_calls": True},
+                    }
+                },
+                "qwen2.5*": {
+                    "providers": {
+                        "ollama": {"native_tool_calls": True},
+                    }
+                },
             }
         }
         result = {}
@@ -103,8 +113,16 @@ class TestExtractToolCapablePatterns:
 
         data = {
             "models": {
-                "llama3.1*": {"native_tool_calls": True},
-                "old-model*": {"native_tool_calls": False},
+                "llama3.1*": {
+                    "providers": {
+                        "ollama": {"native_tool_calls": True},
+                    }
+                },
+                "old-model*": {
+                    "providers": {
+                        "ollama": {"native_tool_calls": False},
+                    }
+                },
             }
         }
         result = {}
@@ -118,7 +136,7 @@ class TestExtractToolCapablePatterns:
         from victor.config.model_capabilities import _extract_tool_capable_patterns
 
         data = {
-            "providers": {
+            "provider_defaults": {
                 "test_provider": "not a dict",
             },
             "models": {

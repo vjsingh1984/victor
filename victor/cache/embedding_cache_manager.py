@@ -360,7 +360,11 @@ class EmbeddingCacheManager:
                         result.cleared_files += file_count
                         result.cleared_size += total_size
                         if progress_callback:
-                            size_str = f"{total_size / 1024:.1f} KB" if total_size >= 1024 else f"{total_size} B"
+                            size_str = (
+                                f"{total_size / 1024:.1f} KB"
+                                if total_size >= 1024
+                                else f"{total_size} B"
+                            )
                             progress_callback(f"  {cat['name']}: {file_count} files ({size_str})")
                     else:
                         if progress_callback:
@@ -378,7 +382,11 @@ class EmbeddingCacheManager:
                         result.cleared_files += file_count
                         result.cleared_size += total_size
                         if progress_callback:
-                            size_str = f"{total_size / 1024:.1f} KB" if total_size >= 1024 else f"{total_size} B"
+                            size_str = (
+                                f"{total_size / 1024:.1f} KB"
+                                if total_size >= 1024
+                                else f"{total_size} B"
+                            )
                             progress_callback(f"  {cat['name']}: {file_count} files ({size_str})")
                     else:
                         if progress_callback:

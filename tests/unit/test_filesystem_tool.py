@@ -29,6 +29,12 @@ from victor.tools.filesystem import (
     FileTypeInfo,
     register_binary_handler,
     get_binary_handler,
+    # File content cache (P3-2)
+    FileContentCache,
+    get_file_content_cache,
+    clear_file_content_cache,
+    set_file_cache_enabled,
+    is_file_cache_enabled,
 )
 
 
@@ -174,14 +180,21 @@ async def test_list_directory_success():
         # depth=1 returns immediate children with "name" key
         result = await ls(path=tmpdir, depth=1)
 
-        assert len(result) == 3
-        names = [item["name"] for item in result]
+        # Result is now a dict with cwd, target, items, count
+        assert "cwd" in result
+        assert "target" in result
+        assert "items" in result
+        assert "count" in result
+        assert result["count"] == 3
+
+        items = result["items"]
+        names = [item["name"] for item in items]
         assert "file1.txt" in names
         assert "file2.txt" in names
         assert "subdir" in names
 
         # Check types
-        types = {item["name"]: item["type"] for item in result}
+        types = {item["name"]: item["type"] for item in items}
         assert types["file1.txt"] == "file"
         assert types["file2.txt"] == "file"
         assert types["subdir"] == "directory"
@@ -189,7 +202,7 @@ async def test_list_directory_success():
 
 @pytest.mark.asyncio
 async def test_list_directory_default_depth():
-    """Test listing directory with default depth=1 returns immediate children."""
+    """Test listing directory with default depth=2 returns immediate children and one level nested."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create nested structure
         file1 = os.path.join(tmpdir, "file1.txt")
@@ -202,13 +215,19 @@ async def test_list_directory_default_depth():
         with open(nested_file, "w") as f:
             f.write("nested")
 
-        # Default depth=1 returns only immediate children with "name" key
+        # Default depth=2 returns immediate children AND one level nested
         result = await ls(path=tmpdir)
 
-        assert len(result) == 2  # file1.txt, subdir (not nested.txt)
-        names = [item["name"] for item in result]
-        assert "file1.txt" in names
-        assert "subdir" in names
+        # Result is now a dict with items
+        assert "items" in result
+        items = result["items"]
+        # With depth=2: file1.txt, subdir, subdir/nested.txt
+        assert len(items) == 3
+        paths = [item.get("path", item.get("name")) for item in items]
+        assert "file1.txt" in paths
+        assert "subdir" in paths
+        # nested.txt should be included at depth=2
+        assert any("nested.txt" in p for p in paths)
 
 
 @pytest.mark.asyncio
@@ -228,8 +247,11 @@ async def test_list_directory_recursive():
 
         result = await ls(path=tmpdir, recursive=True)
 
-        assert len(result) == 3  # subdir, file1.txt, subdir/file2.txt
-        paths = [item["path"] for item in result]
+        # Result is now a dict with items
+        assert "items" in result
+        items = result["items"]
+        assert len(items) == 3  # subdir, file1.txt, subdir/file2.txt
+        paths = [item["path"] for item in items]
         assert "subdir" in paths
         assert "file1.txt" in paths
         assert os.path.join("subdir", "file2.txt") in paths or "subdir/file2.txt" in paths
@@ -262,7 +284,10 @@ async def test_list_directory_empty():
     with tempfile.TemporaryDirectory() as tmpdir:
         result = await ls(path=tmpdir)
 
-        assert result == []
+        # Result is now a dict with items
+        assert "items" in result
+        assert result["items"] == []
+        assert result["count"] == 0
 
 
 @pytest.mark.asyncio
@@ -624,3 +649,267 @@ async def test_read_file_allows_text_with_no_magic():
         assert content == "This is plain text content"
 
         os.unlink(f.name)
+
+
+# ============================================================================
+# FILE CONTENT CACHE TESTS (P3-2)
+# ============================================================================
+
+
+class TestFileContentCache:
+    """Tests for session-level file content cache."""
+
+    def test_cache_set_and_get(self):
+        """Test basic cache set and get operations."""
+        cache = FileContentCache(max_entries=10)
+
+        # Create a temp file
+        with tempfile.NamedTemporaryFile(delete=False, mode="w") as f:
+            f.write("test content")
+            temp_path = f.name
+
+        try:
+            mtime = os.path.getmtime(temp_path)
+            size = os.path.getsize(temp_path)
+
+            # Set in cache
+            cache.set(temp_path, "test content", mtime, size)
+
+            # Get from cache
+            result = cache.get(temp_path)
+            assert result == "test content"
+
+            # Stats should show 1 hit
+            stats = cache.get_stats()
+            assert stats["hits"] == 1
+        finally:
+            os.unlink(temp_path)
+
+    def test_cache_miss_on_empty(self):
+        """Test cache miss returns None."""
+        cache = FileContentCache()
+        result = cache.get("/nonexistent/path.txt")
+        assert result is None
+
+        stats = cache.get_stats()
+        assert stats["misses"] == 1
+
+    def test_cache_invalidate_on_mtime_change(self):
+        """Test cache invalidates when file mtime changes."""
+        import time
+        cache = FileContentCache()
+
+        with tempfile.NamedTemporaryFile(delete=False, mode="w") as f:
+            f.write("original content")
+            temp_path = f.name
+
+        try:
+            mtime = os.path.getmtime(temp_path)
+            size = os.path.getsize(temp_path)
+
+            cache.set(temp_path, "original content", mtime, size)
+
+            # Modify file
+            time.sleep(0.1)  # Ensure mtime changes
+            with open(temp_path, "w") as f:
+                f.write("modified content")
+
+            # Cache should return None (mtime changed)
+            result = cache.get(temp_path)
+            assert result is None
+        finally:
+            os.unlink(temp_path)
+
+    def test_cache_invalidate_explicit(self):
+        """Test explicit cache invalidation."""
+        cache = FileContentCache()
+
+        with tempfile.NamedTemporaryFile(delete=False, mode="w") as f:
+            f.write("content")
+            temp_path = f.name
+
+        try:
+            mtime = os.path.getmtime(temp_path)
+            size = os.path.getsize(temp_path)
+
+            cache.set(temp_path, "content", mtime, size)
+            assert cache.get(temp_path) == "content"
+
+            # Invalidate
+            cache.invalidate(temp_path)
+
+            # Should miss now
+            assert cache.get(temp_path) is None
+
+            stats = cache.get_stats()
+            assert stats["invalidations"] == 1
+        finally:
+            os.unlink(temp_path)
+
+    def test_cache_clear(self):
+        """Test cache clear removes all entries."""
+        cache = FileContentCache()
+
+        with tempfile.NamedTemporaryFile(delete=False, mode="w") as f:
+            f.write("content")
+            temp_path = f.name
+
+        try:
+            mtime = os.path.getmtime(temp_path)
+            size = os.path.getsize(temp_path)
+
+            cache.set(temp_path, "content", mtime, size)
+            assert len(cache) == 1
+
+            cache.clear()
+            assert len(cache) == 0
+        finally:
+            os.unlink(temp_path)
+
+    def test_cache_lru_eviction(self):
+        """Test LRU eviction when max_entries exceeded."""
+        cache = FileContentCache(max_entries=2)
+
+        # Create 3 temp files
+        temp_files = []
+        for i in range(3):
+            with tempfile.NamedTemporaryFile(delete=False, mode="w") as f:
+                f.write(f"content {i}")
+                temp_files.append(f.name)
+
+        try:
+            # Cache files 0 and 1
+            for i in range(2):
+                mtime = os.path.getmtime(temp_files[i])
+                size = os.path.getsize(temp_files[i])
+                cache.set(temp_files[i], f"content {i}", mtime, size)
+
+            assert len(cache) == 2
+
+            # Cache file 2 - should evict file 0 (LRU)
+            mtime = os.path.getmtime(temp_files[2])
+            size = os.path.getsize(temp_files[2])
+            cache.set(temp_files[2], "content 2", mtime, size)
+
+            assert len(cache) == 2
+
+            # File 0 should be evicted
+            assert cache.get(temp_files[0]) is None
+            # Files 1 and 2 should still be cached
+            assert cache.get(temp_files[1]) == "content 1"
+            assert cache.get(temp_files[2]) == "content 2"
+        finally:
+            for temp_path in temp_files:
+                os.unlink(temp_path)
+
+    def test_cache_stats(self):
+        """Test cache statistics tracking."""
+        cache = FileContentCache()
+
+        with tempfile.NamedTemporaryFile(delete=False, mode="w") as f:
+            f.write("content")
+            temp_path = f.name
+
+        try:
+            mtime = os.path.getmtime(temp_path)
+            size = os.path.getsize(temp_path)
+
+            # Miss
+            cache.get(temp_path)
+
+            # Set
+            cache.set(temp_path, "content", mtime, size)
+
+            # Hits
+            cache.get(temp_path)
+            cache.get(temp_path)
+
+            stats = cache.get_stats()
+            assert stats["hits"] == 2
+            assert stats["misses"] == 1
+            assert stats["entries"] == 1
+            assert stats["total_bytes_cached"] == size
+            assert stats["total_bytes_saved"] == size * 2
+        finally:
+            os.unlink(temp_path)
+
+
+class TestFileCacheIntegration:
+    """Integration tests for file cache with read/write functions."""
+
+    @pytest.fixture(autouse=True)
+    def setup_cache(self):
+        """Ensure cache is enabled and cleared before each test."""
+        set_file_cache_enabled(True)
+        clear_file_content_cache()
+        yield
+        clear_file_content_cache()
+
+    @pytest.mark.asyncio
+    async def test_read_caches_content(self):
+        """Test that read() caches file content."""
+        with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".py") as f:
+            f.write("print('hello')")
+            temp_path = f.name
+
+        try:
+            # First read - cache miss
+            content1 = await read(path=temp_path)
+            assert content1 == "print('hello')"
+
+            cache = get_file_content_cache()
+            stats = cache.get_stats()
+            assert stats["misses"] == 1
+
+            # Second read - cache hit
+            content2 = await read(path=temp_path)
+            assert content2 == "print('hello')"
+
+            stats = cache.get_stats()
+            assert stats["hits"] == 1
+        finally:
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_write_invalidates_cache(self):
+        """Test that write() invalidates file cache."""
+        with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".py") as f:
+            f.write("original")
+            temp_path = f.name
+
+        try:
+            # Read to populate cache
+            content1 = await read(path=temp_path)
+            assert content1 == "original"
+
+            # Write new content
+            await write(path=temp_path, content="updated")
+
+            # Read should get fresh content
+            content2 = await read(path=temp_path)
+            assert content2 == "updated"
+        finally:
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_cache_disabled(self):
+        """Test that cache can be disabled."""
+        with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".py") as f:
+            f.write("content")
+            temp_path = f.name
+
+        try:
+            set_file_cache_enabled(False)
+
+            # Read should work but not cache
+            content = await read(path=temp_path)
+            assert content == "content"
+
+            # Cache should be empty
+            cache = get_file_content_cache()
+            stats = cache.get_stats()
+            # When disabled, stats shouldn't change
+            assert len(cache) == 0
+        finally:
+            set_file_cache_enabled(True)  # Restore
+            os.unlink(temp_path)

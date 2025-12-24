@@ -363,8 +363,9 @@ class TestRunGit:
         """Test _run_git exception handling."""
         from victor.tools.git_tool import _run_git
 
-        with patch("subprocess.run") as mock:
-            mock.side_effect = Exception("unexpected error")
+        with patch("victor.tools.git_tool.subprocess.run") as mock:
+            # _run_git catches OSError and ValueError
+            mock.side_effect = OSError("unexpected error")
             success, stdout, stderr = _run_git("status")
             assert success is False
             assert "unexpected error" in stderr
@@ -471,7 +472,8 @@ class TestGitSuggestCommit:
         from unittest.mock import MagicMock
 
         mock_provider = MagicMock()
-        mock_provider.complete = AsyncMock(side_effect=Exception("LLM error"))
+        # commit_msg catches (AttributeError, ValueError)
+        mock_provider.complete = AsyncMock(side_effect=ValueError("LLM error"))
         set_git_provider(mock_provider, "test-model")
 
         with patch("victor.tools.git_tool._run_git") as mock:

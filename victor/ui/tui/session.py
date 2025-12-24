@@ -1,0 +1,286 @@
+"""Session persistence for Victor TUI.
+
+Provides auto-save/restore functionality for conversations,
+allowing users to resume where they left off.
+"""
+
+from __future__ import annotations
+
+import json
+import sqlite3
+import uuid
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Optional
+
+
+@dataclass
+class Message:
+    """A single message in a conversation."""
+
+    role: str  # user, assistant, system, error
+    content: str
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    metadata: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for serialization."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Message":
+        """Create from dictionary."""
+        return cls(
+            role=data["role"],
+            content=data["content"],
+            timestamp=data.get("timestamp", datetime.now().isoformat()),
+            metadata=data.get("metadata", {}),
+        )
+
+
+@dataclass
+class Session:
+    """A conversation session."""
+
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = ""
+    provider: str = ""
+    model: str = ""
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    messages: list[Message] = field(default_factory=list)
+    metadata: dict = field(default_factory=dict)
+
+    def add_message(self, role: str, content: str, **metadata) -> Message:
+        """Add a message to the session."""
+        msg = Message(role=role, content=content, metadata=metadata)
+        self.messages.append(msg)
+        self.updated_at = datetime.now().isoformat()
+        return msg
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for serialization."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "provider": self.provider,
+            "model": self.model,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "messages": [m.to_dict() for m in self.messages],
+            "metadata": self.metadata,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Session":
+        """Create from dictionary."""
+        return cls(
+            id=data.get("id", str(uuid.uuid4())),
+            name=data.get("name", ""),
+            provider=data.get("provider", ""),
+            model=data.get("model", ""),
+            created_at=data.get("created_at", datetime.now().isoformat()),
+            updated_at=data.get("updated_at", datetime.now().isoformat()),
+            messages=[Message.from_dict(m) for m in data.get("messages", [])],
+            metadata=data.get("metadata", {}),
+        )
+
+    def to_markdown(self) -> str:
+        """Export session to markdown format."""
+        lines = [
+            f"# Victor Session: {self.name or self.id[:8]}",
+            "",
+            f"**Provider**: {self.provider}",
+            f"**Model**: {self.model}",
+            f"**Created**: {self.created_at}",
+            f"**Updated**: {self.updated_at}",
+            "",
+            "---",
+            "",
+        ]
+
+        for msg in self.messages:
+            role_display = {
+                "user": "You",
+                "assistant": "Victor",
+                "system": "System",
+                "error": "Error",
+            }.get(msg.role, msg.role.title())
+
+            lines.append(f"### {role_display}")
+            lines.append("")
+            lines.append(msg.content)
+            lines.append("")
+
+        return "\n".join(lines)
+
+
+class SessionManager:
+    """Manages session persistence using SQLite."""
+
+    def __init__(self, db_path: Optional[Path] = None):
+        """Initialize session manager.
+
+        Args:
+            db_path: Path to SQLite database. Defaults to ~/.victor/sessions.db
+        """
+        if db_path is None:
+            db_path = Path.home() / ".victor" / "sessions.db"
+
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.db_path = db_path
+        self._init_db()
+
+    def _init_db(self) -> None:
+        """Initialize database schema."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    provider TEXT,
+                    model TEXT,
+                    created_at TEXT,
+                    updated_at TEXT,
+                    data TEXT
+                )
+            """
+            )
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_sessions_updated
+                ON sessions(updated_at DESC)
+            """
+            )
+            conn.commit()
+
+    def save(self, session: Session) -> None:
+        """Save or update a session."""
+        session.updated_at = datetime.now().isoformat()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO sessions
+                (id, name, provider, model, created_at, updated_at, data)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    session.id,
+                    session.name,
+                    session.provider,
+                    session.model,
+                    session.created_at,
+                    session.updated_at,
+                    json.dumps(session.to_dict()),
+                ),
+            )
+            conn.commit()
+
+    def load(self, session_id: str) -> Optional[Session]:
+        """Load a session by ID."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                "SELECT data FROM sessions WHERE id = ?",
+                (session_id,),
+            )
+            row = cursor.fetchone()
+            if row:
+                return Session.from_dict(json.loads(row[0]))
+        return None
+
+    def get_latest(self) -> Optional[Session]:
+        """Get the most recently updated session."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("SELECT data FROM sessions ORDER BY updated_at DESC LIMIT 1")
+            row = cursor.fetchone()
+            if row:
+                return Session.from_dict(json.loads(row[0]))
+        return None
+
+    def list_sessions(self, limit: int = 20) -> list[dict[str, Any]]:
+        """List recent sessions (metadata only, not full messages).
+
+        Returns:
+            List of session metadata dicts with id, name, provider, model,
+            created_at, updated_at, and message_count.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT id, name, provider, model, created_at, updated_at, data
+                FROM sessions
+                ORDER BY updated_at DESC
+                LIMIT ?
+            """,
+                (limit,),
+            )
+            sessions = []
+            for row in cursor:
+                data = json.loads(row[6])
+                sessions.append(
+                    {
+                        "id": row[0],
+                        "name": row[1] or f"Session {row[0][:8]}",
+                        "provider": row[2],
+                        "model": row[3],
+                        "created_at": row[4],
+                        "updated_at": row[5],
+                        "message_count": len(data.get("messages", [])),
+                    }
+                )
+            return sessions
+
+    def delete(self, session_id: str) -> bool:
+        """Delete a session by ID.
+
+        Returns:
+            True if session was deleted, False if not found.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                "DELETE FROM sessions WHERE id = ?",
+                (session_id,),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def export_markdown(self, session_id: str, output_path: Path) -> bool:
+        """Export a session to markdown file.
+
+        Args:
+            session_id: Session ID to export
+            output_path: Path to write markdown file
+
+        Returns:
+            True if exported successfully, False if session not found.
+        """
+        session = self.load(session_id)
+        if not session:
+            return False
+
+        output_path.write_text(session.to_markdown())
+        return True
+
+    def create_session(
+        self,
+        provider: str = "",
+        model: str = "",
+        name: str = "",
+    ) -> Session:
+        """Create a new session.
+
+        Args:
+            provider: Provider name
+            model: Model name
+            name: Optional session name
+
+        Returns:
+            New Session instance (not yet saved)
+        """
+        return Session(
+            name=name,
+            provider=provider,
+            model=model,
+        )

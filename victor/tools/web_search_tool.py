@@ -60,10 +60,20 @@ def set_web_tool_defaults(
 def set_web_search_provider(provider, model: Optional[str] = None) -> None:
     """Set the global provider and model for web search AI summarization.
 
+    DEPRECATED: Use ToolConfig via executor context instead.
+    This function will be removed in v2.0.
+
     Args:
         provider: LLM provider instance for summarization
         model: Model identifier to use for summarization
     """
+    import warnings
+
+    warnings.warn(
+        "set_web_search_provider() is deprecated. Use ToolConfig via executor.update_context() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     global _provider, _model
     _provider = provider
     _model = model
@@ -175,13 +185,24 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
     danger_level=DangerLevel.SAFE,  # No local side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["query"],  # Different queries indicate progress, not loops
-    stages=["research"],  # Conversation stages where relevant
+    stages=["planning", "initial"],  # Conversation stages where relevant
     task_types=["research", "analysis"],  # Task types for classification-aware selection
     execution_category="network",  # Can run in parallel with read-only ops
-    keywords=["search", "web", "internet", "lookup", "find online", "google", "duckduckgo", "summarize"],
-    mandatory_keywords=["search web", "search online", "look up online"],  # Force inclusion
+    keywords=[
+        "search",
+        "web",
+        "internet",
+        "lookup",
+        "find online",
+        "google",
+        "duckduckgo",
+        "summarize",
+        "web search",
+    ],
+    mandatory_keywords=["search web", "search online", "look up online", "web search"],  # Force inclusion
+    aliases=["web"],  # Backward compatibility alias
 )
-async def web(
+async def web_search(
     query: str,
     max_results: int = 5,
     region: str = "wt-wt",
@@ -279,12 +300,13 @@ async def web(
     danger_level=DangerLevel.SAFE,  # No local side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["url"],  # Different URLs indicate progress, not loops
-    stages=["research"],  # Conversation stages where relevant
+    stages=["planning", "initial"],  # Conversation stages where relevant
     task_types=["research", "analysis"],  # Task types for classification-aware selection
     execution_category="network",  # Can run in parallel with read-only ops
-    keywords=["fetch", "url", "webpage", "download", "http", "content"],
+    keywords=["fetch", "url", "webpage", "download", "http", "content", "web fetch"],
+    aliases=["fetch"],  # Backward compatibility alias
 )
-async def fetch(url: str) -> Dict[str, Any]:
+async def web_fetch(url: str) -> Dict[str, Any]:
     """Fetch and extract main text content from a URL.
 
     Args:
@@ -405,7 +427,7 @@ async def _summarize_search(
             url = result.get("url")
             if not url:
                 continue
-            fetch_res = await fetch(url=url)
+            fetch_res = await web_fetch(url=url)
             if fetch_res.get("success") and fetch_res.get("content"):
                 content = fetch_res["content"][:max_content_length]
                 fetched_contents.append({"url": url, "content": content})

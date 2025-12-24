@@ -153,7 +153,8 @@ async def test_execute_disabled_tool():
     tool = DummyTool()
     registry.register(tool, enabled=False)
 
-    result = await registry.execute("dummy_tool", context={})
+    # ToolRegistry.execute signature: (name, _exec_ctx, **kwargs)
+    result = await registry.execute("dummy_tool", {})  # _exec_ctx is positional
     assert not result.success
     assert "disabled" in result.error.lower()
 

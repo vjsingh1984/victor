@@ -1,7 +1,7 @@
 /**
  * Inline Completion Provider
  *
- * Provides AI-powered inline code completions similar to GitHub Copilot.
+ * Provides AI-powered inline code completions as you type.
  */
 
 import * as vscode from 'vscode';

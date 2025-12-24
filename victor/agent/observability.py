@@ -19,6 +19,7 @@ OpenTelemetry, Prometheus, or other backends.
 """
 
 import logging
+import threading
 import time
 import uuid
 from contextlib import contextmanager
@@ -65,9 +66,8 @@ class Span:
     @property
     def duration_ms(self) -> float:
         """Get span duration in milliseconds."""
-        if self.end_time:
-            return (self.end_time - self.start_time) * 1000
-        return 0.0
+        end = self.end_time or time.time()
+        return (end - self.start_time) * 1000
 
     def set_attribute(self, key: str, value: Any) -> None:
         """Set a span attribute."""
@@ -196,12 +196,11 @@ class TracingProvider:
             self.start_trace()
 
         # Create span
-        parent_span_id = self._current_span.span_id if self._current_span else None
         span = Span(
             name=name,
-            trace_id=self._current_trace_id or str(uuid.uuid4()),
+            trace_id=self._current_trace_id,
             span_id=str(uuid.uuid4()),
-            parent_span_id=parent_span_id,
+            parent_span_id=self._current_span.span_id if self._current_span else None,
             kind=kind,
             attributes=attributes or {},
         )
@@ -215,7 +214,7 @@ class TracingProvider:
             try:
                 hook(span)
             except Exception as e:
-                logger.warning(f"Span start hook error: {e}")
+                logger.exception(f"Span start hook error: {e}")
 
         try:
             yield span
@@ -231,16 +230,16 @@ class TracingProvider:
                 try:
                     hook(span)
                 except Exception as e:
-                    logger.warning(f"Span end hook error: {e}")
+                    logger.exception(f"Span end hook error: {e}")
 
-            # Pop from stack
+            # Pop from stack and update current span
             self._span_stack.pop()
             self._current_span = self._span_stack[-1] if self._span_stack else None
 
-            # Store completed span
+            # Store completed span with efficient rotation
             self._completed_spans.append(span)
             if len(self._completed_spans) > self._max_completed_spans:
-                self._completed_spans = self._completed_spans[-self._max_completed_spans :]
+                self._completed_spans.pop(0)
 
     def record_metric(
         self,
@@ -260,7 +259,7 @@ class TracingProvider:
             try:
                 hook(name, value, labels)
             except Exception as e:
-                logger.warning(f"Metric hook error: {e}")
+                logger.exception(f"Metric hook error: {e}")
 
     def get_completed_spans(self) -> List[Span]:
         """Get recently completed spans."""
@@ -281,8 +280,9 @@ class TracingProvider:
 ObservabilityManager = TracingProvider
 
 
-# Global instance for convenience
+# Global instance for convenience with thread safety
 _global_observability: Optional[TracingProvider] = None
+_observability_lock = threading.Lock()
 
 
 def get_observability() -> TracingProvider:
@@ -292,17 +292,20 @@ def get_observability() -> TracingProvider:
     """
     global _global_observability
     if _global_observability is None:
-        _global_observability = TracingProvider()
+        with _observability_lock:
+            if _global_observability is None:
+                _global_observability = TracingProvider()
     return _global_observability
 
 
-def set_observability(manager: TracingProvider) -> None:
+def set_observability(provider: TracingProvider) -> None:
     """Set the global tracing provider instance.
 
     Note: Function name kept for backward compatibility.
     """
     global _global_observability
-    _global_observability = manager
+    with _observability_lock:
+        _global_observability = provider
 
 
 # Convenience decorators

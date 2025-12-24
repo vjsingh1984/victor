@@ -75,8 +75,8 @@ function createInitialState(): AppState {
     return {
         server: {
             status: ServerStatus.Stopped,
-            url: 'http://localhost:8765',
-            port: 8765,
+            url: 'http://localhost:8000',
+            port: 8000,
             connectionState: ConnectionState.Disconnected,
         },
         session: {
@@ -101,11 +101,12 @@ function createInitialState(): AppState {
             statusBarMode: 'build',
         },
         settings: {
-            autoStart: true,
+            autoStart: false,
             showInlineCompletions: true,
             semanticSearchEnabled: true,
             semanticSearchMaxResults: 10,
-            serverPort: 8765,
+            serverPort: 8000,
+            serverApiKey: '',
         },
         initialized: false,
     };
@@ -185,8 +186,8 @@ export class StateStore {
 
         this.updateState({
             server: {
-                port: config.get('serverPort', 8765),
-                url: `http://localhost:${config.get('serverPort', 8765)}`,
+                port: config.get('serverPort', 8000),
+                url: `http://localhost:${config.get('serverPort', 8000)}`,
             },
             session: {
                 mode: config.get('mode', 'build') as AgentMode,
@@ -200,11 +201,12 @@ export class StateStore {
                 },
             },
             settings: {
-                autoStart: config.get('autoStart', true),
+                autoStart: config.get('autoStart', false),
                 showInlineCompletions: config.get('showInlineCompletions', true),
                 semanticSearchEnabled: config.get('semanticSearch.enabled', true),
                 semanticSearchMaxResults: config.get('semanticSearch.maxResults', 10),
-                serverPort: config.get('serverPort', 8765),
+                serverPort: config.get('serverPort', 8000),
+                serverApiKey: config.get('serverApiKey', ''),
             },
         });
     }
@@ -343,7 +345,14 @@ export class StateStore {
                 conversation: this.state.session.conversation,
                 context: [], // Don't persist context
             },
-            settings: this.state.settings,
+            // Persist non-sensitive settings only (avoid storing API key in VS Code storage)
+            settings: {
+                autoStart: this.state.settings.autoStart,
+                showInlineCompletions: this.state.settings.showInlineCompletions,
+                semanticSearchEnabled: this.state.settings.semanticSearchEnabled,
+                semanticSearchMaxResults: this.state.settings.semanticSearchMaxResults,
+                serverPort: this.state.settings.serverPort,
+            },
         };
 
         await this.globalState.update(this.STORAGE_KEY, stateToPersist);
@@ -490,6 +499,7 @@ export const selectors = {
     serverStatus: (state: AppState) => state.server.status,
     connectionState: (state: AppState) => state.server.connectionState,
     serverUrl: (state: AppState) => state.server.url,
+    serverApiKey: (state: AppState) => state.settings.serverApiKey,
     mode: (state: AppState) => state.session.mode,
     model: (state: AppState) => state.session.model,
     conversation: (state: AppState) => state.session.conversation,

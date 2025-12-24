@@ -2,9 +2,12 @@
  * Chat View Provider
  *
  * Provides the webview-based chat panel for interacting with Victor.
+ * Supports both legacy HTML mode and modern Svelte-built UI.
  */
 
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 import { VictorClient, ChatMessage, ToolCall } from './victorClient';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
@@ -12,11 +15,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     private _view?: vscode.WebviewView;
     private _messages: ChatMessage[] = [];
     private _disposables: vscode.Disposable[] = [];
+    private _webviewReady = false;
+    private _useSvelteUI = true; // Use Svelte-built UI by default
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
-        private readonly _client: VictorClient
-    ) {}
+        private readonly _client: VictorClient,
+        private readonly _log?: vscode.OutputChannel
+    ) {
+        // Check if Svelte build exists
+        const webviewPath = vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'index.html');
+        try {
+            fs.accessSync(webviewPath.fsPath);
+            this._useSvelteUI = true;
+            this._log?.appendLine('[Chat] Using Svelte-built UI');
+        } catch {
+            this._useSvelteUI = false;
+            this._log?.appendLine('[Chat] Svelte UI not found, using legacy HTML');
+        }
+    }
 
     public dispose(): void {
         // Clean up all registered event listeners
@@ -30,18 +47,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         _token: vscode.CancellationToken
     ) {
         this._view = webviewView;
+        this._log?.appendLine('[Chat] Webview resolved');
 
         webviewView.webview.options = {
             enableScripts: true,
             localResourceRoots: [this._extensionUri],
         };
 
-        webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+        webviewView.webview.html = this._useSvelteUI
+            ? this._getSvelteHtml(webviewView.webview)
+            : this._getHtmlForWebview(webviewView.webview);
 
         // Handle messages from the webview - store disposable for cleanup
         const messageListener = webviewView.webview.onDidReceiveMessage(async (data) => {
+            this._log?.appendLine(`[Chat] Received message from webview: ${data?.type ?? 'unknown'}`);
             switch (data.type) {
+                case 'webviewReady':
+                    this._webviewReady = true;
+                    this._log?.appendLine('[Chat] Webview script reported ready');
+                    break;
+                case 'sendClick':
+                    this._log?.appendLine(`[Chat] Webview send clicked (${data.length ?? 0} chars)`);
+                    break;
                 case 'sendMessage':
+                    this._log?.appendLine(`[Chat] Webview requested send (${(data.message ?? '').length} chars)`);
                     await this.sendMessage(data.message);
                     break;
                 case 'clearHistory':
@@ -58,6 +87,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         // Clean up when webview is disposed
         const viewDisposedListener = webviewView.onDidDispose(() => {
             this._view = undefined;
+            this._webviewReady = false;
         });
         this._disposables.push(viewDisposedListener);
 
@@ -70,8 +100,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
     public async sendMessage(content: string): Promise<void> {
         if (!this._view) {
+            this._log?.appendLine('[Chat] Ignoring send (webview not ready)');
             return;
         }
+
+        if (!content || !content.trim()) {
+            this._log?.appendLine('[Chat] Ignoring send (empty content)');
+            return;
+        }
+
+        if (!this._webviewReady) {
+            this._log?.appendLine('[Chat] Warning: webviewReady not observed yet');
+        }
+
+        this._log?.appendLine(`[Chat] Sending user message (${content.length} chars)`);
 
         // Add user message
         const userMessage: ChatMessage = { role: 'user', content };
@@ -114,11 +156,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
             this._updateMessages();
 
         } catch (error) {
+            this._log?.appendLine(`[Chat] Error: ${error}`);
             this._postMessage({
                 type: 'error',
                 message: `Error: ${error}`,
             });
         } finally {
+            this._log?.appendLine('[Chat] Done');
             this._postMessage({ type: 'thinking', thinking: false });
         }
     }
@@ -158,6 +202,40 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
     }
 
+    /**
+     * Generate HTML for Svelte-built webview UI
+     * Loads the pre-built Svelte application from out/webview/
+     */
+    private _getSvelteHtml(webview: vscode.Webview): string {
+        const nonce = this._getNonce();
+
+        // Get URIs for the built Svelte assets
+        const scriptUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'assets', 'main.js')
+        );
+        const styleUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'assets', 'main.css')
+        );
+
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; img-src ${webview.cspSource} https: data:;">
+    <title>Victor Chat</title>
+    <link rel="stylesheet" href="${styleUri}">
+</head>
+<body>
+    <div id="app"></div>
+    <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
+</body>
+</html>`;
+    }
+
+    /**
+     * Generate legacy HTML (fallback when Svelte build is not available)
+     */
     private _getHtmlForWebview(webview: vscode.Webview): string {
         const nonce = this._getNonce();
 
@@ -259,18 +337,186 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
             font-family: var(--vscode-editor-font-family);
         }
 
+        /* Tool Call - Enhanced Styling */
         .tool-call {
-            background: var(--vscode-inputValidation-infoBackground);
-            border: 1px solid var(--vscode-inputValidation-infoBorder);
-            padding: 8px;
-            border-radius: 6px;
+            background: var(--vscode-editorWidget-background);
+            border: 1px solid var(--vscode-editorWidget-border);
+            border-radius: 8px;
             margin: 8px 0;
             font-size: 12px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+
+        .tool-call.dangerous {
+            border-left: 3px solid var(--vscode-editorWarning-foreground);
+        }
+
+        .tool-call-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .tool-call-header:hover {
+            background: var(--vscode-list-hoverBackground);
+        }
+
+        .tool-call-icon {
+            font-size: 14px;
+            width: 20px;
+            text-align: center;
         }
 
         .tool-call-name {
-            font-weight: bold;
-            color: var(--accent);
+            font-weight: 600;
+            color: var(--vscode-symbolIcon-functionForeground, #dcdcaa);
+            flex: 1;
+        }
+
+        .tool-call-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tool-call-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tool-call-badge.free { background: var(--vscode-testing-iconPassed); color: #000; }
+        .tool-call-badge.low { background: var(--vscode-charts-blue); color: #fff; }
+        .tool-call-badge.medium { background: var(--vscode-editorWarning-foreground); color: #000; }
+        .tool-call-badge.high { background: var(--vscode-errorForeground); color: #fff; }
+        .tool-call-badge.danger { background: var(--vscode-errorForeground); color: #fff; }
+
+        .tool-call-status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .tool-call-status-indicator.pending { background: var(--vscode-editorInfo-foreground); }
+        .tool-call-status-indicator.running {
+            background: var(--vscode-progressBar-background);
+            animation: pulse 1s infinite;
+        }
+        .tool-call-status-indicator.success { background: var(--vscode-testing-iconPassed); }
+        .tool-call-status-indicator.error { background: var(--vscode-errorForeground); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        .tool-call-chevron {
+            transition: transform 0.2s;
+            color: var(--text-secondary);
+        }
+
+        .tool-call.expanded .tool-call-chevron {
+            transform: rotate(90deg);
+        }
+
+        .tool-call-body {
+            display: none;
+            border-top: 1px solid var(--vscode-editorWidget-border);
+            padding: 10px 12px;
+        }
+
+        .tool-call.expanded .tool-call-body {
+            display: block;
+        }
+
+        .tool-call-section {
+            margin-bottom: 10px;
+        }
+
+        .tool-call-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .tool-call-section-title {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .tool-call-args {
+            background: var(--vscode-textCodeBlock-background);
+            padding: 8px;
+            border-radius: 4px;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 11px;
+            overflow-x: auto;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .tool-call-args-key {
+            color: var(--vscode-symbolIcon-propertyForeground, #9cdcfe);
+        }
+
+        .tool-call-args-value {
+            color: var(--vscode-symbolIcon-stringForeground, #ce9178);
+        }
+
+        .tool-call-result {
+            background: var(--vscode-textCodeBlock-background);
+            padding: 8px;
+            border-radius: 4px;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 11px;
+            max-height: 200px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .tool-call-result.success {
+            border-left: 3px solid var(--vscode-testing-iconPassed);
+        }
+
+        .tool-call-result.error {
+            border-left: 3px solid var(--vscode-errorForeground);
+            color: var(--vscode-errorForeground);
+        }
+
+        .tool-call-spinner {
+            display: inline-flex;
+            gap: 3px;
+            align-items: center;
+        }
+
+        .tool-call-spinner span {
+            width: 4px;
+            height: 4px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: spinnerBounce 1.4s infinite ease-in-out;
+        }
+
+        .tool-call-spinner span:nth-child(1) { animation-delay: -0.32s; }
+        .tool-call-spinner span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes spinnerBounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .tool-call-duration {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-left: auto;
         }
 
         .thinking {
@@ -382,6 +628,139 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         .shortcut:hover {
             border-color: var(--accent);
         }
+
+        /* Syntax highlighting using VS Code theme colors */
+        .hljs-keyword { color: var(--vscode-symbolIcon-keywordForeground, #569cd6); font-weight: 500; }
+        .hljs-string { color: var(--vscode-symbolIcon-stringForeground, #ce9178); }
+        .hljs-number { color: var(--vscode-symbolIcon-numberForeground, #b5cea8); }
+        .hljs-function { color: var(--vscode-symbolIcon-functionForeground, #dcdcaa); }
+        .hljs-class { color: var(--vscode-symbolIcon-classForeground, #4ec9b0); }
+        .hljs-comment { color: var(--vscode-symbolIcon-colorForeground, #6a9955); font-style: italic; }
+        .hljs-operator { color: var(--vscode-symbolIcon-operatorForeground, #d4d4d4); }
+        .hljs-variable { color: var(--vscode-symbolIcon-variableForeground, #9cdcfe); }
+        .hljs-type { color: var(--vscode-symbolIcon-typeParameterForeground, #4ec9b0); }
+        .hljs-property { color: var(--vscode-symbolIcon-propertyForeground, #9cdcfe); }
+        .hljs-decorator { color: var(--vscode-symbolIcon-referenceForeground, #dcdcaa); }
+        .hljs-punctuation { color: var(--vscode-editor-foreground, #d4d4d4); }
+        .hljs-builtin { color: var(--vscode-symbolIcon-methodForeground, #dcdcaa); }
+        .hljs-constant { color: var(--vscode-symbolIcon-constantForeground, #4fc1ff); }
+        .hljs-tag { color: var(--vscode-symbolIcon-keywordForeground, #569cd6); }
+        .hljs-attr { color: var(--vscode-symbolIcon-propertyForeground, #9cdcfe); }
+
+        /* Code block with language label */
+        .code-block-wrapper {
+            position: relative;
+            margin: 8px 0;
+        }
+
+        .code-lang-label {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            padding: 2px 8px;
+            font-size: 10px;
+            border-radius: 4px 0 4px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .code-block-wrapper pre {
+            margin-top: 0;
+            padding-top: 24px !important;
+        }
+
+        /* Apply code button */
+        .apply-btn {
+            position: absolute;
+            top: 4px;
+            right: 60px;
+            background: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .code-block-wrapper:hover .apply-btn,
+        .code-block-wrapper:hover .copy-btn {
+            opacity: 1;
+        }
+
+        /* Markdown enhancements */
+        .message h1, .message h2, .message h3, .message h4 {
+            margin: 12px 0 8px 0;
+            color: var(--text-primary);
+        }
+        .message h1 { font-size: 1.4em; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; }
+        .message h2 { font-size: 1.2em; }
+        .message h3 { font-size: 1.1em; }
+        .message h4 { font-size: 1em; }
+
+        .message ul, .message ol {
+            margin: 8px 0;
+            padding-left: 24px;
+        }
+
+        .message li { margin: 4px 0; }
+
+        .message blockquote {
+            border-left: 3px solid var(--accent);
+            margin: 8px 0;
+            padding: 4px 12px;
+            color: var(--text-secondary);
+            background: var(--vscode-textBlockQuote-background);
+        }
+
+        .message a {
+            color: var(--vscode-textLink-foreground);
+            text-decoration: none;
+        }
+        .message a:hover { text-decoration: underline; }
+
+        .message table {
+            border-collapse: collapse;
+            margin: 8px 0;
+            width: 100%;
+        }
+        .message th, .message td {
+            border: 1px solid var(--border-color);
+            padding: 6px 10px;
+            text-align: left;
+        }
+        .message th {
+            background: var(--vscode-editorWidget-background);
+            font-weight: 600;
+        }
+
+        .message hr {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: 12px 0;
+        }
+
+        /* Keyboard shortcuts help */
+        .kbd {
+            background: var(--vscode-keybindingLabel-background);
+            border: 1px solid var(--vscode-keybindingLabel-border);
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 11px;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+        }
+
+        .help-text {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 4px;
+        }
     </style>
 </head>
 <body>
@@ -394,6 +773,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
                 <span class="shortcut" onclick="useShortcut('Refactor this code')">Refactor</span>
                 <span class="shortcut" onclick="useShortcut('Write tests for')">Test</span>
                 <span class="shortcut" onclick="useShortcut('Fix the bugs in')">Fix</span>
+                <span class="shortcut" onclick="useShortcut('Add documentation to')">Document</span>
+                <span class="shortcut" onclick="useShortcut('Optimize this code')">Optimize</span>
+            </div>
+            <div class="help-text" style="margin-top: 20px;">
+                <span class="kbd">Enter</span> to send &nbsp;|&nbsp;
+                <span class="kbd">Shift+Enter</span> for new line &nbsp;|&nbsp;
+                <span class="kbd">Esc</span> to clear
             </div>
         </div>
     </div>
@@ -420,6 +806,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
     <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
+        // Handshake so the extension knows the webview script loaded
+        vscode.postMessage({ type: 'webviewReady' });
         const chatContainer = document.getElementById('chatContainer');
         const messageInput = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
@@ -435,11 +823,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
             this.style.height = Math.min(this.scrollHeight, 150) + 'px';
         });
 
-        // Send on Enter (Shift+Enter for newline)
+        // Keyboard shortcuts
         messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
+            } else if (e.key === 'Escape') {
+                messageInput.value = '';
+                messageInput.style.height = 'auto';
+                messageInput.blur();
             }
         });
 
@@ -449,6 +841,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
             const message = messageInput.value.trim();
             if (!message || isStreaming) return;
 
+            vscode.postMessage({ type: 'sendClick', length: message.length });
             vscode.postMessage({ type: 'sendMessage', message });
             messageInput.value = '';
             messageInput.style.height = 'auto';
@@ -491,6 +884,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
                     appendToolCall(data.toolCall);
                     break;
 
+                case 'toolCallResult':
+                    updateToolCallStatus(data.id, data.status, data.result);
+                    break;
+
                 case 'error':
                     appendError(data.message);
                     break;
@@ -527,11 +924,113 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
             return el;
         }
 
+        // Tool call tracking
+        const toolCallElements = new Map();
+
         function createToolCallElement(toolCall) {
             const el = document.createElement('div');
-            el.className = 'tool-call';
-            el.innerHTML = '<span class="tool-call-name">' + toolCall.name + '</span>';
+            const id = toolCall.id || 'tc-' + Date.now();
+            el.id = id;
+            el.className = 'tool-call' + (toolCall.is_dangerous ? ' dangerous' : '');
+            el.dataset.status = toolCall.status || 'running';
+
+            // Get icon based on tool category
+            const icon = getToolIcon(toolCall.category || toolCall.name);
+            const statusClass = toolCall.status || 'running';
+            const costBadge = toolCall.cost_tier ? '<span class="tool-call-badge ' + toolCall.cost_tier.toLowerCase() + '">' + toolCall.cost_tier + '</span>' : '';
+            const dangerBadge = toolCall.is_dangerous ? '<span class="tool-call-badge danger">⚠</span>' : '';
+
+            // Format arguments for display
+            const argsHtml = formatToolArgs(toolCall.arguments || toolCall.args || {});
+
+            el.innerHTML =
+                '<div class="tool-call-header" onclick="toggleToolCall(\\'' + id + '\\')">' +
+                    '<span class="tool-call-icon">' + icon + '</span>' +
+                    '<span class="tool-call-name">' + escapeHtml(toolCall.name) + '</span>' +
+                    '<span class="tool-call-status">' +
+                        dangerBadge +
+                        costBadge +
+                        '<span class="tool-call-status-indicator ' + statusClass + '"></span>' +
+                    '</span>' +
+                    '<span class="tool-call-chevron">▶</span>' +
+                '</div>' +
+                '<div class="tool-call-body">' +
+                    (argsHtml ? '<div class="tool-call-section"><div class="tool-call-section-title">Arguments</div><div class="tool-call-args">' + argsHtml + '</div></div>' : '') +
+                    '<div class="tool-call-section tool-call-result-section" style="display:none;"><div class="tool-call-section-title">Result</div><div class="tool-call-result"></div></div>' +
+                '</div>';
+
+            toolCallElements.set(id, el);
             return el;
+        }
+
+        function getToolIcon(categoryOrName) {
+            const icons = {
+                'filesystem': '📁', 'file': '📁',
+                'search': '🔍', 'code_search': '🔍',
+                'git': '🔀', 'git_tool': '🔀',
+                'shell': '💻', 'bash': '💻',
+                'analysis': '📊', 'code_review': '📊',
+                'web': '🌐', 'web_search': '🌐',
+                'docker': '🐳',
+                'testing': '🧪', 'test': '🧪',
+                'refactor': '🔧',
+                'code intelligence': '🧠', 'lsp': '🧠',
+                'database': '🗃️',
+                'documentation': '📖',
+                'infrastructure': '🏗️',
+                'batch': '📦',
+                'cache': '💾',
+                'mcp': '🔌',
+                'workflow': '⚙️',
+                'patch': '📝', 'edit': '📝',
+                'read': '👁️',
+                'write': '✏️',
+                'default': '🔧'
+            };
+            const key = (categoryOrName || '').toLowerCase();
+            return icons[key] || icons['default'];
+        }
+
+        function formatToolArgs(args) {
+            if (!args || Object.keys(args).length === 0) return '';
+
+            let html = '';
+            for (const [key, value] of Object.entries(args)) {
+                const valueStr = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
+                const truncated = valueStr.length > 100 ? valueStr.substring(0, 100) + '...' : valueStr;
+                html += '<div><span class="tool-call-args-key">' + escapeHtml(key) + ':</span> <span class="tool-call-args-value">' + escapeHtml(truncated) + '</span></div>';
+            }
+            return html;
+        }
+
+        function toggleToolCall(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.classList.toggle('expanded');
+            }
+        }
+
+        function updateToolCallStatus(id, status, result) {
+            const el = toolCallElements.get(id) || document.getElementById(id);
+            if (!el) return;
+
+            el.dataset.status = status;
+            const indicator = el.querySelector('.tool-call-status-indicator');
+            if (indicator) {
+                indicator.className = 'tool-call-status-indicator ' + status;
+            }
+
+            // Update result section if provided
+            if (result !== undefined) {
+                const resultSection = el.querySelector('.tool-call-result-section');
+                const resultDiv = el.querySelector('.tool-call-result');
+                if (resultSection && resultDiv) {
+                    resultSection.style.display = 'block';
+                    resultDiv.className = 'tool-call-result ' + (status === 'error' ? 'error' : 'success');
+                    const resultText = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
+                    resultDiv.textContent = resultText.length > 500 ? resultText.substring(0, 500) + '...' : resultText;
+                }
+            }
         }
 
         function appendToolCall(toolCall) {
@@ -550,13 +1049,53 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
 
         function formatContent(content) {
-            // Basic markdown-like formatting
-            let html = escapeHtml(content);
+            if (!content) return '';
 
-            // Code blocks
-            html = html.replace(/\`\`\`(\\w*)\\n([\\s\\S]*?)\`\`\`/g, (match, lang, code) => {
-                return '<pre><code class="language-' + lang + '">' + code + '</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>';
+            // First handle code blocks (before escaping)
+            const codeBlocks = [];
+            let processedContent = content.replace(/\`\`\`(\\w*)\\n([\\s\\S]*?)\`\`\`/g, (match, lang, code) => {
+                const placeholder = '___CODEBLOCK_' + codeBlocks.length + '___';
+                codeBlocks.push({ lang: lang || 'text', code });
+                return placeholder;
             });
+
+            // Escape HTML
+            let html = escapeHtml(processedContent);
+
+            // Restore code blocks with syntax highlighting
+            codeBlocks.forEach((block, i) => {
+                const highlighted = highlightCode(block.code, block.lang);
+                const langLabel = block.lang ? '<span class="code-lang-label">' + block.lang + '</span>' : '';
+                const codeId = 'code-' + Date.now() + '-' + i;
+                html = html.replace('___CODEBLOCK_' + i + '___',
+                    '<div class="code-block-wrapper">' + langLabel +
+                    '<pre><code id="' + codeId + '" class="language-' + block.lang + '">' + highlighted + '</code>' +
+                    '<button class="apply-btn" onclick="applyCode(\\'' + codeId + '\\')">Apply</button>' +
+                    '<button class="copy-btn" onclick="copyCode(this)">Copy</button></pre></div>'
+                );
+            });
+
+            // Headers (process before other formatting)
+            html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+            // Blockquotes
+            html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+            // Horizontal rules
+            html = html.replace(/^---$/gm, '<hr>');
+
+            // Unordered lists
+            html = html.replace(/^[\\*\\-] (.+)$/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\\/li>\\n?)+/g, '<ul>$&</ul>');
+
+            // Ordered lists
+            html = html.replace(/^\\d+\\. (.+)$/gm, '<li>$1</li>');
+
+            // Links [text](url)
+            html = html.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2" target="_blank">$1</a>');
 
             // Inline code
             html = html.replace(/\`([^\`]+)\`/g, '<code>$1</code>');
@@ -564,10 +1103,77 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
             // Bold
             html = html.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
 
-            // Line breaks
+            // Italic
+            html = html.replace(/\\*([^*]+)\\*/g, '<em>$1</em>');
+
+            // Strikethrough
+            html = html.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+
+            // Line breaks (but not inside block elements)
             html = html.replace(/\\n/g, '<br>');
 
+            // Clean up extra breaks after block elements
+            html = html.replace(/<\\/(h[1-4]|ul|ol|blockquote|pre|hr)><br>/g, '</$1>');
+            html = html.replace(/<br><(h[1-4]|ul|ol|blockquote|pre)/g, '<$1');
+
             return html;
+        }
+
+        // Simple syntax highlighting for common languages
+        function highlightCode(code, lang) {
+            const escaped = escapeHtml(code);
+
+            // Language-specific keyword sets
+            const keywords = {
+                js: ['const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while', 'class', 'extends', 'new', 'this', 'import', 'export', 'from', 'async', 'await', 'try', 'catch', 'throw', 'switch', 'case', 'break', 'default', 'typeof', 'instanceof'],
+                ts: ['const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while', 'class', 'extends', 'new', 'this', 'import', 'export', 'from', 'async', 'await', 'try', 'catch', 'throw', 'interface', 'type', 'enum', 'implements', 'private', 'public', 'protected', 'readonly', 'abstract', 'static'],
+                python: ['def', 'class', 'return', 'if', 'elif', 'else', 'for', 'while', 'import', 'from', 'as', 'try', 'except', 'finally', 'raise', 'with', 'yield', 'lambda', 'pass', 'break', 'continue', 'and', 'or', 'not', 'in', 'is', 'None', 'True', 'False', 'async', 'await', 'self'],
+                rust: ['fn', 'let', 'mut', 'const', 'struct', 'enum', 'impl', 'trait', 'pub', 'use', 'mod', 'if', 'else', 'match', 'for', 'while', 'loop', 'return', 'Self', 'self', 'async', 'await', 'where', 'type', 'dyn', 'move'],
+                go: ['func', 'var', 'const', 'type', 'struct', 'interface', 'package', 'import', 'return', 'if', 'else', 'for', 'range', 'switch', 'case', 'default', 'break', 'continue', 'go', 'defer', 'chan', 'select', 'map', 'make', 'new'],
+                java: ['public', 'private', 'protected', 'class', 'interface', 'extends', 'implements', 'static', 'final', 'void', 'return', 'if', 'else', 'for', 'while', 'switch', 'case', 'break', 'new', 'this', 'super', 'try', 'catch', 'throw', 'throws', 'import', 'package'],
+                cpp: ['int', 'float', 'double', 'char', 'void', 'bool', 'class', 'struct', 'public', 'private', 'protected', 'virtual', 'override', 'const', 'static', 'return', 'if', 'else', 'for', 'while', 'switch', 'case', 'break', 'new', 'delete', 'nullptr', 'template', 'typename', 'namespace', 'using', 'include'],
+                bash: ['if', 'then', 'else', 'fi', 'for', 'do', 'done', 'while', 'case', 'esac', 'function', 'return', 'export', 'local', 'echo', 'exit', 'cd', 'pwd', 'ls', 'cat', 'grep', 'sed', 'awk', 'find', 'xargs', 'pip', 'npm', 'git'],
+                sql: ['SELECT', 'FROM', 'WHERE', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'ON', 'AND', 'OR', 'NOT', 'IN', 'NULL', 'IS', 'AS', 'ORDER', 'BY', 'GROUP', 'HAVING', 'LIMIT', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE', 'INDEX', 'DROP', 'ALTER'],
+                html: ['html', 'head', 'body', 'div', 'span', 'p', 'a', 'img', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'form', 'input', 'button', 'script', 'style', 'link', 'meta', 'title'],
+                css: ['color', 'background', 'margin', 'padding', 'border', 'width', 'height', 'display', 'position', 'top', 'left', 'right', 'bottom', 'flex', 'grid', 'font', 'text', 'align', 'justify', 'transform', 'transition', 'animation']
+            };
+
+            // Normalize language name
+            const langMap = { javascript: 'js', typescript: 'ts', py: 'python', sh: 'bash', shell: 'bash', c: 'cpp', 'c++': 'cpp' };
+            const normalizedLang = langMap[lang?.toLowerCase()] || lang?.toLowerCase() || 'text';
+            const langKeywords = keywords[normalizedLang] || [];
+
+            let result = escaped;
+
+            // Comments (single line // and #, multi-line /* */)
+            result = result.replace(/(\/\/[^\\n]*)/g, '<span class="hljs-comment">$1</span>');
+            result = result.replace(/(#[^\\n]*)/g, '<span class="hljs-comment">$1</span>');
+            result = result.replace(/(\\/\\*[\\s\\S]*?\\*\\/)/g, '<span class="hljs-comment">$1</span>');
+
+            // Strings (double and single quotes)
+            result = result.replace(/(&quot;[^&]*&quot;)/g, '<span class="hljs-string">$1</span>');
+            result = result.replace(/('[^']*')/g, '<span class="hljs-string">$1</span>');
+            result = result.replace(/(\`[^\`]*\`)/g, '<span class="hljs-string">$1</span>');
+
+            // Numbers
+            result = result.replace(/\\b(\\d+\\.?\\d*)\\b/g, '<span class="hljs-number">$1</span>');
+
+            // Keywords
+            if (langKeywords.length > 0) {
+                const keywordPattern = new RegExp('\\\\b(' + langKeywords.join('|') + ')\\\\b', 'g');
+                result = result.replace(keywordPattern, '<span class="hljs-keyword">$1</span>');
+            }
+
+            // Decorators (Python @decorator, TypeScript @Decorator)
+            result = result.replace(/(@\\w+)/g, '<span class="hljs-decorator">$1</span>');
+
+            // Function calls
+            result = result.replace(/(\\w+)\\(/g, '<span class="hljs-function">$1</span>(');
+
+            // Types/Classes (PascalCase)
+            result = result.replace(/\\b([A-Z][a-zA-Z0-9_]*)\\b/g, '<span class="hljs-type">$1</span>');
+
+            return result;
         }
 
         function escapeHtml(text) {
@@ -577,10 +1183,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
 
         function copyCode(btn) {
-            const code = btn.previousSibling.textContent;
+            const pre = btn.closest('pre');
+            const code = pre.querySelector('code').textContent;
             navigator.clipboard.writeText(code);
             btn.textContent = 'Copied!';
             setTimeout(() => btn.textContent = 'Copy', 1500);
+        }
+
+        function applyCode(codeId) {
+            const codeEl = document.getElementById(codeId);
+            if (codeEl) {
+                const code = codeEl.textContent;
+                vscode.postMessage({ type: 'applyCode', code });
+            }
         }
 
         function scrollToBottom() {

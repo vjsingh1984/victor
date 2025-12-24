@@ -126,6 +126,10 @@ profiles:
     temperature: 0.7
     max_tokens: 4096
     description: "xAI Grok Code Fast - cheapest with tool calling ($0.20/$1.50 per M tokens)"
+    # Provider tuning: xAI benefits from more exploration latitude
+    max_continuation_prompts: 5  # More patience for thorough exploration
+    quality_threshold: 0.5  # Accept varied response styles
+    session_idle_timeout: 300  # Idle timeout: 5 min (resets on each response/tool execution)
 
   grok-fast:
     provider: xai
@@ -154,6 +158,11 @@ profiles:
     temperature: 0.7
     max_tokens: 4096
     description: "DeepSeek-V3 for coding with tool calling"
+    # Provider tuning: DeepSeek benefits from stricter loop detection
+    loop_repeat_threshold: 2  # Detect loops earlier (default: 3)
+    max_continuation_prompts: 4  # Force completion sooner (default: 6)
+    quality_threshold: 0.6  # Lower quality bar (uses grounding hints instead)
+    tool_deduplication_enabled: true
 
   deepseek-reason:
     provider: deepseek
@@ -229,8 +238,7 @@ providers:
 # TOOLS - Enable/disable specific tools
 # =============================================================================
 tools:
-  disabled:
-    - code_review  # Has aspect validation issues
+  disabled: []  # Add tool names here to disable specific tools
 
   # Individual tool configuration (optional)
   # web_search:
@@ -641,3 +649,39 @@ model_capabilities:
     #   parallel_tool_calls: true
     #   requires_strict_prompting: false
     #   recommended_tool_budget: 15
+
+# =============================================================================
+# CONTINUATION PROMPT OVERRIDES (Provider/Model-Specific Tuning)
+# =============================================================================
+# Override continuation prompt limits for specific provider:model combinations
+# This allows fine-tuning how many times Victor prompts a model to continue
+# before forcing completion. Different models have different continuation behaviors.
+#
+# Format: {"provider:model": {"analysis": N, "action": N, "default": N}}
+#
+# Global defaults (can be overridden here):
+# - analysis tasks: 6 prompts
+# - action tasks: 5 prompts  
+# - default tasks: 3 prompts
+# =============================================================================
+# continuation_prompt_overrides:
+#   # Qwen models benefit from more continuation prompts
+#   "ollama:qwen3-coder-tools:30b-128k":
+#     analysis: 8  # 33% more than default 6
+#     action: 6    # 20% more than default 5
+#     default: 4   # 33% more than default 3
+#
+#   # DeepSeek-R1 with thinking mode needs fewer (thinking takes time)
+#   "ollama:deepseek-r1-tools:32b":
+#     analysis: 5  # 17% less than default 6
+#     action: 4    # 20% less than default 5
+#     default: 2   # 33% less than default 3
+#
+#   # Claude models are good at following instructions, need fewer prompts
+#   "anthropic:claude-sonnet-4-20250514":
+#     analysis: 4
+#     action: 3
+#     default: 2
+#
+# # Enable RL-based learning (future feature - automatically adjusts above values)
+# enable_continuation_rl_learning: false

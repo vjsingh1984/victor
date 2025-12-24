@@ -12,46 +12,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Modular slash commands for Victor CLI.
+"""Victor CLI commands package.
 
-This package organizes slash commands into logical groups:
-- base: Command registry and base classes
-- session: Session management (save, load, resume)
-- model: Model/provider management
-- context: Context and initialization
-- history: Undo/redo/snapshots
-- tools: Tool management
-- analysis: Review, metrics, search
+This package contains CLI commands (chat, init, tools, etc.) and
+re-exports the modular slash command system.
 
-Backward Compatibility:
-- SlashCommandHandler is re-exported from slash_commands.py for existing code
+The slash command system is implemented in victor.ui.slash/ using
+SOLID principles for clean, extensible command handling.
 """
 
-# Re-export legacy SlashCommandHandler for backward compatibility
-from victor.ui.slash_commands import SlashCommand as LegacySlashCommand
-from victor.ui.slash_commands import SlashCommandHandler
-
-# New modular command system
-from victor.ui.commands.base import (
-    SlashCommand,
-    CommandGroup,
-    CommandRegistry,
+# Re-export from the modular slash command system
+from victor.ui.slash import (
+    SlashCommandHandler,
+    SlashCommandProtocol,
+    BaseSlashCommand,
     CommandContext,
+    CommandMetadata,
+    CommandRegistry,
     get_command_registry,
-    set_command_registry,
-    reset_command_registry,
+    register_command,
+    command,
 )
 
 __all__ = [
-    # Backward compatibility
     "SlashCommandHandler",
-    "LegacySlashCommand",
-    # New modular system
-    "SlashCommand",
-    "CommandGroup",
-    "CommandRegistry",
+    "SlashCommandProtocol",
+    "BaseSlashCommand",
     "CommandContext",
+    "CommandMetadata",
+    "CommandRegistry",
     "get_command_registry",
-    "set_command_registry",
-    "reset_command_registry",
+    "register_command",
+    "command",
 ]

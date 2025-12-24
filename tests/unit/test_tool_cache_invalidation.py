@@ -36,10 +36,10 @@ class _DummyProvider(BaseProvider):
 async def _run_with_invalidation(tmpdir: str) -> int:
     settings = Settings(
         analytics_enabled=False,
-        use_semantic_tool_selection=False,
+        tool_selection_strategy="keyword",
         tool_cache_enabled=True,
         tool_cache_allowlist=["code_search"],
-        tool_cache_dir=tmpdir,
+        tool_cache_dir=tmpdir,  # Use correct setting name
     )
     orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
 
@@ -67,7 +67,7 @@ async def _run_with_invalidation(tmpdir: str) -> int:
     # Second call should be a miss after invalidation
     await orch._execute_tool_with_retry("code_search", args, context={})
 
-    orch.shutdown()
+    await orch.shutdown()
     return call_count["count"]
 
 

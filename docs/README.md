@@ -10,7 +10,9 @@ Comprehensive documentation for Victor - Enterprise-Ready AI Coding Assistant.
 | [Quick Start](guides/QUICKSTART.md) | First steps with Victor |
 | [Provider Setup](guides/PROVIDER_SETUP.md) | Configure 25+ LLM providers |
 | [User Guide](USER_GUIDE.md) | Complete usage guide |
-| [Tool Catalog](TOOL_CATALOG.md) | All 46 available tools |
+| [Tool Catalog](TOOL_CATALOG.md) | All 45 available tools |
+| [Verticals](VERTICALS.md) | 4 domain-specific assistant templates |
+| [Framework Migration](FRAMEWORK_MIGRATION.md) | Migrating to Framework API |
 | [Releasing](RELEASING.md) | Release process for maintainers |
 
 ## Documentation Structure
@@ -18,11 +20,15 @@ Comprehensive documentation for Victor - Enterprise-Ready AI Coding Assistant.
 ```
 docs/
 ├── USER_GUIDE.md              # Comprehensive user guide
-├── TOOL_CATALOG.md            # All 46 tools with descriptions
+├── TOOL_CATALOG.md            # All 45 tools with descriptions
 ├── MODEL_COMPARISON.md        # Ollama model benchmarks
 ├── DEVELOPER_GUIDE.md         # Contributing and development
 ├── RELEASING.md               # Release process
 ├── ENTERPRISE.md              # Enterprise deployment
+├── VERTICALS.md               # Domain-specific assistants
+├── STATE_MACHINE.md           # Conversation state tracking
+├── FRAMEWORK_MIGRATION.md     # Framework API migration guide
+├── CORE_PATTERNS.md           # Design patterns used
 │
 ├── guides/                    # How-to guides
 │   ├── INSTALLATION.md        # Installation methods
@@ -80,7 +86,7 @@ docs/
 ### Using Victor
 - [Interactive Mode](USER_GUIDE.md#interactive-mode)
 - [One-shot Commands](USER_GUIDE.md#one-shot-mode)
-- [Tool Catalog](TOOL_CATALOG.md) - 46 tools across 8 categories
+- [Tool Catalog](TOOL_CATALOG.md) - 45 tools across 8 categories
 
 ### Air-gapped & Offline
 - [Air-gapped Setup](embeddings/AIRGAPPED.md)
@@ -94,6 +100,10 @@ docs/
 
 ### Architecture
 - [Architecture Deep Dive](ARCHITECTURE_DEEP_DIVE.md)
+- [State Machine](STATE_MACHINE.md) - Conversation state tracking
+- [Verticals](VERTICALS.md) - Domain-specific assistants
+- [Framework Migration](FRAMEWORK_MIGRATION.md) - Framework API guide
+- [Core Patterns](CORE_PATTERNS.md) - Design patterns used
 - [Embedding System](embeddings/ARCHITECTURE.md)
 - [Codebase Analysis](CODEBASE_ANALYSIS_REPORT.md)
 

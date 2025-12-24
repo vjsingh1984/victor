@@ -158,6 +158,12 @@ class AdaptiveSerializer:
         self._metrics: Optional[SerializationMetrics] = None
         self._last_context: Optional[SerializationContext] = None
         self._last_characteristics: Optional[DataCharacteristics] = None
+        # Stats tracking
+        self._serialization_count: int = 0
+        self._total_tokens_saved: int = 0
+        self._total_original_tokens: int = 0
+        self._tool_stats: Dict[str, Dict[str, Any]] = {}
+        self._format_stats: Dict[str, Dict[str, Any]] = {}
 
     def serialize(
         self,
@@ -257,7 +263,15 @@ class AdaptiveSerializer:
             except Exception as e:
                 logger.debug(f"Failed to record metrics: {e}")
 
-        return self._build_result(result, selected_format, config, characteristics)
+        serialization_result = self._build_result(
+            result, selected_format, config, characteristics
+        )
+
+        # Update internal statistics
+        if result.success:
+            self._update_stats(serialization_result, context)
+
+        return serialization_result
 
     def serialize_for_tool(
         self,
@@ -294,6 +308,101 @@ class AdaptiveSerializer:
             SerializationMetrics or None if no serialization performed
         """
         return self._metrics
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get serialization statistics.
+
+        Returns:
+            Dict with serialization stats including totals, by-tool, and by-format breakdowns.
+        """
+        avg_savings = 0.0
+        if self._total_original_tokens > 0:
+            avg_savings = (
+                (self._total_tokens_saved / self._total_original_tokens) * 100
+            )
+
+        # Build by_format list sorted by usage
+        format_list = [
+            {
+                "format": fmt,
+                "usage_count": stats.get("count", 0),
+                "avg_savings_percent": stats.get("avg_savings", 0.0),
+            }
+            for fmt, stats in self._format_stats.items()
+        ]
+        format_list.sort(key=lambda x: x["usage_count"], reverse=True)
+
+        return {
+            "total_serializations": self._serialization_count,
+            "total_tokens_saved": self._total_tokens_saved,
+            "avg_savings_percent": avg_savings,
+            "by_tool": self._tool_stats,
+            "by_format": format_list,
+        }
+
+    def reset_stats(self) -> None:
+        """Reset serialization statistics."""
+        self._serialization_count = 0
+        self._total_tokens_saved = 0
+        self._total_original_tokens = 0
+        self._tool_stats = {}
+        self._format_stats = {}
+
+    def _update_stats(
+        self,
+        result: "SerializationResult",
+        context: SerializationContext,
+    ) -> None:
+        """Update internal statistics after a serialization.
+
+        Args:
+            result: The serialization result
+            context: The serialization context used
+        """
+        self._serialization_count += 1
+
+        # Calculate tokens saved
+        original = result.original_json_estimate
+        serialized = result.serialized_tokens
+        saved = max(0, original - serialized)
+        self._total_tokens_saved += saved
+        self._total_original_tokens += original
+
+        savings_pct = result.estimated_savings_percent * 100
+
+        # Update tool stats
+        if context.tool_name:
+            if context.tool_name not in self._tool_stats:
+                self._tool_stats[context.tool_name] = {
+                    "usage_count": 0,
+                    "total_savings": 0,
+                    "avg_savings_percent": 0.0,
+                    "preferred_format": result.format.value,
+                }
+            ts = self._tool_stats[context.tool_name]
+            ts["usage_count"] += 1
+            ts["total_savings"] += saved
+            # Running average
+            ts["avg_savings_percent"] = (
+                (ts["avg_savings_percent"] * (ts["usage_count"] - 1) + savings_pct)
+                / ts["usage_count"]
+            )
+            ts["preferred_format"] = result.format.value
+
+        # Update format stats
+        fmt_name = result.format.value
+        if fmt_name not in self._format_stats:
+            self._format_stats[fmt_name] = {
+                "count": 0,
+                "total_savings": 0,
+                "avg_savings": 0.0,
+            }
+        fs = self._format_stats[fmt_name]
+        fs["count"] += 1
+        fs["total_savings"] += saved
+        fs["avg_savings"] = (
+            (fs["avg_savings"] * (fs["count"] - 1) + savings_pct) / fs["count"]
+        )
 
     def _get_config(self, context: SerializationContext) -> SerializationConfig:
         """Get serialization config for context.

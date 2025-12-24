@@ -1,0 +1,394 @@
+"""Events - Stream of observable agent actions.
+
+This module defines the canonical event format for observing agent execution
+in real-time. Events provide visibility into thinking, tool calls, content
+generation, state changes, and errors.
+
+Example:
+    async for event in agent.stream("Analyze this code"):
+        match event.type:
+            case EventType.CONTENT:
+                print(event.content, end="")
+            case EventType.TOOL_CALL:
+                print(f"Calling {event.tool_name}")
+            case EventType.THINKING:
+                print(f"Thinking: {event.content[:50]}...")
+"""
+
+from __future__ import annotations
+
+import time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, Optional
+
+
+class EventType(str, Enum):
+    """Types of events emitted during agent execution.
+
+    Events are categorized by their purpose:
+    - Content events: CONTENT, THINKING
+    - Tool events: TOOL_CALL, TOOL_RESULT, TOOL_ERROR
+    - State events: STAGE_CHANGE
+    - Lifecycle events: STREAM_START, STREAM_END
+    - Error events: ERROR, RECOVERY
+    - Progress events: PROGRESS, MILESTONE
+    """
+
+    # Content events
+    CONTENT = "content"
+    """Text content from the model's response."""
+
+    THINKING = "thinking"
+    """Extended thinking content (Claude's reasoning mode)."""
+
+    # Tool events
+    TOOL_CALL = "tool_call"
+    """Tool is being invoked with arguments."""
+
+    TOOL_RESULT = "tool_result"
+    """Tool has returned a result."""
+
+    TOOL_ERROR = "tool_error"
+    """Tool execution failed."""
+
+    # State events
+    STAGE_CHANGE = "stage_change"
+    """Conversation stage has changed (e.g., PLANNING -> EXECUTION)."""
+
+    # Lifecycle events
+    STREAM_START = "stream_start"
+    """Streaming response has started."""
+
+    STREAM_END = "stream_end"
+    """Streaming response has completed."""
+
+    # Error events
+    ERROR = "error"
+    """An error occurred during execution."""
+
+    RECOVERY = "recovery"
+    """Recovery attempt is being made."""
+
+    # Progress events
+    PROGRESS = "progress"
+    """Progress update (0.0 to 1.0)."""
+
+    MILESTONE = "milestone"
+    """Task milestone has been reached."""
+
+
+@dataclass
+class Event:
+    """An observable event from agent execution.
+
+    Events provide real-time visibility into what the agent is doing.
+    Use the `type` field to determine what kind of event this is and
+    which fields are relevant.
+
+    Attributes:
+        type: The type of event (see EventType enum)
+        content: Text content for CONTENT/THINKING events
+        tool_name: Tool name for tool-related events
+        tool_id: Unique identifier for tool calls
+        arguments: Arguments passed to the tool
+        result: Result returned by the tool
+        success: Whether the operation succeeded
+        old_stage: Previous stage for STAGE_CHANGE events
+        new_stage: New stage for STAGE_CHANGE events
+        error: Error message for error events
+        recoverable: Whether the error can be recovered from
+        progress: Progress value (0.0 to 1.0) for PROGRESS events
+        milestone: Milestone name for MILESTONE events
+        metadata: Additional context-specific data
+        timestamp: Unix timestamp when event was created
+
+    Example:
+        async for event in agent.stream("Refactor this"):
+            if event.is_content_event:
+                print(event.content, end="")
+            elif event.is_tool_event:
+                print(f"{event.tool_name}: {event.result[:100] if event.result else 'running...'}")
+            elif event.is_error_event:
+                print(f"Error: {event.error}")
+    """
+
+    type: EventType
+
+    # Content fields
+    content: str = ""
+
+    # Tool fields
+    tool_name: Optional[str] = None
+    tool_id: Optional[str] = None
+    arguments: Dict[str, Any] = field(default_factory=dict)
+    result: Optional[str] = None
+    success: bool = True
+
+    # State fields
+    old_stage: Optional[str] = None
+    new_stage: Optional[str] = None
+
+    # Error fields
+    error: Optional[str] = None
+    recoverable: bool = True
+
+    # Progress fields
+    progress: float = 0.0
+    milestone: Optional[str] = None
+
+    # Metadata
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    timestamp: float = field(default_factory=time.time)
+
+    @property
+    def is_tool_event(self) -> bool:
+        """Check if this is a tool-related event."""
+        return self.type in (
+            EventType.TOOL_CALL,
+            EventType.TOOL_RESULT,
+            EventType.TOOL_ERROR,
+        )
+
+    @property
+    def is_content_event(self) -> bool:
+        """Check if this is a content event."""
+        return self.type in (EventType.CONTENT, EventType.THINKING)
+
+    @property
+    def is_error_event(self) -> bool:
+        """Check if this is an error event."""
+        return self.type in (EventType.ERROR, EventType.TOOL_ERROR)
+
+    @property
+    def is_lifecycle_event(self) -> bool:
+        """Check if this is a lifecycle event."""
+        return self.type in (EventType.STREAM_START, EventType.STREAM_END)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "type": self.type.value,
+            "content": self.content,
+            "tool_name": self.tool_name,
+            "tool_id": self.tool_id,
+            "arguments": self.arguments,
+            "result": self.result,
+            "success": self.success,
+            "old_stage": self.old_stage,
+            "new_stage": self.new_stage,
+            "error": self.error,
+            "recoverable": self.recoverable,
+            "progress": self.progress,
+            "milestone": self.milestone,
+            "metadata": self.metadata,
+            "timestamp": self.timestamp,
+        }
+
+
+# =============================================================================
+# Convenience Constructors
+# =============================================================================
+
+
+def content_event(content: str, **kwargs: Any) -> Event:
+    """Create a content event.
+
+    Args:
+        content: Text content from the model
+        **kwargs: Additional event attributes
+
+    Returns:
+        Event with type=CONTENT
+    """
+    return Event(type=EventType.CONTENT, content=content, **kwargs)
+
+
+def thinking_event(content: str, **kwargs: Any) -> Event:
+    """Create a thinking event.
+
+    Args:
+        content: Thinking/reasoning content
+        **kwargs: Additional event attributes
+
+    Returns:
+        Event with type=THINKING
+    """
+    return Event(type=EventType.THINKING, content=content, **kwargs)
+
+
+def tool_call_event(
+    tool_name: str,
+    arguments: Dict[str, Any],
+    tool_id: Optional[str] = None,
+    **kwargs: Any,
+) -> Event:
+    """Create a tool call event.
+
+    Args:
+        tool_name: Name of the tool being called
+        arguments: Arguments passed to the tool
+        tool_id: Optional unique identifier for this call
+        **kwargs: Additional event attributes
+
+    Returns:
+        Event with type=TOOL_CALL
+    """
+    return Event(
+        type=EventType.TOOL_CALL,
+        tool_name=tool_name,
+        tool_id=tool_id,
+        arguments=arguments,
+        **kwargs,
+    )
+
+
+def tool_result_event(
+    tool_name: str,
+    result: str,
+    success: bool = True,
+    tool_id: Optional[str] = None,
+    **kwargs: Any,
+) -> Event:
+    """Create a tool result event.
+
+    Args:
+        tool_name: Name of the tool that returned
+        result: Result from the tool
+        success: Whether the tool succeeded
+        tool_id: Optional unique identifier for this call
+        **kwargs: Additional event attributes
+
+    Returns:
+        Event with type=TOOL_RESULT
+    """
+    return Event(
+        type=EventType.TOOL_RESULT,
+        tool_name=tool_name,
+        tool_id=tool_id,
+        result=result,
+        success=success,
+        **kwargs,
+    )
+
+
+def tool_error_event(
+    tool_name: str,
+    error: str,
+    tool_id: Optional[str] = None,
+    **kwargs: Any,
+) -> Event:
+    """Create a tool error event.
+
+    Args:
+        tool_name: Name of the tool that failed
+        error: Error message
+        tool_id: Optional unique identifier for this call
+        **kwargs: Additional event attributes
+
+    Returns:
+        Event with type=TOOL_ERROR
+    """
+    return Event(
+        type=EventType.TOOL_ERROR,
+        tool_name=tool_name,
+        tool_id=tool_id,
+        error=error,
+        success=False,
+        **kwargs,
+    )
+
+
+def stage_change_event(
+    old_stage: str,
+    new_stage: str,
+    **kwargs: Any,
+) -> Event:
+    """Create a stage change event.
+
+    Args:
+        old_stage: Previous conversation stage
+        new_stage: New conversation stage
+        **kwargs: Additional event attributes
+
+    Returns:
+        Event with type=STAGE_CHANGE
+    """
+    return Event(
+        type=EventType.STAGE_CHANGE,
+        old_stage=old_stage,
+        new_stage=new_stage,
+        **kwargs,
+    )
+
+
+def error_event(
+    error: str,
+    recoverable: bool = True,
+    **kwargs: Any,
+) -> Event:
+    """Create an error event.
+
+    Args:
+        error: Error message
+        recoverable: Whether the error can be recovered from
+        **kwargs: Additional event attributes
+
+    Returns:
+        Event with type=ERROR
+    """
+    return Event(
+        type=EventType.ERROR,
+        error=error,
+        recoverable=recoverable,
+        success=False,
+        **kwargs,
+    )
+
+
+def stream_start_event(**kwargs: Any) -> Event:
+    """Create a stream start event.
+
+    Returns:
+        Event with type=STREAM_START
+    """
+    return Event(type=EventType.STREAM_START, **kwargs)
+
+
+def stream_end_event(success: bool = True, error: Optional[str] = None, **kwargs: Any) -> Event:
+    """Create a stream end event.
+
+    Args:
+        success: Whether streaming completed successfully
+        error: Error message if failed
+
+    Returns:
+        Event with type=STREAM_END
+    """
+    return Event(type=EventType.STREAM_END, success=success, error=error, **kwargs)
+
+
+def progress_event(progress: float, **kwargs: Any) -> Event:
+    """Create a progress event.
+
+    Args:
+        progress: Progress value from 0.0 to 1.0
+        **kwargs: Additional event attributes
+
+    Returns:
+        Event with type=PROGRESS
+    """
+    return Event(type=EventType.PROGRESS, progress=progress, **kwargs)
+
+
+def milestone_event(milestone: str, **kwargs: Any) -> Event:
+    """Create a milestone event.
+
+    Args:
+        milestone: Name/description of the milestone reached
+        **kwargs: Additional event attributes
+
+    Returns:
+        Event with type=MILESTONE
+    """
+    return Event(type=EventType.MILESTONE, milestone=milestone, **kwargs)

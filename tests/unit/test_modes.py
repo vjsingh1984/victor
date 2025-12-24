@@ -23,6 +23,7 @@ from victor.agent.mode_controller import (
     get_mode_controller,
     reset_mode_controller,
 )
+from victor.core.container import reset_container
 
 
 @pytest.fixture
@@ -291,8 +292,10 @@ class TestGlobalModeController:
 
     def test_reset_mode_manager(self):
         """Test resetting the mode controller."""
+        reset_container()
         reset_mode_controller()
         manager1 = get_mode_controller()
+        reset_container()
         reset_mode_controller()
         manager2 = get_mode_controller()
 

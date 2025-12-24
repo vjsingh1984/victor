@@ -71,7 +71,7 @@ class DummyTool(BaseTool):
         super().__init__()
         self.calls: list[Dict[str, Any]] = []
 
-    async def execute(self, context: Dict[str, Any], **kwargs: Any):
+    async def execute(self, _exec_ctx: Dict[str, Any] = None, **kwargs: Any):
         self.calls.append(kwargs)
         return SimpleNamespace(success=True, output="ok", error=None)
 
@@ -82,7 +82,7 @@ async def test_orchestrator_executes_streamed_tool_call(monkeypatch):
     settings = Settings(
         analytics_enabled=False,
         analytics_log_file=str(Path("tmp_usage.log")),
-        tool_cache_dir=str(Path("tmp_cache")),
+        tool_cache_dir_override=str(Path("tmp_cache")),
     )
     settings.tool_cache_enabled = False
     provider = DummyStreamProvider()
@@ -98,8 +98,10 @@ async def test_orchestrator_executes_streamed_tool_call(monkeypatch):
     dummy_tool = DummyTool()
     orch.tools = ToolRegistry()
     orch.tools.register(dummy_tool)
-    # Update tool_executor to use the new registry
+    # Update all components that reference the tools registry
     orch.tool_executor.tools = orch.tools
+    orch._tool_pipeline.tools = orch.tools  # Pipeline's registry
+    orch._tool_pipeline.executor.tools = orch.tools  # Pipeline's executor registry
 
     # Bypass heavy semantic selector; return just our dummy tool definition
     orch._select_tools = lambda *args, **kwargs: [

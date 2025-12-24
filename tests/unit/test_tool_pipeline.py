@@ -196,7 +196,13 @@ class TestToolPipeline:
 
     @pytest.mark.asyncio
     async def test_skip_repeated_failures(self, pipeline, mock_tool_executor):
-        """Test that repeated failing calls are skipped."""
+        """Test that repeated failing calls are skipped.
+
+        Note: With batch deduplication enabled (default), identical tool calls
+        in the same batch are deduplicated first, so the skip reason will be
+        'Deduplicated' rather than 'Repeated failing'. The 'Repeated failing'
+        behavior still applies to subsequent batches/iterations.
+        """
         # Make the tool fail
         mock_tool_executor.execute.return_value = ToolExecutionResult(
             tool_name="failing_tool",
@@ -212,10 +218,11 @@ class TestToolPipeline:
 
         result = await pipeline.execute_tool_calls(tool_calls, {})
 
-        # First call fails, second is skipped
+        # First call fails, second is skipped (deduplicated in same batch)
         assert result.failed_calls == 1
         assert result.skipped_calls == 1
-        assert "Repeated failing" in result.results[1].skip_reason
+        # With batch deduplication enabled, duplicates in same batch are deduped first
+        assert "Deduplicated" in result.results[1].skip_reason
 
     @pytest.mark.asyncio
     async def test_argument_normalization(self, pipeline, mock_tool_executor):
@@ -368,9 +375,11 @@ class TestToolPipelineParallelExecution:
     @pytest.mark.asyncio
     async def test_parallel_skips_invalid_tools(self, parallel_pipeline, mock_tool_registry):
         """Test that parallel execution skips invalid tool names."""
+
         # Disable one tool
         def is_tool_enabled(name):
             return name != "disabled_tool"
+
         mock_tool_registry.is_tool_enabled.side_effect = is_tool_enabled
 
         tool_calls = [
@@ -390,9 +399,7 @@ class TestToolPipelineParallelExecution:
     async def test_parallel_skips_repeated_failures(self, parallel_pipeline, mock_tool_executor):
         """Test that parallel execution skips repeated failing calls."""
         # Add a failed signature
-        parallel_pipeline._failed_signatures.add(
-            ("failing_tool", '{"x": 1}')
-        )
+        parallel_pipeline._failed_signatures.add(("failing_tool", '{"x": 1}'))
 
         tool_calls = [
             {"name": "test_tool", "arguments": {"a": 1}},
@@ -426,9 +433,7 @@ class TestToolPipelineParallelExecution:
             {"name": "tool3", "arguments": {}},
         ]
 
-        result = await pipeline.execute_tool_calls_parallel(
-            tool_calls, {}, force_parallel=True
-        )
+        result = await pipeline.execute_tool_calls_parallel(tool_calls, {}, force_parallel=True)
 
         # Should stop after budget exhausted
         assert result.budget_exhausted is True
@@ -499,6 +504,7 @@ class TestToolPipelineNormalization:
 
     def test_get_call_signature_non_serializable(self, pipeline):
         """Test generating call signature with non-serializable args."""
+
         class NonSerializable:
             pass
 
@@ -532,7 +538,9 @@ class TestToolPipelineCodeCorrection:
         return middleware
 
     @pytest.fixture
-    def pipeline_with_correction(self, mock_tool_registry, mock_tool_executor, mock_correction_middleware):
+    def pipeline_with_correction(
+        self, mock_tool_registry, mock_tool_executor, mock_correction_middleware
+    ):
         """Create a pipeline with code correction enabled."""
         config = ToolPipelineConfig(
             tool_budget=20,
@@ -621,7 +629,7 @@ class TestToolPipelineCodeCorrection:
         )
 
         tool_calls = [{"name": "read_file", "arguments": {"path": "test.py"}}]
-        result = await pipeline.execute_tool_calls(tool_calls, {})
+        await pipeline.execute_tool_calls(tool_calls, {})
 
         # validate_and_fix should not be called
         mock_correction_middleware.validate_and_fix.assert_not_called()
@@ -708,6 +716,7 @@ class TestToolPipelineCallbacks:
     @pytest.mark.asyncio
     async def test_on_tool_start_exception_handled(self, pipeline, mock_tool_executor):
         """Test that exceptions in on_tool_start are handled."""
+
         def failing_start(name, args):
             raise Exception("Start callback error")
 
@@ -722,6 +731,7 @@ class TestToolPipelineCallbacks:
     @pytest.mark.asyncio
     async def test_on_tool_complete_exception_handled(self, pipeline, mock_tool_executor):
         """Test that exceptions in on_tool_complete are handled."""
+
         def failing_complete(result):
             raise Exception("Complete callback error")
 

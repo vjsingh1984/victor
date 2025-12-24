@@ -22,6 +22,7 @@ Handles cleaning and validation of model responses, including:
 - AST-based code extraction and cleanup (for LLM-generated code)
 - Markdown code block extraction
 - Python syntax validation
+- **Real-time streaming content filtering for thinking tokens**
 """
 
 import ast
@@ -29,9 +30,320 @@ import logging
 import re
 import textwrap
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+class ThinkingState(Enum):
+    """State for tracking thinking blocks during streaming."""
+
+    NORMAL = "normal"  # Outside thinking block
+    IN_THINKING = "in_thinking"  # Inside a thinking block
+    SUPPRESSED = "suppressed"  # Thinking content being suppressed
+
+
+@dataclass
+class StreamingChunkResult:
+    """Result of processing a streaming chunk.
+
+    Attributes:
+        content: The processed content to display
+        is_thinking: Whether this content is from thinking/reasoning
+        state_changed: Whether we transitioned into/out of thinking state
+        entering_thinking: True if we just entered thinking state
+        exiting_thinking: True if we just exited thinking state
+    """
+
+    content: str
+    is_thinking: bool = False
+    state_changed: bool = False
+    entering_thinking: bool = False
+    exiting_thinking: bool = False
+
+
+class StreamingContentFilter:
+    """Real-time content filter for streaming responses.
+
+    Processes thinking tokens and tracks thinking state during streaming.
+    Designed to be called chunk-by-chunk as content arrives.
+
+    Key features:
+    - Detects DeepSeek thinking markers (<｜begin▁of▁thinking｜>, <｜end▁of▁thinking｜>)
+    - Detects Qwen3 thinking blocks (<think>...</think>)
+    - Tracks thinking state across chunks
+    - Buffers partial tokens at chunk boundaries
+    - Limits thinking content length to prevent runaway generation
+    - Returns styled results for rendering thinking content dimmed/italic
+
+    Usage:
+        filter = StreamingContentFilter()
+
+        async for chunk in stream:
+            result = filter.process_chunk(chunk.content)
+            if result.entering_thinking:
+                show_thinking_header()
+            if result.content:
+                if result.is_thinking:
+                    display_dimmed(result.content)
+                else:
+                    display_normal(result.content)
+            if result.exiting_thinking:
+                show_response_separator()
+
+            if filter.should_abort():
+                break  # Thinking exceeded max length
+    """
+
+    # Max chars of thinking content before aborting (prevents runaway)
+    MAX_THINKING_CONTENT: int = 50000
+
+    # Thinking token patterns (compiled for efficiency) - class-level constants
+    THINKING_START_PATTERNS: List[re.Pattern] = [
+        re.compile(r"<｜begin▁of▁thinking｜>"),  # DeepSeek
+        re.compile(r"<\|begin_of_thinking\|>"),  # ASCII variant
+        re.compile(r"<think>"),  # Qwen3
+    ]
+
+    THINKING_END_PATTERNS: List[re.Pattern] = [
+        re.compile(r"<｜end▁of▁thinking｜>"),  # DeepSeek
+        re.compile(r"<\|end_of_thinking\|>"),  # ASCII variant
+        re.compile(r"</think>"),  # Qwen3
+    ]
+
+    # Individual token patterns to strip (single markers without blocks)
+    INLINE_TOKEN_PATTERNS: List[re.Pattern] = [
+        re.compile(r"<｜end▁of▁thinking｜>"),
+        re.compile(r"<｜begin▁of▁thinking｜>"),
+        re.compile(r"<\|end_of_thinking\|>"),
+        re.compile(r"<\|begin_of_thinking\|>"),
+        re.compile(r"</think>"),
+        re.compile(r"<think>"),
+    ]
+
+    def __init__(self, suppress_thinking: bool = False):
+        """Initialize the streaming filter.
+
+        Args:
+            suppress_thinking: If True, completely suppress thinking content.
+                              If False (default), return thinking content marked as such.
+        """
+        self._state = ThinkingState.NORMAL
+        self._buffer = ""  # Buffer for partial tokens
+        self._thinking_content_length = 0
+        self._total_thinking_length = 0
+        self._should_abort = False
+        self._abort_reason: Optional[str] = None
+        self._suppress_thinking = suppress_thinking
+
+    def reset(self) -> None:
+        """Reset filter state for a new response."""
+        self._state = ThinkingState.NORMAL
+        self._buffer = ""
+        self._thinking_content_length = 0
+        self._total_thinking_length = 0
+        self._should_abort = False
+        self._abort_reason = None
+
+    def process_chunk(self, chunk: str) -> StreamingChunkResult:
+        """Process a content chunk, detecting thinking state transitions.
+
+        Args:
+            chunk: Raw content chunk from streaming response
+
+        Returns:
+            StreamingChunkResult with content and state information
+        """
+        if not chunk:
+            return StreamingChunkResult(content="")
+
+        # Combine with buffer from previous chunk
+        text = self._buffer + chunk
+        self._buffer = ""
+
+        # Keep potential partial token at end of chunk
+        # (handles tokens split across chunk boundaries)
+        partial_start = self._find_partial_token_start(text)
+        if partial_start >= 0:
+            self._buffer = text[partial_start:]
+            text = text[:partial_start]
+
+        # Process based on current state
+        if self._state == ThinkingState.NORMAL:
+            return self._process_normal_state(text)
+        else:  # IN_THINKING
+            return self._process_thinking_state(text)
+
+    def _process_normal_state(self, text: str) -> StreamingChunkResult:
+        """Process text when in normal (non-thinking) state."""
+        # Check for thinking start markers
+        for pattern in self.THINKING_START_PATTERNS:
+            match = pattern.search(text)
+            if match:
+                # Output text before the marker
+                before = text[: match.start()]
+                after = text[match.end() :]
+
+                # Enter thinking state
+                self._state = ThinkingState.IN_THINKING
+                self._thinking_content_length = 0
+                logger.debug("StreamingContentFilter: Entered thinking state")
+
+                # Process remaining text in thinking state
+                thinking_result = self._process_thinking_state(after)
+
+                # Combine: normal content before, then thinking content
+                # Return the before content (normal) and flag state change
+                result_content = self._strip_inline_tokens(before)
+                if thinking_result.content and not self._suppress_thinking:
+                    # We have both normal and thinking content
+                    return StreamingChunkResult(
+                        content=result_content,
+                        is_thinking=False,
+                        state_changed=True,
+                        entering_thinking=True,
+                        exiting_thinking=thinking_result.exiting_thinking,
+                    )
+                return StreamingChunkResult(
+                    content=result_content,
+                    is_thinking=False,
+                    state_changed=True,
+                    entering_thinking=True,
+                )
+
+        # No thinking markers, strip any orphaned tokens and return
+        return StreamingChunkResult(
+            content=self._strip_inline_tokens(text),
+            is_thinking=False,
+        )
+
+    def _process_thinking_state(self, text: str) -> StreamingChunkResult:
+        """Process text when inside a thinking block."""
+        # Track thinking content length
+        self._thinking_content_length += len(text)
+        self._total_thinking_length += len(text)
+
+        # Check for max thinking content
+        if self._thinking_content_length > self.MAX_THINKING_CONTENT:
+            self._should_abort = True
+            self._abort_reason = (
+                f"Thinking content exceeded {self.MAX_THINKING_CONTENT} chars. "
+                "Model may be stuck in a reasoning loop."
+            )
+            logger.warning(f"StreamingContentFilter: {self._abort_reason}")
+            return StreamingChunkResult(content="", is_thinking=True)
+
+        # Check for thinking end markers
+        for pattern in self.THINKING_END_PATTERNS:
+            match = pattern.search(text)
+            if match:
+                # Get thinking content before end marker
+                thinking_content = text[: match.start()]
+                after = text[match.end() :]
+                self._state = ThinkingState.NORMAL
+                logger.debug(
+                    f"StreamingContentFilter: Exited thinking state "
+                    f"(thinking content: {self._thinking_content_length} chars)"
+                )
+
+                # Process remaining text in normal state
+                normal_result = self._process_normal_state(after)
+
+                # Return thinking content with state change flag
+                if self._suppress_thinking:
+                    return StreamingChunkResult(
+                        content=normal_result.content,
+                        is_thinking=False,
+                        state_changed=True,
+                        exiting_thinking=True,
+                    )
+                return StreamingChunkResult(
+                    content=self._strip_inline_tokens(thinking_content),
+                    is_thinking=True,
+                    state_changed=True,
+                    exiting_thinking=True,
+                )
+
+        # Still in thinking state, return thinking content (or empty if suppressed)
+        if self._suppress_thinking:
+            return StreamingChunkResult(content="", is_thinking=True)
+        return StreamingChunkResult(
+            content=self._strip_inline_tokens(text),
+            is_thinking=True,
+        )
+
+    def _strip_inline_tokens(self, text: str) -> str:
+        """Strip any inline thinking tokens from text."""
+        for pattern in self.INLINE_TOKEN_PATTERNS:
+            text = pattern.sub("", text)
+        return text
+
+    def _find_partial_token_start(self, text: str) -> int:
+        """Find where a partial token might start at end of text.
+
+        Looks for incomplete tokens like '<｜begin', '<think', etc.
+
+        Returns:
+            Index where partial token starts, or -1 if none
+        """
+        if not text:
+            return -1
+
+        # Check last N chars for start of known tokens
+        # Max token length is about 25 chars
+        check_len = min(len(text), 25)
+        suffix = text[-check_len:]
+
+        # Token prefixes to look for
+        prefixes = ["<｜", "<|", "<think", "</think", "<think>"]
+
+        for prefix in prefixes:
+            for i in range(1, len(prefix)):
+                partial = prefix[:i]
+                if suffix.endswith(partial):
+                    return len(text) - i
+
+        return -1
+
+    def should_abort(self) -> bool:
+        """Check if streaming should be aborted due to excessive thinking."""
+        return self._should_abort
+
+    @property
+    def abort_reason(self) -> Optional[str]:
+        """Reason for abort if should_abort() is True."""
+        return self._abort_reason
+
+    @property
+    def state(self) -> ThinkingState:
+        """Current thinking state."""
+        return self._state
+
+    @property
+    def is_thinking(self) -> bool:
+        """Whether we are currently in thinking state."""
+        return self._state == ThinkingState.IN_THINKING
+
+    @property
+    def total_thinking_length(self) -> int:
+        """Total length of thinking content processed."""
+        return self._total_thinking_length
+
+    def flush(self) -> StreamingChunkResult:
+        """Flush any remaining buffered content.
+
+        Call this when streaming ends to get any buffered content.
+
+        Returns:
+            StreamingChunkResult with any remaining content
+        """
+        result = StreamingChunkResult(
+            content=self._strip_inline_tokens(self._buffer),
+            is_thinking=self._state == ThinkingState.IN_THINKING,
+        )
+        self._buffer = ""
+        return result
 
 
 @dataclass

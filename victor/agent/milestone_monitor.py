@@ -440,7 +440,7 @@ class TaskMilestoneMonitor:
 
         # Model-specific exploration settings (can be overridden by orchestrator)
         self._exploration_multiplier: float = 1.0
-        self._continuation_patience: int = 3
+        self._continuation_patience: int = 10
 
         # Lazy initialization of classifier (use singleton to avoid duplicate loading)
         if self._use_semantic:
@@ -453,7 +453,7 @@ class TaskMilestoneMonitor:
                 self._use_semantic = False
 
     def set_model_exploration_settings(
-        self, exploration_multiplier: float = 1.0, continuation_patience: int = 3
+        self, exploration_multiplier: float = 1.0, continuation_patience: int = 10
     ) -> None:
         """Set model-specific exploration settings.
 

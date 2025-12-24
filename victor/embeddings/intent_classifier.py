@@ -58,6 +58,85 @@ CONTINUATION_HEURISTIC_PATTERNS = [
 ]
 
 
+# Patterns that indicate the model is STUCK in a loop (says what it will do but doesn't)
+# These should be detected to prevent continuation loops
+STUCK_LOOP_HEURISTIC_PATTERNS = [
+    # "I'm going to" without tool call
+    re.compile(r"\bi[''`]?m\s+going\s+to\s+(read|examine|check|call|use)\b", re.IGNORECASE),
+    # "I will now" without action
+    re.compile(r"\bi\s+will\s+now\s+(read|examine|check|call|use)\b", re.IGNORECASE),
+    # Long preamble about what will be done (indicates stalling)
+    re.compile(
+        r"(first|to\s+begin|to\s+start),?\s+i[''`]?(ll|'ll|m\s+going\s+to)",
+        re.IGNORECASE,
+    ),
+    # Repeating tool name like "I'll use search... I'll use read..."
+    re.compile(r"\bi[''`]?ll\s+use\s+\w+.*\bi[''`]?ll\s+use\s+\w+", re.IGNORECASE | re.DOTALL),
+]
+
+
+def _has_stuck_loop_heuristic(text: str) -> bool:
+    """Check if text indicates model is stuck in a loop (planning but not executing).
+
+    This detects patterns where the model keeps saying what it will do
+    but never actually makes tool calls.
+
+    The detection requires either:
+    - 3+ planning statements (strong indicator of stalling)
+    - The repeating pattern "I'll use X... I'll use Y" (already indicates multiple plans)
+    - 2+ planning statements from different pattern types
+
+    This threshold balances:
+    - Too low (1-2): False positives when model legitimately plans before acting
+    - Too high (4+): Misses actual stuck loops where model can't execute
+
+    Args:
+        text: Text to check
+
+    Returns:
+        True if text shows stuck loop patterns
+    """
+    # Check if multiple planning statements exist (strong stuck signal)
+    planning_count = 0
+    has_repeating_pattern = False
+    matched_pattern_indices = set()
+
+    for i, pattern in enumerate(STUCK_LOOP_HEURISTIC_PATTERNS):
+        matches = pattern.findall(text)
+        match_count = len(matches)
+        planning_count += match_count
+
+        if match_count > 0:
+            matched_pattern_indices.add(i)
+
+        # Pattern 3 (index 3) is the "repeating tool use" pattern - strongest indicator
+        # This pattern already implies 2+ planning statements in one match
+        if i == 3 and match_count > 0:
+            has_repeating_pattern = True
+
+    # The repeating pattern is a strong signal on its own (implies 2+ I'll use statements)
+    if has_repeating_pattern:
+        logger.debug(
+            f"Stuck loop heuristic: found repeating 'I'll use X... I'll use Y' pattern"
+        )
+        return True
+
+    # Require 3+ planning statements OR 2+ from different pattern types
+    # This prevents false positives for legitimate planning responses
+    if planning_count >= 3:
+        logger.debug(f"Stuck loop heuristic: found {planning_count} planning statements (threshold=3)")
+        return True
+
+    # 2+ statements from different pattern types indicates diverse planning without action
+    if planning_count >= 2 and len(matched_pattern_indices) >= 2:
+        logger.debug(
+            f"Stuck loop heuristic: found {planning_count} statements from {len(matched_pattern_indices)} pattern types"
+        )
+        return True
+
+    return False
+
+
 # Compiled regex patterns for explicit asking-for-input detection
 # These are strong signals that should override semantic classification
 ASKING_INPUT_HEURISTIC_PATTERNS = [
@@ -186,6 +265,7 @@ class IntentType(Enum):
     CONTINUATION = "continuation"  # Model wants to continue (future-looking)
     COMPLETION = "completion"  # Model has finished (summary/conclusion)
     ASKING_INPUT = "asking_input"  # Model is asking for user input/confirmation
+    STUCK_LOOP = "stuck_loop"  # Model is stuck in a loop (planning but not executing)
     NEUTRAL = "neutral"  # Neither clear continuation nor completion
 
 
@@ -566,6 +646,20 @@ class IntentClassifier:
         for item, score in asking_input_results[:2]:
             top_matches.append((f"ask:{item.text[:50]}", score))
 
+        # HEURISTIC OVERRIDE 0: Check for stuck loop patterns FIRST
+        # If model keeps saying what it will do with multiple planning statements,
+        # it's likely stuck and not actually making progress
+        if _has_stuck_loop_heuristic(text):
+            top_matches.append(("heuristic:stuck_loop_pattern", 0.85))
+            logger.debug(
+                "STUCK_LOOP detected via heuristic override (conf=0.85)"
+            )
+            return IntentResult(
+                intent=IntentType.STUCK_LOOP,
+                confidence=0.85,
+                top_matches=top_matches,
+            )
+
         # HEURISTIC OVERRIDE 1: Check for explicit continuation patterns
         # Patterns like "let me read", "let me check" are unambiguous
         if _has_continuation_heuristic(text):
@@ -699,6 +793,20 @@ class IntentClassifier:
             top_matches.append((f"comp:{item.text[:50]}", score))
         for item, score in asking_input_results[:2]:
             top_matches.append((f"ask:{item.text[:50]}", score))
+
+        # HEURISTIC OVERRIDE 0: Check for stuck loop patterns FIRST
+        # If model keeps saying what it will do with multiple planning statements,
+        # it's likely stuck and not actually making progress
+        if _has_stuck_loop_heuristic(text):
+            top_matches.append(("heuristic:stuck_loop_pattern", 0.85))
+            logger.debug(
+                "STUCK_LOOP detected via heuristic override (conf=0.85)"
+            )
+            return IntentResult(
+                intent=IntentType.STUCK_LOOP,
+                confidence=0.85,
+                top_matches=top_matches,
+            )
 
         # HEURISTIC OVERRIDE 1: Check for explicit continuation patterns
         # Patterns like "let me read", "let me check" are unambiguous

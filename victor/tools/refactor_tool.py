@@ -252,11 +252,13 @@ def _rename_in_file(
     for line_num, line in enumerate(lines, 1):
         if re.search(pattern, line):
             modified_line = re.sub(pattern, new_name, line)
-            changes.append({
-                "line": line_num,
-                "old": line.strip(),
-                "new": modified_line.strip(),
-            })
+            changes.append(
+                {
+                    "line": line_num,
+                    "old": line.strip(),
+                    "new": modified_line.strip(),
+                }
+            )
             modified_lines.append(modified_line)
         else:
             modified_lines.append(line)
@@ -278,10 +280,20 @@ def _rename_in_file(
     priority=Priority.MEDIUM,  # Task-specific refactoring
     access_mode=AccessMode.WRITE,  # Modifies source files
     danger_level=DangerLevel.LOW,  # Changes are undoable
-    keywords=["rename", "refactor", "symbol", "variable", "function", "class", "project", "multi-file", "ast"],
+    keywords=[
+        "rename",
+        "refactor",
+        "symbol",
+        "variable",
+        "function",
+        "class",
+        "project",
+        "multi-file",
+        "ast",
+    ],
     mandatory_keywords=["rename variable", "rename function", "refactor code"],  # Force inclusion
     task_types=["refactor", "edit"],  # Classification-aware selection
-    stages=["executing", "refactoring"],  # Conversation stages where relevant
+    stages=["execution"],  # Conversation stages where relevant
 )
 async def rename(
     old_name: str,
@@ -343,7 +355,10 @@ async def rename(
     # Validate scope
     valid_scopes = ("file", "directory", "project")
     if scope not in valid_scopes:
-        return {"success": False, "error": f"Invalid scope '{scope}'. Must be one of: {valid_scopes}"}
+        return {
+            "success": False,
+            "error": f"Invalid scope '{scope}'. Must be one of: {valid_scopes}",
+        }
 
     path_obj = Path(path).resolve()
 
@@ -359,7 +374,10 @@ async def rename(
         if not path_obj.exists():
             return {"success": False, "error": f"Directory not found: {path}"}
         if not path_obj.is_dir():
-            return {"success": False, "error": f"Path must be a directory for scope='{scope}': {path}"}
+            return {
+                "success": False,
+                "error": f"Path must be a directory for scope='{scope}': {path}",
+            }
 
     # Collect files to process
     files = _collect_python_files(path_obj, scope, depth)
@@ -387,7 +405,10 @@ async def rename(
         if scope == "file":
             return {"success": False, "error": f"Symbol '{old_name}' not found in {path}"}
         else:
-            return {"success": False, "error": f"No occurrences of '{old_name}' found in {len(files)} files"}
+            return {
+                "success": False,
+                "error": f"No occurrences of '{old_name}' found in {len(files)} files",
+            }
 
     # Build report
     report = []
@@ -406,7 +427,11 @@ async def rename(
     # Show changes per file
     report.append("Changes by file:")
     for fc in all_file_changes[:15]:  # Show first 15 files
-        rel_path = Path(fc["file_path"]).relative_to(Path.cwd()) if Path(fc["file_path"]).is_relative_to(Path.cwd()) else fc["file_path"]
+        rel_path = (
+            Path(fc["file_path"]).relative_to(Path.cwd())
+            if Path(fc["file_path"]).is_relative_to(Path.cwd())
+            else fc["file_path"]
+        )
         report.append(f"\n  {rel_path} ({len(fc['changes'])} changes):")
         for change in fc["changes"][:5]:  # Show first 5 changes per file
             report.append(f"    Line {change['line']}: {change['old'][:50]}...")
@@ -456,6 +481,8 @@ async def rename(
     access_mode=AccessMode.WRITE,  # Modifies source files
     danger_level=DangerLevel.LOW,  # Changes are undoable
     keywords=["extract", "refactor", "function", "method", "code block"],
+    mandatory_keywords=["refactor", "extract function", "extract method"],  # From MANDATORY_TOOL_KEYWORDS
+    stages=["execution"],  # Conversation stages where relevant
 )
 async def extract(
     file: str,
@@ -603,6 +630,7 @@ async def extract(
     access_mode=AccessMode.WRITE,  # Modifies source files
     danger_level=DangerLevel.LOW,  # Changes are undoable
     keywords=["inline", "refactor", "variable", "replace", "expand"],
+    mandatory_keywords=["refactor", "inline variable"],  # From MANDATORY_TOOL_KEYWORDS
 )
 async def inline(
     file: str,
@@ -907,5 +935,3 @@ async def organize_imports(
         "local_count": len(local_imports),
         "formatted_report": "\n".join(report),
     }
-
-

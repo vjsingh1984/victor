@@ -134,12 +134,14 @@ async def _http_test(
     if expected_status is not None:
         passed = response.status_code == expected_status
         all_passed = all_passed and passed
-        validations.append({
-            "test": "Status code",
-            "expected": expected_status,
-            "actual": response.status_code,
-            "passed": passed,
-        })
+        validations.append(
+            {
+                "test": "Status code",
+                "expected": expected_status,
+                "actual": response.status_code,
+                "passed": passed,
+            }
+        )
 
     return {
         "success": all_passed,
@@ -225,8 +227,16 @@ async def http(
             )
         elif mode_lower == "test":
             return await _http_test(
-                method, url, headers, params, json, data, auth, follow_redirects, timeout,
-                expected_status
+                method,
+                url,
+                headers,
+                params,
+                json,
+                data,
+                auth,
+                follow_redirects,
+                timeout,
+                expected_status,
             )
         else:
             return {"success": False, "error": f"Unknown mode '{mode}'. Use 'request' or 'test'."}

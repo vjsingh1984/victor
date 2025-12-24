@@ -52,6 +52,10 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.payload_limiter import (
+    ProviderPayloadLimiter,
+    TruncationStrategy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -146,15 +150,23 @@ class GroqProvider(BaseProvider):
             timeout: Request timeout (default: 60s - Groq is fast)
             **kwargs: Additional configuration
         """
-        # Get API key from parameter or environment
+        # Try provided key, then env vars, then keyring/api_keys.yaml
         # Support both GROQ_API_KEY and GROQCLOUD_API_KEY for flexibility
         self._api_key = (
             api_key or os.environ.get("GROQ_API_KEY") or os.environ.get("GROQCLOUD_API_KEY", "")
         )
         if not self._api_key:
+            try:
+                from victor.config.api_keys import get_api_key
+
+                # Try both groqcloud and groq aliases
+                self._api_key = get_api_key("groqcloud") or get_api_key("groq") or ""
+            except ImportError:
+                pass
+        if not self._api_key:
             logger.warning(
                 "Groq API key not provided. Set GROQ_API_KEY environment variable "
-                "or pass api_key parameter."
+                "or add to keyring with: victor keys --set groqcloud --keyring"
             )
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)
@@ -167,6 +179,14 @@ class GroqProvider(BaseProvider):
                 "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
             },
+        )
+
+        # Initialize payload limiter for Groq's strict ~4MB limit
+        # Groq uses LPU hardware which has strict payload constraints
+        self._payload_limiter = ProviderPayloadLimiter(
+            provider_name="groq",
+            max_payload_bytes=4 * 1024 * 1024,  # 4MB
+            default_strategy=TruncationStrategy.TRUNCATE_TOOL_RESULTS,
         )
 
     @property
@@ -209,6 +229,24 @@ class GroqProvider(BaseProvider):
             ProviderError: If request fails
         """
         try:
+            # Check payload size before building request
+            ok, warning = self._payload_limiter.check_limit(messages, tools)
+            if warning:
+                logger.warning(warning)
+
+            # Truncate if payload exceeds Groq's limit
+            if not ok:
+                truncation_result = self._payload_limiter.truncate_if_needed(messages, tools)
+                messages = truncation_result.messages
+                tools = truncation_result.tools
+                if truncation_result.warning:
+                    logger.warning(truncation_result.warning)
+                if truncation_result.truncated:
+                    logger.info(
+                        f"Truncated payload: removed {truncation_result.messages_removed} messages, "
+                        f"saved {truncation_result.bytes_saved:,} bytes"
+                    )
+
             payload = self._build_request_payload(
                 messages=messages,
                 model=model,
@@ -278,6 +316,24 @@ class GroqProvider(BaseProvider):
             ProviderError: If request fails
         """
         try:
+            # Check payload size before building request
+            ok, warning = self._payload_limiter.check_limit(messages, tools)
+            if warning:
+                logger.warning(warning)
+
+            # Truncate if payload exceeds Groq's limit
+            if not ok:
+                truncation_result = self._payload_limiter.truncate_if_needed(messages, tools)
+                messages = truncation_result.messages
+                tools = truncation_result.tools
+                if truncation_result.warning:
+                    logger.warning(truncation_result.warning)
+                if truncation_result.truncated:
+                    logger.info(
+                        f"Truncated payload: removed {truncation_result.messages_removed} messages, "
+                        f"saved {truncation_result.bytes_saved:,} bytes"
+                    )
+
             payload = self._build_request_payload(
                 messages=messages,
                 model=model,
