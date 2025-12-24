@@ -12,7 +12,7 @@ console = Console()
 logger = logging.getLogger(__name__)
 
 # Supported providers for model listing
-SUPPORTED_PROVIDERS = ["ollama", "anthropic", "openai", "google"]
+SUPPORTED_PROVIDERS = ["ollama", "lmstudio", "llamacpp", "vllm", "anthropic", "openai", "google"]
 
 
 @models_app.command("list")
@@ -23,22 +23,35 @@ def list_models(
         "-p",
         help=f"Provider to list models from ({', '.join(SUPPORTED_PROVIDERS)})",
     ),
+    endpoint: str = typer.Option(
+        None,
+        "--endpoint",
+        "-e",
+        help="Endpoint URL for LMStudio/Ollama (e.g., http://192.168.1.20:1234)",
+    ),
 ) -> None:
     """List available models for a provider.
 
-    Supports: ollama, anthropic, openai, google
+    Supports: ollama, lmstudio, anthropic, openai, google
 
     Examples:
         victor models list -p ollama
+        victor models list -p lmstudio
+        victor models list -p lmstudio -e http://192.168.1.20:1234
         victor models list -p anthropic
         victor models list -p openai
         victor models list -p google
     """
-    asyncio.run(list_models_async(provider))
+    asyncio.run(list_models_async(provider, endpoint))
 
 
-async def list_models_async(provider: str) -> None:
-    """Async function to list models."""
+async def list_models_async(provider: str, endpoint: str = None) -> None:
+    """Async function to list models.
+
+    Args:
+        provider: Provider name
+        endpoint: Optional endpoint URL override
+    """
     settings = load_settings()
     provider = provider.lower()
 
@@ -50,6 +63,12 @@ async def list_models_async(provider: str) -> None:
     try:
         if provider == "ollama":
             await _list_ollama_models(settings)
+        elif provider == "lmstudio":
+            await _list_lmstudio_models(settings, endpoint)
+        elif provider == "llamacpp":
+            await _list_llamacpp_models(settings, endpoint)
+        elif provider == "vllm":
+            await _list_vllm_models(settings, endpoint)
         elif provider == "anthropic":
             await _list_anthropic_models(settings)
         elif provider == "openai":
@@ -108,6 +127,271 @@ async def _list_ollama_models(settings) -> None:
         console.print("\nMake sure Ollama is running: [bold]ollama serve[/]")
     finally:
         await ollama.close()
+
+
+async def _list_lmstudio_models(settings, endpoint: str = None) -> None:
+    """List LMStudio models with capability detection.
+
+    Args:
+        settings: Application settings
+        endpoint: Optional LMStudio endpoint URL
+    """
+    from victor.providers.lmstudio_provider import (
+        LMStudioProvider,
+        _model_supports_tools,
+        _model_uses_thinking_tags,
+    )
+
+    provider_settings = settings.get_provider_settings("lmstudio")
+
+    # Allow endpoint override
+    if endpoint:
+        provider_settings["base_url"] = endpoint
+
+    base_url = provider_settings.get("base_url", "http://127.0.0.1:1234")
+
+    console.print(f"[dim]Connecting to LMStudio at {base_url}...[/]")
+
+    try:
+        lmstudio = await LMStudioProvider.create(**provider_settings)
+    except Exception as e:
+        console.print(f"[red]Cannot connect to LMStudio:[/] {e}")
+        console.print("\n[yellow]Troubleshooting:[/]")
+        console.print("  1. Make sure LMStudio is running")
+        console.print("  2. Enable the local server in LMStudio settings")
+        console.print("  3. Check the endpoint URL is correct")
+        console.print(f"\n[dim]Tried: {base_url}[/]")
+        return
+
+    try:
+        models_list = await lmstudio.list_models()
+
+        if not models_list:
+            console.print("[yellow]No models found on LMStudio server[/]")
+            console.print("\n[dim]Load a model in LMStudio to see it here[/]")
+            return
+
+        table = Table(title=f"Available Models (LMStudio @ {base_url})", show_header=True)
+        table.add_column("Model", style="cyan", no_wrap=True)
+        table.add_column("Tools", style="green", justify="center")
+        table.add_column("Thinking", style="yellow", justify="center")
+        table.add_column("Recommended", style="magenta")
+
+        # Categorize models
+        tool_models = []
+        thinking_models = []
+        other_models = []
+
+        for model in models_list:
+            model_id = model.get("id", "unknown")
+            has_tools = _model_supports_tools(model_id)
+            has_thinking = _model_uses_thinking_tags(model_id)
+
+            tools_icon = "✅" if has_tools else "❌"
+            thinking_icon = "🧠" if has_thinking else "-"
+
+            # Recommend models based on capabilities
+            recommended = ""
+            if has_tools and "coder" in model_id.lower():
+                recommended = "⭐ Best for coding"
+                tool_models.append(model_id)
+            elif has_tools:
+                recommended = "Good for tasks"
+                tool_models.append(model_id)
+            elif has_thinking:
+                recommended = "Good for reasoning"
+                thinking_models.append(model_id)
+            else:
+                other_models.append(model_id)
+
+            table.add_row(model_id, tools_icon, thinking_icon, recommended)
+
+        console.print(table)
+
+        # Summary
+        console.print(f"\n[dim]Total models: {len(models_list)}[/]")
+        if tool_models:
+            console.print(f"[green]Tool-capable models: {len(tool_models)}[/]")
+        if thinking_models:
+            console.print(f"[yellow]Thinking models: {len(thinking_models)}[/]")
+
+        console.print("\n[dim]Use a model with: [bold]victor chat --provider lmstudio --model <model>[/dim]")
+
+        # Show best recommendations
+        if tool_models:
+            best = tool_models[0]
+            console.print(f"\n[green]Recommended:[/] victor chat --provider lmstudio --model {best}")
+
+    except Exception as e:
+        console.print(f"[red]Error listing models:[/] {e}")
+    finally:
+        await lmstudio.close()
+
+
+async def _list_llamacpp_models(settings, endpoint: str = None) -> None:
+    """List llama.cpp server models with server info.
+
+    Args:
+        settings: Application settings
+        endpoint: Optional llama.cpp endpoint URL
+    """
+    from victor.providers.llamacpp_provider import LlamaCppProvider
+
+    provider_settings = settings.get_provider_settings("llamacpp")
+
+    # Allow endpoint override
+    if endpoint:
+        provider_settings["base_url"] = endpoint
+
+    base_url = provider_settings.get("base_url", "http://localhost:8080")
+
+    console.print(f"[dim]Connecting to llama.cpp at {base_url}...[/]")
+
+    try:
+        llamacpp = await LlamaCppProvider.create(**provider_settings)
+    except Exception as e:
+        console.print(f"[red]Cannot connect to llama.cpp server:[/] {e}")
+        console.print("\n[yellow]Troubleshooting:[/]")
+        console.print("  1. Make sure llama.cpp server is running")
+        console.print("  2. Start with:")
+        console.print("     [dim]llama-server -m model.gguf --port 8080[/]")
+        console.print("\n  Or using llama-cpp-python:")
+        console.print("     [dim]pip install llama-cpp-python[server][/]")
+        console.print("     [dim]python -m llama_cpp.server --model model.gguf[/]")
+        console.print(f"\n[dim]Tried: {base_url}[/]")
+        return
+
+    try:
+        models_list = await llamacpp.list_models()
+        health = await llamacpp.check_health()
+        props = await llamacpp.get_server_props()
+
+        # Server status
+        status = health.get("status", "unknown")
+        if status == "ok":
+            console.print("[green]Server status: OK[/]")
+        else:
+            console.print(f"[yellow]Server status: {status}[/]")
+
+        if not models_list:
+            console.print("[yellow]No models reported by server[/]")
+            # llama.cpp may not list models, but still be running
+            if props:
+                console.print("\n[cyan]Server Properties:[/]")
+                if "default_generation_settings" in props:
+                    gen = props["default_generation_settings"]
+                    if "model" in gen:
+                        console.print(f"  Model: {gen.get('model', 'unknown')}")
+                    if "n_ctx" in gen:
+                        console.print(f"  Context: {gen.get('n_ctx', 'unknown')}")
+        else:
+            table = Table(title=f"Available Models (llama.cpp @ {base_url})", show_header=True)
+            table.add_column("Model", style="cyan", no_wrap=True)
+            table.add_column("Type", style="yellow")
+
+            for model in models_list:
+                model_id = model.get("id", "unknown")
+                model_type = "GGUF" if ".gguf" in model_id.lower() else "Model"
+                table.add_row(model_id, model_type)
+
+            console.print(table)
+
+        console.print("\n[dim]Use with: [bold]victor chat --provider llamacpp[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]Error listing models:[/] {e}")
+    finally:
+        await llamacpp.close()
+
+
+async def _list_vllm_models(settings, endpoint: str = None) -> None:
+    """List vLLM server models with capability detection.
+
+    Args:
+        settings: Application settings
+        endpoint: Optional vLLM endpoint URL
+    """
+    from victor.providers.vllm_provider import (
+        VLLMProvider,
+        _model_supports_tools,
+        _model_uses_thinking_tags,
+    )
+
+    provider_settings = settings.get_provider_settings("vllm")
+
+    # Allow endpoint override
+    if endpoint:
+        provider_settings["base_url"] = endpoint
+
+    base_url = provider_settings.get("base_url", "http://localhost:8000")
+
+    console.print(f"[dim]Connecting to vLLM at {base_url}...[/]")
+
+    try:
+        vllm = await VLLMProvider.create(**provider_settings)
+    except Exception as e:
+        console.print(f"[red]Cannot connect to vLLM server:[/] {e}")
+        console.print("\n[yellow]Troubleshooting:[/]")
+        console.print("  1. Make sure vLLM is running with a model loaded")
+        console.print("  2. Start vLLM with:")
+        console.print("     [dim]python -m vllm.entrypoints.openai.api_server \\[/]")
+        console.print("     [dim]  --model Qwen/Qwen2.5-Coder-7B-Instruct \\[/]")
+        console.print("     [dim]  --port 8000[/]")
+        console.print(f"\n[dim]Tried: {base_url}[/]")
+        return
+
+    try:
+        models_list = await vllm.list_models()
+
+        if not models_list:
+            console.print("[yellow]No models found on vLLM server[/]")
+            console.print("\n[dim]Load a model when starting vLLM server[/]")
+            return
+
+        table = Table(title=f"Available Models (vLLM @ {base_url})", show_header=True)
+        table.add_column("Model", style="cyan", no_wrap=True)
+        table.add_column("Tools", style="green", justify="center")
+        table.add_column("Thinking", style="yellow", justify="center")
+        table.add_column("Notes", style="dim")
+
+        for model in models_list:
+            model_id = model.get("id", "unknown")
+            has_tools = _model_supports_tools(model_id)
+            has_thinking = _model_uses_thinking_tags(model_id)
+
+            tools_icon = "✅" if has_tools else "❌"
+            thinking_icon = "🧠" if has_thinking else "-"
+
+            notes = []
+            if "qwen" in model_id.lower() and "coder" in model_id.lower():
+                notes.append("⭐ Best for coding")
+            elif has_tools:
+                notes.append("Good for tasks")
+
+            table.add_row(model_id, tools_icon, thinking_icon, " ".join(notes))
+
+        console.print(table)
+        console.print(f"\n[dim]Total models loaded: {len(models_list)}[/]")
+
+        # Health check
+        if await vllm.check_health():
+            console.print("[green]Server health: OK[/]")
+        else:
+            console.print("[yellow]Server health: Unknown[/]")
+
+        console.print("\n[dim]Use a model with: [bold]victor chat --provider vllm --model <model>[/dim]")
+
+        # Show recommendation if available
+        for model in models_list:
+            model_id = model.get("id", "")
+            if _model_supports_tools(model_id):
+                console.print(f"\n[green]Recommended:[/] victor chat --provider vllm --model {model_id}")
+                break
+
+    except Exception as e:
+        console.print(f"[red]Error listing models:[/] {e}")
+    finally:
+        await vllm.close()
 
 
 async def _list_anthropic_models(settings) -> None:

@@ -470,7 +470,7 @@ class TestLMStudioAdapter:
         """Test LMStudio-specific capabilities."""
         caps = adapter.capabilities
 
-        assert caps.quality_threshold == 0.70
+        assert caps.quality_threshold == 0.75  # Updated for higher-quality local models
         assert caps.tool_call_format == ToolCallFormat.OPENAI
         assert caps.supports_parallel_tools is False
         assert caps.max_continuation_attempts == 3
@@ -490,7 +490,7 @@ class TestLMStudioAdapter:
         is_retryable, backoff = adapter.should_retry(error)
 
         assert is_retryable is True
-        assert backoff == 10.0
+        assert backoff == 15.0  # Longer wait for model loading
 
 
 class TestVLLMAdapter:

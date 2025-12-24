@@ -555,7 +555,26 @@ class LMStudioAdapter(BaseProviderAdapter):
     - OpenAI-compatible API
     - Local model management
     - VRAM-aware model recommendations
+    - Thinking tag extraction for Qwen3/DeepSeek-R1 models
     """
+
+    # Models that output thinking tags
+    THINKING_TAG_MODELS = [
+        "qwen3",
+        "deepseek-r1",
+        "deepseek-reasoner",
+    ]
+
+    # Models with native tool calling support
+    TOOL_CAPABLE_MODELS = [
+        "-tools",  # Suffix pattern
+        "qwen2.5-coder",
+        "qwen3-coder",
+        "llama3.1-tools",
+        "llama3.3-tools",
+        "deepseek-coder-tools",
+        "deepseek-r1-tools",
+    ]
 
     @property
     def name(self) -> str:
@@ -564,18 +583,86 @@ class LMStudioAdapter(BaseProviderAdapter):
     @property
     def capabilities(self) -> ProviderCapabilities:
         return ProviderCapabilities(
-            quality_threshold=0.70,  # Lower for local models
-            supports_thinking_tags=False,
-            continuation_markers=["..."],
+            quality_threshold=0.75,  # Raised - many LMStudio models are high quality
+            supports_thinking_tags=True,  # Enable for Qwen3/DeepSeek-R1 models
+            thinking_tag_format="<think>...</think>",
+            continuation_markers=["...", "Let me ", "I'll "],
             max_continuation_attempts=3,
             tool_call_format=ToolCallFormat.OPENAI,  # OpenAI-compatible
             supports_parallel_tools=False,  # Model-dependent
             grounding_required=False,  # Varies by loaded model
             grounding_strictness=0.65,  # Lenient
             continuation_patience=5,  # More patient - local is slower
-            thinking_tokens_budget=700,  # Generous budget
+            thinking_tokens_budget=1000,  # Generous budget for thinking models
             requires_thinking_time=True,  # Needs time
         )
+
+    def model_supports_thinking(self, model: str) -> bool:
+        """Check if a model outputs thinking tags.
+
+        Args:
+            model: Model name/identifier
+
+        Returns:
+            True if model uses <think>...</think> tags
+        """
+        model_lower = model.lower()
+        return any(pattern in model_lower for pattern in self.THINKING_TAG_MODELS)
+
+    def model_supports_tools(self, model: str) -> bool:
+        """Check if a model supports native tool calling.
+
+        Args:
+            model: Model name/identifier
+
+        Returns:
+            True if model supports tool calling
+        """
+        model_lower = model.lower()
+        return any(pattern in model_lower for pattern in self.TOOL_CAPABLE_MODELS)
+
+    def extract_thinking_content(self, response: str) -> Tuple[str, str]:
+        """Extract <think>...</think> tags from LMStudio model responses.
+
+        Handles Qwen3 and DeepSeek-R1 models that output thinking tags.
+
+        Args:
+            response: The LLM response text
+
+        Returns:
+            Tuple of (thinking_content, main_content)
+        """
+        import re
+
+        if not response:
+            return ("", "")
+
+        # Match <think>...</think> tags (case insensitive, multiline)
+        think_pattern = r"<think>(.*?)</think>"
+        matches = re.findall(think_pattern, response, re.DOTALL | re.IGNORECASE)
+
+        thinking = "\n".join(matches) if matches else ""
+        content = re.sub(think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE).strip()
+
+        return (thinking, content)
+
+    def detect_continuation_needed(self, response: str) -> bool:
+        """LMStudio-specific continuation detection."""
+        if not response or not response.strip():
+            return True
+
+        response_stripped = response.strip()
+
+        # Check for unclosed thinking tag
+        if "<think>" in response.lower() and "</think>" not in response.lower():
+            return True
+
+        # Check standard markers
+        for marker in self.capabilities.continuation_markers:
+            if response_stripped.endswith(marker):
+                return True
+
+        return False
 
     def should_retry(self, error: Exception) -> Tuple[bool, float]:
         """LMStudio-specific retry logic for local server issues."""
@@ -585,9 +672,21 @@ class LMStudioAdapter(BaseProviderAdapter):
         if "connection refused" in error_str:
             return (True, 5.0)
 
-        # Model loading
+        # Model loading / cold start
         if "loading" in error_str or "initializing" in error_str:
-            return (True, 10.0)
+            return (True, 15.0)  # Longer wait for model loading
+
+        # Timeout during model loading (first request)
+        if "timeout" in error_str:
+            return (True, 10.0)  # Retry with backoff
+
+        # VRAM exhaustion
+        if "out of memory" in error_str or "cuda" in error_str:
+            return (False, 0.0)  # Don't retry OOM
+
+        # Server overloaded
+        if "503" in error_str or "service unavailable" in error_str:
+            return (True, 5.0)
 
         # Fall back to base retry logic
         return super().should_retry(error)
@@ -614,6 +713,7 @@ class VLLMAdapter(BaseProviderAdapter):
             continuation_markers=["..."],
             max_continuation_attempts=4,
             tool_call_format=ToolCallFormat.OPENAI,  # OpenAI-compatible
+            output_deduplication=True,  # Some models repeat content
             supports_parallel_tools=True,  # vLLM handles parallel well
             streaming_chunk_size=512,  # Smaller chunks for faster streaming
             grounding_required=False,  # Depends on deployed model
@@ -622,6 +722,56 @@ class VLLMAdapter(BaseProviderAdapter):
             thinking_tokens_budget=600,  # Moderate budget
             requires_thinking_time=False,  # Fast inference
         )
+
+
+class LlamaCppAdapter(BaseProviderAdapter):
+    """Adapter for llama.cpp server (CPU-friendly inference).
+
+    Handles:
+    - GGUF quantized models
+    - CPU-optimized inference
+    - Low memory footprint
+    - Cross-platform support (macOS, Linux, Windows)
+    """
+
+    @property
+    def name(self) -> str:
+        return "llamacpp"
+
+    @property
+    def capabilities(self) -> ProviderCapabilities:
+        return ProviderCapabilities(
+            quality_threshold=0.70,  # Varies by quantization
+            supports_thinking_tags=False,
+            continuation_markers=["...", "Let me ", "I'll "],
+            max_continuation_attempts=3,
+            tool_call_format=ToolCallFormat.OPENAI,  # OpenAI-compatible
+            supports_parallel_tools=False,  # Single request at a time
+            streaming_chunk_size=256,  # Smaller chunks for CPU
+            grounding_required=False,  # Model-dependent
+            grounding_strictness=0.65,  # Lenient
+            continuation_patience=5,  # More patient - CPU is slower
+            thinking_tokens_budget=800,  # Generous for reasoning
+            requires_thinking_time=True,  # CPU inference is slow
+        )
+
+    def should_retry(self, error: Exception) -> Tuple[bool, float]:
+        """llama.cpp-specific retry logic for CPU inference issues."""
+        error_str = str(error).lower()
+
+        # Connection refused - server not started
+        if "connection refused" in error_str:
+            return (True, 5.0)
+
+        # Timeout - CPU inference can be slow
+        if "timeout" in error_str:
+            return (True, 10.0)  # Retry with longer wait
+
+        # Memory issues
+        if "memory" in error_str or "oom" in error_str:
+            return (False, 0.0)  # Don't retry memory issues
+
+        return super().should_retry(error)
 
 
 class GroqAdapter(BaseProviderAdapter):
@@ -1062,6 +1212,9 @@ _ADAPTER_REGISTRY: dict[str, type[BaseProviderAdapter]] = {
     "ollama": OllamaAdapter,
     "lmstudio": LMStudioAdapter,
     "vllm": VLLMAdapter,
+    "llamacpp": LlamaCppAdapter,
+    "llama-cpp": LlamaCppAdapter,  # Alias
+    "llama.cpp": LlamaCppAdapter,  # Alias
 }
 
 
