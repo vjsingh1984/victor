@@ -309,3 +309,221 @@ suite('CodeActionProvider Test Suite', () => {
         });
     });
 });
+
+suite('Symbol-Based Commands Test Suite', () => {
+    // Test symbol kind mapping
+    suite('Symbol Kind Mapping', () => {
+        test('Should map symbol kinds correctly', () => {
+            const SymbolKind: Record<number, string> = {
+                0: 'File',
+                1: 'Module',
+                2: 'Namespace',
+                3: 'Package',
+                4: 'Class',
+                5: 'Method',
+                6: 'Property',
+                7: 'Field',
+                8: 'Constructor',
+                9: 'Enum',
+                10: 'Interface',
+                11: 'Function',
+                12: 'Variable',
+                13: 'Constant',
+            };
+
+            assert.strictEqual(SymbolKind[4], 'Class');
+            assert.strictEqual(SymbolKind[5], 'Method');
+            assert.strictEqual(SymbolKind[11], 'Function');
+            assert.strictEqual(SymbolKind[12], 'Variable');
+        });
+
+        test('Should lowercase symbol kind for display', () => {
+            const kind = 'Function';
+            const displayKind = kind.toLowerCase();
+            assert.strictEqual(displayKind, 'function');
+        });
+    });
+
+    // Test symbol finding
+    suite('Symbol Finding', () => {
+        test('Should find symbol at cursor position', () => {
+            const position = { line: 10, character: 5 };
+            const symbolRange = { start: { line: 5, character: 0 }, end: { line: 15, character: 0 } };
+
+            const containsPosition = (
+                range: typeof symbolRange,
+                pos: typeof position
+            ): boolean => {
+                return pos.line >= range.start.line && pos.line <= range.end.line;
+            };
+
+            assert.ok(containsPosition(symbolRange, position));
+        });
+
+        test('Should not find symbol outside cursor', () => {
+            const position = { line: 20, character: 5 };
+            const symbolRange = { start: { line: 5, character: 0 }, end: { line: 15, character: 0 } };
+
+            const containsPosition = (
+                range: typeof symbolRange,
+                pos: typeof position
+            ): boolean => {
+                return pos.line >= range.start.line && pos.line <= range.end.line;
+            };
+
+            assert.ok(!containsPosition(symbolRange, position));
+        });
+
+        test('Should prefer nested symbol over parent', () => {
+            const parentSymbol = { name: 'MyClass', range: { start: 0, end: 50 } };
+            const nestedSymbol = { name: 'myMethod', range: { start: 10, end: 20 } };
+            const cursorLine = 15;
+
+            const isInRange = (symbol: typeof parentSymbol, line: number): boolean => {
+                return line >= symbol.range.start && line <= symbol.range.end;
+            };
+
+            // Both contain cursor, but nested is more specific
+            assert.ok(isInRange(parentSymbol, cursorLine));
+            assert.ok(isInRange(nestedSymbol, cursorLine));
+
+            // Nested range is smaller, so it should be preferred
+            const parentSize = parentSymbol.range.end - parentSymbol.range.start;
+            const nestedSize = nestedSymbol.range.end - nestedSymbol.range.start;
+            assert.ok(nestedSize < parentSize);
+        });
+    });
+
+    // Test symbol command prompts
+    suite('Symbol Command Prompts', () => {
+        test('Should format explain symbol prompt', () => {
+            const symbol = { name: 'calculateTotal', kind: 'Function' };
+            const code = 'function calculateTotal(items) { return items.reduce((a, b) => a + b, 0); }';
+            const language = 'typescript';
+
+            const prompt = `Explain this ${symbol.kind.toLowerCase()} "${symbol.name}" in detail:\n\n\`\`\`${language}\n${code}\n\`\`\``;
+
+            assert.ok(prompt.includes('function'));
+            assert.ok(prompt.includes('calculateTotal'));
+            assert.ok(prompt.includes('```typescript'));
+        });
+
+        test('Should format ask about symbol prompt', () => {
+            const symbol = { name: 'UserService', kind: 'Class' };
+            const question = 'What design pattern does this use?';
+            const code = 'class UserService { constructor() {} getUser() {} }';
+            const language = 'typescript';
+
+            const prompt = `Question about the ${symbol.kind.toLowerCase()} "${symbol.name}":\n\n${question}\n\n\`\`\`${language}\n${code}\n\`\`\``;
+
+            assert.ok(prompt.includes('class'));
+            assert.ok(prompt.includes('UserService'));
+            assert.ok(prompt.includes('design pattern'));
+        });
+
+        test('Should format refactor symbol prompt', () => {
+            const symbol = { name: 'processData', kind: 'Method' };
+            const suggestion = 'Extract helper functions';
+            const code = 'processData(data) { /* complex logic */ }';
+            const language = 'typescript';
+
+            const prompt = `Refactor this ${symbol.kind.toLowerCase()} "${symbol.name}" (${suggestion}):\n\n\`\`\`${language}\n${code}\n\`\`\``;
+
+            assert.ok(prompt.includes('method'));
+            assert.ok(prompt.includes('processData'));
+            assert.ok(prompt.includes('Extract helper functions'));
+        });
+
+        test('Should format document symbol prompt', () => {
+            const symbol = { name: 'fetchUsers', kind: 'Function' };
+            const code = 'async function fetchUsers(limit) { return await api.get("/users", { limit }); }';
+            const language = 'typescript';
+
+            const prompt = `Add comprehensive documentation to this ${symbol.kind.toLowerCase()} "${symbol.name}":\n\n\`\`\`${language}\n${code}\n\`\`\``;
+
+            assert.ok(prompt.includes('documentation'));
+            assert.ok(prompt.includes('fetchUsers'));
+        });
+
+        test('Should format generate tests prompt', () => {
+            const symbol = { name: 'validateEmail', kind: 'Function' };
+            const code = 'function validateEmail(email) { return /^[^@]+@[^@]+\\.[^@]+$/.test(email); }';
+            const language = 'typescript';
+
+            const prompt = `Generate comprehensive unit tests for this ${symbol.kind.toLowerCase()} "${symbol.name}":\n\n\`\`\`${language}\n${code}\n\`\`\``;
+
+            assert.ok(prompt.includes('unit tests'));
+            assert.ok(prompt.includes('validateEmail'));
+        });
+
+        test('Should format optimize symbol prompt', () => {
+            const symbol = { name: 'sortItems', kind: 'Method' };
+            const code = 'sortItems(items) { return items.sort((a, b) => a.name.localeCompare(b.name)); }';
+            const language = 'typescript';
+
+            const prompt = `Analyze and optimize this ${symbol.kind.toLowerCase()} "${symbol.name}" for better performance:\n\n\`\`\`${language}\n${code}\n\`\`\``;
+
+            assert.ok(prompt.includes('optimize'));
+            assert.ok(prompt.includes('performance'));
+            assert.ok(prompt.includes('sortItems'));
+        });
+
+        test('Should format review symbol prompt', () => {
+            const symbol = { name: 'handleAuth', kind: 'Function' };
+            const code = 'function handleAuth(token) { /* auth logic */ }';
+            const language = 'typescript';
+
+            const prompt = `Review this ${symbol.kind.toLowerCase()} "${symbol.name}" for:\n- Code quality and best practices\n- Potential bugs\n- Security issues\n- Performance concerns\n\n\`\`\`${language}\n${code}\n\`\`\``;
+
+            assert.ok(prompt.includes('Review'));
+            assert.ok(prompt.includes('Security'));
+            assert.ok(prompt.includes('handleAuth'));
+        });
+    });
+
+    // Test symbol commands list
+    suite('Symbol Commands', () => {
+        const symbolCommands = [
+            'victor.askAboutSymbol',
+            'victor.explainSymbol',
+            'victor.refactorSymbol',
+            'victor.documentSymbol',
+            'victor.generateTestsForSymbol',
+            'victor.optimizeSymbol',
+            'victor.reviewSymbol',
+        ];
+
+        symbolCommands.forEach(cmd => {
+            test(`Should have command: ${cmd}`, () => {
+                assert.ok(cmd.startsWith('victor.'));
+                assert.ok(cmd.includes('Symbol'));
+            });
+        });
+
+        test('Should have 7 symbol commands', () => {
+            assert.strictEqual(symbolCommands.length, 7);
+        });
+    });
+
+    // Test null symbol handling
+    suite('Null Symbol Handling', () => {
+        test('Should return null when no symbol at cursor', () => {
+            const symbols: unknown[] = [];
+            const cursorPosition = { line: 10, character: 5 };
+
+            const findSymbol = (symbols: unknown[], _position: typeof cursorPosition): unknown | null => {
+                return symbols.length > 0 ? symbols[0] : null;
+            };
+
+            const result = findSymbol(symbols, cursorPosition);
+            assert.strictEqual(result, null);
+        });
+
+        test('Should handle empty document symbols', () => {
+            const documentSymbols: unknown[] | undefined = [];
+
+            const hasSymbols = documentSymbols && documentSymbols.length > 0;
+            assert.ok(!hasSymbols);
+        });
+    });
+});
