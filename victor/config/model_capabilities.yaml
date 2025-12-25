@@ -1,4 +1,4 @@
-# Model Capabilities Configuration v0.1.0
+# Model Capabilities Configuration v0.2.0
 #
 # MODEL-CENTRIC SCHEMA: Each model is the authoritative source of truth.
 # Helper tools can update specific sections for individual models.
@@ -16,7 +16,7 @@
 #   4. models.<pattern>.providers.<provider> (provider-specific overrides)
 #   5. models.<pattern>.settings (tuning)
 
-schema_version: "0.1.0"
+schema_version: "0.2.0"
 
 # =============================================================================
 # GLOBAL DEFAULTS

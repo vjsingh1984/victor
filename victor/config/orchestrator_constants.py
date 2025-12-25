@@ -126,13 +126,13 @@ class BudgetLimits:
     - warning_threshold_pct (0.83) gives early warning at 250/300 calls
     """
 
-    simple_task: int = 2
-    medium_task: int = 6
-    complex_task: int = 15
-    action_task: int = 50
-    analysis_task: int = 60
-    max_session_budget: int = 300
-    warning_threshold_pct: float = 0.83  # 250/300
+    simple_task: int = 5  # Was 2 - increased for more thorough exploration
+    medium_task: int = 15  # Was 6 - better for multi-file tasks
+    complex_task: int = 30  # Was 15 - allows deeper analysis
+    action_task: int = 75  # Was 50 - more room for building features
+    analysis_task: int = 100  # Was 60 - thorough codebase exploration
+    max_session_budget: int = 500  # Was 300 - more room for complex sessions
+    warning_threshold_pct: float = 0.80  # 400/500
 
 
 @dataclass(frozen=True)

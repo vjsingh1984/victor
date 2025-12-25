@@ -640,15 +640,16 @@ class Settings(BaseSettings):
 
     # Exploration Loop Settings (prevents endless exploration without output)
     # Higher values = more thorough exploration, slower responses
-    max_exploration_iterations: int = 8  # Max consecutive read-only tool calls with minimal output
+    # These were increased from 8/12/50/6 to allow more thorough exploration
+    max_exploration_iterations: int = 25  # Max consecutive read-only tool calls with minimal output
     max_exploration_iterations_action: int = (
-        12  # More lenient for action tasks (create, write, etc.)
+        35  # More lenient for action tasks (create, write, etc.)
     )
     max_exploration_iterations_analysis: int = (
-        50  # Very lenient for analysis tasks (uses loop detection instead)
+        75  # Very lenient for analysis tasks (uses loop detection instead)
     )
-    min_content_threshold: int = 150  # Minimum chars to consider "substantial" output
-    max_research_iterations: int = 6  # Force synthesis after N consecutive web searches
+    min_content_threshold: int = 100  # Minimum chars to consider "substantial" output (was 150)
+    max_research_iterations: int = 15  # Force synthesis after N consecutive web searches (was 6)
 
     # ==========================================================================
     # Recovery & Loop Detection Thresholds
