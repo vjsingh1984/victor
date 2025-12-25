@@ -548,7 +548,7 @@ class ConversationStore:
     """
 
     # Schema version for migration tracking (semver format: major.minor.patch)
-    SCHEMA_VERSION = "0.1.0"  # Initial normalized schema with ML/RL lookup tables
+    SCHEMA_VERSION = "0.2.0"  # Aligned with Victor 0.2.0 release
 
     def __init__(
         self,

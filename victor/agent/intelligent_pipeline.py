@@ -252,6 +252,7 @@ class IntelligentAgentPipeline:
                 self._mode_controller = AdaptiveModeController(
                     profile_name=self.profile_name,
                     provider_name=self.provider_name,
+                    model_name=self.model,
                     provider_adapter=self._provider_adapter,
                     mode_transition_learner=mode_transition_learner,
                 )

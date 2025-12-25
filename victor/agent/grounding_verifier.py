@@ -282,6 +282,7 @@ class GroundingVerifier:
     def _record_verification_outcome(
         self,
         provider: str,
+        model: str,
         response_type: str,
         threshold_used: float,
         actual_hallucination: bool,
@@ -291,6 +292,7 @@ class GroundingVerifier:
 
         Args:
             provider: Provider name
+            model: Model name
             response_type: Type of response
             threshold_used: Threshold that was used
             actual_hallucination: Whether there was actually a hallucination
@@ -303,10 +305,11 @@ class GroundingVerifier:
             from victor.agent.rl.base import RLOutcome
 
             outcome = RLOutcome(
+                provider=provider,
+                model=model or "unknown",
+                task_type=response_type,
                 success=not actual_hallucination,  # Success if no actual hallucination
                 quality_score=1.0 if not actual_hallucination else 0.0,
-                provider=provider,
-                task_type=response_type,
                 metadata={
                     "response_type": response_type,
                     "threshold_used": threshold_used,
@@ -316,7 +319,7 @@ class GroundingVerifier:
             )
             self._grounding_threshold_learner.record_outcome(outcome)
             logger.debug(
-                f"RL: Recorded grounding outcome for {provider}: "
+                f"RL: Recorded grounding outcome for {provider}/{model}: "
                 f"actual={actual_hallucination}, detected={detected_hallucination}"
             )
         except Exception as e:
@@ -855,8 +858,9 @@ class GroundingVerifier:
                     "[GroundingVerifier] Skipping symbol verification for code generation task"
                 )
 
-        # Get provider and response type for RL
+        # Get provider, model, and response type for RL
         provider = context.get("provider", "unknown")
+        model = context.get("model", "unknown")
         response_type = "code_generation" if is_code_generation else context.get("task_type", "general")
 
         # Try RL-learned threshold, fall back to config
@@ -889,6 +893,7 @@ class GroundingVerifier:
         )
         self._record_verification_outcome(
             provider=provider,
+            model=model,
             response_type=response_type,
             threshold_used=threshold,
             actual_hallucination=actual_hallucination,

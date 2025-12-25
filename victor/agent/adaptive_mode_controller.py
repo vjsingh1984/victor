@@ -608,6 +608,7 @@ class AdaptiveModeController:
         profile_name: str = "default",
         q_store: Optional[QLearningStore] = None,
         provider_name: Optional[str] = None,
+        model_name: Optional[str] = None,
         provider_adapter: Optional[Any] = None,
         mode_transition_learner: Optional[Any] = None,
     ):
@@ -617,12 +618,14 @@ class AdaptiveModeController:
             profile_name: Profile name for tracking
             q_store: Optional Q-learning store (creates one if not provided)
             provider_name: Provider name for provider-aware thresholds (e.g., "deepseek", "anthropic")
+            model_name: Model name for RL tracking (e.g., "deepseek-chat", "gpt-4")
             provider_adapter: Optional provider adapter for capability-based thresholds
             mode_transition_learner: Optional ModeTransitionLearner for unified RL tracking
         """
         self.profile_name = profile_name
         self._q_store = q_store or QLearningStore()
         self._provider_name = self._normalize_provider_name(provider_name)
+        self._model_name = model_name or profile_name  # Fall back to profile name
         self._provider_adapter = provider_adapter
         self._mode_transition_learner = mode_transition_learner
 
@@ -1061,6 +1064,8 @@ class AdaptiveModeController:
             )
 
             outcome = RLOutcome(
+                provider=self._provider_name or "unknown",
+                model=self._model_name or "unknown",
                 success=success,
                 quality_score=quality_score,
                 task_type=self._current_state.task_type if self._current_state else "general",
