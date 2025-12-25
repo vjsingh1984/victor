@@ -344,6 +344,12 @@ filterwarnings = [
     # Ignore PytestCollectionWarning for non-test classes in victor module
     # These are data classes/enums that happen to start with "Test" (e.g., TestResult, TestRunner)
     "ignore:cannot collect test class.*because it has a __init__ constructor:pytest.PytestCollectionWarning",
+    # Ignore semaphore leak warnings from multiprocessing (common in test cleanup)
+    # These come from dependencies like ChromaDB, sentence_transformers
+    "ignore:.*semaphore.*:ResourceWarning",
+    "ignore:.*leaked.*semaphore.*:UserWarning",
+    # Ignore multiprocessing resource tracker warnings
+    "ignore:.*resource_tracker.*:UserWarning",
 ]
 
 [tool.ruff]
