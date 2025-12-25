@@ -284,8 +284,8 @@ class SemanticToolSelector:
         )
 
     # Cache version - aligned with Victor version, increment on breaking cache format changes
-    # Format: "{victor_version}.{cache_revision}" e.g., "0.1.0.1" for first revision of 0.1.0
-    CACHE_VERSION = "0.1.0"
+    # Format: "{victor_version}.{cache_revision}" e.g., "0.2.0.1" for first revision of 0.2.0
+    CACHE_VERSION = "0.2.0"
 
     def _calculate_tools_hash(self, tools: ToolRegistry) -> str:
         """Calculate hash of all tool definitions to detect changes.
@@ -893,8 +893,8 @@ class SemanticToolSelector:
         tools_for_action = action_to_tools.get(action, [])
         for msg in history:
             if msg.get("role") == "assistant":
-                # Check tool_calls in the message
-                tool_calls = msg.get("tool_calls", [])
+                # Check tool_calls in the message (handle None explicitly)
+                tool_calls = msg.get("tool_calls") or []
                 for tc in tool_calls:
                     tool_name = tc.get("name", "") or tc.get("function", {}).get("name", "")
                     if tool_name in tools_for_action:

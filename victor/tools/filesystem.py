@@ -298,6 +298,73 @@ _file_content_cache: Optional[FileContentCache] = None
 _cache_enabled: bool = True  # Can be disabled via settings
 
 
+# ============================================================================
+# SANDBOX PATH ENFORCEMENT (P4 - Explore/Plan Mode Restrictions)
+# ============================================================================
+# In EXPLORE and PLAN modes, file writes are restricted to the sandbox directory
+# (.victor/sandbox/) to prevent accidental modifications to the main codebase.
+
+
+def get_sandbox_path() -> Optional[Path]:
+    """Get the sandbox directory path for the current mode.
+
+    Returns:
+        Path to sandbox directory if in restricted mode, None if unrestricted.
+    """
+    try:
+        from victor.agent.mode_controller import get_mode_controller
+
+        controller = get_mode_controller()
+        config = controller.config
+
+        if config.sandbox_dir and config.allow_sandbox_edits:
+            # Sandbox is enabled for this mode
+            return Path.cwd() / config.sandbox_dir
+        elif not config.allow_all_tools and ("write_file" in config.disallowed_tools or "edit_files" in config.disallowed_tools):
+            # Writing is disallowed in this mode (no sandbox exception)
+            return None
+
+        # Unrestricted mode (BUILD) - no sandbox enforcement
+        return None
+    except Exception:
+        # If mode controller not available, default to unrestricted
+        return None
+
+
+def enforce_sandbox_path(file_path: Path) -> None:
+    """Enforce sandbox restrictions for file writes in restricted modes.
+
+    Args:
+        file_path: The resolved file path being written to
+
+    Raises:
+        PermissionError: If path is outside sandbox in restricted mode
+    """
+    sandbox = get_sandbox_path()
+
+    if sandbox is None:
+        # No sandbox restriction in effect
+        return
+
+    # Ensure sandbox exists
+    sandbox.mkdir(parents=True, exist_ok=True)
+
+    # Check if the path is within the sandbox
+    try:
+        file_path.resolve().relative_to(sandbox.resolve())
+    except ValueError:
+        # Path is not within sandbox
+        from victor.agent.mode_controller import get_mode_controller
+
+        mode = get_mode_controller().current_mode.value.upper()
+        raise PermissionError(
+            f"[{mode} MODE] Cannot write to '{file_path}'.\n"
+            f"In {mode} mode, edits are restricted to the sandbox directory: {sandbox}\n"
+            f"Use /mode build to switch to build mode for unrestricted file access.\n"
+            f"Or prefix your path with .victor/sandbox/ to write within the sandbox."
+        )
+
+
 def get_file_content_cache() -> FileContentCache:
     """Get or create the global file content cache."""
     global _file_content_cache
@@ -1357,10 +1424,17 @@ async def write(path: str, content: str) -> str:
 
     Returns:
         Success message.
+
+    Note:
+        In EXPLORE/PLAN modes, writes are restricted to .victor/sandbox/.
+        Use /mode build to enable unrestricted file writes.
     """
     from victor.agent.change_tracker import ChangeType, get_change_tracker
 
     file_path = Path(path).expanduser().resolve()
+
+    # Enforce sandbox restrictions in EXPLORE/PLAN modes
+    enforce_sandbox_path(file_path)
 
     if file_path.exists() and file_path.is_dir():
         raise IsADirectoryError(f"Cannot write to directory: {path}")
