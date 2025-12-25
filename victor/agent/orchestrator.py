@@ -6588,12 +6588,33 @@ class AgentOrchestrator:
     def get_enabled_tools(self) -> Set[str]:
         """Get currently enabled tool names (protocol method).
 
+        In BUILD mode (allow_all_tools=True), expands to all available tools
+        regardless of vertical restrictions. This ensures BUILD mode has
+        full access to all tools including shell, edit_files, etc.
+
         Returns:
             Set of enabled tool names for this session
         """
-        # Check for framework-set tools first
+        # Check mode controller for BUILD mode (allows all tools)
+        try:
+            from victor.agent.mode_controller import get_mode_controller
+
+            mode_controller = get_mode_controller()
+            config = mode_controller.config
+
+            # BUILD mode expands to all available tools (minus disallowed)
+            if config.allow_all_tools:
+                all_tools = self.get_available_tools()
+                # Remove any explicitly disallowed tools
+                enabled = all_tools - config.disallowed_tools
+                return enabled
+        except Exception as e:
+            logger.debug(f"Mode controller check failed in get_enabled_tools: {e}")
+
+        # Check for framework-set tools (vertical filtering)
         if hasattr(self, "_enabled_tools") and self._enabled_tools:
             return self._enabled_tools
+
         # Fall back to all available tools
         return self.get_available_tools()
 

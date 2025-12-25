@@ -187,6 +187,8 @@ class UnifiedTaskProgress:
 
     # Iteration tracking
     iteration_count: int = 0  # Productive iterations (tool calls)
+    exploration_iterations: int = 0  # Read/search operations (counts toward exploration limit)
+    action_iterations: int = 0  # Write/modify operations (don't count toward exploration limit)
     total_turns: int = 0  # All turns including continuations
     low_output_iterations: int = 0
 
@@ -697,11 +699,36 @@ class UnifiedTaskTracker:
     # Recording
     # =========================================================================
 
+    # Tools that perform write/modify actions (don't count toward exploration limit)
+    WRITE_TOOLS = {
+        "edit_files", "write_file", "shell", "bash", "git_commit",
+        "git_push", "create_file", "delete_file", "rename_file",
+        "notebook_edit", "refactor", "rename",
+    }
+
     def record_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> None:
-        """Record a tool call - updates milestones, loops, and budgets."""
+        """Record a tool call - updates milestones, loops, and budgets.
+
+        Classifies tool calls as exploration (read/search) or action (write/modify).
+        Only exploration iterations count toward the exploration limit in BUILD mode.
+        """
         self._progress.tool_calls += 1
         self._progress.iteration_count += 1
         self._progress.total_turns += 1
+
+        # Classify as exploration vs action
+        # Shell commands with write-like operations are actions
+        is_write_operation = tool_name in self.WRITE_TOOLS
+        if tool_name in {"shell", "bash"} and arguments:
+            cmd = arguments.get("cmd", "")
+            # Check for write-like shell commands
+            write_commands = ["mkdir", "touch", "echo", "cat >", "cp", "mv", "rm", "chmod", "chown"]
+            is_write_operation = any(wc in cmd for wc in write_commands)
+
+        if is_write_operation:
+            self._progress.action_iterations += 1
+        else:
+            self._progress.exploration_iterations += 1
 
         # Update milestones
         self._update_milestones(tool_name, arguments)
@@ -718,7 +745,8 @@ class UnifiedTaskTracker:
         logger.debug(
             f"UnifiedTaskTracker: tool_call={tool_name}, "
             f"iteration={self._progress.iteration_count}, "
-            f"tool_calls={self._progress.tool_calls}"
+            f"exploration={self._progress.exploration_iterations}, "
+            f"action={self._progress.action_iterations}"
         )
 
     def increment_turn(self) -> None:
@@ -812,18 +840,36 @@ class UnifiedTaskTracker:
             )
 
         # Task-specific iteration limit (with model multiplier)
+        # In BUILD mode (allow_all_tools), only exploration iterations count toward limit
+        # This allows agents to continue creating files without hitting exploration limit
         effective_max = self._calculate_effective_max()
-        if self._progress.iteration_count > effective_max:
+
+        # Determine which counter to use for exploration limit
+        try:
+            from victor.agent.mode_controller import get_mode_controller
+            mode_controller = get_mode_controller()
+            is_build_mode = mode_controller.config.allow_all_tools
+        except Exception:
+            is_build_mode = False
+
+        # In BUILD mode, use exploration_iterations; otherwise use total iteration_count
+        exploration_count = (
+            self._progress.exploration_iterations if is_build_mode
+            else self._progress.iteration_count
+        )
+
+        if exploration_count > effective_max:
             hint = self._get_completion_hint()
             # Only log once to avoid duplicate messages
             if not self._progress.completion_forcing_logged:
                 self._progress.completion_forcing_logged = True
                 logger.info(
-                    f"UnifiedTaskTracker: Forcing completion at iteration {self._progress.iteration_count} "
+                    f"UnifiedTaskTracker: Forcing completion at exploration_count={exploration_count} "
                     f"(task_type={self._progress.task_type.value}, "
                     f"base_max={self._get_base_max()}, effective_max={effective_max}, "
-                    f"total_turns={self._progress.total_turns}, "
-                    f"multiplier={self._exploration_multiplier})"
+                    f"total_iterations={self._progress.iteration_count}, "
+                    f"action_iterations={self._progress.action_iterations}, "
+                    f"is_build_mode={is_build_mode})"
                 )
             return StopDecision(
                 should_stop=True,

@@ -31,6 +31,49 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# PATH NORMALIZATION
+# ============================================================================
+# LLMs sometimes use paths with redundant prefixes when working in subdirectories.
+# For example, when cwd is "investor_homelab/", they might use "investor_homelab/utils"
+# instead of just "utils". This helper attempts to fix such paths.
+
+
+def _normalize_path(path: str) -> Optional[str]:
+    """Normalize a path by stripping redundant directory prefixes.
+
+    When working in a subdirectory, LLMs sometimes include the directory name
+    in paths (e.g., "project/utils" when cwd is already "project/").
+    This function attempts to strip such redundant prefixes.
+
+    Args:
+        path: The original path that doesn't exist
+
+    Returns:
+        A normalized path if a valid one is found, None otherwise
+    """
+    if not path or path.startswith("/") or path.startswith("~"):
+        return None  # Absolute paths shouldn't be normalized
+
+    cwd = Path.cwd()
+    cwd_name = cwd.name
+
+    # Check if path starts with cwd name (common pattern)
+    # e.g., path="investor_homelab/utils", cwd.name="investor_homelab"
+    if path.startswith(f"{cwd_name}/"):
+        stripped = path[len(cwd_name) + 1:]
+        if stripped:
+            return stripped
+
+    # Try stripping first path component
+    parts = Path(path).parts
+    if len(parts) > 1:
+        stripped = str(Path(*parts[1:]))
+        return stripped
+
+    return None
+
+
+# ============================================================================
 # SESSION-LEVEL FILE CONTENT CACHE (P3-2)
 # ============================================================================
 # Prevents redundant file reads within a session. Especially helpful for
@@ -1094,7 +1137,19 @@ async def read(
     file_path = Path(path).expanduser().resolve()
 
     if not file_path.exists():
-        raise FileNotFoundError(f"File not found: {path}")
+        # Try path normalization - LLMs sometimes use paths with redundant prefixes
+        # e.g., "investor_homelab/utils" when cwd is already "investor_homelab"
+        normalized_path = _normalize_path(path)
+        if normalized_path and normalized_path != path:
+            alt_file_path = Path(normalized_path).expanduser().resolve()
+            if alt_file_path.exists():
+                logger.debug(f"Path normalized: '{path}' -> '{normalized_path}'")
+                file_path = alt_file_path
+                path = normalized_path
+            else:
+                raise FileNotFoundError(f"File not found: {path}")
+        else:
+            raise FileNotFoundError(f"File not found: {path}")
     if not file_path.is_file():
         if file_path.is_dir():
             raise IsADirectoryError(
@@ -1555,7 +1610,18 @@ async def ls(
         dir_path = Path(path).expanduser().resolve()
 
         if not dir_path.exists():
-            raise FileNotFoundError(f"Directory not found: {path}")
+            # Try path normalization - LLMs sometimes use paths with redundant prefixes
+            normalized_path = _normalize_path(path)
+            if normalized_path and normalized_path != path:
+                alt_dir_path = Path(normalized_path).expanduser().resolve()
+                if alt_dir_path.exists() and alt_dir_path.is_dir():
+                    logger.debug(f"Directory path normalized: '{path}' -> '{normalized_path}'")
+                    dir_path = alt_dir_path
+                    path = normalized_path
+                else:
+                    raise FileNotFoundError(f"Directory not found: {path}")
+            else:
+                raise FileNotFoundError(f"Directory not found: {path}")
         if not dir_path.is_dir():
             raise NotADirectoryError(f"Path is not a directory: {path}")
 
