@@ -161,6 +161,22 @@ class VictorAPIServer:
         self._app.router.add_post("/rl/strategy", self._rl_strategy)
         self._app.router.add_post("/rl/reset", self._rl_reset)
 
+        # Background agent endpoints
+        self._app.router.add_get("/agents", self._list_agents)
+        self._app.router.add_post("/agents/start", self._start_agent)
+        self._app.router.add_get("/agents/{id}", self._get_agent)
+        self._app.router.add_post("/agents/{id}/cancel", self._cancel_agent)
+        self._app.router.add_post("/agents/clear", self._clear_agents)
+        self._app.router.add_delete("/agents/{id}", self._delete_agent)
+
+        # Plan management endpoints
+        self._app.router.add_get("/plans", self._list_plans)
+        self._app.router.add_post("/plans", self._create_plan)
+        self._app.router.add_get("/plans/{id}", self._get_plan)
+        self._app.router.add_post("/plans/{id}/approve", self._approve_plan)
+        self._app.router.add_post("/plans/{id}/execute", self._execute_plan)
+        self._app.router.add_delete("/plans/{id}", self._delete_plan)
+
         # WebSocket
         self._app.router.add_get("/ws", self._websocket_handler)
 
@@ -187,7 +203,7 @@ class VictorAPIServer:
 
     async def _health(self, request: Request) -> Response:
         """Health check endpoint."""
-        return web.json_response({"status": "healthy", "version": "0.1.0"})
+        return web.json_response({"status": "healthy", "version": "0.2.0"})
 
     async def _status(self, request: Request) -> Response:
         """Get current status."""
@@ -2002,6 +2018,438 @@ class VictorAPIServer:
 
         except Exception as e:
             logger.exception("RL reset error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    # =========================================================================
+    # Background Agent Management
+    # =========================================================================
+
+    async def _list_agents(self, request: Request) -> Response:
+        """List all background agents."""
+        try:
+            if not hasattr(self, "_agents"):
+                self._agents: Dict[str, Dict[str, Any]] = {}
+
+            agents_list = []
+            for agent_id, agent in self._agents.items():
+                agents_list.append({
+                    "id": agent_id,
+                    "task": agent.get("task", ""),
+                    "status": agent.get("status", "unknown"),
+                    "started_at": agent.get("started_at"),
+                    "completed_at": agent.get("completed_at"),
+                    "tool_calls": agent.get("tool_calls", []),
+                    "progress": agent.get("progress", 0),
+                })
+
+            return web.json_response({"agents": agents_list})
+
+        except Exception as e:
+            logger.exception("List agents error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _start_agent(self, request: Request) -> Response:
+        """Start a new background agent."""
+        try:
+            if not hasattr(self, "_agents"):
+                self._agents = {}
+
+            data = await request.json()
+            task = data.get("task", "")
+            mode = data.get("mode", "build")
+
+            if not task:
+                return web.json_response({"error": "task required"}, status=400)
+
+            agent_id = str(uuid.uuid4())[:8]
+
+            # Store agent metadata
+            self._agents[agent_id] = {
+                "id": agent_id,
+                "task": task,
+                "mode": mode,
+                "status": "running",
+                "started_at": asyncio.get_event_loop().time(),
+                "completed_at": None,
+                "tool_calls": [],
+                "output": "",
+                "progress": 0,
+                "task_handle": None,
+            }
+
+            # Start the agent task asynchronously
+            async def run_agent():
+                try:
+                    orchestrator = await self._get_orchestrator()
+                    agent_data = self._agents.get(agent_id)
+                    if not agent_data:
+                        return
+
+                    # Track tool calls
+                    tool_calls = []
+
+                    async for chunk in orchestrator.stream_chat(task):
+                        if agent_id not in self._agents:
+                            break  # Agent was cancelled/deleted
+
+                        content = getattr(chunk, "content", "")
+                        tool_call = getattr(chunk, "tool_calls", None)
+
+                        if content:
+                            self._agents[agent_id]["output"] += content
+
+                        if tool_call:
+                            tool_calls.append(tool_call)
+                            self._agents[agent_id]["tool_calls"] = tool_calls
+
+                        # Update progress (estimate based on output length)
+                        output_len = len(self._agents[agent_id]["output"])
+                        self._agents[agent_id]["progress"] = min(95, output_len // 100)
+
+                    # Mark as completed
+                    if agent_id in self._agents:
+                        self._agents[agent_id]["status"] = "completed"
+                        self._agents[agent_id]["completed_at"] = asyncio.get_event_loop().time()
+                        self._agents[agent_id]["progress"] = 100
+
+                except asyncio.CancelledError:
+                    if agent_id in self._agents:
+                        self._agents[agent_id]["status"] = "cancelled"
+                        self._agents[agent_id]["completed_at"] = asyncio.get_event_loop().time()
+
+                except Exception as e:
+                    logger.exception(f"Agent {agent_id} error")
+                    if agent_id in self._agents:
+                        self._agents[agent_id]["status"] = "failed"
+                        self._agents[agent_id]["error"] = str(e)
+                        self._agents[agent_id]["completed_at"] = asyncio.get_event_loop().time()
+
+            # Create and store the task
+            task_handle = asyncio.create_task(run_agent())
+            self._agents[agent_id]["task_handle"] = task_handle
+
+            return web.json_response({
+                "id": agent_id,
+                "status": "running",
+                "message": f"Agent started for task: {task[:50]}..."
+            })
+
+        except Exception as e:
+            logger.exception("Start agent error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _get_agent(self, request: Request) -> Response:
+        """Get agent status and output."""
+        try:
+            if not hasattr(self, "_agents"):
+                self._agents = {}
+
+            agent_id = request.match_info.get("id")
+            if not agent_id or agent_id not in self._agents:
+                return web.json_response({"error": "Agent not found"}, status=404)
+
+            agent = self._agents[agent_id]
+            return web.json_response({
+                "id": agent_id,
+                "task": agent.get("task", ""),
+                "status": agent.get("status", "unknown"),
+                "started_at": agent.get("started_at"),
+                "completed_at": agent.get("completed_at"),
+                "tool_calls": agent.get("tool_calls", []),
+                "output": agent.get("output", ""),
+                "progress": agent.get("progress", 0),
+                "error": agent.get("error"),
+            })
+
+        except Exception as e:
+            logger.exception("Get agent error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _cancel_agent(self, request: Request) -> Response:
+        """Cancel a running agent."""
+        try:
+            if not hasattr(self, "_agents"):
+                self._agents = {}
+
+            agent_id = request.match_info.get("id")
+            if not agent_id or agent_id not in self._agents:
+                return web.json_response({"error": "Agent not found"}, status=404)
+
+            agent = self._agents[agent_id]
+            if agent.get("status") != "running":
+                return web.json_response({
+                    "error": f"Agent is not running (status: {agent.get('status')})"
+                }, status=400)
+
+            # Cancel the task
+            task_handle = agent.get("task_handle")
+            if task_handle and not task_handle.done():
+                task_handle.cancel()
+
+            agent["status"] = "cancelled"
+            agent["completed_at"] = asyncio.get_event_loop().time()
+
+            return web.json_response({
+                "success": True,
+                "message": f"Agent {agent_id} cancelled"
+            })
+
+        except Exception as e:
+            logger.exception("Cancel agent error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _delete_agent(self, request: Request) -> Response:
+        """Delete an agent."""
+        try:
+            if not hasattr(self, "_agents"):
+                self._agents = {}
+
+            agent_id = request.match_info.get("id")
+            if not agent_id or agent_id not in self._agents:
+                return web.json_response({"error": "Agent not found"}, status=404)
+
+            # Cancel if running
+            agent = self._agents[agent_id]
+            task_handle = agent.get("task_handle")
+            if task_handle and not task_handle.done():
+                task_handle.cancel()
+
+            del self._agents[agent_id]
+
+            return web.json_response({
+                "success": True,
+                "message": f"Agent {agent_id} deleted"
+            })
+
+        except Exception as e:
+            logger.exception("Delete agent error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _clear_agents(self, request: Request) -> Response:
+        """Clear completed/failed/cancelled agents."""
+        try:
+            if not hasattr(self, "_agents"):
+                self._agents = {}
+
+            cleared = 0
+            agents_to_remove = []
+
+            for agent_id, agent in self._agents.items():
+                status = agent.get("status", "")
+                if status in ("completed", "failed", "cancelled"):
+                    agents_to_remove.append(agent_id)
+
+            for agent_id in agents_to_remove:
+                del self._agents[agent_id]
+                cleared += 1
+
+            return web.json_response({
+                "success": True,
+                "cleared": cleared,
+                "message": f"Cleared {cleared} agents"
+            })
+
+        except Exception as e:
+            logger.exception("Clear agents error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    # =========================================================================
+    # Plan Management
+    # =========================================================================
+
+    async def _list_plans(self, request: Request) -> Response:
+        """List all plans."""
+        try:
+            if not hasattr(self, "_plans"):
+                self._plans: Dict[str, Dict[str, Any]] = {}
+
+            plans_list = []
+            for plan_id, plan in self._plans.items():
+                plans_list.append({
+                    "id": plan_id,
+                    "title": plan.get("title", ""),
+                    "description": plan.get("description", ""),
+                    "status": plan.get("status", "draft"),
+                    "created_at": plan.get("created_at"),
+                    "approved_at": plan.get("approved_at"),
+                    "executed_at": plan.get("executed_at"),
+                    "steps": plan.get("steps", []),
+                })
+
+            return web.json_response({"plans": plans_list})
+
+        except Exception as e:
+            logger.exception("List plans error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _create_plan(self, request: Request) -> Response:
+        """Create a new plan."""
+        try:
+            if not hasattr(self, "_plans"):
+                self._plans = {}
+
+            data = await request.json()
+            title = data.get("title", "Untitled Plan")
+            description = data.get("description", "")
+            steps = data.get("steps", [])
+
+            plan_id = str(uuid.uuid4())[:8]
+
+            self._plans[plan_id] = {
+                "id": plan_id,
+                "title": title,
+                "description": description,
+                "status": "draft",
+                "created_at": asyncio.get_event_loop().time(),
+                "approved_at": None,
+                "executed_at": None,
+                "completed_at": None,
+                "steps": steps,
+                "current_step": 0,
+                "output": "",
+            }
+
+            return web.json_response({
+                "id": plan_id,
+                "status": "draft",
+                "message": f"Plan created: {title}"
+            })
+
+        except Exception as e:
+            logger.exception("Create plan error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _get_plan(self, request: Request) -> Response:
+        """Get plan details."""
+        try:
+            if not hasattr(self, "_plans"):
+                self._plans = {}
+
+            plan_id = request.match_info.get("id")
+            if not plan_id or plan_id not in self._plans:
+                return web.json_response({"error": "Plan not found"}, status=404)
+
+            plan = self._plans[plan_id]
+            return web.json_response(plan)
+
+        except Exception as e:
+            logger.exception("Get plan error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _approve_plan(self, request: Request) -> Response:
+        """Approve a plan for execution."""
+        try:
+            if not hasattr(self, "_plans"):
+                self._plans = {}
+
+            plan_id = request.match_info.get("id")
+            if not plan_id or plan_id not in self._plans:
+                return web.json_response({"error": "Plan not found"}, status=404)
+
+            plan = self._plans[plan_id]
+            if plan.get("status") != "draft":
+                return web.json_response({
+                    "error": f"Plan is not in draft status (status: {plan.get('status')})"
+                }, status=400)
+
+            plan["status"] = "approved"
+            plan["approved_at"] = asyncio.get_event_loop().time()
+
+            return web.json_response({
+                "success": True,
+                "message": f"Plan {plan_id} approved",
+                "status": "approved"
+            })
+
+        except Exception as e:
+            logger.exception("Approve plan error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _execute_plan(self, request: Request) -> Response:
+        """Execute an approved plan."""
+        try:
+            if not hasattr(self, "_plans"):
+                self._plans = {}
+
+            plan_id = request.match_info.get("id")
+            if not plan_id or plan_id not in self._plans:
+                return web.json_response({"error": "Plan not found"}, status=404)
+
+            plan = self._plans[plan_id]
+            if plan.get("status") != "approved":
+                return web.json_response({
+                    "error": f"Plan must be approved before execution (status: {plan.get('status')})"
+                }, status=400)
+
+            plan["status"] = "executing"
+            plan["executed_at"] = asyncio.get_event_loop().time()
+
+            # Execute the plan steps asynchronously
+            async def execute_steps():
+                try:
+                    orchestrator = await self._get_orchestrator()
+                    steps = plan.get("steps", [])
+
+                    for i, step in enumerate(steps):
+                        if plan_id not in self._plans:
+                            break  # Plan was deleted
+
+                        plan["current_step"] = i
+                        step_desc = step.get("description", step) if isinstance(step, dict) else step
+
+                        # Execute step
+                        response = await orchestrator.chat(f"Execute this step: {step_desc}")
+                        content = getattr(response, "content", "") or ""
+                        plan["output"] += f"\n## Step {i+1}: {step_desc}\n{content}\n"
+
+                        # Mark step as completed
+                        if isinstance(step, dict):
+                            step["status"] = "completed"
+
+                    # Mark plan as completed
+                    if plan_id in self._plans:
+                        plan["status"] = "completed"
+                        plan["completed_at"] = asyncio.get_event_loop().time()
+
+                except Exception as e:
+                    logger.exception(f"Plan {plan_id} execution error")
+                    if plan_id in self._plans:
+                        plan["status"] = "failed"
+                        plan["error"] = str(e)
+                        plan["completed_at"] = asyncio.get_event_loop().time()
+
+            # Start execution task
+            asyncio.create_task(execute_steps())
+
+            return web.json_response({
+                "success": True,
+                "message": f"Plan {plan_id} execution started",
+                "status": "executing"
+            })
+
+        except Exception as e:
+            logger.exception("Execute plan error")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _delete_plan(self, request: Request) -> Response:
+        """Delete a plan."""
+        try:
+            if not hasattr(self, "_plans"):
+                self._plans = {}
+
+            plan_id = request.match_info.get("id")
+            if not plan_id or plan_id not in self._plans:
+                return web.json_response({"error": "Plan not found"}, status=404)
+
+            del self._plans[plan_id]
+
+            return web.json_response({
+                "success": True,
+                "message": f"Plan {plan_id} deleted"
+            })
+
+        except Exception as e:
+            logger.exception("Delete plan error")
             return web.json_response({"error": str(e)}, status=500)
 
     def run(self) -> None:

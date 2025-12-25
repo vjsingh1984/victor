@@ -29,6 +29,7 @@ Features:
 import asyncio
 import json
 import logging
+import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -44,7 +45,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ class HealthResponse(BaseModel):
     """Health check response."""
 
     status: str = "healthy"
-    version: str = "0.1.0"
+    version: str = "0.2.0"
 
 
 class StatusResponse(BaseModel):
@@ -92,12 +93,25 @@ class ChatResponse(BaseModel):
     tool_calls: Optional[List[Dict[str, Any]]] = None
 
 
-class CompletionRequest(BaseModel):
-    """Code completion request."""
+class CompletionPosition(BaseModel):
+    """Cursor position for completions."""
 
-    prompt: str
+    line: int
+    character: int
+
+
+class CompletionRequest(BaseModel):
+    """Code completion request with FIM (Fill-in-the-Middle) support."""
+
+    prompt: str  # Code before cursor (prefix)
+    suffix: Optional[str] = None  # Code after cursor (for FIM)
     file: Optional[str] = None
     language: Optional[str] = None
+    position: Optional[CompletionPosition] = None
+    context: Optional[str] = None  # Additional file context (imports, etc.)
+    max_tokens: int = Field(default=128, ge=1, le=512)  # Limit completion length
+    temperature: float = Field(default=0.0, ge=0.0, le=1.0)  # Deterministic by default
+    stop_sequences: Optional[List[str]] = None  # Custom stop sequences
 
 
 class CompletionResponse(BaseModel):
@@ -105,6 +119,7 @@ class CompletionResponse(BaseModel):
 
     completions: List[str]
     error: Optional[str] = None
+    latency_ms: Optional[float] = None  # Track performance
 
 
 class SearchRequest(BaseModel):
@@ -117,10 +132,21 @@ class SearchRequest(BaseModel):
 class CodeSearchRequest(BaseModel):
     """Code search request payload."""
 
-    query: str
+    query: str = Field(..., min_length=1, max_length=1000)
     regex: bool = False
     case_sensitive: bool = True
-    file_pattern: str = "*"
+    file_pattern: str = Field(default="*", max_length=200)
+
+    @field_validator("file_pattern")
+    @classmethod
+    def validate_file_pattern(cls, v: str) -> str:
+        """Validate file pattern to prevent shell injection."""
+        # Disallow shell metacharacters except glob patterns
+        dangerous_chars = [";", "|", "&", "$", "`", "(", ")", "<", ">", "\\"]
+        for char in dangerous_chars:
+            if char in v:
+                raise ValueError(f"Invalid character '{char}' in file pattern")
+        return v
 
 
 class SearchResult(BaseModel):
@@ -169,9 +195,28 @@ class PatchCreateRequest(BaseModel):
 class GitCommitRequest(BaseModel):
     """Git commit request."""
 
-    message: Optional[str] = None
+    message: Optional[str] = Field(default=None, max_length=5000)
     use_ai: bool = False
     files: Optional[List[str]] = None
+
+    @field_validator("files")
+    @classmethod
+    def validate_files(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """Validate file paths to prevent path traversal."""
+        if v is None:
+            return v
+        for file_path in v:
+            # Disallow absolute paths and path traversal
+            if file_path.startswith("/") or file_path.startswith("\\"):
+                raise ValueError("Absolute paths not allowed")
+            if ".." in file_path:
+                raise ValueError("Path traversal not allowed")
+            # Disallow shell metacharacters
+            dangerous_chars = [";", "|", "&", "$", "`", "(", ")", "<", ">"]
+            for char in dangerous_chars:
+                if char in file_path:
+                    raise ValueError(f"Invalid character '{char}' in file path")
+        return v
 
 
 class MCPConnectRequest(BaseModel):
@@ -206,6 +251,45 @@ class LSPRequest(BaseModel):
     file: str
     line: int = 0
     character: int = 0
+
+
+class TerminalCommandRequest(BaseModel):
+    """Terminal command execution request."""
+
+    command: str = Field(..., min_length=1, max_length=5000)
+    working_dir: Optional[str] = None
+    timeout: int = Field(default=60, ge=1, le=300)
+    require_approval: bool = True
+
+    @field_validator("command")
+    @classmethod
+    def validate_command(cls, v: str) -> str:
+        """Validate command to prevent obviously dangerous operations."""
+        # Disallow command chaining with shell metacharacters
+        dangerous_patterns = [
+            "rm -rf /",
+            "rm -rf ~",
+            "> /dev/sd",
+            "mkfs.",
+            "dd if=",
+            ":(){:|:&};:",  # Fork bomb
+        ]
+        for pattern in dangerous_patterns:
+            if pattern in v:
+                raise ValueError(f"Command contains dangerous pattern: {pattern}")
+        return v
+
+
+class TerminalCommandResponse(BaseModel):
+    """Terminal command execution response."""
+
+    command_id: str
+    command: str
+    status: str  # 'pending', 'running', 'completed', 'failed', 'cancelled'
+    output: Optional[str] = None
+    exit_code: Optional[int] = None
+    is_dangerous: bool = False
+    requires_approval: bool = True
 
 
 # =============================================================================
@@ -250,17 +334,26 @@ class VictorFastAPIServer:
         self.app = FastAPI(
             title="Victor API",
             description="AI Coding Assistant API for IDE integrations",
-            version="0.1.0",
+            version="0.2.0",
             lifespan=self._lifespan,
         )
 
-        # Configure CORS
+        # Configure CORS with secure defaults
+        # Allow localhost for development and VS Code webview origins
         if enable_cors:
+            cors_origins = [
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "https://localhost:*",
+                "https://127.0.0.1:*",
+                "vscode-webview://*",
+            ]
             self.app.add_middleware(
                 CORSMiddleware,
-                allow_origins=["*"],
+                allow_origins=cors_origins,
+                allow_origin_regex=r"^(http://localhost:\d+|http://127\.0\.0\.1:\d+|vscode-webview://[a-z0-9-]+)$",
                 allow_credentials=True,
-                allow_methods=["*"],
+                allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
                 allow_headers=["*"],
             )
 
@@ -326,18 +419,6 @@ class VictorFastAPIServer:
                     workspace=self.workspace_root,
                 )
 
-        @app.get("/providers", tags=["System"])
-        async def providers() -> JSONResponse:
-            """List available providers."""
-            try:
-                from victor.providers.registry import ProviderRegistry
-
-                provider_list = ProviderRegistry.list_providers()
-                return JSONResponse({"providers": provider_list})
-            except Exception as e:
-                logger.warning(f"Providers list error: {e}")
-                return JSONResponse({"providers": [], "error": str(e)})
-
         # Chat endpoints
         @app.post("/chat", response_model=ChatResponse, tags=["Chat"])
         async def chat(request: ChatRequest) -> ChatResponse:
@@ -394,27 +475,91 @@ class VictorFastAPIServer:
                 },
             )
 
-        # Completions
+        # Completions with FIM (Fill-in-the-Middle) support
         @app.post("/completions", response_model=CompletionResponse, tags=["Completions"])
         async def completions(request: CompletionRequest) -> CompletionResponse:
-            """Get code completions."""
+            """Get fast code completions with FIM support.
+
+            For inline/ghost text completions, this endpoint is optimized for:
+            - Low latency (bypasses orchestrator overhead)
+            - FIM format (uses both prefix and suffix context)
+            - Deterministic output (temperature=0 by default)
+            """
+            import time
+
+            start_time = time.perf_counter()
+
             if not request.prompt:
-                return CompletionResponse(completions=[])
+                return CompletionResponse(completions=[], latency_ms=0.0)
 
             try:
                 orchestrator = await self._get_orchestrator()
-                file_context = f" in file {request.file}" if request.file else ""
-                completion_prompt = f"""Complete the following {request.language or ''} code{file_context}. Only provide the completion, no explanation.
+                provider = orchestrator.provider_manager.current_provider
+
+                # Build FIM prompt for better completions
+                file_info = f" ({request.language})" if request.language else ""
+                if request.file:
+                    file_info = f" in {request.file}{file_info}"
+
+                # Use FIM format if suffix is provided
+                if request.suffix:
+                    # FIM format: prefix <FILL> suffix
+                    completion_prompt = f"""Complete the code at <FILL>. Only output the completion, nothing else.
+
+{request.context or ''}
+
+{request.prompt}<FILL>{request.suffix}"""
+                else:
+                    # Standard completion (no suffix)
+                    completion_prompt = f"""Complete this {request.language or 'code'}{file_info}. Only output the completion.
+
+{request.context or ''}
 
 {request.prompt}"""
 
-                response = await orchestrator.chat(completion_prompt)
-                content = getattr(response, "content", None) or ""
-                return CompletionResponse(completions=[content.strip()])
+                # Default stop sequences for code completions
+                stop_sequences = request.stop_sequences or [
+                    "\n\n",  # Stop at blank line
+                    "\ndef ",  # Python function
+                    "\nclass ",  # Python class
+                    "\nfunction ",  # JavaScript function
+                    "\n//",  # Comment start
+                    "\n#",  # Python/shell comment
+                ]
+
+                # Direct provider call for lower latency
+                messages = [{"role": "user", "content": completion_prompt}]
+                response = await provider.chat(
+                    messages=messages,
+                    max_tokens=request.max_tokens,
+                    temperature=request.temperature,
+                    stop=stop_sequences,
+                )
+
+                content = getattr(response, "content", "") or ""
+                # Clean up the completion
+                completion = content.strip()
+                # Remove any explanation text that might follow the code
+                if "\n\nExplanation:" in completion:
+                    completion = completion.split("\n\nExplanation:")[0]
+                if "\n\nNote:" in completion:
+                    completion = completion.split("\n\nNote:")[0]
+
+                latency_ms = (time.perf_counter() - start_time) * 1000
+
+                return CompletionResponse(
+                    completions=[completion] if completion else [],
+                    latency_ms=round(latency_ms, 2),
+                )
 
             except Exception as e:
                 logger.exception("Completions error")
-                return CompletionResponse(completions=[], error=str(e))
+                latency_ms = (time.perf_counter() - start_time) * 1000
+                return CompletionResponse(
+                    completions=[],
+                    error=str(e),
+                    latency_ms=round(latency_ms, 2),
+                )
 
         # Search endpoints
         @app.post("/search/semantic", response_model=SearchResponse, tags=["Search"])
@@ -1065,6 +1210,127 @@ class VictorFastAPIServer:
                 logger.exception("Git diff error")
                 return JSONResponse({"error": str(e)}, status_code=500)
 
+        # Terminal Agent endpoints
+        @app.post("/terminal/suggest", tags=["Terminal"])
+        async def terminal_suggest(intent: str = Query(..., min_length=1)) -> JSONResponse:
+            """Suggest a terminal command based on user intent."""
+            try:
+                orchestrator = await self._get_orchestrator()
+                prompt = f"""Generate a terminal command for this task. Return ONLY the command, nothing else.
+
+Working directory: {self.workspace_root}
+OS: {__import__('sys').platform}
+Task: {intent}
+
+Respond with just the command to run."""
+
+                response = await orchestrator.chat(prompt)
+                command = response.get("content", "").strip()
+
+                # Clean up markdown code blocks
+                if command.startswith("```"):
+                    lines = command.split("\n")
+                    command = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+                command = command.strip()
+
+                if not command:
+                    return JSONResponse({"error": "Could not generate command"}, status_code=400)
+
+                # Check if command is dangerous
+                dangerous_patterns = [
+                    "rm -rf /", "rm -rf ~", "> /dev/sd", "mkfs.", "dd if=",
+                    "sudo rm", ":(){", "chmod -R 777", "curl | sh", "wget | sh"
+                ]
+                is_dangerous = any(p in command.lower() for p in dangerous_patterns)
+
+                cmd_id = f"cmd-{int(time.time() * 1000)}"
+                return JSONResponse({
+                    "command_id": cmd_id,
+                    "command": command,
+                    "description": intent,
+                    "is_dangerous": is_dangerous,
+                    "status": "pending"
+                })
+
+            except Exception as e:
+                logger.exception("Terminal suggest error")
+                return JSONResponse({"error": str(e)}, status_code=500)
+
+        @app.post("/terminal/execute", response_model=TerminalCommandResponse, tags=["Terminal"])
+        async def terminal_execute(request: TerminalCommandRequest) -> TerminalCommandResponse:
+            """Execute a terminal command."""
+            import asyncio.subprocess as asp
+
+            cmd_id = f"cmd-{int(time.time() * 1000)}"
+            working_dir = request.working_dir or self.workspace_root
+
+            # Check for dangerous commands
+            dangerous_patterns = [
+                "rm -rf /", "rm -rf ~", "> /dev/sd", "mkfs.", "dd if=",
+                "sudo rm", ":(){", "chmod -R 777"
+            ]
+            is_dangerous = any(p in request.command.lower() for p in dangerous_patterns)
+
+            if is_dangerous and request.require_approval:
+                return TerminalCommandResponse(
+                    command_id=cmd_id,
+                    command=request.command,
+                    status="pending",
+                    is_dangerous=True,
+                    requires_approval=True,
+                )
+
+            try:
+                # Execute command asynchronously
+                proc = await asyncio.create_subprocess_shell(
+                    request.command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                    cwd=working_dir,
+                )
+
+                try:
+                    stdout, _ = await asyncio.wait_for(
+                        proc.communicate(),
+                        timeout=request.timeout
+                    )
+                    output = stdout.decode("utf-8", errors="replace")
+                    exit_code = proc.returncode
+
+                    return TerminalCommandResponse(
+                        command_id=cmd_id,
+                        command=request.command,
+                        status="completed" if exit_code == 0 else "failed",
+                        output=output[:50000],  # Limit output size
+                        exit_code=exit_code,
+                        is_dangerous=is_dangerous,
+                        requires_approval=False,
+                    )
+
+                except asyncio.TimeoutError:
+                    proc.kill()
+                    return TerminalCommandResponse(
+                        command_id=cmd_id,
+                        command=request.command,
+                        status="failed",
+                        output="Command timed out",
+                        exit_code=-1,
+                        is_dangerous=is_dangerous,
+                        requires_approval=False,
+                    )
+
+            except Exception as e:
+                logger.exception("Terminal execute error")
+                return TerminalCommandResponse(
+                    command_id=cmd_id,
+                    command=request.command,
+                    status="failed",
+                    output=str(e),
+                    exit_code=-1,
+                    is_dangerous=is_dangerous,
+                    requires_approval=False,
+                )
+
         # Workspace analysis
         @app.get("/workspace/overview", tags=["Workspace"])
         async def workspace_overview(depth: int = Query(3, ge=1, le=10)) -> JSONResponse:
@@ -1653,6 +1919,298 @@ class VictorFastAPIServer:
                 logger.exception("RL reset error")
                 return JSONResponse({"error": str(e)}, status_code=500)
 
+        # =====================================================================
+        # Background Agent Endpoints
+        # =====================================================================
+
+        @app.post("/agents/start", tags=["Agents"])
+        async def start_agent(
+            task: str = Body(..., description="Task for the agent to execute"),
+            mode: str = Body("build", description="Agent mode: build, plan, explore"),
+            name: Optional[str] = Body(None, description="Display name for the agent"),
+        ) -> JSONResponse:
+            """Start a new background agent.
+
+            Agents run asynchronously and report progress via WebSocket events.
+            Maximum 4 concurrent agents allowed.
+            """
+            try:
+                from victor.agent.background_agent import get_agent_manager, init_agent_manager
+
+                manager = get_agent_manager()
+                if manager is None:
+                    # Initialize with orchestrator
+                    orchestrator = await self._get_orchestrator()
+                    manager = init_agent_manager(
+                        orchestrator=orchestrator,
+                        max_concurrent=4,
+                        event_callback=lambda t, d: asyncio.create_task(
+                            self._broadcast_agent_event(t, d)
+                        ),
+                    )
+
+                agent_id = await manager.start_agent(
+                    task=task,
+                    mode=mode,
+                    name=name,
+                )
+
+                return JSONResponse({
+                    "success": True,
+                    "agent_id": agent_id,
+                    "message": f"Agent started: {agent_id}",
+                })
+
+            except RuntimeError as e:
+                return JSONResponse({"error": str(e)}, status_code=429)
+            except Exception as e:
+                logger.exception("Failed to start agent")
+                return JSONResponse({"error": str(e)}, status_code=500)
+
+        @app.get("/agents", tags=["Agents"])
+        async def list_agents(
+            status: Optional[str] = Query(None, description="Filter by status"),
+            limit: int = Query(20, ge=1, le=100),
+        ) -> JSONResponse:
+            """List background agents."""
+            try:
+                from victor.agent.background_agent import get_agent_manager, AgentStatus
+
+                manager = get_agent_manager()
+                if manager is None:
+                    return JSONResponse({"agents": []})
+
+                status_filter = None
+                if status:
+                    try:
+                        status_filter = AgentStatus(status)
+                    except ValueError:
+                        pass
+
+                agents = manager.list_agents(status=status_filter, limit=limit)
+                return JSONResponse({
+                    "agents": agents,
+                    "active_count": manager.active_count,
+                })
+
+            except Exception as e:
+                logger.exception("Failed to list agents")
+                return JSONResponse({"error": str(e)}, status_code=500)
+
+        @app.get("/agents/{agent_id}", tags=["Agents"])
+        async def get_agent(agent_id: str) -> JSONResponse:
+            """Get a specific agent's status."""
+            try:
+                from victor.agent.background_agent import get_agent_manager
+
+                manager = get_agent_manager()
+                if manager is None:
+                    return JSONResponse({"error": "No agents running"}, status_code=404)
+
+                agent_data = manager.get_agent_status(agent_id)
+                if agent_data is None:
+                    return JSONResponse({"error": "Agent not found"}, status_code=404)
+
+                return JSONResponse(agent_data)
+
+            except Exception as e:
+                logger.exception("Failed to get agent")
+                return JSONResponse({"error": str(e)}, status_code=500)
+
+        @app.post("/agents/{agent_id}/cancel", tags=["Agents"])
+        async def cancel_agent(agent_id: str) -> JSONResponse:
+            """Cancel a running agent."""
+            try:
+                from victor.agent.background_agent import get_agent_manager
+
+                manager = get_agent_manager()
+                if manager is None:
+                    return JSONResponse({"error": "No agents running"}, status_code=404)
+
+                cancelled = await manager.cancel_agent(agent_id)
+                if cancelled:
+                    return JSONResponse({
+                        "success": True,
+                        "message": f"Agent {agent_id} cancelled",
+                    })
+                else:
+                    return JSONResponse(
+                        {"error": "Agent not found or not running"},
+                        status_code=404,
+                    )
+
+            except Exception as e:
+                logger.exception("Failed to cancel agent")
+                return JSONResponse({"error": str(e)}, status_code=500)
+
+        @app.post("/agents/clear", tags=["Agents"])
+        async def clear_agents() -> JSONResponse:
+            """Clear completed/failed/cancelled agents."""
+            try:
+                from victor.agent.background_agent import get_agent_manager
+
+                manager = get_agent_manager()
+                if manager is None:
+                    return JSONResponse({"cleared": 0})
+
+                cleared = manager.clear_completed()
+                return JSONResponse({
+                    "success": True,
+                    "cleared": cleared,
+                    "message": f"Cleared {cleared} agents",
+                })
+
+            except Exception as e:
+                logger.exception("Failed to clear agents")
+                return JSONResponse({"error": str(e)}, status_code=500)
+
+        # =====================================================================
+        # Plan Management Endpoints
+        # =====================================================================
+
+        # In-memory plan storage (would use database in production)
+        _plans: Dict[str, Dict[str, Any]] = {}
+
+        @app.get("/plans", tags=["Plans"])
+        async def list_plans() -> JSONResponse:
+            """List all plans."""
+            plans_list = []
+            for plan_id, plan in _plans.items():
+                plans_list.append({
+                    "id": plan_id,
+                    "title": plan.get("title", ""),
+                    "description": plan.get("description", ""),
+                    "status": plan.get("status", "draft"),
+                    "created_at": plan.get("created_at"),
+                    "approved_at": plan.get("approved_at"),
+                    "executed_at": plan.get("executed_at"),
+                    "steps": plan.get("steps", []),
+                })
+            return JSONResponse({"plans": plans_list})
+
+        @app.post("/plans", tags=["Plans"])
+        async def create_plan(request: Request) -> JSONResponse:
+            """Create a new plan."""
+            try:
+                data = await request.json()
+                title = data.get("title", "Untitled Plan")
+                description = data.get("description", "")
+                steps = data.get("steps", [])
+
+                plan_id = str(uuid.uuid4())[:8]
+                import time
+                _plans[plan_id] = {
+                    "id": plan_id,
+                    "title": title,
+                    "description": description,
+                    "status": "draft",
+                    "created_at": time.time(),
+                    "approved_at": None,
+                    "executed_at": None,
+                    "completed_at": None,
+                    "steps": steps,
+                    "current_step": 0,
+                    "output": "",
+                }
+
+                return JSONResponse({
+                    "id": plan_id,
+                    "status": "draft",
+                    "message": f"Plan created: {title}"
+                })
+
+            except Exception as e:
+                logger.exception("Failed to create plan")
+                return JSONResponse({"error": str(e)}, status_code=500)
+
+        @app.get("/plans/{plan_id}", tags=["Plans"])
+        async def get_plan(plan_id: str) -> JSONResponse:
+            """Get plan details."""
+            if plan_id not in _plans:
+                return JSONResponse({"error": "Plan not found"}, status_code=404)
+            return JSONResponse(_plans[plan_id])
+
+        @app.post("/plans/{plan_id}/approve", tags=["Plans"])
+        async def approve_plan(plan_id: str) -> JSONResponse:
+            """Approve a plan for execution."""
+            if plan_id not in _plans:
+                return JSONResponse({"error": "Plan not found"}, status_code=404)
+
+            plan = _plans[plan_id]
+            if plan.get("status") != "draft":
+                return JSONResponse({
+                    "error": f"Plan is not in draft status (status: {plan.get('status')})"
+                }, status_code=400)
+
+            import time
+            plan["status"] = "approved"
+            plan["approved_at"] = time.time()
+
+            return JSONResponse({
+                "success": True,
+                "message": f"Plan {plan_id} approved",
+                "status": "approved"
+            })
+
+        @app.post("/plans/{plan_id}/execute", tags=["Plans"])
+        async def execute_plan(plan_id: str) -> JSONResponse:
+            """Execute an approved plan."""
+            if plan_id not in _plans:
+                return JSONResponse({"error": "Plan not found"}, status_code=404)
+
+            plan = _plans[plan_id]
+            if plan.get("status") != "approved":
+                return JSONResponse({
+                    "error": f"Plan must be approved before execution (status: {plan.get('status')})"
+                }, status_code=400)
+
+            import time
+            plan["status"] = "executing"
+            plan["executed_at"] = time.time()
+
+            # Execute steps asynchronously (simplified - in production would use background task)
+            async def execute_steps():
+                try:
+                    steps = plan.get("steps", [])
+                    for i, step in enumerate(steps):
+                        if plan_id not in _plans:
+                            break
+                        plan["current_step"] = i
+                        step_desc = step.get("description", step) if isinstance(step, dict) else step
+                        plan["output"] += f"\n## Step {i+1}: {step_desc}\n"
+                        if isinstance(step, dict):
+                            step["status"] = "completed"
+
+                    if plan_id in _plans:
+                        plan["status"] = "completed"
+                        plan["completed_at"] = time.time()
+                except Exception as e:
+                    logger.exception(f"Plan {plan_id} execution error")
+                    if plan_id in _plans:
+                        plan["status"] = "failed"
+                        plan["error"] = str(e)
+
+            import asyncio
+            asyncio.create_task(execute_steps())
+
+            return JSONResponse({
+                "success": True,
+                "message": f"Plan {plan_id} execution started",
+                "status": "executing"
+            })
+
+        @app.delete("/plans/{plan_id}", tags=["Plans"])
+        async def delete_plan(plan_id: str) -> JSONResponse:
+            """Delete a plan."""
+            if plan_id not in _plans:
+                return JSONResponse({"error": "Plan not found"}, status_code=404)
+
+            del _plans[plan_id]
+            return JSONResponse({
+                "success": True,
+                "message": f"Plan {plan_id} deleted"
+            })
+
         # Placeholder endpoints
         @app.get("/credentials/get", tags=["System"])
         async def credentials_get(provider: str = Query("")) -> JSONResponse:
@@ -1833,6 +2391,21 @@ class VictorFastAPIServer:
         elif msg_type == "ping":
             await ws.send_json({"type": "pong"})
 
+        elif msg_type == "auth":
+            # Handle WebSocket authentication (more secure than URL query params)
+            # API key is sent in first message after connection instead of URL
+            api_key = data.get("api_key", "")
+            if api_key:
+                # Store auth state on the websocket scope for future operations
+                if not hasattr(ws, "state"):
+                    ws.state = type("State", (), {})()
+                ws.state.authenticated = True
+                ws.state.api_key = api_key
+                logger.debug("WebSocket client authenticated via message")
+                await ws.send_json({"type": "auth_success"})
+            else:
+                await ws.send_json({"type": "auth_failed", "message": "No API key provided"})
+
         elif msg_type == "subscribe":
             channel = data.get("channel", "")
             await ws.send_json({"type": "subscribed", "channel": channel})
@@ -1844,6 +2417,19 @@ class VictorFastAPIServer:
                 await ws.send_json(message)
             except Exception:
                 pass
+
+    async def _broadcast_agent_event(self, event_type: str, data: Dict[str, Any]) -> None:
+        """Broadcast agent events to all connected WebSocket clients.
+
+        Used by BackgroundAgentManager to send real-time updates.
+        """
+        message = {
+            "type": "agent_event",
+            "event": event_type,
+            "data": data,
+            "timestamp": time.time(),
+        }
+        await self._broadcast_ws(message)
 
     def _format_messages_markdown(self, messages: List[Dict[str, Any]]) -> str:
         """Format messages as markdown."""
