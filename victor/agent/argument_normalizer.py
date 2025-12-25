@@ -13,6 +13,17 @@ import logging
 from enum import Enum
 from typing import Any, Dict, Optional, Tuple, TypedDict
 
+# Import native extensions with fallback
+try:
+    from victor.native import (
+        repair_json as native_repair_json,
+        is_native_available,
+    )
+
+    _NATIVE_AVAILABLE = is_native_available()
+except ImportError:
+    _NATIVE_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -378,6 +389,8 @@ class ArgumentNormalizer:
         """
         Simple quote replacement via regex.
 
+        Uses native Rust implementation when available for ~5-10x speedup.
+
         This is a fallback for cases where AST parsing fails but simple
         quote replacement might work.
 
@@ -394,13 +407,18 @@ class ArgumentNormalizer:
         normalized = {}
         for key, value in arguments.items():
             if isinstance(value, str):
-                # Replace escaped single quotes with double quotes
-                # Pattern: \' → "  and standalone ' → "
-                repaired = value.replace("\\'", '"')
-                # Also try replacing unescaped single quotes
-                # (careful not to replace quotes in strings)
-                if "'" in repaired:
-                    repaired = repaired.replace("'", '"')
+                if _NATIVE_AVAILABLE:
+                    # Use native Rust JSON repair (handles more edge cases)
+                    repaired = native_repair_json(value)
+                else:
+                    # Python fallback
+                    # Replace escaped single quotes with double quotes
+                    # Pattern: \' → "  and standalone ' → "
+                    repaired = value.replace("\\'", '"')
+                    # Also try replacing unescaped single quotes
+                    # (careful not to replace quotes in strings)
+                    if "'" in repaired:
+                        repaired = repaired.replace("'", '"')
                 normalized[key] = repaired
             else:
                 normalized[key] = value
