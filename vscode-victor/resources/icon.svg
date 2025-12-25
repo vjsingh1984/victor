@@ -1,28 +1,64 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#6366F1"/>
-      <stop offset="100%" style="stop-color:#4F46E5"/>
+    <!-- Indian flag inspired gradient: saffron to white to green -->
+    <linearGradient id="indianGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF9933"/>
+      <stop offset="50%" style="stop-color:#FFFFFF"/>
+      <stop offset="100%" style="stop-color:#138808"/>
     </linearGradient>
-    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#10B981"/>
-      <stop offset="100%" style="stop-color:#059669"/>
+    <!-- Deep purple/indigo tech gradient -->
+    <linearGradient id="techGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4C1D95"/>
+      <stop offset="50%" style="stop-color:#5B21B6"/>
+      <stop offset="100%" style="stop-color:#7C3AED"/>
     </linearGradient>
+    <!-- Gold accent -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F59E0B"/>
+      <stop offset="100%" style="stop-color:#D97706"/>
+    </linearGradient>
+    <!-- Glow effect -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
 
-  <!-- Background rounded square -->
-  <rect x="4" y="4" width="120" height="120" rx="24" fill="url(#bg)"/>
+  <!-- Background circle with tech gradient -->
+  <circle cx="64" cy="64" r="60" fill="url(#techGrad)"/>
 
-  <!-- V letter stylized as code brackets -->
-  <path d="M 40 36 L 64 88 L 88 36"
-        stroke="white"
-        stroke-width="10"
+  <!-- Inner ring accent -->
+  <circle cx="64" cy="64" r="52" fill="none" stroke="url(#goldGrad)" stroke-width="2" opacity="0.5"/>
+
+  <!-- Stylized V - representing Victor/Vijaykumar -->
+  <path d="M 32 30 L 64 90 L 96 30"
+        stroke="url(#indianGrad)"
+        stroke-width="12"
         stroke-linecap="round"
         stroke-linejoin="round"
-        fill="none"/>
+        fill="none"
+        filter="url(#glow)"/>
 
-  <!-- Code dots/accent -->
-  <circle cx="64" cy="100" r="6" fill="url(#accent)"/>
-  <circle cx="48" cy="100" r="4" fill="white" opacity="0.6"/>
-  <circle cx="80" cy="100" r="4" fill="white" opacity="0.6"/>
+  <!-- AI neural nodes -->
+  <circle cx="32" cy="30" r="6" fill="#FF9933"/>
+  <circle cx="96" cy="30" r="6" fill="#138808"/>
+  <circle cx="64" cy="90" r="8" fill="url(#goldGrad)"/>
+
+  <!-- Connection lines (neural network style) -->
+  <line x1="32" y1="30" x2="48" y2="45" stroke="white" stroke-width="1.5" opacity="0.4"/>
+  <line x1="96" y1="30" x2="80" y2="45" stroke="white" stroke-width="1.5" opacity="0.4"/>
+  <line x1="48" y1="45" x2="64" y2="60" stroke="white" stroke-width="1.5" opacity="0.3"/>
+  <line x1="80" y1="45" x2="64" y2="60" stroke="white" stroke-width="1.5" opacity="0.3"/>
+
+  <!-- Small accent dots -->
+  <circle cx="48" cy="45" r="3" fill="white" opacity="0.6"/>
+  <circle cx="80" cy="45" r="3" fill="white" opacity="0.6"/>
+  <circle cx="64" cy="60" r="3" fill="white" opacity="0.8"/>
+
+  <!-- Code brackets hint -->
+  <path d="M 20 50 L 14 64 L 20 78" stroke="white" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.4"/>
+  <path d="M 108 50 L 114 64 L 108 78" stroke="white" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.4"/>
 </svg>

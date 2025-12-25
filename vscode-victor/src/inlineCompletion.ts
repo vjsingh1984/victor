@@ -6,14 +6,55 @@
 
 import * as vscode from 'vscode';
 import { VictorClient, CompletionRequest } from './victorClient';
+import { TerminalHistoryService } from './terminalHistory';
 
-export class InlineCompletionProvider implements vscode.InlineCompletionItemProvider {
+export class InlineCompletionProvider implements vscode.InlineCompletionItemProvider, vscode.Disposable {
     private _debounceTimer: NodeJS.Timeout | null = null;
+    private _abortController: AbortController | null = null;
     private _lastRequest: string = '';
     private _cache: Map<string, string[]> = new Map();
     private _maxCacheSize: number = 100;
+    private _disposed: boolean = false;
+    private _statusBarItem: vscode.StatusBarItem;
+    private _isGenerating: boolean = false;
 
-    constructor(private readonly _client: VictorClient) {}
+    constructor(private readonly _client: VictorClient) {
+        // Create status bar item for completion indicator
+        this._statusBarItem = vscode.window.createStatusBarItem(
+            vscode.StatusBarAlignment.Right,
+            95
+        );
+        this._statusBarItem.text = '$(loading~spin) Completing...';
+        this._statusBarItem.tooltip = 'Victor AI is generating code completions';
+    }
+
+    dispose(): void {
+        this._disposed = true;
+        if (this._debounceTimer) {
+            clearTimeout(this._debounceTimer);
+            this._debounceTimer = null;
+        }
+        if (this._abortController) {
+            this._abortController.abort();
+            this._abortController = null;
+        }
+        this._cache.clear();
+        this._statusBarItem.dispose();
+    }
+
+    private _showGenerating(): void {
+        if (!this._isGenerating) {
+            this._isGenerating = true;
+            this._statusBarItem.show();
+        }
+    }
+
+    private _hideGenerating(): void {
+        if (this._isGenerating) {
+            this._isGenerating = false;
+            this._statusBarItem.hide();
+        }
+    }
 
     async provideInlineCompletionItems(
         document: vscode.TextDocument,
@@ -64,6 +105,18 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
         position: vscode.Position,
         token: vscode.CancellationToken
     ): Promise<vscode.InlineCompletionItem[] | null> {
+        // Check if disposed
+        if (this._disposed) {
+            return null;
+        }
+
+        // Cancel any pending request
+        if (this._abortController) {
+            this._abortController.abort();
+        }
+        this._abortController = new AbortController();
+        const signal = this._abortController.signal;
+
         // Get context around cursor
         const prefix = this._getPrefix(document, position);
         const suffix = this._getSuffix(document, position);
@@ -82,6 +135,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
         try {
             const request: CompletionRequest = {
                 prompt: prefix,
+                suffix: suffix,  // FIM: include code after cursor for better context
                 file: document.uri.fsPath,
                 language: document.languageId,
                 position: {
@@ -89,19 +143,39 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
                     character: position.character,
                 },
                 context: this._getFileContext(document, position),
+                max_tokens: 128,  // Keep completions concise
+                temperature: 0.0,  // Deterministic for inline suggestions
             };
 
-            const completions = await this._client.getCompletions(request);
-
-            if (token.isCancellationRequested || completions.length === 0) {
+            // Check cancellation before and after the request
+            if (token.isCancellationRequested || signal.aborted) {
                 return null;
             }
 
-            // Cache results
-            this._addToCache(cacheKey, completions);
+            // Show generating indicator
+            this._showGenerating();
 
-            return completions.map(text => this._createCompletionItem(text, position));
+            try {
+                const completions = await this._client.getCompletions(request, signal);
+
+                if (token.isCancellationRequested || signal.aborted || completions.length === 0) {
+                    return null;
+                }
+
+                // Cache results
+                this._addToCache(cacheKey, completions);
+
+                return completions.map(text => this._createCompletionItem(text, position));
+            } finally {
+                // Always hide the indicator
+                this._hideGenerating();
+            }
         } catch (error) {
+            this._hideGenerating();
+            // Ignore abort errors
+            if (error instanceof Error && error.name === 'AbortError') {
+                return null;
+            }
             console.error('Completion error:', error);
             return null;
         }
@@ -261,6 +335,151 @@ export class ContextManager {
     }
 
     /**
+     * Get context from @workspace (repo-aware context like Copilot)
+     * Provides project structure, key files, and configuration
+     */
+    static async getWorkspaceContext(): Promise<string> {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            return '// No workspace open';
+        }
+
+        const lines: string[] = ['// Workspace Context:'];
+        const rootPath = workspaceFolder.uri.fsPath;
+        const rootName = workspaceFolder.name;
+
+        lines.push(`// Project: ${rootName}`);
+
+        // Find key configuration files
+        const configFiles = [
+            'package.json',
+            'pyproject.toml',
+            'Cargo.toml',
+            'go.mod',
+            'pom.xml',
+            'build.gradle',
+            'tsconfig.json',
+            'setup.py',
+            '.victor.md',
+            'README.md',
+        ];
+
+        for (const config of configFiles) {
+            try {
+                const uri = vscode.Uri.joinPath(workspaceFolder.uri, config);
+                const doc = await vscode.workspace.openTextDocument(uri);
+                const content = doc.getText();
+
+                // Truncate large files
+                const truncated = content.length > 2000
+                    ? content.slice(0, 2000) + '\n// ... (truncated)'
+                    : content;
+
+                lines.push(`\n// === ${config} ===`);
+                lines.push(truncated);
+            } catch {
+                // File doesn't exist, skip
+            }
+        }
+
+        // Get directory structure (top-level only)
+        try {
+            const files = await vscode.workspace.findFiles(
+                '*',
+                '{**/node_modules/**,**/.git/**,**/dist/**,**/build/**,**/__pycache__/**}',
+                50
+            );
+            const dirs = await vscode.workspace.findFiles(
+                '*/',
+                '{**/node_modules/**,**/.git/**,**/dist/**,**/build/**,**/__pycache__/**}',
+                20
+            );
+
+            lines.push('\n// === Directory Structure ===');
+            for (const file of files) {
+                const relativePath = vscode.workspace.asRelativePath(file);
+                lines.push(`//   ${relativePath}`);
+            }
+        } catch {
+            // Ignore errors
+        }
+
+        // Include open editors as context
+        const openEditors = vscode.window.visibleTextEditors;
+        if (openEditors.length > 0) {
+            lines.push('\n// === Open Files ===');
+            for (const editor of openEditors) {
+                const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
+                lines.push(`//   ${relativePath} (${editor.document.languageId})`);
+            }
+        }
+
+        return lines.join('\n');
+    }
+
+    /**
+     * Get context from @selection (current editor selection)
+     */
+    static getSelectionContext(): string {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            return '// No active editor';
+        }
+
+        const selection = editor.selection;
+        if (selection.isEmpty) {
+            return '// No selection';
+        }
+
+        const selectedText = editor.document.getText(selection);
+        const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
+        const startLine = selection.start.line + 1;
+        const endLine = selection.end.line + 1;
+
+        return `// Selected from ${relativePath}:${startLine}-${endLine}\n${selectedText}`;
+    }
+
+    /**
+     * Get context from @terminal (recent terminal output)
+     */
+    static getTerminalContext(): string {
+        const terminal = vscode.window.activeTerminal;
+        const historyService = TerminalHistoryService.getInstance();
+
+        if (!terminal) {
+            // No active terminal, but still show recent commands if available
+            const recentContext = historyService.getContextString(5);
+            if (recentContext !== '// No recent terminal commands') {
+                return recentContext;
+            }
+            return '// No active terminal';
+        }
+
+        // Get commands from the specific terminal first, then global history
+        const terminalCommands = historyService.getTerminalCommands(terminal.name, 5);
+
+        if (terminalCommands.length > 0) {
+            const lines = [`// Terminal: ${terminal.name}`, '// Recent commands:'];
+            for (const entry of terminalCommands) {
+                lines.push(`// $ ${entry.command}`);
+                if (entry.exitCode !== undefined && entry.exitCode !== 0) {
+                    lines.push(`//   (exit code: ${entry.exitCode})`);
+                }
+                if (entry.output) {
+                    const outputLines = entry.output.split('\n').slice(0, 2);
+                    for (const line of outputLines) {
+                        lines.push(`//   > ${line.slice(0, 60)}`);
+                    }
+                }
+            }
+            return lines.join('\n');
+        }
+
+        // Fall back to global history
+        return historyService.getContextString(5);
+    }
+
+    /**
      * Get context from @git (recent changes)
      */
     static async getGitContext(): Promise<string> {
@@ -297,20 +516,39 @@ export class ContextManager {
 
     /**
      * Resolve all @ mentions in a message
+     * Supports: @workspace, @selection, @terminal, @problems, @git, @file:path, @folder:path
      */
     static async resolveAllMentions(message: string): Promise<string> {
         let resolved = message;
 
+        // @workspace (repo-aware context like GitHub Copilot)
+        if (message.includes('@workspace')) {
+            const workspaceContext = await this.getWorkspaceContext();
+            resolved = resolved.replace(/@workspace/g, workspaceContext);
+        }
+
+        // @selection (current editor selection)
+        if (message.includes('@selection')) {
+            const selectionContext = this.getSelectionContext();
+            resolved = resolved.replace(/@selection/g, selectionContext);
+        }
+
+        // @terminal (terminal context)
+        if (message.includes('@terminal')) {
+            const terminalContext = this.getTerminalContext();
+            resolved = resolved.replace(/@terminal/g, terminalContext);
+        }
+
         // @problems
         if (message.includes('@problems')) {
             const problems = this.getProblemsContext();
-            resolved = resolved.replace('@problems', problems);
+            resolved = resolved.replace(/@problems/g, problems);
         }
 
         // @git
         if (message.includes('@git')) {
             const gitContext = await this.getGitContext();
-            resolved = resolved.replace('@git', gitContext);
+            resolved = resolved.replace(/@git/g, gitContext);
         }
 
         // @file:path
@@ -328,5 +566,20 @@ export class ContextManager {
         }
 
         return resolved;
+    }
+
+    /**
+     * Get list of available @ mention commands for autocomplete
+     */
+    static getAvailableMentions(): Array<{ label: string; description: string }> {
+        return [
+            { label: '@workspace', description: 'Project context (structure, configs, open files)' },
+            { label: '@selection', description: 'Current editor selection' },
+            { label: '@terminal', description: 'Active terminal context' },
+            { label: '@problems', description: 'Workspace diagnostics (errors, warnings)' },
+            { label: '@git', description: 'Git status (modified, staged files)' },
+            { label: '@file:', description: 'Include specific file content' },
+            { label: '@folder:', description: 'Include folder structure' },
+        ];
     }
 }

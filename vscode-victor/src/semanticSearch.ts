@@ -32,7 +32,16 @@ export class SemanticSearchProvider {
                     }
 
                     if (this._results.length === 0) {
-                        vscode.window.showInformationMessage('No results found');
+                        const action = await vscode.window.showInformationMessage(
+                            'No results found. Try broader keywords or check server status.',
+                            'Search Again',
+                            'Check Server'
+                        );
+                        if (action === 'Search Again') {
+                            vscode.commands.executeCommand('victor.search');
+                        } else if (action === 'Check Server') {
+                            vscode.commands.executeCommand('victor.serverStatus');
+                        }
                         return;
                     }
 

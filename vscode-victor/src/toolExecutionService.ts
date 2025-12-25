@@ -275,10 +275,15 @@ export class ToolExecutionService implements vscode.Disposable {
             return false;
         }
 
-        // TODO: Send cancellation request to backend
-        // if (this.victorClient) {
-        //     await this.victorClient.cancelToolExecution(id);
-        // }
+        // Send cancellation request to backend
+        if (this.victorClient) {
+            try {
+                await this.victorClient.cancelToolExecution(id);
+            } catch (error) {
+                // Log but continue - we'll still update local state
+                console.warn('Failed to cancel tool execution on backend:', error);
+            }
+        }
 
         execution.status = 'cancelled';
         execution.endTime = Date.now();

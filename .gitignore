@@ -177,6 +177,7 @@ vscode-victor/node_modules/
 vscode-victor/out/
 vscode-victor/.vscode-test/
 vscode-victor/*.vsix
+vscode-victor/webview-ui/node_modules/
 
 # Audit logs (contain sensitive metadata - never commit)
 audit/

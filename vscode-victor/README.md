@@ -1,11 +1,60 @@
 # Victor AI - VS Code Extension
 
-AI-powered coding assistant with multi-provider support, semantic code search, and 46 enterprise tools.
+AI-powered coding assistant with multi-provider support, semantic code search, and 46 enterprise tools. Competitive with GitHub Copilot, Cursor, and Windsurf.
 
 [![GitHub](https://img.shields.io/badge/GitHub-vjsingh1984%2Fvictor-blue)](https://github.com/vjsingh1984/victor)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/vjsingh1984/victor/blob/main/LICENSE)
 
 ## Features
+
+### Background Agents (NEW in v0.2.0)
+- Run AI agents asynchronously with real-time progress tracking
+- Agent sidebar shows active tasks with tool call details
+- WebSocket-based real-time updates
+- Cancel running agents, view output
+- Status bar indicator shows active agent count
+
+### Terminal Agent (NEW in v0.2.0)
+- AI-assisted terminal command execution (like GitHub Copilot CLI)
+- Suggest commands based on natural language intent
+- Dangerous command detection with approval workflow
+- Command history and approval tracking
+
+### Smart Paste (NEW in v0.2.0)
+- Automatically adapt pasted code to current context (like Windsurf)
+- Adjusts indentation, naming conventions
+- Adds missing imports based on file context
+- Preview adaptations before applying
+
+### Multi-file Composer (NEW in v0.2.0)
+- Complex multi-file edits in one prompt (like Cursor Composer)
+- Add multiple files to composer context
+- Describe changes in natural language
+- Preview all changes before applying
+- Selective application of changes
+
+### Autonomy Controls (NEW in v0.2.0)
+- Control how much freedom Victor has
+- Autonomy levels: Manual, Semi-auto, Auto
+- Configurable approval thresholds for terminal/file operations
+- Dangerous command pattern detection
+
+### @workspace Context (NEW in v0.2.0)
+- GitHub Copilot-style repo-aware context
+- `@workspace`: Project structure, configs, open files
+- `@selection`: Current editor selection
+- `@terminal`: Active terminal context
+- Enhanced `@git`, `@problems`, `@file:`, `@folder:`
+
+### Inline Edit with Diff Preview
+- Edit selected code with AI suggestions
+- Ghost text preview of changes
+- Show diff before applying
+- Accept/reject with Tab/Escape
+
+### FIM Completions
+- Fill-in-the-Middle support for better inline suggestions
+- Includes code after cursor for context-aware completions
 
 ### Automatic Server Management
 - **Auto-start**: Server starts automatically when VS Code opens
@@ -86,6 +135,10 @@ If your Victor server sets `VICTOR_SERVER_API_KEY`:
 | Victor: Open Chat | `Ctrl+Shift+V` | Open chat panel |
 | Victor: Explain | `Ctrl+Shift+E` | Explain selected code |
 | Victor: Search | `Ctrl+Shift+S` | Semantic code search |
+| Victor: Start Agent | `Cmd/Ctrl+Shift+A` | Start background agent |
+| Victor: Suggest Command | `Cmd/Ctrl+Shift+T` | AI terminal command suggestion |
+| Victor: Smart Paste | `Cmd/Ctrl+Shift+P` | Context-aware paste |
+| Victor: Open Composer | `Cmd/Ctrl+Shift+C` | Multi-file composer |
 | Victor: Refactor | - | Refactor selected code |
 | Victor: Fix | - | Fix issues in selection |
 | Victor: Test | - | Generate tests |
@@ -106,30 +159,38 @@ Open Settings (`Ctrl+,`) and search for "Victor":
 
 ```json
 {
-  "victor.serverPort": 8000,
-  "victor.serverUrl": "http://127.0.0.1:8000",
-  "victor.autoStart": false,
-  "victor.pythonPath": "/Users/you/path/to/repo/venv/bin/python",
-  "victor.provider": "anthropic",
-  "victor.model": "claude-sonnet-4-20250514",
+  "victor.serverPort": 8765,
+  "victor.autoStart": true,
+  "victor.profile": "default",
   "victor.mode": "build",
-  "victor.showInlineCompletions": true,
-  "victor.victorPath": "",
-  "victor.semanticSearch.enabled": true,
-  "victor.semanticSearch.maxResults": 10
+  "victor.autonomy.level": "semi-auto"
 }
 ```
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| `serverPort` | Port for Victor server | `8000` |
-| `autoStart` | Auto-start server on activation | `false` |
-| `provider` | Default LLM provider | `anthropic` |
-| `model` | Default model | `claude-sonnet-4-20250514` |
+| `serverPort` | Port for Victor server | `8765` |
+| `autoStart` | Auto-start server on activation | `true` |
+| `profile` | Victor profile from ~/.victor/profiles.yaml | `default` |
 | `mode` | Agent mode (build/plan/explore) | `build` |
-| `showInlineCompletions` | Enable inline suggestions | `true` |
-| `pythonPath` | Custom Python path | auto-detect |
-| `victorPath` | Path to bundled binary | none |
+| `autonomy.level` | Autonomy level (manual/semi-auto/auto) | `semi-auto` |
+
+### Available Profiles
+
+**Local (Ollama):**
+- `default` - Qwen3-Coder 30B, 64K context (recommended)
+- `m4` - Qwen3-Coder 30B, 128K context
+- `m4-deepseek` - DeepSeek-R1 32B with thinking
+- `quick` - Mistral 7B, fastest local
+
+**Cloud:**
+- `claude` - Claude Sonnet 4.5
+- `gpt` - GPT-4o
+- `groq` - Llama 3.3 70B (ultra-fast)
+- `gemini` - Gemini 3.0 Flash
+- `deepseek` - DeepSeek-V3.2
+
+Profiles are defined in `~/.victor/profiles.yaml`.
 
 ## Server Management
 

@@ -33,11 +33,21 @@ export interface ToolCall {
 }
 
 export interface CompletionRequest {
-    prompt: string;
+    prompt: string;  // Code before cursor (prefix)
+    suffix?: string;  // Code after cursor (for FIM)
     file: string;
     language: string;
     position: { line: number; character: number };
-    context?: string;
+    context?: string;  // Additional file context (imports, etc.)
+    max_tokens?: number;  // Limit completion length (default: 128)
+    temperature?: number;  // 0.0 = deterministic (default)
+    stop_sequences?: string[];  // Custom stop sequences
+}
+
+export interface CompletionResponse {
+    completions: string[];
+    error?: string;
+    latency_ms?: number;
 }
 
 export interface SearchResult {
@@ -60,6 +70,53 @@ export interface ServerStatus {
     mode: string;
     connected: boolean;
     capabilities?: string[];
+}
+
+// =============================================================================
+// Background Agent Types
+// =============================================================================
+
+export interface AgentToolCall {
+    id: string;
+    name: string;
+    status: 'pending' | 'running' | 'success' | 'error';
+    start_time: number;
+    end_time?: number;
+    result?: string;
+    error?: string;
+}
+
+export interface BackgroundAgent {
+    id: string;
+    name: string;
+    description: string;
+    task: string;
+    mode: 'build' | 'plan' | 'explore';
+    status: 'pending' | 'running' | 'paused' | 'completed' | 'error' | 'cancelled';
+    progress: number;
+    start_time: number;
+    end_time?: number;
+    tool_calls: AgentToolCall[];
+    output?: string;
+    error?: string;
+}
+
+export interface AgentStartRequest {
+    task: string;
+    mode?: 'build' | 'plan' | 'explore';
+    name?: string;
+}
+
+export interface AgentListResponse {
+    agents: BackgroundAgent[];
+    active_count: number;
+}
+
+export interface AgentEvent {
+    type: 'agent_event';
+    event: string;
+    data: BackgroundAgent | { agent_id: string; [key: string]: unknown };
+    timestamp: number;
 }
 
 // =============================================================================
@@ -166,6 +223,7 @@ export class VictorClient {
     private messageHandlers: ((msg: ChatMessage) => void)[] = [];
     private stateChangeHandlers: ((state: WebSocketState) => void)[] = [];
     private errorHandlers: ((error: VictorError) => void)[] = [];
+    private agentEventHandlers: ((event: { type: string; data: unknown }) => void)[] = [];
 
     constructor(serverUrl: string, wsConfig?: Partial<WebSocketConfig>, apiToken?: string) {
         this.serverUrl = serverUrl;
@@ -270,6 +328,31 @@ export class VictorClient {
         };
     }
 
+    /**
+     * Subscribe to background agent events.
+     * Events include: agent_started, agent_running, agent_tool_call,
+     * agent_tool_result, agent_completed, agent_error, agent_cancelled
+     */
+    onAgentEvent(handler: (event: { type: string; data: unknown }) => void): () => void {
+        this.agentEventHandlers.push(handler);
+        return () => {
+            const index = this.agentEventHandlers.indexOf(handler);
+            if (index !== -1) {
+                this.agentEventHandlers.splice(index, 1);
+            }
+        };
+    }
+
+    private emitAgentEvent(eventType: string, data: unknown): void {
+        for (const handler of this.agentEventHandlers) {
+            try {
+                handler({ type: eventType, data });
+            } catch (e) {
+                console.error('Agent event handler error:', e);
+            }
+        }
+    }
+
     private emitStateChange(state: WebSocketState): void {
         this.wsState = state;
         for (const handler of this.stateChangeHandlers) {
@@ -296,15 +379,28 @@ export class VictorClient {
     // =========================================================================
 
     private buildWebSocketUrl(): string {
+        // Security: Don't put API keys in query strings - they can leak to logs
+        // Authentication is now handled via first message after connection
         const base = this.serverUrl.replace(/^http/, 'ws') + '/ws';
         const url = new URL(base);
-        if (this.apiToken) {
-            url.searchParams.set('api_key', this.apiToken);
-        }
+        // Only session token in URL (short-lived, less sensitive)
         if (this.sessionToken) {
             url.searchParams.set('session_token', this.sessionToken);
         }
         return url.toString();
+    }
+
+    /**
+     * Send authentication message after WebSocket connects.
+     * This is more secure than putting API key in URL query string.
+     */
+    private _sendAuthMessage(): void {
+        if (this.wsConnection?.readyState === WebSocket.OPEN && this.apiToken) {
+            this.wsConnection.send(JSON.stringify({
+                type: 'auth',
+                api_key: this.apiToken,
+            }));
+        }
     }
 
     connectWebSocket(): void {
@@ -325,6 +421,8 @@ export class VictorClient {
             this.wsConnection.onopen = () => {
                 console.log('Victor WebSocket connected');
                 this.wsReconnectAttempt = 0;
+                // Send authentication as first message (more secure than URL param)
+                this._sendAuthMessage();
                 this.emitStateChange(WebSocketState.Connected);
                 this._startHeartbeat();
             };
@@ -350,6 +448,29 @@ export class VictorClient {
                         return;
                     }
 
+                    // Handle auth success
+                    if (data.type === 'auth_success') {
+                        console.log('Victor WebSocket authenticated');
+                        return;
+                    }
+
+                    // Handle agent events
+                    if (data.type === 'agent_event' && data.event) {
+                        this.emitAgentEvent(data.event, data.data);
+                        return;
+                    }
+
+                    // Handle direct agent event types (for backwards compatibility)
+                    const agentEventTypes = [
+                        'agent_started', 'agent_running', 'agent_tool_call',
+                        'agent_tool_result', 'agent_completed', 'agent_error',
+                        'agent_cancelled'
+                    ];
+                    if (agentEventTypes.includes(data.type)) {
+                        this.emitAgentEvent(data.type, data);
+                        return;
+                    }
+
                     // Handle chat messages
                     for (const handler of this.messageHandlers) {
                         try {
@@ -358,8 +479,9 @@ export class VictorClient {
                             console.error('Message handler error:', e);
                         }
                     }
-                } catch {
-                    // Ignore parse errors
+                } catch (e) {
+                    // Log parse errors for debugging (may be binary data or incomplete message)
+                    console.debug('[Victor WebSocket] Parse error (may be expected for binary data):', e);
                 }
             };
 
@@ -506,8 +628,13 @@ export class VictorClient {
 
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
+                            const payload = line.slice(6);
+                            // Skip [DONE] marker
+                            if (payload === '[DONE]') {
+                                return;
+                            }
                             try {
-                                const data = JSON.parse(line.slice(6));
+                                const data = JSON.parse(payload);
                                 if (data.type === 'content') {
                                     onChunk(data.content);
                                 } else if (data.type === 'tool_call' && onToolCall) {
@@ -515,8 +642,9 @@ export class VictorClient {
                                 } else if (data.type === 'error') {
                                     reject(new VictorError(data.message, VictorErrorType.ServerError));
                                 }
-                            } catch {
-                                // Ignore parse errors for incomplete chunks
+                            } catch (e) {
+                                // Log parse errors for debugging incomplete SSE chunks
+                                console.debug('[Victor SSE] Parse error for chunk:', payload.slice(0, 50), e);
                             }
                         }
                     }
@@ -540,11 +668,18 @@ export class VictorClient {
     // Completions API
     // =========================================================================
 
-    async getCompletions(request: CompletionRequest): Promise<string[]> {
+    async getCompletions(request: CompletionRequest, signal?: AbortSignal): Promise<string[]> {
         try {
-            const response = await this.client.post('/completions', request);
+            const response = await this.client.post('/completions', request, {
+                signal,
+                timeout: 5000,  // 5 second timeout for inline completions
+            });
             return response.data.completions || [];
         } catch (error) {
+            // Don't log abort/cancel errors
+            if (error instanceof Error && (error.name === 'AbortError' || error.name === 'CanceledError')) {
+                return [];
+            }
             console.error('Completions error:', error);
             return []; // Graceful degradation for completions
         }
@@ -1306,6 +1441,253 @@ export class VictorClient {
     }> {
         try {
             const response = await this.client.post('/rl/reset');
+            return response.data;
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
+    // =========================================================================
+    // Background Agents API
+    // =========================================================================
+
+    /**
+     * Start a new background agent.
+     * Agents run asynchronously and report progress via WebSocket events.
+     *
+     * @param task The task/prompt for the agent
+     * @param mode Agent mode: 'build', 'plan', or 'explore'
+     * @param name Optional display name
+     * @returns Agent ID if successful
+     */
+    async startAgent(
+        task: string,
+        mode: 'build' | 'plan' | 'explore' = 'build',
+        name?: string
+    ): Promise<string> {
+        try {
+            const request: AgentStartRequest = { task, mode, name };
+            const response = await this.client.post('/agents/start', request);
+            return response.data.agent_id;
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
+    /**
+     * List all background agents.
+     * @returns Array of BackgroundAgent objects
+     */
+    async listAgents(status?: string, limit: number = 20): Promise<BackgroundAgent[]> {
+        try {
+            const params: Record<string, unknown> = { limit };
+            if (status) {
+                params.status = status;
+            }
+            const response = await this.client.get('/agents', { params });
+            return response.data.agents || [];
+        } catch (error) {
+            console.error('List agents error:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Get a specific agent's status.
+     */
+    async getAgent(agentId: string): Promise<BackgroundAgent | null> {
+        try {
+            const response = await this.client.get(`/agents/${agentId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Get agent error:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Cancel a running agent.
+     */
+    async cancelAgent(agentId: string): Promise<{
+        success: boolean;
+        message: string;
+    }> {
+        try {
+            const response = await this.client.post(`/agents/${agentId}/cancel`);
+            return response.data;
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
+    /**
+     * Clear completed/failed/cancelled agents.
+     */
+    async clearAgents(): Promise<{
+        success: boolean;
+        cleared: number;
+        message: string;
+    }> {
+        try {
+            const response = await this.client.post('/agents/clear');
+            return response.data;
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
+    /**
+     * Cancel a tool execution.
+     * Sends cancellation signal via WebSocket if connected.
+     */
+    async cancelToolExecution(toolCallId: string): Promise<boolean> {
+        // Try to send cancellation via WebSocket
+        if (this.wsConnection?.readyState === WebSocket.OPEN) {
+            try {
+                this.wsConnection.send(JSON.stringify({
+                    type: 'cancel_tool',
+                    tool_call_id: toolCallId,
+                }));
+                return true;
+            } catch (error) {
+                console.error('Failed to send tool cancellation:', error);
+            }
+        }
+
+        // Fallback: try HTTP endpoint if available
+        try {
+            await this.client.post('/tools/cancel', { tool_call_id: toolCallId });
+            return true;
+        } catch {
+            // Endpoint may not exist - that's ok, we tried
+            return false;
+        }
+    }
+
+    // =========================================================================
+    // Plan Management API
+    // =========================================================================
+
+    /**
+     * Plan status type
+     */
+    static readonly PlanStatus = {
+        DRAFT: 'draft',
+        APPROVED: 'approved',
+        EXECUTING: 'executing',
+        COMPLETED: 'completed',
+        FAILED: 'failed',
+    } as const;
+
+    /**
+     * List all plans
+     */
+    async listPlans(): Promise<{
+        id: string;
+        title: string;
+        description: string;
+        status: string;
+        created_at: number;
+        approved_at?: number;
+        executed_at?: number;
+        steps: Array<{ description: string; status?: string }>;
+    }[]> {
+        try {
+            const response = await this.client.get('/plans');
+            return response.data.plans || [];
+        } catch (error) {
+            console.error('List plans error:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Create a new plan
+     */
+    async createPlan(
+        title: string,
+        description: string,
+        steps: Array<{ description: string }>
+    ): Promise<{ id: string; status: string; message: string }> {
+        try {
+            const response = await this.client.post('/plans', {
+                title,
+                description,
+                steps,
+            });
+            return response.data;
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
+    /**
+     * Get plan details
+     */
+    async getPlan(planId: string): Promise<{
+        id: string;
+        title: string;
+        description: string;
+        status: string;
+        created_at: number;
+        approved_at?: number;
+        executed_at?: number;
+        completed_at?: number;
+        steps: Array<{ description: string; status?: string }>;
+        current_step?: number;
+        output?: string;
+        error?: string;
+    } | null> {
+        try {
+            const response = await this.client.get(`/plans/${planId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Get plan error:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Approve a plan for execution
+     */
+    async approvePlan(planId: string): Promise<{
+        success: boolean;
+        message: string;
+        status: string;
+    }> {
+        try {
+            const response = await this.client.post(`/plans/${planId}/approve`);
+            return response.data;
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
+    /**
+     * Execute an approved plan
+     */
+    async executePlan(planId: string): Promise<{
+        success: boolean;
+        message: string;
+        status: string;
+    }> {
+        try {
+            const response = await this.client.post(`/plans/${planId}/execute`);
+            return response.data;
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
+    /**
+     * Delete a plan
+     */
+    async deletePlan(planId: string): Promise<{
+        success: boolean;
+        message: string;
+    }> {
+        try {
+            const response = await this.client.delete(`/plans/${planId}`);
             return response.data;
         } catch (error) {
             throw this._handleError(error);

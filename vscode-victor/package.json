@@ -2,7 +2,7 @@
   "name": "victor-ai",
   "displayName": "Victor AI Assistant",
   "description": "AI-powered coding assistant with multi-provider support, semantic code search, and enterprise tools",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "victor-ai",
   "license": "Apache-2.0",
   "icon": "resources/icon.png",
@@ -118,6 +118,56 @@
         "command": "victor.refreshHistory",
         "title": "Victor: Refresh History",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "victor.refreshAgents",
+        "title": "Victor: Refresh Agents",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "victor.clearAgents",
+        "title": "Victor: Clear Completed Agents",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "victor.cancelAgent",
+        "title": "Victor: Cancel Agent",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "victor.startAgent",
+        "title": "Victor: Start Background Agent",
+        "icon": "$(play)"
+      },
+      {
+        "command": "victor.viewAgentOutput",
+        "title": "Victor: View Agent Output",
+        "icon": "$(output)"
+      },
+      {
+        "command": "victor.refreshPlans",
+        "title": "Victor: Refresh Plans",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "victor.approvePlan",
+        "title": "Victor: Approve Plan",
+        "icon": "$(check)"
+      },
+      {
+        "command": "victor.executePlan",
+        "title": "Victor: Execute Plan",
+        "icon": "$(play)"
+      },
+      {
+        "command": "victor.clearPlans",
+        "title": "Victor: Clear Completed Plans",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "victor.deletePlan",
+        "title": "Victor: Delete Plan",
+        "icon": "$(trash)"
       },
       {
         "command": "victor.refreshTools",
@@ -393,6 +443,54 @@
       {
         "command": "victor.clearAllConversations",
         "title": "Victor: Clear All Conversations"
+      },
+      {
+        "command": "victor.terminal.suggest",
+        "title": "Victor: Suggest Terminal Command",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "victor.terminal.run",
+        "title": "Victor: Run Terminal Command",
+        "icon": "$(play)"
+      },
+      {
+        "command": "victor.terminal.approve",
+        "title": "Victor: Approve Command",
+        "icon": "$(check)"
+      },
+      {
+        "command": "victor.terminal.reject",
+        "title": "Victor: Reject Command",
+        "icon": "$(x)"
+      },
+      {
+        "command": "victor.terminal.history",
+        "title": "Victor: Command History",
+        "icon": "$(history)"
+      },
+      {
+        "command": "victor.smartPaste",
+        "title": "Victor: Smart Paste",
+        "icon": "$(clippy)"
+      },
+      {
+        "command": "victor.smartPasteInEditor",
+        "title": "Victor: Smart Paste (Editor)"
+      },
+      {
+        "command": "victor.openComposer",
+        "title": "Victor: Open Composer",
+        "icon": "$(files)"
+      },
+      {
+        "command": "victor.composeWithFiles",
+        "title": "Victor: Compose with Current File",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "victor.addToComposer",
+        "title": "Victor: Add to Composer"
       }
     ],
     "menus": {
@@ -443,6 +541,31 @@
           "group": "navigation"
         },
         {
+          "command": "victor.startAgent",
+          "when": "view == victor.agentsView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "victor.refreshAgents",
+          "when": "view == victor.agentsView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "victor.clearAgents",
+          "when": "view == victor.agentsView",
+          "group": "navigation@3"
+        },
+        {
+          "command": "victor.refreshPlans",
+          "when": "view == victor.plansView",
+          "group": "navigation"
+        },
+        {
+          "command": "victor.clearPlans",
+          "when": "view == victor.plansView",
+          "group": "navigation"
+        },
+        {
           "command": "victor.refreshDiagnostics",
           "when": "view == victor.diagnosticsView",
           "group": "navigation"
@@ -473,6 +596,31 @@
           "command": "victor.undoFromHistory",
           "when": "view == victor.historyView && viewItem == undoable",
           "group": "inline"
+        },
+        {
+          "command": "victor.cancelAgent",
+          "when": "view == victor.agentsView && viewItem == agent-running",
+          "group": "inline@1"
+        },
+        {
+          "command": "victor.viewAgentOutput",
+          "when": "view == victor.agentsView && viewItem =~ /^agent-.+/",
+          "group": "inline@2"
+        },
+        {
+          "command": "victor.approvePlan",
+          "when": "view == victor.plansView && viewItem == plan-draft",
+          "group": "inline"
+        },
+        {
+          "command": "victor.executePlan",
+          "when": "view == victor.plansView && viewItem == plan-approved",
+          "group": "inline"
+        },
+        {
+          "command": "victor.deletePlan",
+          "when": "view == victor.plansView && viewItem =~ /^plan-.+/",
+          "group": "inline@2"
         },
         {
           "command": "victor.fixDiagnosticFromView",
@@ -540,6 +688,27 @@
         "command": "victor.rejectInlineEdit",
         "key": "escape",
         "when": "victorInlineEditActive"
+      },
+      {
+        "command": "victor.startAgent",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a"
+      },
+      {
+        "command": "victor.smartPaste",
+        "key": "ctrl+shift+p",
+        "mac": "cmd+shift+p",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "victor.terminal.suggest",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t"
+      },
+      {
+        "command": "victor.openComposer",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c"
       }
     ],
     "configuration": {
@@ -584,24 +753,76 @@
           "default": "",
           "description": "Path to bundled Victor binary (for standalone distribution)"
         },
-        "victor.provider": {
+        "victor.profile": {
           "type": "string",
           "enum": [
-            "anthropic",
-            "openai",
-            "ollama",
-            "google",
-            "lmstudio",
-            "vllm",
-            "xai"
+            "default",
+            "m1",
+            "m1-small",
+            "m1-deepseek",
+            "m4",
+            "m4-deepseek",
+            "m4-heavy",
+            "m4-devstral",
+            "ada",
+            "ada-small",
+            "ada-heavy",
+            "quick",
+            "groq",
+            "groq-fast",
+            "claude",
+            "claude-haiku",
+            "claude-opus",
+            "gpt",
+            "gpt-mini",
+            "gpt-4.1",
+            "o1",
+            "o3-mini",
+            "gemini",
+            "gemini-pro",
+            "grok",
+            "deepseek",
+            "deepseek-reason",
+            "kimi",
+            "cerebras",
+            "mistral",
+            "codestral"
           ],
-          "default": "anthropic",
-          "description": "Default LLM provider"
-        },
-        "victor.model": {
-          "type": "string",
-          "default": "claude-sonnet-4-20250514",
-          "description": "Default model to use"
+          "enumDescriptions": [
+            "Default: Qwen3-Coder 30B (m4) - 64K context, tools",
+            "M1 Max: Qwen3-Coder 14B - fits in 48GB",
+            "M1 Max: Qwen2.5-Coder 7B - fast, low memory",
+            "M1 Max: DeepSeek-R1 14B with thinking",
+            "M4 Max: Qwen3-Coder 30B - 128K context",
+            "M4 Max: DeepSeek-R1 32B with thinking",
+            "M4 Max: DeepSeek-R1 70B - heavy",
+            "M4 Max: Devstral 24B - agentic coder",
+            "ADA: Qwen2.5-Coder 14B - fits in 20GB VRAM",
+            "ADA: Mistral 7B - fast responses",
+            "ADA: DeepSeek-R1 32B - offloaded",
+            "Quick: Mistral 7B - fastest local",
+            "Groq: Llama 3.3 70B - ultra-fast cloud",
+            "Groq: Llama 3.1 8B - fastest cloud",
+            "Claude Sonnet 4.5 - best for complex tasks",
+            "Claude 3.5 Haiku - fast, cost-effective",
+            "Claude Opus 4.5 - most capable",
+            "GPT-4o - multimodal, stable",
+            "GPT-4o Mini - cost effective",
+            "GPT-4.1 - latest flagship model",
+            "OpenAI o1 - reasoning model",
+            "OpenAI o3-mini - fast reasoning",
+            "Gemini 3.0 Flash - fast multimodal",
+            "Gemini 3.0 Pro - 1M context",
+            "Grok 3 - 128K context, tools",
+            "DeepSeek-V3.2 - coding with tools",
+            "DeepSeek Reasoner - CoT (no tools)",
+            "Kimi K2 Thinking - 256K context",
+            "Cerebras: Llama 3.3 70B - ultra fast",
+            "Mistral Large - 131K context, tools",
+            "Codestral - optimized for code"
+          ],
+          "default": "default",
+          "description": "Victor profile from ~/.victor/profiles.yaml"
         },
         "victor.mode": {
           "type": "string",
@@ -712,6 +933,77 @@
           "type": "number",
           "default": 150,
           "description": "Debounce time for hover requests in milliseconds"
+        },
+        "victor.agents.maxConcurrent": {
+          "type": "number",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum number of concurrent background agents"
+        },
+        "victor.agents.showNotifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notifications when agents complete or fail"
+        },
+        "victor.ui.showAgentsPanel": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Agents panel in sidebar (background agent execution)"
+        },
+        "victor.ui.showHistoryPanel": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show History panel in sidebar (undo/redo AI changes)"
+        },
+        "victor.ui.showTerminalAgent": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Terminal Agent panel in sidebar (AI command suggestions)"
+        },
+        "victor.ui.showComposer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Composer panel in sidebar (multi-file AI editing)"
+        },
+        "victor.ui.showSettings": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show Settings panel in sidebar"
+        },
+        "victor.autonomy.level": {
+          "type": "string",
+          "enum": ["manual", "semi-auto", "auto"],
+          "default": "semi-auto",
+          "enumDescriptions": [
+            "Always ask before executing tools or making changes",
+            "Ask for dangerous operations only (file writes, terminal commands)",
+            "Execute all operations automatically with minimal prompts"
+          ],
+          "description": "Control how much autonomy Victor has when executing tasks"
+        },
+        "victor.autonomy.autoApproveReadOnly": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically approve read-only operations (file reads, searches)"
+        },
+        "victor.autonomy.requireApprovalForTerminal": {
+          "type": "boolean",
+          "default": true,
+          "description": "Always require approval before running terminal commands"
+        },
+        "victor.autonomy.requireApprovalForFileWrites": {
+          "type": "boolean",
+          "default": false,
+          "description": "Require approval before writing or modifying files"
+        },
+        "victor.autonomy.dangerousCommandPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["rm -rf", "sudo", "mkfs", "dd if=", "> /dev/"],
+          "description": "Command patterns that always require approval"
         }
       }
     },
@@ -720,7 +1012,14 @@
         {
           "id": "victor",
           "title": "Victor AI",
-          "icon": "$(hubot)"
+          "icon": "resources/icon-mono.svg"
+        }
+      ],
+      "panel": [
+        {
+          "id": "victorPanel",
+          "title": "Victor AI",
+          "icon": "resources/icon-mono.svg"
         }
       ]
     },
@@ -732,16 +1031,53 @@
           "name": "Chat"
         },
         {
+          "type": "webview",
+          "id": "victor.settingsView",
+          "name": "Settings",
+          "when": "config.victor.ui.showSettings"
+        }
+      ],
+      "victorPanel": [
+        {
+          "type": "webview",
+          "id": "victor.chatPanelView",
+          "name": "Victor Chat"
+        },
+        {
+          "id": "victor.agentsView",
+          "name": "Agents",
+          "contextualTitle": "Active Agents",
+          "when": "config.victor.ui.showAgentsPanel"
+        },
+        {
+          "id": "victor.plansView",
+          "name": "Plans",
+          "when": "config.victor.ui.showAgentsPanel"
+        },
+        {
           "id": "victor.historyView",
-          "name": "History"
+          "name": "History",
+          "when": "config.victor.ui.showHistoryPanel"
         },
         {
           "id": "victor.toolsView",
           "name": "Tools"
         },
         {
+          "id": "victor.terminalAgentView",
+          "name": "Terminal Agent",
+          "when": "config.victor.ui.showTerminalAgent"
+        },
+        {
           "id": "victor.terminalHistoryView",
-          "name": "Commands"
+          "name": "Terminal History",
+          "when": "config.victor.ui.showTerminalAgent"
+        },
+        {
+          "type": "webview",
+          "id": "victor.composerView",
+          "name": "Composer",
+          "when": "config.victor.ui.showComposer"
         },
         {
           "id": "victor.diagnosticsView",
@@ -754,11 +1090,6 @@
         {
           "id": "victor.mcpView",
           "name": "MCP Servers"
-        },
-        {
-          "type": "webview",
-          "id": "victor.settingsView",
-          "name": "Settings"
         }
       ]
     },
