@@ -18,12 +18,13 @@ This tool provides transaction-based file editing with diff preview and
 rollback capability to the agent.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from pathlib import Path
 
 from victor.editing import FileEditor
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
+from victor.tools.filesystem import enforce_sandbox_path
 
 
 @tool(
@@ -39,7 +40,7 @@ from victor.tools.decorators import tool
     keywords=["edit", "modify", "replace", "create", "delete", "rename", "file", "text"],
 )
 async def edit(
-    ops: List[Dict[str, Any]],
+    ops: Optional[List[Dict[str, Any]]] = None,
     preview: bool = False,
     commit: bool = True,
     desc: str = "",
@@ -69,7 +70,22 @@ async def edit(
     When NOT to use:
         - Renaming Python symbols (use rename() instead - AST-aware)
         - Code refactoring where false positives matter
+
+    Note:
+        In EXPLORE/PLAN modes, edits are restricted to .victor/sandbox/.
+        Use /mode build to enable unrestricted file edits.
     """
+    # Validate required 'ops' parameter with helpful error message
+    if ops is None:
+        return {
+            "error": "Missing required parameter: 'ops'",
+            "hint": "The 'ops' parameter must be a list of edit operations. Example:\n"
+                    '  ops=[{"type": "replace", "path": "file.py", "old_str": "foo", "new_str": "bar"}]\n'
+                    "  ops=[{\"type\": \"create\", \"path\": \"new_file.txt\", \"content\": \"Hello\"}]\n"
+                    "  ops=[{\"type\": \"delete\", \"path\": \"old_file.txt\"}]",
+            "success": False,
+        }
+
     # Allow callers (models) to pass ops as a JSON string; normalize to list[dict]
     if isinstance(ops, str):
         import json
@@ -218,6 +234,11 @@ async def edit(
             op_type = op["type"]
             path = op["path"]
             file_path = Path(path).expanduser().resolve()
+
+            # Enforce sandbox restrictions in EXPLORE/PLAN modes
+            # (skip for read-only operations if we ever add them)
+            if op_type in ("create", "modify", "delete", "rename", "replace"):
+                enforce_sandbox_path(file_path)
 
             if op_type == "create":
                 content = op.get("content", "")
