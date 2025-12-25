@@ -56,6 +56,13 @@ class ModeConfig:
     max_files_per_operation: int = 0  # 0 = no limit
     # Tool priority adjustments (tool_name -> priority_boost)
     tool_priorities: Dict[str, float] = field(default_factory=dict)
+    # Exploration multiplier - increases exploration limits in explore/plan modes
+    exploration_multiplier: float = 1.0
+    # Sandbox directory for limited edits (relative to project root)
+    # If set, edits are only allowed within this directory
+    sandbox_dir: Optional[str] = None
+    # Whether edits are allowed in sandbox even if disallowed_tools has edit
+    allow_sandbox_edits: bool = False
 
 
 # Default mode configurations
@@ -101,27 +108,42 @@ You are in BUILD mode - focused on implementation and code modification.
             "code_review",
             # Planning-specific
             "plan_files",
-        },
-        disallowed_tools={
-            # No file modifications in plan mode
+            # Sandbox editing (limited to .victor/sandbox/)
             "write_file",
             "edit_files",
-            "bash",  # Could modify things
+        },
+        disallowed_tools={
+            # No direct bash/shell or git modifications
+            "bash",  # Could modify things outside sandbox
+            "shell",  # Also shell tool (same as bash)
             "git_commit",
             "git_push",
         },
         system_prompt_addition="""
 You are in PLAN mode - focused on analysis and planning before implementation.
-- DO NOT modify any files - only analyze and plan
-- Explore the codebase thoroughly to understand the structure
-- Identify potential issues and edge cases
-- Create a clear, step-by-step implementation plan
-- Consider testing strategy and potential impacts
-- Use /mode build to switch to implementation when ready
+
+SANDBOX EDITING: You can create/edit files ONLY in the `.victor/sandbox/` directory.
+This is useful for:
+- Drafting code snippets before implementation
+- Creating plan documents
+- Testing small code samples
+
+RESTRICTIONS:
+- DO NOT modify files outside `.victor/sandbox/`
+- All edits to main codebase will be blocked
+- Use /mode build to switch to full implementation when ready
+
+WORKFLOW:
+1. Explore the codebase thoroughly to understand the structure
+2. Identify potential issues and edge cases
+3. Create a clear, step-by-step implementation plan
+4. Save your plan with /plan save
+5. Draft code in .victor/sandbox/ if helpful
+6. Use /mode build when ready to implement
 """,
         require_write_confirmation=True,
         verbose_planning=True,
-        max_files_per_operation=0,  # Read-only anyway
+        max_files_per_operation=5,  # Limited edits in sandbox
         tool_priorities={
             "code_search": 1.3,
             "semantic_code_search": 1.3,
@@ -129,6 +151,9 @@ You are in PLAN mode - focused on analysis and planning before implementation.
             "dependency_graph": 1.2,
             "plan_files": 1.5,
         },
+        exploration_multiplier=2.5,  # 2.5x more exploration in plan mode
+        sandbox_dir=".victor/sandbox",
+        allow_sandbox_edits=True,
     ),
     AgentMode.EXPLORE: ModeConfig(
         name="Explore",
@@ -150,32 +175,48 @@ You are in PLAN mode - focused on analysis and planning before implementation.
             "code_review",
             "web_search",
             "web_fetch",
+            # Sandbox notes (limited to .victor/sandbox/)
+            "write_file",
         },
         disallowed_tools={
-            "write_file",
-            "edit_files",
+            "edit_files",  # No editing main codebase
             "bash",
+            "shell",  # Also shell tool (same as bash)
             "git_commit",
             "git_push",
             "git_checkout",
         },
         system_prompt_addition="""
 You are in EXPLORE mode - focused on understanding and navigating code.
-- DO NOT modify any files - only read and analyze
-- Answer questions about the codebase clearly
-- Navigate through code to trace functionality
-- Explain architecture, patterns, and design decisions
-- Use /mode build to switch to implementation when ready
+
+NOTES: You can create notes ONLY in the `.victor/sandbox/` directory.
+This is useful for:
+- Saving findings and observations
+- Creating documentation drafts
+
+RESTRICTIONS:
+- DO NOT modify files outside `.victor/sandbox/`
+- Use /mode plan for structured planning
+- Use /mode build for implementation
+
+WORKFLOW:
+1. Answer questions about the codebase clearly
+2. Navigate through code to trace functionality
+3. Explain architecture, patterns, and design decisions
+4. Save notes in .victor/sandbox/ if helpful
 """,
         require_write_confirmation=True,
         verbose_planning=False,
-        max_files_per_operation=0,
+        max_files_per_operation=3,  # Limited notes in sandbox
         tool_priorities={
             "read_file": 1.3,
             "code_search": 1.2,
             "semantic_code_search": 1.2,
             "list_directory": 1.1,
         },
+        exploration_multiplier=3.0,  # 3x more exploration in explore mode
+        sandbox_dir=".victor/sandbox",
+        allow_sandbox_edits=True,
     ),
 }
 

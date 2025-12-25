@@ -523,6 +523,9 @@ class UnifiedTaskTracker:
         self._exploration_multiplier: float = 1.0
         self._continuation_patience: int = 10
 
+        # Agent mode settings (plan/explore get higher multipliers)
+        self._mode_exploration_multiplier: float = 1.0
+
         # Global settings
         global_config = self._config_loader.get_global_config()
         self._max_total_iterations = global_config.get("max_total_iterations", 50)
@@ -664,8 +667,31 @@ class UnifiedTaskTracker:
 
     @property
     def max_exploration_iterations(self) -> int:
-        """Get max exploration iterations for current task type."""
-        return self._task_config.max_exploration_iterations
+        """Get max exploration iterations for current task type.
+
+        Combines base task config with mode and model multipliers:
+        - Plan mode: 2.5x multiplier (more exploration needed for planning)
+        - Explore mode: 3.0x multiplier (exploration is the primary goal)
+        - Model multiplier: varies by model capability
+        """
+        base = self._task_config.max_exploration_iterations
+        combined_multiplier = self._exploration_multiplier * self._mode_exploration_multiplier
+        return int(base * combined_multiplier)
+
+    def set_mode_exploration_multiplier(self, multiplier: float) -> None:
+        """Set the agent mode exploration multiplier.
+
+        Plan mode (2.5x) and Explore mode (3.0x) need more iterations
+        since their purpose is thorough exploration before action.
+
+        Args:
+            multiplier: Mode-specific multiplier (1.0 for build, 2.5 for plan, 3.0 for explore)
+        """
+        self._mode_exploration_multiplier = multiplier
+        logger.info(
+            f"UnifiedTaskTracker: mode_exploration_multiplier={multiplier}, "
+            f"effective_max={self.max_exploration_iterations}"
+        )
 
     # =========================================================================
     # Recording

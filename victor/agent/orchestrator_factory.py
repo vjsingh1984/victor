@@ -730,7 +730,7 @@ class OrchestratorFactory:
         Returns:
             UnifiedTaskTracker instance configured with model exploration parameters
         """
-        from victor.agent.protocols import TaskTrackerProtocol
+        from victor.agent.protocols import TaskTrackerProtocol, ModeControllerProtocol
 
         # Resolve from DI container (guaranteed to be registered)
         unified_tracker = self.container.get(TaskTrackerProtocol)
@@ -740,6 +740,25 @@ class OrchestratorFactory:
             exploration_multiplier=tool_calling_caps.exploration_multiplier,
             continuation_patience=tool_calling_caps.continuation_patience,
         )
+
+        # Apply agent mode exploration multiplier (plan/explore modes get more iterations)
+        try:
+            mode_controller = self.container.get_optional(ModeControllerProtocol)
+            if mode_controller:
+                from victor.agent.mode_controller import MODE_CONFIGS
+
+                current_mode = mode_controller.current_mode
+                mode_config = MODE_CONFIGS.get(current_mode)
+                if mode_config and hasattr(mode_config, "exploration_multiplier"):
+                    unified_tracker.set_mode_exploration_multiplier(
+                        mode_config.exploration_multiplier
+                    )
+                    logger.info(
+                        f"Applied mode exploration multiplier: mode={current_mode.value}, "
+                        f"multiplier={mode_config.exploration_multiplier}"
+                    )
+        except Exception as e:
+            logger.debug(f"Could not apply mode exploration multiplier: {e}")
 
         logger.debug(
             f"UnifiedTaskTracker created with exploration_multiplier="
