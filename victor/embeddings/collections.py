@@ -78,7 +78,7 @@ class StaticEmbeddingCollection:
 
     # Cache version - aligned with Victor version, increment on breaking cache format changes
     # This ensures stale caches are automatically rebuilt
-    CACHE_VERSION = "0.1.0"  # Added dimension validation and integrity checks
+    CACHE_VERSION = "0.2.0"  # Added dimension validation and integrity checks
 
     def __init__(
         self,

@@ -24,7 +24,7 @@ Usage:
     # Initialize OpenTelemetry (call once at startup)
     setup_opentelemetry(
         service_name="victor",
-        service_version="0.1.0",
+        service_version="0.2.0",
         otlp_endpoint="http://localhost:4317",  # Optional, defaults to env vars
     )
 
@@ -79,7 +79,7 @@ def is_telemetry_enabled() -> bool:
 
 def setup_opentelemetry(
     service_name: str = "victor",
-    service_version: str = "0.1.0",
+    service_version: str = "0.2.0",
     otlp_endpoint: Optional[str] = None,
     enable_tracing: bool = True,
     enable_metrics: bool = True,
@@ -93,7 +93,7 @@ def setup_opentelemetry(
 
     Args:
         service_name: Name of the service (default: "victor")
-        service_version: Version of the service (default: "0.1.0")
+        service_version: Version of the service (default: "0.2.0")
         otlp_endpoint: OTLP collector endpoint (default: from OTEL_EXPORTER_OTLP_ENDPOINT env var)
         enable_tracing: Enable tracing (default: True)
         enable_metrics: Enable metrics (default: True)
