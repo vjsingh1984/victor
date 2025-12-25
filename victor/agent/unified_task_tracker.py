@@ -1146,11 +1146,13 @@ class UnifiedTaskTracker:
         return None
 
     def _calculate_effective_max(self) -> int:
-        """Calculate effective max iterations with model adjustments."""
+        """Calculate effective max iterations with model and mode adjustments."""
         base_max = self._get_base_max()
 
-        # Apply model multiplier
-        model_adjusted = int(base_max * self._exploration_multiplier)
+        # Apply combined multiplier (model * mode)
+        # Mode multipliers: Build=1.0, Plan=2.5, Explore=3.0
+        combined_multiplier = self._exploration_multiplier * self._mode_exploration_multiplier
+        model_adjusted = int(base_max * combined_multiplier)
 
         # Apply productivity ratio adjustment
         total = self._progress.total_turns
