@@ -49,10 +49,21 @@ class ToolsCommand(BaseSlashCommand):
             return
 
         search = ctx.args[0].lower() if ctx.args else None
-        tools = ctx.agent.get_available_tools()
+
+        # Get tool objects from the tool registry
+        tool_registry = getattr(ctx.agent, "tools", None)
+        if tool_registry is None:
+            ctx.console.print("[yellow]Tool registry not available[/]")
+            return
+
+        tools = tool_registry.list_tools(only_enabled=True)
 
         if search:
-            tools = [t for t in tools if search in t["name"].lower() or search in t.get("description", "").lower()]
+            tools = [
+                t for t in tools
+                if search in getattr(t, "name", "").lower()
+                or search in getattr(t, "description", "").lower()
+            ]
 
         if not tools:
             ctx.console.print("[yellow]No matching tools found[/]")
@@ -63,12 +74,14 @@ class ToolsCommand(BaseSlashCommand):
         table.add_column("Description")
         table.add_column("Cost", style="yellow", justify="right")
 
-        for tool in sorted(tools, key=lambda t: t["name"]):
-            name = tool["name"]
-            desc = tool.get("description", "")[:60]
-            if len(tool.get("description", "")) > 60:
+        for tool in sorted(tools, key=lambda t: getattr(t, "name", "")):
+            name = getattr(tool, "name", "unknown")
+            full_desc = getattr(tool, "description", "")
+            desc = full_desc[:60]
+            if len(full_desc) > 60:
                 desc += "..."
-            cost = tool.get("cost_tier", "unknown")
+            cost_tier = getattr(tool, "cost_tier", None)
+            cost = cost_tier.value if cost_tier else "unknown"
             table.add_row(name, desc, cost)
 
         ctx.console.print(table)
