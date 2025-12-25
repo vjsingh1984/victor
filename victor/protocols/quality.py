@@ -340,6 +340,7 @@ class SimpleQualityAssessor(BaseQualityAssessor):
         """Assess query coverage."""
         query = context.get("query", "")
         score = 0.5
+        covered = 0
 
         # Extract key terms from query
         key_terms = set(
@@ -357,7 +358,7 @@ class SimpleQualityAssessor(BaseQualityAssessor):
         return DimensionScore(
             dimension=QualityDimension.COVERAGE,
             score=score,
-            reason=f"Covered {covered}/{len(key_terms)} key terms",
+            reason=f"Covered {covered}/{len(key_terms)} key terms" if key_terms else "No query terms to cover",
             evidence={"key_terms": list(key_terms)},
         )
 
