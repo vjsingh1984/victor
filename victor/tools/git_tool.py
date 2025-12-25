@@ -651,11 +651,67 @@ async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
             analysis.append(f"   Error reading file: {e}")
 
     # If AI available, get resolution suggestions
-    provider, _ = _get_provider_and_model(context)
+    provider, model = _get_provider_and_model(context)
     if provider:
         analysis.append("\n\nAI-generated resolution suggestions:")
-        analysis.append("   (Using LLM to analyze conflicts...)")
-        # TODO: Implement AI conflict resolution suggestions
+        try:
+            # Collect conflict details for AI analysis
+            conflict_details = []
+            for file in conflicted[:3]:  # Limit to first 3 files for context size
+                try:
+                    with open(file) as f:
+                        content = f.read()
+                    # Extract conflict sections
+                    conflicts_in_file = []
+                    pos = 0
+                    while True:
+                        start = content.find("<<<<<<< ", pos)
+                        if start == -1:
+                            break
+                        end = content.find(">>>>>>> ", start)
+                        if end == -1:
+                            break
+                        # Get the full conflict block
+                        end_line = content.find("\n", end)
+                        if end_line == -1:
+                            end_line = len(content)
+                        conflict_block = content[start:end_line]
+                        conflicts_in_file.append(conflict_block[:500])  # Limit size
+                        pos = end_line
+                    if conflicts_in_file:
+                        conflict_details.append(f"File: {file}\n" + "\n---\n".join(conflicts_in_file[:2]))
+                except Exception:
+                    pass
+
+            if conflict_details:
+                prompt = f"""Analyze these git merge conflicts and suggest how to resolve them.
+
+{chr(10).join(conflict_details)}
+
+For each conflict:
+1. Explain what changed in each branch
+2. Suggest which changes to keep or how to combine them
+3. Provide the resolved code if possible
+
+Be concise and practical."""
+
+                from victor.providers.base import Message
+
+                response = await provider.complete(
+                    model=model or "default",
+                    messages=[Message(role="user", content=prompt)],
+                    temperature=0.3,
+                    max_tokens=1000,
+                )
+
+                suggestions = response.content.strip()
+                # Indent the suggestions for better formatting
+                for line in suggestions.split("\n"):
+                    analysis.append(f"   {line}")
+            else:
+                analysis.append("   Could not extract conflict details for AI analysis.")
+        except Exception as e:
+            analysis.append(f"   AI analysis failed: {e}")
 
     analysis.append("\n\nTo resolve:")
     analysis.append("1. Edit conflicted files manually")
