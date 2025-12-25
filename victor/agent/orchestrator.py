@@ -2454,10 +2454,25 @@ class AgentOrchestrator:
         from victor.tools.tool_names import get_canonical_name, ToolNames
 
         # Shell-related aliases that should resolve intelligently
-        shell_aliases = {"run", "bash", "execute", "cmd", "execute_bash"}
+        # Also include shell_readonly so it can be upgraded to shell in BUILD mode
+        shell_aliases = {"run", "bash", "execute", "cmd", "execute_bash", "shell_readonly", "shell"}
 
         if tool_name not in shell_aliases:
             return tool_name
+
+        # Check mode controller for BUILD mode (allows all tools including shell)
+        try:
+            from victor.agent.mode_controller import get_mode_controller
+
+            mode_controller = get_mode_controller()
+            config = mode_controller.config
+
+            # If mode allows all tools and shell isn't explicitly disallowed, use full shell
+            if config.allow_all_tools and "shell" not in config.disallowed_tools:
+                logger.debug(f"Resolved '{tool_name}' to 'shell' (BUILD mode allows all tools)")
+                return ToolNames.SHELL
+        except Exception as e:
+            logger.debug(f"Mode controller check failed: {e}")
 
         # Check if full shell is enabled first
         if self.tools.is_tool_enabled(ToolNames.SHELL):
@@ -6627,12 +6642,35 @@ class AgentOrchestrator:
     def is_tool_enabled(self, tool_name: str) -> bool:
         """Check if a specific tool is enabled (protocol method).
 
+        Integrates mode-based restrictions with session/vertical restrictions.
+        Mode settings (BUILD/PLAN/EXPLORE) take precedence.
+
         Args:
             tool_name: Name of tool to check
 
         Returns:
             True if tool is enabled
         """
+        # Check mode controller restrictions first
+        try:
+            from victor.agent.mode_controller import get_mode_controller
+
+            mode_controller = get_mode_controller()
+            config = mode_controller.config
+
+            # If tool is in mode's disallowed list, it's disabled regardless of other settings
+            if tool_name in config.disallowed_tools:
+                return False
+
+            # If mode allows all tools, it's enabled (unless in disallowed list above)
+            if config.allow_all_tools:
+                # Check if tool exists in registry
+                if self.tools and tool_name in self.tools.list_tools():
+                    return True
+        except Exception as e:
+            logger.debug(f"Mode controller check failed in is_tool_enabled: {e}")
+
+        # Fall back to session/vertical restrictions
         enabled = self.get_enabled_tools()
         return tool_name in enabled
 
