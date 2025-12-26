@@ -12,8 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Centralized RL coordinator with unified SQLite storage."""
+"""Centralized RL coordinator with unified SQLite storage.
 
+Provides both sync and async interfaces:
+- Sync methods: `record_outcome()`, `get_recommendation()` (for sync callers)
+- Async methods: `record_outcome_async()`, `get_recommendation_async()` (for async orchestrator)
+
+The async methods use `asyncio.to_thread()` to offload SQLite operations to a thread pool,
+preventing event loop blocking while maintaining the same synchronous SQLite internals.
+"""
+
+import asyncio
 import logging
 import sqlite3
 from pathlib import Path
@@ -338,6 +347,85 @@ class RLCoordinator:
             )
             return None
 
+    # =========================================================================
+    # Async Wrappers - Non-blocking versions for async orchestrator
+    # =========================================================================
+
+    async def record_outcome_async(
+        self,
+        learner_name: str,
+        outcome: RLOutcome,
+        vertical: str = "coding",
+    ) -> None:
+        """Async version of record_outcome - offloads SQLite to thread pool.
+
+        Use this from async code (like orchestrator.stream_chat) to avoid
+        blocking the event loop during SQLite operations.
+
+        Args:
+            learner_name: Name of learner to update
+            outcome: Outcome data
+            vertical: Which vertical this came from (coding, devops, data_science)
+        """
+        await asyncio.to_thread(self.record_outcome, learner_name, outcome, vertical)
+
+    async def get_recommendation_async(
+        self,
+        learner_name: str,
+        provider: str,
+        model: str,
+        task_type: str,
+    ) -> Optional[RLRecommendation]:
+        """Async version of get_recommendation - offloads SQLite to thread pool.
+
+        Use this from async code to avoid blocking the event loop.
+
+        Args:
+            learner_name: Name of learner to query
+            provider: Provider name
+            model: Model name
+            task_type: Task type
+
+        Returns:
+            Recommendation with value and confidence, or None if no data
+        """
+        return await asyncio.to_thread(
+            self.get_recommendation, learner_name, provider, model, task_type
+        )
+
+    async def get_all_recommendations_async(
+        self, provider: str, model: str, task_type: str
+    ) -> Dict[str, RLRecommendation]:
+        """Async version of get_all_recommendations.
+
+        Args:
+            provider: Provider name
+            model: Model name
+            task_type: Task type
+
+        Returns:
+            Dictionary mapping learner name to recommendation
+        """
+        return await asyncio.to_thread(
+            self.get_all_recommendations, provider, model, task_type
+        )
+
+    async def export_metrics_async(self) -> Dict[str, Any]:
+        """Async version of export_metrics.
+
+        Returns:
+            Dictionary with metrics from all learners
+        """
+        return await asyncio.to_thread(self.export_metrics)
+
+    async def get_stats_async(self) -> Dict[str, Any]:
+        """Async version of get_stats.
+
+        Returns:
+            Dictionary with coordinator statistics
+        """
+        return await asyncio.to_thread(self.get_stats)
+
     def export_metrics(self) -> Dict[str, Any]:
         """Export all learned values and metrics for monitoring.
 
@@ -463,6 +551,8 @@ _rl_coordinator: Optional[RLCoordinator] = None
 def get_rl_coordinator() -> RLCoordinator:
     """Get global RL coordinator (lazy init).
 
+    For sync callers. Use get_rl_coordinator_async() from async code.
+
     Returns:
         Global coordinator singleton
     """
@@ -470,4 +560,21 @@ def get_rl_coordinator() -> RLCoordinator:
     if _rl_coordinator is None:
         storage_path = Path.home() / ".victor" / "rl_data"
         _rl_coordinator = RLCoordinator(storage_path)
+    return _rl_coordinator
+
+
+async def get_rl_coordinator_async() -> RLCoordinator:
+    """Get global RL coordinator with async-safe initialization.
+
+    Use this from async code to avoid blocking the event loop during
+    coordinator initialization (which involves SQLite table creation).
+
+    Returns:
+        Global coordinator singleton
+    """
+    global _rl_coordinator
+    if _rl_coordinator is None:
+        storage_path = Path.home() / ".victor" / "rl_data"
+        # Initialize in thread to avoid blocking event loop
+        _rl_coordinator = await asyncio.to_thread(RLCoordinator, storage_path)
     return _rl_coordinator
