@@ -31,6 +31,7 @@ from victor.agent.orchestrator_factory import (
     StreamingComponents,
     AnalyticsComponents,
     RecoveryComponents,
+    WorkflowFixComponents,
 )
 
 
@@ -549,3 +550,122 @@ class TestCreateUsageLogger:
                 logger = factory.create_usage_logger()
 
                 assert logger == mock_logger
+
+
+# =============================================================================
+# Workflow Fix Components Tests (v2)
+# =============================================================================
+
+
+class TestWorkflowFixComponents:
+    """Tests for workflow v2 fix component factory methods."""
+
+    def test_create_task_completion_detector(self, factory):
+        """create_task_completion_detector returns TaskCompletionDetector."""
+        detector = factory.create_task_completion_detector()
+
+        from victor.agent.task_completion import TaskCompletionDetector
+        assert isinstance(detector, TaskCompletionDetector)
+
+    def test_create_read_cache(self, factory, mock_settings):
+        """create_read_cache returns ReadResultCache with settings."""
+        mock_settings.read_cache_ttl = 120.0
+        mock_settings.read_cache_max_entries = 50
+
+        cache = factory.create_read_cache()
+
+        from victor.agent.read_cache import ReadResultCache
+        assert isinstance(cache, ReadResultCache)
+        assert cache._ttl == 120.0
+        assert cache._max_entries == 50
+
+    def test_create_read_cache_defaults(self, factory, mock_settings):
+        """create_read_cache uses defaults when settings not present."""
+        # Remove attributes to test defaults
+        if hasattr(mock_settings, "read_cache_ttl"):
+            delattr(mock_settings, "read_cache_ttl")
+        if hasattr(mock_settings, "read_cache_max_entries"):
+            delattr(mock_settings, "read_cache_max_entries")
+
+        cache = factory.create_read_cache()
+
+        from victor.agent.read_cache import ReadResultCache
+        assert isinstance(cache, ReadResultCache)
+        assert cache._ttl == 300.0  # default
+        assert cache._max_entries == 100  # default
+
+    def test_create_time_aware_executor_with_timeout(self, factory):
+        """create_time_aware_executor with explicit timeout."""
+        executor = factory.create_time_aware_executor(timeout_seconds=60.0)
+
+        from victor.agent.time_aware_executor import TimeAwareExecutor
+        assert isinstance(executor, TimeAwareExecutor)
+        assert executor.get_remaining_seconds() is not None
+
+    def test_create_time_aware_executor_no_timeout(self, factory, mock_settings):
+        """create_time_aware_executor without timeout."""
+        # Ensure no timeout setting
+        if hasattr(mock_settings, "execution_timeout"):
+            delattr(mock_settings, "execution_timeout")
+
+        executor = factory.create_time_aware_executor()
+
+        from victor.agent.time_aware_executor import TimeAwareExecutor
+        assert isinstance(executor, TimeAwareExecutor)
+        assert executor.get_remaining_seconds() is None
+
+    def test_create_thinking_detector(self, factory, mock_settings):
+        """create_thinking_detector returns ThinkingPatternDetector."""
+        mock_settings.thinking_repetition_threshold = 4
+        mock_settings.thinking_similarity_threshold = 0.7
+
+        detector = factory.create_thinking_detector()
+
+        from victor.agent.thinking_detector import ThinkingPatternDetector
+        assert isinstance(detector, ThinkingPatternDetector)
+        assert detector._repetition_threshold == 4
+        assert detector._similarity_threshold == 0.7
+
+    def test_create_resource_manager(self, factory):
+        """create_resource_manager returns singleton ResourceManager."""
+        from victor.agent.resource_manager import ResourceManager
+
+        # Reset singleton for test
+        ResourceManager._instance = None
+
+        manager = factory.create_resource_manager()
+
+        assert isinstance(manager, ResourceManager)
+
+        # Cleanup
+        manager.reset()
+        ResourceManager._instance = None
+
+    def test_create_mode_completion_criteria(self, factory):
+        """create_mode_completion_criteria returns ModeCompletionCriteria."""
+        criteria = factory.create_mode_completion_criteria()
+
+        from victor.agent.budget_manager import ModeCompletionCriteria
+        assert isinstance(criteria, ModeCompletionCriteria)
+
+    def test_create_workflow_fix_components(self, factory):
+        """create_workflow_fix_components returns all components."""
+        from victor.agent.resource_manager import ResourceManager
+
+        # Reset singleton for test
+        ResourceManager._instance = None
+
+        components = factory.create_workflow_fix_components(timeout_seconds=30.0)
+
+        from victor.agent.orchestrator_factory import WorkflowFixComponents
+        assert isinstance(components, WorkflowFixComponents)
+        assert components.task_completion_detector is not None
+        assert components.read_cache is not None
+        assert components.time_aware_executor is not None
+        assert components.thinking_detector is not None
+        assert components.resource_manager is not None
+        assert components.mode_completion_criteria is not None
+
+        # Cleanup
+        components.resource_manager.reset()
+        ResourceManager._instance = None

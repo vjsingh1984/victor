@@ -711,6 +711,16 @@ class AgentOrchestrator(ModeAwareMixin):
         # Initialize ObservabilityIntegration for unified event bus (via factory)
         self._observability = self._factory.create_observability()
 
+        # =================================================================
+        # Workflow Fix Components (v2) - MODE workflow optimizations
+        # These address issues identified during EXPLORE/PLAN/BUILD testing
+        # =================================================================
+
+        # Initialize workflow fix components (via factory)
+        self._workflow_fixes = self._factory.create_workflow_fix_components(
+            timeout_seconds=getattr(settings, "execution_timeout", None)
+        )
+
         # Wire component dependencies (via factory)
         self._factory.wire_component_dependencies(
             recovery_handler=self._recovery_handler,
@@ -724,7 +734,7 @@ class AgentOrchestrator(ModeAwareMixin):
             "ConversationController, ToolPipeline, StreamingController, StreamingChatHandler, "
             "TaskAnalyzer, ContextCompactor, UsageAnalytics, ToolSequenceTracker, "
             "ToolOutputFormatter, RecoveryCoordinator, ChunkGenerator, ToolPlanner, TaskCoordinator, "
-            "ObservabilityIntegration"
+            "ObservabilityIntegration, WorkflowFixes(v2)"
         )
 
     # =====================================================================

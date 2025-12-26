@@ -21,6 +21,7 @@ Design:
 - Single source of truth for all budget tracking
 - Consistent multiplier composition: effective_max = base × model × mode × productivity
 - Separate tracking for exploration vs action operations
+- Mode-specific early exit criteria for graceful completion
 - Integration with UnifiedTaskTracker and prompt builder
 
 Usage:
@@ -34,13 +35,22 @@ Usage:
     if manager.is_exhausted(BudgetType.EXPLORATION):
         # Force synthesis/completion
         pass
+
+    # Check for mode-based early exit
+    if manager.should_early_exit("PLAN", response_text):
+        # Mode objectives met, can stop
+        pass
+
+Issue Reference: workflow-test-issues-v2.md Issue #6
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional, Set
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Protocol, Set, runtime_checkable
 
 from victor.agent.protocols import (
     BudgetConfig,
@@ -51,6 +61,265 @@ from victor.agent.protocols import (
 from victor.protocols.mode_aware import ModeAwareMixin
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Mode Completion Criteria (Fix #6)
+# =============================================================================
+
+
+class ModeObjective(Enum):
+    """Defines primary objectives for each mode."""
+
+    EXPLORE = "understand_codebase"
+    PLAN = "provide_implementation_plan"
+    BUILD = "create_or_modify_files"
+
+
+@dataclass
+class ModeCompletionConfig:
+    """Configuration for mode-specific completion criteria.
+
+    Attributes:
+        min_files_read: Minimum files to read before considering complete
+        min_files_written: Minimum files to write (BUILD mode)
+        max_iterations: Maximum iterations before forcing completion
+        completion_signals: Phrases indicating task completion
+        required_sections: Required sections in output (PLAN mode)
+    """
+
+    min_files_read: int = 1
+    min_files_written: int = 0
+    max_iterations: int = 20
+    completion_signals: List[str] = field(default_factory=list)
+    required_sections: List[str] = field(default_factory=list)
+
+
+@runtime_checkable
+class IModeCompletionCriteria(Protocol):
+    """Protocol for mode completion detection."""
+
+    def get_criteria(self, mode: str) -> ModeCompletionConfig:
+        """Get completion criteria for a mode."""
+        ...
+
+    def check_early_exit(
+        self,
+        mode: str,
+        files_read: int,
+        files_written: int,
+        iterations: int,
+        response_text: str,
+    ) -> tuple[bool, str]:
+        """Check if mode objectives are met for early exit."""
+        ...
+
+
+class ModeCompletionCriteria:
+    """Defines and checks completion criteria per mode.
+
+    Each mode has specific objectives and exit criteria:
+    - EXPLORE: Understand codebase, provide explanation
+    - PLAN: Analyze requirements, provide implementation plan
+    - BUILD: Create/modify files, complete implementation
+
+    Usage:
+        criteria = ModeCompletionCriteria()
+
+        # Check if can exit early
+        should_exit, reason = criteria.check_early_exit(
+            mode="PLAN",
+            files_read=3,
+            files_written=0,
+            iterations=10,
+            response_text="Here's the implementation plan..."
+        )
+    """
+
+    # Default criteria per mode
+    CRITERIA = {
+        ModeObjective.EXPLORE: ModeCompletionConfig(
+            min_files_read=1,
+            min_files_written=0,
+            max_iterations=15,
+            completion_signals=[
+                "here's what",
+                "the file",
+                "this is",
+                "here's an overview",
+                "this module",
+                "the codebase",
+                "i found",
+                "the structure",
+            ],
+            required_sections=[],
+        ),
+        ModeObjective.PLAN: ModeCompletionConfig(
+            min_files_read=1,
+            min_files_written=0,
+            max_iterations=20,
+            completion_signals=[
+                "implementation plan",
+                "steps to",
+                "here's how",
+                "here's the plan",
+                "proposed approach",
+                "implementation steps",
+                "the plan",
+            ],
+            required_sections=[
+                "step",
+                "file",
+            ],
+        ),
+        ModeObjective.BUILD: ModeCompletionConfig(
+            min_files_read=0,
+            min_files_written=1,
+            max_iterations=30,
+            completion_signals=[
+                "created",
+                "implemented",
+                "written",
+                "has been created",
+                "successfully created",
+                "file created",
+                "implementation complete",
+            ],
+            required_sections=[],
+        ),
+    }
+
+    def __init__(self, custom_criteria: Optional[Dict[str, ModeCompletionConfig]] = None):
+        """Initialize with optional custom criteria.
+
+        Args:
+            custom_criteria: Override default criteria for specific modes
+        """
+        self._custom_criteria = custom_criteria or {}
+        self._iteration_counts: Dict[str, int] = {}
+
+    def get_criteria(self, mode: str) -> ModeCompletionConfig:
+        """Get completion criteria for mode.
+
+        Args:
+            mode: Mode name (EXPLORE, PLAN, BUILD)
+
+        Returns:
+            Completion configuration for the mode
+        """
+        # Check custom criteria first
+        if mode.upper() in self._custom_criteria:
+            return self._custom_criteria[mode.upper()]
+
+        # Get from default criteria
+        try:
+            objective = ModeObjective[mode.upper()]
+            return self.CRITERIA.get(objective, ModeCompletionConfig())
+        except KeyError:
+            logger.warning(f"Unknown mode: {mode}, using default criteria")
+            return ModeCompletionConfig()
+
+    def check_early_exit(
+        self,
+        mode: str,
+        files_read: int,
+        files_written: int,
+        iterations: int,
+        response_text: str,
+    ) -> tuple[bool, str]:
+        """Check if mode objectives are met for early exit.
+
+        Args:
+            mode: Current mode (EXPLORE, PLAN, BUILD)
+            files_read: Number of files read so far
+            files_written: Number of files written so far
+            iterations: Current iteration count
+            response_text: Agent's response text
+
+        Returns:
+            Tuple of (should_exit, reason)
+        """
+        criteria = self.get_criteria(mode)
+
+        # Track iterations
+        self._iteration_counts[mode] = iterations
+
+        # Check maximum iterations exceeded
+        if iterations >= criteria.max_iterations:
+            logger.info(f"Mode {mode}: max iterations ({criteria.max_iterations}) reached")
+            return True, f"Maximum iterations ({criteria.max_iterations}) reached"
+
+        # Check minimum requirements by mode
+        mode_upper = mode.upper()
+
+        if mode_upper == "BUILD":
+            # BUILD mode requires file(s) to be written
+            if files_written < criteria.min_files_written:
+                return False, f"Need {criteria.min_files_written - files_written} more file(s) written"
+        else:
+            # EXPLORE and PLAN require files to be read
+            if files_read < criteria.min_files_read:
+                return False, f"Need {criteria.min_files_read - files_read} more file(s) read"
+
+        # Check for completion signals in response
+        response_lower = response_text.lower()
+        signals = criteria.completion_signals
+
+        found_signal = None
+        for signal in signals:
+            if signal in response_lower:
+                found_signal = signal
+                break
+
+        if not found_signal:
+            return False, "No completion signal detected"
+
+        # For PLAN mode, check required sections
+        if mode_upper == "PLAN" and criteria.required_sections:
+            missing_sections = []
+            for section in criteria.required_sections:
+                # Check for section headers or keywords
+                if not re.search(rf"\b{section}\b", response_lower):
+                    missing_sections.append(section)
+
+            if missing_sections:
+                return False, f"Missing required sections: {missing_sections}"
+
+        reason = f"Mode objectives complete: '{found_signal}' signal detected"
+        logger.info(f"Mode {mode}: early exit - {reason}")
+        return True, reason
+
+    def reset(self, mode: Optional[str] = None) -> None:
+        """Reset iteration counts.
+
+        Args:
+            mode: Specific mode to reset, or None for all
+        """
+        if mode is None:
+            self._iteration_counts.clear()
+        elif mode.upper() in self._iteration_counts:
+            del self._iteration_counts[mode.upper()]
+
+    def get_progress(self, mode: str) -> Dict[str, Any]:
+        """Get progress towards mode completion.
+
+        Args:
+            mode: Mode to check
+
+        Returns:
+            Progress information dictionary
+        """
+        criteria = self.get_criteria(mode)
+        iterations = self._iteration_counts.get(mode.upper(), 0)
+
+        return {
+            "mode": mode,
+            "iterations": iterations,
+            "max_iterations": criteria.max_iterations,
+            "progress_pct": min(100, (iterations / criteria.max_iterations) * 100),
+            "min_files_read": criteria.min_files_read,
+            "min_files_written": criteria.min_files_written,
+        }
 
 
 # =============================================================================
@@ -466,7 +735,142 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
 
 
 # =============================================================================
-# Factory Function
+# Extended Budget Manager with Mode Completion
+# =============================================================================
+
+
+@dataclass
+class ExtendedBudgetManager(BudgetManager):
+    """BudgetManager with integrated mode completion criteria.
+
+    Extends BudgetManager to include mode-specific early exit detection,
+    providing a unified interface for both budget tracking and mode
+    completion checking.
+
+    Attributes:
+        _mode_criteria: Mode completion criteria checker
+        _files_read: Count of files read in current session
+        _files_written: Count of files written in current session
+    """
+
+    _mode_criteria: Optional[ModeCompletionCriteria] = None
+    _files_read: int = 0
+    _files_written: int = 0
+    _current_mode: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        """Initialize with mode criteria."""
+        super().__post_init__()
+        if self._mode_criteria is None:
+            self._mode_criteria = ModeCompletionCriteria()
+
+    def set_mode(self, mode: str) -> None:
+        """Set current operating mode.
+
+        Args:
+            mode: Mode name (EXPLORE, PLAN, BUILD)
+        """
+        self._current_mode = mode.upper()
+        logger.debug(f"ExtendedBudgetManager: mode set to {self._current_mode}")
+
+    def record_file_read(self) -> None:
+        """Record a file read operation."""
+        self._files_read += 1
+
+    def record_file_write(self) -> None:
+        """Record a file write operation."""
+        self._files_written += 1
+
+    def record_tool_call(
+        self, tool_name: str, is_write_operation: bool = False
+    ) -> bool:
+        """Record tool call with file tracking.
+
+        Extends parent to track file read/write operations.
+
+        Args:
+            tool_name: Name of the tool called
+            is_write_operation: Whether this is a write operation
+
+        Returns:
+            True if budget was available
+        """
+        # Track file operations
+        tool_lower = tool_name.lower()
+        if tool_lower in {"read", "read_file"}:
+            self.record_file_read()
+        elif tool_lower in WRITE_TOOLS:
+            self.record_file_write()
+
+        return super().record_tool_call(tool_name, is_write_operation)
+
+    def should_early_exit(
+        self,
+        response_text: str,
+        mode: Optional[str] = None,
+    ) -> tuple[bool, str]:
+        """Check if mode objectives are met for early exit.
+
+        Args:
+            response_text: Agent's response text to analyze
+            mode: Mode to check (uses current mode if not specified)
+
+        Returns:
+            Tuple of (should_exit, reason)
+        """
+        check_mode = mode or self._current_mode
+        if not check_mode:
+            return False, "No mode set"
+
+        if self._mode_criteria is None:
+            return False, "No mode criteria configured"
+
+        # Get current iteration from exploration budget
+        exploration_status = self.get_status(BudgetType.EXPLORATION)
+        iterations = exploration_status.current
+
+        return self._mode_criteria.check_early_exit(
+            mode=check_mode,
+            files_read=self._files_read,
+            files_written=self._files_written,
+            iterations=iterations,
+            response_text=response_text,
+        )
+
+    def get_mode_progress(self, mode: Optional[str] = None) -> Dict[str, Any]:
+        """Get progress towards mode completion.
+
+        Args:
+            mode: Mode to check (uses current mode if not specified)
+
+        Returns:
+            Progress information dictionary
+        """
+        check_mode = mode or self._current_mode
+        if not check_mode or self._mode_criteria is None:
+            return {}
+
+        progress = self._mode_criteria.get_progress(check_mode)
+        progress["files_read"] = self._files_read
+        progress["files_written"] = self._files_written
+        return progress
+
+    def reset(self, budget_type: Optional[BudgetType] = None) -> None:
+        """Reset budgets and file counters.
+
+        Args:
+            budget_type: Specific budget to reset, or None for all
+        """
+        super().reset(budget_type)
+        if budget_type is None:
+            self._files_read = 0
+            self._files_written = 0
+            if self._mode_criteria:
+                self._mode_criteria.reset()
+
+
+# =============================================================================
+# Factory Functions
 # =============================================================================
 
 
@@ -494,3 +898,46 @@ def create_budget_manager(
     manager.set_mode_multiplier(mode_multiplier)
     manager.set_productivity_multiplier(productivity_multiplier)
     return manager
+
+
+def create_extended_budget_manager(
+    config: Optional[BudgetConfig] = None,
+    mode: Optional[str] = None,
+    model_multiplier: float = 1.0,
+    mode_multiplier: float = 1.0,
+) -> ExtendedBudgetManager:
+    """Create a configured ExtendedBudgetManager with mode completion support.
+
+    Factory function for DI registration.
+
+    Args:
+        config: Budget configuration with base values
+        mode: Initial operating mode (EXPLORE, PLAN, BUILD)
+        model_multiplier: Initial model multiplier
+        mode_multiplier: Initial mode multiplier
+
+    Returns:
+        Configured ExtendedBudgetManager instance
+    """
+    manager = ExtendedBudgetManager(config=config or BudgetConfig())
+    manager.set_model_multiplier(model_multiplier)
+    manager.set_mode_multiplier(mode_multiplier)
+    if mode:
+        manager.set_mode(mode)
+    return manager
+
+
+def create_mode_completion_criteria(
+    custom_criteria: Optional[Dict[str, ModeCompletionConfig]] = None,
+) -> ModeCompletionCriteria:
+    """Create a ModeCompletionCriteria instance.
+
+    Factory function for DI registration.
+
+    Args:
+        custom_criteria: Override default criteria for specific modes
+
+    Returns:
+        Configured ModeCompletionCriteria instance
+    """
+    return ModeCompletionCriteria(custom_criteria=custom_criteria)
