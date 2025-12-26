@@ -256,22 +256,23 @@ class TestDirectProtocolAdapterStatus:
         mock_orch.provider.model = "gpt-4"
         mock_orch.tools = ["read", "write"]
         mock_orch.messages = [{"role": "user", "content": "hi"}]
+        # ModeAwareMixin property used by get_status()
+        mock_orch.current_mode_name = "build"
         return DirectProtocolAdapter(mock_orch)
 
     @pytest.mark.asyncio
     async def test_get_status(self, adapter):
-        """Test getting status."""
-        with patch("victor.agent.mode_controller.get_mode_controller") as mock_get:
-            mock_mode = MagicMock()
-            mock_mode.current_mode.value = "build"  # Valid AgentMode value
-            mock_get.return_value = mock_mode
+        """Test getting status.
 
-            status = await adapter.get_status()
+        Uses orchestrator's current_mode_name property (via ModeAwareMixin).
+        """
+        status = await adapter.get_status()
 
-            assert isinstance(status, AgentStatus)
-            assert status.provider == "openai"
-            assert status.connected is True
-            assert status.tools_available == 2
+        assert isinstance(status, AgentStatus)
+        assert status.provider == "openai"
+        assert status.mode == AgentMode.BUILD
+        assert status.connected is True
+        assert status.tools_available == 2
 
 
 class TestDirectProtocolAdapterUndoRedo:

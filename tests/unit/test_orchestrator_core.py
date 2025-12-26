@@ -3218,13 +3218,27 @@ class TestResolveShellVariant:
         assert result == ToolNames.SHELL
 
     def test_shell_alias_with_only_readonly_enabled(self, orchestrator):
-        """Test shell alias resolves to 'shell_readonly' when only readonly enabled."""
+        """Test shell alias resolves to 'shell_readonly' when only readonly enabled.
+
+        This test simulates a non-BUILD mode (e.g., PLAN or EXPLORE) where the full
+        shell is not allowed but shell_readonly is available.
+        """
         from victor.tools.tool_names import ToolNames
+
         def is_enabled(tool):
             return tool == ToolNames.SHELL_READONLY
+
         orchestrator.tools.is_tool_enabled = MagicMock(side_effect=is_enabled)
-        result = orchestrator._resolve_shell_variant("run")
-        assert result == ToolNames.SHELL_READONLY
+
+        # Mock mode controller to return allow_all_tools=False (non-BUILD mode)
+        # so that _resolve_shell_variant checks which tools are enabled
+        mock_controller = MagicMock()
+        mock_controller.config.allow_all_tools = False
+        mock_controller.config.disallowed_tools = {"shell"}  # shell is disallowed
+
+        with patch("victor.agent.mode_controller.get_mode_controller", return_value=mock_controller):
+            result = orchestrator._resolve_shell_variant("run")
+            assert result == ToolNames.SHELL_READONLY
 
     def test_shell_alias_with_neither_enabled(self, orchestrator):
         """Test shell alias returns canonical when neither enabled."""

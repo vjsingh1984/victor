@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch, MagicMock
 
 from victor.agent.conversation_state import ConversationStage, ConversationStateMachine
 from victor.agent.tool_selection import ToolSelector
@@ -38,6 +38,26 @@ def reset_global_registry():
     """Reset global metadata registry between tests to avoid cross-contamination."""
     metadata_registry._global_registry = None
     yield
+
+
+@pytest.fixture(autouse=True)
+def mock_non_build_mode():
+    """Mock mode controller to return allow_all_tools=False for stage filtering tests.
+
+    Stage filtering tests need the mode to be non-BUILD (i.e., allow_all_tools=False)
+    so that stage-based tool filtering actually happens. Without this, the global
+    mode controller would return is_build_mode=True and skip filtering.
+    """
+    mock_controller = MagicMock()
+    mock_controller.current_mode.value = "PLAN"  # Non-BUILD mode
+    mock_controller.config.allow_all_tools = False  # Enable stage filtering
+    mock_controller.config.exploration_multiplier = 1.0
+    mock_controller.config.sandbox_dir = None
+    mock_controller.config.allowed_tools = set()
+    mock_controller.config.disallowed_tools = set()
+
+    with patch("victor.agent.mode_controller.get_mode_controller", return_value=mock_controller):
+        yield mock_controller
     metadata_registry._global_registry = None
 
 
