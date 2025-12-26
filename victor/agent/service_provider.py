@@ -497,6 +497,9 @@ class OrchestratorServiceProvider:
             ServiceLifetime.SINGLETON,
         )
 
+        # PathResolver - singleton for centralized path resolution
+        self._register_path_resolver(container)
+
         logger.debug("Registered singleton orchestrator services")
 
     def register_scoped_services(self, container: ServiceContainer) -> None:
@@ -534,6 +537,12 @@ class OrchestratorServiceProvider:
             lambda c: self._create_message_history(),
             ServiceLifetime.SCOPED,
         )
+
+        # ToolAccessController - per-session tool access control
+        self._register_tool_access_controller(container)
+
+        # BudgetManager - per-session budget management
+        self._register_budget_manager(container)
 
         logger.debug("Registered scoped orchestrator services")
 
@@ -746,6 +755,63 @@ class OrchestratorServiceProvider:
             system_prompt="",  # Will be set by orchestrator
             max_history_messages=getattr(self._settings, "max_conversation_history", 100),
         )
+
+    # =========================================================================
+    # Factory methods for new framework services
+    # =========================================================================
+
+    def _register_path_resolver(self, container: ServiceContainer) -> None:
+        """Register PathResolver as singleton."""
+        from victor.protocols.path_resolver import PathResolver, IPathResolver
+
+        container.register(
+            IPathResolver,
+            lambda c: PathResolver(),
+            ServiceLifetime.SINGLETON,
+        )
+
+    def _register_tool_access_controller(self, container: ServiceContainer) -> None:
+        """Register ToolAccessController as scoped service."""
+        from victor.agent.protocols import IToolAccessController
+        from victor.agent.tool_access_controller import (
+            create_tool_access_controller,
+        )
+
+        container.register(
+            IToolAccessController,
+            lambda c: create_tool_access_controller(
+                registry=c.get_or_none("ToolRegistryProtocol"),
+            ),
+            ServiceLifetime.SCOPED,
+        )
+
+    def _register_budget_manager(self, container: ServiceContainer) -> None:
+        """Register BudgetManager as scoped service."""
+        from victor.agent.protocols import IBudgetManager, BudgetConfig
+        from victor.agent.budget_manager import create_budget_manager
+
+        # Get budget settings from settings
+        base_tool_calls = getattr(self._settings, "tool_budget", 30)
+        base_iterations = getattr(self._settings, "max_iterations", 50)
+        base_exploration = getattr(self._settings, "max_exploration_iterations", 8)
+        base_action = getattr(self._settings, "max_action_iterations", 12)
+
+        config = BudgetConfig(
+            base_tool_calls=base_tool_calls,
+            base_iterations=base_iterations,
+            base_exploration=base_exploration,
+            base_action=base_action,
+        )
+
+        container.register(
+            IBudgetManager,
+            lambda c: create_budget_manager(config=config),
+            ServiceLifetime.SCOPED,
+        )
+
+    # =========================================================================
+    # Infrastructure service factory methods
+    # =========================================================================
 
     def _create_code_execution_manager(self) -> Any:
         """Create CodeExecutionManager instance."""

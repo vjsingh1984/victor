@@ -37,6 +37,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
+# Mode-aware mixin for consistent mode controller access
+from victor.protocols.mode_aware import ModeAwareMixin
+
 if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
@@ -171,7 +174,7 @@ class OrchestratorComponents:
     tool_output_formatter: Optional["ToolOutputFormatter"] = None
 
 
-class OrchestratorFactory:
+class OrchestratorFactory(ModeAwareMixin):
     """Factory for creating AgentOrchestrator components.
 
     This factory extracts component initialization logic from the orchestrator's
@@ -181,6 +184,9 @@ class OrchestratorFactory:
     2. Easier testing of individual component creation
     3. Potential for lazy initialization
     4. Reduced orchestrator complexity
+
+    Uses ModeAwareMixin for consistent mode controller access when applying
+    mode-specific configurations (e.g., exploration multipliers).
 
     Example:
         factory = OrchestratorFactory(settings, provider, model)
@@ -1750,6 +1756,70 @@ class OrchestratorFactory:
 
         logger.debug(f"Debug logger initialized: enabled={debug_logger.enabled}")
         return debug_logger
+
+    def create_tool_access_controller(self, registry: Any = None) -> Any:
+        """Create ToolAccessController for unified tool access control.
+
+        Creates a layered tool access controller that consolidates 6 independent
+        access control systems with clear precedence:
+        Safety (L0) > Mode (L1) > Session (L2) > Vertical (L3) > Stage (L4) > Intent (L5)
+
+        Args:
+            registry: Optional tool registry for tool lookup
+
+        Returns:
+            ToolAccessController instance
+        """
+        from victor.agent.tool_access_controller import create_tool_access_controller
+
+        controller = create_tool_access_controller(registry=registry)
+
+        # Apply mode exploration multiplier if available (via ModeAwareMixin)
+        mc = self.mode_controller
+        if mc is not None and hasattr(mc.config, "exploration_multiplier"):
+            multiplier = mc.config.exploration_multiplier
+            logger.debug(f"ToolAccessController created with mode multiplier: {multiplier}")
+
+        return controller
+
+    def create_budget_manager(self) -> Any:
+        """Create BudgetManager for unified budget tracking.
+
+        Creates a budget manager that centralizes all budget tracking with
+        consistent multiplier composition:
+        effective_max = base × model_multiplier × mode_multiplier × productivity_multiplier
+
+        Returns:
+            BudgetManager instance with settings-derived configuration
+        """
+        from victor.agent.budget_manager import create_budget_manager
+        from victor.agent.protocols import BudgetConfig
+
+        # Get budget settings from settings
+        base_tool_calls = getattr(self.settings, "tool_budget", 30)
+        base_iterations = getattr(self.settings, "max_iterations", 50)
+        base_exploration = getattr(self.settings, "max_exploration_iterations", 8)
+        base_action = getattr(self.settings, "max_action_iterations", 12)
+
+        config = BudgetConfig(
+            base_tool_calls=base_tool_calls,
+            base_iterations=base_iterations,
+            base_exploration=base_exploration,
+            base_action=base_action,
+        )
+
+        manager = create_budget_manager(config=config)
+
+        # Apply mode multiplier if available (via ModeAwareMixin)
+        mc = self.mode_controller
+        if mc is not None and hasattr(mc.config, "exploration_multiplier"):
+            manager.set_mode_multiplier(mc.config.exploration_multiplier)
+            logger.debug(
+                f"BudgetManager created with mode multiplier: "
+                f"{mc.config.exploration_multiplier}"
+            )
+
+        return manager
 
 
 # Convenience function for creating factory
