@@ -55,6 +55,20 @@ from victor.protocols.quality import (
     CompositeQualityAssessor,
 )
 
+from victor.protocols.mode_aware import (
+    IModeController,
+    ModeInfo,
+    ModeAwareMixin,
+    create_mode_aware_mixin,
+)
+
+from victor.protocols.path_resolver import (
+    IPathResolver,
+    PathResolution,
+    PathResolver,
+    create_path_resolver,
+)
+
 __all__ = [
     # Provider Adapter
     "IProviderAdapter",
@@ -82,4 +96,14 @@ __all__ = [
     "SimpleQualityAssessor",
     "ProviderAwareQualityAssessor",
     "CompositeQualityAssessor",
+    # Mode Awareness
+    "IModeController",
+    "ModeInfo",
+    "ModeAwareMixin",
+    "create_mode_aware_mixin",
+    # Path Resolution
+    "IPathResolver",
+    "PathResolution",
+    "PathResolver",
+    "create_path_resolver",
 ]
