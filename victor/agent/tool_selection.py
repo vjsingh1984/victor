@@ -757,6 +757,16 @@ class ToolSelector:
         since they are essential for the vertical's operation even in early stages.
         For example, DevOps needs 'docker' and 'shell', Research needs 'web_search'.
         """
+        # Skip stage filtering in BUILD mode (allow_all_tools=True)
+        try:
+            from victor.agent.mode_controller import get_mode_controller
+            mode_controller = get_mode_controller()
+            if mode_controller.config.allow_all_tools:
+                logger.debug("Stage filtering skipped: BUILD mode allows all tools")
+                return tools
+        except Exception:
+            pass  # Mode controller not available, continue with filtering
+
         if stage not in {
             ConversationStage.INITIAL,
             ConversationStage.PLANNING,

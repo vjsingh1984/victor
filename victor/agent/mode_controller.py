@@ -88,6 +88,7 @@ You are in BUILD mode - focused on implementation and code modification.
             "bash": 1.1,
             "git_status": 1.0,
         },
+        exploration_multiplier=2.0,  # 2x exploration for reading before writing
     ),
     AgentMode.PLAN: ModeConfig(
         name="Plan",

@@ -665,6 +665,8 @@ class UnifiedTaskTracker:
         Returns:
             Set of tool names required for this task
         """
+        if self._task_config is None:
+            return set()
         return set(self._task_config.required_tools)
 
     @property
@@ -676,6 +678,9 @@ class UnifiedTaskTracker:
         - Explore mode: 3.0x multiplier (exploration is the primary goal)
         - Model multiplier: varies by model capability
         """
+        # Handle case where task_config hasn't been set yet
+        if self._task_config is None:
+            return 8  # Default fallback
         base = self._task_config.max_exploration_iterations
         combined_multiplier = self._exploration_multiplier * self._mode_exploration_multiplier
         return int(base * combined_multiplier)
