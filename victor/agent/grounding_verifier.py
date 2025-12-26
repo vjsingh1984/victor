@@ -53,6 +53,144 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# GROUNDING STOPWORDS
+# =============================================================================
+# Common English words that should NOT be treated as code symbols during
+# grounding verification. These words frequently appear in LLM explanations
+# but are not actual code identifiers.
+#
+# Issue Reference: GAP-15, workflow-test-issues.md Issue #3
+# =============================================================================
+
+GROUNDING_STOPWORDS: frozenset = frozenset({
+    # Articles and determiners
+    "a", "an", "the", "this", "that", "these", "those", "some", "any",
+    "each", "every", "all", "both", "few", "many", "much", "other", "another",
+    # Pronouns
+    "it", "its", "they", "them", "their", "we", "us", "our", "you", "your",
+    "i", "me", "my", "he", "him", "his", "she", "her", "who", "which", "what",
+    # Common verbs (often in descriptions)
+    "is", "are", "was", "were", "be", "been", "being", "am",
+    "has", "have", "had", "having",
+    "do", "does", "did", "doing", "done",
+    "will", "would", "could", "should", "may", "might", "must", "shall", "can",
+    "get", "gets", "got", "getting",
+    "make", "makes", "made", "making",
+    "take", "takes", "took", "taking", "taken",
+    "let", "lets", "letting",
+    "put", "puts", "putting",
+    "see", "sees", "saw", "seeing", "seen",
+    "know", "knows", "knew", "knowing", "known",
+    "want", "wants", "wanted", "wanting",
+    "need", "needs", "needed", "needing",
+    "use", "uses", "used", "using",
+    "find", "finds", "found", "finding",
+    "give", "gives", "gave", "giving", "given",
+    "tell", "tells", "told", "telling",
+    "call", "calls", "called", "calling",
+    "try", "tries", "tried", "trying",
+    "ask", "asks", "asked", "asking",
+    "work", "works", "worked", "working",
+    "seem", "seems", "seemed", "seeming",
+    "feel", "feels", "felt", "feeling",
+    "leave", "leaves", "left", "leaving",
+    "keep", "keeps", "kept", "keeping",
+    "begin", "begins", "began", "beginning", "begun",
+    "show", "shows", "showed", "showing", "shown",
+    "hear", "hears", "heard", "hearing",
+    "run", "runs", "ran", "running",
+    "move", "moves", "moved", "moving",
+    "live", "lives", "lived", "living",
+    "believe", "believes", "believed", "believing",
+    "bring", "brings", "brought", "bringing",
+    "happen", "happens", "happened", "happening",
+    "write", "writes", "wrote", "writing", "written",
+    "provide", "provides", "provided", "providing",
+    "sit", "sits", "sat", "sitting",
+    "stand", "stands", "stood", "standing",
+    "lose", "loses", "lost", "losing",
+    "pay", "pays", "paid", "paying",
+    "meet", "meets", "met", "meeting",
+    "include", "includes", "included", "including",
+    "continue", "continues", "continued", "continuing",
+    "set", "sets", "setting",
+    "learn", "learns", "learned", "learning",
+    "change", "changes", "changed", "changing",
+    "lead", "leads", "led", "leading",
+    "understand", "understands", "understood", "understanding",
+    "watch", "watches", "watched", "watching",
+    "follow", "follows", "followed", "following",
+    "stop", "stops", "stopped", "stopping",
+    "create", "creates", "created", "creating",
+    "speak", "speaks", "spoke", "speaking", "spoken",
+    "read", "reads", "reading",
+    "allow", "allows", "allowed", "allowing",
+    "add", "adds", "added", "adding",
+    "spend", "spends", "spent", "spending",
+    "grow", "grows", "grew", "growing", "grown",
+    "open", "opens", "opened", "opening",
+    "walk", "walks", "walked", "walking",
+    "win", "wins", "won", "winning",
+    "offer", "offers", "offered", "offering",
+    "remember", "remembers", "remembered", "remembering",
+    "consider", "considers", "considered", "considering",
+    "appear", "appears", "appeared", "appearing",
+    "buy", "buys", "bought", "buying",
+    "wait", "waits", "waited", "waiting",
+    "serve", "serves", "served", "serving",
+    "die", "dies", "died", "dying",
+    "send", "sends", "sent", "sending",
+    "expect", "expects", "expected", "expecting",
+    "build", "builds", "built", "building",
+    "stay", "stays", "stayed", "staying",
+    "fall", "falls", "fell", "falling", "fallen",
+    "cut", "cuts", "cutting",
+    "reach", "reaches", "reached", "reaching",
+    "kill", "kills", "killed", "killing",
+    "remain", "remains", "remained", "remaining",
+    # Action words commonly used in tech documentation
+    "handles", "manages", "provides", "supports", "allows", "enables",
+    "creates", "returns", "contains", "includes", "uses", "works",
+    "sets", "gets", "adds", "removes", "updates", "deletes", "modifies",
+    "processes", "executes", "implements", "defines", "declares",
+    "initializes", "configures", "validates", "parses", "formats",
+    "converts", "transforms", "maps", "filters", "reduces", "sorts",
+    # Prepositions
+    "in", "on", "at", "to", "for", "of", "with", "by", "from", "as",
+    "into", "through", "during", "before", "after", "above", "below",
+    "between", "under", "over", "against", "among", "throughout",
+    "around", "within", "without", "toward", "towards", "upon",
+    # Conjunctions
+    "and", "or", "but", "if", "then", "else", "when", "where", "while",
+    "although", "because", "unless", "since", "whether", "however",
+    "therefore", "thus", "hence", "moreover", "furthermore", "nevertheless",
+    # Common words in tech contexts
+    "here", "there", "now", "also", "just", "only", "very", "more",
+    "most", "so", "than", "too", "even", "still", "already", "yet",
+    "again", "always", "never", "often", "sometimes", "usually",
+    "really", "quite", "rather", "almost", "well", "back", "up", "down",
+    "out", "away", "off", "first", "last", "next", "new", "old", "same",
+    "different", "good", "bad", "great", "little", "big", "small", "long",
+    "short", "high", "low", "right", "wrong", "able", "available",
+    # Numbers and ordinals
+    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+    "first", "second", "third", "fourth", "fifth",
+    # Question words
+    "how", "why", "when", "where", "what", "who", "whom", "whose", "which",
+    # Negations
+    "no", "not", "none", "nothing", "nobody", "nowhere", "neither", "nor",
+    # Tech explanation phrases (common in LLM output)
+    "file", "code", "function", "method", "class", "module", "package",
+    "variable", "value", "data", "type", "object", "instance", "parameter",
+    "argument", "result", "output", "input", "error", "exception", "message",
+    "name", "path", "directory", "folder", "line", "number", "string", "list",
+    "dict", "array", "example", "case", "issue", "problem", "solution",
+    "step", "process", "system", "service", "request", "response", "user",
+    "default", "option", "setting", "config", "configuration",
+})
+
+
 class IssueType(Enum):
     """Types of grounding issues."""
 
@@ -745,46 +883,46 @@ class GroundingVerifier:
                 file_symbols = self.SYMBOL_PATTERN.findall(content)
                 known_symbols.update(file_symbols)
 
-        # GAP-15 FIX: Skip common keywords and built-ins that should not be flagged
-        # These are Python/JavaScript language constructs, not user-defined symbols
-        language_keywords = {
-            # Python keywords
-            "if", "else", "elif", "for", "while", "try", "except", "finally",
-            "with", "as", "import", "from", "class", "def", "return", "yield",
-            "raise", "assert", "pass", "break", "continue", "lambda", "and",
-            "or", "not", "in", "is", "True", "False", "None", "async", "await",
-            # Python built-ins commonly appearing in code
-            "print", "len", "range", "str", "int", "float", "list", "dict",
-            "set", "tuple", "type", "isinstance", "hasattr", "getattr", "setattr",
-            "open", "file", "input", "output", "read", "write", "append",
-            # JavaScript/TypeScript keywords
-            "const", "let", "var", "function", "return", "returns", "async",
-            "await", "export", "import", "default", "interface", "type",
-            # Common patterns in generated code descriptions
-            "returns", "takes", "args", "kwargs", "param", "params",
-            # Magic methods
-            "__init__", "__str__", "__repr__", "self", "cls", "__name__",
-            "__main__", "__file__", "__doc__",
-        }
-
-        # Verify each symbol
+        # Verify each symbol, filtering out stopwords and common English words
+        # that frequently appear in LLM explanations but are not code symbols
         for symbol in symbols:
+            symbol_lower = symbol.lower()
+
+            # Skip if in known symbols from files
             if symbol in known_symbols:
                 result.verified_references.append(f"symbol:{symbol}")
-            elif symbol.lower() in language_keywords or symbol in language_keywords:
-                # GAP-15 FIX: Skip language keywords - they are not user symbols
                 continue
-            else:
-                result.add_issue(
-                    GroundingIssue(
-                        issue_type=IssueType.SYMBOL_NOT_FOUND,
-                        severity=IssueSeverity.MEDIUM,
-                        description=f"Symbol '{symbol}' not found in referenced files",
-                        reference=symbol,
-                        suggestion="May be defined elsewhere or hallucinated",
-                    )
+
+            # GAP-15 FIX: Skip common English words, language keywords, and stopwords
+            # These are NOT user-defined symbols and should not be flagged
+            if symbol_lower in GROUNDING_STOPWORDS:
+                continue
+
+            # Skip very short symbols (likely not meaningful code identifiers)
+            if len(symbol) <= 2:
+                continue
+
+            # Skip Python magic methods and dunder names
+            if symbol.startswith("__") and symbol.endswith("__"):
+                continue
+
+            # Skip common built-in type names
+            builtin_types = {"str", "int", "float", "bool", "list", "dict", "set",
+                           "tuple", "bytes", "None", "True", "False", "type"}
+            if symbol in builtin_types:
+                continue
+
+            # If not filtered out, flag as potential issue
+            result.add_issue(
+                GroundingIssue(
+                    issue_type=IssueType.SYMBOL_NOT_FOUND,
+                    severity=IssueSeverity.MEDIUM,
+                    description=f"Symbol '{symbol}' not found in referenced files",
+                    reference=symbol,
+                    suggestion="May be defined elsewhere or hallucinated",
                 )
-                result.unverified_references.append(symbol)
+            )
+            result.unverified_references.append(symbol)
 
     async def verify(
         self,
