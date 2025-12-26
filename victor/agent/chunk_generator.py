@@ -266,3 +266,25 @@ class ChunkGenerator:
             Formatted metrics line string
         """
         return self.streaming_handler.format_completion_metrics(stream_ctx, elapsed_time)
+
+    def format_budget_exhausted_metrics(
+        self,
+        stream_ctx: "StreamingChatContext",
+        elapsed_time: float,
+        time_to_first_token: Optional[float] = None,
+    ) -> str:
+        """Format performance metrics for budget exhausted completion.
+
+        Delegates to streaming handler for budget exhausted metrics formatting.
+
+        Args:
+            stream_ctx: The streaming context
+            elapsed_time: Elapsed time in seconds
+            time_to_first_token: Optional time to first token
+
+        Returns:
+            Formatted metrics line string
+        """
+        return self.streaming_handler.format_budget_exhausted_metrics(
+            stream_ctx, elapsed_time, time_to_first_token
+        )
