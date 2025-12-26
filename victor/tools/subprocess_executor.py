@@ -635,6 +635,58 @@ async def run_docker_async(
     return result.success, result.stdout, result.stderr
 
 
+async def run_npm_async(
+    *args: str,
+    working_dir: Optional[Union[str, Path]] = None,
+    timeout: int = 300,
+) -> Tuple[bool, str, str]:
+    """Execute an npm command asynchronously.
+
+    Args:
+        *args: npm command arguments.
+        working_dir: Project directory.
+        timeout: Timeout in seconds.
+
+    Returns:
+        Tuple of (success, stdout, stderr).
+    """
+    if not check_npm_available():
+        return False, "", "npm is not available"
+
+    command = "npm " + " ".join(args)
+    result = await run_command_async(
+        command,
+        working_dir=working_dir,
+        timeout=timeout,
+        check_dangerous=False,
+    )
+
+    return result.success, result.stdout, result.stderr
+
+
+async def run_pip_async(
+    *args: str,
+    timeout: int = 300,
+) -> Tuple[bool, str, str]:
+    """Execute a pip command asynchronously.
+
+    Args:
+        *args: pip command arguments.
+        timeout: Timeout in seconds.
+
+    Returns:
+        Tuple of (success, stdout, stderr).
+    """
+    command = "pip " + " ".join(args)
+    result = await run_command_async(
+        command,
+        timeout=timeout,
+        check_dangerous=False,
+    )
+
+    return result.success, result.stdout, result.stderr
+
+
 # =============================================================================
 # Utility Functions
 # =============================================================================

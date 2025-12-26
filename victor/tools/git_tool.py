@@ -22,61 +22,35 @@ This tool provides:
 """
 
 import os
-import subprocess
 from typing import Any, Dict, List, Optional, Tuple
 
 from victor.config.timeouts import ProcessTimeouts
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority, ToolConfig
 from victor.tools.decorators import tool
-
-# Global state for AI provider (DEPRECATED: use ToolConfig via context instead)
-_provider = None
-_model: Optional[str] = None
-
-
-def set_git_provider(provider, model: Optional[str] = None) -> None:
-    """Set the global provider and model for git AI operations.
-
-    DEPRECATED: Use ToolConfig via executor context instead.
-    Tools now receive ToolConfig in their execution context.
-    This function will be removed in v2.0.
-
-    Args:
-        provider: LLM provider for AI-generated messages
-        model: Model to use for message generation
-    """
-    import warnings
-
-    warnings.warn(
-        "set_git_provider() is deprecated. Use ToolConfig via executor.update_context() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    global _provider, _model
-    _provider = provider
-    _model = model
-
+from victor.tools.subprocess_executor import run_command_async
 
 def _get_provider_and_model(context: Optional[Dict[str, Any]] = None) -> Tuple[Any, Optional[str]]:
-    """Get provider and model from context or fall back to globals.
+    """Get provider and model from ToolConfig in execution context.
 
     Args:
-        context: Tool execution context
+        context: Tool execution context containing ToolConfig
 
     Returns:
         Tuple of (provider, model) - provider may be None if not configured
+
+    Note:
+        Provider is optional - AI commit message generation is skipped if not available.
     """
-    # First try to get from context (preferred method)
     config = ToolConfig.from_context(context) if context else None
-    if config and config.provider:
+    if config:
         return config.provider, config.model
-
-    # Fall back to global state (deprecated)
-    return _provider, _model
+    return None, None
 
 
-def _run_git(*args: str, env_overrides: Optional[Dict[str, str]] = None) -> Tuple[bool, str, str]:
-    """Run git command with optional environment variable overrides.
+async def _run_git_async(
+    *args: str, env_overrides: Optional[Dict[str, str]] = None
+) -> Tuple[bool, str, str]:
+    """Run git command asynchronously with optional environment variable overrides.
 
     Args:
         *args: Git command arguments
@@ -86,25 +60,23 @@ def _run_git(*args: str, env_overrides: Optional[Dict[str, str]] = None) -> Tupl
     Returns:
         Tuple of (success, stdout, stderr)
     """
-    try:
-        # Prepare environment
-        cmd_env = None
-        if env_overrides:
-            cmd_env = os.environ.copy()
-            cmd_env.update(env_overrides)
+    # Build the git command string
+    command = "git " + " ".join(args)
 
-        result = subprocess.run(
-            ["git"] + list(args),
-            capture_output=True,
-            text=True,
-            timeout=ProcessTimeouts.GIT,
-            env=cmd_env,
-        )
-        return result.returncode == 0, result.stdout, result.stderr
-    except subprocess.TimeoutExpired:
-        return False, "", "Git command timed out"
-    except Exception as e:
-        return False, "", str(e)
+    # Prepare environment
+    cmd_env = None
+    if env_overrides:
+        cmd_env = os.environ.copy()
+        cmd_env.update(env_overrides)
+
+    result = await run_command_async(
+        command,
+        timeout=ProcessTimeouts.GIT,
+        check_dangerous=False,  # Git commands are generally safe
+        env=cmd_env,
+    )
+
+    return result.success, result.stdout, result.stderr
 
 
 @tool(
@@ -181,13 +153,13 @@ async def git(
 
     # Status operation
     if operation == "status":
-        success, stdout, stderr = _run_git("status", "--short", "--branch")
+        success, stdout, stderr = await _run_git_async("status", "--short", "--branch")
 
         if not success:
             return {"success": False, "output": "", "error": stderr}
 
         # Also get longer status for summary
-        _, long_status, _ = _run_git("status")
+        _, long_status, _ = await _run_git_async("status")
 
         return {
             "success": True,
@@ -204,7 +176,7 @@ async def git(
         if files:
             args.extend(["--"] + files)
 
-        success, stdout, stderr = _run_git(*args)
+        success, stdout, stderr = await _run_git_async(*args)
 
         if not success:
             return {"success": False, "output": "", "error": stderr}
@@ -222,16 +194,16 @@ async def git(
     elif operation == "stage":
         if not files:
             # Stage all changes
-            success, stdout, stderr = _run_git("add", ".")
+            success, stdout, stderr = await _run_git_async("add", ".")
         else:
             # Stage specific files
-            success, stdout, stderr = _run_git("add", *files)
+            success, stdout, stderr = await _run_git_async("add", *files)
 
         if not success:
             return {"success": False, "output": "", "error": stderr}
 
         # Get updated status
-        _, status, _ = _run_git("status", "--short")
+        _, status, _ = await _run_git_async("status", "--short")
 
         return {
             "success": True,
@@ -258,7 +230,7 @@ async def git(
             env_overrides["GIT_COMMITTER_EMAIL"] = author_email
 
         # Commit with message and optional author override
-        success, stdout, stderr = _run_git(
+        success, stdout, stderr = await _run_git_async(
             "commit", "-m", message, env_overrides=env_overrides if env_overrides else None
         )
 
@@ -277,7 +249,7 @@ async def git(
 
     # Log operation
     elif operation == "log":
-        success, stdout, stderr = _run_git(
+        success, stdout, stderr = await _run_git_async(
             "log", f"-{limit}", "--pretty=format:%h - %s (%an, %ar)", "--graph"
         )
 
@@ -290,15 +262,15 @@ async def git(
     elif operation == "branch":
         if not branch:
             # List branches
-            success, stdout, stderr = _run_git("branch", "-a")
+            success, stdout, stderr = await _run_git_async("branch", "-a")
         else:
             # Create or switch to branch
             # Try to switch first
-            success, stdout, stderr = _run_git("checkout", branch)
+            success, stdout, stderr = await _run_git_async("checkout", branch)
 
             if not success and "did not match" in stderr:
                 # Branch doesn't exist, create it
-                success, stdout, stderr = _run_git("checkout", "-b", branch)
+                success, stdout, stderr = await _run_git_async("checkout", "-b", branch)
 
         if not success:
             return {"success": False, "output": "", "error": stderr}
@@ -354,7 +326,7 @@ async def commit_msg(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
         }
 
     # Get staged diff
-    success, diff, stderr = _run_git("diff", "--staged")
+    success, diff, stderr = await _run_git_async("diff", "--staged")
 
     if not success:
         return {"success": False, "output": "", "error": stderr}
@@ -363,7 +335,7 @@ async def commit_msg(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
         return {"success": False, "output": "", "error": "No staged changes to analyze"}
 
     # Get list of changed files
-    _, files, _ = _run_git("diff", "--staged", "--name-only")
+    _, files, _ = await _run_git_async("diff", "--staged", "--name-only")
 
     # Prepare prompt for LLM
     prompt = f"""Analyze these git changes and generate a concise, conventional commit message.
@@ -458,7 +430,7 @@ async def pr(
     provider, model = _get_provider_and_model(context)
 
     # Get current branch
-    success, current_branch, stderr = _run_git("branch", "--show-current")
+    success, current_branch, stderr = await _run_git_async("branch", "--show-current")
     if not success:
         return {"success": False, "output": "", "error": stderr}
 
@@ -467,11 +439,11 @@ async def pr(
     # If no title/description and AI available, generate them
     if (not pr_title or not pr_description) and provider:
         # Get diff from base branch
-        success, diff, stderr = _run_git("diff", f"{base_branch}...HEAD")
+        success, diff, stderr = await _run_git_async("diff", f"{base_branch}...HEAD")
 
         if success and diff:
             # Get commit log
-            _, log, _ = _run_git("log", f"{base_branch}..HEAD", "--pretty=format:- %s")
+            _, log, _ = await _run_git_async("log", f"{base_branch}..HEAD", "--pretty=format:- %s")
 
             # Generate PR content
             prompt = f"""Generate a pull request title and description for these changes.
@@ -533,50 +505,40 @@ DESCRIPTION:
         pr_description = "Automatically generated PR description"
 
     # Push branch first
-    success, stdout, stderr = _run_git("push", "--set-upstream", "origin", current_branch)
+    success, stdout, stderr = await _run_git_async("push", "--set-upstream", "origin", current_branch)
 
     if not success:
         return {"success": False, "output": "", "error": f"Failed to push branch: {stderr}"}
 
     # Create PR with gh CLI
-    try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "create",
-                "--base",
-                base_branch,
-                "--head",
-                current_branch,
-                "--title",
-                pr_title,
-                "--body",
-                pr_description,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+    pr_command = (
+        f'gh pr create --base "{base_branch}" --head "{current_branch}" '
+        f'--title "{pr_title}" --body "{pr_description}"'
+    )
 
-        if result.returncode == 0:
-            return {
-                "success": True,
-                "output": f"PR created successfully!\n\n{result.stdout}",
-                "error": "",
-            }
-        else:
-            return {
-                "success": False,
-                "output": "",
-                "error": f"Failed to create PR: {result.stderr}",
-            }
+    result = await run_command_async(
+        pr_command,
+        timeout=30,
+        check_dangerous=False,
+    )
 
-    except FileNotFoundError:
+    if result.success:
+        return {
+            "success": True,
+            "output": f"PR created successfully!\n\n{result.stdout}",
+            "error": "",
+        }
+    elif "not found" in result.error_message.lower() if result.error_message else False:
         return {
             "success": False,
             "output": "",
             "error": "GitHub CLI (gh) not found. Install with: brew install gh",
+        }
+    else:
+        return {
+            "success": False,
+            "output": "",
+            "error": f"Failed to create PR: {result.stderr}",
         }
 
 
@@ -612,7 +574,7 @@ async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         and continue with git merge --continue or git rebase --continue.
     """
     # Get list of conflicted files
-    success, status, stderr = _run_git("status", "--short")
+    success, status, stderr = await _run_git_async("status", "--short")
 
     if not success:
         return {"success": False, "output": "", "error": stderr}

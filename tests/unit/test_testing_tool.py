@@ -15,12 +15,12 @@
 """Tests for testing_tool module."""
 
 import json
-import subprocess
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from victor.tools.testing_tool import test, _summarize_report
+from victor.tools.subprocess_executor import CommandResult, CommandErrorType
 
 
 class TestRunTests:
@@ -29,8 +29,6 @@ class TestRunTests:
     @pytest.mark.asyncio
     async def test_run_tests_success_with_report(self, tmp_path):
         """Test successful test execution with valid report."""
-        # Create a mock report file
-        tmp_path / ".pytest_report.json"
         report_data = {
             "summary": {
                 "total": 10,
@@ -53,14 +51,20 @@ class TestRunTests:
             ],
         }
 
-        # Mock subprocess.run
-        mock_process = MagicMock()
-        mock_process.stdout = "Test output"
-        mock_process.stderr = ""
-        mock_process.returncode = 1  # Some tests failed
+        mock_result = CommandResult(
+            success=True,
+            stdout="Test output",
+            stderr="",
+            return_code=1,  # Some tests failed
+            error_type=CommandErrorType.SUCCESS,
+        )
 
         with (
-            patch("subprocess.run", return_value=mock_process),
+            patch(
+                "victor.tools.testing_tool.run_command_async",
+                new_callable=AsyncMock,
+                return_value=mock_result,
+            ),
             patch("pathlib.Path.exists", return_value=True),
             patch("builtins.open", create=True) as mock_open,
             patch("pathlib.Path.unlink"),
@@ -81,11 +85,6 @@ class TestRunTests:
     @pytest.mark.asyncio
     async def test_run_tests_with_path(self):
         """Test running tests with specific path."""
-        mock_process = MagicMock()
-        mock_process.stdout = ""
-        mock_process.stderr = ""
-        mock_process.returncode = 0
-
         report_data = {
             "summary": {
                 "total": 5,
@@ -95,8 +94,20 @@ class TestRunTests:
             "tests": [],
         }
 
+        mock_result = CommandResult(
+            success=True,
+            stdout="",
+            stderr="",
+            return_code=0,
+            error_type=CommandErrorType.SUCCESS,
+        )
+
         with (
-            patch("subprocess.run", return_value=mock_process) as mock_run,
+            patch(
+                "victor.tools.testing_tool.run_command_async",
+                new_callable=AsyncMock,
+                return_value=mock_result,
+            ) as mock_run,
             patch("pathlib.Path.exists", return_value=True),
             patch("builtins.open", create=True) as mock_open,
             patch("pathlib.Path.unlink"),
@@ -116,11 +127,6 @@ class TestRunTests:
     @pytest.mark.asyncio
     async def test_run_tests_with_pytest_args(self):
         """Test running tests with custom pytest arguments."""
-        mock_process = MagicMock()
-        mock_process.stdout = ""
-        mock_process.stderr = ""
-        mock_process.returncode = 0
-
         report_data = {
             "summary": {
                 "total": 3,
@@ -130,8 +136,20 @@ class TestRunTests:
             "tests": [],
         }
 
+        mock_result = CommandResult(
+            success=True,
+            stdout="",
+            stderr="",
+            return_code=0,
+            error_type=CommandErrorType.SUCCESS,
+        )
+
         with (
-            patch("subprocess.run", return_value=mock_process) as mock_run,
+            patch(
+                "victor.tools.testing_tool.run_command_async",
+                new_callable=AsyncMock,
+                return_value=mock_result,
+            ) as mock_run,
             patch("pathlib.Path.exists", return_value=True),
             patch("builtins.open", create=True) as mock_open,
             patch("pathlib.Path.unlink"),
@@ -151,7 +169,19 @@ class TestRunTests:
     @pytest.mark.asyncio
     async def test_run_tests_missing_pytest(self):
         """Test handling of missing pytest binary."""
-        with patch("subprocess.run", side_effect=FileNotFoundError("pytest not found")):
+        mock_result = CommandResult(
+            success=False,
+            stdout="",
+            stderr="pytest not found",
+            return_code=127,
+            error_type=CommandErrorType.NOT_FOUND,
+        )
+
+        with patch(
+            "victor.tools.testing_tool.run_command_async",
+            new_callable=AsyncMock,
+            return_value=mock_result,
+        ):
             result = await test()
 
             assert "error" in result
@@ -160,7 +190,19 @@ class TestRunTests:
     @pytest.mark.asyncio
     async def test_run_tests_timeout(self):
         """Test handling of test execution timeout."""
-        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("pytest", 300)):
+        mock_result = CommandResult(
+            success=False,
+            stdout="",
+            stderr="",
+            return_code=-1,
+            error_type=CommandErrorType.TIMEOUT,
+        )
+
+        with patch(
+            "victor.tools.testing_tool.run_command_async",
+            new_callable=AsyncMock,
+            return_value=mock_result,
+        ):
             result = await test()
 
             assert "error" in result
@@ -169,13 +211,20 @@ class TestRunTests:
     @pytest.mark.asyncio
     async def test_run_tests_missing_report_file(self):
         """Test handling of missing report file."""
-        mock_process = MagicMock()
-        mock_process.stdout = "Test output"
-        mock_process.stderr = ""
-        mock_process.returncode = 0
+        mock_result = CommandResult(
+            success=True,
+            stdout="Test output",
+            stderr="",
+            return_code=0,
+            error_type=CommandErrorType.SUCCESS,
+        )
 
         with (
-            patch("subprocess.run", return_value=mock_process),
+            patch(
+                "victor.tools.testing_tool.run_command_async",
+                new_callable=AsyncMock,
+                return_value=mock_result,
+            ),
             patch("pathlib.Path.exists", return_value=False),
         ):
 
@@ -189,13 +238,20 @@ class TestRunTests:
     @pytest.mark.asyncio
     async def test_run_tests_invalid_json_report(self):
         """Test handling of invalid JSON in report file."""
-        mock_process = MagicMock()
-        mock_process.stdout = ""
-        mock_process.stderr = ""
-        mock_process.returncode = 0
+        mock_result = CommandResult(
+            success=True,
+            stdout="",
+            stderr="",
+            return_code=0,
+            error_type=CommandErrorType.SUCCESS,
+        )
 
         with (
-            patch("subprocess.run", return_value=mock_process),
+            patch(
+                "victor.tools.testing_tool.run_command_async",
+                new_callable=AsyncMock,
+                return_value=mock_result,
+            ),
             patch("pathlib.Path.exists", return_value=True),
             patch("builtins.open", create=True) as mock_open,
             patch("pathlib.Path.unlink"),
@@ -211,11 +267,6 @@ class TestRunTests:
     @pytest.mark.asyncio
     async def test_run_tests_all_passed(self):
         """Test successful test execution with all tests passing."""
-        mock_process = MagicMock()
-        mock_process.stdout = "All tests passed"
-        mock_process.stderr = ""
-        mock_process.returncode = 0
-
         report_data = {
             "summary": {
                 "total": 15,
@@ -232,8 +283,20 @@ class TestRunTests:
             ],
         }
 
+        mock_result = CommandResult(
+            success=True,
+            stdout="All tests passed",
+            stderr="",
+            return_code=0,
+            error_type=CommandErrorType.SUCCESS,
+        )
+
         with (
-            patch("subprocess.run", return_value=mock_process),
+            patch(
+                "victor.tools.testing_tool.run_command_async",
+                new_callable=AsyncMock,
+                return_value=mock_result,
+            ),
             patch("pathlib.Path.exists", return_value=True),
             patch("builtins.open", create=True) as mock_open,
             patch("pathlib.Path.unlink"),
@@ -253,11 +316,6 @@ class TestRunTests:
     @pytest.mark.asyncio
     async def test_run_tests_with_skipped(self):
         """Test handling of skipped tests."""
-        mock_process = MagicMock()
-        mock_process.stdout = ""
-        mock_process.stderr = ""
-        mock_process.returncode = 0
-
         report_data = {
             "summary": {
                 "total": 10,
@@ -268,8 +326,20 @@ class TestRunTests:
             "tests": [],
         }
 
+        mock_result = CommandResult(
+            success=True,
+            stdout="",
+            stderr="",
+            return_code=0,
+            error_type=CommandErrorType.SUCCESS,
+        )
+
         with (
-            patch("subprocess.run", return_value=mock_process),
+            patch(
+                "victor.tools.testing_tool.run_command_async",
+                new_callable=AsyncMock,
+                return_value=mock_result,
+            ),
             patch("pathlib.Path.exists", return_value=True),
             patch("builtins.open", create=True) as mock_open,
             patch("pathlib.Path.unlink"),
