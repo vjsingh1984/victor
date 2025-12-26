@@ -726,7 +726,10 @@
         },
         "victor.serverBackend": {
           "type": "string",
-          "enum": ["aiohttp", "fastapi"],
+          "enum": [
+            "aiohttp",
+            "fastapi"
+          ],
           "default": "aiohttp",
           "description": "Server backend: 'aiohttp' (legacy) or 'fastapi' (modern with OpenAPI docs at /docs)"
         },
@@ -735,7 +738,13 @@
           "items": {
             "type": "number"
           },
-          "default": [8765, 8766, 8767, 8768, 8000],
+          "default": [
+            8765,
+            8766,
+            8767,
+            8768,
+            8000
+          ],
           "description": "Fallback ports to try if primary port is in use"
         },
         "victor.serverApiKey": {
@@ -861,10 +870,22 @@
         },
         "victor.codeLens.actions": {
           "type": "array",
-          "default": ["ask", "explain", "test"],
+          "default": [
+            "ask",
+            "explain",
+            "test"
+          ],
           "items": {
             "type": "string",
-            "enum": ["ask", "explain", "test", "document", "optimize", "refactor", "review"]
+            "enum": [
+              "ask",
+              "explain",
+              "test",
+              "document",
+              "optimize",
+              "refactor",
+              "review"
+            ]
           },
           "description": "Actions to show in CodeLens"
         },
@@ -910,7 +931,11 @@
         },
         "victor.hover.verbosity": {
           "type": "string",
-          "enum": ["minimal", "standard", "detailed"],
+          "enum": [
+            "minimal",
+            "standard",
+            "detailed"
+          ],
           "default": "standard",
           "description": "Verbosity level for hover tooltips"
         },
@@ -973,7 +998,11 @@
         },
         "victor.autonomy.level": {
           "type": "string",
-          "enum": ["manual", "semi-auto", "auto"],
+          "enum": [
+            "manual",
+            "semi-auto",
+            "auto"
+          ],
           "default": "semi-auto",
           "enumDescriptions": [
             "Always ask before executing tools or making changes",
@@ -1002,7 +1031,13 @@
           "items": {
             "type": "string"
           },
-          "default": ["rm -rf", "sudo", "mkfs", "dd if=", "> /dev/"],
+          "default": [
+            "rm -rf",
+            "sudo",
+            "mkfs",
+            "dd if=",
+            "> /dev/"
+          ],
           "description": "Command patterns that always require approval"
         }
       }
@@ -1107,7 +1142,9 @@
               "image": "resources/icon.png",
               "altText": "Victor AI Chat"
             },
-            "completionEvents": ["onCommand:victor.chat"]
+            "completionEvents": [
+              "onCommand:victor.chat"
+            ]
           },
           {
             "id": "configureProvider",
@@ -1117,7 +1154,9 @@
               "image": "resources/icon.png",
               "altText": "Victor AI Settings"
             },
-            "completionEvents": ["onCommand:victor.openSettings"]
+            "completionEvents": [
+              "onCommand:victor.openSettings"
+            ]
           },
           {
             "id": "explainCode",
@@ -1127,7 +1166,9 @@
               "image": "resources/icon.png",
               "altText": "Explain Code"
             },
-            "completionEvents": ["onCommand:victor.explain"]
+            "completionEvents": [
+              "onCommand:victor.explain"
+            ]
           },
           {
             "id": "semanticSearch",
@@ -1137,23 +1178,30 @@
               "image": "resources/icon.png",
               "altText": "Semantic Search"
             },
-            "completionEvents": ["onCommand:victor.search"]
+            "completionEvents": [
+              "onCommand:victor.search"
+            ]
           }
         ]
       }
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run build",
+    "vscode:prepublish": "npm run build:production",
     "build": "npm run build:webview && npm run compile",
+    "build:production": "npm run build:webview && npm run esbuild:production",
     "build:webview": "cd webview-ui && npm install && npm run build",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "watch:all": "concurrently \"npm run watch\" \"cd webview-ui && npm run dev\"",
+    "esbuild": "node esbuild.config.js",
+    "esbuild:production": "node esbuild.config.js --production",
+    "esbuild:watch": "node esbuild.config.js --watch",
+    "watch": "npm run esbuild:watch",
+    "watch:tsc": "tsc -watch -p ./",
+    "watch:all": "concurrently \"npm run esbuild:watch\" \"cd webview-ui && npm run dev\"",
     "pretest": "npm run compile",
     "test": "node ./out/test/runTest.js",
     "lint": "eslint src --ext ts",
-    "package": "npm run build && vsce package"
+    "package": "npm run build:production && vsce package"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",
@@ -1165,6 +1213,7 @@
     "@typescript-eslint/parser": "^6.13.0",
     "@vscode/test-electron": "^2.3.8",
     "@vscode/vsce": "^2.22.0",
+    "esbuild": "^0.24.2",
     "eslint": "^8.54.0",
     "glob": "^13.0.0",
     "mocha": "^11.7.5",
