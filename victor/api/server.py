@@ -206,17 +206,27 @@ class VictorAPIServer:
         return web.json_response({"status": "healthy", "version": "0.2.0"})
 
     async def _status(self, request: Request) -> Response:
-        """Get current status."""
-        from victor.agent.mode_controller import get_mode_controller
+        """Get current status.
+
+        Uses orchestrator's ModeAwareMixin if available, falls back to global controller.
+        """
         from victor.agent.model_switcher import get_model_switcher
 
-        mode_manager = get_mode_controller()
         model_switcher = get_model_switcher()
+
+        # Use orchestrator's ModeAwareMixin if available (consistent access)
+        if self._orchestrator is not None:
+            current_mode = self._orchestrator.current_mode_name.lower()
+        else:
+            # Fallback to global mode controller
+            from victor.agent.mode_controller import get_mode_controller
+            mode_manager = get_mode_controller()
+            current_mode = mode_manager.current_mode.value
 
         return web.json_response(
             {
                 "connected": True,
-                "mode": mode_manager.current_mode.value,
+                "mode": current_mode,
                 "provider": model_switcher.current_provider,
                 "model": model_switcher.current_model,
                 "workspace": self.workspace_root,

@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 from victor.agent.conversation_state import ConversationStage
+from victor.protocols.mode_aware import ModeAwareMixin
 from victor.tools.base import AccessMode, ExecutionCategory
 
 if TYPE_CHECKING:
@@ -596,7 +597,7 @@ def select_tools_by_keywords(
     return selected
 
 
-class ToolSelector:
+class ToolSelector(ModeAwareMixin):
     """Unified tool selection with semantic and keyword-based approaches.
 
     This class encapsulates tool selection logic extracted from AgentOrchestrator,
@@ -607,6 +608,10 @@ class ToolSelector:
     - Keyword-based selection using category matching
     - Stage-aware prioritization using ConversationStateMachine
     - Adaptive thresholds based on model size and query complexity
+    - Mode-aware filtering (BUILD/PLAN/EXPLORE modes)
+
+    Uses ModeAwareMixin for consistent mode controller access (via self.is_build_mode,
+    self.exploration_multiplier, etc.).
 
     Example:
         selector = ToolSelector(
@@ -758,14 +763,10 @@ class ToolSelector:
         For example, DevOps needs 'docker' and 'shell', Research needs 'web_search'.
         """
         # Skip stage filtering in BUILD mode (allow_all_tools=True)
-        try:
-            from victor.agent.mode_controller import get_mode_controller
-            mode_controller = get_mode_controller()
-            if mode_controller.config.allow_all_tools:
-                logger.debug("Stage filtering skipped: BUILD mode allows all tools")
-                return tools
-        except Exception:
-            pass  # Mode controller not available, continue with filtering
+        # Uses ModeAwareMixin for consistent mode controller access
+        if self.is_build_mode:
+            logger.debug("Stage filtering skipped: BUILD mode allows all tools")
+            return tools
 
         if stage not in {
             ConversationStage.INITIAL,
