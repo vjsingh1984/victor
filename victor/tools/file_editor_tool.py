@@ -18,8 +18,143 @@ This tool provides transaction-based file editing with diff preview and
 rollback capability to the agent.
 """
 
+import logging
 from typing import Any, Dict, List, Optional
 from pathlib import Path
+
+
+# =============================================================================
+# EDIT OPERATION NORMALIZATION
+# =============================================================================
+# LLMs (especially DeepSeek, Ollama models) often use alternate parameter names.
+# This normalization layer bridges provider-specific formats to our canonical format.
+# =============================================================================
+
+# Maps alternate parameter names to canonical names for edit operations
+EDIT_PARAMETER_ALIASES: Dict[str, str] = {
+    # Path aliases
+    "file_path": "path",
+    "file": "path",
+    "filepath": "path",
+    "filename": "path",
+    # Content aliases for create/modify
+    "new_content": "content",
+    "text": "content",
+    "data": "content",
+    # Replace operation aliases
+    "old": "old_str",
+    "old_string": "old_str",
+    "find": "old_str",
+    "search": "old_str",
+    "new": "new_str",
+    "new_string": "new_str",
+    "replace": "new_str",
+    "replacement": "new_str",
+    # Rename operation aliases
+    "new_name": "new_path",
+    "to": "new_path",
+    "destination": "new_path",
+    "dest": "new_path",
+}
+
+# Maps operation type aliases to canonical types
+EDIT_TYPE_ALIASES: Dict[str, str] = {
+    "write": "create",
+    "add": "create",
+    "new": "create",
+    "update": "modify",
+    "change": "modify",
+    "edit": "modify",
+    "remove": "delete",
+    "rm": "delete",
+    "move": "rename",
+    "mv": "rename",
+    "find_replace": "replace",
+    "substitute": "replace",
+    "sub": "replace",
+}
+
+# Keys that indicate an implicit operation type (when 'type' is missing)
+TYPE_INFERENCE_KEYS: Dict[str, str] = {
+    "old_str": "replace",
+    "old": "replace",
+    "find": "replace",
+    "search": "replace",
+    "new_path": "rename",
+    "new_name": "rename",
+    "destination": "rename",
+}
+
+
+def normalize_edit_operation(op: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize a single edit operation for provider-agnostic handling.
+
+    Handles:
+    1. Parameter name aliases (e.g., 'file_path' -> 'path')
+    2. Operation type aliases (e.g., 'write' -> 'create')
+    3. Type inference from keys (e.g., presence of 'old_str' implies 'replace')
+
+    Args:
+        op: Raw operation dictionary from LLM
+
+    Returns:
+        Normalized operation dictionary with canonical parameter names
+    """
+    logger = logging.getLogger(__name__)
+    normalized: Dict[str, Any] = {}
+    applied_aliases: List[str] = []
+
+    # Step 1: Normalize all parameter names
+    for key, value in op.items():
+        if key in EDIT_PARAMETER_ALIASES:
+            canonical = EDIT_PARAMETER_ALIASES[key]
+            # Only apply if canonical doesn't already have a value
+            if canonical not in normalized or normalized[canonical] is None:
+                normalized[canonical] = value
+                applied_aliases.append(f"{key}->{canonical}")
+        else:
+            # Keep original key
+            normalized[key] = value
+
+    # Step 2: Normalize operation type
+    if "type" in normalized:
+        op_type = normalized["type"]
+        if isinstance(op_type, str) and op_type.lower() in EDIT_TYPE_ALIASES:
+            old_type = normalized["type"]
+            normalized["type"] = EDIT_TYPE_ALIASES[op_type.lower()]
+            applied_aliases.append(f"type:{old_type}->{normalized['type']}")
+
+    # Step 3: Infer type from keys if not specified
+    if "type" not in normalized or not normalized.get("type"):
+        for key, inferred_type in TYPE_INFERENCE_KEYS.items():
+            if key in op:  # Check original op keys too
+                normalized["type"] = inferred_type
+                applied_aliases.append(f"inferred_type:{inferred_type}")
+                break
+        # Default to create if has content but no type
+        if "type" not in normalized and "content" in normalized:
+            normalized["type"] = "create"
+            applied_aliases.append("inferred_type:create")
+
+    if applied_aliases:
+        logger.debug(f"Normalized edit operation: {applied_aliases}")
+
+    return normalized
+
+
+def normalize_edit_operations(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Normalize a list of edit operations.
+
+    This function should be called after JSON parsing but before validation
+    to handle provider-specific parameter variations gracefully.
+
+    Args:
+        ops: List of raw operation dictionaries
+
+    Returns:
+        List of normalized operation dictionaries
+    """
+    return [normalize_edit_operation(op) for op in ops]
 
 from victor.editing import FileEditor
 from victor.tools.base import AccessMode, DangerLevel, Priority
@@ -184,6 +319,10 @@ async def edit(
 
     if not ops:
         return {"success": False, "error": "No operations provided"}
+
+    # Normalize operations to handle provider-specific parameter variations
+    # This bridges LLM-specific formats (e.g., 'file_path' vs 'path') to canonical format
+    ops = normalize_edit_operations(ops)
 
     # Validate operations
     for i, op in enumerate(ops):
