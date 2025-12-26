@@ -282,13 +282,22 @@ class PathResolver(IPathResolver):
     Applies a series of normalizers to resolve paths that may have
     common issues (redundant prefixes, wrong separators, etc.).
 
+    Multi-Root Support:
+    - Primary cwd is always checked first
+    - Additional search roots can be added for nested project structures
+    - Useful for monorepos or projects with multiple working directories
+    - Example: project/project/utils/ structure where files could be
+      in either root
+
     Attributes:
         cwd: Base directory for resolution (defaults to os.getcwd())
+        additional_roots: Additional directories to search for paths
         normalizers: List of normalizer functions to apply
         _cache: Cache for resolved paths
     """
 
     cwd: Optional[Path] = None
+    additional_roots: List[Path] = field(default_factory=list)
     normalizers: List[Callable[[str, Path], Tuple[Optional[str], str]]] = field(
         default_factory=list
     )
@@ -302,6 +311,15 @@ class PathResolver(IPathResolver):
         else:
             self.cwd = Path(self.cwd).resolve()
 
+        # Convert additional_roots to resolved Paths
+        self.additional_roots = [
+            Path(root).resolve() if not isinstance(root, Path) else root.resolve()
+            for root in self.additional_roots
+        ]
+
+        # Auto-detect nested project structure (project/project pattern)
+        self._auto_detect_nested_roots()
+
         if not self.normalizers:
             self.normalizers = [
                 normalize_separators,
@@ -309,6 +327,39 @@ class PathResolver(IPathResolver):
                 strip_first_component,
                 strip_common_prefix,
             ]
+
+    def _auto_detect_nested_roots(self) -> None:
+        """Auto-detect nested project structure and add as additional root.
+
+        Handles common pattern where project structure is:
+            my_project/
+                my_project/
+                    __init__.py
+                    utils/
+                tests/
+                setup.py
+
+        In this case, if cwd is my_project/, we should also search in
+        my_project/my_project/ for files referenced as 'utils/foo.py'.
+        """
+        # Check for directory with same name as cwd
+        cwd_name = self.cwd.name
+        nested_dir = self.cwd / cwd_name
+
+        if nested_dir.is_dir() and nested_dir not in self.additional_roots:
+            # Check if it looks like a Python package (has __init__.py or .py files)
+            has_python_files = any(
+                nested_dir.glob("*.py")
+            ) or any(
+                nested_dir.glob("**/__init__.py")
+            )
+
+            if has_python_files:
+                self.additional_roots.append(nested_dir)
+                logger.debug(
+                    f"PathResolver: Auto-detected nested project structure, "
+                    f"added search root: {nested_dir}"
+                )
 
     def _apply_normalizers(self, path: str) -> Tuple[str, Optional[str]]:
         """Apply normalizers in sequence until one succeeds.
@@ -333,10 +384,13 @@ class PathResolver(IPathResolver):
         return path, None
 
     def resolve(self, path: str, must_exist: bool = True) -> PathResolution:
-        """Resolve a path with normalization.
+        """Resolve a path with normalization and multi-root search.
 
-        Tries the path directly first, then applies normalizers
-        to find a valid path.
+        Resolution order:
+        1. Try path directly from cwd
+        2. Try path from each additional_root
+        3. Apply normalizers and try again from cwd
+        4. Apply normalizers and try from each additional_root
 
         Args:
             path: Path to resolve
@@ -364,48 +418,62 @@ class PathResolver(IPathResolver):
             self._cache[cache_key] = result
             return result
 
-        # Try original path first
-        try:
-            resolved = Path(path).expanduser()
-            if not resolved.is_absolute():
-                resolved = (self.cwd / resolved).resolve()
-            else:
-                resolved = resolved.resolve()
+        # Build list of search roots: cwd first, then additional roots
+        search_roots = [self.cwd] + self.additional_roots
 
-            if resolved.exists():
-                result = PathResolution(
-                    original_path=path,
-                    resolved_path=resolved,
-                    exists=True,
-                    is_file=resolved.is_file(),
-                    is_directory=resolved.is_dir(),
-                )
-                self._cache[cache_key] = result
-                return result
-        except (OSError, ValueError):
-            pass  # Continue to normalization
-
-        # Apply normalizers
-        normalized, description = self._apply_normalizers(path)
-
-        if normalized != path:
+        # Try original path from each root
+        for root in search_roots:
             try:
-                resolved = (self.cwd / normalized).resolve()
+                resolved = Path(path).expanduser()
+                if not resolved.is_absolute():
+                    resolved = (root / resolved).resolve()
+                else:
+                    resolved = resolved.resolve()
+
                 if resolved.exists():
                     result = PathResolution(
                         original_path=path,
                         resolved_path=resolved,
-                        was_normalized=True,
-                        normalization_applied=description,
+                        was_normalized=(root != self.cwd),
+                        normalization_applied=(
+                            f"resolved_from:{root.name}" if root != self.cwd else None
+                        ),
                         exists=True,
                         is_file=resolved.is_file(),
                         is_directory=resolved.is_dir(),
                     )
-                    logger.debug(f"Path resolved: {result}")
                     self._cache[cache_key] = result
                     return result
             except (OSError, ValueError):
-                pass
+                continue
+
+        # Apply normalizers and try each root again
+        normalized, description = self._apply_normalizers(path)
+
+        if normalized != path:
+            for root in search_roots:
+                try:
+                    resolved = (root / normalized).resolve()
+                    if resolved.exists():
+                        # Build combined description
+                        full_description = description
+                        if root != self.cwd:
+                            full_description = f"{description}, resolved_from:{root.name}"
+
+                        result = PathResolution(
+                            original_path=path,
+                            resolved_path=resolved,
+                            was_normalized=True,
+                            normalization_applied=full_description,
+                            exists=True,
+                            is_file=resolved.is_file(),
+                            is_directory=resolved.is_dir(),
+                        )
+                        logger.debug(f"Path resolved: {result}")
+                        self._cache[cache_key] = result
+                        return result
+                except (OSError, ValueError):
+                    continue
 
         # Path not found
         if must_exist:
@@ -580,14 +648,53 @@ class PathResolver(IPathResolver):
     def set_cwd(self, cwd: Path) -> None:
         """Update the base directory.
 
-        Clears all caches when cwd changes.
+        Clears all caches when cwd changes and re-runs auto-detection.
 
         Args:
             cwd: New working directory
         """
         self.cwd = Path(cwd).resolve()
+        self.additional_roots = []  # Reset additional roots
+        self._auto_detect_nested_roots()  # Re-detect nested structure
         self._cache.clear()
         self._known_paths = None
+
+    def add_search_root(self, root: Path) -> None:
+        """Add an additional search root.
+
+        Useful for monorepos or projects with multiple working directories.
+
+        Args:
+            root: Additional directory to search for paths
+        """
+        resolved_root = Path(root).resolve()
+        if resolved_root.is_dir() and resolved_root not in self.additional_roots:
+            self.additional_roots.append(resolved_root)
+            self._cache.clear()  # Clear cache since search paths changed
+            self._known_paths = None
+            logger.debug(f"PathResolver: Added search root: {resolved_root}")
+
+    def remove_search_root(self, root: Path) -> bool:
+        """Remove an additional search root.
+
+        Args:
+            root: Directory to remove from search paths
+
+        Returns:
+            True if root was removed, False if not found
+        """
+        resolved_root = Path(root).resolve()
+        if resolved_root in self.additional_roots:
+            self.additional_roots.remove(resolved_root)
+            self._cache.clear()
+            self._known_paths = None
+            return True
+        return False
+
+    @property
+    def search_roots(self) -> List[Path]:
+        """Get all search roots (cwd + additional roots)."""
+        return [self.cwd] + self.additional_roots
 
     def clear_cache(self) -> None:
         """Clear all cached resolutions."""
@@ -600,15 +707,22 @@ class PathResolver(IPathResolver):
 # =============================================================================
 
 
-def create_path_resolver(cwd: Optional[Path] = None) -> PathResolver:
+def create_path_resolver(
+    cwd: Optional[Path] = None,
+    additional_roots: Optional[List[Path]] = None,
+) -> PathResolver:
     """Create a configured PathResolver instance.
 
     Factory function for DI registration.
 
     Args:
         cwd: Base directory (defaults to os.getcwd())
+        additional_roots: Additional directories to search for paths
 
     Returns:
-        Configured PathResolver instance
+        Configured PathResolver instance with multi-root support
     """
-    return PathResolver(cwd=cwd)
+    return PathResolver(
+        cwd=cwd,
+        additional_roots=additional_roots or [],
+    )
