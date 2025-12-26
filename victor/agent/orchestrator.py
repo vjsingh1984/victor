@@ -89,6 +89,9 @@ from victor.agent.protocols import (
     ContextCompactorProtocol,
 )
 
+# Mode-aware mixin for consistent mode controller access
+from victor.protocols.mode_aware import ModeAwareMixin
+
 # Config loaders for externalized configuration
 from victor.config.config_loaders import get_provider_limits
 from victor.agent.conversation_embedding_store import (
@@ -312,8 +315,12 @@ def _detect_mentioned_tools(text: str) -> List[str]:
     return mentioned
 
 
-class AgentOrchestrator:
-    """Orchestrates agent interactions, tool execution, and provider communication."""
+class AgentOrchestrator(ModeAwareMixin):
+    """Orchestrates agent interactions, tool execution, and provider communication.
+
+    Uses ModeAwareMixin for consistent mode controller access (via self.is_build_mode,
+    self.mode_controller, self.exploration_multiplier, etc.).
+    """
 
     @staticmethod
     def _calculate_max_context_chars(
@@ -599,6 +606,16 @@ class AgentOrchestrator:
             tool_selection=self.tool_selection,
             on_selection_recorded=self._record_tool_selection,
         )
+
+        # Initialize ToolAccessController for unified tool access control (via factory)
+        # Replaces scattered is_tool_enabled/get_enabled_tools logic with layered precedence
+        self._tool_access_controller = self._factory.create_tool_access_controller(
+            registry=self.tools,
+        )
+
+        # Initialize BudgetManager for unified budget tracking (via factory)
+        # Centralizes budget management with consistent multiplier composition
+        self._budget_manager = self._factory.create_budget_manager()
 
         # =================================================================
         # NEW: Decomposed component facades for orchestrator responsibilities
@@ -2461,18 +2478,14 @@ class AgentOrchestrator:
             return tool_name
 
         # Check mode controller for BUILD mode (allows all tools including shell)
-        try:
-            from victor.agent.mode_controller import get_mode_controller
-
-            mode_controller = get_mode_controller()
-            config = mode_controller.config
-
+        # Uses ModeAwareMixin for consistent access
+        mc = self.mode_controller
+        if mc is not None:
+            config = mc.config
             # If mode allows all tools and shell isn't explicitly disallowed, use full shell
             if config.allow_all_tools and "shell" not in config.disallowed_tools:
                 logger.debug(f"Resolved '{tool_name}' to 'shell' (BUILD mode allows all tools)")
                 return ToolNames.SHELL
-        except Exception as e:
-            logger.debug(f"Mode controller check failed: {e}")
 
         # Check if full shell is enabled first
         if self.tools.is_tool_enabled(ToolNames.SHELL):
@@ -6588,28 +6601,37 @@ class AgentOrchestrator:
     def get_enabled_tools(self) -> Set[str]:
         """Get currently enabled tool names (protocol method).
 
+        Uses ToolAccessController if available for unified access control.
         In BUILD mode (allow_all_tools=True), expands to all available tools
-        regardless of vertical restrictions. This ensures BUILD mode has
-        full access to all tools including shell, edit_files, etc.
+        regardless of vertical restrictions.
 
         Returns:
             Set of enabled tool names for this session
         """
-        # Check mode controller for BUILD mode (allows all tools)
-        try:
-            from victor.agent.mode_controller import get_mode_controller
+        # Use ToolAccessController if available (new unified approach)
+        if hasattr(self, "_tool_access_controller") and self._tool_access_controller:
+            from victor.agent.protocols import ToolAccessContext
 
-            mode_controller = get_mode_controller()
-            config = mode_controller.config
+            # Build context for access check
+            # Uses ModeAwareMixin for consistent mode access
+            context = ToolAccessContext(
+                session_enabled_tools=getattr(self, "_enabled_tools", None),
+                current_mode=self.current_mode_name if self.mode_controller else None,
+            )
 
+            return self._tool_access_controller.get_allowed_tools(context)
+
+        # Legacy fallback: Check mode controller for BUILD mode (allows all tools)
+        # Uses ModeAwareMixin for consistent access
+        mc = self.mode_controller
+        if mc is not None:
+            config = mc.config
             # BUILD mode expands to all available tools (minus disallowed)
             if config.allow_all_tools:
                 all_tools = self.get_available_tools()
                 # Remove any explicitly disallowed tools
                 enabled = all_tools - config.disallowed_tools
                 return enabled
-        except Exception as e:
-            logger.debug(f"Mode controller check failed in get_enabled_tools: {e}")
 
         # Check for framework-set tools (vertical filtering)
         if hasattr(self, "_enabled_tools") and self._enabled_tools:
@@ -6663,8 +6685,10 @@ class AgentOrchestrator:
     def is_tool_enabled(self, tool_name: str) -> bool:
         """Check if a specific tool is enabled (protocol method).
 
-        Integrates mode-based restrictions with session/vertical restrictions.
-        Mode settings (BUILD/PLAN/EXPLORE) take precedence.
+        Uses ToolAccessController for unified layered access control:
+        Safety (L0) > Mode (L1) > Session (L2) > Vertical (L3) > Stage (L4) > Intent (L5)
+
+        Falls back to legacy logic if controller not available.
 
         Args:
             tool_name: Name of tool to check
@@ -6672,12 +6696,25 @@ class AgentOrchestrator:
         Returns:
             True if tool is enabled
         """
-        # Check mode controller restrictions first
-        try:
-            from victor.agent.mode_controller import get_mode_controller
+        # Use ToolAccessController if available (new unified approach)
+        if hasattr(self, "_tool_access_controller") and self._tool_access_controller:
+            from victor.agent.protocols import ToolAccessContext
 
-            mode_controller = get_mode_controller()
-            config = mode_controller.config
+            # Build context for access check
+            # Uses ModeAwareMixin for consistent mode access
+            context = ToolAccessContext(
+                session_enabled_tools=getattr(self, "_enabled_tools", None),
+                current_mode=self.current_mode_name if self.mode_controller else None,
+            )
+
+            decision = self._tool_access_controller.check_access(tool_name, context)
+            return decision.allowed
+
+        # Legacy fallback: Check mode controller restrictions first
+        # Uses ModeAwareMixin for consistent access
+        mc = self.mode_controller
+        if mc is not None:
+            config = mc.config
 
             # If tool is in mode's disallowed list, it's disabled regardless of other settings
             if tool_name in config.disallowed_tools:
@@ -6688,8 +6725,6 @@ class AgentOrchestrator:
                 # Check if tool exists in registry
                 if self.tools and tool_name in self.tools.list_tools():
                     return True
-        except Exception as e:
-            logger.debug(f"Mode controller check failed in is_tool_enabled: {e}")
 
         # Fall back to session/vertical restrictions
         enabled = self.get_enabled_tools()

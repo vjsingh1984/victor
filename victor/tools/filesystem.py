@@ -27,7 +27,27 @@ import aiofiles
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
 from victor.tools.decorators import tool
 
+# PathResolver for centralized path normalization
+from victor.protocols.path_resolver import PathResolver, create_path_resolver
+
 logger = logging.getLogger(__name__)
+
+# Global PathResolver instance (lazy initialized)
+_path_resolver: Optional[PathResolver] = None
+
+
+def get_path_resolver() -> PathResolver:
+    """Get or create the global PathResolver instance."""
+    global _path_resolver
+    if _path_resolver is None:
+        _path_resolver = create_path_resolver()
+    return _path_resolver
+
+
+def reset_path_resolver() -> None:
+    """Reset the path resolver (useful when cwd changes)."""
+    global _path_resolver
+    _path_resolver = None
 
 
 # ============================================================================
@@ -35,7 +55,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # LLMs sometimes use paths with redundant prefixes when working in subdirectories.
 # For example, when cwd is "investor_homelab/", they might use "investor_homelab/utils"
-# instead of just "utils". This helper attempts to fix such paths.
+# instead of just "utils". This helper delegates to PathResolver for consistency.
 
 
 def _normalize_path(path: str) -> Optional[str]:
@@ -43,34 +63,54 @@ def _normalize_path(path: str) -> Optional[str]:
 
     When working in a subdirectory, LLMs sometimes include the directory name
     in paths (e.g., "project/utils" when cwd is already "project/").
-    This function attempts to strip such redundant prefixes.
+    This function delegates to PathResolver for consistent normalization.
 
     Args:
         path: The original path that doesn't exist
 
     Returns:
         A normalized path if a valid one is found, None otherwise
+
+    Note:
+        This function is maintained for backward compatibility.
+        New code should use PathResolver directly.
     """
     if not path or path.startswith("/") or path.startswith("~"):
         return None  # Absolute paths shouldn't be normalized
 
-    cwd = Path.cwd()
-    cwd_name = cwd.name
+    try:
+        resolver = get_path_resolver()
+        result = resolver.resolve(path, must_exist=True)
 
-    # Check if path starts with cwd name (common pattern)
-    # e.g., path="investor_homelab/utils", cwd.name="investor_homelab"
-    if path.startswith(f"{cwd_name}/"):
-        stripped = path[len(cwd_name) + 1:]
-        if stripped:
-            return stripped
+        # If the path was normalized, return the relative path
+        if result.was_normalized:
+            # Return relative path string
+            try:
+                return str(result.resolved_path.relative_to(Path.cwd()))
+            except ValueError:
+                return str(result.resolved_path)
 
-    # Try stripping first path component
-    parts = Path(path).parts
-    if len(parts) > 1:
-        stripped = str(Path(*parts[1:]))
-        return stripped
+        return None
+    except FileNotFoundError:
+        # Path doesn't exist even after normalization - try legacy fallback
+        # for cases where we just want a normalized path string (not validation)
+        cwd = Path.cwd()
+        cwd_name = cwd.name
 
-    return None
+        # Check if path starts with cwd name (common pattern)
+        if path.startswith(f"{cwd_name}/"):
+            stripped = path[len(cwd_name) + 1:]
+            if stripped and (cwd / stripped).exists():
+                return stripped
+
+        # Try stripping first path component
+        parts = Path(path).parts
+        if len(parts) > 1:
+            stripped = str(Path(*parts[1:]))
+            if (cwd / stripped).exists():
+                return stripped
+
+        return None
 
 
 # ============================================================================
@@ -1137,19 +1177,38 @@ async def read(
     file_path = Path(path).expanduser().resolve()
 
     if not file_path.exists():
-        # Try path normalization - LLMs sometimes use paths with redundant prefixes
-        # e.g., "investor_homelab/utils" when cwd is already "investor_homelab"
-        normalized_path = _normalize_path(path)
-        if normalized_path and normalized_path != path:
-            alt_file_path = Path(normalized_path).expanduser().resolve()
-            if alt_file_path.exists():
-                logger.debug(f"Path normalized: '{path}' -> '{normalized_path}'")
-                file_path = alt_file_path
-                path = normalized_path
+        # Try PathResolver for intelligent path normalization and suggestions
+        resolver = get_path_resolver()
+        try:
+            result = resolver.resolve_file(path)
+            # PathResolver found a valid path after normalization
+            file_path = result.resolved_path
+            if result.was_normalized:
+                logger.debug(
+                    f"Path normalized by PathResolver: '{path}' -> '{result.resolved_path}' "
+                    f"(applied: {result.normalization_applied})"
+                )
+                try:
+                    path = str(result.resolved_path.relative_to(Path.cwd()))
+                except ValueError:
+                    path = str(result.resolved_path)
+        except FileNotFoundError:
+            # PathResolver couldn't find the file - provide helpful suggestions
+            suggestions = resolver.suggest_similar(path, limit=5)
+            if suggestions:
+                suggestion_list = "\n  - ".join(suggestions[:5])
+                raise FileNotFoundError(
+                    f"File not found: {path}\n"
+                    f"Did you mean one of these?\n  - {suggestion_list}"
+                )
             else:
                 raise FileNotFoundError(f"File not found: {path}")
-        else:
-            raise FileNotFoundError(f"File not found: {path}")
+        except IsADirectoryError:
+            raise IsADirectoryError(
+                f"Cannot read directory as file: {path}\n"
+                f"Suggestion: Use list_directory(path='{path}') to explore its contents, "
+                f"or specify a file path within this directory."
+            )
     if not file_path.is_file():
         if file_path.is_dir():
             raise IsADirectoryError(
@@ -1610,18 +1669,37 @@ async def ls(
         dir_path = Path(path).expanduser().resolve()
 
         if not dir_path.exists():
-            # Try path normalization - LLMs sometimes use paths with redundant prefixes
-            normalized_path = _normalize_path(path)
-            if normalized_path and normalized_path != path:
-                alt_dir_path = Path(normalized_path).expanduser().resolve()
-                if alt_dir_path.exists() and alt_dir_path.is_dir():
-                    logger.debug(f"Directory path normalized: '{path}' -> '{normalized_path}'")
-                    dir_path = alt_dir_path
-                    path = normalized_path
+            # Try PathResolver for intelligent path normalization and suggestions
+            resolver = get_path_resolver()
+            try:
+                result = resolver.resolve_directory(path)
+                # PathResolver found a valid directory after normalization
+                dir_path = result.resolved_path
+                if result.was_normalized:
+                    logger.debug(
+                        f"Directory path normalized by PathResolver: '{path}' -> '{result.resolved_path}' "
+                        f"(applied: {result.normalization_applied})"
+                    )
+                    try:
+                        path = str(result.resolved_path.relative_to(Path.cwd()))
+                    except ValueError:
+                        path = str(result.resolved_path)
+            except FileNotFoundError:
+                # PathResolver couldn't find the directory - provide helpful suggestions
+                suggestions = resolver.suggest_similar(path, limit=5)
+                if suggestions:
+                    suggestion_list = "\n  - ".join(suggestions[:5])
+                    raise FileNotFoundError(
+                        f"Directory not found: {path}\n"
+                        f"Did you mean one of these?\n  - {suggestion_list}"
+                    )
                 else:
                     raise FileNotFoundError(f"Directory not found: {path}")
-            else:
-                raise FileNotFoundError(f"Directory not found: {path}")
+            except NotADirectoryError:
+                raise NotADirectoryError(
+                    f"Path is not a directory: {path}\n"
+                    f"Suggestion: Use read_file(path='{path}') to read this file instead."
+                )
         if not dir_path.is_dir():
             raise NotADirectoryError(f"Path is not a directory: {path}")
 

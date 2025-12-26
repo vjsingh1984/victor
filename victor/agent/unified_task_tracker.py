@@ -52,6 +52,7 @@ from victor.agent.loop_detector import (
     get_progress_params_for_tool,
     is_progressive_tool,
 )
+from victor.protocols.mode_aware import ModeAwareMixin
 
 if TYPE_CHECKING:
     from victor.agent.unified_classifier import ClassificationResult
@@ -488,7 +489,7 @@ class UnifiedTaskConfigLoader:
 # =============================================================================
 
 
-class UnifiedTaskTracker:
+class UnifiedTaskTracker(ModeAwareMixin):
     """Unified task tracking combining milestones and loop detection.
 
     This class is the single source of truth for:
@@ -497,6 +498,9 @@ class UnifiedTaskTracker:
     - Milestone tracking
     - Loop detection
     - Stop decisions
+
+    Uses ModeAwareMixin for consistent mode controller access (via self.is_build_mode,
+    self.exploration_multiplier, etc.).
 
     Usage:
         tracker = UnifiedTaskTracker()
@@ -511,8 +515,13 @@ class UnifiedTaskTracker:
             print(decision.hint)
     """
 
-    def __init__(self) -> None:
-        """Initialize the unified task tracker."""
+    def __init__(self, budget_manager: Optional[Any] = None) -> None:
+        """Initialize the unified task tracker.
+
+        Args:
+            budget_manager: Optional BudgetManager for unified budget tracking.
+                          If provided, budget operations are delegated to it.
+        """
         self._config_loader = UnifiedTaskConfigLoader()
         self._progress = UnifiedTaskProgress()
         self._task_config: Optional[TaskConfig] = None
@@ -520,6 +529,9 @@ class UnifiedTaskTracker:
         self._allow_budget_override: bool = False
         self._sticky_user_iterations: bool = False
         self._allow_iteration_override: bool = False
+
+        # Optional BudgetManager integration (parallel operation)
+        self._budget_manager = budget_manager
 
         # Model-specific settings
         self._exploration_multiplier: float = 1.0
@@ -691,14 +703,42 @@ class UnifiedTaskTracker:
         Plan mode (2.5x) and Explore mode (3.0x) need more iterations
         since their purpose is thorough exploration before action.
 
+        Also syncs with BudgetManager if available.
+
         Args:
             multiplier: Mode-specific multiplier (1.0 for build, 2.5 for plan, 3.0 for explore)
         """
         self._mode_exploration_multiplier = multiplier
+
+        # Sync with BudgetManager if available
+        if self._budget_manager:
+            self._budget_manager.set_mode_multiplier(multiplier)
+
         logger.info(
             f"UnifiedTaskTracker: mode_exploration_multiplier={multiplier}, "
             f"effective_max={self.max_exploration_iterations}"
         )
+
+    def set_budget_manager(self, budget_manager: Any) -> None:
+        """Set the BudgetManager for unified budget tracking.
+
+        Enables parallel operation mode where both the tracker and
+        BudgetManager track budgets. Useful for migration and comparison.
+
+        Args:
+            budget_manager: BudgetManager instance
+        """
+        self._budget_manager = budget_manager
+
+        # Sync current multipliers
+        if budget_manager:
+            budget_manager.set_mode_multiplier(self._mode_exploration_multiplier)
+            budget_manager.set_model_multiplier(self._exploration_multiplier)
+            logger.debug(
+                f"UnifiedTaskTracker: BudgetManager attached with "
+                f"mode_multiplier={self._mode_exploration_multiplier}, "
+                f"model_multiplier={self._exploration_multiplier}"
+            )
 
     # =========================================================================
     # Recording
@@ -716,6 +756,8 @@ class UnifiedTaskTracker:
 
         Classifies tool calls as exploration (read/search) or action (write/modify).
         Only exploration iterations count toward the exploration limit in BUILD mode.
+
+        If a BudgetManager is available, also delegates budget tracking to it.
         """
         self._progress.tool_calls += 1
         self._progress.iteration_count += 1
@@ -734,6 +776,10 @@ class UnifiedTaskTracker:
             self._progress.action_iterations += 1
         else:
             self._progress.exploration_iterations += 1
+
+        # Delegate to BudgetManager if available (parallel operation)
+        if self._budget_manager:
+            self._budget_manager.record_tool_call(tool_name, is_write_operation)
 
         # Update milestones
         self._update_milestones(tool_name, arguments)
@@ -850,12 +896,8 @@ class UnifiedTaskTracker:
         effective_max = self._calculate_effective_max()
 
         # Determine which counter to use for exploration limit
-        try:
-            from victor.agent.mode_controller import get_mode_controller
-            mode_controller = get_mode_controller()
-            is_build_mode = mode_controller.config.allow_all_tools
-        except Exception:
-            is_build_mode = False
+        # Uses ModeAwareMixin for consistent mode controller access
+        is_build_mode = self.is_build_mode
 
         # In BUILD mode, use exploration_iterations; otherwise use total iteration_count
         exploration_count = (
