@@ -33,8 +33,8 @@ from victor.tools.filesystem import (
     FileContentCache,
     get_file_content_cache,
     clear_file_content_cache,
-    set_file_cache_enabled,
     is_file_cache_enabled,
+    _cache_enabled,
 )
 
 
@@ -839,8 +839,7 @@ class TestFileCacheIntegration:
 
     @pytest.fixture(autouse=True)
     def setup_cache(self):
-        """Ensure cache is enabled and cleared before each test."""
-        set_file_cache_enabled(True)
+        """Ensure cache is cleared before each test."""
         clear_file_content_cache()
         yield
         clear_file_content_cache()
@@ -892,24 +891,7 @@ class TestFileCacheIntegration:
             os.unlink(temp_path)
 
     @pytest.mark.asyncio
-    async def test_cache_disabled(self):
-        """Test that cache can be disabled."""
-        with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".py") as f:
-            f.write("content")
-            temp_path = f.name
-
-        try:
-            set_file_cache_enabled(False)
-
-            # Read should work but not cache
-            content = await read(path=temp_path)
-            assert content == "content"
-
-            # Cache should be empty
-            cache = get_file_content_cache()
-            stats = cache.get_stats()
-            # When disabled, stats shouldn't change
-            assert len(cache) == 0
-        finally:
-            set_file_cache_enabled(True)  # Restore
-            os.unlink(temp_path)
+    async def test_cache_enabled_by_default(self):
+        """Test that cache is enabled by default."""
+        assert is_file_cache_enabled() is True
+        assert _cache_enabled is True

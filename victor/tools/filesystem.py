@@ -471,13 +471,6 @@ def clear_file_content_cache(reset_stats: bool = True) -> None:
             _file_content_cache._stats = FileContentCacheStats()
 
 
-def set_file_cache_enabled(enabled: bool) -> None:
-    """Enable or disable the file content cache."""
-    global _cache_enabled
-    _cache_enabled = enabled
-    logger.info("File content cache %s", "enabled" if enabled else "disabled")
-
-
 def is_file_cache_enabled() -> bool:
     """Check if file content cache is enabled."""
     return _cache_enabled

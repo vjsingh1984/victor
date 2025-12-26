@@ -20,24 +20,23 @@ import os
 
 from victor.tools.database_tool import (
     database,
-    set_database_config,
     DANGEROUS_PATTERNS,
     _connections,
+    _DEFAULT_ALLOW_MODIFICATIONS,
+    _DEFAULT_MAX_ROWS,
 )
 
 
-class TestSetDatabaseConfig:
-    """Tests for set_database_config function."""
+class TestDatabaseConstants:
+    """Tests for database tool constants."""
 
-    def test_set_config_default(self):
-        """Test setting config with defaults."""
-        set_database_config()
-        # Just verify no exception
+    def test_default_allow_modifications(self):
+        """Test default allow_modifications constant."""
+        assert _DEFAULT_ALLOW_MODIFICATIONS is False
 
-    def test_set_config_custom(self):
-        """Test setting config with custom values."""
-        set_database_config(allow_modifications=True, max_rows=50)
-        # Just verify no exception
+    def test_default_max_rows(self):
+        """Test default max_rows constant."""
+        assert _DEFAULT_MAX_ROWS == 100
 
 
 class TestDatabaseConnect:
@@ -89,9 +88,6 @@ class TestDatabaseQuery:
     @pytest.fixture
     async def sqlite_conn(self):
         """Create SQLite connection for testing."""
-        # Reset config
-        set_database_config(allow_modifications=False, max_rows=100)
-
         result = await database(action="connect", database=":memory:")
         conn_id = result["connection_id"]
 
@@ -172,20 +168,18 @@ class TestDatabaseQuery:
         assert "Modification operations not allowed" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_query_modifications_allowed(self, sqlite_conn):
-        """Test modifications work when allowed."""
-        set_database_config(allow_modifications=True, max_rows=100)
-
+    async def test_query_modifications_blocked_by_default(self, sqlite_conn):
+        """Test modifications are blocked by default (secure setting)."""
+        # Modifications are blocked by default for security
+        # The _DEFAULT_ALLOW_MODIFICATIONS constant is False
         result = await database(
             action="query",
             connection_id=sqlite_conn,
             sql="INSERT INTO users (name, email) VALUES ('Charlie', 'c@test.com')",
         )
-        assert result["success"] is True
-        assert result["rows_affected"] == 1
-
-        # Reset config
-        set_database_config(allow_modifications=False, max_rows=100)
+        # Modifications should be blocked
+        assert result["success"] is False
+        assert "Modification operations not allowed" in result["error"]
 
     @pytest.mark.asyncio
     async def test_query_invalid_sql(self, sqlite_conn):

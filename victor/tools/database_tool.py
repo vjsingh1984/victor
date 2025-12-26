@@ -36,9 +36,11 @@ from typing import Any, Dict, List, Optional
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
-# Global state
-_allow_modifications: bool = False
-_max_rows: int = 100
+# Constants
+_DEFAULT_ALLOW_MODIFICATIONS: bool = False
+_DEFAULT_MAX_ROWS: int = 100
+
+# Session-level connection cache (required for connection pooling)
 _connections: Dict[str, Any] = {}
 
 # Dangerous SQL patterns that should be blocked
@@ -53,28 +55,6 @@ DANGEROUS_PATTERNS = [
     "CREATE",
     "DROP TABLE",
 ]
-
-
-def set_database_config(allow_modifications: bool = False, max_rows: int = 100) -> None:
-    """Configure database tool settings.
-
-    DEPRECATED: Use ToolConfig via executor context instead.
-    This function will be removed in v2.0.
-
-    Args:
-        allow_modifications: Allow INSERT/UPDATE/DELETE operations
-        max_rows: Maximum rows to return from queries
-    """
-    import warnings
-
-    warnings.warn(
-        "set_database_config() is deprecated. Use ToolConfig via executor.update_context() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    global _allow_modifications, _max_rows
-    _allow_modifications = allow_modifications
-    _max_rows = max_rows
 
 
 # Helper functions for db-specific connections
@@ -234,14 +214,14 @@ async def _do_query(connection_id: str, sql: str, limit: Optional[int] = None) -
         return {"success": False, "error": "Missing required parameter: sql"}
 
     # Check for dangerous patterns
-    if not _allow_modifications:
+    if not _DEFAULT_ALLOW_MODIFICATIONS:
         sql_upper = sql.upper()
         for pattern in DANGEROUS_PATTERNS:
             if pattern in sql_upper:
                 return {
                     "success": False,
                     "error": f"Modification operations not allowed: {pattern}. "
-                    "Call set_database_config(allow_modifications=True) to enable.",
+                    "Modification operations are disabled by default for safety.",
                 }
 
     try:
@@ -253,7 +233,7 @@ async def _do_query(connection_id: str, sql: str, limit: Optional[int] = None) -
         if cursor.description:
             # SELECT query - fetch results
             columns = [desc[0] for desc in cursor.description]
-            query_limit = limit if limit is not None else _max_rows
+            query_limit = limit if limit is not None else _DEFAULT_MAX_ROWS
             rows = cursor.fetchmany(query_limit)
 
             # Convert to list of dicts

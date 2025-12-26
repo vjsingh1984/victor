@@ -36,35 +36,15 @@ from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
 
-# Module-level state
-_max_workers: int = 4
-
-
-def set_batch_processor_config(max_workers: int = 4) -> None:
-    """Configure batch processor settings.
-
-    DEPRECATED: Use ToolConfig via executor context instead.
-    This function will be removed in v2.0.
-
-    Args:
-        max_workers: Maximum parallel workers for batch operations.
-    """
-    import warnings
-
-    warnings.warn(
-        "set_batch_processor_config() is deprecated. Use ToolConfig via executor.update_context() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    global _max_workers
-    _max_workers = max_workers
+# Constants
+_DEFAULT_MAX_WORKERS: int = 4
 
 
 # Helper functions for parallel processing
 
 
 async def _parallel_search(
-    files: List[Path], pattern: str, use_regex: bool
+    files: List[Path], pattern: str, use_regex: bool, max_workers: int = _DEFAULT_MAX_WORKERS
 ) -> List[Dict[str, Any]]:
     """Search files in parallel with progress indication."""
     results = []
@@ -101,7 +81,7 @@ async def _parallel_search(
     ) as progress:
         task = progress.add_task(f"Searching {len(files)} files...", total=len(files))
 
-        with ThreadPoolExecutor(max_workers=_max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(search_file, f): f for f in files}
 
             for future in as_completed(futures):
@@ -119,6 +99,7 @@ async def _parallel_replace(
     replace_text: str,
     use_regex: bool,
     dry_run: bool,
+    max_workers: int = _DEFAULT_MAX_WORKERS,
 ) -> List[Dict[str, Any]]:
     """Replace in files in parallel with progress indication."""
     results = []
@@ -166,7 +147,7 @@ async def _parallel_replace(
     ) as progress:
         task = progress.add_task(f"{mode} in {len(files)} files...", total=len(files))
 
-        with ThreadPoolExecutor(max_workers=_max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(replace_in_file, f): f for f in files}
 
             for future in as_completed(futures):
@@ -178,7 +159,7 @@ async def _parallel_replace(
     return results
 
 
-async def _parallel_analyze(files: List[Path]) -> List[Dict[str, Any]]:
+async def _parallel_analyze(files: List[Path], max_workers: int = _DEFAULT_MAX_WORKERS) -> List[Dict[str, Any]]:
     """Analyze files in parallel with progress indication."""
     results = []
 
@@ -211,7 +192,7 @@ async def _parallel_analyze(files: List[Path]) -> List[Dict[str, Any]]:
     ) as progress:
         task = progress.add_task(f"Analyzing {len(files)} files...", total=len(files))
 
-        with ThreadPoolExecutor(max_workers=_max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(analyze_file, f): f for f in files}
 
             for future in as_completed(futures):

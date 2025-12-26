@@ -21,25 +21,19 @@ from unittest.mock import patch
 
 from victor.tools.batch_processor_tool import (
     batch,
-    set_batch_processor_config,
     _parallel_search,
     _parallel_replace,
     _parallel_analyze,
+    _DEFAULT_MAX_WORKERS,
 )
 
 
-class TestSetBatchProcessorConfig:
-    """Tests for set_batch_processor_config function."""
+class TestBatchConstants:
+    """Tests for batch processor constants."""
 
-    def test_set_config_default(self):
-        """Test setting config with defaults."""
-        set_batch_processor_config()
-        # Just verify no exception
-
-    def test_set_config_custom(self):
-        """Test setting config with custom values."""
-        set_batch_processor_config(max_workers=8)
-        # Verify the global was set (could check via batch operation)
+    def test_default_max_workers(self):
+        """Test default max workers constant."""
+        assert _DEFAULT_MAX_WORKERS == 4
 
 
 class TestBatchList:

@@ -27,27 +27,28 @@ from victor.cache.tiered_cache import TieredCache
 
 logger = logging.getLogger(__name__)
 
-# Global cache manager instance (set by orchestrator)
-# Using TieredCache (renamed from CacheManager)
-_cache_manager: Optional[TieredCache] = None
 
-
-def set_cache_manager(manager: TieredCache) -> None:
-    """Set the global cache manager instance.
+def _get_cache_manager(context: Optional[Dict[str, Any]] = None) -> Optional[TieredCache]:
+    """Get cache manager from execution context.
 
     Args:
-        manager: Cache manager to use for cache operations
+        context: Tool execution context
+
+    Returns:
+        TieredCache instance if available in context, None otherwise
     """
-    global _cache_manager
-    _cache_manager = manager
+    if context:
+        return context.get("cache_manager")
+    return None
 
 
-async def _do_stats() -> Dict[str, Any]:
+async def _do_stats(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Get cache statistics."""
-    if _cache_manager is None:
+    cache_manager = _get_cache_manager(context)
+    if cache_manager is None:
         return {"success": False, "error": "Cache manager not initialized"}
 
-    stats = _cache_manager.get_stats()
+    stats = cache_manager.get_stats()
 
     # Build formatted report
     report = []
@@ -83,13 +84,14 @@ async def _do_stats() -> Dict[str, Any]:
     return {"success": True, "stats": stats, "formatted_report": "\n".join(report)}
 
 
-async def _do_clear(namespace: Optional[str] = None) -> Dict[str, Any]:
+async def _do_clear(namespace: Optional[str] = None, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Clear cache entries."""
-    if _cache_manager is None:
+    cache_manager = _get_cache_manager(context)
+    if cache_manager is None:
         return {"success": False, "error": "Cache manager not initialized"}
 
     try:
-        count = _cache_manager.clear(namespace)
+        count = cache_manager.clear(namespace)
 
         if namespace:
             message = f"Cleared {count} entries from namespace '{namespace}'"
@@ -103,12 +105,13 @@ async def _do_clear(namespace: Optional[str] = None) -> Dict[str, Any]:
         return {"success": False, "error": f"Failed to clear cache: {str(e)}"}
 
 
-async def _do_info() -> Dict[str, Any]:
+async def _do_info(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Get cache configuration info."""
-    if _cache_manager is None:
+    cache_manager = _get_cache_manager(context)
+    if cache_manager is None:
         return {"success": False, "error": "Cache manager not initialized"}
 
-    config = _cache_manager.config
+    config = cache_manager.config
 
     report = []
     report.append("Cache Configuration")
@@ -166,6 +169,7 @@ async def _do_info() -> Dict[str, Any]:
 async def cache(
     action: str,
     namespace: Optional[str] = None,
+    context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Unified cache management tool for Victor's tiered caching system.
@@ -179,6 +183,7 @@ async def cache(
         action: Operation to perform - 'stats', 'clear', or 'info'.
         namespace: Optional namespace for clear action (e.g., "responses", "embeddings").
                   If not provided with clear, clears all cache.
+        context: Tool execution context containing cache_manager.
 
     Returns:
         Dictionary containing:
@@ -204,13 +209,13 @@ async def cache(
     action_lower = action.lower().strip()
 
     if action_lower == "stats":
-        return await _do_stats()
+        return await _do_stats(context)
 
     elif action_lower == "clear":
-        return await _do_clear(namespace)
+        return await _do_clear(namespace, context)
 
     elif action_lower == "info":
-        return await _do_info()
+        return await _do_info(context)
 
     else:
         return {

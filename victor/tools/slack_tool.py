@@ -38,62 +38,24 @@ from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
 
-_slack_client: Optional["WebClient"] = None
-_config: Dict[str, Optional[str]] = {
-    "api_token": None,
-}
 
-
-def set_slack_config(api_token: Optional[str] = None) -> bool:
-    """Set Slack configuration.
-
-    DEPRECATED: Use ToolConfig via executor context instead.
-    This function will be removed in v2.0.
+def _get_slack_client(context: Optional[Dict[str, Any]] = None) -> Optional["WebClient"]:
+    """Get Slack client from execution context.
 
     Args:
-        api_token: Slack Bot User OAuth Token (xoxb-...)
+        context: Tool execution context
 
     Returns:
-        True if configuration was successful, False otherwise
+        WebClient if available in context, None otherwise
     """
-    import warnings
-
-    warnings.warn(
-        "set_slack_config() is deprecated. Use ToolConfig via executor.update_context() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    global _slack_client
-
-    if not SLACK_AVAILABLE:
-        logger.error("Slack SDK not available. Install with: pip install slack_sdk")
-        return False
-
-    if api_token:
-        _config["api_token"] = api_token
-
-    if _config["api_token"]:
-        try:
-            _slack_client = WebClient(token=_config["api_token"])
-            # Test the connection
-            auth_response = _slack_client.auth_test()
-            if auth_response.get("ok"):
-                logger.info(f"Successfully connected to Slack as {auth_response.get('user')}")
-                return True
-            else:
-                logger.error(f"Slack auth failed: {auth_response.get('error')}")
-                _slack_client = None
-                return False
-        except Exception as e:
-            logger.error(f"Failed to connect to Slack: {e}")
-            _slack_client = None
-            return False
-    return False
+    if context:
+        return context.get("slack_client")
+    return None
 
 
-def is_slack_configured() -> bool:
+def is_slack_configured(context: Optional[Dict[str, Any]] = None) -> bool:
     """Check if Slack client is configured and connected."""
-    return _slack_client is not None
+    return _get_slack_client(context) is not None
 
 
 @tool(
@@ -116,6 +78,7 @@ async def slack(
     text: Optional[str] = None,
     query: Optional[str] = None,
     thread_ts: Optional[str] = None,
+    context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Perform operations on Slack.
 
@@ -125,6 +88,7 @@ async def slack(
         text: The text of the message for 'send_message'.
         query: The query for searching messages for 'search_messages'.
         thread_ts: Optional thread timestamp to reply in a thread.
+        context: Tool execution context containing slack_client.
 
     Returns:
         A dictionary with the result of the operation.
@@ -135,10 +99,11 @@ async def slack(
             "error": "Slack SDK not installed. Install with: pip install slack_sdk",
         }
 
-    if not _slack_client:
+    slack_client = _get_slack_client(context)
+    if not slack_client:
         return {
             "success": False,
-            "error": "Slack client is not configured. Call set_slack_config() first.",
+            "error": "Slack client not configured. Provide slack_client in context.",
         }
 
     try:
@@ -152,7 +117,7 @@ async def slack(
             kwargs: Dict[str, Any] = {"channel": channel, "text": text}
             if thread_ts:
                 kwargs["thread_ts"] = thread_ts
-            response = _slack_client.chat_postMessage(**kwargs)
+            response = slack_client.chat_postMessage(**kwargs)
             if response.get("ok"):
                 return {
                     "success": True,
@@ -167,7 +132,7 @@ async def slack(
             if not query:
                 return {"success": False, "error": "Missing required parameter: query"}
             logger.info(f"[slack] Searching messages with query='{query}'")
-            response = _slack_client.search_messages(query=query)
+            response = slack_client.search_messages(query=query)
             if response.get("ok"):
                 matches = response.get("messages", {}).get("matches", [])
                 results: List[Dict[str, Any]] = [
@@ -185,7 +150,7 @@ async def slack(
 
         elif operation == "list_channels":
             logger.info("[slack] Listing channels")
-            response = _slack_client.conversations_list(types="public_channel,private_channel")
+            response = slack_client.conversations_list(types="public_channel,private_channel")
             if response.get("ok"):
                 channels_data = response.get("channels", [])
                 results: List[Dict[str, Any]] = [

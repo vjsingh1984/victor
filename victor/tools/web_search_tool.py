@@ -29,54 +29,39 @@ from typing import Any, Dict, List, Optional
 import httpx
 from bs4 import BeautifulSoup
 
-from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
+from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority, ToolConfig
 from victor.tools.decorators import tool
 
-# Global provider and model for AI summarization (set by orchestrator)
-_provider = None
-_model: Optional[str] = None
-_user_agent = "Mozilla/5.0 (compatible; Victor/1.0; +https://github.com/vijaykumar/victor)"
-_config = {
-    "fetch_top": None,
-    "fetch_pool": None,
-    "max_content_length": 5000,
-}
+# Constants
+_USER_AGENT = "Mozilla/5.0 (compatible; Victor/1.0; +https://github.com/vijaykumar/victor)"
+_DEFAULT_MAX_CONTENT_LENGTH = 5000
 
 
-def set_web_tool_defaults(
-    fetch_top: Optional[int] = None,
-    fetch_pool: Optional[int] = None,
-    max_content_length: Optional[int] = None,
-) -> None:
-    """Set default behaviors for web_summarize."""
-    if fetch_top is not None:
-        _config["fetch_top"] = fetch_top
-    if fetch_pool is not None:
-        _config["fetch_pool"] = fetch_pool
-    if max_content_length is not None:
-        _config["max_content_length"] = max_content_length
-
-
-def set_web_search_provider(provider, model: Optional[str] = None) -> None:
-    """Set the global provider and model for web search AI summarization.
-
-    DEPRECATED: Use ToolConfig via executor context instead.
-    This function will be removed in v2.0.
+def _get_web_config(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Get web tool configuration from ToolConfig in execution context.
 
     Args:
-        provider: LLM provider instance for summarization
-        model: Model identifier to use for summarization
-    """
-    import warnings
+        context: Tool execution context containing ToolConfig
 
-    warnings.warn(
-        "set_web_search_provider() is deprecated. Use ToolConfig via executor.update_context() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    global _provider, _model
-    _provider = provider
-    _model = model
+    Returns:
+        Dictionary with web tool settings (fetch_top, fetch_pool, max_content_length)
+    """
+    config = ToolConfig.from_context(context) if context else None
+    if config:
+        return {
+            "provider": config.provider,
+            "model": config.model,
+            "fetch_top": config.web_fetch_top,
+            "fetch_pool": config.web_fetch_pool,
+            "max_content_length": config.max_content_length or _DEFAULT_MAX_CONTENT_LENGTH,
+        }
+    return {
+        "provider": None,
+        "model": None,
+        "fetch_top": None,
+        "fetch_pool": None,
+        "max_content_length": _DEFAULT_MAX_CONTENT_LENGTH,
+    }
 
 
 def _parse_ddg_results(html: str, max_results: int) -> List[Dict[str, str]]:
@@ -211,6 +196,7 @@ async def web_search(
     fetch_top: Optional[int] = None,
     fetch_pool: Optional[int] = None,
     max_content_length: int = 5000,
+    context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Search the web using DuckDuckGo. Optionally summarize with AI.
 
@@ -229,6 +215,7 @@ async def web_search(
         fetch_top: Number of URLs to fetch for deeper summary (only with ai_summarize=True).
         fetch_pool: Pool of URLs to try fetching from (only with ai_summarize=True).
         max_content_length: Max content length to extract per URL (only with ai_summarize=True).
+        context: Tool execution context containing ToolConfig for provider/model access.
 
     Returns:
         Dictionary containing:
@@ -241,7 +228,8 @@ async def web_search(
     # Route to summarize implementation if ai_summarize is True
     if ai_summarize:
         return await _summarize_search(
-            query, max_results, region, safe_search, fetch_top, fetch_pool, max_content_length
+            query, max_results, region, safe_search, fetch_top, fetch_pool, max_content_length,
+            context=context
         )
     if not query:
         return {"success": False, "error": "Missing required parameter: query"}
@@ -249,7 +237,6 @@ async def web_search(
     # Map safe search to DuckDuckGo values
     safe_map = {"on": "1", "moderate": "-1", "off": "-2"}
     safe_value = safe_map.get(safe_search, "-1")
-    logger = logging.getLogger(__name__)
     logger = logging.getLogger(__name__)
 
     try:
@@ -260,7 +247,7 @@ async def web_search(
             data = {"q": query, "kl": region, "p": safe_value}
 
             response = await client.post(
-                search_url, data=data, headers={"User-Agent": _user_agent}, follow_redirects=True
+                search_url, data=data, headers={"User-Agent": _USER_AGENT}, follow_redirects=True
             )
 
             if response.status_code != 200:
@@ -318,7 +305,7 @@ async def web_fetch(url: str) -> Dict[str, Any]:
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.get(
-                url, headers={"User-Agent": _user_agent}, follow_redirects=True
+                url, headers={"User-Agent": _USER_AGENT}, follow_redirects=True
             )
 
             if response.status_code != 200:
@@ -349,9 +336,15 @@ async def _summarize_search(
     fetch_top: Optional[int] = None,
     fetch_pool: Optional[int] = None,
     max_content_length: int = 5000,
+    context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Internal implementation for web search with AI summarization."""
-    if not _provider:
+    # Get config from context
+    config = _get_web_config(context)
+    provider = config.get("provider")
+    model = config.get("model")
+
+    if not provider:
         return {"success": False, "error": "No LLM provider available for summarization"}
 
     if not query:
@@ -362,9 +355,9 @@ async def _summarize_search(
     safe_value = safe_map.get(safe_search, "-1")
     logger = logging.getLogger(__name__)
 
-    default_fetch_top = _config.get("fetch_top")
-    default_fetch_pool = _config.get("fetch_pool")
-    default_max_len = _config.get("max_content_length", 5000)
+    default_fetch_top = config.get("fetch_top")
+    default_fetch_pool = config.get("fetch_pool")
+    default_max_len = config.get("max_content_length", _DEFAULT_MAX_CONTENT_LENGTH)
 
     fetch_top = (
         fetch_top
@@ -394,7 +387,7 @@ async def _summarize_search(
             data = {"q": query, "kl": region, "p": safe_value}
 
             response = await client.post(
-                search_url, data=data, headers={"User-Agent": _user_agent}, follow_redirects=True
+                search_url, data=data, headers={"User-Agent": _USER_AGENT}, follow_redirects=True
             )
 
             if response.status_code != 200:
@@ -471,8 +464,8 @@ Format the response clearly with sections."""
         try:
             from victor.providers.base import Message
 
-            response = await _provider.complete(
-                model=_model or "default",
+            response = await provider.complete(
+                model=model or "default",
                 messages=[Message(role="user", content=prompt)],
                 temperature=0.5,
                 max_tokens=1000,
@@ -480,7 +473,7 @@ Format the response clearly with sections."""
 
             summary = response.content.strip()
             logger.info(
-                f"[web_summarize] summarization model='{_model}', summary_len={len(summary)}"
+                f"[web_summarize] summarization model='{model}', summary_len={len(summary)}"
             )
 
             return {"success": True, "summary": summary, "original_results": results_text}

@@ -15,9 +15,30 @@
 """Tests for unified cache tool module."""
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
-from victor.tools.cache_tool import cache, set_cache_manager
+from victor.tools.cache_tool import cache, _get_cache_manager
+
+
+class TestGetCacheManager:
+    """Tests for _get_cache_manager function."""
+
+    def test_get_cache_manager_from_context(self):
+        """Test getting cache manager from context."""
+        mock_manager = MagicMock()
+        context = {"cache_manager": mock_manager}
+        result = _get_cache_manager(context)
+        assert result == mock_manager
+
+    def test_get_cache_manager_without_context(self):
+        """Test getting cache manager without context returns None."""
+        result = _get_cache_manager(None)
+        assert result is None
+
+    def test_get_cache_manager_empty_context(self):
+        """Test getting cache manager with empty context returns None."""
+        result = _get_cache_manager({})
+        assert result is None
 
 
 class TestCacheStats:
@@ -26,10 +47,9 @@ class TestCacheStats:
     @pytest.mark.asyncio
     async def test_cache_stats_no_manager(self):
         """Test cache stats when no manager is set."""
-        with patch("victor.tools.cache_tool._cache_manager", None):
-            result = await cache(action="stats")
-            assert result["success"] is False
-            assert "not initialized" in result["error"]
+        result = await cache(action="stats", context=None)
+        assert result["success"] is False
+        assert "not initialized" in result["error"]
 
     @pytest.mark.asyncio
     async def test_cache_stats_with_manager(self):
@@ -44,11 +64,11 @@ class TestCacheStats:
             "disk_misses": 50,
             "sets": 200,
         }
-        with patch("victor.tools.cache_tool._cache_manager", mock_manager):
-            result = await cache(action="stats")
-            assert result["success"] is True
-            assert "stats" in result
-            assert "formatted_report" in result
+        context = {"cache_manager": mock_manager}
+        result = await cache(action="stats", context=context)
+        assert result["success"] is True
+        assert "stats" in result
+        assert "formatted_report" in result
 
 
 class TestCacheClear:
@@ -57,29 +77,29 @@ class TestCacheClear:
     @pytest.mark.asyncio
     async def test_cache_clear_no_manager(self):
         """Test cache clear when no manager is set."""
-        with patch("victor.tools.cache_tool._cache_manager", None):
-            result = await cache(action="clear")
-            assert result["success"] is False
-            assert "not initialized" in result["error"]
+        result = await cache(action="clear", context=None)
+        assert result["success"] is False
+        assert "not initialized" in result["error"]
 
     @pytest.mark.asyncio
     async def test_cache_clear_all(self):
         """Test clearing all cache."""
         mock_manager = MagicMock()
         mock_manager.clear.return_value = 10
-        with patch("victor.tools.cache_tool._cache_manager", mock_manager):
-            result = await cache(action="clear")
-            assert result["success"] is True
-            mock_manager.clear.assert_called_once()
+        context = {"cache_manager": mock_manager}
+        result = await cache(action="clear", context=context)
+        assert result["success"] is True
+        mock_manager.clear.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_cache_clear_namespace(self):
         """Test clearing specific namespace."""
         mock_manager = MagicMock()
         mock_manager.clear.return_value = 5
-        with patch("victor.tools.cache_tool._cache_manager", mock_manager):
-            result = await cache(action="clear", namespace="test")
-            assert result["success"] is True
+        context = {"cache_manager": mock_manager}
+        result = await cache(action="clear", namespace="responses", context=context)
+        assert result["success"] is True
+        mock_manager.clear.assert_called_once_with("responses")
 
 
 class TestCacheInfo:
@@ -88,25 +108,30 @@ class TestCacheInfo:
     @pytest.mark.asyncio
     async def test_cache_info_no_manager(self):
         """Test cache info when no manager is set."""
-        with patch("victor.tools.cache_tool._cache_manager", None):
-            result = await cache(action="info")
-            assert result["success"] is False
-            assert "not initialized" in result["error"]
+        result = await cache(action="info", context=None)
+        assert result["success"] is False
+        assert "not initialized" in result["error"]
 
     @pytest.mark.asyncio
     async def test_cache_info_with_manager(self):
-        """Test getting cache info."""
+        """Test getting cache configuration info."""
+        mock_config = MagicMock()
+        mock_config.enable_memory = True
+        mock_config.memory_max_size = 1000
+        mock_config.memory_ttl = 300
+        mock_config.enable_disk = True
+        mock_config.disk_max_size = 100 * 1024 * 1024
+        mock_config.disk_ttl = 86400 * 7
+        mock_config.disk_path = "/tmp/cache"
+
         mock_manager = MagicMock()
-        mock_manager.config.enable_memory = True
-        mock_manager.config.enable_disk = True
-        mock_manager.config.memory_max_size = 1000
-        mock_manager.config.memory_ttl = 300
-        mock_manager.config.disk_max_size = 1000000000
-        mock_manager.config.disk_ttl = 86400
-        mock_manager.config.disk_path = "/tmp/cache"
-        with patch("victor.tools.cache_tool._cache_manager", mock_manager):
-            result = await cache(action="info")
-            assert result["success"] is True
+        mock_manager.config = mock_config
+        context = {"cache_manager": mock_manager}
+
+        result = await cache(action="info", context=context)
+        assert result["success"] is True
+        assert "config" in result
+        assert "formatted_report" in result
 
 
 class TestCacheUnknownAction:
@@ -114,18 +139,9 @@ class TestCacheUnknownAction:
 
     @pytest.mark.asyncio
     async def test_unknown_action(self):
-        """Test unknown action returns error."""
-        result = await cache(action="invalid_action")
+        """Test handling of unknown action."""
+        mock_manager = MagicMock()
+        context = {"cache_manager": mock_manager}
+        result = await cache(action="invalid", context=context)
         assert result["success"] is False
         assert "Unknown action" in result["error"]
-
-
-class TestSetCacheManager:
-    """Tests for set_cache_manager function."""
-
-    def test_set_cache_manager(self):
-        """Test setting the cache manager."""
-        mock_manager = MagicMock()
-        set_cache_manager(mock_manager)
-        # The function sets the global, we can't directly test it
-        # but we can verify no exception was raised
