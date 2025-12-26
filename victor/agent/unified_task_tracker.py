@@ -544,8 +544,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
         global_config = self._config_loader.get_global_config()
         self._max_total_iterations = global_config.get("max_total_iterations", 50)
         self._min_content_threshold = global_config.get("min_content_threshold", 150)
-        self._max_overlapping_reads = global_config.get("max_overlapping_reads_per_file", 3)
-        self._max_searches_per_prefix = global_config.get("max_searches_per_query_prefix", 2)
+        self._base_max_overlapping_reads = global_config.get("max_overlapping_reads_per_file", 3)
+        self._base_max_searches_per_prefix = global_config.get("max_searches_per_query_prefix", 2)
 
     # =========================================================================
     # Properties
@@ -585,6 +585,24 @@ class UnifiedTaskTracker(ModeAwareMixin):
     def stage(self) -> ConversationStage:
         """Get current conversation stage."""
         return self._progress.stage
+
+    @property
+    def max_overlapping_reads(self) -> int:
+        """Get mode-aware max overlapping reads per file.
+
+        PLAN/EXPLORE modes get higher limits to allow thorough file exploration.
+        """
+        effective = int(self._base_max_overlapping_reads * self._mode_exploration_multiplier)
+        return max(self._base_max_overlapping_reads, effective)
+
+    @property
+    def max_searches_per_prefix(self) -> int:
+        """Get mode-aware max searches per query prefix.
+
+        PLAN/EXPLORE modes get higher limits to allow thorough search exploration.
+        """
+        effective = int(self._base_max_searches_per_prefix * self._mode_exploration_multiplier)
+        return max(self._base_max_searches_per_prefix, effective)
 
     # =========================================================================
     # Configuration
@@ -1127,9 +1145,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
         if file_loop:
             return file_loop
 
-        # Check search query repetition
+        # Check search query repetition (mode-aware limit)
         for base_key, count in self._progress.base_resource_counts.items():
-            if base_key.startswith("search:") and count > self._max_searches_per_prefix:
+            if base_key.startswith("search:") and count > self.max_searches_per_prefix:
                 return f"Similar search repeated {count} times: {base_key}"
 
         # Check signature repetition
@@ -1160,7 +1178,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
                     1 for j, other in enumerate(ranges) if i != j and current.overlaps(other)
                 )
                 total = overlap_count + 1
-                if total > self._max_overlapping_reads:
+                # Use mode-aware overlapping reads limit
+                if total > self.max_overlapping_reads:
                     return (
                         f"Same file region read {total} times: {path} " f"[offset={current.offset}]"
                     )
@@ -1266,14 +1285,26 @@ class UnifiedTaskTracker(ModeAwareMixin):
         return 8
 
     def _get_loop_threshold(self) -> int:
-        """Get loop repeat threshold from task config.
+        """Get loop repeat threshold from task config with mode awareness.
 
         Warning triggers at threshold - 1, block at threshold.
         Default is 4 (warning at 3, block at 4).
+
+        Mode multipliers are applied to allow more exploration in PLAN/EXPLORE modes:
+        - BUILD mode: 1.0x (default threshold)
+        - PLAN mode: 2.5x (e.g., threshold 4 becomes 10)
+        - EXPLORE mode: 3.0x (e.g., threshold 4 becomes 12)
         """
+        base_threshold = 4
         if self._task_config:
-            return self._task_config.loop_repeat_threshold
-        return 4
+            base_threshold = self._task_config.loop_repeat_threshold
+
+        # Apply mode multiplier for PLAN/EXPLORE modes
+        # This allows more exploration before triggering loop detection
+        effective_threshold = int(base_threshold * self._mode_exploration_multiplier)
+
+        # Ensure minimum threshold of base to prevent immediate loops
+        return max(base_threshold, effective_threshold)
 
     def _get_completion_hint(self) -> str:
         """Get appropriate completion hint based on task type."""
@@ -1293,25 +1324,67 @@ class UnifiedTaskTracker(ModeAwareMixin):
         else:
             return "Please complete the task or explain what's blocking you."
 
-    def _get_signature(self, tool_name: str, arguments: Dict[str, Any]) -> str:
-        """Generate signature for loop detection.
+    def _get_signature(
+        self, tool_name: str, arguments: Dict[str, Any], include_stage: bool = True
+    ) -> str:
+        """Generate context-aware signature for loop detection.
 
         For progressive tools (with progress_params defined via @tool decorator),
         only the specified parameters are used in the signature - this allows
         different queries/paths to be treated as exploration, not loops.
+
+        Context-Awareness:
+        - Includes conversation stage to prevent false loop detection when the same
+          operation is performed in different stages (e.g., reading a file in
+          EXPLORING stage vs IMPLEMENTING stage)
+        - Excludes volatile parameters like offset/limit for progressive reads
+
+        Args:
+            tool_name: Name of the tool being called
+            arguments: Tool call arguments
+            include_stage: Whether to include stage in signature (default True)
+
+        Returns:
+            Context-aware signature string for loop detection
         """
+        # Volatile fields that shouldn't count towards loop detection
+        # Reading the same file with different offsets is NOT a loop
+        volatile_fields = {
+            "offset", "limit", "line_start", "line_end", "start_line", "end_line",
+            "page", "page_size", "count", "max_results", "timeout",
+        }
+
         params = get_progress_params_for_tool(tool_name)
         if params:
             sig_parts = [tool_name]
             for param in params:
+                # Skip volatile fields for progressive tools
+                if param in volatile_fields:
+                    continue
                 value = arguments.get(param, "")
                 if isinstance(value, str) and len(value) > 100:
                     value = value[:100]
                 sig_parts.append(str(value))
+
+            # Add stage for context-awareness
+            if include_stage:
+                sig_parts.append(f"stage:{self._progress.stage.value}")
+
             return "|".join(sig_parts)
         else:
-            args_str = str(sorted(arguments.items()))
-            return f"{tool_name}:{hashlib.md5(args_str.encode()).hexdigest()[:8]}"
+            # Filter out volatile fields for non-progressive tools too
+            stable_args = {
+                k: v for k, v in arguments.items()
+                if k not in volatile_fields
+            }
+            args_str = str(sorted(stable_args.items()))
+            base_sig = f"{tool_name}:{hashlib.md5(args_str.encode()).hexdigest()[:8]}"
+
+            # Add stage for context-awareness
+            if include_stage:
+                base_sig += f"|stage:{self._progress.stage.value}"
+
+            return base_sig
 
     def _get_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
         """Generate resource key for tracking unique resources."""
