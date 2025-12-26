@@ -243,3 +243,26 @@ class ChunkGenerator:
             List of StreamChunks for budget exhausted warning
         """
         return self.streaming_handler.get_budget_exhausted_chunks(stream_ctx)
+
+    # =====================================================================
+    # Metrics Formatting
+    # =====================================================================
+
+    def format_completion_metrics(
+        self,
+        stream_ctx: "StreamingChatContext",
+        elapsed_time: float,
+    ) -> str:
+        """Format performance metrics for normal completion.
+
+        Delegates to streaming handler for detailed metrics formatting
+        with cache info when available, or falls back to estimated tokens.
+
+        Args:
+            stream_ctx: The streaming context
+            elapsed_time: Elapsed time in seconds
+
+        Returns:
+            Formatted metrics line string
+        """
+        return self.streaming_handler.format_completion_metrics(stream_ctx, elapsed_time)

@@ -4016,17 +4016,20 @@ class AgentOrchestrator(ModeAwareMixin):
         )
 
     # =====================================================================
-    # Recovery Handler Methods (Delegate to RecoveryCoordinator)
+    # Recovery Facade Methods
+    # These methods create RecoveryContext from StreamingChatContext and
+    # delegate to the appropriate coordinator. They centralize context
+    # creation and provide a clean API for stream_chat.
     # =====================================================================
 
     def _check_time_limit_with_handler(
         self,
         stream_ctx: StreamingChatContext,
     ) -> Optional[StreamChunk]:
-        """Check time limit using the recovery coordinator.
+        """Check time limit and record Q-learning outcome.
 
-        DEPRECATED: Use recovery_coordinator.check_time_limit() directly.
-        This method delegates to RecoveryCoordinator for centralized recovery logic.
+        Creates RecoveryContext and delegates to recovery_coordinator.
+        Also records Q-learning outcome when time limit is reached.
 
         Args:
             stream_ctx: The streaming context
@@ -4055,12 +4058,9 @@ class AgentOrchestrator(ModeAwareMixin):
         self,
         stream_ctx: StreamingChatContext,
     ) -> Optional[StreamChunk]:
-        """Check iteration limit using the recovery coordinator.
+        """Check iteration limit.
 
-        DEPRECATED: Use recovery_coordinator.check_iteration_limit() directly.
-
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
+        Creates RecoveryContext and delegates to recovery_coordinator.
 
         Args:
             stream_ctx: The streaming context
@@ -4080,12 +4080,9 @@ class AgentOrchestrator(ModeAwareMixin):
         has_tool_calls: bool,
         content_length: int,
     ) -> Optional[StreamChunk]:
-        """Check for natural completion using the recovery coordinator.
+        """Check for natural completion.
 
-        DEPRECATED: Use recovery_coordinator.check_natural_completion() directly.
-
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
+        Creates RecoveryContext and delegates to recovery_coordinator.
 
         Args:
             stream_ctx: The streaming context
@@ -4107,12 +4104,9 @@ class AgentOrchestrator(ModeAwareMixin):
         self,
         stream_ctx: StreamingChatContext,
     ) -> Tuple[Optional[StreamChunk], bool]:
-        """Handle empty response using the recovery coordinator.
+        """Handle empty response.
 
-        DEPRECATED: Use recovery_coordinator.handle_empty_response() directly.
-
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
+        Creates RecoveryContext and delegates to recovery_coordinator.
 
         Args:
             stream_ctx: The streaming context
@@ -4133,12 +4127,9 @@ class AgentOrchestrator(ModeAwareMixin):
         tool_args: Dict[str, Any],
         block_reason: str,
     ) -> StreamChunk:
-        """Handle blocked tool call using the recovery coordinator.
+        """Handle blocked tool call.
 
-        DEPRECATED: Use recovery_coordinator.handle_blocked_tool() directly.
-
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
+        Creates RecoveryContext and delegates to recovery_coordinator.
 
         Args:
             stream_ctx: The streaming context
@@ -4164,11 +4155,9 @@ class AgentOrchestrator(ModeAwareMixin):
     ) -> Optional[Tuple[StreamChunk, bool]]:
         """Check blocked threshold using the recovery coordinator.
 
-        DEPRECATED: Use recovery_coordinator.check_blocked_threshold() directly.
+        Creates RecoveryContext and delegates to recovery_coordinator viacheck_blocked_threshold() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
-
+        
         Args:
             stream_ctx: The streaming context
             all_blocked: Whether all tool calls were blocked
@@ -4193,11 +4182,9 @@ class AgentOrchestrator(ModeAwareMixin):
     ) -> "OrchestratorRecoveryAction":
         """Handle response using the recovery coordinator.
 
-        DEPRECATED: Use recovery_coordinator.handle_recovery_with_integration() directly.
+        Creates RecoveryContext and delegates to recovery_coordinator viahandle_recovery_with_integration() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
-
+        
         Args:
             stream_ctx: The streaming context
             full_content: Full response content
@@ -4226,11 +4213,9 @@ class AgentOrchestrator(ModeAwareMixin):
     ) -> Optional[StreamChunk]:
         """Apply a recovery action using the recovery coordinator.
 
-        DEPRECATED: Use recovery_coordinator.apply_recovery_action() directly.
+        Creates RecoveryContext and delegates to recovery_coordinator viaapply_recovery_action() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
-
+        
         Args:
             recovery_action: The recovery action to apply
             stream_ctx: The streaming context
@@ -4253,11 +4238,9 @@ class AgentOrchestrator(ModeAwareMixin):
     ) -> Tuple[List[Dict[str, Any]], List[StreamChunk], int]:
         """Filter blocked tool calls using the recovery coordinator.
 
-        DEPRECATED: Use recovery_coordinator.filter_blocked_tool_calls() directly.
+        Creates RecoveryContext and delegates to recovery_coordinator viafilter_blocked_tool_calls() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
-
+        
         Args:
             stream_ctx: The streaming context
             tool_calls: List of tool calls to filter
@@ -4277,11 +4260,9 @@ class AgentOrchestrator(ModeAwareMixin):
     ) -> Tuple[bool, Optional[str]]:
         """Check if force action should be triggered using the recovery coordinator.
 
-        DEPRECATED: Use recovery_coordinator.check_force_action() directly.
+        Creates RecoveryContext and delegates to recovery_coordinator viacheck_force_action() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
-
+        
         Args:
             stream_ctx: The streaming context
 
@@ -4305,11 +4286,9 @@ class AgentOrchestrator(ModeAwareMixin):
     ) -> None:
         """Handle force tool execution using the recovery coordinator.
 
-        DEPRECATED: Use recovery_coordinator.handle_force_tool_execution() directly.
+        Creates RecoveryContext and delegates to recovery_coordinator viahandle_force_tool_execution() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
-
+        
         Args:
             stream_ctx: The streaming context
             mentioned_tools: Tools that were mentioned but not executed
@@ -4333,11 +4312,9 @@ class AgentOrchestrator(ModeAwareMixin):
     ) -> Optional[StreamChunk]:
         """Check tool budget using the recovery coordinator.
 
-        DEPRECATED: Use recovery_coordinator.check_tool_budget() directly.
+        Creates RecoveryContext and delegates to recovery_coordinator viacheck_tool_budget() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
-
+        
         Args:
             stream_ctx: The streaming context
 
@@ -4354,11 +4331,9 @@ class AgentOrchestrator(ModeAwareMixin):
     def _check_progress_with_handler(self, stream_ctx: StreamingChatContext) -> bool:
         """Check progress using the recovery coordinator.
 
-        DEPRECATED: Use recovery_coordinator.check_progress() directly.
+        Creates RecoveryContext and delegates to recovery_coordinator viacheck_progress() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
-
+        
         Args:
             stream_ctx: The streaming context
 
@@ -4387,11 +4362,9 @@ class AgentOrchestrator(ModeAwareMixin):
     ) -> List[Dict[str, Any]]:
         """Truncate tool calls using the recovery coordinator.
 
-        DEPRECATED: Use recovery_coordinator.truncate_tool_calls() directly.
+        Creates RecoveryContext and delegates to recovery_coordinator viatruncate_tool_calls() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
-
+        
         Args:
             tool_calls: List of tool calls
             stream_ctx: The streaming context
@@ -4415,11 +4388,9 @@ class AgentOrchestrator(ModeAwareMixin):
     ) -> Optional[StreamChunk]:
         """Handle force completion using the recovery coordinator.
 
-        DEPRECATED: Use recovery_coordinator.handle_force_completion() directly.
+        Creates RecoveryContext and delegates to recovery_coordinator viahandle_force_completion() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
-
+        
         Args:
             stream_ctx: The streaming context
 
@@ -4445,84 +4416,15 @@ class AgentOrchestrator(ModeAwareMixin):
             return result.chunks[0]
         return None
 
-    def _format_completion_metrics_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-        elapsed_time: float,
-    ) -> str:
-        """Format completion metrics using the streaming handler.
-
-        DEPRECATED: Use streaming_handler.format_completion_metrics() directly.
-
-        This method delegates to StreamingHandler for proper metrics formatting
-        that includes token counts, cache info, and timing.
-
-        Args:
-            stream_ctx: The streaming context
-            elapsed_time: Elapsed time in seconds
-
-        Returns:
-            Formatted metrics line string
-        """
-        # Delegate to StreamingHandler for proper string formatting
-        return self._streaming_handler.format_completion_metrics(stream_ctx, elapsed_time)
-
-    def _format_budget_exhausted_metrics_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-        elapsed_time: float,
-        time_to_first_token: Optional[float] = None,
-    ) -> str:
-        """Format budget exhausted metrics using the streaming handler.
-
-        DEPRECATED: Use streaming_handler.format_budget_exhausted_metrics() directly.
-
-        This method delegates to StreamingHandler for proper metrics formatting.
-
-        Args:
-            stream_ctx: The streaming context
-            elapsed_time: Elapsed time in seconds
-            time_to_first_token: Optional time to first token
-
-        Returns:
-            Formatted metrics line string
-        """
-        # Delegate to StreamingHandler for proper string formatting
-        return self._streaming_handler.format_budget_exhausted_metrics(
-            stream_ctx, elapsed_time, time_to_first_token
-        )
-
-    def _generate_tool_result_chunks_with_handler(
-        self,
-        result: Dict[str, Any],
-    ) -> List[StreamChunk]:
-        """Generate tool result chunks using the chunk generator.
-
-        DEPRECATED: Use chunk_generator.generate_tool_result_chunks() directly.
-
-        This method delegates to ChunkGenerator for centralized
-        chunk generation. Maintained for backward compatibility.
-
-        Args:
-            result: The tool execution result dictionary
-
-        Returns:
-            List of StreamChunks for the tool result
-        """
-        # Delegate to ChunkGenerator
-        return self._chunk_generator.generate_tool_result_chunks(result)
-
     def _get_recovery_prompts_with_handler(
         self,
         stream_ctx: "StreamingChatContext",
     ) -> List[tuple[str, float]]:
         """Get recovery prompts using the recovery coordinator.
 
-        DEPRECATED: Use recovery_coordinator.get_recovery_prompts() directly.
+        Creates RecoveryContext and delegates to recovery_coordinator viaget_recovery_prompts() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
-
+        
         Args:
             stream_ctx: The streaming context
 
@@ -4551,11 +4453,9 @@ class AgentOrchestrator(ModeAwareMixin):
     ) -> bool:
         """Check if tools should be enabled for recovery using the recovery coordinator.
 
-        DEPRECATED: Use recovery_coordinator.should_use_tools_for_recovery() directly.
+        Creates RecoveryContext and delegates to recovery_coordinator viashould_use_tools_for_recovery() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
-
+        
         Args:
             stream_ctx: The streaming context
             attempt: The recovery attempt number (1-indexed)
@@ -4575,11 +4475,9 @@ class AgentOrchestrator(ModeAwareMixin):
     ) -> str:
         """Get recovery fallback message using the recovery coordinator.
 
-        DEPRECATED: Use recovery_coordinator.get_recovery_fallback_message() directly.
+        Creates RecoveryContext and delegates to recovery_coordinator viaget_recovery_fallback_message() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
-
+        
         Args:
             stream_ctx: The streaming context
 
@@ -4599,11 +4497,9 @@ class AgentOrchestrator(ModeAwareMixin):
     ) -> Optional[StreamChunk]:
         """Handle loop warning using the recovery coordinator.
 
-        DEPRECATED: Use recovery_coordinator.handle_loop_warning() directly.
+        Creates RecoveryContext and delegates to recovery_coordinator viahandle_loop_warning() directly.
 
-        This method delegates to RecoveryCoordinator for centralized
-        recovery logic. Maintained for backward compatibility.
-
+        
         Args:
             stream_ctx: The streaming context
             warning_message: The warning message from unified tracker
@@ -4616,120 +4512,6 @@ class AgentOrchestrator(ModeAwareMixin):
 
         # Delegate to streaming handler (RecoveryCoordinator signature is different)
         return self._streaming_handler.handle_loop_warning(stream_ctx, warning_message)
-
-    def _generate_tool_start_chunk_with_handler(
-        self,
-        tool_name: str,
-        tool_args: Dict[str, Any],
-        status_msg: str,
-    ) -> StreamChunk:
-        """Generate tool start chunk using chunk generator.
-
-        DEPRECATED: Use chunk_generator.generate_tool_start_chunk() directly.
-
-        Args:
-            tool_name: Name of the tool
-            tool_args: Tool arguments
-            status_msg: Status message to display
-
-        Returns:
-            StreamChunk with tool start metadata
-        """
-        return self._chunk_generator.generate_tool_start_chunk(tool_name, tool_args, status_msg)
-
-    def _get_budget_exhausted_chunks_with_handler(
-        self,
-        stream_ctx: "StreamingChatContext",
-    ) -> List[StreamChunk]:
-        """Get budget exhausted warning chunks using chunk generator.
-
-        DEPRECATED: Use chunk_generator.get_budget_exhausted_chunks() directly.
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            List of StreamChunks for budget exhausted warning
-        """
-        return self._chunk_generator.get_budget_exhausted_chunks(stream_ctx)
-
-    def _generate_thinking_status_chunk_with_handler(self) -> StreamChunk:
-        """Generate thinking status chunk using chunk generator.
-
-        DEPRECATED: Use chunk_generator.generate_thinking_status_chunk() directly.
-
-        Returns:
-            StreamChunk with thinking status metadata
-        """
-        return self._chunk_generator.generate_thinking_status_chunk()
-
-    def _generate_budget_error_chunk_with_handler(self) -> StreamChunk:
-        """Generate budget limit error chunk using chunk generator.
-
-        DEPRECATED: Use chunk_generator.generate_budget_error_chunk() directly.
-
-        Returns:
-            StreamChunk with budget limit error message
-        """
-        return self._chunk_generator.generate_budget_error_chunk()
-
-    def _generate_force_response_error_chunk_with_handler(self) -> StreamChunk:
-        """Generate force response error chunk using chunk generator.
-
-        DEPRECATED: Use chunk_generator.generate_force_response_error_chunk() directly.
-
-        Returns:
-            StreamChunk with force response error message
-        """
-        return self._chunk_generator.generate_force_response_error_chunk()
-
-    def _generate_final_marker_chunk_with_handler(self) -> StreamChunk:
-        """Generate final marker chunk using chunk generator.
-
-        DEPRECATED: Use chunk_generator.generate_final_marker_chunk() directly.
-
-        Returns:
-            StreamChunk with is_final=True
-        """
-        return self._chunk_generator.generate_final_marker_chunk()
-
-    def _generate_metrics_chunk_with_handler(
-        self, metrics_line: str, is_final: bool = False, prefix: str = "\n\n"
-    ) -> StreamChunk:
-        """Generate metrics display chunk using chunk generator.
-
-        DEPRECATED: Use chunk_generator.generate_metrics_chunk() directly.
-
-        Args:
-            metrics_line: The formatted metrics line
-            is_final: Whether this is the final chunk
-            prefix: Prefix before metrics line (default: double newline)
-
-        Returns:
-            StreamChunk with formatted metrics content
-        """
-        return self._chunk_generator.generate_metrics_chunk(
-            metrics_line, is_final=is_final, prefix=prefix
-        )
-
-    def _generate_content_chunk_with_handler(
-        self, content: str, is_final: bool = False, suffix: str = ""
-    ) -> StreamChunk:
-        """Generate content chunk using chunk generator.
-
-        DEPRECATED: Use chunk_generator.generate_content_chunk() directly.
-
-        Args:
-            content: The sanitized content to display
-            is_final: Whether this is the final chunk
-            suffix: Optional suffix to append
-
-        Returns:
-            StreamChunk with content and optional suffix
-        """
-        return self._chunk_generator.generate_content_chunk(
-            content, is_final=is_final, suffix=suffix
-        )
 
     def _parse_and_validate_tool_calls(
         self,
@@ -5267,7 +5049,7 @@ class AgentOrchestrator(ModeAwareMixin):
                             sanitized = self._sanitize_response(response.content)
                             if sanitized and len(sanitized) > 20:
                                 self.add_message("assistant", sanitized)
-                                yield self._generate_content_chunk_with_handler(
+                                yield self._chunk_generator.generate_content_chunk(
                                     sanitized, is_final=True
                                 )
                                 recovery_success = True
@@ -5275,7 +5057,7 @@ class AgentOrchestrator(ModeAwareMixin):
                             elif response.content and len(response.content) > 20:
                                 # Use raw if sanitization failed but content exists
                                 self.add_message("assistant", response.content)
-                                yield self._generate_content_chunk_with_handler(
+                                yield self._chunk_generator.generate_content_chunk(
                                     response.content, is_final=True
                                 )
                                 recovery_success = True
@@ -5327,7 +5109,7 @@ class AgentOrchestrator(ModeAwareMixin):
                         user_satisfied=False,
                         completed=False,
                     )
-                    yield self._generate_content_chunk_with_handler(fallback_msg, is_final=True)
+                    yield self._chunk_generator.generate_content_chunk(fallback_msg, is_final=True)
                     return
 
             # Record tool calls in progress tracker for loop detection
@@ -5394,7 +5176,7 @@ class AgentOrchestrator(ModeAwareMixin):
                         sanitized = self._sanitize_response(full_content)
                         if sanitized:
                             logger.debug(f"Yielding content to UI: {len(sanitized)} chars")
-                            yield self._generate_content_chunk_with_handler(sanitized)
+                            yield self._chunk_generator.generate_content_chunk(sanitized)
                             # Track accumulated content - use context method for consistency
                             stream_ctx.accumulate_content(sanitized)
                             logger.debug(
@@ -5497,8 +5279,8 @@ class AgentOrchestrator(ModeAwareMixin):
                         if full_content:
                             sanitized = self._sanitize_response(full_content)
                             if sanitized:
-                                yield self._generate_content_chunk_with_handler(sanitized)
-                        yield self._generate_final_marker_chunk_with_handler()
+                                yield self._chunk_generator.generate_content_chunk(sanitized)
+                        yield self._chunk_generator.generate_final_marker_chunk()
                         return
 
                     # Handle action: prompt_tool_call
@@ -5538,15 +5320,15 @@ class AgentOrchestrator(ModeAwareMixin):
                                     sanitized = self._sanitize_response(response.content)
                                     if sanitized:
                                         self.add_message("assistant", sanitized)
-                                        yield self._generate_content_chunk_with_handler(sanitized)
+                                        yield self._chunk_generator.generate_content_chunk(sanitized)
 
                                 # Display metrics and exit
                                 elapsed_time = time.time() - stream_ctx.start_time
-                                metrics_line = self._format_completion_metrics_with_handler(
+                                metrics_line = self._chunk_generator.format_completion_metrics(
                                     stream_ctx, elapsed_time
                                 )
-                                yield self._generate_metrics_chunk_with_handler(metrics_line)
-                                yield self._generate_final_marker_chunk_with_handler()
+                                yield self._chunk_generator.generate_metrics_chunk(metrics_line)
+                                yield self._chunk_generator.generate_final_marker_chunk()
                                 return
                             except Exception as e:
                                 logger.warning(f"Error forcing final response: {e}")
@@ -5580,14 +5362,14 @@ class AgentOrchestrator(ModeAwareMixin):
                         if full_content:
                             sanitized = self._sanitize_response(full_content)
                             if sanitized:
-                                yield self._generate_content_chunk_with_handler(sanitized)
+                                yield self._chunk_generator.generate_content_chunk(sanitized)
 
                         # Display performance metrics using handler delegation
                         elapsed_time = time.time() - stream_ctx.start_time
-                        metrics_line = self._format_completion_metrics_with_handler(
+                        metrics_line = self._chunk_generator.format_completion_metrics(
                             stream_ctx, elapsed_time
                         )
-                        yield self._generate_metrics_chunk_with_handler(metrics_line)
+                        yield self._chunk_generator.generate_metrics_chunk(metrics_line)
                         # Record outcome for Q-learning (normal completion = success)
                         self._record_intelligent_outcome(
                             success=True,
@@ -5595,7 +5377,7 @@ class AgentOrchestrator(ModeAwareMixin):
                             user_satisfied=True,
                             completed=True,
                         )
-                        yield self._generate_final_marker_chunk_with_handler()
+                        yield self._chunk_generator.generate_final_marker_chunk()
                         return
 
                 # Tool execution section - runs regardless of loop warning
@@ -5617,7 +5399,7 @@ class AgentOrchestrator(ModeAwareMixin):
 
                 if remaining <= 0:
                     # Use handler delegation for budget exhausted chunks (testable)
-                    for chunk in self._get_budget_exhausted_chunks_with_handler(stream_ctx):
+                    for chunk in self._chunk_generator.get_budget_exhausted_chunks(stream_ctx):
                         yield chunk
                     try:
                         self.add_message(
@@ -5635,13 +5417,13 @@ class AgentOrchestrator(ModeAwareMixin):
                         if response and response.content:
                             sanitized = self._sanitize_response(response.content)
                             if sanitized:
-                                yield self._generate_content_chunk_with_handler(
+                                yield self._chunk_generator.generate_content_chunk(
                                     sanitized, suffix="\n"
                                 )
                     except Exception as e:
                         logger.warning(f"Failed to generate final summary: {e}")
                         # Use handler delegation for budget error chunk (testable)
-                        yield self._generate_budget_error_chunk_with_handler()
+                        yield self._chunk_generator.generate_budget_error_chunk()
 
                     # Finalize and display performance metrics using handler delegation
                     final_metrics = self._finalize_stream_metrics()
@@ -5651,7 +5433,7 @@ class AgentOrchestrator(ModeAwareMixin):
                         else time.time() - stream_ctx.start_time
                     )
                     ttft = final_metrics.time_to_first_token if final_metrics else None
-                    metrics_line = self._format_budget_exhausted_metrics_with_handler(
+                    metrics_line = self._chunk_generator.format_budget_exhausted_metrics(
                         stream_ctx, elapsed_time, ttft
                     )
                     # Record outcome for Q-learning (budget reached = partial success)
@@ -5661,7 +5443,7 @@ class AgentOrchestrator(ModeAwareMixin):
                         user_satisfied=True,
                         completed=True,
                     )
-                    yield self._generate_metrics_chunk_with_handler(
+                    yield self._chunk_generator.generate_metrics_chunk(
                         metrics_line, is_final=True, prefix="\n"
                     )
                     return
@@ -5693,11 +5475,11 @@ class AgentOrchestrator(ModeAwareMixin):
                             sanitized = self._sanitize_response(response.content)
                             if sanitized:
                                 self.add_message("assistant", sanitized)
-                                yield self._generate_content_chunk_with_handler(sanitized)
+                                yield self._chunk_generator.generate_content_chunk(sanitized)
                     except Exception as e:
                         logger.warning(f"Error forcing final response: {e}")
                         # Use handler delegation for force response error chunk (testable)
-                        yield self._generate_force_response_error_chunk_with_handler()
+                        yield self._chunk_generator.generate_force_response_error_chunk()
                     return  # Exit the loop after forcing final response
 
                 # Guard against None tool_calls (can happen when model response has no tool calls
@@ -5737,7 +5519,7 @@ class AgentOrchestrator(ModeAwareMixin):
                     # Generate user-friendly status message with relevant context
                     status_msg = self._get_tool_status_message(tool_name, tool_args)
                     # Emit structured tool_start event using handler delegation (testable)
-                    yield self._generate_tool_start_chunk_with_handler(
+                    yield self._chunk_generator.generate_tool_start_chunk(
                         tool_name, tool_args, status_msg
                     )
 
@@ -5748,11 +5530,11 @@ class AgentOrchestrator(ModeAwareMixin):
                 # Generate tool result and preview chunks using handler delegation
                 for result in tool_results:
                     tool_name = result.get("name", "tool")
-                    for chunk in self._generate_tool_result_chunks_with_handler(result):
+                    for chunk in self._chunk_generator.generate_tool_result_chunks(result):
                         yield chunk
 
                 # Use handler delegation for thinking status chunk (testable)
-                yield self._generate_thinking_status_chunk_with_handler()
+                yield self._chunk_generator.generate_thinking_status_chunk()
 
                 # Update reminder manager state and inject consolidated reminder if needed
                 # This replaces the previous per-tool-call evidence injection with smart throttling
