@@ -712,12 +712,12 @@ class AgentOrchestrator(ModeAwareMixin):
         self._observability = self._factory.create_observability()
 
         # =================================================================
-        # Workflow Fix Components (v2) - MODE workflow optimizations
+        # Workflow Optimization Components - MODE workflow optimizations
         # These address issues identified during EXPLORE/PLAN/BUILD testing
         # =================================================================
 
-        # Initialize workflow fix components (via factory)
-        self._workflow_fixes = self._factory.create_workflow_fix_components(
+        # Initialize workflow optimization components (via factory)
+        self._workflow_optimization = self._factory.create_workflow_optimization_components(
             timeout_seconds=getattr(settings, "execution_timeout", None)
         )
 
@@ -734,7 +734,7 @@ class AgentOrchestrator(ModeAwareMixin):
             "ConversationController, ToolPipeline, StreamingController, StreamingChatHandler, "
             "TaskAnalyzer, ContextCompactor, UsageAnalytics, ToolSequenceTracker, "
             "ToolOutputFormatter, RecoveryCoordinator, ChunkGenerator, ToolPlanner, TaskCoordinator, "
-            "ObservabilityIntegration, WorkflowFixes(v2)"
+            "ObservabilityIntegration, WorkflowOptimization"
         )
 
     # =====================================================================

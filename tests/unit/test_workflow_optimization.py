@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Comprehensive tests for workflow fixes v2.
+"""Comprehensive tests for workflow optimization components.
 
 Tests all 6 components introduced to address MODE workflow issues:
-1. TaskCompletionDetector - Issue #1
-2. ReadResultCache - Issue #2
-3. TimeAwareExecutor - Issue #3
-4. ThinkingPatternDetector - Issue #4
-5. ResourceManager - Issue #5
-6. ModeCompletionCriteria - Issue #6
+1. TaskCompletionDetector - Task completion detection
+2. ReadResultCache - File read deduplication
+3. TimeAwareExecutor - Time-aware execution phases
+4. ThinkingPatternDetector - Thinking loop detection
+5. ResourceManager - Resource lifecycle management
+6. ModeCompletionCriteria - Mode-specific early exit
 
 Reference: workflow-test-issues-v2.md
 """

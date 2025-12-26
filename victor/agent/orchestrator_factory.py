@@ -138,16 +138,16 @@ class RecoveryComponents:
 
 
 @dataclass
-class WorkflowFixComponents:
-    """Components for workflow optimizations (v2 fixes).
+class WorkflowOptimizationComponents:
+    """Components for workflow optimizations.
 
     These components address MODE workflow issues:
-    - Issue #1: Task completion detection
-    - Issue #2: Read result deduplication
-    - Issue #3: Time-aware execution
-    - Issue #4: Thinking pattern detection
-    - Issue #5: Resource lifecycle management
-    - Issue #6: Mode-specific early exit
+    - TaskCompletionDetector: Detects when task objectives are met
+    - ReadResultCache: Caches file reads to prevent redundant operations
+    - TimeAwareExecutor: Manages execution with time budget awareness
+    - ThinkingPatternDetector: Detects and breaks thinking loops
+    - ResourceManager: Centralized resource lifecycle management
+    - ModeCompletionCriteria: Mode-specific early exit detection
     """
 
     task_completion_detector: Optional[Any] = None
@@ -194,8 +194,10 @@ class OrchestratorComponents:
     # Tool output formatter
     tool_output_formatter: Optional["ToolOutputFormatter"] = None
 
-    # Workflow optimizations (v2 fixes)
-    workflow_fixes: WorkflowFixComponents = field(default_factory=WorkflowFixComponents)
+    # Workflow optimizations
+    workflow_optimization: WorkflowOptimizationComponents = field(
+        default_factory=WorkflowOptimizationComponents
+    )
 
 
 class OrchestratorFactory(ModeAwareMixin):
@@ -1846,7 +1848,7 @@ class OrchestratorFactory(ModeAwareMixin):
         return manager
 
     # =========================================================================
-    # Workflow Fix Components (v2)
+    # Workflow Optimization Components
     # =========================================================================
 
     def create_task_completion_detector(self) -> Any:
@@ -1959,18 +1961,18 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ModeCompletionCriteria created")
         return criteria
 
-    def create_workflow_fix_components(
+    def create_workflow_optimization_components(
         self, timeout_seconds: Optional[float] = None
-    ) -> WorkflowFixComponents:
-        """Create all workflow fix components.
+    ) -> WorkflowOptimizationComponents:
+        """Create all workflow optimization components.
 
         Args:
             timeout_seconds: Execution timeout for time-aware executor
 
         Returns:
-            WorkflowFixComponents with all v2 fix components
+            WorkflowOptimizationComponents with all optimization components
         """
-        return WorkflowFixComponents(
+        return WorkflowOptimizationComponents(
             task_completion_detector=self.create_task_completion_detector(),
             read_cache=self.create_read_cache(),
             time_aware_executor=self.create_time_aware_executor(timeout_seconds),

@@ -31,7 +31,7 @@ from victor.agent.orchestrator_factory import (
     StreamingComponents,
     AnalyticsComponents,
     RecoveryComponents,
-    WorkflowFixComponents,
+    WorkflowOptimizationComponents,
 )
 
 
@@ -553,12 +553,12 @@ class TestCreateUsageLogger:
 
 
 # =============================================================================
-# Workflow Fix Components Tests (v2)
+# Workflow Optimization Components Tests
 # =============================================================================
 
 
-class TestWorkflowFixComponents:
-    """Tests for workflow v2 fix component factory methods."""
+class TestWorkflowOptimizationComponents:
+    """Tests for workflow optimization component factory methods."""
 
     def test_create_task_completion_detector(self, factory):
         """create_task_completion_detector returns TaskCompletionDetector."""
@@ -648,17 +648,17 @@ class TestWorkflowFixComponents:
         from victor.agent.budget_manager import ModeCompletionCriteria
         assert isinstance(criteria, ModeCompletionCriteria)
 
-    def test_create_workflow_fix_components(self, factory):
-        """create_workflow_fix_components returns all components."""
+    def test_create_workflow_optimization_components(self, factory):
+        """create_workflow_optimization_components returns all components."""
         from victor.agent.resource_manager import ResourceManager
 
         # Reset singleton for test
         ResourceManager._instance = None
 
-        components = factory.create_workflow_fix_components(timeout_seconds=30.0)
+        components = factory.create_workflow_optimization_components(timeout_seconds=30.0)
 
-        from victor.agent.orchestrator_factory import WorkflowFixComponents
-        assert isinstance(components, WorkflowFixComponents)
+        from victor.agent.orchestrator_factory import WorkflowOptimizationComponents
+        assert isinstance(components, WorkflowOptimizationComponents)
         assert components.task_completion_detector is not None
         assert components.read_cache is not None
         assert components.time_aware_executor is not None
