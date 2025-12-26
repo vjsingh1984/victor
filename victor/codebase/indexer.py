@@ -1078,7 +1078,20 @@ class CodebaseIndex:
     ) -> List[str]:
         """Extract identifier references using tree-sitter when available."""
         refs: Set[str] = set(fallback_calls) | set(imports)
-        query_src = REFERENCE_QUERIES.get(language)
+
+        # PRIMARY: Get reference query from language plugin
+        query_src = None
+        try:
+            plugin = self._language_registry.get(language)
+            if plugin and plugin.tree_sitter_queries.references:
+                query_src = plugin.tree_sitter_queries.references
+        except Exception:
+            pass
+
+        # FALLBACK: Use legacy static dictionary (for languages not yet migrated)
+        if not query_src:
+            query_src = REFERENCE_QUERIES.get(language)
+
         if not query_src:
             return list(refs)
         try:

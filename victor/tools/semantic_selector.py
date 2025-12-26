@@ -69,73 +69,25 @@ class SemanticToolSelector:
     - Self-improving with better tool descriptions
     """
 
-    # Class-level cache for tool knowledge loaded from YAML
-    _tool_knowledge: ClassVar[Optional[Dict[str, Dict[str, Any]]]] = None
-    _tool_knowledge_loaded: ClassVar[bool] = False
-
-    @classmethod
-    def _load_tool_knowledge(cls) -> Dict[str, Dict[str, Any]]:
-        """Load tool knowledge from YAML file (DEPRECATED).
-
-        NOTE: This is a legacy fallback for tools that don't implement
-        the ToolMetadataProvider contract (get_metadata()). New tools
-        should use inline metadata via @tool decorator or metadata property.
-
-        The tool_knowledge.yaml file has been archived. All tools should
-        now provide metadata via get_metadata() which auto-generates from
-        tool properties if not explicitly defined.
-
-        Returns:
-            Dictionary mapping tool names to their knowledge (use_cases, keywords, examples)
-        """
-        if cls._tool_knowledge_loaded:
-            # Return cached value (don't use `or {}` as empty dict is falsy)
-            return cls._tool_knowledge if cls._tool_knowledge is not None else {}
-
-        # tool_knowledge.yaml is deprecated and archived
-        # Return empty dict - all metadata now comes from get_metadata()
-        cls._tool_knowledge = {}
-        cls._tool_knowledge_loaded = True
-        logger.debug(
-            "tool_knowledge.yaml is deprecated. All tools should use get_metadata() "
-            "for metadata discovery (auto-generated or explicit)."
-        )
-        return cls._tool_knowledge
+    # NOTE: _load_tool_knowledge() and related class variables were removed.
+    # All tools now provide metadata via get_metadata() which auto-generates
+    # from tool properties. Legacy tool_knowledge.yaml has been archived.
 
     @classmethod
     def _build_use_case_text(cls, tool_name: str) -> str:
-        """Build use case text from loaded tool knowledge.
+        """Build use case text for embedding (legacy method, returns empty).
+
+        NOTE: This method previously loaded from tool_knowledge.yaml which
+        has been archived. All metadata now comes from get_metadata().
+        Kept for API compatibility but always returns empty string.
 
         Args:
-            tool_name: Name of the tool
+            tool_name: Name of the tool (unused)
 
         Returns:
-            Formatted use case text for embedding
+            Empty string - use get_metadata() for tool metadata
         """
-        knowledge = cls._load_tool_knowledge()
-
-        if tool_name not in knowledge:
-            return ""
-
-        tool_data = knowledge[tool_name]
-        parts = []
-
-        # Add use cases
-        use_cases = tool_data.get("use_cases", [])
-        if use_cases:
-            parts.append(f"Use for: {', '.join(use_cases)}.")
-
-        # Add keywords
-        keywords = tool_data.get("keywords", [])
-        if keywords:
-            parts.append(f"Common requests: {', '.join(keywords)}.")
-
-        # Add examples
-        examples = tool_data.get("examples", [])
-        if examples:
-            parts.append(f"Examples: {', '.join(examples)}.")
-
-        return " ".join(parts)
+        return ""
 
     def __init__(
         self,
