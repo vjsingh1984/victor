@@ -84,8 +84,8 @@ class TestModeConfig:
         # Should have sandbox configuration
         assert config.sandbox_dir == ".victor/sandbox"
         assert config.allow_sandbox_edits is True
-        # Should have exploration multiplier for plan mode
-        assert config.exploration_multiplier == 2.5
+        # Should have high exploration multiplier for plan mode (like Claude Code)
+        assert config.exploration_multiplier == 10.0
 
     def test_explore_mode_config(self):
         """Test EXPLORE mode configuration."""
@@ -103,8 +103,8 @@ class TestModeConfig:
         # Should have sandbox configuration
         assert config.sandbox_dir == ".victor/sandbox"
         assert config.allow_sandbox_edits is True
-        # Should have exploration multiplier for explore mode
-        assert config.exploration_multiplier == 3.0
+        # Should have very high exploration multiplier for explore mode (like Claude Code)
+        assert config.exploration_multiplier == 20.0
 
 
 class TestAgentModeController:

@@ -126,13 +126,15 @@ class BudgetLimits:
     - warning_threshold_pct (0.83) gives early warning at 250/300 calls
     """
 
-    simple_task: int = 5  # Was 2 - increased for more thorough exploration
-    medium_task: int = 15  # Was 6 - better for multi-file tasks
-    complex_task: int = 30  # Was 15 - allows deeper analysis
-    action_task: int = 75  # Was 50 - more room for building features
-    analysis_task: int = 100  # Was 60 - thorough codebase exploration
-    max_session_budget: int = 500  # Was 300 - more room for complex sessions
-    warning_threshold_pct: float = 0.80  # 400/500
+    # Significantly increased to match Claude Code's approach of unlimited exploration
+    # Claude Code lets the model explore as much as needed to complete the task
+    simple_task: int = 20  # Quick tasks still bounded (was 5)
+    medium_task: int = 50  # Multi-file tasks need room (was 15)
+    complex_task: int = 100  # Complex tasks get generous budget (was 30)
+    action_task: int = 200  # BUILD mode tasks - let task completion decide (was 75)
+    analysis_task: int = 500  # PLAN/EXPLORE modes - effectively unlimited (was 100)
+    max_session_budget: int = 2000  # Very high - rely on task completion detection (was 500)
+    warning_threshold_pct: float = 0.90  # Only warn at 90% (1800/2000)
 
 
 @dataclass(frozen=True)

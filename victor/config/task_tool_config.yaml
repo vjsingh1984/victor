@@ -13,7 +13,7 @@
 task_types:
   edit:
     description: "Modify existing code/files"
-    max_exploration_iterations: 8  # Increased from 3 - edits often need context gathering
+    max_exploration_iterations: 50  # Generous exploration like Claude Code (was 8)
     force_action_after_target_read: true
 
     # Tools required to complete this task type
@@ -47,7 +47,7 @@ task_types:
 
   search:
     description: "Find/locate code or files"
-    max_exploration_iterations: 8
+    max_exploration_iterations: 100  # Very generous for thorough search (was 8)
     force_action_after_target_read: false
 
     required_tools:
@@ -75,7 +75,7 @@ task_types:
 
   create:
     description: "Write new files"
-    max_exploration_iterations: 8  # Increased from 3 - creates often need context gathering
+    max_exploration_iterations: 50  # Generous exploration like Claude Code (was 8)
     force_action_after_target_read: false
 
     required_tools:
@@ -103,7 +103,7 @@ task_types:
 
   analyze:
     description: "Count, measure, analyze code"
-    max_exploration_iterations: 20
+    max_exploration_iterations: 200  # Very generous for thorough analysis (was 20)
     force_action_after_target_read: false
 
     required_tools:
@@ -131,7 +131,7 @@ task_types:
 
   design:
     description: "Architecture/design questions - requires codebase exploration"
-    max_exploration_iterations: 20  # Design tasks need thorough exploration
+    max_exploration_iterations: 500  # Effectively unlimited like Claude Code (was 20)
     force_action_after_target_read: false
     needs_tools: true  # Design tasks NEED tools to explore the codebase
 
@@ -160,7 +160,7 @@ task_types:
 
   general:
     description: "Ambiguous or general help"
-    max_exploration_iterations: 15
+    max_exploration_iterations: 100  # Generous for general tasks (was 15)
     force_action_after_target_read: false
 
     required_tools:

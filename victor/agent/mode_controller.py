@@ -88,7 +88,7 @@ You are in BUILD mode - focused on implementation and code modification.
             "bash": 1.1,
             "git_status": 1.0,
         },
-        exploration_multiplier=2.0,  # 2x exploration for reading before writing
+        exploration_multiplier=5.0,  # 5x exploration for reading before writing (was 2x)
     ),
     AgentMode.PLAN: ModeConfig(
         name="Plan",
@@ -152,7 +152,7 @@ WORKFLOW:
             "dependency_graph": 1.2,
             "plan_files": 1.5,
         },
-        exploration_multiplier=2.5,  # 2.5x more exploration in plan mode
+        exploration_multiplier=10.0,  # 10x exploration in plan mode (effectively unlimited like Claude Code)
         sandbox_dir=".victor/sandbox",
         allow_sandbox_edits=True,
     ),
@@ -215,7 +215,7 @@ WORKFLOW:
             "semantic_code_search": 1.2,
             "list_directory": 1.1,
         },
-        exploration_multiplier=3.0,  # 3x more exploration in explore mode
+        exploration_multiplier=20.0,  # 20x exploration in explore mode (effectively unlimited like Claude Code)
         sandbox_dir=".victor/sandbox",
         allow_sandbox_edits=True,
     ),
