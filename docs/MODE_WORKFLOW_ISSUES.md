@@ -6,12 +6,26 @@ Testing of EXPLORE, PLAN, and BUILD modes across OpenAI and DeepSeek providers r
 
 | Mode | Provider | Status | Issues |
 |------|----------|--------|--------|
-| EXPLORE | OpenAI | ✅ Works | Path resolution (subdirectory prefix) |
-| EXPLORE | DeepSeek | ✅ Works | Path resolution issues |
-| PLAN | OpenAI | ⚠️ Partial | Hit exploration limit early |
-| PLAN | DeepSeek | ❌ Issues | File reading loop/timeout |
-| BUILD | OpenAI | ❌ Broken | Uses shell_readonly, can't create files |
-| BUILD | DeepSeek | ❌ Timeout | Timeouts on file creation |
+| EXPLORE | OpenAI | ✅ Works | Path resolution fixed |
+| EXPLORE | DeepSeek | ✅ Works | Path resolution fixed |
+| PLAN | OpenAI | ✅ Works | Exploration multiplier 2.5x applied |
+| PLAN | DeepSeek | ⚠️ Partial | May timeout on complex tasks |
+| BUILD | OpenAI | ✅ Works | Shell access, write tools, exploration multiplier 2.0x |
+| BUILD | DeepSeek | ⚠️ Partial | May timeout on complex tasks |
+
+## Implementation Status (December 2025)
+
+All 5 issues have been implemented:
+
+| Issue | Status | Commit |
+|-------|--------|--------|
+| Issue 1: shell_readonly in BUILD mode | ✅ Fixed | c8c7026 |
+| Issue 2: Path resolution (subdirectory prefix) | ✅ Fixed | c8c7026 |
+| Issue 3: Mode controller integration | ✅ Fixed | c8c7026 |
+| Issue 4: Exploration limit for BUILD | ✅ Fixed | c8c7026 |
+| Issue 5: Vertical tool filtering override | ✅ Fixed | c8c7026 |
+| Additional: Stage filtering in BUILD mode | ✅ Fixed | 925cc50 |
+| Additional: exploration_multiplier for BUILD | ✅ Fixed | 925cc50 |
 
 ## Identified Issues
 
