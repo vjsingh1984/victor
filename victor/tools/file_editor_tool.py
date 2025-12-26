@@ -152,9 +152,10 @@ def normalize_edit_operations(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]
         ops: List of raw operation dictionaries
 
     Returns:
-        List of normalized operation dictionaries
+        List of normalized operation dictionaries (non-dicts passed through for validation)
     """
-    return [normalize_edit_operation(op) for op in ops]
+    # Only normalize actual dicts; pass through non-dicts for validation to catch
+    return [normalize_edit_operation(op) if isinstance(op, dict) else op for op in ops]
 
 from victor.editing import FileEditor
 from victor.tools.base import AccessMode, DangerLevel, Priority
