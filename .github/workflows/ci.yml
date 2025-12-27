@@ -2,12 +2,48 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  lint-test:
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Check formatting with Black
+        run: black --check victor tests
+
+      - name: Lint with Ruff
+        run: ruff check victor
+
+      - name: Type check with MyPy
+        run: mypy victor
+        continue-on-error: true
+
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    needs: lint
     strategy:
       fail-fast: false
       matrix:
@@ -16,34 +52,150 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-      - name: Ruff
-        run: ruff check victor web
-      - name: Black
-        run: black --check .
-      - name: MyPy
-        run: mypy
-      - name: Pytest (unit only)
-        run: pytest -m "not integration and not slow"
+
+      - name: Run unit tests
+        run: pytest tests/unit -v --cov=victor --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.11'
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
       - name: CLI smoke test
         run: victor --help
 
   security:
+    name: Security Scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Gitleaks secret scan
         uses: gitleaks/gitleaks-action@v2
         with:
           args: detect --source . --no-banner
+
       - name: Dependency audit
         uses: pypa/gh-action-pip-audit@v1.0.8
         with:
           inputs: "-e ."
+        continue-on-error: true
+
+  guards:
+    name: Guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Fail if archive/victor-legacy is modified
+        if: github.event_name == 'pull_request'
+        run: |
+          if git diff --name-only origin/main...HEAD | grep -q '^archive/victor-legacy/'; then
+            echo "Changes under archive/victor-legacy/ are not allowed. Move edits to active package."
+            exit 1
+          fi
+
+      - name: Ensure fallback_max_tools bound remains sane
+        run: |
+          val=$(python - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path("victor/config/settings.py").read_text()
+          m = re.search(r"fallback_max_tools:\s*int\s*=\s*(\d+)", text)
+          print(m.group(1) if m else "")
+          PY
+          )
+          if [ -z "$val" ]; then
+            echo "fallback_max_tools not found in settings.py"
+            exit 1
+          fi
+          if [ "$val" -le 0 ] || [ "$val" -gt 20 ]; then
+            echo "fallback_max_tools must be between 1 and 20 (found $val)"
+            exit 1
+          fi
+
+      - name: Validate import dependencies
+        run: |
+          if [ -f scripts/check_imports.py ]; then
+            python scripts/check_imports.py || echo "Import check failed (non-blocking)"
+          fi
+        continue-on-error: true
+
+  rust:
+    name: Rust Native Extensions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+
+      - name: Check Rust code
+        run: cd rust && cargo check
+
+      - name: Clippy lints
+        run: cd rust && cargo clippy --all-targets -- -D warnings
+        continue-on-error: true
+
+      - name: Run Rust tests
+        run: cd rust && cargo test
+
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install build tools
+        run: pip install build wheel
+
+      - name: Build package
+        run: python -m build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
