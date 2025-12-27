@@ -206,6 +206,7 @@ class RecoveryCoordinator:
         # Data directory
         if data_dir is None and settings:
             from victor.config.settings import get_project_paths
+
             paths = get_project_paths()
             data_dir = paths.project_victor_dir / "recovery"
 
@@ -306,6 +307,7 @@ class RecoveryCoordinator:
             return False
 
         import re
+
         planning_patterns = [
             r"\bi[''`]?m\s+going\s+to\s+(read|examine|check|call|use)\b",
             r"\bi\s+will\s+now\s+(read|examine|check|call|use)\b",
@@ -413,9 +415,7 @@ class RecoveryCoordinator:
 
         # Handle temperature adjustment
         if result.action == RecoveryAction.ADJUST_TEMPERATURE:
-            new_temp, reason = self._temperature.get_adjusted_temperature(
-                context, session_id
-            )
+            new_temp, reason = self._temperature.get_adjusted_temperature(context, session_id)
             outcome.new_temperature = new_temp
             result.new_temperature = new_temp
 
@@ -568,9 +568,7 @@ class RecoveryCoordinator:
         diagnostics = {
             "recovery_attempts": self._recovery_attempts,
             "recovery_successes": self._recovery_successes,
-            "success_rate": (
-                self._recovery_successes / max(self._recovery_attempts, 1)
-            ),
+            "success_rate": (self._recovery_successes / max(self._recovery_attempts, 1)),
             "strategy_metrics": self._strategy.get_strategy_metrics(),
             "template_stats": self._prompts.get_template_stats(),
             "learned_temperatures": self._temperature.get_learned_optima(),

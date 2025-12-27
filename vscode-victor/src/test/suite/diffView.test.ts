@@ -357,7 +357,7 @@ suite('DiffViewProvider Test Suite', () => {
     suite('Status Bar', () => {
         test('Should format status bar text', () => {
             const formatStatusBar = (totalChanges: number): string => {
-                if (totalChanges === 0) return '';
+                if (totalChanges === 0) {return '';}
                 return `$(git-compare) ${totalChanges} pending`;
             };
 

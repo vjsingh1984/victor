@@ -97,9 +97,7 @@ class ContinuationPatienceLearner(BaseLearner):
         Args:
             outcome: Outcome with continuation patience data
         """
-        context_key = self._get_context_key(
-            outcome.provider, outcome.model, outcome.task_type
-        )
+        context_key = self._get_context_key(outcome.provider, outcome.model, outcome.task_type)
 
         cursor = self.db.cursor()
 
@@ -134,7 +132,7 @@ class ContinuationPatienceLearner(BaseLearner):
 
         flagged_as_stuck = outcome.metadata.get("flagged_as_stuck", False)
         actually_stuck = outcome.metadata.get("actually_stuck", False)
-        made_progress = outcome.metadata.get("eventually_made_progress", False)
+        _made_progress = outcome.metadata.get("eventually_made_progress", False)  # noqa: F841
 
         if flagged_as_stuck and not actually_stuck:
             # False positive: Flagged as stuck but wasn't really stuck
@@ -266,9 +264,9 @@ class ContinuationPatienceLearner(BaseLearner):
 
         # Need at least 5 sessions for confidence
         if stats["total_sessions"] < 5:
-            baseline = self._get_provider_baseline("continuation_patience") or stats[
-                "current_patience"
-            ]
+            baseline = (
+                self._get_provider_baseline("continuation_patience") or stats["current_patience"]
+            )
             return RLRecommendation(
                 value=baseline,
                 confidence=0.0,

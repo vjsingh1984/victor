@@ -326,8 +326,7 @@ class SubAgentOrchestrator:
                 )
 
         logger.info(
-            f"Fan-out: spawning {len(tasks)} sub-agents "
-            f"(max concurrent: {max_concurrent})"
+            f"Fan-out: spawning {len(tasks)} sub-agents " f"(max concurrent: {max_concurrent})"
         )
 
         # Execute all tasks
@@ -344,7 +343,9 @@ class SubAgentOrchestrator:
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 # Convert exception to failed result
-                error_msg = f"Task {i} ({tasks[i].role.value}): {type(result).__name__}: {str(result)}"
+                error_msg = (
+                    f"Task {i} ({tasks[i].role.value}): {type(result).__name__}: {str(result)}"
+                )
                 errors.append(error_msg)
                 processed_results.append(
                     SubAgentResult(

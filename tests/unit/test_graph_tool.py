@@ -975,7 +975,8 @@ class TestFuzzyNodeResolution:
 
         # Find nodes where file contains normalized search term
         file_matches = [
-            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            (nid, n)
+            for nid, n in analyzer_with_named_nodes.nodes.items()
             if n.file and normalized_search in n.file.lower()
         ]
 
@@ -1003,7 +1004,8 @@ class TestFuzzyNodeResolution:
         search_lower = search.lower()
 
         name_matches = [
-            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            (nid, n)
+            for nid, n in analyzer_with_named_nodes.nodes.items()
             if search_lower in n.name.lower()
         ]
 
@@ -1019,7 +1021,8 @@ class TestFuzzyNodeResolution:
         search_lower = search.lower()
 
         matches = [
-            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            (nid, n)
+            for nid, n in analyzer_with_named_nodes.nodes.items()
             if search_lower in n.name.lower()
         ]
 
@@ -1035,7 +1038,8 @@ class TestFuzzyNodeResolution:
         normalized = search.lower()
 
         file_matches = [
-            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            (nid, n)
+            for nid, n in analyzer_with_named_nodes.nodes.items()
             if n.file and normalized in n.file.lower()
         ]
 
@@ -1050,7 +1054,8 @@ class TestFuzzyNodeResolution:
         search_normalized = search.lower().replace("_", "")
 
         partial_matches = [
-            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            (nid, n)
+            for nid, n in analyzer_with_named_nodes.nodes.items()
             if search_normalized in n.name.lower().replace("_", "")
         ]
 
@@ -1065,14 +1070,16 @@ class TestFuzzyNodeResolution:
 
         # Strategy 1: Name substring
         name_matches = [
-            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            (nid, n)
+            for nid, n in analyzer_with_named_nodes.nodes.items()
             if search.lower() in n.name.lower()
         ]
 
         # Strategy 2: File path
         normalized_search = search.lower()
         file_matches = [
-            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            (nid, n)
+            for nid, n in analyzer_with_named_nodes.nodes.items()
             if n.file and normalized_search in n.file.lower()
         ]
 
@@ -1092,7 +1099,8 @@ class TestFuzzyNodeResolution:
         search = "Schema"
 
         name_matches = [
-            (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+            (nid, n)
+            for nid, n in analyzer_with_named_nodes.nodes.items()
             if search.lower() in n.name.lower()
         ]
 
@@ -1106,13 +1114,13 @@ class TestFuzzyNodeResolution:
                 normalized += c.lower()
 
             file_matches = [
-                (nid, n) for nid, n in analyzer_with_named_nodes.nodes.items()
+                (nid, n)
+                for nid, n in analyzer_with_named_nodes.nodes.items()
                 if n.file and normalized in n.file.lower()
             ]
 
             suggestions = [
-                {"name": m.name, "type": m.type, "file": m.file}
-                for _, m in file_matches[:10]
+                {"name": m.name, "type": m.type, "file": m.file} for _, m in file_matches[:10]
             ]
 
             # Suggestions should help user find correct symbols
@@ -1138,8 +1146,7 @@ class TestFuzzyNodeResolutionEdgeCases:
         # Simulate the resolution logic for empty graph
         search = "AnyNode"
         matches = [
-            (nid, n) for nid, n in analyzer.nodes.items()
-            if search.lower() in n.name.lower()
+            (nid, n) for nid, n in analyzer.nodes.items() if search.lower() in n.name.lower()
         ]
 
         assert len(matches) == 0
@@ -1159,8 +1166,7 @@ class TestFuzzyNodeResolutionEdgeCases:
 
         # File matching should handle empty file gracefully
         file_matches = [
-            (nid, n) for nid, n in analyzer.nodes.items()
-            if n.file and "test" in n.file.lower()
+            (nid, n) for nid, n in analyzer.nodes.items() if n.file and "test" in n.file.lower()
         ]
 
         assert len(file_matches) == 0  # Empty file should not match
@@ -1183,7 +1189,8 @@ class TestFuzzyNodeResolutionEdgeCases:
         search_normalized = search.lower().replace("_", "")
 
         matches = [
-            (nid, n) for nid, n in analyzer.nodes.items()
+            (nid, n)
+            for nid, n in analyzer.nodes.items()
             if search_normalized in n.name.lower().replace("_", "")
         ]
 
@@ -1207,7 +1214,13 @@ class TestFuzzyNodeResolutionEdgeCases:
 
         # These modes work on entire graph, not specific nodes
         for mode in skip_modes:
-            assert mode in ["pagerank", "centrality", "stats", "module_pagerank", "module_centrality"]
+            assert mode in [
+                "pagerank",
+                "centrality",
+                "stats",
+                "module_pagerank",
+                "module_centrality",
+            ]
 
 
 class TestIntegrationFuzzyResolution:
@@ -1219,7 +1232,9 @@ class TestIntegrationFuzzyResolution:
         analyzer = GraphAnalyzer()
 
         nodes = [
-            MockGraphNode("db.py:DatabaseConnection", "class", "DatabaseConnection", "utils/db.py", 10),
+            MockGraphNode(
+                "db.py:DatabaseConnection", "class", "DatabaseConnection", "utils/db.py", 10
+            ),
             MockGraphNode("db.py:query", "function", "query", "utils/db.py", 50),
             MockGraphNode("api.py:APIClient", "class", "APIClient", "clients/api.py", 15),
             MockGraphNode("api.py:get", "method", "get", "clients/api.py", 30),
@@ -1236,7 +1251,8 @@ class TestIntegrationFuzzyResolution:
         search = "Database"
 
         name_matches = [
-            (nid, n) for nid, n in real_world_analyzer.nodes.items()
+            (nid, n)
+            for nid, n in real_world_analyzer.nodes.items()
             if search.lower() in n.name.lower()
         ]
 
@@ -1262,7 +1278,8 @@ class TestIntegrationFuzzyResolution:
         search_lower = search.lower()
 
         file_matches = [
-            (nid, n) for nid, n in real_world_analyzer.nodes.items()
+            (nid, n)
+            for nid, n in real_world_analyzer.nodes.items()
             if n.file and search_lower in n.file.lower()
         ]
 

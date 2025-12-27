@@ -114,9 +114,9 @@ suite('ProviderSettingsService Test Suite', () => {
 
         test('Should classify connection speed', () => {
             const classifySpeed = (latencyMs: number): string => {
-                if (latencyMs < 100) return 'excellent';
-                if (latencyMs < 300) return 'good';
-                if (latencyMs < 1000) return 'fair';
+                if (latencyMs < 100) {return 'excellent';}
+                if (latencyMs < 300) {return 'good';}
+                if (latencyMs < 1000) {return 'fair';}
                 return 'poor';
             };
 
@@ -271,7 +271,7 @@ suite('ProviderSettingsService Test Suite', () => {
 
         test('Should mask API keys for display', () => {
             const maskApiKey = (key: string): string => {
-                if (key.length <= 8) return '****';
+                if (key.length <= 8) {return '****';}
                 return key.substring(0, 4) + '...' + key.substring(key.length - 4);
             };
 

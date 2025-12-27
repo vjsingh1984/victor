@@ -311,43 +311,27 @@ class TestToolSelectionWithEmbeddings:
 
 
 class TestToolKnowledge:
-    """Tests for tool knowledge loading from YAML."""
+    """Tests for legacy tool knowledge methods.
 
-    def test_load_tool_knowledge_returns_dict(self):
-        """Test _load_tool_knowledge returns dictionary."""
-        # Reset class-level cache
-        SemanticToolSelector._tool_knowledge = None
-        SemanticToolSelector._tool_knowledge_loaded = False
+    NOTE: _load_tool_knowledge() was removed - it always returned {}.
+    All metadata now comes from get_metadata(). These tests verify
+    the legacy _build_use_case_text() API still works (returns empty).
+    """
 
-        result = SemanticToolSelector._load_tool_knowledge()
-        assert isinstance(result, dict)
+    def test_build_use_case_text_returns_empty(self):
+        """Test _build_use_case_text returns empty for any tool.
 
-    def test_load_tool_knowledge_caches_result(self):
-        """Test _load_tool_knowledge caches result (covers lines 70-71)."""
-        # First call loads
-        SemanticToolSelector._tool_knowledge = None
-        SemanticToolSelector._tool_knowledge_loaded = False
-        result1 = SemanticToolSelector._load_tool_knowledge()
-
-        # Second call should return cached
-        result2 = SemanticToolSelector._load_tool_knowledge()
-        assert result1 is result2
-
-    def test_build_use_case_text_unknown_tool(self):
-        """Test _build_use_case_text returns empty for unknown tool (covers line 111)."""
+        The legacy YAML-based tool knowledge has been removed.
+        This method now always returns empty string.
+        """
         result = SemanticToolSelector._build_use_case_text("unknown_tool_xyz_123")
         assert result == ""
 
-    def test_build_use_case_text_known_tool(self):
-        """Test _build_use_case_text builds text for known tool (covers lines 113-131)."""
-        # Force load knowledge
-        SemanticToolSelector._tool_knowledge = None
-        SemanticToolSelector._tool_knowledge_loaded = False
-
-        # Use a tool that exists in the YAML
         result = SemanticToolSelector._build_use_case_text("read_file")
-        # Should return empty string or use case text depending on YAML content
-        assert isinstance(result, str)
+        assert result == ""
+
+        result = SemanticToolSelector._build_use_case_text("code_search")
+        assert result == ""
 
 
 class TestCacheOperations:

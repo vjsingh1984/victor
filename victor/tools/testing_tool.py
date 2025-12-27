@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import subprocess
 import json
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
+from victor.tools.subprocess_executor import run_command_async, CommandErrorType
 
 
 @tool(
@@ -60,18 +60,27 @@ async def test(
         command.extend(pytest_args)
 
     try:
-        process = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
+        # Build command string for async execution
+        cmd_str = " ".join(command)
+        result = await run_command_async(
+            cmd_str,
             timeout=300,  # 5-minute timeout for tests
+            check_dangerous=False,
         )
+
+        # Handle timeout
+        if result.error_type == CommandErrorType.TIMEOUT:
+            return {"error": "Test execution timed out after 5 minutes."}
+
+        # Handle command not found
+        if result.error_type == CommandErrorType.NOT_FOUND:
+            return {"error": "pytest is not installed or not in the system's PATH."}
 
         if not report_file.exists():
             return {
                 "error": "pytest execution failed or report was not generated.",
-                "stdout": process.stdout,
-                "stderr": process.stderr,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
             }
 
         with open(report_file, "r") as f:
@@ -82,10 +91,6 @@ async def test(
 
         return _summarize_report(report)
 
-    except FileNotFoundError:
-        return {"error": "pytest is not installed or not in the system's PATH."}
-    except subprocess.TimeoutExpired:
-        return {"error": "Test execution timed out after 5 minutes."}
     except Exception as e:
         return {"error": f"An unexpected error occurred: {e}"}
 

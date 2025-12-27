@@ -88,7 +88,7 @@ suite('FileWatcher Test Suite', () => {
 
             const increment = (type: number) => {
                 const event = events.find(e => e.type === type);
-                if (event) event.count++;
+                if (event) {event.count++;}
             };
 
             increment(2);
@@ -348,7 +348,7 @@ suite('FileWatcher Test Suite', () => {
             const maxBatchSize = 10;
 
             const addToBatch = (path: string): boolean => {
-                if (batch.length >= maxBatchSize) return false;
+                if (batch.length >= maxBatchSize) {return false;}
                 batch.push(path);
                 return true;
             };

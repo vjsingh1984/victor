@@ -24,29 +24,15 @@ Features:
 """
 
 import json
-import subprocess
 from typing import Any, Dict, List, Optional, Tuple
 
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
+from victor.tools.subprocess_executor import run_command_async, check_docker_available
 
 
-def _check_docker() -> bool:
-    """Check if Docker CLI is available."""
-    try:
-        subprocess.run(
-            ["docker", "--version"],
-            capture_output=True,
-            check=True,
-            timeout=5,
-        )
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-        return False
-
-
-def _run_docker_command(args: List[str], timeout: int = 30) -> Tuple[bool, str, str]:
-    """Run Docker command.
+async def _run_docker_command_async(args: List[str], timeout: int = 30) -> Tuple[bool, str, str]:
+    """Run Docker command asynchronously.
 
     Args:
         args: Docker command arguments
@@ -55,19 +41,13 @@ def _run_docker_command(args: List[str], timeout: int = 30) -> Tuple[bool, str, 
     Returns:
         Tuple of (success, stdout, stderr)
     """
-    try:
-        result = subprocess.run(
-            ["docker"] + args,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        return result.returncode == 0, result.stdout, result.stderr
-
-    except subprocess.TimeoutExpired:
-        return False, "", "Command timed out"
-    except Exception as e:
-        return False, "", str(e)
+    command = "docker " + " ".join(args)
+    result = await run_command_async(
+        command,
+        timeout=timeout,
+        check_dangerous=False,
+    )
+    return result.success, result.stdout, result.stderr
 
 
 @tool(
@@ -146,7 +126,7 @@ async def docker(
         # List volumes
         docker("volumes")
     """
-    if not _check_docker():
+    if not check_docker_available():
         return {"success": False, "error": "Docker CLI not found. Please install Docker."}
 
     if options is None:
@@ -160,7 +140,7 @@ async def docker(
         if options.get("all"):
             args.append("--all")
 
-        success, stdout, stderr = _run_docker_command(args)
+        success, stdout, stderr = await _run_docker_command_async(args)
         if not success:
             return {"success": False, "error": stderr}
 
@@ -186,7 +166,7 @@ async def docker(
         if operation == "rm" and options.get("force"):
             args.insert(1, "-f")
 
-        success, stdout, stderr = _run_docker_command(args)
+        success, stdout, stderr = await _run_docker_command_async(args)
         if not success:
             return {"success": False, "error": stderr}
 
@@ -207,7 +187,7 @@ async def docker(
             args.append("--follow")
 
         timeout = 60 if options.get("follow") else 30
-        success, stdout, stderr = _run_docker_command(args, timeout=timeout)
+        success, stdout, stderr = await _run_docker_command_async(args, timeout=timeout)
 
         if not success:
             return {"success": False, "error": stderr}
@@ -223,7 +203,7 @@ async def docker(
         if resource_id:
             args.append(resource_id)
 
-        success, stdout, stderr = _run_docker_command(args)
+        success, stdout, stderr = await _run_docker_command_async(args)
         if not success:
             return {"success": False, "error": stderr}
 
@@ -253,7 +233,7 @@ async def docker(
 
         args = ["exec", resource_id] + cmd
 
-        success, stdout, stderr = _run_docker_command(args)
+        success, stdout, stderr = await _run_docker_command_async(args)
 
         return {
             "success": success,
@@ -268,7 +248,7 @@ async def docker(
             return {"success": False, "error": "resource_id required for inspect operation"}
 
         args = ["inspect", resource_id]
-        success, stdout, stderr = _run_docker_command(args)
+        success, stdout, stderr = await _run_docker_command_async(args)
 
         if not success:
             return {"success": False, "error": stderr}
@@ -287,7 +267,7 @@ async def docker(
     elif operation == "images":
         args = ["images", "--format", "json"]
 
-        success, stdout, stderr = _run_docker_command(args)
+        success, stdout, stderr = await _run_docker_command_async(args)
         if not success:
             return {"success": False, "error": stderr}
 
@@ -316,7 +296,7 @@ async def docker(
         if "platform" in options:
             args.extend(["--platform", options["platform"]])
 
-        success, stdout, stderr = _run_docker_command(args, timeout=300)
+        success, stdout, stderr = await _run_docker_command_async(args, timeout=300)
 
         if not success:
             return {"success": False, "error": stderr}
@@ -338,7 +318,7 @@ async def docker(
         if options.get("force"):
             args.insert(1, "-f")
 
-        success, stdout, stderr = _run_docker_command(args)
+        success, stdout, stderr = await _run_docker_command_async(args)
 
         if not success:
             return {"success": False, "error": stderr}
@@ -353,7 +333,7 @@ async def docker(
     elif operation == "networks":
         args = ["network", "ls", "--format", "json"]
 
-        success, stdout, stderr = _run_docker_command(args)
+        success, stdout, stderr = await _run_docker_command_async(args)
         if not success:
             return {"success": False, "error": stderr}
 
@@ -375,7 +355,7 @@ async def docker(
     elif operation == "volumes":
         args = ["volume", "ls", "--format", "json"]
 
-        success, stdout, stderr = _run_docker_command(args)
+        success, stdout, stderr = await _run_docker_command_async(args)
         if not success:
             return {"success": False, "error": stderr}
 

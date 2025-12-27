@@ -481,7 +481,11 @@ async def rename(
     access_mode=AccessMode.WRITE,  # Modifies source files
     danger_level=DangerLevel.LOW,  # Changes are undoable
     keywords=["extract", "refactor", "function", "method", "code block"],
-    mandatory_keywords=["refactor", "extract function", "extract method"],  # From MANDATORY_TOOL_KEYWORDS
+    mandatory_keywords=[
+        "refactor",
+        "extract function",
+        "extract method",
+    ],  # From MANDATORY_TOOL_KEYWORDS
     stages=["execution"],  # Conversation stages where relevant
 )
 async def extract(

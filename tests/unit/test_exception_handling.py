@@ -57,10 +57,7 @@ class TestProviderErrorHandling:
         """Verify ProviderConnectionError is raised with proper context."""
         caplog.set_level(logging.ERROR)
 
-        error = ProviderConnectionError(
-            "Connection failed",
-            provider="test_provider"
-        )
+        error = ProviderConnectionError("Connection failed", provider="test_provider")
 
         assert "Connection failed" in str(error)
         assert error.provider == "test_provider"
@@ -69,10 +66,7 @@ class TestProviderErrorHandling:
 
     def test_provider_auth_error(self, caplog):
         """Verify ProviderAuthError is raised with proper context."""
-        error = ProviderAuthError(
-            "Authentication failed",
-            provider="test_provider"
-        )
+        error = ProviderAuthError("Authentication failed", provider="test_provider")
 
         assert "Authentication failed" in str(error)
         assert error.provider == "test_provider"
@@ -82,9 +76,7 @@ class TestProviderErrorHandling:
     def test_provider_rate_limit_error(self, caplog):
         """Verify ProviderRateLimitError includes retry_after."""
         error = ProviderRateLimitError(
-            "Rate limit exceeded",
-            provider="test_provider",
-            retry_after=60
+            "Rate limit exceeded", provider="test_provider", retry_after=60
         )
 
         assert "Rate limit exceeded" in str(error)
@@ -93,11 +85,7 @@ class TestProviderErrorHandling:
 
     def test_provider_timeout_error(self, caplog):
         """Verify ProviderTimeoutError includes timeout value."""
-        error = ProviderTimeoutError(
-            "Request timeout",
-            provider="test_provider",
-            timeout=30
-        )
+        error = ProviderTimeoutError("Request timeout", provider="test_provider", timeout=30)
 
         assert "Request timeout" in str(error)
         assert error.timeout == 30
@@ -106,8 +94,7 @@ class TestProviderErrorHandling:
     def test_provider_not_found_error(self, caplog):
         """Verify ProviderNotFoundError lists available providers."""
         error = ProviderNotFoundError(
-            provider="unknown_provider",
-            available_providers=["anthropic", "openai", "google"]
+            provider="unknown_provider", available_providers=["anthropic", "openai", "google"]
         )
 
         assert "unknown_provider" in str(error)
@@ -117,9 +104,7 @@ class TestProviderErrorHandling:
         """Verify ProviderInvalidResponseError captures response data."""
         response_data = {"status": "error", "code": 500}
         error = ProviderInvalidResponseError(
-            "Invalid response format",
-            provider="test_provider",
-            response_data=response_data
+            "Invalid response format", provider="test_provider", response_data=response_data
         )
 
         assert "Invalid response format" in str(error)
@@ -141,10 +126,7 @@ class TestToolErrorHandling:
 
     def test_tool_execution_error(self, caplog):
         """Verify ToolExecutionError captures tool context."""
-        error = ToolExecutionError(
-            "Execution failed",
-            tool_name="test_tool"
-        )
+        error = ToolExecutionError("Execution failed", tool_name="test_tool")
 
         assert "Execution failed" in str(error)
         assert error.tool_name == "test_tool"
@@ -153,9 +135,7 @@ class TestToolErrorHandling:
     def test_tool_validation_error(self, caplog):
         """Verify ToolValidationError captures invalid arguments."""
         error = ToolValidationError(
-            "Invalid arguments",
-            tool_name="test_tool",
-            invalid_args=["path", "content"]
+            "Invalid arguments", tool_name="test_tool", invalid_args=["path", "content"]
         )
 
         assert "Invalid arguments" in str(error)
@@ -165,10 +145,7 @@ class TestToolErrorHandling:
 
     def test_tool_timeout_error(self, caplog):
         """Verify ToolTimeoutError includes timeout value."""
-        error = ToolTimeoutError(
-            tool_name="slow_tool",
-            timeout=30
-        )
+        error = ToolTimeoutError(tool_name="slow_tool", timeout=30)
 
         assert "slow_tool" in str(error)
         assert "30 seconds" in str(error)
@@ -181,10 +158,7 @@ class TestConfigurationErrorHandling:
 
     def test_configuration_error(self, caplog):
         """Verify ConfigurationError captures config key."""
-        error = ConfigurationError(
-            "Invalid configuration",
-            config_key="provider"
-        )
+        error = ConfigurationError("Invalid configuration", config_key="provider")
 
         assert "Invalid configuration" in str(error)
         assert error.config_key == "provider"
@@ -192,11 +166,7 @@ class TestConfigurationErrorHandling:
 
     def test_validation_error(self, caplog):
         """Verify ValidationError captures field and value."""
-        error = ValidationError(
-            "Invalid value",
-            field="timeout",
-            value=-1
-        )
+        error = ValidationError("Invalid value", field="timeout", value=-1)
 
         assert "Invalid value" in str(error)
         assert error.field == "timeout"
@@ -217,10 +187,7 @@ class TestFileErrorHandling:
 
     def test_file_error(self, caplog):
         """Verify FileError captures path."""
-        error = FileError(
-            "Permission denied",
-            path="/restricted/file.txt"
-        )
+        error = FileError("Permission denied", path="/restricted/file.txt")
 
         assert "Permission denied" in str(error)
         assert error.path == "/restricted/file.txt"
@@ -231,10 +198,7 @@ class TestNetworkErrorHandling:
 
     def test_network_error(self, caplog):
         """Verify NetworkError captures URL."""
-        error = NetworkError(
-            "Connection failed",
-            url="https://api.example.com"
-        )
+        error = NetworkError("Connection failed", url="https://api.example.com")
 
         assert "Connection failed" in str(error)
         assert error.url == "https://api.example.com"
@@ -275,6 +239,7 @@ class TestErrorHandler:
 
         # Use Python's builtin FileNotFoundError
         import builtins
+
         error = builtins.FileNotFoundError("File not found")
         error_info = handler.handle(error)
 
@@ -310,11 +275,7 @@ class TestErrorSerialization:
 
     def test_error_to_dict(self):
         """Verify VictorError serializes to dict correctly."""
-        error = ProviderError(
-            "Test error",
-            provider="test_provider",
-            model="test_model"
-        )
+        error = ProviderError("Test error", provider="test_provider", model="test_model")
 
         error_dict = error.to_dict()
 
@@ -327,10 +288,7 @@ class TestErrorSerialization:
 
     def test_error_str(self):
         """Verify VictorError __str__ includes recovery hint."""
-        error = ProviderConnectionError(
-            "Connection failed",
-            provider="test"
-        )
+        error = ProviderConnectionError("Connection failed", provider="test")
 
         error_str = str(error)
         assert "Connection failed" in error_str
@@ -363,8 +321,7 @@ class TestExceptionChaining:
                 inner_function()
             except ConnectionError as e:
                 raise ProviderConnectionError(
-                    "Failed to connect to provider",
-                    provider="test"
+                    "Failed to connect to provider", provider="test"
                 ) from e
 
         with pytest.raises(ProviderConnectionError) as exc_info:
@@ -394,15 +351,9 @@ class TestLoggingPatterns:
         """Verify exceptions are logged with extra context."""
         caplog.set_level(logging.ERROR)
 
-        error = ToolExecutionError(
-            "Execution failed",
-            tool_name="test_tool"
-        )
+        error = ToolExecutionError("Execution failed", tool_name="test_tool")
         handler = ErrorHandler()
-        error_info = handler.handle(
-            error,
-            context={"operation": "test_operation", "attempt": 1}
-        )
+        error_info = handler.handle(error, context={"operation": "test_operation", "attempt": 1})
 
         assert error_info.details["operation"] == "test_operation"
         assert error_info.details["attempt"] == 1

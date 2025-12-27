@@ -44,10 +44,10 @@ def serve(
         help="Profile to use for the server",
     ),
     backend: ServerBackend = typer.Option(
-        ServerBackend.AIOHTTP,
+        ServerBackend.FASTAPI,
         "--backend",
         "-b",
-        help="Server backend: 'aiohttp' (legacy) or 'fastapi' (modern with OpenAPI docs)",
+        help="Server backend: 'fastapi' (default, with OpenAPI docs) or 'aiohttp' (legacy)",
     ),
 ):
     """Start the Victor API server for IDE integrations.
@@ -56,9 +56,8 @@ def serve(
     and external tool access.
 
     Examples:
-        victor serve                          # Start with default aiohttp backend
-        victor serve --backend fastapi        # Use modern FastAPI backend with OpenAPI docs
-        victor serve -b fastapi -p 8000       # FastAPI on custom port
+        victor serve                          # Start with FastAPI backend (default)
+        victor serve -p 8000                  # FastAPI on custom port
         victor serve --backend aiohttp        # Use legacy aiohttp backend
     """
     if ctx.invoked_subcommand is None:

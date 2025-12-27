@@ -149,9 +149,7 @@ class ProfileCommand(BaseSlashCommand):
             ):
                 info = ctx.agent.get_current_provider_info()
                 ctx.console.print(f"[green]Switched to profile:[/] [cyan]{profile_name}[/]")
-                ctx.console.print(
-                    f"  [dim]Provider: {info['provider']}, Model: {info['model']}[/]"
-                )
+                ctx.console.print(f"  [dim]Provider: {info['provider']}, Model: {info['model']}[/]")
                 ctx.console.print(
                     f"  [dim]Native tools: {info['native_tool_calls']}, "
                     f"Thinking: {info['thinking_mode']}[/]"
@@ -260,7 +258,11 @@ class ProviderCommand(BaseSlashCommand):
                     if rankings:
                         ctx.console.print("\n[bold]Provider Rankings (RL):[/]")
                         for r in rankings[:5]:
-                            indicator = "current" if r["provider"].lower() == info.get("provider", "").lower() else ""
+                            indicator = (
+                                "current"
+                                if r["provider"].lower() == info.get("provider", "").lower()
+                                else ""
+                            )
                             ctx.console.print(
                                 f"  {r['provider']}: Q={r['q_value']:.2f} "
                                 f"(samples: {r['sample_count']}) {indicator}"

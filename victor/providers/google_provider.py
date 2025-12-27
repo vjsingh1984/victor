@@ -36,8 +36,9 @@ warnings.filterwarnings(
 try:
     from google import genai
     from google.genai import types
+
     # Verify that the Client class is available
-    if not hasattr(genai, 'Client'):
+    if not hasattr(genai, "Client"):
         HAS_GOOGLE_GENAI = False
         genai = None
         types = None
@@ -115,8 +116,7 @@ class GoogleProvider(BaseProvider):
         """
         if not HAS_GOOGLE_GENAI:
             raise ImportError(
-                "google-genai package not installed. "
-                "Install with: pip install google-genai"
+                "google-genai package not installed. " "Install with: pip install google-genai"
             )
         super().__init__(api_key=api_key, timeout=timeout, **kwargs)
 
@@ -126,8 +126,7 @@ class GoogleProvider(BaseProvider):
         # Configure safety settings using string-based thresholds
         threshold = SAFETY_LEVELS.get(safety_level, "BLOCK_NONE")
         self.safety_settings = [
-            types.SafetySetting(category=cat, threshold=threshold)
-            for cat in HARM_CATEGORIES
+            types.SafetySetting(category=cat, threshold=threshold) for cat in HARM_CATEGORIES
         ]
         logger.info(
             f"GoogleProvider initialized with safety_level={safety_level}, categories={len(self.safety_settings)}"
@@ -503,6 +502,7 @@ class GoogleProvider(BaseProvider):
                             else:
                                 # Fallback: try to convert from protobuf Struct
                                 from google.protobuf.json_format import MessageToDict
+
                                 args = MessageToDict(fc.args)
                         except Exception:
                             # Fallback: try direct dict access

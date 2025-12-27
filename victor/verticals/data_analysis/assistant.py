@@ -35,20 +35,20 @@ class DataAnalysisAssistant(VerticalBase):
 
         return [
             # Core filesystem for data files
-            ToolNames.READ,      # read_file → read
-            ToolNames.WRITE,     # write_file → write
-            ToolNames.EDIT,      # edit_files → edit
-            ToolNames.LS,        # list_directory → ls
+            ToolNames.READ,  # read_file → read
+            ToolNames.WRITE,  # write_file → write
+            ToolNames.EDIT,  # edit_files → edit
+            ToolNames.LS,  # list_directory → ls
             # Python/Shell execution for analysis
-            ToolNames.SHELL,     # bash → shell (for running Python scripts)
+            ToolNames.SHELL,  # bash → shell (for running Python scripts)
             # Code generation and search
-            ToolNames.GREP,        # Keyword search
-            ToolNames.CODE_SEARCH, # Semantic code search
-            ToolNames.OVERVIEW,    # codebase_overview → overview
-            ToolNames.GRAPH,       # Code graph analysis (PageRank, dependencies)
+            ToolNames.GREP,  # Keyword search
+            ToolNames.CODE_SEARCH,  # Semantic code search
+            ToolNames.OVERVIEW,  # codebase_overview → overview
+            ToolNames.GRAPH,  # Code graph analysis (PageRank, dependencies)
             # Web for datasets and documentation
             ToolNames.WEB_SEARCH,  # Web search (internet search)
-            ToolNames.WEB_FETCH,   # Fetch URL content
+            ToolNames.WEB_FETCH,  # Fetch URL content
         ]
 
     @classmethod
@@ -206,21 +206,27 @@ When presenting analysis:
     @classmethod
     def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
         from victor.verticals.data_analysis.prompts import DataAnalysisPromptContributor
+
         return DataAnalysisPromptContributor()
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
         from victor.verticals.data_analysis.mode_config import DataAnalysisModeConfigProvider
+
         return DataAnalysisModeConfigProvider()
 
     @classmethod
     def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
         from victor.verticals.data_analysis.safety import DataAnalysisSafetyExtension
+
         return DataAnalysisSafetyExtension()
 
     @classmethod
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
-        from victor.verticals.data_analysis.tool_dependencies import DataAnalysisToolDependencyProvider
+        from victor.verticals.data_analysis.tool_dependencies import (
+            DataAnalysisToolDependencyProvider,
+        )
+
         return DataAnalysisToolDependencyProvider()
 
     @classmethod
@@ -241,14 +247,14 @@ When presenting analysis:
         return TieredToolConfig(
             # Tier 1: Mandatory - always included for any task
             mandatory={
-                ToolNames.READ,      # Read files - essential for data
-                ToolNames.LS,        # List directory - essential
-                ToolNames.GREP,      # Search code/data - essential
+                ToolNames.READ,  # Read files - essential for data
+                ToolNames.LS,  # List directory - essential
+                ToolNames.GREP,  # Search code/data - essential
             },
             # Tier 2: Vertical Core - essential for data analysis tasks
             vertical_core={
-                ToolNames.SHELL,     # Shell commands - core for running Python scripts
-                ToolNames.WRITE,     # Write files - core for saving results
+                ToolNames.SHELL,  # Shell commands - core for running Python scripts
+                ToolNames.WRITE,  # Write files - core for saving results
                 ToolNames.OVERVIEW,  # Codebase overview - core for understanding
             },
             # semantic_pool and stage_tools are now derived from @tool decorator metadata

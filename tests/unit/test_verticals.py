@@ -242,7 +242,7 @@ class TestResearchAssistant:
         assert config is not None
         assert config.system_prompt is not None
         # Check evaluation criteria for research-specific attributes
-        if hasattr(config, 'evaluation_criteria') and config.evaluation_criteria:
+        if hasattr(config, "evaluation_criteria") and config.evaluation_criteria:
             criteria_text = " ".join(config.evaluation_criteria).lower()
             assert "source" in criteria_text or "accuracy" in criteria_text
 
@@ -554,7 +554,12 @@ class TestVerticalProtocolMethods:
         """All built-in verticals should have get_mode_config()."""
         from victor.verticals import DevOpsAssistant, DataAnalysisAssistant
 
-        for vertical in [CodingAssistant, ResearchAssistant, DevOpsAssistant, DataAnalysisAssistant]:
+        for vertical in [
+            CodingAssistant,
+            ResearchAssistant,
+            DevOpsAssistant,
+            DataAnalysisAssistant,
+        ]:
             mode_config = vertical.get_mode_config()
             assert isinstance(mode_config, dict), f"{vertical.name} get_mode_config failed"
             assert len(mode_config) >= 3, f"{vertical.name} missing modes"
@@ -563,7 +568,12 @@ class TestVerticalProtocolMethods:
         """All built-in verticals should have get_task_type_hints()."""
         from victor.verticals import DevOpsAssistant, DataAnalysisAssistant
 
-        for vertical in [CodingAssistant, ResearchAssistant, DevOpsAssistant, DataAnalysisAssistant]:
+        for vertical in [
+            CodingAssistant,
+            ResearchAssistant,
+            DevOpsAssistant,
+            DataAnalysisAssistant,
+        ]:
             hints = vertical.get_task_type_hints()
             assert isinstance(hints, dict), f"{vertical.name} get_task_type_hints failed"
             assert len(hints) >= 5, f"{vertical.name} missing hints"

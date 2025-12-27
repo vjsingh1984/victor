@@ -52,6 +52,17 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 from victor.tools.tool_names import ToolNames, get_canonical_name
 from victor.tools.metadata_registry import get_progress_params as registry_get_progress_params
 
+# Import native extensions with fallback
+try:
+    from victor.native import (
+        compute_signature as native_compute_signature,
+        is_native_available,
+    )
+
+    _NATIVE_AVAILABLE = is_native_available()
+except ImportError:
+    _NATIVE_AVAILABLE = False
+
 if TYPE_CHECKING:
     from victor.agent.complexity_classifier import TaskClassification
 
@@ -528,6 +539,8 @@ class LoopDetector:
     def _get_signature(self, tool_name: str, arguments: Dict[str, Any]) -> str:
         """Generate a signature for loop detection.
 
+        Uses native Rust implementation when available for ~10x speedup.
+
         For progressive tools, includes key parameters to distinguish
         different work from repeated identical calls.
 
@@ -552,8 +565,13 @@ class LoopDetector:
             return "|".join(sig_parts)
         else:
             # For other tools, hash the full arguments
-            args_str = str(sorted(arguments.items()))
-            return f"{tool_name}:{hashlib.md5(args_str.encode()).hexdigest()[:8]}"
+            if _NATIVE_AVAILABLE:
+                # Use native Rust xxHash3 implementation
+                return native_compute_signature(tool_name, arguments)
+            else:
+                # Python fallback with MD5
+                args_str = str(sorted(arguments.items()))
+                return f"{tool_name}:{hashlib.md5(args_str.encode()).hexdigest()[:8]}"
 
     def _get_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
         """Generate a resource key for tracking unique resources.

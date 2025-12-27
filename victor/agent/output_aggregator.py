@@ -134,14 +134,11 @@ class LoggingObserver:
         self._logger.info(f"Aggregation state changed to: {new_state.value}")
 
     def on_result_added(self, result: ToolOutput) -> None:
-        self._logger.debug(
-            f"Tool result added: {result.tool_name} (success={result.success})"
-        )
+        self._logger.debug(f"Tool result added: {result.tool_name} (success={result.success})")
 
     def on_synthesis_ready(self, aggregated: AggregatedResult) -> None:
         self._logger.info(
-            f"Synthesis ready: {aggregated.tool_count} results, "
-            f"state={aggregated.state.value}"
+            f"Synthesis ready: {aggregated.tool_count} results, " f"state={aggregated.state.value}"
         )
 
 
@@ -157,9 +154,7 @@ class MetricsObserver:
         self.state_changes.append((new_state, time.time()))
 
     def on_result_added(self, result: ToolOutput) -> None:
-        self.results_by_tool[result.tool_name] = (
-            self.results_by_tool.get(result.tool_name, 0) + 1
-        )
+        self.results_by_tool[result.tool_name] = self.results_by_tool.get(result.tool_name, 0) + 1
 
     def on_synthesis_ready(self, aggregated: AggregatedResult) -> None:
         self.synthesis_count += 1
@@ -251,9 +246,7 @@ class OutputAggregator:
         # Check for duplicate operations
         if output.args_hash:
             if output.args_hash in self._seen_hashes:
-                self._logger.debug(
-                    f"Duplicate tool call detected: {tool_name} with same args"
-                )
+                self._logger.debug(f"Duplicate tool call detected: {tool_name} with same args")
                 output.metadata["is_duplicate"] = True
             else:
                 self._seen_hashes.add(output.args_hash)
@@ -289,9 +282,7 @@ class OutputAggregator:
             self._state = AggregationState.COMPLETE
 
         if old_state != self._state:
-            self._logger.info(
-                f"State transition: {old_state.value} -> {self._state.value}"
-            )
+            self._logger.info(f"State transition: {old_state.value} -> {self._state.value}")
             for obs in self._observers:
                 try:
                     obs.on_state_change(self._state)
@@ -391,9 +382,7 @@ Instructions:
                 "total_results": len(self._results),
                 "success_rate": sum(1 for r in self._results if r.success)
                 / max(len(self._results), 1),
-                "has_duplicates": any(
-                    r.metadata.get("is_duplicate") for r in self._results
-                ),
+                "has_duplicates": any(r.metadata.get("is_duplicate") for r in self._results),
             },
         )
 
@@ -413,9 +402,7 @@ Instructions:
         factors.append(min(unique_ratio * 1.5, 1.0))
 
         # Factor 3: No duplicates penalty
-        duplicate_count = sum(
-            1 for r in self._results if r.metadata.get("is_duplicate")
-        )
+        duplicate_count = sum(1 for r in self._results if r.metadata.get("is_duplicate"))
         duplicate_penalty = max(0, 1 - (duplicate_count / max(len(self._results), 1)))
         factors.append(duplicate_penalty)
 

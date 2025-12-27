@@ -371,4 +371,215 @@ export function registerCodeActionProviderCommands(
             );
         })
     );
+
+    // Register symbol-based commands (work on symbol at cursor)
+    registerSymbolCommands(context, sendToChat);
+}
+
+/**
+ * Get the symbol range at the current cursor position
+ */
+async function getSymbolAtCursor(): Promise<{ uri: vscode.Uri; range: vscode.Range; name: string; kind: string } | null> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        return null;
+    }
+
+    const document = editor.document;
+    const position = editor.selection.active;
+
+    // Get document symbols
+    const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+        'vscode.executeDocumentSymbolProvider',
+        document.uri
+    );
+
+    if (!symbols || symbols.length === 0) {
+        return null;
+    }
+
+    // Find the smallest symbol containing the cursor
+    const findSymbol = (
+        symbols: vscode.DocumentSymbol[],
+        position: vscode.Position
+    ): vscode.DocumentSymbol | null => {
+        for (const symbol of symbols) {
+            if (symbol.range.contains(position)) {
+                // Check children first for more specific match
+                const child = findSymbol(symbol.children, position);
+                if (child) {
+                    return child;
+                }
+                return symbol;
+            }
+        }
+        return null;
+    };
+
+    const symbol = findSymbol(symbols, position);
+    if (!symbol) {
+        return null;
+    }
+
+    return {
+        uri: document.uri,
+        range: symbol.range,
+        name: symbol.name,
+        kind: vscode.SymbolKind[symbol.kind],
+    };
+}
+
+/**
+ * Register symbol-based AI commands
+ */
+function registerSymbolCommands(
+    context: vscode.ExtensionContext,
+    sendToChat: (message: string) => Promise<void>
+): void {
+    // Ask about symbol
+    context.subscriptions.push(
+        vscode.commands.registerCommand('victor.askAboutSymbol', async () => {
+            const symbol = await getSymbolAtCursor();
+            if (!symbol) {
+                vscode.window.showWarningMessage('No symbol found at cursor position');
+                return;
+            }
+
+            const question = await vscode.window.showInputBox({
+                prompt: `Ask about ${symbol.name}`,
+                placeHolder: 'What does this do? How can I improve it?',
+            });
+
+            if (question) {
+                const document = await vscode.workspace.openTextDocument(symbol.uri);
+                const code = document.getText(symbol.range);
+
+                await sendToChat(
+                    `Question about the ${symbol.kind.toLowerCase()} "${symbol.name}":\n\n${question}\n\n\`\`\`${document.languageId}\n${code}\n\`\`\``
+                );
+                await vscode.commands.executeCommand('victor.chatView.focus');
+            }
+        })
+    );
+
+    // Explain symbol
+    context.subscriptions.push(
+        vscode.commands.registerCommand('victor.explainSymbol', async () => {
+            const symbol = await getSymbolAtCursor();
+            if (!symbol) {
+                vscode.window.showWarningMessage('No symbol found at cursor position');
+                return;
+            }
+
+            const document = await vscode.workspace.openTextDocument(symbol.uri);
+            const code = document.getText(symbol.range);
+
+            await sendToChat(
+                `Explain this ${symbol.kind.toLowerCase()} "${symbol.name}" in detail:\n\n\`\`\`${document.languageId}\n${code}\n\`\`\``
+            );
+            await vscode.commands.executeCommand('victor.chatView.focus');
+        })
+    );
+
+    // Refactor symbol
+    context.subscriptions.push(
+        vscode.commands.registerCommand('victor.refactorSymbol', async () => {
+            const symbol = await getSymbolAtCursor();
+            if (!symbol) {
+                vscode.window.showWarningMessage('No symbol found at cursor position');
+                return;
+            }
+
+            const suggestion = await vscode.window.showInputBox({
+                prompt: `Refactor ${symbol.name}`,
+                placeHolder: 'e.g., Extract helper function, simplify logic, rename variables...',
+            });
+
+            if (suggestion) {
+                const document = await vscode.workspace.openTextDocument(symbol.uri);
+                const code = document.getText(symbol.range);
+
+                await sendToChat(
+                    `Refactor this ${symbol.kind.toLowerCase()} "${symbol.name}" (${suggestion}):\n\n\`\`\`${document.languageId}\n${code}\n\`\`\``
+                );
+                await vscode.commands.executeCommand('victor.chatView.focus');
+            }
+        })
+    );
+
+    // Document symbol
+    context.subscriptions.push(
+        vscode.commands.registerCommand('victor.documentSymbol', async () => {
+            const symbol = await getSymbolAtCursor();
+            if (!symbol) {
+                vscode.window.showWarningMessage('No symbol found at cursor position');
+                return;
+            }
+
+            const document = await vscode.workspace.openTextDocument(symbol.uri);
+            const code = document.getText(symbol.range);
+
+            await sendToChat(
+                `Add comprehensive documentation to this ${symbol.kind.toLowerCase()} "${symbol.name}":\n\n\`\`\`${document.languageId}\n${code}\n\`\`\``
+            );
+            await vscode.commands.executeCommand('victor.chatView.focus');
+        })
+    );
+
+    // Generate tests for symbol
+    context.subscriptions.push(
+        vscode.commands.registerCommand('victor.generateTestsForSymbol', async () => {
+            const symbol = await getSymbolAtCursor();
+            if (!symbol) {
+                vscode.window.showWarningMessage('No symbol found at cursor position');
+                return;
+            }
+
+            const document = await vscode.workspace.openTextDocument(symbol.uri);
+            const code = document.getText(symbol.range);
+
+            await sendToChat(
+                `Generate comprehensive unit tests for this ${symbol.kind.toLowerCase()} "${symbol.name}":\n\n\`\`\`${document.languageId}\n${code}\n\`\`\``
+            );
+            await vscode.commands.executeCommand('victor.chatView.focus');
+        })
+    );
+
+    // Optimize symbol
+    context.subscriptions.push(
+        vscode.commands.registerCommand('victor.optimizeSymbol', async () => {
+            const symbol = await getSymbolAtCursor();
+            if (!symbol) {
+                vscode.window.showWarningMessage('No symbol found at cursor position');
+                return;
+            }
+
+            const document = await vscode.workspace.openTextDocument(symbol.uri);
+            const code = document.getText(symbol.range);
+
+            await sendToChat(
+                `Analyze and optimize this ${symbol.kind.toLowerCase()} "${symbol.name}" for better performance:\n\n\`\`\`${document.languageId}\n${code}\n\`\`\``
+            );
+            await vscode.commands.executeCommand('victor.chatView.focus');
+        })
+    );
+
+    // Review symbol
+    context.subscriptions.push(
+        vscode.commands.registerCommand('victor.reviewSymbol', async () => {
+            const symbol = await getSymbolAtCursor();
+            if (!symbol) {
+                vscode.window.showWarningMessage('No symbol found at cursor position');
+                return;
+            }
+
+            const document = await vscode.workspace.openTextDocument(symbol.uri);
+            const code = document.getText(symbol.range);
+
+            await sendToChat(
+                `Review this ${symbol.kind.toLowerCase()} "${symbol.name}" for:\n- Code quality and best practices\n- Potential bugs\n- Security issues\n- Performance concerns\n\n\`\`\`${document.languageId}\n${code}\n\`\`\``
+            );
+            await vscode.commands.executeCommand('victor.chatView.focus');
+        })
+    );
 }

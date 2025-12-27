@@ -262,20 +262,24 @@ class BaseProviderAdapter:
             if isinstance(call, dict):
                 # OpenAI format
                 func = call.get("function", {})
-                normalized.append(ToolCall(
-                    id=call.get("id", f"call_{i}"),
-                    name=func.get("name", ""),
-                    arguments=func.get("arguments", {}),
-                    raw=call,
-                ))
+                normalized.append(
+                    ToolCall(
+                        id=call.get("id", f"call_{i}"),
+                        name=func.get("name", ""),
+                        arguments=func.get("arguments", {}),
+                        raw=call,
+                    )
+                )
             elif hasattr(call, "function"):
                 # OpenAI object format
-                normalized.append(ToolCall(
-                    id=getattr(call, "id", f"call_{i}"),
-                    name=call.function.name,
-                    arguments=call.function.arguments,
-                    raw=call,
-                ))
+                normalized.append(
+                    ToolCall(
+                        id=getattr(call, "id", f"call_{i}"),
+                        name=call.function.name,
+                        arguments=call.function.arguments,
+                        raw=call,
+                    )
+                )
         return normalized
 
     def should_retry(self, error: Exception) -> Tuple[bool, float]:
@@ -452,12 +456,14 @@ class AnthropicAdapter(BaseProviderAdapter):
         normalized = []
         for i, call in enumerate(raw_calls):
             if isinstance(call, dict) and call.get("type") == "tool_use":
-                normalized.append(ToolCall(
-                    id=call.get("id", f"call_{i}"),
-                    name=call.get("name", ""),
-                    arguments=call.get("input", {}),
-                    raw=call,
-                ))
+                normalized.append(
+                    ToolCall(
+                        id=call.get("id", f"call_{i}"),
+                        name=call.get("name", ""),
+                        arguments=call.get("input", {}),
+                        raw=call,
+                    )
+                )
         return normalized
 
 
@@ -522,29 +528,35 @@ class GoogleAdapter(BaseProviderAdapter):
                 # Google's function_call format
                 if "function_call" in call:
                     fc = call["function_call"]
-                    normalized.append(ToolCall(
-                        id=call.get("id", f"call_{i}"),
-                        name=fc.get("name", ""),
-                        arguments=fc.get("args", {}),
-                        raw=call,
-                    ))
+                    normalized.append(
+                        ToolCall(
+                            id=call.get("id", f"call_{i}"),
+                            name=fc.get("name", ""),
+                            arguments=fc.get("args", {}),
+                            raw=call,
+                        )
+                    )
                 # Direct name/args format
                 elif "name" in call:
-                    normalized.append(ToolCall(
-                        id=call.get("id", f"call_{i}"),
-                        name=call.get("name", ""),
-                        arguments=call.get("args", call.get("arguments", {})),
-                        raw=call,
-                    ))
+                    normalized.append(
+                        ToolCall(
+                            id=call.get("id", f"call_{i}"),
+                            name=call.get("name", ""),
+                            arguments=call.get("args", call.get("arguments", {})),
+                            raw=call,
+                        )
+                    )
             elif hasattr(call, "function_call"):
                 # Google object format
                 fc = call.function_call
-                normalized.append(ToolCall(
-                    id=getattr(call, "id", f"call_{i}"),
-                    name=getattr(fc, "name", ""),
-                    arguments=dict(getattr(fc, "args", {})),
-                    raw=call,
-                ))
+                normalized.append(
+                    ToolCall(
+                        id=getattr(call, "id", f"call_{i}"),
+                        name=getattr(fc, "name", ""),
+                        arguments=dict(getattr(fc, "args", {})),
+                        raw=call,
+                    )
+                )
         return normalized
 
 
@@ -998,21 +1010,25 @@ class BedrockAdapter(BaseProviderAdapter):
             if isinstance(call, dict):
                 # Anthropic Claude format on Bedrock
                 if call.get("type") == "tool_use":
-                    normalized.append(ToolCall(
-                        id=call.get("id", f"call_{i}"),
-                        name=call.get("name", ""),
-                        arguments=call.get("input", {}),
-                        raw=call,
-                    ))
+                    normalized.append(
+                        ToolCall(
+                            id=call.get("id", f"call_{i}"),
+                            name=call.get("name", ""),
+                            arguments=call.get("input", {}),
+                            raw=call,
+                        )
+                    )
                 # OpenAI-like format (Llama, etc.)
                 elif "function" in call:
                     func = call.get("function", {})
-                    normalized.append(ToolCall(
-                        id=call.get("id", f"call_{i}"),
-                        name=func.get("name", ""),
-                        arguments=func.get("arguments", {}),
-                        raw=call,
-                    ))
+                    normalized.append(
+                        ToolCall(
+                            id=call.get("id", f"call_{i}"),
+                            name=func.get("name", ""),
+                            arguments=func.get("arguments", {}),
+                            raw=call,
+                        )
+                    )
         return normalized
 
 

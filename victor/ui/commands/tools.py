@@ -155,6 +155,7 @@ def _list_tools_lightweight() -> None:
     except Exception as e:
         console.print(f"[red]Error discovering tools:[/] {e}")
         import traceback
+
         console.print(traceback.format_exc())
         raise typer.Exit(1)
 

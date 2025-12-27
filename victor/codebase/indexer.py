@@ -1078,7 +1078,20 @@ class CodebaseIndex:
     ) -> List[str]:
         """Extract identifier references using tree-sitter when available."""
         refs: Set[str] = set(fallback_calls) | set(imports)
-        query_src = REFERENCE_QUERIES.get(language)
+
+        # PRIMARY: Get reference query from language plugin
+        query_src = None
+        try:
+            plugin = self._language_registry.get(language)
+            if plugin and plugin.tree_sitter_queries.references:
+                query_src = plugin.tree_sitter_queries.references
+        except Exception:
+            pass
+
+        # FALLBACK: Use legacy static dictionary (for languages not yet migrated)
+        if not query_src:
+            query_src = REFERENCE_QUERIES.get(language)
+
         if not query_src:
             return list(refs)
         try:
@@ -1276,7 +1289,11 @@ class CodebaseIndex:
                     if isinstance(node, py_ast.ClassDef):
                         for base in node.bases:
                             try:
-                                base_name = py_ast.unparse(base) if hasattr(py_ast, "unparse") else getattr(base, "id", None)
+                                base_name = (
+                                    py_ast.unparse(base)
+                                    if hasattr(py_ast, "unparse")
+                                    else getattr(base, "id", None)
+                                )
                             except Exception:
                                 base_name = getattr(base, "id", None)
                             if base_name:

@@ -1555,7 +1555,9 @@ class TestDetermineContinuationAction:
                 "Overall, this is a well-structured codebase with minor areas for improvement."
             )
             # Verify content meets threshold
-            assert len(structured_content) > 500, f"Test content must be >500 chars, got {len(structured_content)}"
+            assert (
+                len(structured_content) > 500
+            ), f"Test content must be >500 chars, got {len(structured_content)}"
             result = orch._determine_continuation_action(
                 intent_result=intent,
                 is_analysis_task=True,
@@ -1601,7 +1603,10 @@ class TestVerticalExtensionSupport:
     def test_apply_vertical_middleware_empty_list(self, orchestrator):
         """apply_vertical_middleware with empty list does nothing."""
         orchestrator.apply_vertical_middleware([])
-        assert not hasattr(orchestrator, "_vertical_middleware") or orchestrator._vertical_middleware == []
+        assert (
+            not hasattr(orchestrator, "_vertical_middleware")
+            or orchestrator._vertical_middleware == []
+        )
 
     def test_apply_vertical_middleware_with_middleware(self, mock_provider, orchestrator_settings):
         """apply_vertical_middleware adds middleware to chain."""
@@ -1609,10 +1614,12 @@ class TestVerticalExtensionSupport:
         class MockMiddleware:
             async def before_tool_call(self, tool_name, arguments):
                 from victor.verticals.protocols import MiddlewareResult
+
                 return MiddlewareResult()
 
             def get_priority(self):
                 from victor.verticals.protocols import MiddlewarePriority
+
                 return MiddlewarePriority.NORMAL
 
             def get_applicable_tools(self):
@@ -1635,9 +1642,14 @@ class TestVerticalExtensionSupport:
     def test_apply_vertical_safety_patterns_empty_list(self, orchestrator):
         """apply_vertical_safety_patterns with empty list does nothing."""
         orchestrator.apply_vertical_safety_patterns([])
-        assert not hasattr(orchestrator, "_vertical_safety_patterns") or orchestrator._vertical_safety_patterns == []
+        assert (
+            not hasattr(orchestrator, "_vertical_safety_patterns")
+            or orchestrator._vertical_safety_patterns == []
+        )
 
-    def test_apply_vertical_safety_patterns_with_patterns(self, mock_provider, orchestrator_settings):
+    def test_apply_vertical_safety_patterns_with_patterns(
+        self, mock_provider, orchestrator_settings
+    ):
         """apply_vertical_safety_patterns adds patterns to safety checker."""
         from dataclasses import dataclass
 
@@ -1676,10 +1688,12 @@ class TestVerticalExtensionSupport:
         class MockMiddleware:
             async def before_tool_call(self, tool_name, arguments):
                 from victor.verticals.protocols import MiddlewareResult
+
                 return MiddlewareResult()
 
             def get_priority(self):
                 from victor.verticals.protocols import MiddlewarePriority
+
                 return MiddlewarePriority.NORMAL
 
             def get_applicable_tools(self):
@@ -1697,6 +1711,7 @@ class TestVerticalExtensionSupport:
 
             assert chain is not None
             from victor.agent.middleware_chain import MiddlewareChain
+
             assert isinstance(chain, MiddlewareChain)
 
 
@@ -1826,6 +1841,7 @@ class TestComponentAccessors:
         # Could be None or ObservabilityIntegration
         if obs is not None:
             from victor.observability.integration import ObservabilityIntegration
+
             assert isinstance(obs, ObservabilityIntegration)
 
     def test_observability_setter(self, orchestrator):
@@ -1906,7 +1922,9 @@ class TestContextLimitCalculation:
             use_mcp_tools=False,
         )
         # Note: arguments order is (settings, provider, model)
-        limit = AgentOrchestrator._calculate_max_context_chars(settings, mock_provider, "test-model")
+        limit = AgentOrchestrator._calculate_max_context_chars(
+            settings, mock_provider, "test-model"
+        )
         assert limit == 50000
 
     @patch("victor.config.config_loaders.get_provider_limits")
@@ -1923,7 +1941,9 @@ class TestContextLimitCalculation:
         mock_limits.context_window = 100000
         mock_get_limits.return_value = mock_limits
 
-        limit = AgentOrchestrator._calculate_max_context_chars(settings, mock_provider, "test-model")
+        limit = AgentOrchestrator._calculate_max_context_chars(
+            settings, mock_provider, "test-model"
+        )
         # 100000 * 3.5 * 0.8 = 280000
         assert limit == 280000
 
@@ -1938,7 +1958,9 @@ class TestContextLimitCalculation:
         )
         mock_get_limits.side_effect = RuntimeError("Config error")
         # Should not raise, falls back to defaults (128000 * 3.5 * 0.8 = 358400)
-        limit = AgentOrchestrator._calculate_max_context_chars(settings, mock_provider, "test-model")
+        limit = AgentOrchestrator._calculate_max_context_chars(
+            settings, mock_provider, "test-model"
+        )
         assert limit == 358400
 
     @patch("victor.config.config_loaders.get_provider_limits")
@@ -1951,12 +1973,14 @@ class TestContextLimitCalculation:
             use_mcp_tools=False,
         )
         mock_limits = MagicMock()
-        mock_limits.context_window = "invalid_value" # Explicitly non-numeric string
+        mock_limits.context_window = "invalid_value"  # Explicitly non-numeric string
         mock_get_limits.return_value = mock_limits
 
         mock_provider.name = "mock_provider"
         # Should handle gracefully and fall back to failsafe (100k tokens)
-        limit = AgentOrchestrator._calculate_max_context_chars(settings, mock_provider, "test-model")
+        limit = AgentOrchestrator._calculate_max_context_chars(
+            settings, mock_provider, "test-model"
+        )
         # 100000 * 3.5 * 0.8 = 280000
         assert limit == 280000
 
@@ -2064,6 +2088,7 @@ class TestMetricsCollector:
         stats = orchestrator._metrics_collector._selection_stats
         assert stats is not None
         from victor.agent.metrics_collector import ToolSelectionStats
+
         assert isinstance(stats, ToolSelectionStats)
 
     def test_classification_stats_attribute(self, orchestrator):
@@ -2071,6 +2096,7 @@ class TestMetricsCollector:
         stats = orchestrator._metrics_collector._classification_stats
         assert stats is not None
         from victor.agent.metrics_collector import ClassificationStats
+
         assert isinstance(stats, ClassificationStats)
 
 
@@ -2137,31 +2163,23 @@ class TestToolStatusMessage:
 
     def test_execute_bash_status(self, orchestrator):
         """Status message for bash command."""
-        msg = orchestrator._get_tool_status_message(
-            "execute_bash", {"command": "ls -la"}
-        )
+        msg = orchestrator._get_tool_status_message("execute_bash", {"command": "ls -la"})
         assert isinstance(msg, str)
         assert "ls -la" in msg or "execute_bash" in msg
 
     def test_read_file_status(self, orchestrator):
         """Status message for read_file."""
-        msg = orchestrator._get_tool_status_message(
-            "read_file", {"path": "/path/to/file.py"}
-        )
+        msg = orchestrator._get_tool_status_message("read_file", {"path": "/path/to/file.py"})
         assert isinstance(msg, str)
 
     def test_code_search_status(self, orchestrator):
         """Status message for code_search."""
-        msg = orchestrator._get_tool_status_message(
-            "code_search", {"query": "function name"}
-        )
+        msg = orchestrator._get_tool_status_message("code_search", {"query": "function name"})
         assert isinstance(msg, str)
 
     def test_unknown_tool_status(self, orchestrator):
         """Status message for unknown tool."""
-        msg = orchestrator._get_tool_status_message(
-            "unknown_tool", {"arg": "value"}
-        )
+        msg = orchestrator._get_tool_status_message("unknown_tool", {"arg": "value"})
         assert isinstance(msg, str)
 
 
@@ -2511,6 +2529,7 @@ class TestSafetyChecker:
         # May be None if disabled
         if checker is not None:
             from victor.agent.safety import SafetyChecker
+
             assert isinstance(checker, SafetyChecker)
 
     def test_set_confirmation_callback(self, orchestrator):
@@ -2588,6 +2607,7 @@ class TestUsageAnalytics:
     def test_usage_analytics_is_singleton(self, orchestrator):
         """UsageAnalytics uses singleton pattern."""
         from victor.agent.usage_analytics import UsageAnalytics
+
         instance = UsageAnalytics.get_instance()
         assert instance is orchestrator._usage_analytics
 
@@ -2643,7 +2663,9 @@ class TestClassifyTaskKeywords:
 
     def test_classify_refactoring(self, orchestrator):
         """Classifies refactoring tasks."""
-        result = orchestrator._classify_task_keywords("Refactor this class to use dependency injection")
+        result = orchestrator._classify_task_keywords(
+            "Refactor this class to use dependency injection"
+        )
         assert isinstance(result, dict)
 
     def test_classify_search(self, orchestrator):
@@ -2944,7 +2966,9 @@ class TestIntelligentPipelineIntegration:
         mock_context.system_prompt = "Extra context"
         mock_integration.prepare_request = AsyncMock(return_value=mock_context)
         # Patch the property to return our mock
-        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)):
+        with patch.object(
+            type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)
+        ):
             result = await orchestrator._prepare_intelligent_request("test task", "analysis")
 
         assert result is not None
@@ -2958,7 +2982,9 @@ class TestIntelligentPipelineIntegration:
         """Test _prepare_intelligent_request handles errors."""
         mock_integration = MagicMock()
         mock_integration.prepare_request = AsyncMock(side_effect=Exception("Pipeline error"))
-        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)):
+        with patch.object(
+            type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)
+        ):
             result = await orchestrator._prepare_intelligent_request("test task", "analysis")
 
         assert result is None
@@ -2976,11 +3002,15 @@ class TestIntelligentPipelineIntegration:
     async def test_validate_intelligent_response_empty_response(self, orchestrator):
         """Test _validate_intelligent_response skips empty responses."""
         mock_integration = MagicMock()
-        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)):
+        with patch.object(
+            type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)
+        ):
             result = await orchestrator._validate_intelligent_response("", "query", 5, "analysis")
             assert result is None
 
-            result = await orchestrator._validate_intelligent_response("short", "query", 5, "analysis")
+            result = await orchestrator._validate_intelligent_response(
+                "short", "query", 5, "analysis"
+            )
             assert result is None
 
     @pytest.mark.asyncio
@@ -2994,7 +3024,9 @@ class TestIntelligentPipelineIntegration:
         mock_result.is_valid = True
         mock_result.grounding_issues = []
         mock_integration.validate_response = AsyncMock(return_value=mock_result)
-        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)):
+        with patch.object(
+            type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)
+        ):
             result = await orchestrator._validate_intelligent_response(
                 "This is a longer response with at least 50 characters for testing purposes.",
                 "query",
@@ -3013,7 +3045,9 @@ class TestIntelligentPipelineIntegration:
         """Test _validate_intelligent_response handles errors."""
         mock_integration = MagicMock()
         mock_integration.validate_response = AsyncMock(side_effect=Exception("Validation error"))
-        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)):
+        with patch.object(
+            type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)
+        ):
             result = await orchestrator._validate_intelligent_response(
                 "This is a longer response with at least 50 characters for testing purposes.",
                 "query",
@@ -3036,7 +3070,9 @@ class TestIntelligentPipelineIntegration:
         mock_pipeline._mode_controller = mock_controller
         mock_integration = MagicMock()
         mock_integration.pipeline = mock_pipeline
-        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)):
+        with patch.object(
+            type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)
+        ):
             orchestrator._record_intelligent_outcome(True, 0.9, True, True)
 
         mock_controller.record_outcome.assert_called_once_with(
@@ -3053,7 +3089,9 @@ class TestIntelligentPipelineIntegration:
         mock_pipeline._mode_controller.record_outcome.side_effect = Exception("Error")
         mock_integration = MagicMock()
         mock_integration.pipeline = mock_pipeline
-        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)):
+        with patch.object(
+            type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)
+        ):
             # Should not raise
             orchestrator._record_intelligent_outcome(True, 0.9, True, True)
 
@@ -3149,6 +3187,7 @@ class TestCancellation:
     def test_request_cancellation(self, orchestrator):
         """Test request_cancellation sets cancel event."""
         import asyncio
+
         # Set up cancel event (normally done during streaming)
         orchestrator._cancel_event = asyncio.Event()
         # Initially not cancelled
@@ -3161,6 +3200,7 @@ class TestCancellation:
     def test_check_cancellation(self, orchestrator):
         """Test _check_cancellation returns event state."""
         import asyncio
+
         # Set up cancel event
         orchestrator._cancel_event = asyncio.Event()
         assert orchestrator._check_cancellation() is False
@@ -3195,6 +3235,7 @@ class TestHandleCancellation:
     def test_handle_cancellation_when_cancelled(self, orchestrator):
         """Test _handle_cancellation returns chunk when cancelled."""
         import asyncio
+
         orchestrator._cancel_event = asyncio.Event()
         orchestrator.request_cancellation()
         result = orchestrator._handle_cancellation(0.5)
@@ -3213,18 +3254,35 @@ class TestResolveShellVariant:
     def test_shell_alias_with_shell_enabled(self, orchestrator):
         """Test shell alias resolves to 'shell' when shell is enabled."""
         from victor.tools.tool_names import ToolNames
+
         orchestrator.tools.is_tool_enabled = MagicMock(side_effect=lambda t: t == ToolNames.SHELL)
         result = orchestrator._resolve_shell_variant("bash")
         assert result == ToolNames.SHELL
 
     def test_shell_alias_with_only_readonly_enabled(self, orchestrator):
-        """Test shell alias resolves to 'shell_readonly' when only readonly enabled."""
+        """Test shell alias resolves to 'shell_readonly' when only readonly enabled.
+
+        This test simulates a non-BUILD mode (e.g., PLAN or EXPLORE) where the full
+        shell is not allowed but shell_readonly is available.
+        """
         from victor.tools.tool_names import ToolNames
+
         def is_enabled(tool):
             return tool == ToolNames.SHELL_READONLY
+
         orchestrator.tools.is_tool_enabled = MagicMock(side_effect=is_enabled)
-        result = orchestrator._resolve_shell_variant("run")
-        assert result == ToolNames.SHELL_READONLY
+
+        # Mock mode controller to return allow_all_tools=False (non-BUILD mode)
+        # so that _resolve_shell_variant checks which tools are enabled
+        mock_controller = MagicMock()
+        mock_controller.config.allow_all_tools = False
+        mock_controller.config.disallowed_tools = {"shell"}  # shell is disallowed
+
+        with patch(
+            "victor.agent.mode_controller.get_mode_controller", return_value=mock_controller
+        ):
+            result = orchestrator._resolve_shell_variant("run")
+            assert result == ToolNames.SHELL_READONLY
 
     def test_shell_alias_with_neither_enabled(self, orchestrator):
         """Test shell alias returns canonical when neither enabled."""
@@ -3236,6 +3294,7 @@ class TestResolveShellVariant:
     def test_various_shell_aliases(self, orchestrator):
         """Test various shell aliases are recognized."""
         from victor.tools.tool_names import ToolNames
+
         orchestrator.tools.is_tool_enabled = MagicMock(side_effect=lambda t: t == ToolNames.SHELL)
 
         aliases = ["run", "bash", "execute", "cmd", "execute_bash"]
@@ -3299,6 +3358,7 @@ class TestGetRecentSessions:
     def test_returns_sessions_from_memory_manager(self, orchestrator):
         """Test returns sessions from memory manager."""
         from datetime import datetime
+
         mock_session = MagicMock()
         mock_session.session_id = "session-1"
         mock_session.created_at = datetime(2024, 1, 1, 12, 0, 0)
@@ -3450,7 +3510,9 @@ class TestGetSessionStats:
         orchestrator._memory_session_id = None
 
         mock_msg = MagicMock()
-        with patch.object(type(orchestrator), "messages", property(lambda self: [mock_msg, mock_msg])):
+        with patch.object(
+            type(orchestrator), "messages", property(lambda self: [mock_msg, mock_msg])
+        ):
             result = orchestrator.get_session_stats()
 
         assert result["enabled"] is False
@@ -3527,6 +3589,7 @@ class TestFilterToolsByIntent:
     def test_filters_write_tools_for_display_only(self, orchestrator):
         """Test filters write tools for DISPLAY_ONLY intent."""
         from victor.agent.action_authorizer import ActionIntent
+
         orchestrator._current_intent = ActionIntent.DISPLAY_ONLY
 
         # Create mock tools with name attribute
@@ -3545,6 +3608,7 @@ class TestFilterToolsByIntent:
     def test_no_filtering_for_write_allowed(self, orchestrator):
         """Test no filtering for WRITE_ALLOWED intent."""
         from victor.agent.action_authorizer import ActionIntent
+
         orchestrator._current_intent = ActionIntent.WRITE_ALLOWED
 
         tools = [{"name": "write_file"}, {"name": "read_file"}]
@@ -3567,36 +3631,28 @@ class TestInferGitOperation:
     def test_infers_status_from_git_status(self, orchestrator):
         """Test infers 'status' from 'git_status' alias."""
         result = orchestrator._infer_git_operation(
-            original_name="git_status",
-            canonical_name="git",
-            args={"command": "status"}
+            original_name="git_status", canonical_name="git", args={"command": "status"}
         )
         assert result["operation"] == "status"
 
     def test_infers_commit_from_git_commit(self, orchestrator):
         """Test infers 'commit' from 'git_commit' alias."""
         result = orchestrator._infer_git_operation(
-            original_name="git_commit",
-            canonical_name="git",
-            args={"command": "-m 'test'"}
+            original_name="git_commit", canonical_name="git", args={"command": "-m 'test'"}
         )
         assert result["operation"] == "commit"
 
     def test_infers_log_from_git_log(self, orchestrator):
         """Test infers 'log' from 'git_log' alias."""
         result = orchestrator._infer_git_operation(
-            original_name="git_log",
-            canonical_name="git",
-            args={}
+            original_name="git_log", canonical_name="git", args={}
         )
         assert result["operation"] == "log"
 
     def test_infers_diff_from_git_diff(self, orchestrator):
         """Test infers 'diff' from 'git_diff' alias."""
         result = orchestrator._infer_git_operation(
-            original_name="git_diff",
-            canonical_name="git",
-            args={}
+            original_name="git_diff", canonical_name="git", args={}
         )
         assert result["operation"] == "diff"
 
@@ -3605,7 +3661,7 @@ class TestInferGitOperation:
         result = orchestrator._infer_git_operation(
             original_name="git_status",
             canonical_name="git",
-            args={"operation": "diff", "command": "status"}
+            args={"operation": "diff", "command": "status"},
         )
         # Existing operation should be preserved
         assert result["operation"] == "diff"
@@ -3614,9 +3670,7 @@ class TestInferGitOperation:
         """Test returns unchanged for non-git tools."""
         args = {"path": "/test"}
         result = orchestrator._infer_git_operation(
-            original_name="read_file",
-            canonical_name="read_file",
-            args=args
+            original_name="read_file", canonical_name="read_file", args=args
         )
         assert result == args
 
@@ -3624,9 +3678,7 @@ class TestInferGitOperation:
         """Test returns unchanged for unknown git aliases."""
         args = {"command": "push"}
         result = orchestrator._infer_git_operation(
-            original_name="git_push",  # Not a recognized alias
-            canonical_name="git",
-            args=args
+            original_name="git_push", canonical_name="git", args=args  # Not a recognized alias
         )
         # No operation should be inferred for unknown aliases
         assert "operation" not in result or result.get("operation") is None
@@ -3640,6 +3692,7 @@ class TestComponentAccessors:
         controller = orchestrator.conversation_controller
         assert controller is not None
         from victor.agent.conversation_controller import ConversationController
+
         assert isinstance(controller, ConversationController)
 
     def test_tool_pipeline_accessor(self, orchestrator):
@@ -3647,6 +3700,7 @@ class TestComponentAccessors:
         pipeline = orchestrator.tool_pipeline
         assert pipeline is not None
         from victor.agent.tool_pipeline import ToolPipeline
+
         assert isinstance(pipeline, ToolPipeline)
 
     def test_streaming_controller_accessor(self, orchestrator):
@@ -3654,6 +3708,7 @@ class TestComponentAccessors:
         controller = orchestrator.streaming_controller
         assert controller is not None
         from victor.agent.streaming_controller import StreamingController
+
         assert isinstance(controller, StreamingController)
 
     def test_streaming_handler_accessor(self, orchestrator):
@@ -3661,6 +3716,7 @@ class TestComponentAccessors:
         handler = orchestrator.streaming_handler
         assert handler is not None
         from victor.agent.streaming import StreamingChatHandler
+
         assert isinstance(handler, StreamingChatHandler)
 
     def test_task_analyzer_accessor(self, orchestrator):
@@ -3668,6 +3724,7 @@ class TestComponentAccessors:
         analyzer = orchestrator.task_analyzer
         assert analyzer is not None
         from victor.agent.task_analyzer import TaskAnalyzer
+
         assert isinstance(analyzer, TaskAnalyzer)
 
     def test_observability_accessor(self, orchestrator):
@@ -3708,6 +3765,7 @@ class TestUsageAnalytics:
         analytics = orchestrator.usage_analytics
         assert analytics is not None
         from victor.agent.usage_analytics import UsageAnalytics
+
         assert isinstance(analytics, UsageAnalytics)
 
 
@@ -3719,6 +3777,7 @@ class TestSequenceTracker:
         tracker = orchestrator.sequence_tracker
         assert tracker is not None
         from victor.agent.tool_sequence_tracker import ToolSequenceTracker
+
         assert isinstance(tracker, ToolSequenceTracker)
 
 
@@ -3730,6 +3789,7 @@ class TestContextCompactor:
         compactor = orchestrator.context_compactor
         assert compactor is not None
         from victor.agent.context_compactor import ContextCompactor
+
         assert isinstance(compactor, ContextCompactor)
 
 
@@ -3742,6 +3802,7 @@ class TestRecoveryHandler:
         # May be None if recovery not configured
         if handler is not None:
             from victor.agent.recovery.handler import RecoveryHandler
+
             assert isinstance(handler, RecoveryHandler)
 
 
@@ -3753,6 +3814,7 @@ class TestProviderManager:
         manager = orchestrator.provider_manager
         assert manager is not None
         from victor.agent.provider_manager import ProviderManager
+
         assert isinstance(manager, ProviderManager)
 
 
@@ -3771,6 +3833,7 @@ class TestCreateBackgroundTask:
     @pytest.mark.asyncio
     async def test_create_background_task(self, orchestrator):
         """Test _create_background_task adds task to background_tasks."""
+
         async def dummy_coro():
             pass
 
@@ -3829,7 +3892,9 @@ class TestShouldContinueIntelligent:
 
     def test_with_no_integration(self, orchestrator):
         """Test returns continue when no integration."""
-        with patch.object(type(orchestrator), "intelligent_integration", property(lambda self: None)):
+        with patch.object(
+            type(orchestrator), "intelligent_integration", property(lambda self: None)
+        ):
             should_continue, reason = orchestrator._should_continue_intelligent()
             assert should_continue is True
             assert "disabled" in reason.lower()
@@ -3843,6 +3908,7 @@ class TestSafetyChecker:
         checker = orchestrator.safety_checker
         assert checker is not None
         from victor.agent.safety import SafetyChecker
+
         assert isinstance(checker, SafetyChecker)
 
 
@@ -3855,6 +3921,7 @@ class TestAutoCommitter:
         # May be None if not enabled
         if committer is not None:
             from victor.agent.auto_commit import AutoCommitter
+
             assert isinstance(committer, AutoCommitter)
 
 
@@ -4240,6 +4307,7 @@ class TestCancelEvent:
     def test_cancel_event_can_be_set(self, orchestrator):
         """Test _cancel_event can be set."""
         import asyncio
+
         orchestrator._cancel_event = asyncio.Event()
         assert orchestrator._cancel_event is not None
 
@@ -5123,9 +5191,7 @@ class TestCheckBlockedThresholdWithHandler:
         ctx.consecutive_blocked_attempts = 1
         ctx.total_blocked_attempts = 2
 
-        result = orchestrator._check_blocked_threshold_with_handler(
-            ctx, all_blocked=False
-        )
+        result = orchestrator._check_blocked_threshold_with_handler(ctx, all_blocked=False)
         assert result is None
 
     def test_returns_tuple_at_threshold(self, orchestrator):
@@ -5145,9 +5211,7 @@ class TestCheckBlockedThresholdWithHandler:
             return_value=(expected_chunk, True)
         )
 
-        result = orchestrator._check_blocked_threshold_with_handler(
-            ctx, all_blocked=True
-        )
+        result = orchestrator._check_blocked_threshold_with_handler(ctx, all_blocked=True)
         assert result is not None
         chunk, should_clear = result
         assert should_clear is True

@@ -9,6 +9,7 @@ from victor.verticals.protocols import ModeConfigProviderProtocol
 @dataclass
 class DevOpsModeConfig:
     """Configuration for a DevOps mode."""
+
     tool_budget: int
     max_iterations: int
     description: str
@@ -33,13 +34,31 @@ DEVOPS_MODE_CONFIGS: Dict[str, DevOpsModeConfig] = {
         tool_budget=40,
         max_iterations=80,
         description="Full infrastructure setup with all stages",
-        allowed_stages=["INITIAL", "ASSESSMENT", "PLANNING", "IMPLEMENTATION", "VALIDATION", "DEPLOYMENT", "MONITORING", "COMPLETION"],
+        allowed_stages=[
+            "INITIAL",
+            "ASSESSMENT",
+            "PLANNING",
+            "IMPLEMENTATION",
+            "VALIDATION",
+            "DEPLOYMENT",
+            "MONITORING",
+            "COMPLETION",
+        ],
     ),
     "migration": DevOpsModeConfig(
         tool_budget=60,
         max_iterations=120,
         description="Large-scale infrastructure migrations",
-        allowed_stages=["INITIAL", "ASSESSMENT", "PLANNING", "IMPLEMENTATION", "VALIDATION", "DEPLOYMENT", "MONITORING", "COMPLETION"],
+        allowed_stages=[
+            "INITIAL",
+            "ASSESSMENT",
+            "PLANNING",
+            "IMPLEMENTATION",
+            "VALIDATION",
+            "DEPLOYMENT",
+            "MONITORING",
+            "COMPLETION",
+        ],
     ),
 }
 

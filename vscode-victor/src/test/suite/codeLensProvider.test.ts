@@ -133,11 +133,11 @@ class Service {
     suite('Symbol Type Inference', () => {
         test('Should infer function type', () => {
             const inferSymbolType = (line: string): string => {
-                if (/function\s+\w+/.test(line)) return 'function';
-                if (/=>\s*{/.test(line) || /=>\s*[^{]/.test(line)) return 'arrow function';
-                if (/class\s+\w+/.test(line)) return 'class';
-                if (/interface\s+\w+/.test(line)) return 'interface';
-                if (/def\s+\w+/.test(line)) return 'function';
+                if (/function\s+\w+/.test(line)) {return 'function';}
+                if (/=>\s*{/.test(line) || /=>\s*[^{]/.test(line)) {return 'arrow function';}
+                if (/class\s+\w+/.test(line)) {return 'class';}
+                if (/interface\s+\w+/.test(line)) {return 'interface';}
+                if (/def\s+\w+/.test(line)) {return 'function';}
                 return 'symbol';
             };
 

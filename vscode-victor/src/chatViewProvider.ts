@@ -61,25 +61,35 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         // Handle messages from the webview - store disposable for cleanup
         const messageListener = webviewView.webview.onDidReceiveMessage(async (data) => {
             this._log?.appendLine(`[Chat] Received message from webview: ${data?.type ?? 'unknown'}`);
-            switch (data.type) {
-                case 'webviewReady':
-                    this._webviewReady = true;
-                    this._log?.appendLine('[Chat] Webview script reported ready');
-                    break;
-                case 'sendClick':
-                    this._log?.appendLine(`[Chat] Webview send clicked (${data.length ?? 0} chars)`);
-                    break;
-                case 'sendMessage':
-                    this._log?.appendLine(`[Chat] Webview requested send (${(data.message ?? '').length} chars)`);
-                    await this.sendMessage(data.message);
-                    break;
-                case 'clearHistory':
-                    this._messages = [];
-                    this._updateMessages();
-                    break;
-                case 'applyCode':
-                    await this._applyCode(data.code, data.file);
-                    break;
+            try {
+                switch (data.type) {
+                    case 'webviewReady':
+                        this._webviewReady = true;
+                        this._log?.appendLine('[Chat] Webview script reported ready');
+                        break;
+                    case 'sendClick':
+                        this._log?.appendLine(`[Chat] Webview send clicked (${data.length ?? 0} chars)`);
+                        break;
+                    case 'sendMessage':
+                        this._log?.appendLine(`[Chat] Webview requested send (${(data.message ?? '').length} chars)`);
+                        await this.sendMessage(data.message);
+                        break;
+                    case 'clearHistory':
+                        this._messages = [];
+                        this._updateMessages();
+                        break;
+                    case 'applyCode':
+                        await this._applyCode(data.code, data.file);
+                        break;
+                }
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                console.error('[Chat] Error handling webview message:', errorMessage);
+                this._log?.appendLine(`[Chat] Error: ${errorMessage}`);
+                // Notify user of error
+                vscode.window.showErrorMessage(`Victor chat error: ${errorMessage}`);
+                // Also update webview to show error state
+                this._postMessage({ type: 'error', message: errorMessage });
             }
         });
         this._disposables.push(messageListener);
@@ -157,10 +167,53 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
         } catch (error) {
             this._log?.appendLine(`[Chat] Error: ${error}`);
+
+            // Format user-friendly error message
+            let errorMessage = 'An unexpected error occurred.';
+            let errorDetails = '';
+
+            if (error instanceof Error) {
+                const errMsg = error.message.toLowerCase();
+
+                if (errMsg.includes('econnrefused') || errMsg.includes('network')) {
+                    errorMessage = 'Unable to connect to Victor server.';
+                    errorDetails = 'Make sure the server is running (victor serve).';
+                } else if (errMsg.includes('timeout') || errMsg.includes('timed out')) {
+                    errorMessage = 'Request timed out.';
+                    errorDetails = 'The server took too long to respond. Try a simpler query.';
+                } else if (errMsg.includes('rate limit') || errMsg.includes('429')) {
+                    errorMessage = 'Rate limit exceeded.';
+                    errorDetails = 'Please wait a moment before trying again.';
+                } else if (errMsg.includes('unauthorized') || errMsg.includes('401')) {
+                    errorMessage = 'Authentication failed.';
+                    errorDetails = 'Check your API key configuration.';
+                } else if (errMsg.includes('500') || errMsg.includes('internal server')) {
+                    errorMessage = 'Server error occurred.';
+                    errorDetails = 'Check the Victor Server output for details.';
+                } else {
+                    errorMessage = error.message;
+                }
+
+                this._log?.appendLine(`[Chat] Error type: ${error.name}, message: ${error.message}`);
+            }
+
             this._postMessage({
                 type: 'error',
-                message: `Error: ${error}`,
+                message: errorMessage,
+                details: errorDetails,
             });
+
+            // Show VS Code notification for connection errors
+            if (errorMessage.includes('connect')) {
+                vscode.window.showWarningMessage(
+                    `Victor: ${errorMessage}`,
+                    'Show Server Output'
+                ).then(selection => {
+                    if (selection === 'Show Server Output') {
+                        vscode.commands.executeCommand('victor.showServerOutput');
+                    }
+                });
+            }
         } finally {
             this._log?.appendLine('[Chat] Done');
             this._postMessage({ type: 'thinking', thinking: false });

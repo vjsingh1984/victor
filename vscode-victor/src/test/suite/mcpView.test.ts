@@ -47,9 +47,9 @@ suite('McpViewProvider Test Suite', () => {
 
         test('Should get status color', () => {
             const getStatusColor = (status: string): string => {
-                if (status === 'connected') return 'green';
-                if (status === 'error') return 'red';
-                if (status === 'connecting') return 'yellow';
+                if (status === 'connected') {return 'green';}
+                if (status === 'error') {return 'red';}
+                if (status === 'connecting') {return 'yellow';}
                 return 'gray';
             };
 
@@ -266,8 +266,8 @@ suite('McpViewProvider Test Suite', () => {
 
         test('Should format uptime', () => {
             const formatUptime = (seconds: number): string => {
-                if (seconds < 60) return `${seconds}s`;
-                if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+                if (seconds < 60) {return `${seconds}s`;}
+                if (seconds < 3600) {return `${Math.floor(seconds / 60)}m`;}
                 return `${Math.floor(seconds / 3600)}h`;
             };
 

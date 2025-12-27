@@ -51,10 +51,8 @@ nosetests.xml
 coverage.xml
 *.coveragerc
 
-# Environment variables
-.env
-.env.local
-.env.*.local
+# Environment variables (use victor keys --keyring for API keys)
+.env*
 
 # Configuration (user-specific)
 *.local.yaml
@@ -177,11 +175,12 @@ vscode-victor/node_modules/
 vscode-victor/out/
 vscode-victor/.vscode-test/
 vscode-victor/*.vsix
+vscode-victor/webview-ui/node_modules/
 
 # Audit logs (contain sensitive metadata - never commit)
 audit/
 docs/security/audit/
-victor/audit/
+# Note: victor/audit/ is source code, not logs - it should be tracked
 *.jsonl
 
 # HumanEval benchmark test outputs (orphaned in root)

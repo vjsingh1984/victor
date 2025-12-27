@@ -170,12 +170,8 @@ class OrchestratorRecoveryIntegration:
         self._state = RecoveryState()
 
         # Configuration
-        self._empty_response_threshold = getattr(
-            settings, "recovery_empty_response_threshold", 3
-        )
-        self._max_recovery_attempts = getattr(
-            settings, "recovery_max_attempts", 5
-        )
+        self._empty_response_threshold = getattr(settings, "recovery_empty_response_threshold", 3)
+        self._max_recovery_attempts = getattr(settings, "recovery_max_attempts", 5)
 
         # Initialize handler with session
         if self._handler:
@@ -379,9 +375,7 @@ class OrchestratorRecoveryIntegration:
                 "consecutive_failures": self._state.consecutive_failures,
                 "recovery_attempts": self._state.recovery_attempts,
                 "last_failure_type": (
-                    self._state.last_failure_type.name
-                    if self._state.last_failure_type
-                    else None
+                    self._state.last_failure_type.name if self._state.last_failure_type else None
                 ),
                 "recent_responses_count": len(self._state.recent_responses),
             },

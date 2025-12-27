@@ -59,9 +59,7 @@ class ParameterInferenceError(Exception):
     def __init__(self, param_name: str, tool_name: str):
         self.param_name = param_name
         self.tool_name = tool_name
-        super().__init__(
-            f"Cannot infer required parameter '{param_name}' for tool '{tool_name}'"
-        )
+        super().__init__(f"Cannot infer required parameter '{param_name}' for tool '{tool_name}'")
 
 
 @dataclass
@@ -165,9 +163,7 @@ class ParameterEnforcer:
                     inferred = self._infer_value(spec, context)
                     if inferred is not None:
                         enforced[name] = inferred
-                        self._logger.debug(
-                            f"Inferred {name}={inferred} for {self.tool_name}"
-                        )
+                        self._logger.debug(f"Inferred {name}={inferred} for {self.tool_name}")
                         continue  # Move to next parameter
 
                 # If we couldn't infer, try defaults or raise error

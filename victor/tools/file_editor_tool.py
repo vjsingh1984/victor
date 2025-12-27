@@ -18,12 +18,150 @@ This tool provides transaction-based file editing with diff preview and
 rollback capability to the agent.
 """
 
-from typing import Any, Dict, List
+import logging
+from typing import Any, Dict, List, Optional
 from pathlib import Path
+
+
+# =============================================================================
+# EDIT OPERATION NORMALIZATION
+# =============================================================================
+# LLMs (especially DeepSeek, Ollama models) often use alternate parameter names.
+# This normalization layer bridges provider-specific formats to our canonical format.
+# =============================================================================
+
+# Maps alternate parameter names to canonical names for edit operations
+EDIT_PARAMETER_ALIASES: Dict[str, str] = {
+    # Path aliases
+    "file_path": "path",
+    "file": "path",
+    "filepath": "path",
+    "filename": "path",
+    # Content aliases for create/modify
+    "new_content": "content",
+    "text": "content",
+    "data": "content",
+    # Replace operation aliases
+    "old": "old_str",
+    "old_string": "old_str",
+    "find": "old_str",
+    "search": "old_str",
+    "new": "new_str",
+    "new_string": "new_str",
+    "replace": "new_str",
+    "replacement": "new_str",
+    # Rename operation aliases
+    "new_name": "new_path",
+    "to": "new_path",
+    "destination": "new_path",
+    "dest": "new_path",
+}
+
+# Maps operation type aliases to canonical types
+EDIT_TYPE_ALIASES: Dict[str, str] = {
+    "write": "create",
+    "add": "create",
+    "new": "create",
+    "update": "modify",
+    "change": "modify",
+    "edit": "modify",
+    "remove": "delete",
+    "rm": "delete",
+    "move": "rename",
+    "mv": "rename",
+    "find_replace": "replace",
+    "substitute": "replace",
+    "sub": "replace",
+}
+
+# Keys that indicate an implicit operation type (when 'type' is missing)
+TYPE_INFERENCE_KEYS: Dict[str, str] = {
+    "old_str": "replace",
+    "old": "replace",
+    "find": "replace",
+    "search": "replace",
+    "new_path": "rename",
+    "new_name": "rename",
+    "destination": "rename",
+}
+
+
+def normalize_edit_operation(op: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize a single edit operation for provider-agnostic handling.
+
+    Handles:
+    1. Parameter name aliases (e.g., 'file_path' -> 'path')
+    2. Operation type aliases (e.g., 'write' -> 'create')
+    3. Type inference from keys (e.g., presence of 'old_str' implies 'replace')
+
+    Args:
+        op: Raw operation dictionary from LLM
+
+    Returns:
+        Normalized operation dictionary with canonical parameter names
+    """
+    logger = logging.getLogger(__name__)
+    normalized: Dict[str, Any] = {}
+    applied_aliases: List[str] = []
+
+    # Step 1: Normalize all parameter names
+    for key, value in op.items():
+        if key in EDIT_PARAMETER_ALIASES:
+            canonical = EDIT_PARAMETER_ALIASES[key]
+            # Only apply if canonical doesn't already have a value
+            if canonical not in normalized or normalized[canonical] is None:
+                normalized[canonical] = value
+                applied_aliases.append(f"{key}->{canonical}")
+        else:
+            # Keep original key
+            normalized[key] = value
+
+    # Step 2: Normalize operation type
+    if "type" in normalized:
+        op_type = normalized["type"]
+        if isinstance(op_type, str) and op_type.lower() in EDIT_TYPE_ALIASES:
+            old_type = normalized["type"]
+            normalized["type"] = EDIT_TYPE_ALIASES[op_type.lower()]
+            applied_aliases.append(f"type:{old_type}->{normalized['type']}")
+
+    # Step 3: Infer type from keys if not specified
+    if "type" not in normalized or not normalized.get("type"):
+        for key, inferred_type in TYPE_INFERENCE_KEYS.items():
+            if key in op:  # Check original op keys too
+                normalized["type"] = inferred_type
+                applied_aliases.append(f"inferred_type:{inferred_type}")
+                break
+        # Default to create if has content but no type
+        if "type" not in normalized and "content" in normalized:
+            normalized["type"] = "create"
+            applied_aliases.append("inferred_type:create")
+
+    if applied_aliases:
+        logger.debug(f"Normalized edit operation: {applied_aliases}")
+
+    return normalized
+
+
+def normalize_edit_operations(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Normalize a list of edit operations.
+
+    This function should be called after JSON parsing but before validation
+    to handle provider-specific parameter variations gracefully.
+
+    Args:
+        ops: List of raw operation dictionaries
+
+    Returns:
+        List of normalized operation dictionaries (non-dicts passed through for validation)
+    """
+    # Only normalize actual dicts; pass through non-dicts for validation to catch
+    return [normalize_edit_operation(op) if isinstance(op, dict) else op for op in ops]
+
 
 from victor.editing import FileEditor
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
+from victor.tools.filesystem import enforce_sandbox_path
 
 
 @tool(
@@ -37,39 +175,70 @@ from victor.tools.decorators import tool
     task_types=["edit", "action"],  # Task types for classification-aware selection
     execution_category="write",  # Cannot run in parallel with conflicting ops
     keywords=["edit", "modify", "replace", "create", "delete", "rename", "file", "text"],
+    # Examples help LLMs understand correct parameter format
+    examples=[
+        'edit(ops=[{"type": "replace", "path": "config.py", "old_str": "DEBUG = True", "new_str": "DEBUG = False"}])',
+        'edit(ops=[{"type": "create", "path": "README.md", "content": "# Project\\nDescription here"}])',
+        'edit(ops=[{"type": "delete", "path": "temp_file.txt"}])',
+        'edit(ops=[{"type": "rename", "path": "old.py", "new_path": "new.py"}])',
+    ],
+    priority_hints=[
+        "The 'ops' parameter is REQUIRED - it must be a list of operation dictionaries",
+        "Each operation needs 'type' (replace/create/delete/rename) and 'path'",
+        "For replace: also include 'old_str' and 'new_str'",
+    ],
 )
 async def edit(
-    ops: List[Dict[str, Any]],
+    ops: Optional[List[Dict[str, Any]]] = None,
     preview: bool = False,
     commit: bool = True,
     desc: str = "",
     ctx: int = 3,
 ) -> Dict[str, Any]:
-    """[TEXT-BASED] Edit files atomically with undo. NOT code-aware.
+    """Edit files atomically with undo. REQUIRED: 'ops' parameter with operation list.
+
+    IMPORTANT: You MUST provide the 'ops' parameter. Example:
+        edit(ops=[{"type": "replace", "path": "file.py", "old_str": "old", "new_str": "new"}])
 
     Performs literal string replacement. Does NOT understand code structure.
     WARNING: May cause false positives in code (e.g., 'foo' matches 'foobar').
     For Python symbol renaming, use rename() from refactor_tool instead.
 
-    Ops: replace/create/modify/delete/rename.
+    Operation types:
+        - replace: Find and replace text. Requires: path, old_str, new_str
+        - create: Create new file. Requires: path, content
+        - modify: Overwrite file content. Requires: path, content
+        - delete: Remove file. Requires: path
+        - rename: Rename/move file. Requires: path, new_path
 
     Args:
-        ops: [{type, path, ...}] - replace needs old_str/new_str
-        preview: Show diff without applying
-        commit: Auto-apply changes
-        desc: Change description
-        ctx: Diff context lines
+        ops: REQUIRED! List of operations. Each op must have 'type' and 'path'.
+             Example: [{"type": "replace", "path": "f.py", "old_str": "x", "new_str": "y"}]
+        preview: Show diff without applying (default: False)
+        commit: Auto-apply changes (default: True)
+        desc: Change description for tracking
+        ctx: Diff context lines (default: 3)
 
     When to use:
         - Config files (JSON, YAML, TOML, etc.)
         - Documentation (Markdown, text files)
-        - Any non-code text changes
-        - Creating/deleting/renaming files
+        - Any text-based file changes
 
-    When NOT to use:
-        - Renaming Python symbols (use rename() instead - AST-aware)
-        - Code refactoring where false positives matter
+    Note:
+        In EXPLORE/PLAN modes, edits are restricted to .victor/sandbox/.
+        Use /mode build to enable unrestricted file edits.
     """
+    # Validate required 'ops' parameter with helpful error message
+    if ops is None:
+        return {
+            "error": "Missing required parameter: 'ops'",
+            "hint": "The 'ops' parameter must be a list of edit operations. Example:\n"
+            '  ops=[{"type": "replace", "path": "file.py", "old_str": "foo", "new_str": "bar"}]\n'
+            '  ops=[{"type": "create", "path": "new_file.txt", "content": "Hello"}]\n'
+            '  ops=[{"type": "delete", "path": "old_file.txt"}]',
+            "success": False,
+        }
+
     # Allow callers (models) to pass ops as a JSON string; normalize to list[dict]
     if isinstance(ops, str):
         import json
@@ -169,6 +338,10 @@ async def edit(
     if not ops:
         return {"success": False, "error": "No operations provided"}
 
+    # Normalize operations to handle provider-specific parameter variations
+    # This bridges LLM-specific formats (e.g., 'file_path' vs 'path') to canonical format
+    ops = normalize_edit_operations(ops)
+
     # Validate operations
     for i, op in enumerate(ops):
         if not isinstance(op, dict):
@@ -218,6 +391,11 @@ async def edit(
             op_type = op["type"]
             path = op["path"]
             file_path = Path(path).expanduser().resolve()
+
+            # Enforce sandbox restrictions in EXPLORE/PLAN modes
+            # (skip for read-only operations if we ever add them)
+            if op_type in ("create", "modify", "delete", "rename", "replace"):
+                enforce_sandbox_path(file_path)
 
             if op_type == "create":
                 content = op.get("content", "")

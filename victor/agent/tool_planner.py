@@ -83,9 +83,7 @@ class ToolPlanner:
     # =====================================================================
 
     def plan_tools(
-        self,
-        goals: List[str],
-        available_inputs: Optional[List[str]] = None
+        self, goals: List[str], available_inputs: Optional[List[str]] = None
     ) -> List["ToolDefinition"]:
         """Plan a sequence of tools to satisfy goals using the dependency graph.
 
@@ -137,9 +135,7 @@ class ToolPlanner:
     # =====================================================================
 
     def filter_tools_by_intent(
-        self,
-        tools: List[Any],
-        current_intent: Optional["ActionIntent"] = None
+        self, tools: List[Any], current_intent: Optional["ActionIntent"] = None
     ) -> List[Any]:
         """Filter tools based on detected user intent.
 

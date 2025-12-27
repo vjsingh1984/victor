@@ -399,9 +399,7 @@ class MCPServer:
 
                 # Write response to stdout using run_in_executor to avoid blocking
                 response_json = json.dumps(response)
-                await loop.run_in_executor(
-                    None, lambda: (print(response_json, flush=True))
-                )
+                await loop.run_in_executor(None, lambda: (print(response_json, flush=True)))
 
             except json.JSONDecodeError as e:
                 error_response = self._create_error(None, -32700, f"Parse error: {str(e)}")

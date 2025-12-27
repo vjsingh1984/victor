@@ -32,7 +32,7 @@ Full API (advanced):
     orchestrator = await AgentOrchestrator.from_settings(settings, "default")
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Vijaykumar Singh"
 __email__ = "singhvjd@gmail.com"
 __license__ = "Apache-2.0"

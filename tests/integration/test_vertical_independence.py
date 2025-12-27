@@ -30,10 +30,7 @@ class TestResearchVerticalIndependence:
     def test_research_imports_without_coding(self):
         """ResearchAssistant can be imported without coding module."""
         # Temporarily make coding module raise ImportError
-        coding_modules = [
-            key for key in sys.modules.keys()
-            if 'victor.verticals.coding' in key
-        ]
+        coding_modules = [key for key in sys.modules.keys() if "victor.verticals.coding" in key]
 
         # Store original modules
         original_modules = {key: sys.modules.get(key) for key in coding_modules}
@@ -45,8 +42,8 @@ class TestResearchVerticalIndependence:
                     del sys.modules[key]
 
             # Import research vertical fresh
-            if 'victor.verticals.research' in sys.modules:
-                del sys.modules['victor.verticals.research']
+            if "victor.verticals.research" in sys.modules:
+                del sys.modules["victor.verticals.research"]
 
             from victor.verticals.research import ResearchAssistant
 
@@ -68,8 +65,8 @@ class TestResearchVerticalIndependence:
 
         # Research vertical has extensions (can vary based on framework)
         # The key is that it can be created without coding module errors
-        assert hasattr(extensions, 'middleware')
-        assert hasattr(extensions, 'safety_extensions')
+        assert hasattr(extensions, "middleware")
+        assert hasattr(extensions, "safety_extensions")
 
     def test_research_provides_valid_tools(self):
         """ResearchAssistant provides valid tool configurations."""
@@ -166,6 +163,7 @@ class TestBootstrapWithVerticals:
 
         # Should have registered vertical extensions
         from victor.verticals.protocols import VerticalExtensions
+
         extensions = container.get_optional(VerticalExtensions)
 
         # May or may not be registered depending on loader state

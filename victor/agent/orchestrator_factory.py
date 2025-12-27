@@ -37,6 +37,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
+# Mode-aware mixin for consistent mode controller access
+from victor.protocols.mode_aware import ModeAwareMixin
+
 if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
@@ -135,6 +138,27 @@ class RecoveryComponents:
 
 
 @dataclass
+class WorkflowOptimizationComponents:
+    """Components for workflow optimizations.
+
+    These components address MODE workflow issues:
+    - TaskCompletionDetector: Detects when task objectives are met
+    - ReadResultCache: Caches file reads to prevent redundant operations
+    - TimeAwareExecutor: Manages execution with time budget awareness
+    - ThinkingPatternDetector: Detects and breaks thinking loops
+    - ResourceManager: Centralized resource lifecycle management
+    - ModeCompletionCriteria: Mode-specific early exit detection
+    """
+
+    task_completion_detector: Optional[Any] = None
+    read_cache: Optional[Any] = None
+    time_aware_executor: Optional[Any] = None
+    thinking_detector: Optional[Any] = None
+    resource_manager: Optional[Any] = None
+    mode_completion_criteria: Optional[Any] = None
+
+
+@dataclass
 class OrchestratorComponents:
     """All components needed to construct an AgentOrchestrator.
 
@@ -170,8 +194,13 @@ class OrchestratorComponents:
     # Tool output formatter
     tool_output_formatter: Optional["ToolOutputFormatter"] = None
 
+    # Workflow optimizations
+    workflow_optimization: WorkflowOptimizationComponents = field(
+        default_factory=WorkflowOptimizationComponents
+    )
 
-class OrchestratorFactory:
+
+class OrchestratorFactory(ModeAwareMixin):
     """Factory for creating AgentOrchestrator components.
 
     This factory extracts component initialization logic from the orchestrator's
@@ -181,6 +210,9 @@ class OrchestratorFactory:
     2. Easier testing of individual component creation
     3. Potential for lazy initialization
     4. Reduced orchestrator complexity
+
+    Uses ModeAwareMixin for consistent mode controller access when applying
+    mode-specific configurations (e.g., exploration multipliers).
 
     Example:
         factory = OrchestratorFactory(settings, provider, model)
@@ -235,6 +267,7 @@ class OrchestratorFactory:
         """Get or create the DI container."""
         if self._container is None:
             from victor.core.bootstrap import ensure_bootstrapped
+
             self._container = ensure_bootstrapped(self.settings)
         return self._container
 
@@ -716,9 +749,7 @@ class OrchestratorFactory:
         logger.debug("ResponseCompleter created")
         return response_completer
 
-    def create_unified_tracker(
-        self, tool_calling_caps: "ToolCallingCapabilities"
-    ) -> Any:
+    def create_unified_tracker(self, tool_calling_caps: "ToolCallingCapabilities") -> Any:
         """Create unified task tracker with model-specific exploration settings.
 
         The UnifiedTaskTracker is the single source of truth for task progress,
@@ -730,7 +761,7 @@ class OrchestratorFactory:
         Returns:
             UnifiedTaskTracker instance configured with model exploration parameters
         """
-        from victor.agent.protocols import TaskTrackerProtocol
+        from victor.agent.protocols import TaskTrackerProtocol, ModeControllerProtocol
 
         # Resolve from DI container (guaranteed to be registered)
         unified_tracker = self.container.get(TaskTrackerProtocol)
@@ -740,6 +771,25 @@ class OrchestratorFactory:
             exploration_multiplier=tool_calling_caps.exploration_multiplier,
             continuation_patience=tool_calling_caps.continuation_patience,
         )
+
+        # Apply agent mode exploration multiplier (plan/explore modes get more iterations)
+        try:
+            mode_controller = self.container.get_optional(ModeControllerProtocol)
+            if mode_controller:
+                from victor.agent.mode_controller import MODE_CONFIGS
+
+                current_mode = mode_controller.current_mode
+                mode_config = MODE_CONFIGS.get(current_mode)
+                if mode_config and hasattr(mode_config, "exploration_multiplier"):
+                    unified_tracker.set_mode_exploration_multiplier(
+                        mode_config.exploration_multiplier
+                    )
+                    logger.info(
+                        f"Applied mode exploration multiplier: mode={current_mode.value}, "
+                        f"multiplier={mode_config.exploration_multiplier}"
+                    )
+        except Exception as e:
+            logger.debug(f"Could not apply mode exploration multiplier: {e}")
 
         logger.debug(
             f"UnifiedTaskTracker created with exploration_multiplier="
@@ -766,9 +816,7 @@ class OrchestratorFactory:
         formatter = create_tool_output_formatter(
             config=ToolOutputFormatterConfig(
                 max_output_chars=getattr(self.settings, "max_tool_output_chars", 15000),
-                file_structure_threshold=getattr(
-                    self.settings, "file_structure_threshold", 50000
-                ),
+                file_structure_threshold=getattr(self.settings, "file_structure_threshold", 50000),
             ),
             truncator=context_compactor,
         )
@@ -1140,9 +1188,7 @@ class OrchestratorFactory:
             enable_tool_truncation=getattr(self.settings, "tool_result_truncation", True),
         )
 
-        logger.debug(
-            f"ContextCompactor created with truncation_strategy={truncation_strategy}"
-        )
+        logger.debug(f"ContextCompactor created with truncation_strategy={truncation_strategy}")
         return compactor
 
     def create_argument_normalizer(self, provider: "BaseProvider") -> Any:
@@ -1440,9 +1486,7 @@ class OrchestratorFactory:
             on_selection_recorded=on_selection_recorded,
         )
 
-        logger.debug(
-            f"ToolSelector created with fallback_max_tools={fallback_max_tools}"
-        )
+        logger.debug(f"ToolSelector created with fallback_max_tools={fallback_max_tools}")
         return selector
 
     def create_intent_classifier(self) -> Any:
@@ -1605,9 +1649,7 @@ class OrchestratorFactory:
             ],
         )
 
-        logger.debug(
-            f"ToolCallingMatrix created with {len(tool_calling_models)} model configs"
-        )
+        logger.debug(f"ToolCallingMatrix created with {len(tool_calling_models)} model configs")
         return (tool_calling_models, tool_capabilities)
 
     def create_system_prompt_builder(
@@ -1731,6 +1773,202 @@ class OrchestratorFactory:
 
         logger.debug(f"Debug logger initialized: enabled={debug_logger.enabled}")
         return debug_logger
+
+    def create_tool_access_controller(self, registry: Any = None) -> Any:
+        """Create ToolAccessController for unified tool access control.
+
+        Creates a layered tool access controller that consolidates 6 independent
+        access control systems with clear precedence:
+        Safety (L0) > Mode (L1) > Session (L2) > Vertical (L3) > Stage (L4) > Intent (L5)
+
+        Args:
+            registry: Optional tool registry for tool lookup
+
+        Returns:
+            ToolAccessController instance
+        """
+        from victor.agent.tool_access_controller import create_tool_access_controller
+
+        controller = create_tool_access_controller(registry=registry)
+
+        # Apply mode exploration multiplier if available (via ModeAwareMixin)
+        mc = self.mode_controller
+        if mc is not None and hasattr(mc.config, "exploration_multiplier"):
+            multiplier = mc.config.exploration_multiplier
+            logger.debug(f"ToolAccessController created with mode multiplier: {multiplier}")
+
+        return controller
+
+    def create_budget_manager(self) -> Any:
+        """Create BudgetManager for unified budget tracking.
+
+        Creates a budget manager that centralizes all budget tracking with
+        consistent multiplier composition:
+        effective_max = base × model_multiplier × mode_multiplier × productivity_multiplier
+
+        Returns:
+            BudgetManager instance with settings-derived configuration
+        """
+        from victor.agent.budget_manager import create_budget_manager
+        from victor.agent.protocols import BudgetConfig
+
+        # Get budget settings from settings
+        base_tool_calls = getattr(self.settings, "tool_budget", 30)
+        base_iterations = getattr(self.settings, "max_iterations", 50)
+        base_exploration = getattr(self.settings, "max_exploration_iterations", 8)
+        base_action = getattr(self.settings, "max_action_iterations", 12)
+
+        config = BudgetConfig(
+            base_tool_calls=base_tool_calls,
+            base_iterations=base_iterations,
+            base_exploration=base_exploration,
+            base_action=base_action,
+        )
+
+        manager = create_budget_manager(config=config)
+
+        # Apply mode multiplier if available (via ModeAwareMixin)
+        mc = self.mode_controller
+        if mc is not None and hasattr(mc.config, "exploration_multiplier"):
+            manager.set_mode_multiplier(mc.config.exploration_multiplier)
+            logger.debug(
+                f"BudgetManager created with mode multiplier: "
+                f"{mc.config.exploration_multiplier}"
+            )
+
+        return manager
+
+    # =========================================================================
+    # Workflow Optimization Components
+    # =========================================================================
+
+    def create_task_completion_detector(self) -> Any:
+        """Create TaskCompletionDetector for detecting task completion.
+
+        Issue Reference: workflow-test-issues-v2.md Issue #1
+
+        Returns:
+            TaskCompletionDetector instance
+        """
+        from victor.agent.task_completion import create_task_completion_detector
+
+        detector = create_task_completion_detector()
+        logger.debug("TaskCompletionDetector created")
+        return detector
+
+    def create_read_cache(self) -> Any:
+        """Create ReadResultCache for file read deduplication.
+
+        Issue Reference: workflow-test-issues-v2.md Issue #2
+
+        Returns:
+            ReadResultCache instance with settings-derived configuration
+        """
+        from victor.agent.read_cache import create_read_cache
+
+        # Get cache settings from settings
+        ttl_seconds = getattr(self.settings, "read_cache_ttl", 300.0)
+        max_entries = getattr(self.settings, "read_cache_max_entries", 100)
+
+        cache = create_read_cache(ttl_seconds=ttl_seconds, max_entries=max_entries)
+        logger.debug(f"ReadResultCache created (ttl={ttl_seconds}s, max={max_entries})")
+        return cache
+
+    def create_time_aware_executor(self, timeout_seconds: Optional[float] = None) -> Any:
+        """Create TimeAwareExecutor for time-aware execution management.
+
+        Issue Reference: workflow-test-issues-v2.md Issue #3
+
+        Args:
+            timeout_seconds: Execution time budget (None for unlimited)
+
+        Returns:
+            TimeAwareExecutor instance
+        """
+        from victor.agent.time_aware_executor import create_time_aware_executor
+
+        # Get timeout from settings if not specified
+        if timeout_seconds is None:
+            timeout_seconds = getattr(self.settings, "execution_timeout", None)
+
+        executor = create_time_aware_executor(timeout_seconds=timeout_seconds)
+        if timeout_seconds:
+            logger.debug(f"TimeAwareExecutor created with {timeout_seconds}s budget")
+        else:
+            logger.debug("TimeAwareExecutor created (no timeout)")
+        return executor
+
+    def create_thinking_detector(self) -> Any:
+        """Create ThinkingPatternDetector for detecting thinking loops.
+
+        Issue Reference: workflow-test-issues-v2.md Issue #4
+
+        Returns:
+            ThinkingPatternDetector instance
+        """
+        from victor.agent.thinking_detector import create_thinking_detector
+
+        # Get detector settings from settings
+        repetition_threshold = getattr(self.settings, "thinking_repetition_threshold", 3)
+        similarity_threshold = getattr(self.settings, "thinking_similarity_threshold", 0.65)
+
+        detector = create_thinking_detector(
+            repetition_threshold=repetition_threshold,
+            similarity_threshold=similarity_threshold,
+        )
+        logger.debug(
+            f"ThinkingPatternDetector created "
+            f"(repetition={repetition_threshold}, similarity={similarity_threshold})"
+        )
+        return detector
+
+    def create_resource_manager(self) -> Any:
+        """Get ResourceManager for resource lifecycle management.
+
+        Issue Reference: workflow-test-issues-v2.md Issue #5
+
+        Returns:
+            ResourceManager singleton instance
+        """
+        from victor.agent.resource_manager import get_resource_manager
+
+        manager = get_resource_manager()
+        logger.debug("ResourceManager retrieved (singleton)")
+        return manager
+
+    def create_mode_completion_criteria(self) -> Any:
+        """Create ModeCompletionCriteria for mode-specific early exit.
+
+        Issue Reference: workflow-test-issues-v2.md Issue #6
+
+        Returns:
+            ModeCompletionCriteria instance
+        """
+        from victor.agent.budget_manager import create_mode_completion_criteria
+
+        criteria = create_mode_completion_criteria()
+        logger.debug("ModeCompletionCriteria created")
+        return criteria
+
+    def create_workflow_optimization_components(
+        self, timeout_seconds: Optional[float] = None
+    ) -> WorkflowOptimizationComponents:
+        """Create all workflow optimization components.
+
+        Args:
+            timeout_seconds: Execution timeout for time-aware executor
+
+        Returns:
+            WorkflowOptimizationComponents with all optimization components
+        """
+        return WorkflowOptimizationComponents(
+            task_completion_detector=self.create_task_completion_detector(),
+            read_cache=self.create_read_cache(),
+            time_aware_executor=self.create_time_aware_executor(timeout_seconds),
+            thinking_detector=self.create_thinking_detector(),
+            resource_manager=self.create_resource_manager(),
+            mode_completion_criteria=self.create_mode_completion_criteria(),
+        )
 
 
 # Convenience function for creating factory

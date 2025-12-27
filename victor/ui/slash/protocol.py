@@ -125,7 +125,9 @@ class BaseSlashCommand:
         """Check if any of the specified flags are present in args."""
         return any(flag in ctx.args for flag in flags)
 
-    def _get_arg(self, ctx: CommandContext, index: int, default: Optional[str] = None) -> Optional[str]:
+    def _get_arg(
+        self, ctx: CommandContext, index: int, default: Optional[str] = None
+    ) -> Optional[str]:
         """Get argument at index, or default if not present."""
         if index < len(ctx.args):
             return ctx.args[index]
@@ -141,7 +143,9 @@ class BaseSlashCommand:
         except ValueError:
             return default
 
-    def _get_flag_value(self, ctx: CommandContext, flag: str, default: Optional[str] = None) -> Optional[str]:
+    def _get_flag_value(
+        self, ctx: CommandContext, flag: str, default: Optional[str] = None
+    ) -> Optional[str]:
         """Get value following a flag (e.g., --keep 5 returns '5' for flag='--keep')."""
         for i, arg in enumerate(ctx.args):
             if arg == flag and i + 1 < len(ctx.args):

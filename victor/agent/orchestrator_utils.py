@@ -62,9 +62,7 @@ def calculate_max_context_chars(
 
         limits = get_provider_limits(provider_name, model)
         context_tokens = limits.context_window
-        logger.debug(
-            f"Using YAML config for {provider_name}/{model}: {context_tokens} tokens"
-        )
+        logger.debug(f"Using YAML config for {provider_name}/{model}: {context_tokens} tokens")
     except Exception as e:
         logger.warning(f"Could not load provider limits from config: {e}")
         context_tokens = 128000  # Default safe value
@@ -84,13 +82,9 @@ def calculate_max_context_chars(
 
     # Log safely depending on whether context_tokens is numeric
     if isinstance(context_tokens, (int, float)):
-        logger.info(
-            f"Model context: {int(context_tokens):,} tokens -> {max_chars:,} chars limit"
-        )
+        logger.info(f"Model context: {int(context_tokens):,} tokens -> {max_chars:,} chars limit")
     else:
-        logger.info(
-            "Model context: %r tokens -> %s chars limit", context_tokens, f"{max_chars:,}"
-        )
+        logger.info("Model context: %r tokens -> %s chars limit", context_tokens, f"{max_chars:,}")
 
     return max_chars
 

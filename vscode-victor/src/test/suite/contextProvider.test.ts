@@ -227,7 +227,7 @@ suite('ContextProvider Test Suite', () => {
             ];
 
             const formatContextForPrompt = (itemsList: ContextItem[][]): string => {
-                if (itemsList.length === 0) return '';
+                if (itemsList.length === 0) {return '';}
                 return `## Context\n\n${itemsList.length} item(s)`;
             };
 

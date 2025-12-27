@@ -142,10 +142,7 @@ class TestReturnValue:
 
     def test_all_fields(self):
         """Test ReturnValue with all fields."""
-        ret = ReturnValue(
-            type_hint="dict[str, Any]",
-            description="Parsed configuration dictionary"
-        )
+        ret = ReturnValue(type_hint="dict[str, Any]", description="Parsed configuration dictionary")
         assert ret.type_hint == "dict[str, Any]"
         assert ret.description == "Parsed configuration dictionary"
 
@@ -162,8 +159,7 @@ class TestRaisedException:
     def test_all_fields(self):
         """Test RaisedException with all fields."""
         exc = RaisedException(
-            exception_type="FileNotFoundError",
-            description="When the config file doesn't exist"
+            exception_type="FileNotFoundError", description="When the config file doesn't exist"
         )
         assert exc.exception_type == "FileNotFoundError"
         assert exc.description == "When the config file doesn't exist"
@@ -181,11 +177,7 @@ class TestExample:
 
     def test_all_fields(self):
         """Test Example with all fields."""
-        ex = Example(
-            code="result = add(1, 2)",
-            description="Adding two numbers",
-            output="3"
-        )
+        ex = Example(code="result = add(1, 2)", description="Adding two numbers", output="3")
         assert ex.code == "result = add(1, 2)"
         assert ex.description == "Adding two numbers"
         assert ex.output == "3"
@@ -254,7 +246,7 @@ class TestFunctionDoc:
         func = FunctionDoc(
             name="iter_items",
             signature="iter_items() -> Iterator[str]",
-            yields=ReturnValue(type_hint="str", description="Next item in sequence")
+            yields=ReturnValue(type_hint="str", description="Next item in sequence"),
         )
         assert func.yields is not None
         assert func.yields.type_hint == "str"
@@ -265,7 +257,7 @@ class TestFunctionDoc:
             name="from_dict",
             signature="from_dict(data: dict) -> Self",
             is_static=True,
-            decorators=["@staticmethod"]
+            decorators=["@staticmethod"],
         )
         assert func.is_static is True
 
@@ -275,17 +267,14 @@ class TestFunctionDoc:
             name="create",
             signature="create(cls, name: str) -> Self",
             is_classmethod=True,
-            decorators=["@classmethod"]
+            decorators=["@classmethod"],
         )
         assert func.is_classmethod is True
 
     def test_property(self):
         """Test FunctionDoc for property."""
         func = FunctionDoc(
-            name="value",
-            signature="value(self) -> int",
-            is_property=True,
-            decorators=["@property"]
+            name="value", signature="value(self) -> int", is_property=True, decorators=["@property"]
         )
         assert func.is_property is True
 
@@ -700,10 +689,7 @@ class TestEdgeCases:
 
     def test_unicode_in_descriptions(self):
         """Test unicode characters in descriptions."""
-        param = Parameter(
-            name="emoji",
-            description="Supports unicode: emoji, CJK characters"
-        )
+        param = Parameter(name="emoji", description="Supports unicode: emoji, CJK characters")
         assert "emoji" in param.description
 
     def test_multiline_description(self):

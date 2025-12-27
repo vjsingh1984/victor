@@ -663,7 +663,6 @@ class TestStreamRetryWithoutTools:
             mock_response.__aexit__ = AsyncMock()
             return mock_response
 
-
         def mock_stream(*args, **kwargs):
             nonlocal call_count
             call_count += 1
@@ -715,7 +714,6 @@ class TestStreamRetryWithoutTools:
         mock_response.__aexit__ = AsyncMock()
 
         payloads_sent = []
-
 
         def capture_stream(*args, **kwargs):
             payloads_sent.append(kwargs.get("json", {}))

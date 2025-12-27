@@ -163,9 +163,7 @@ class TestProviderResponseResult:
 
     def test_has_tool_calls(self):
         """has_tool_calls property works."""
-        result = ProviderResponseResult(
-            tool_calls=[{"name": "test", "arguments": {}}]
-        )
+        result = ProviderResponseResult(tool_calls=[{"name": "test", "arguments": {}}])
         assert result.has_tool_calls is True
 
         result = ProviderResponseResult()

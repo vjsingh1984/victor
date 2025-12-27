@@ -19,14 +19,12 @@ _DATA_ANALYSIS_SAFETY_TUPLES: List[Tuple[str, str, str]] = [
     (r"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b", "Credit card pattern detected", HIGH),
     (r"(?i)password|passwd|pwd", "Password column exposure", HIGH),
     (r"(?i)medical|diagnosis|health[_\s-]?record", "Medical data exposure", HIGH),
-
     # Medium-risk patterns - semi-sensitive
     (r"(?i)(email|e-mail)[^\w]", "Email addresses in output", MEDIUM),
     (r"(?i)(phone|mobile|cell)[^\w]", "Phone numbers in output", MEDIUM),
     (r"(?i)(address|street|zip[_\s-]?code)", "Physical address exposure", MEDIUM),
     (r"(?i)(date[_\s-]?of[_\s-]?birth|dob|birth[_\s-]?date)", "Date of birth exposure", MEDIUM),
     (r"(?i)(salary|income|wage)", "Financial data exposure", MEDIUM),
-
     # Low-risk patterns - best practices
     (r"(?i)print\(.*df\)", "Full dataframe print", LOW),
     (r"\.to_csv\([^)]*index\s*=\s*True", "Index in CSV output", LOW),
@@ -99,6 +97,7 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
             List of (column_name, pii_type) tuples.
         """
         import re
+
         detected = []
         for col in columns:
             for pii_type, pattern in PII_COLUMN_PATTERNS.items():

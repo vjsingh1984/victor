@@ -73,7 +73,7 @@ suite('DiagnosticsViewProvider Test Suite', () => {
 
             const grouped: Record<string, typeof diagnostics> = {};
             diagnostics.forEach(d => {
-                if (!grouped[d.uri]) grouped[d.uri] = [];
+                if (!grouped[d.uri]) {grouped[d.uri] = [];}
                 grouped[d.uri].push(d);
             });
 
@@ -133,7 +133,7 @@ suite('DiagnosticsViewProvider Test Suite', () => {
 
         test('Should format long messages', () => {
             const truncate = (message: string, maxLen: number): string => {
-                if (message.length <= maxLen) return message;
+                if (message.length <= maxLen) {return message;}
                 return message.substring(0, maxLen - 3) + '...';
             };
 
@@ -273,8 +273,8 @@ suite('DiagnosticsViewProvider Test Suite', () => {
     suite('Badge Display', () => {
         test('Should format badge text', () => {
             const formatBadge = (count: number): string => {
-                if (count === 0) return '';
-                if (count > 99) return '99+';
+                if (count === 0) {return '';}
+                if (count > 99) {return '99+';}
                 return count.toString();
             };
 
@@ -286,8 +286,8 @@ suite('DiagnosticsViewProvider Test Suite', () => {
         test('Should get badge tooltip', () => {
             const getTooltip = (errors: number, warnings: number): string => {
                 const parts: string[] = [];
-                if (errors > 0) parts.push(`${errors} error(s)`);
-                if (warnings > 0) parts.push(`${warnings} warning(s)`);
+                if (errors > 0) {parts.push(`${errors} error(s)`);}
+                if (warnings > 0) {parts.push(`${warnings} warning(s)`);}
                 return parts.join(', ') || 'No issues';
             };
 
@@ -322,7 +322,7 @@ suite('DiagnosticsViewProvider Test Suite', () => {
     suite('Empty State', () => {
         test('Should show empty message', () => {
             const getEmptyMessage = (hasWorkspace: boolean): string => {
-                if (!hasWorkspace) return 'No workspace open';
+                if (!hasWorkspace) {return 'No workspace open';}
                 return 'No issues found';
             };
 

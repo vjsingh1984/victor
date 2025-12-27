@@ -180,15 +180,17 @@ class DirectProtocolAdapter(VictorProtocol):
             self._orchestrator.set_mode(mode.value)
 
     async def get_status(self) -> AgentStatus:
-        """Get current agent status."""
-        from victor.agent.mode_controller import get_mode_controller
+        """Get current agent status.
 
-        mode_manager = get_mode_controller()
+        Uses orchestrator's ModeAwareMixin properties for mode access.
+        """
+        # Get mode from orchestrator's ModeAwareMixin (consistent access)
+        current_mode = self._orchestrator.current_mode_name.lower()
 
         return AgentStatus(
             provider=self._orchestrator.provider.name,
             model=getattr(self._orchestrator.provider, "model", "unknown"),
-            mode=AgentMode(mode_manager.current_mode.value),
+            mode=AgentMode(current_mode),
             connected=True,
             tools_available=(
                 len(self._orchestrator.tools) if hasattr(self._orchestrator, "tools") else 0

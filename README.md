@@ -173,11 +173,8 @@ victor chat
 <summary><b>Cloud Provider</b></summary>
 
 ```bash
-# Option 1: Store API key securely in system keyring (recommended)
+# Store API key securely in system keyring
 victor keys --set anthropic --keyring
-
-# Option 2: Use environment variable
-export ANTHROPIC_API_KEY="your-key"
 
 # Start chatting
 victor chat --provider anthropic --model claude-sonnet-4-5

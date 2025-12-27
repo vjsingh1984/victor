@@ -220,7 +220,8 @@ class ConversationController:
             char_count=total_chars,
             estimated_tokens=estimated_tokens,
             message_count=len(self.messages),
-            is_overflow_risk=total_chars > self.config.max_context_chars * CONTEXT_LIMITS.overflow_threshold,
+            is_overflow_risk=total_chars
+            > self.config.max_context_chars * CONTEXT_LIMITS.overflow_threshold,
             max_context_chars=self.config.max_context_chars,
         )
 

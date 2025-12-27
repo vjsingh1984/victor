@@ -285,9 +285,7 @@ class TestRLEvictionPolicy:
         assert isinstance(to_evict, list)
         assert len(to_evict) <= 2
 
-    def test_get_entries_to_evict_prefers_old_unused(
-        self, policy: RLEvictionPolicy
-    ) -> None:
+    def test_get_entries_to_evict_prefers_old_unused(self, policy: RLEvictionPolicy) -> None:
         """Test eviction prefers old unused entries."""
         entries = [
             CacheEntryState(key="old_unused", hit_count=0, entry_age_seconds=1200),
@@ -357,6 +355,7 @@ class TestGlobalSingleton:
     def test_get_rl_eviction_policy(self) -> None:
         """Test getting global singleton."""
         import victor.cache.rl_eviction_policy as module
+
         module._rl_eviction_policy = None
 
         policy1 = get_rl_eviction_policy()
@@ -367,6 +366,7 @@ class TestGlobalSingleton:
     def test_singleton_preserves_state(self) -> None:
         """Test singleton preserves state."""
         import victor.cache.rl_eviction_policy as module
+
         module._rl_eviction_policy = None
 
         policy = get_rl_eviction_policy()

@@ -109,15 +109,11 @@ class TestCurriculumController:
         # Edit not allowed at warm-up by default
         assert controller.is_task_allowed(context, "edit") is False
 
-    def test_record_outcome_creates_metrics(
-        self, controller: CurriculumController
-    ) -> None:
+    def test_record_outcome_creates_metrics(self, controller: CurriculumController) -> None:
         """Test that recording outcome creates metrics."""
         context = "test:context:key"
 
-        controller.record_outcome(
-            context, success=True, quality=0.8, iterations=3, tools_used=2
-        )
+        controller.record_outcome(context, success=True, quality=0.8, iterations=3, tools_used=2)
 
         stage = controller.get_stage(context)
         metrics = controller._metrics.get(context, {}).get(stage)
@@ -125,9 +121,7 @@ class TestCurriculumController:
         assert metrics is not None
         assert metrics.sample_count == 1
 
-    def test_no_advancement_insufficient_samples(
-        self, controller: CurriculumController
-    ) -> None:
+    def test_no_advancement_insufficient_samples(self, controller: CurriculumController) -> None:
         """Test no advancement with insufficient samples."""
         context = "test:context:key"
 
@@ -140,9 +134,7 @@ class TestCurriculumController:
         # Should not advance (need min_samples, default 10 for warm-up)
         assert controller.get_stage(context) == CurriculumStage.WARM_UP
 
-    def test_advancement_with_sufficient_samples(
-        self, controller: CurriculumController
-    ) -> None:
+    def test_advancement_with_sufficient_samples(self, controller: CurriculumController) -> None:
         """Test advancement with sufficient samples and success rate."""
         context = "test:context:key"
 
@@ -156,9 +148,7 @@ class TestCurriculumController:
         # Should have advanced to BASIC
         assert controller.get_stage(context) == CurriculumStage.BASIC
 
-    def test_no_advancement_low_success_rate(
-        self, controller: CurriculumController
-    ) -> None:
+    def test_no_advancement_low_success_rate(self, controller: CurriculumController) -> None:
         """Test no advancement with low success rate."""
         context = "test:context:key"
 
@@ -175,9 +165,7 @@ class TestCurriculumController:
         # Should not advance
         assert controller.get_stage(context) == CurriculumStage.WARM_UP
 
-    def test_regression_on_poor_recent_performance(
-        self, controller: CurriculumController
-    ) -> None:
+    def test_regression_on_poor_recent_performance(self, controller: CurriculumController) -> None:
         """Test regression when recent performance is poor."""
         context = "test:context:key"
 
@@ -196,9 +184,7 @@ class TestCurriculumController:
         # Should have regressed to WARM_UP
         assert controller.get_stage(context) == CurriculumStage.WARM_UP
 
-    def test_no_regression_below_warmup(
-        self, controller: CurriculumController
-    ) -> None:
+    def test_no_regression_below_warmup(self, controller: CurriculumController) -> None:
         """Test that we can't regress below warm-up."""
         context = "test:context:key"
 
@@ -231,12 +217,8 @@ class TestCurriculumController:
 
     def test_export_metrics(self, controller: CurriculumController) -> None:
         """Test metrics export."""
-        controller.record_outcome(
-            "ctx1", success=True, quality=0.8, iterations=3, tools_used=2
-        )
-        controller.record_outcome(
-            "ctx2", success=True, quality=0.7, iterations=4, tools_used=3
-        )
+        controller.record_outcome("ctx1", success=True, quality=0.8, iterations=3, tools_used=2)
+        controller.record_outcome("ctx2", success=True, quality=0.7, iterations=4, tools_used=3)
 
         metrics = controller.export_metrics()
 
@@ -244,9 +226,7 @@ class TestCurriculumController:
         assert "stage_distribution" in metrics
         assert metrics["stage_distribution"]["WARM_UP"] == 2
 
-    def test_expert_stage_allows_all_tasks(
-        self, controller: CurriculumController
-    ) -> None:
+    def test_expert_stage_allows_all_tasks(self, controller: CurriculumController) -> None:
         """Test that expert stage allows all task types."""
         context = "expert:context:key"
         controller._context_stages[context] = CurriculumStage.EXPERT
@@ -255,9 +235,7 @@ class TestCurriculumController:
         assert controller.is_task_allowed(context, "debug") is True
         assert controller.is_task_allowed(context, "action") is True
 
-    def test_stage_configs_have_increasing_limits(
-        self, controller: CurriculumController
-    ) -> None:
+    def test_stage_configs_have_increasing_limits(self, controller: CurriculumController) -> None:
         """Test that stage configs have increasing complexity limits."""
         prev_tools = 0
         prev_iters = 0

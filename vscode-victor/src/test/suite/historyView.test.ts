@@ -38,10 +38,10 @@ suite('HistoryViewProvider Test Suite', () => {
                 const now = Date.now();
                 const diff = now - timestamp.getTime();
                 const minutes = Math.floor(diff / 60000);
-                if (minutes < 1) return 'Just now';
-                if (minutes < 60) return `${minutes}m ago`;
+                if (minutes < 1) {return 'Just now';}
+                if (minutes < 60) {return `${minutes}m ago`;}
                 const hours = Math.floor(minutes / 60);
-                if (hours < 24) return `${hours}h ago`;
+                if (hours < 24) {return `${hours}h ago`;}
                 return `${Math.floor(hours / 24)}d ago`;
             };
 
@@ -142,7 +142,7 @@ suite('HistoryViewProvider Test Suite', () => {
             let undoPointer = 0;
 
             const canUndo = () => undoPointer < history.length;
-            const undo = () => { if (canUndo()) undoPointer++; };
+            const undo = () => { if (canUndo()) {undoPointer++;} };
 
             assert.ok(canUndo());
             undo();
@@ -153,7 +153,7 @@ suite('HistoryViewProvider Test Suite', () => {
             let undoPointer = 2;
 
             const canRedo = () => undoPointer > 0;
-            const redo = () => { if (canRedo()) undoPointer--; };
+            const redo = () => { if (canRedo()) {undoPointer--;} };
 
             assert.ok(canRedo());
             redo();
@@ -257,7 +257,7 @@ suite('HistoryViewProvider Test Suite', () => {
 
         test('Should truncate long descriptions', () => {
             const truncate = (text: string, maxLen: number): string => {
-                if (text.length <= maxLen) return text;
+                if (text.length <= maxLen) {return text;}
                 return text.substring(0, maxLen - 3) + '...';
             };
 

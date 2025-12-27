@@ -349,8 +349,8 @@ export class QuickActionsProvider implements vscode.Disposable {
             if (aIndex >= 0 && bIndex >= 0) {
                 return aIndex - bIndex;
             }
-            if (aIndex >= 0) return -1;
-            if (bIndex >= 0) return 1;
+            if (aIndex >= 0) {return -1;}
+            if (bIndex >= 0) {return 1;}
             return 0;
         });
     }

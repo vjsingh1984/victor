@@ -27,7 +27,7 @@ from victor.providers.base import (
 pytestmark = [
     pytest.mark.skipif(
         not HAS_GOOGLE_GENAI,
-        reason="google-generativeai package not installed (optional dependency)"
+        reason="google-generativeai package not installed (optional dependency)",
     ),
     # Many tests need rework for new google.genai API (uses client.aio.models.generate_content)
     # instead of the old GenerativeModel.start_chat() pattern
@@ -722,3 +722,623 @@ async def test_stream_model_initialization(google_provider):
         gen_config = call_args.kwargs["generation_config"]
         assert gen_config["temperature"] == 0.8
         assert gen_config["max_output_tokens"] == 1024
+
+
+# =============================================================================
+# CONVERT TOOLS TESTS
+# =============================================================================
+
+
+class TestConvertTools:
+    """Tests for tool conversion to Gemini format."""
+
+    @pytest.fixture
+    def google_provider(self):
+        """Create GoogleProvider instance for testing."""
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(
+                api_key="test-api-key",
+                timeout=30,
+            )
+        return provider
+
+    def test_convert_tools_empty(self, google_provider):
+        """Test converting empty tools list."""
+        result = google_provider._convert_tools([])
+        assert result == []
+
+    def test_convert_tools_none(self, google_provider):
+        """Test converting None tools."""
+        result = google_provider._convert_tools(None)
+        assert result == []
+
+    def test_convert_tools_single_tool(self, google_provider):
+        """Test converting single tool."""
+        from victor.providers.base import ToolDefinition
+
+        tools = [
+            ToolDefinition(
+                name="read_file",
+                description="Read a file",
+                parameters={
+                    "type": "object",
+                    "properties": {"path": {"type": "string", "description": "File path"}},
+                    "required": ["path"],
+                },
+            )
+        ]
+
+        result = google_provider._convert_tools(tools)
+
+        assert len(result) == 1
+        # Result should be a Tool with function_declarations
+
+    def test_convert_tools_no_parameters(self, google_provider):
+        """Test converting tool without parameters."""
+        from victor.providers.base import ToolDefinition
+
+        tools = [ToolDefinition(name="get_time", description="Get current time", parameters={})]
+
+        result = google_provider._convert_tools(tools)
+        assert len(result) == 1
+
+
+# =============================================================================
+# CLEAN SCHEMA TESTS
+# =============================================================================
+
+
+class TestCleanSchemaForGemini:
+    """Tests for schema cleaning."""
+
+    @pytest.fixture
+    def google_provider(self):
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(api_key="test-key")
+        return provider
+
+    def test_removes_default_field(self, google_provider):
+        """Test removes 'default' field from schema."""
+        schema = {"type": "object", "properties": {"path": {"type": "string", "default": "/tmp"}}}
+
+        result = google_provider._clean_schema_for_gemini(schema)
+
+        assert "default" not in result["properties"]["path"]
+        assert result["properties"]["path"]["type"] == "string"
+
+    def test_removes_examples_field(self, google_provider):
+        """Test removes 'examples' field from schema."""
+        schema = {"type": "string", "examples": ["example1", "example2"]}
+
+        result = google_provider._clean_schema_for_gemini(schema)
+
+        assert "examples" not in result
+        assert result["type"] == "string"
+
+    def test_removes_schema_field(self, google_provider):
+        """Test removes '$schema' field."""
+        schema = {"$schema": "http://json-schema.org/draft-07/schema#", "type": "object"}
+
+        result = google_provider._clean_schema_for_gemini(schema)
+
+        assert "$schema" not in result
+
+    def test_removes_definitions_field(self, google_provider):
+        """Test removes 'definitions' field."""
+        schema = {"type": "object", "definitions": {"custom": {"type": "string"}}}
+
+        result = google_provider._clean_schema_for_gemini(schema)
+
+        assert "definitions" not in result
+
+    def test_recursive_cleaning(self, google_provider):
+        """Test recursive cleaning of nested objects."""
+        schema = {
+            "type": "object",
+            "properties": {
+                "nested": {
+                    "type": "object",
+                    "properties": {"value": {"type": "string", "default": "test"}},
+                    "default": {},
+                }
+            },
+        }
+
+        result = google_provider._clean_schema_for_gemini(schema)
+
+        assert "default" not in result["properties"]["nested"]
+        assert "default" not in result["properties"]["nested"]["properties"]["value"]
+
+    def test_handles_lists(self, google_provider):
+        """Test cleaning schemas with list values."""
+        schema = {
+            "type": "array",
+            "items": [{"type": "string", "default": "x"}, {"type": "number", "examples": [1, 2]}],
+        }
+
+        result = google_provider._clean_schema_for_gemini(schema)
+
+        assert "default" not in result["items"][0]
+        assert "examples" not in result["items"][1]
+
+
+# =============================================================================
+# CONVERT MESSAGES TESTS (NEW API)
+# =============================================================================
+
+
+class TestConvertMessagesNewAPI:
+    """Tests for message conversion with new google.genai API."""
+
+    @pytest.fixture
+    def google_provider(self):
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(api_key="test-key")
+        return provider
+
+    def test_converts_user_message(self, google_provider):
+        """Test converting user message."""
+        from victor.providers.base import Message
+
+        messages = [Message(role="user", content="Hello")]
+        result = google_provider._convert_messages(messages)
+
+        assert len(result) == 1
+        # Result should be Content objects
+
+    def test_converts_assistant_to_model(self, google_provider):
+        """Test converts assistant role to model."""
+        from victor.providers.base import Message
+
+        messages = [
+            Message(role="user", content="Hi"),
+            Message(role="assistant", content="Hello"),
+        ]
+        result = google_provider._convert_messages(messages)
+
+        assert len(result) == 2
+
+
+# =============================================================================
+# SAFETY FILTER TESTS
+# =============================================================================
+
+
+class TestSafetyFilters:
+    """Tests for safety filter handling."""
+
+    @pytest.fixture
+    def google_provider(self):
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(api_key="test-key")
+        return provider
+
+    @pytest.mark.asyncio
+    async def test_parse_response_safety_block(self, google_provider):
+        """Test parsing response blocked by safety filters."""
+        mock_rating = MagicMock()
+        mock_rating.category = "HARM_CATEGORY_HARASSMENT"
+        mock_rating.probability = "HIGH"
+        mock_rating.blocked = True
+
+        mock_candidate = MagicMock()
+        mock_candidate.finish_reason = "SAFETY"
+        mock_candidate.safety_ratings = [mock_rating]
+
+        mock_response = MagicMock()
+        mock_response.candidates = [mock_candidate]
+
+        with pytest.raises(ProviderError) as exc_info:
+            google_provider._parse_response(mock_response, "test-model")
+
+        assert "safety filters" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_parse_response_recitation_block(self, google_provider):
+        """Test parsing response blocked by recitation detection."""
+        mock_candidate = MagicMock()
+        mock_candidate.finish_reason = "RECITATION"
+
+        mock_response = MagicMock()
+        mock_response.candidates = [mock_candidate]
+
+        with pytest.raises(ProviderError) as exc_info:
+            google_provider._parse_response(mock_response, "test-model")
+
+        assert "recitation" in str(exc_info.value).lower()
+
+    @pytest.mark.asyncio
+    async def test_parse_stream_chunk_safety_block(self, google_provider):
+        """Test parsing stream chunk blocked by safety."""
+        mock_candidate = MagicMock()
+        mock_candidate.finish_reason = "SAFETY"
+
+        mock_chunk = MagicMock()
+        mock_chunk.candidates = [mock_candidate]
+
+        with pytest.raises(ProviderError) as exc_info:
+            google_provider._parse_stream_chunk(mock_chunk)
+
+        assert "safety filters" in str(exc_info.value)
+
+
+# =============================================================================
+# FUNCTION CALL PARSING TESTS
+# =============================================================================
+
+
+class TestFunctionCallParsing:
+    """Tests for function call parsing from responses."""
+
+    @pytest.fixture
+    def google_provider(self):
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(api_key="test-key")
+        return provider
+
+    def test_parse_response_with_function_call(self, google_provider):
+        """Test parsing response with function call."""
+        mock_func_call = MagicMock()
+        mock_func_call.name = "read_file"
+        mock_func_call.args = {"path": "/tmp/test.txt"}
+
+        mock_part = MagicMock(spec=[])
+        mock_part.text = None
+        mock_part.function_call = mock_func_call
+        # Configure hasattr to return False for text, True for function_call
+        del mock_part.text
+
+        mock_content = MagicMock()
+        mock_content.parts = [mock_part]
+
+        mock_candidate = MagicMock()
+        mock_candidate.content = mock_content
+        mock_candidate.finish_reason = "STOP"
+
+        mock_response = MagicMock()
+        mock_response.candidates = [mock_candidate]
+        mock_response.usage_metadata = None
+        mock_response.text = ""  # Fallback text
+
+        result = google_provider._parse_response(mock_response, "gemini-1.5-pro")
+
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0]["name"] == "read_file"
+        assert result.tool_calls[0]["arguments"]["path"] == "/tmp/test.txt"
+
+    def test_parse_response_mixed_text_and_function(self, google_provider):
+        """Test parsing response with both text and function call."""
+        mock_func_call = MagicMock()
+        mock_func_call.name = "search"
+        mock_func_call.args = {"query": "test"}
+
+        mock_text_part = MagicMock()
+        mock_text_part.text = "Let me search for that"
+        mock_text_part.function_call = None
+
+        mock_func_part = MagicMock()
+        mock_func_part.text = None
+        mock_func_part.function_call = mock_func_call
+
+        mock_content = MagicMock()
+        mock_content.parts = [mock_text_part, mock_func_part]
+
+        mock_candidate = MagicMock()
+        mock_candidate.content = mock_content
+        mock_candidate.finish_reason = "STOP"
+
+        mock_response = MagicMock()
+        mock_response.candidates = [mock_candidate]
+        mock_response.usage_metadata = None
+
+        result = google_provider._parse_response(mock_response, "gemini-1.5-pro")
+
+        assert result.content == "Let me search for that"
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 1
+
+
+# =============================================================================
+# STREAM WITH TOOLS TESTS
+# =============================================================================
+
+
+class TestStreamWithTools:
+    """Tests for streaming with tools (fallback behavior)."""
+
+    @pytest.fixture
+    def google_provider(self):
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(api_key="test-key")
+        return provider
+
+    @pytest.mark.asyncio
+    async def test_stream_with_tools_fallback(self, google_provider):
+        """Test streaming with tools falls back to non-streaming."""
+        from victor.providers.base import Message, ToolDefinition
+
+        mock_func_call = MagicMock()
+        mock_func_call.name = "read_file"
+        mock_func_call.args = {"path": "test.py"}
+
+        mock_part = MagicMock(spec=[])
+        mock_part.function_call = mock_func_call
+        # Remove text attribute so hasattr returns False
+        del mock_part.text
+
+        mock_content = MagicMock()
+        mock_content.parts = [mock_part]
+
+        mock_candidate = MagicMock()
+        mock_candidate.content = mock_content
+        mock_candidate.finish_reason = "STOP"
+
+        mock_response = MagicMock()
+        mock_response.candidates = [mock_candidate]
+        mock_response.usage_metadata = None
+        mock_response.text = ""  # Fallback text
+
+        google_provider.client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+        tools = [
+            ToolDefinition(name="read_file", description="Read file", parameters={"type": "object"})
+        ]
+
+        messages = [Message(role="user", content="Read test.py")]
+
+        chunks = []
+        async for chunk in google_provider.stream(
+            messages=messages,
+            model="gemini-1.5-pro",
+            tools=tools,
+        ):
+            chunks.append(chunk)
+
+        # Should return single chunk with tool calls
+        assert len(chunks) == 1
+        assert chunks[0].is_final is True
+        assert chunks[0].tool_calls is not None
+
+
+# =============================================================================
+# LIST MODELS TESTS
+# =============================================================================
+
+
+class TestListModels:
+    """Tests for listing available models."""
+
+    @pytest.fixture
+    def google_provider(self):
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(api_key="test-key")
+        return provider
+
+    @pytest.mark.asyncio
+    async def test_list_models_success(self, google_provider):
+        """Test successful model listing."""
+        mock_model1 = MagicMock()
+        mock_model1.name = "models/gemini-1.5-pro"
+        mock_model1.display_name = "Gemini 1.5 Pro"
+        mock_model1.description = "Pro model"
+        mock_model1.input_token_limit = 128000
+        mock_model1.output_token_limit = 8192
+        mock_model1.supported_generation_methods = ["generateContent"]
+
+        mock_model2 = MagicMock()
+        mock_model2.name = "models/gemini-1.5-flash"
+        mock_model2.display_name = "Gemini 1.5 Flash"
+        mock_model2.description = "Fast model"
+        mock_model2.input_token_limit = 128000
+        mock_model2.output_token_limit = 8192
+        mock_model2.supported_generation_methods = ["generateContent"]
+
+        google_provider.client.models.list = MagicMock(return_value=[mock_model1, mock_model2])
+
+        models = await google_provider.list_models()
+
+        assert len(models) == 2
+        assert models[0]["id"] == "gemini-1.5-flash"  # Sorted alphabetically
+        assert models[1]["id"] == "gemini-1.5-pro"
+
+    @pytest.mark.asyncio
+    async def test_list_models_filters_non_generative(self, google_provider):
+        """Test model listing filters non-generative models."""
+        mock_gen_model = MagicMock()
+        mock_gen_model.name = "models/gemini-1.5-pro"
+        mock_gen_model.display_name = "Gemini Pro"
+        mock_gen_model.supported_generation_methods = ["generateContent"]
+
+        mock_embed_model = MagicMock()
+        mock_embed_model.name = "models/text-embedding"
+        mock_embed_model.display_name = "Embedding"
+        mock_embed_model.supported_generation_methods = ["embedContent"]
+
+        google_provider.client.models.list = MagicMock(
+            return_value=[mock_gen_model, mock_embed_model]
+        )
+
+        models = await google_provider.list_models()
+
+        assert len(models) == 1
+        assert models[0]["id"] == "gemini-1.5-pro"
+
+    @pytest.mark.asyncio
+    async def test_list_models_error(self, google_provider):
+        """Test list models error handling."""
+        google_provider.client.models.list = MagicMock(side_effect=Exception("API error"))
+
+        with pytest.raises(ProviderError) as exc_info:
+            await google_provider.list_models()
+
+        assert "Failed to list models" in str(exc_info.value)
+
+
+# =============================================================================
+# SAFETY LEVEL CONFIGURATION TESTS
+# =============================================================================
+
+
+class TestSafetyLevelConfiguration:
+    """Tests for safety level configuration."""
+
+    def test_block_none_safety_level(self):
+        """Test block_none safety level."""
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(api_key="test-key", safety_level="block_none")
+
+        assert len(provider.safety_settings) == 5  # 5 harm categories
+
+    def test_block_few_safety_level(self):
+        """Test block_few safety level."""
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(api_key="test-key", safety_level="block_few")
+
+        assert len(provider.safety_settings) == 5
+
+    def test_block_some_safety_level(self):
+        """Test block_some safety level."""
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(api_key="test-key", safety_level="block_some")
+
+        assert len(provider.safety_settings) == 5
+
+    def test_block_most_safety_level(self):
+        """Test block_most safety level."""
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(api_key="test-key", safety_level="block_most")
+
+        assert len(provider.safety_settings) == 5
+
+    def test_invalid_safety_level_uses_default(self):
+        """Test invalid safety level falls back to default."""
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(api_key="test-key", safety_level="invalid")
+
+        # Should default to BLOCK_NONE
+        assert len(provider.safety_settings) == 5
+
+
+# =============================================================================
+# CHAT ERROR HANDLING TESTS
+# =============================================================================
+
+
+class TestChatErrorHandling:
+    """Tests for chat error handling."""
+
+    @pytest.fixture
+    def google_provider(self):
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(api_key="test-key")
+        return provider
+
+    @pytest.mark.asyncio
+    async def test_chat_api_error(self, google_provider):
+        """Test handling generic API error in chat."""
+        from victor.providers.base import Message
+
+        google_provider.client.aio.models.generate_content = AsyncMock(
+            side_effect=Exception("API Error")
+        )
+
+        messages = [Message(role="user", content="Hello")]
+
+        with pytest.raises(ProviderError) as exc_info:
+            await google_provider.chat(messages=messages, model="gemini-1.5-pro")
+
+        assert "Google API error" in str(exc_info.value)
+        assert exc_info.value.provider == "google"
+
+    @pytest.mark.asyncio
+    async def test_chat_provider_error_passthrough(self, google_provider):
+        """Test ProviderError is passed through without wrapping."""
+        from victor.providers.base import Message
+
+        original_error = ProviderError(message="Original error", provider="google")
+        google_provider.client.aio.models.generate_content = AsyncMock(side_effect=original_error)
+
+        messages = [Message(role="user", content="Hello")]
+
+        with pytest.raises(ProviderError) as exc_info:
+            await google_provider.chat(messages=messages, model="gemini-1.5-pro")
+
+        # Error message contains correlation ID prefix
+        assert "Original error" in str(exc_info.value)
+
+
+# =============================================================================
+# STREAM ERROR HANDLING TESTS
+# =============================================================================
+
+
+class TestStreamErrorHandling:
+    """Tests for stream error handling."""
+
+    @pytest.fixture
+    def google_provider(self):
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(api_key="test-key")
+        return provider
+
+    @pytest.mark.asyncio
+    async def test_stream_api_error(self, google_provider):
+        """Test handling API error in streaming."""
+        from victor.providers.base import Message
+
+        google_provider.client.aio.models.generate_content_stream = MagicMock(
+            side_effect=Exception("Stream Error")
+        )
+
+        messages = [Message(role="user", content="Hello")]
+
+        with pytest.raises(ProviderError) as exc_info:
+            async for _ in google_provider.stream(messages=messages, model="gemini-1.5-pro"):
+                pass
+
+        assert "Google streaming error" in str(exc_info.value)
+
+
+# =============================================================================
+# RESPONSE FALLBACK TESTS
+# =============================================================================
+
+
+class TestResponseFallback:
+    """Tests for response fallback behavior."""
+
+    @pytest.fixture
+    def google_provider(self):
+        with patch("victor.providers.google_provider.genai.Client"):
+            provider = GoogleProvider(api_key="test-key")
+        return provider
+
+    def test_parse_response_fallback_to_text_attr(self, google_provider):
+        """Test fallback to response.text when parts are empty."""
+        mock_content = MagicMock()
+        mock_content.parts = []
+
+        mock_candidate = MagicMock()
+        mock_candidate.content = mock_content
+        mock_candidate.finish_reason = "STOP"
+
+        mock_response = MagicMock()
+        mock_response.candidates = [mock_candidate]
+        mock_response.text = "Fallback text"
+        mock_response.usage_metadata = None
+
+        result = google_provider._parse_response(mock_response, "test-model")
+
+        assert result.content == "Fallback text"
+
+    def test_parse_response_no_candidates(self, google_provider):
+        """Test parsing response with no candidates."""
+        mock_response = MagicMock()
+        mock_response.candidates = []
+        mock_response.text = "Fallback text"
+        mock_response.usage_metadata = None
+
+        result = google_provider._parse_response(mock_response, "test-model")
+
+        assert result.content == "Fallback text"

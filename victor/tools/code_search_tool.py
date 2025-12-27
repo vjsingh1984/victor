@@ -295,10 +295,18 @@ async def _literal_search(
         "code search",
     ],
     mandatory_keywords=[
-        "search code", "find in code", "search for", "code search",
+        "search code",
+        "find in code",
+        "search for",
+        "code search",
         # Analysis-related from MANDATORY_TOOL_KEYWORDS
-        "analyze", "analyze codebase", "codebase analysis", "understand",
-        "explore codebase", "architecture", "search",
+        "analyze",
+        "analyze codebase",
+        "codebase analysis",
+        "understand",
+        "explore codebase",
+        "architecture",
+        "search",
     ],  # Force inclusion
     aliases=["search"],  # Backward compatibility alias
 )
@@ -444,6 +452,7 @@ async def code_search(
 
                 if recommendation and recommendation.value is not None:
                     import logging
+
                     logger = logging.getLogger(__name__)
                     logger.debug(
                         f"RL: Learned threshold {recommendation.value:.2f} "
@@ -454,6 +463,7 @@ async def code_search(
 
             except Exception as e:
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.debug(f"Failed to record threshold learning outcome: {e}")
 
@@ -485,9 +495,7 @@ async def code_search(
 
                     # Combine results using RRF
                     hybrid_results = engine.combine_results(
-                        semantic_dicts,
-                        keyword_results.get("results", []),
-                        max_results=k
+                        semantic_dicts, keyword_results.get("results", []), max_results=k
                     )
 
                     # Convert back to dict format
@@ -506,11 +514,15 @@ async def code_search(
                     ]
 
                     import logging
+
                     logger = logging.getLogger(__name__)
-                    logger.info(f"Hybrid search combined semantic + keyword → {len(results)} results")
+                    logger.info(
+                        f"Hybrid search combined semantic + keyword → {len(results)} results"
+                    )
 
             except Exception as e:
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Hybrid search failed, falling back to semantic: {e}")
                 # Fall back to semantic-only results (already have them)

@@ -139,7 +139,7 @@ suite('InlineCompletionProvider Test Suite', () => {
             let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
             const debounce = (delay: number) => {
-                if (timeoutId) clearTimeout(timeoutId);
+                if (timeoutId) {clearTimeout(timeoutId);}
                 timeoutId = setTimeout(() => { requestCount++; }, delay);
             };
 
@@ -186,7 +186,7 @@ suite('InlineCompletionProvider Test Suite', () => {
 
         test('Should limit context size', () => {
             const limitContext = (text: string, maxChars: number): string => {
-                if (text.length <= maxChars) return text;
+                if (text.length <= maxChars) {return text;}
                 return text.substring(text.length - maxChars);
             };
 
@@ -341,7 +341,7 @@ suite('InlineCompletionProvider Test Suite', () => {
 
         test('Should return empty on error', () => {
             const getCompletions = (hasError: boolean): unknown[] => {
-                if (hasError) return [];
+                if (hasError) {return [];}
                 return [{ insertText: 'code' }];
             };
 

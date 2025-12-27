@@ -112,9 +112,7 @@ class TestSystemMetrics:
 
     def test_system_metrics_curriculum_distribution(self) -> None:
         """Test curriculum distribution in SystemMetrics."""
-        metrics = SystemMetrics(
-            curriculum_distribution={"WARM_UP": 5, "BASIC": 3, "EXPERT": 1}
-        )
+        metrics = SystemMetrics(curriculum_distribution={"WARM_UP": 5, "BASIC": 3, "EXPERT": 1})
 
         assert metrics.curriculum_distribution["WARM_UP"] == 5
         assert metrics.curriculum_distribution["BASIC"] == 3
@@ -207,9 +205,7 @@ class TestRLMetricsCollector:
         # Should keep DEGRADATION_WINDOW (100) outcomes
         assert len(collector._success_history["learner"]) == collector.DEGRADATION_WINDOW
 
-    def test_collect_learner_metrics_no_coordinator(
-        self, collector: RLMetricsCollector
-    ) -> None:
+    def test_collect_learner_metrics_no_coordinator(self, collector: RLMetricsCollector) -> None:
         """Test collecting learner metrics without coordinator."""
         result = collector.collect_learner_metrics("tool_selector")
         assert result is None
@@ -268,30 +264,22 @@ class TestRLMetricsCollector:
     ) -> None:
         """Test system metrics with experiment coordinator."""
         exp_coordinator = MagicMock()
-        exp_coordinator.export_metrics.return_value = {
-            "by_status": {"running": 3, "completed": 5}
-        }
+        exp_coordinator.export_metrics.return_value = {"by_status": {"running": 3, "completed": 5}}
         collector.set_experiment_coordinator(exp_coordinator)
 
         metrics = collector.collect_system_metrics()
         assert metrics.active_experiments == 3
 
-    def test_collect_system_metrics_with_curriculum(
-        self, collector: RLMetricsCollector
-    ) -> None:
+    def test_collect_system_metrics_with_curriculum(self, collector: RLMetricsCollector) -> None:
         """Test system metrics with curriculum controller."""
         curriculum = MagicMock()
-        curriculum.export_metrics.return_value = {
-            "stage_distribution": {"WARM_UP": 3, "BASIC": 2}
-        }
+        curriculum.export_metrics.return_value = {"stage_distribution": {"WARM_UP": 3, "BASIC": 2}}
         collector.set_curriculum_controller(curriculum)
 
         metrics = collector.collect_system_metrics()
         assert metrics.curriculum_distribution == {"WARM_UP": 3, "BASIC": 2}
 
-    def test_collect_alert_metrics_no_degradation(
-        self, collector: RLMetricsCollector
-    ) -> None:
+    def test_collect_alert_metrics_no_degradation(self, collector: RLMetricsCollector) -> None:
         """Test alert metrics with no degradation."""
         # Record consistent success
         for _ in range(100):
@@ -301,9 +289,7 @@ class TestRLMetricsCollector:
         assert alerts.degradation_detected is False
         assert alerts.degradation_learners == []
 
-    def test_collect_alert_metrics_with_degradation(
-        self, collector: RLMetricsCollector
-    ) -> None:
+    def test_collect_alert_metrics_with_degradation(self, collector: RLMetricsCollector) -> None:
         """Test alert metrics with degradation."""
         # Record early successes followed by failures
         for _ in range(50):
@@ -315,9 +301,7 @@ class TestRLMetricsCollector:
         assert alerts.degradation_detected is True
         assert "learner" in alerts.degradation_learners
 
-    def test_collect_alert_metrics_anomaly_score(
-        self, collector: RLMetricsCollector
-    ) -> None:
+    def test_collect_alert_metrics_anomaly_score(self, collector: RLMetricsCollector) -> None:
         """Test anomaly score calculation."""
         # Record consistent rewards
         for _ in range(100):
@@ -424,6 +408,7 @@ class TestGlobalSingleton:
         """Test getting global singleton."""
         # Reset global
         import victor.observability.rl_metrics as module
+
         module._rl_metrics_collector = None
 
         collector1 = get_rl_metrics_collector()
@@ -434,6 +419,7 @@ class TestGlobalSingleton:
     def test_singleton_preserves_state(self) -> None:
         """Test singleton preserves state."""
         import victor.observability.rl_metrics as module
+
         module._rl_metrics_collector = None
 
         collector = get_rl_metrics_collector()

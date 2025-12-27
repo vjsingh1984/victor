@@ -681,9 +681,7 @@ class RecoveryCoordinator:
         if len(tool_calls) <= max_calls:
             return tool_calls, False
 
-        logger.warning(
-            f"Truncating {len(tool_calls)} tool calls to budget limit of {max_calls}"
-        )
+        logger.warning(f"Truncating {len(tool_calls)} tool calls to budget limit of {max_calls}")
         return tool_calls[:max_calls], True
 
     # =====================================================================

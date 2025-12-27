@@ -117,9 +117,7 @@ class TestTaskPreparation:
         assert classification is not None
         assert isinstance(budget, int)
 
-    def test_prepare_task_with_task_hint(
-        self, task_coordinator, mock_conversation_controller
-    ):
+    def test_prepare_task_with_task_hint(self, task_coordinator, mock_conversation_controller):
         """Test task preparation with task hint injection."""
         from unittest.mock import patch
 
@@ -135,7 +133,8 @@ class TestTaskPreparation:
             # Verify hint was injected
             mock_conversation_controller.add_message.assert_called()
             calls = [
-                call for call in mock_conversation_controller.add_message.call_args_list
+                call
+                for call in mock_conversation_controller.add_message.call_args_list
                 if len(call[0]) >= 2 and call[0][0] == "system"
             ]
             assert len(calls) > 0
@@ -241,9 +240,7 @@ class TestTaskGuidance:
         # Verify system messages were added
         assert mock_conversation_controller.add_message.call_count >= 2
 
-    def test_apply_task_guidance_action_task(
-        self, task_coordinator, mock_conversation_controller
-    ):
+    def test_apply_task_guidance_action_task(self, task_coordinator, mock_conversation_controller):
         """Test task guidance for action tasks."""
         unified_type = Mock(value="create")
         message = "Create a new script"

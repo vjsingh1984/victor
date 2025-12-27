@@ -189,9 +189,7 @@ class TestModeTransitionLearner:
         coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
         learner1 = coordinator1.get_learner("mode_transition")  # type: ignore
 
-        _record_transition_outcome(
-            learner1, state_key=state_key, action_key=action_key
-        )
+        _record_transition_outcome(learner1, state_key=state_key, action_key=action_key)
         coordinator1.db.close()
 
         coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
@@ -205,9 +203,7 @@ class TestModeTransitionLearner:
         assert state_key in learner2._q_values
         assert action_key in learner2._q_values[state_key]
 
-    def test_get_recommendation_exploitation(
-        self, learner: ModeTransitionLearner
-    ) -> None:
+    def test_get_recommendation_exploitation(self, learner: ModeTransitionLearner) -> None:
         """Test get_recommendation returns best action in exploitation mode."""
         state_key = "explore:analysis:low:low:fair:fair"
 
@@ -236,20 +232,14 @@ class TestModeTransitionLearner:
         assert rec is not None
         assert rec.value == "plan:0"  # Higher Q-value action
 
-    def test_get_recommendation_exploration(
-        self, learner: ModeTransitionLearner
-    ) -> None:
+    def test_get_recommendation_exploration(self, learner: ModeTransitionLearner) -> None:
         """Test get_recommendation can explore with high epsilon."""
         import random
 
         state_key = "explore:analysis:low:low:fair:fair"
 
-        _record_transition_outcome(
-            learner, state_key=state_key, action_key="plan:0"
-        )
-        _record_transition_outcome(
-            learner, state_key=state_key, action_key="build:0"
-        )
+        _record_transition_outcome(learner, state_key=state_key, action_key="plan:0")
+        _record_transition_outcome(learner, state_key=state_key, action_key="build:0")
 
         # Force exploration
         learner.epsilon = 1.0
@@ -283,12 +273,8 @@ class TestModeTransitionLearner:
         """Test task statistics retrieval."""
         task_type = "edit"
 
-        _record_transition_outcome(
-            learner, task_type=task_type, success=True, quality_score=0.8
-        )
-        _record_transition_outcome(
-            learner, task_type=task_type, success=False, quality_score=0.3
-        )
+        _record_transition_outcome(learner, task_type=task_type, success=True, quality_score=0.8)
+        _record_transition_outcome(learner, task_type=task_type, success=False, quality_score=0.3)
 
         stats = learner.get_task_stats(task_type)
 

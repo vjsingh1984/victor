@@ -205,15 +205,16 @@ class TestAICompletionProviderGetProvider:
         provider = AICompletionProvider()
         # Patch the import to simulate ImportError
         import sys
+
         original_modules = sys.modules.copy()
 
         # Create a mock module that raises ImportError
         try:
             # Remove from cache to force re-import
-            if 'victor.providers.registry' in sys.modules:
-                del sys.modules['victor.providers.registry']
+            if "victor.providers.registry" in sys.modules:
+                del sys.modules["victor.providers.registry"]
 
-            with patch.dict(sys.modules, {'victor.providers.registry': None}):
+            with patch.dict(sys.modules, {"victor.providers.registry": None}):
                 # Since we already have _provider = None by default,
                 # and the registry import may fail, the result is either None or a provider
                 result = provider._get_provider()

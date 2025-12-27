@@ -330,9 +330,7 @@ class LMStudioProvider(BaseProvider):
                 context_window = self._extract_context_window(match)
 
         except Exception as exc:
-            logger.warning(
-                f"Failed to discover capabilities for {model} on {self.base_url}: {exc}"
-            )
+            logger.warning(f"Failed to discover capabilities for {model} on {self.base_url}: {exc}")
 
         from victor.config.config_loaders import get_provider_limits
 
@@ -1002,9 +1000,7 @@ class LMStudioProvider(BaseProvider):
             if thinking:
                 metadata = {"reasoning_content": thinking}
                 content = main_content
-                logger.debug(
-                    f"LMStudio: Extracted {len(thinking)} chars of thinking from {model}"
-                )
+                logger.debug(f"LMStudio: Extracted {len(thinking)} chars of thinking from {model}")
 
         # Fallback: Check if content contains JSON tool call
         if not tool_calls and content:

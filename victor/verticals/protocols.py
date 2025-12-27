@@ -225,7 +225,9 @@ class TieredToolConfig:
     mandatory: Set[str] = field(default_factory=set)
     vertical_core: Set[str] = field(default_factory=set)
     semantic_pool: Set[str] = field(default_factory=set)  # DEPRECATED: derive from registry
-    stage_tools: Dict[str, Set[str]] = field(default_factory=dict)  # DEPRECATED: use @tool(stages=[])
+    stage_tools: Dict[str, Set[str]] = field(
+        default_factory=dict
+    )  # DEPRECATED: use @tool(stages=[])
     readonly_only_for_analysis: bool = True
 
     def get_base_tools(self) -> Set[str]:
@@ -329,9 +331,7 @@ class MiddlewareProtocol(Protocol):
     """
 
     @abstractmethod
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Called before a tool is executed.
 
         Args:
@@ -745,9 +745,7 @@ class VerticalExtensions:
             Merged dict of task type hints
         """
         merged = {}
-        for contributor in sorted(
-            self.prompt_contributors, key=lambda c: c.get_priority()
-        ):
+        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
             merged.update(contributor.get_task_type_hints())
         return merged
 

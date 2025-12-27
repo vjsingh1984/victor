@@ -130,7 +130,15 @@ class TestGraphEdge:
 
     def test_edge_types(self):
         """Test different edge types."""
-        edge_types = ["CALLS", "REFERENCES", "CONTAINS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
+        edge_types = [
+            "CALLS",
+            "REFERENCES",
+            "CONTAINS",
+            "INHERITS",
+            "IMPLEMENTS",
+            "COMPOSED_OF",
+            "IMPORTS",
+        ]
         for edge_type in edge_types:
             edge = GraphEdge(src="a", dst="b", type=edge_type)
             assert edge.type == edge_type
@@ -320,6 +328,7 @@ class TestGraphAnalyzer:
     def analyzer(self):
         """Create a GraphAnalyzer instance."""
         from victor.tools.graph_tool import GraphAnalyzer
+
         return GraphAnalyzer()
 
     @pytest.fixture
@@ -461,6 +470,7 @@ class TestGraphAnalyzerCentrality:
     def analyzer_with_data(self):
         """Create analyzer with test data."""
         from victor.tools.graph_tool import GraphAnalyzer
+
         analyzer = GraphAnalyzer()
 
         nodes = [
@@ -501,6 +511,7 @@ class TestGraphAnalyzerPath:
     def analyzer_with_path(self):
         """Create analyzer with path test data."""
         from victor.tools.graph_tool import GraphAnalyzer
+
         analyzer = GraphAnalyzer()
 
         nodes = [
@@ -546,7 +557,9 @@ class TestGraphStoreProtocol:
         import inspect
 
         # Get all abstract methods from protocol
-        methods = [name for name, _ in inspect.getmembers(GraphStoreProtocol, predicate=inspect.isfunction)]
+        methods = [
+            name for name, _ in inspect.getmembers(GraphStoreProtocol, predicate=inspect.isfunction)
+        ]
 
         expected_methods = [
             "upsert_nodes",

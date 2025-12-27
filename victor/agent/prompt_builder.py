@@ -280,7 +280,7 @@ def get_task_type_hint(task_type: str, prompt_contributors: Optional[list] = Non
             if task_type.lower() in hints:
                 task_hint = hints[task_type.lower()]
                 # Handle TaskTypeHint objects or plain strings
-                if hasattr(task_hint, 'hint'):
+                if hasattr(task_hint, "hint"):
                     hint_text = task_hint.hint
                 else:
                     hint_text = str(task_hint)
@@ -407,7 +407,7 @@ class SystemPromptBuilder:
             hints = contributor.get_task_type_hints()
             for task_type, task_hint in hints.items():
                 # Extract hint string from TaskTypeHint objects
-                if hasattr(task_hint, 'hint'):
+                if hasattr(task_hint, "hint"):
                     merged[task_type] = task_hint.hint
                 else:
                     merged[task_type] = str(task_hint)
@@ -468,8 +468,7 @@ class SystemPromptBuilder:
             return ""
 
         guidance = self._tool_guidance.get_guidance_prompt(
-            task_type=self.task_type,
-            available_tools=self.available_tools
+            task_type=self.task_type, available_tools=self.available_tools
         )
 
         if guidance:

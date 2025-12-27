@@ -119,7 +119,8 @@ class TestDependencyLearner:
     def _ensure_tables(self) -> None:
         """Create database tables if they don't exist."""
         cursor = self.db.cursor()
-        cursor.executescript("""
+        cursor.executescript(
+            """
             CREATE TABLE IF NOT EXISTS test_dependencies (
                 file_hash TEXT,
                 test_name TEXT,
@@ -149,7 +150,8 @@ class TestDependencyLearner:
 
             CREATE INDEX IF NOT EXISTS idx_test_history_name ON test_history(test_name);
             CREATE INDEX IF NOT EXISTS idx_test_history_time ON test_history(timestamp);
-        """)
+        """
+        )
         self.db.commit()
 
     def _load_q_table(self) -> None:
@@ -164,9 +166,7 @@ class TestDependencyLearner:
         """Create a hash for a file path."""
         return hashlib.md5(file_path.encode()).hexdigest()[:16]
 
-    def get_failure_probability(
-        self, test_name: str, changed_files: List[str]
-    ) -> float:
+    def get_failure_probability(self, test_name: str, changed_files: List[str]) -> float:
         """Get estimated failure probability for a test given changed files.
 
         Args:
@@ -267,9 +267,7 @@ class TestDependencyLearner:
             old_failure_rate = row["failure_rate"]
             run_count = row["run_count"] + 1
 
-            new_avg_duration = (
-                old_avg_duration * (run_count - 1) + duration_ms
-            ) / run_count
+            new_avg_duration = (old_avg_duration * (run_count - 1) + duration_ms) / run_count
             new_failure_rate = (
                 old_failure_rate * (run_count - 1) + (0 if passed else 1)
             ) / run_count

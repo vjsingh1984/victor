@@ -9,6 +9,7 @@ from victor.verticals.protocols import ModeConfigProviderProtocol
 @dataclass
 class DataAnalysisModeConfig:
     """Configuration for a data analysis mode."""
+
     tool_budget: int
     max_iterations: int
     description: str
@@ -27,19 +28,45 @@ DATA_ANALYSIS_MODE_CONFIGS: Dict[str, DataAnalysisModeConfig] = {
         tool_budget=25,
         max_iterations=50,
         description="Standard analysis with cleaning and visualization",
-        allowed_stages=["INITIAL", "DATA_LOADING", "EXPLORATION", "CLEANING", "ANALYSIS", "VISUALIZATION", "COMPLETION"],
+        allowed_stages=[
+            "INITIAL",
+            "DATA_LOADING",
+            "EXPLORATION",
+            "CLEANING",
+            "ANALYSIS",
+            "VISUALIZATION",
+            "COMPLETION",
+        ],
     ),
     "comprehensive": DataAnalysisModeConfig(
         tool_budget=50,
         max_iterations=100,
         description="Full analysis pipeline with ML and reporting",
-        allowed_stages=["INITIAL", "DATA_LOADING", "EXPLORATION", "CLEANING", "ANALYSIS", "VISUALIZATION", "REPORTING", "COMPLETION"],
+        allowed_stages=[
+            "INITIAL",
+            "DATA_LOADING",
+            "EXPLORATION",
+            "CLEANING",
+            "ANALYSIS",
+            "VISUALIZATION",
+            "REPORTING",
+            "COMPLETION",
+        ],
     ),
     "research": DataAnalysisModeConfig(
         tool_budget=80,
         max_iterations=150,
         description="Deep research analysis with multiple iterations",
-        allowed_stages=["INITIAL", "DATA_LOADING", "EXPLORATION", "CLEANING", "ANALYSIS", "VISUALIZATION", "REPORTING", "COMPLETION"],
+        allowed_stages=[
+            "INITIAL",
+            "DATA_LOADING",
+            "EXPLORATION",
+            "CLEANING",
+            "ANALYSIS",
+            "VISUALIZATION",
+            "REPORTING",
+            "COMPLETION",
+        ],
     ),
 }
 

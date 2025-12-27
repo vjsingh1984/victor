@@ -9,6 +9,7 @@ from victor.verticals.protocols import ModeConfigProviderProtocol
 @dataclass
 class ResearchModeConfig:
     """Configuration for a research mode."""
+
     tool_budget: int
     max_iterations: int
     description: str
@@ -33,13 +34,29 @@ RESEARCH_MODE_CONFIGS: Dict[str, ResearchModeConfig] = {
         tool_budget=30,
         max_iterations=60,
         description="Comprehensive research with full verification cycle",
-        allowed_stages=["INITIAL", "SEARCHING", "READING", "SYNTHESIZING", "WRITING", "VERIFICATION", "COMPLETION"],
+        allowed_stages=[
+            "INITIAL",
+            "SEARCHING",
+            "READING",
+            "SYNTHESIZING",
+            "WRITING",
+            "VERIFICATION",
+            "COMPLETION",
+        ],
     ),
     "academic": ResearchModeConfig(
         tool_budget=50,
         max_iterations=100,
         description="Thorough literature review with extensive citation",
-        allowed_stages=["INITIAL", "SEARCHING", "READING", "SYNTHESIZING", "WRITING", "VERIFICATION", "COMPLETION"],
+        allowed_stages=[
+            "INITIAL",
+            "SEARCHING",
+            "READING",
+            "SYNTHESIZING",
+            "WRITING",
+            "VERIFICATION",
+            "COMPLETION",
+        ],
     ),
 }
 

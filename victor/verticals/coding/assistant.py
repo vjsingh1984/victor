@@ -98,7 +98,7 @@ class CodingAssistant(VerticalBase):
             "overview",
             # Search
             "code_search",  # Semantic code search (primary name)
-            "grep",         # Keyword search
+            "grep",  # Keyword search
             "plan_files",
             # Git
             "git",
@@ -416,17 +416,17 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         return TieredToolConfig(
             # Tier 1: Mandatory - always included for any task
             mandatory={
-                ToolNames.READ,      # Read files - essential
-                ToolNames.LS,        # List directory - essential
-                ToolNames.GREP,      # Code search - essential for finding code
+                ToolNames.READ,  # Read files - essential
+                ToolNames.LS,  # List directory - essential
+                ToolNames.GREP,  # Code search - essential for finding code
             },
             # Tier 2: Vertical Core - essential for coding tasks
             vertical_core={
-                ToolNames.EDIT,      # Edit files - core coding
-                ToolNames.WRITE,     # Write files - core coding
-                ToolNames.SHELL,     # Shell commands - core for build/test
-                ToolNames.GIT,       # Git operations - core for version control
-                ToolNames.SEARCH,    # Semantic search - core for code exploration
+                ToolNames.EDIT,  # Edit files - core coding
+                ToolNames.WRITE,  # Write files - core coding
+                ToolNames.SHELL,  # Shell commands - core for build/test
+                ToolNames.GIT,  # Git operations - core for version control
+                ToolNames.SEARCH,  # Semantic search - core for code exploration
                 ToolNames.OVERVIEW,  # Codebase overview - core for understanding
             },
             # semantic_pool and stage_tools are now derived from @tool decorator metadata

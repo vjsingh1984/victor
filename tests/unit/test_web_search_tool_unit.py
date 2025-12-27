@@ -16,47 +16,52 @@
 
 from unittest.mock import MagicMock
 
+from victor.tools.base import ToolConfig
 from victor.tools.web_search_tool import (
-    set_web_tool_defaults,
-    set_web_search_provider,
     _parse_ddg_results,
-    _config,
+    _get_web_config,
 )
 
 
-class TestSetWebToolDefaults:
-    """Tests for set_web_tool_defaults function."""
+class TestGetWebConfig:
+    """Tests for _get_web_config function."""
 
-    def test_set_fetch_top(self):
-        """Test setting fetch_top."""
-        original = _config["fetch_top"]
-        set_web_tool_defaults(fetch_top=5)
-        assert _config["fetch_top"] == 5
-        _config["fetch_top"] = original
-
-    def test_set_fetch_pool(self):
-        """Test setting fetch_pool."""
-        original = _config["fetch_pool"]
-        set_web_tool_defaults(fetch_pool=10)
-        assert _config["fetch_pool"] == 10
-        _config["fetch_pool"] = original
-
-    def test_set_max_content_length(self):
-        """Test setting max_content_length."""
-        original = _config["max_content_length"]
-        set_web_tool_defaults(max_content_length=10000)
-        assert _config["max_content_length"] == 10000
-        _config["max_content_length"] = original
-
-
-class TestSetWebSearchProvider:
-    """Tests for set_web_search_provider function."""
-
-    def test_set_provider(self):
-        """Test setting provider."""
+    def test_config_from_tool_config(self):
+        """Test getting config from ToolConfig context."""
         mock_provider = MagicMock()
-        set_web_search_provider(mock_provider, model="test-model")
-        # Provider is set globally - just verify no exception
+        tool_config = ToolConfig(
+            provider=mock_provider,
+            model="test-model",
+            web_fetch_top=5,
+            web_fetch_pool=10,
+            max_content_length=8000,
+        )
+        context = {"tool_config": tool_config}
+
+        config = _get_web_config(context)
+
+        assert config["provider"] == mock_provider
+        assert config["model"] == "test-model"
+        assert config["fetch_top"] == 5
+        assert config["fetch_pool"] == 10
+        assert config["max_content_length"] == 8000
+
+    def test_config_without_context(self):
+        """Test getting config without context returns defaults."""
+        config = _get_web_config(None)
+
+        assert config["provider"] is None
+        assert config["model"] is None
+        assert config["fetch_top"] is None
+        assert config["fetch_pool"] is None
+        assert config["max_content_length"] == 5000
+
+    def test_config_with_empty_context(self):
+        """Test getting config with empty context returns defaults."""
+        config = _get_web_config({})
+
+        assert config["provider"] is None
+        assert config["model"] is None
 
 
 class TestParseDDGResults:

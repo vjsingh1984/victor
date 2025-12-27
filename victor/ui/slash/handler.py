@@ -197,7 +197,9 @@ class SlashCommandHandler:
                 lines.append(f"\n[cyan]{category.title()}[/]")
                 for cmd in commands:
                     meta = cmd.metadata
-                    aliases = f" ({', '.join('/' + a for a in meta.aliases)})" if meta.aliases else ""
+                    aliases = (
+                        f" ({', '.join('/' + a for a in meta.aliases)})" if meta.aliases else ""
+                    )
                     lines.append(f"  /{meta.name}{aliases} - {meta.description}")
 
         lines.append("\n[dim]Type /help <command> for more details[/]")

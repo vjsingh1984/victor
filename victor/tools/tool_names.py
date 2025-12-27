@@ -204,7 +204,9 @@ class ToolNames:
     AUDIT = "audit"  # audit → audit (codebase auditing)
     IAC = "iac"  # iac_scanner → iac (infrastructure as code)
     GRAPH = "graph"  # graph → graph (code graph analysis: PageRank, dependencies)
-    ARCH_SUMMARY = "arch_summary"  # architecture_summary → arch_summary (architectural hubs/coupling)
+    ARCH_SUMMARY = (
+        "arch_summary"  # architecture_summary → arch_summary (architectural hubs/coupling)
+    )
 
 
 # =============================================================================

@@ -841,9 +841,7 @@ class ToolDeduplicationTrackerProtocol(Protocol):
         """
         ...
 
-    def is_redundant(
-        self, tool_name: str, args: Dict[str, Any], explain: bool = False
-    ) -> bool:
+    def is_redundant(self, tool_name: str, args: Dict[str, Any], explain: bool = False) -> bool:
         """Check if a tool call is redundant given recent history.
 
         Args:
@@ -1070,9 +1068,7 @@ class RecoveryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def check_blocked_threshold(
-        self, ctx: Any, all_blocked: bool
-    ) -> Optional[Tuple[Any, bool]]:
+    def check_blocked_threshold(self, ctx: Any, all_blocked: bool) -> Optional[Tuple[Any, bool]]:
         """Check if too many tools have been blocked.
 
         Returns:
@@ -1311,9 +1307,7 @@ class ChunkGeneratorProtocol(Protocol):
         """
         ...
 
-    def generate_content_chunk(
-        self, content: str, is_final: bool = False, suffix: str = ""
-    ) -> Any:
+    def generate_content_chunk(self, content: str, is_final: bool = False, suffix: str = "") -> Any:
         """Generate chunk for content display.
 
         Args:
@@ -1403,10 +1397,7 @@ class TaskCoordinatorProtocol(Protocol):
     """
 
     def prepare_task(
-        self,
-        user_message: str,
-        unified_task_type: Any,
-        conversation_controller: Any
+        self, user_message: str, unified_task_type: Any, conversation_controller: Any
     ) -> tuple[Any, int]:
         """Prepare task-specific guidance and budget adjustments.
 
@@ -1420,9 +1411,7 @@ class TaskCoordinatorProtocol(Protocol):
         """
         ...
 
-    def apply_intent_guard(
-        self, user_message: str, conversation_controller: Any
-    ) -> None:
+    def apply_intent_guard(self, user_message: str, conversation_controller: Any) -> None:
         """Detect intent and inject prompt guards for read-only tasks.
 
         Args:
@@ -2142,4 +2131,358 @@ __all__ = [
     "ParallelExecutorProtocol",
     "ResponseCompleterProtocol",
     "StreamingHandlerProtocol",
+    # Tool access control protocols
+    "AccessPrecedence",
+    "ToolAccessDecision",
+    "ToolAccessContext",
+    "IToolAccessController",
+    # Budget management protocols
+    "BudgetType",
+    "BudgetStatus",
+    "BudgetConfig",
+    "IBudgetManager",
 ]
+
+
+# =============================================================================
+# Tool Access Control Protocols
+# =============================================================================
+
+from enum import Enum
+
+
+class AccessPrecedence(int, Enum):
+    """Precedence levels for tool access control.
+
+    Lower numbers = higher precedence.
+    Safety (L0) > Mode (L1) > Session (L2) > Vertical (L3) > Stage (L4) > Intent (L5)
+    """
+
+    SAFETY = 0  # DangerLevel checks - highest precedence
+    MODE = 1  # Mode restrictions (BUILD/PLAN/EXPLORE)
+    SESSION = 2  # Session-enabled tools set
+    VERTICAL = 3  # TieredToolConfig from vertical
+    STAGE = 4  # Conversation stage filtering
+    INTENT = 5  # DISPLAY_ONLY/READ_ONLY blocking
+
+
+@dataclass
+class ToolAccessDecision:
+    """Result of a tool access check.
+
+    Provides detailed information about why a tool was allowed or denied,
+    and which layer made the decision.
+
+    Attributes:
+        allowed: Whether the tool is allowed
+        tool_name: Name of the tool checked
+        reason: Human-readable explanation
+        source: Which layer made the decision
+        precedence_level: Numeric precedence (lower = higher priority)
+        checked_layers: Names of layers that were checked
+        layer_results: Results from each checked layer
+    """
+
+    allowed: bool
+    tool_name: str
+    reason: str
+    source: str  # Which layer decided (e.g., "mode", "safety")
+    precedence_level: int = 0
+    checked_layers: List[str] = field(default_factory=list)
+    layer_results: Dict[str, bool] = field(default_factory=dict)
+
+    def explain(self) -> str:
+        """Get detailed explanation of the decision."""
+        status = "ALLOWED" if self.allowed else "DENIED"
+        layers = ", ".join(self.checked_layers) if self.checked_layers else "none"
+        return (
+            f"Tool '{self.tool_name}' is {status}\n"
+            f"  Decision by: {self.source} (precedence {self.precedence_level})\n"
+            f"  Reason: {self.reason}\n"
+            f"  Layers checked: {layers}"
+        )
+
+
+@dataclass
+class ToolAccessContext:
+    """Context for tool access decisions.
+
+    Provides all information needed by access layers to make decisions.
+
+    Attributes:
+        user_message: Current user message (for intent detection)
+        conversation_stage: Current conversation stage
+        intent: Detected user intent
+        current_mode: Current agent mode (BUILD/PLAN/EXPLORE)
+        session_enabled_tools: Tools enabled for this session
+        vertical_name: Active vertical (if any)
+        metadata: Additional context data
+    """
+
+    user_message: Optional[str] = None
+    conversation_stage: Optional["ConversationStage"] = None
+    intent: Optional[Any] = None  # ActionIntent
+    current_mode: Optional[str] = None
+    session_enabled_tools: Optional[Set[str]] = None
+    vertical_name: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@runtime_checkable
+class IToolAccessController(Protocol):
+    """Protocol for unified tool access control.
+
+    Provides a single point of control for all tool access decisions,
+    replacing scattered checks throughout the codebase.
+
+    The controller applies layers in precedence order:
+    Safety (L0) > Mode (L1) > Session (L2) > Vertical (L3) > Stage (L4) > Intent (L5)
+
+    A tool is blocked if ANY layer denies it. The first layer to deny
+    becomes the authoritative source of the decision.
+    """
+
+    def check_access(
+        self, tool_name: str, context: Optional[ToolAccessContext] = None
+    ) -> ToolAccessDecision:
+        """Check if a tool is allowed in the given context.
+
+        Args:
+            tool_name: Name of the tool to check
+            context: Access context (mode, stage, intent, etc.)
+
+        Returns:
+            ToolAccessDecision with result and explanation
+        """
+        ...
+
+    def filter_tools(
+        self, tools: List[str], context: Optional[ToolAccessContext] = None
+    ) -> Tuple[List[str], List[ToolAccessDecision]]:
+        """Filter a list of tools to only allowed ones.
+
+        Args:
+            tools: List of tool names to filter
+            context: Access context
+
+        Returns:
+            Tuple of (allowed_tools, denial_decisions)
+        """
+        ...
+
+    def get_allowed_tools(self, context: Optional[ToolAccessContext] = None) -> Set[str]:
+        """Get all tools allowed in the given context.
+
+        Args:
+            context: Access context
+
+        Returns:
+            Set of allowed tool names
+        """
+        ...
+
+    def explain_decision(self, tool_name: str, context: Optional[ToolAccessContext] = None) -> str:
+        """Get detailed explanation for a tool access decision.
+
+        Args:
+            tool_name: Name of the tool
+            context: Access context
+
+        Returns:
+            Human-readable explanation
+        """
+        ...
+
+
+# =============================================================================
+# Budget Management Protocols
+# =============================================================================
+
+
+class BudgetType(str, Enum):
+    """Types of budgets tracked by the budget manager.
+
+    Attributes:
+        TOOL_CALLS: Total tool calls allowed per session
+        ITERATIONS: Total LLM iterations allowed
+        EXPLORATION: Read/search operations (counted toward exploration limit)
+        ACTION: Write/modify operations (separate from exploration)
+    """
+
+    TOOL_CALLS = "tool_calls"
+    ITERATIONS = "iterations"
+    EXPLORATION = "exploration"
+    ACTION = "action"
+
+
+@dataclass
+class BudgetStatus:
+    """Status of a specific budget.
+
+    Attributes:
+        budget_type: Type of budget
+        current: Current usage count
+        base_maximum: Base maximum before multipliers
+        effective_maximum: Maximum after multipliers applied
+        is_exhausted: Whether budget is fully consumed
+        model_multiplier: Model-specific multiplier
+        mode_multiplier: Mode-specific multiplier
+        productivity_multiplier: Productivity-based multiplier
+    """
+
+    budget_type: BudgetType
+    current: int = 0
+    base_maximum: int = 0
+    effective_maximum: int = 0
+    is_exhausted: bool = False
+    model_multiplier: float = 1.0
+    mode_multiplier: float = 1.0
+    productivity_multiplier: float = 1.0
+
+    @property
+    def remaining(self) -> int:
+        """Get remaining budget."""
+        return max(0, self.effective_maximum - self.current)
+
+    @property
+    def utilization(self) -> float:
+        """Get budget utilization as a percentage (0.0-1.0)."""
+        if self.effective_maximum == 0:
+            return 0.0
+        return min(1.0, self.current / self.effective_maximum)
+
+
+@dataclass
+class BudgetConfig:
+    """Configuration for budget manager.
+
+    Attributes:
+        base_tool_calls: Base tool call budget
+        base_iterations: Base iteration budget
+        base_exploration: Base exploration iterations
+        base_action: Base action iterations
+    """
+
+    base_tool_calls: int = 30
+    base_iterations: int = 50
+    base_exploration: int = 8
+    base_action: int = 12
+
+
+@runtime_checkable
+class IBudgetManager(Protocol):
+    """Protocol for unified budget management.
+
+    Centralizes all budget tracking with consistent multiplier composition:
+    effective_max = base × model_multiplier × mode_multiplier × productivity_multiplier
+
+    Replaces scattered budget tracking in:
+    - unified_task_tracker.py: exploration_iterations, action_iterations
+    - orchestrator.py: tool_budget, complexity_tool_budget
+    - intelligent_prompt_builder.py: recommended_tool_budget
+    """
+
+    def get_status(self, budget_type: BudgetType) -> BudgetStatus:
+        """Get current status of a budget.
+
+        Args:
+            budget_type: Type of budget to check
+
+        Returns:
+            BudgetStatus with current usage and limits
+        """
+        ...
+
+    def consume(self, budget_type: BudgetType, amount: int = 1) -> bool:
+        """Consume budget for an operation.
+
+        Args:
+            budget_type: Type of budget to consume
+            amount: Amount to consume (default 1)
+
+        Returns:
+            True if budget was available, False if exhausted
+        """
+        ...
+
+    def is_exhausted(self, budget_type: BudgetType) -> bool:
+        """Check if a budget is exhausted.
+
+        Args:
+            budget_type: Type of budget to check
+
+        Returns:
+            True if budget is fully consumed
+        """
+        ...
+
+    def set_model_multiplier(self, multiplier: float) -> None:
+        """Set the model-specific multiplier.
+
+        Model multipliers vary by model capability:
+        - GPT-4o: 1.0 (baseline)
+        - Claude Opus: 1.2 (more capable)
+        - DeepSeek: 1.3 (needs more exploration)
+        - Ollama local: 1.5 (needs more attempts)
+
+        Args:
+            multiplier: Model multiplier value
+        """
+        ...
+
+    def set_mode_multiplier(self, multiplier: float) -> None:
+        """Set the mode-specific multiplier.
+
+        Mode multipliers:
+        - BUILD: 2.0 (reading before writing)
+        - PLAN: 2.5 (thorough analysis)
+        - EXPLORE: 3.0 (exploration is primary goal)
+
+        Args:
+            multiplier: Mode multiplier value
+        """
+        ...
+
+    def set_productivity_multiplier(self, multiplier: float) -> None:
+        """Set the productivity multiplier.
+
+        Productivity multipliers (from RL learning):
+        - High productivity session: 0.8 (less budget needed)
+        - Normal: 1.0
+        - Low productivity: 1.2-2.0 (more attempts needed)
+
+        Args:
+            multiplier: Productivity multiplier value
+        """
+        ...
+
+    def reset(self, budget_type: Optional[BudgetType] = None) -> None:
+        """Reset budget(s) to initial state.
+
+        Args:
+            budget_type: Specific budget to reset, or None for all
+        """
+        ...
+
+    def get_prompt_budget_info(self) -> Dict[str, Any]:
+        """Get budget information for system prompts.
+
+        Returns:
+            Dictionary with budget info for prompt building
+        """
+        ...
+
+    def record_tool_call(self, tool_name: str, is_write_operation: bool = False) -> bool:
+        """Record a tool call and consume appropriate budget.
+
+        Automatically routes to EXPLORATION or ACTION budget based
+        on whether the operation is a write operation.
+
+        Args:
+            tool_name: Name of the tool called
+            is_write_operation: Whether this is a write/modify operation
+
+        Returns:
+            True if budget was available
+        """
+        ...

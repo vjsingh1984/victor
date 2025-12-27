@@ -130,9 +130,13 @@ class InitCommand(BaseSlashCommand):
                 ctx.console.print(f"[yellow]{target_path.name} already exists[/]")
                 ctx.console.print("")
                 ctx.console.print("[bold]Options:[/]")
-                ctx.console.print("  [cyan]/init --update[/]   Merge new analysis (preserves your edits)")
+                ctx.console.print(
+                    "  [cyan]/init --update[/]   Merge new analysis (preserves your edits)"
+                )
                 ctx.console.print("  [cyan]/init --force[/]    Overwrite completely")
-                ctx.console.print("  [cyan]/init --learn[/]    Enhance with conversation history insights")
+                ctx.console.print(
+                    "  [cyan]/init --learn[/]    Enhance with conversation history insights"
+                )
                 ctx.console.print("  [cyan]/init --deep[/]     LLM-powered analysis (any language)")
                 ctx.console.print("  [cyan]/init --symlinks[/] Create CLAUDE.md and other aliases")
 
@@ -190,7 +194,9 @@ class InitCommand(BaseSlashCommand):
             component_count = content.count("| `")
             pattern_count = content.count(". **") + content.count("Pattern:")
 
-            ctx.console.print(f"[dim]  Lines: {len(lines)}, Components: {component_count}, Patterns: {pattern_count}[/]")
+            ctx.console.print(
+                f"[dim]  Lines: {len(lines)}, Components: {component_count}, Patterns: {pattern_count}[/]"
+            )
 
             # Create symlinks if requested
             if symlinks:

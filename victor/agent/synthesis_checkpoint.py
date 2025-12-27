@@ -147,9 +147,7 @@ class DuplicateToolCheckpoint(SynthesisCheckpoint):
                 metadata={"repeated_tool": tool_name, "count": self.threshold},
             )
 
-        return CheckpointResult(
-            should_synthesize=False, reason="No excessive repetition detected"
-        )
+        return CheckpointResult(should_synthesize=False, reason="No excessive repetition detected")
 
 
 class SimilarArgsCheckpoint(SynthesisCheckpoint):
@@ -193,7 +191,7 @@ class SimilarArgsCheckpoint(SynthesisCheckpoint):
             if len(unique_paths) < len(paths_seen) * (1 - self.similarity_threshold):
                 return CheckpointResult(
                     should_synthesize=True,
-                    reason=f"Repeated file operations on similar paths",
+                    reason="Repeated file operations on similar paths",
                     suggested_prompt=(
                         "You are repeatedly accessing the same files. "
                         "Consider synthesizing what you've learned from these files."
@@ -208,7 +206,7 @@ class SimilarArgsCheckpoint(SynthesisCheckpoint):
             if len(unique_queries) < len(queries_seen) * (1 - self.similarity_threshold):
                 return CheckpointResult(
                     should_synthesize=True,
-                    reason=f"Repeated searches with similar queries",
+                    reason="Repeated searches with similar queries",
                     suggested_prompt=(
                         "You are running similar searches repeatedly. "
                         "Consider synthesizing the search results you have gathered."
@@ -217,17 +215,13 @@ class SimilarArgsCheckpoint(SynthesisCheckpoint):
                     metadata={"repeated_queries": list(unique_queries)},
                 )
 
-        return CheckpointResult(
-            should_synthesize=False, reason="No excessive similarity detected"
-        )
+        return CheckpointResult(should_synthesize=False, reason="No excessive similarity detected")
 
 
 class TimeoutApproachingCheckpoint(SynthesisCheckpoint):
     """Checkpoint when approaching time limit."""
 
-    def __init__(
-        self, warning_threshold: float = 0.7, critical_threshold: float = 0.9
-    ) -> None:
+    def __init__(self, warning_threshold: float = 0.7, critical_threshold: float = 0.9) -> None:
         self.warning_threshold = warning_threshold
         self.critical_threshold = critical_threshold
 
@@ -242,9 +236,7 @@ class TimeoutApproachingCheckpoint(SynthesisCheckpoint):
         timeout = task_context.get("timeout", 180)
 
         if timeout <= 0:
-            return CheckpointResult(
-                should_synthesize=False, reason="No timeout configured"
-            )
+            return CheckpointResult(should_synthesize=False, reason="No timeout configured")
 
         time_ratio = elapsed / timeout
         remaining = timeout - elapsed
@@ -300,9 +292,7 @@ class NoProgressCheckpoint(SynthesisCheckpoint):
         recent = tool_history[-self.window_size :]
 
         # Check for failed tools
-        failures = sum(
-            1 for h in recent if not h.get("success", True) or h.get("error")
-        )
+        failures = sum(1 for h in recent if not h.get("success", True) or h.get("error"))
         if failures >= self.window_size - 1:
             return CheckpointResult(
                 should_synthesize=True,
@@ -335,9 +325,7 @@ class NoProgressCheckpoint(SynthesisCheckpoint):
                 metadata={"empty_results": empty_count, "window": self.window_size},
             )
 
-        return CheckpointResult(
-            should_synthesize=False, reason="Progress appears normal"
-        )
+        return CheckpointResult(should_synthesize=False, reason="Progress appears normal")
 
 
 class ErrorRateCheckpoint(SynthesisCheckpoint):
@@ -359,11 +347,7 @@ class ErrorRateCheckpoint(SynthesisCheckpoint):
                 should_synthesize=False, reason="Too few calls to calculate error rate"
             )
 
-        errors = sum(
-            1
-            for h in tool_history
-            if not h.get("success", True) or h.get("error")
-        )
+        errors = sum(1 for h in tool_history if not h.get("success", True) or h.get("error"))
         error_rate = errors / len(tool_history)
 
         if error_rate > self.error_threshold:

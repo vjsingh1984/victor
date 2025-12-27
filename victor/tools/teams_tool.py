@@ -52,100 +52,33 @@ from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
 
-_config: Dict[str, Optional[str]] = {
-    "client_id": None,
-    "client_secret": None,
-    "tenant_id": None,
-    "access_token": None,
-}
-
 _GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
 
 
-def set_teams_config(
-    client_id: Optional[str] = None,
-    client_secret: Optional[str] = None,
-    tenant_id: Optional[str] = None,
-) -> bool:
-    """Set Microsoft Teams configuration.
-
-    DEPRECATED: Use ToolConfig via executor context instead.
-    This function will be removed in v2.0.
+def _get_teams_access_token(context: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    """Get Teams access token from execution context.
 
     Args:
-        client_id: Azure AD application client ID
-        client_secret: Azure AD application client secret
-        tenant_id: Azure AD tenant ID
+        context: Tool execution context
 
     Returns:
-        True if configuration was successful, False otherwise
+        Access token if available in context, None otherwise
     """
-    import warnings
-
-    warnings.warn(
-        "set_teams_config() is deprecated. Use ToolConfig via executor.update_context() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    if not HTTPX_AVAILABLE:
-        logger.error("httpx not available. Install with: pip install httpx")
-        return False
-
-    if client_id:
-        _config["client_id"] = client_id
-    if client_secret:
-        _config["client_secret"] = client_secret
-    if tenant_id:
-        _config["tenant_id"] = tenant_id
-
-    # Try to get an access token
-    if all([_config["client_id"], _config["client_secret"], _config["tenant_id"]]):
-        return _refresh_access_token()
-
-    return False
+    if context:
+        return context.get("teams_access_token")
+    return None
 
 
-def _refresh_access_token() -> bool:
-    """Refresh the Microsoft Graph API access token.
-
-    Returns:
-        True if token was refreshed successfully
-    """
-    if not HTTPX_AVAILABLE:
-        return False
-
-    token_url = f"https://login.microsoftonline.com/{_config['tenant_id']}/oauth2/v2.0/token"
-
-    try:
-        with httpx.Client() as client:
-            response = client.post(
-                token_url,
-                data={
-                    "client_id": _config["client_id"],
-                    "client_secret": _config["client_secret"],
-                    "scope": "https://graph.microsoft.com/.default",
-                    "grant_type": "client_credentials",
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-            _config["access_token"] = data.get("access_token")
-            logger.info("Successfully obtained Microsoft Graph API access token")
-            return True
-    except Exception as e:
-        logger.error(f"Failed to get access token: {e}")
-        return False
-
-
-def is_teams_configured() -> bool:
+def is_teams_configured(context: Optional[Dict[str, Any]] = None) -> bool:
     """Check if Teams client is configured and has valid token."""
-    return _config["access_token"] is not None
+    return _get_teams_access_token(context) is not None
 
 
-def _get_headers() -> Dict[str, str]:
+def _get_headers(context: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
     """Get headers for Graph API requests."""
+    access_token = _get_teams_access_token(context) or ""
     return {
-        "Authorization": f"Bearer {_config['access_token']}",
+        "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
     }
 
@@ -172,6 +105,7 @@ async def teams(
     query: Optional[str] = None,
     channel_name: Optional[str] = None,
     channel_description: Optional[str] = None,
+    context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Perform operations on Microsoft Teams.
 
@@ -184,6 +118,7 @@ async def teams(
         query: The query for searching messages for 'search_messages'.
         channel_name: Name for 'create_channel' operation.
         channel_description: Description for 'create_channel' operation.
+        context: Tool execution context containing teams_access_token.
 
     Returns:
         A dictionary with the result of the operation.
@@ -191,10 +126,10 @@ async def teams(
     if not HTTPX_AVAILABLE:
         return {"success": False, "error": "httpx not installed. Install with: pip install httpx"}
 
-    if not _config["access_token"]:
+    if not _get_teams_access_token(context):
         return {
             "success": False,
-            "error": "Teams client is not configured. Call set_teams_config() first.",
+            "error": "Teams not configured. Provide teams_access_token in context.",
         }
 
     try:

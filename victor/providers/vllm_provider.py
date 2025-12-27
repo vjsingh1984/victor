@@ -156,11 +156,13 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
         try:
             data = json.loads(match)
             if "name" in data:
-                tool_calls.append({
-                    "id": f"fallback_{len(tool_calls)}",
-                    "name": data.get("name", ""),
-                    "arguments": data.get("arguments", {}),
-                })
+                tool_calls.append(
+                    {
+                        "id": f"fallback_{len(tool_calls)}",
+                        "name": data.get("name", ""),
+                        "arguments": data.get("arguments", {}),
+                    }
+                )
                 remaining = remaining.replace(f"```json\n{match}\n```", "").strip()
                 remaining = remaining.replace(f"```json{match}```", "").strip()
         except json.JSONDecodeError:
@@ -173,12 +175,16 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
         try:
             data = json.loads(match)
             if "name" in data:
-                tool_calls.append({
-                    "id": f"fallback_{len(tool_calls)}",
-                    "name": data.get("name", ""),
-                    "arguments": data.get("arguments", {}),
-                })
-                remaining = re.sub(r"<TOOL_OUTPUT>\s*" + re.escape(match) + r"\s*</TOOL_OUTPUT>", "", remaining)
+                tool_calls.append(
+                    {
+                        "id": f"fallback_{len(tool_calls)}",
+                        "name": data.get("name", ""),
+                        "arguments": data.get("arguments", {}),
+                    }
+                )
+                remaining = re.sub(
+                    r"<TOOL_OUTPUT>\s*" + re.escape(match) + r"\s*</TOOL_OUTPUT>", "", remaining
+                )
         except json.JSONDecodeError:
             pass
 
@@ -188,11 +194,13 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
             # Try to parse the entire content as JSON
             data = json.loads(content.strip())
             if "name" in data:
-                tool_calls.append({
-                    "id": "fallback_0",
-                    "name": data.get("name", ""),
-                    "arguments": data.get("arguments", {}),
-                })
+                tool_calls.append(
+                    {
+                        "id": "fallback_0",
+                        "name": data.get("name", ""),
+                        "arguments": data.get("arguments", {}),
+                    }
+                )
                 remaining = ""
         except json.JSONDecodeError:
             pass
@@ -536,7 +544,9 @@ class VLLMProvider(BaseProvider):
                                     if "name" in func:
                                         accumulated_tool_calls[idx]["name"] = func["name"]
                                     if "arguments" in func:
-                                        accumulated_tool_calls[idx]["arguments"] += func["arguments"]
+                                        accumulated_tool_calls[idx]["arguments"] += func[
+                                            "arguments"
+                                        ]
 
                             # Final chunk
                             if finish_reason:
@@ -550,7 +560,11 @@ class VLLMProvider(BaseProvider):
                                     parsed_tool_calls = []
                                     for tc in accumulated_tool_calls:
                                         try:
-                                            args = json.loads(tc["arguments"]) if tc["arguments"] else {}
+                                            args = (
+                                                json.loads(tc["arguments"])
+                                                if tc["arguments"]
+                                                else {}
+                                            )
                                         except json.JSONDecodeError:
                                             args = {"raw": tc["arguments"]}
                                         parsed_tool_calls.append(

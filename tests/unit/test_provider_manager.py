@@ -309,14 +309,16 @@ class TestProviderSwitching:
         new_provider = MagicMock()
         new_provider.supports_tools.return_value = True
         new_provider.supports_streaming.return_value = True
-        new_provider.discover_capabilities = AsyncMock(return_value=MagicMock(
-            provider="openai",
-            model="gpt-4-turbo",
-            context_window=128000,
-            supports_tools=True,
-            supports_streaming=True,
-            source="runtime",
-        ))
+        new_provider.discover_capabilities = AsyncMock(
+            return_value=MagicMock(
+                provider="openai",
+                model="gpt-4-turbo",
+                context_window=128000,
+                supports_tools=True,
+                supports_streaming=True,
+                source="runtime",
+            )
+        )
         mock_provider_registry.create.return_value = new_provider
 
         # Mock adapter
@@ -389,7 +391,9 @@ class TestProviderSwitching:
         mock_adapter_registry.get_adapter.return_value = mock_adapter
 
         # Mock health check to fail then succeed
-        with patch.object(manager, "_check_provider_health", new=AsyncMock(side_effect=[False, True])):
+        with patch.object(
+            manager, "_check_provider_health", new=AsyncMock(side_effect=[False, True])
+        ):
             result = await manager.switch_provider("google")
 
         # Should have fallen back

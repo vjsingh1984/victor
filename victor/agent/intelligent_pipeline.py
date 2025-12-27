@@ -247,11 +247,14 @@ class IntelligentAgentPipeline:
                     coordinator = get_rl_coordinator()
                     mode_transition_learner = coordinator.get_learner("mode_transition")
                 except Exception as e:
-                    logger.debug(f"[IntelligentPipeline] Could not get mode_transition learner: {e}")
+                    logger.debug(
+                        f"[IntelligentPipeline] Could not get mode_transition learner: {e}"
+                    )
 
                 self._mode_controller = AdaptiveModeController(
                     profile_name=self.profile_name,
                     provider_name=self.provider_name,
+                    model_name=self.model,
                     provider_adapter=self._provider_adapter,
                     mode_transition_learner=mode_transition_learner,
                 )
@@ -306,7 +309,9 @@ class IntelligentAgentPipeline:
                     coordinator = get_rl_coordinator()
                     grounding_threshold_learner = coordinator.get_learner("grounding_threshold")
                 except Exception as e:
-                    logger.debug(f"[IntelligentPipeline] Could not get grounding_threshold learner: {e}")
+                    logger.debug(
+                        f"[IntelligentPipeline] Could not get grounding_threshold learner: {e}"
+                    )
 
                 self._grounding_verifier = GroundingVerifier(
                     project_root=self.project_root,
@@ -464,10 +469,7 @@ class IntelligentAgentPipeline:
             # a slight increase (bounded). This helps tasks that historically need more.
             if learned_budget > tool_budget:
                 # Recommend up to 20% more, but cap at learned budget
-                suggested_increase = min(
-                    learned_budget,
-                    int(tool_budget * 1.2)
-                )
+                suggested_increase = min(learned_budget, int(tool_budget * 1.2))
                 recommended_budget = max(recommended_budget, suggested_increase)
                 logger.debug(
                     f"[IntelligentPipeline] RL suggests higher budget for {task_type}: "

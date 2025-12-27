@@ -13,9 +13,9 @@
 # limitations under the License.
 
 """
-Model-centric capability loader for model_capabilities.yaml v0.1.0.
+Model-centric capability loader for model_capabilities.yaml v0.2.0.
 
-Schema v0.1.0 is model-centric:
+Schema v0.2.0 is model-centric:
   models.<pattern>:
     training:    # What the model was trained to do (provider-independent)
     providers:   # How each provider enables these capabilities

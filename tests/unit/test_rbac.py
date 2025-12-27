@@ -519,9 +519,7 @@ class TestRequirePermissionDecorator:
         # Use new event loop to avoid pollution from other tests
         loop = asyncio.new_event_loop()
         try:
-            result = loop.run_until_complete(
-                async_write(_rbac_manager=rbac, _rbac_user="alice")
-            )
+            result = loop.run_until_complete(async_write(_rbac_manager=rbac, _rbac_user="alice"))
             assert result == "written"
         finally:
             loop.close()
@@ -541,9 +539,7 @@ class TestRequirePermissionDecorator:
         loop = asyncio.new_event_loop()
         try:
             with pytest.raises(PermissionError):
-                loop.run_until_complete(
-                    async_execute(_rbac_manager=rbac, _rbac_user="bob")
-                )
+                loop.run_until_complete(async_execute(_rbac_manager=rbac, _rbac_user="bob"))
         finally:
             loop.close()
 
@@ -698,7 +694,10 @@ class TestEdgeCases:
         def add_roles():
             try:
                 for i in range(100):
-                    role = Role(f"concurrent_role_{threading.current_thread().name}_{i}", frozenset({Permission.READ}))
+                    role = Role(
+                        f"concurrent_role_{threading.current_thread().name}_{i}",
+                        frozenset({Permission.READ}),
+                    )
                     rbac.add_role(role)
             except Exception as e:
                 errors.append(e)

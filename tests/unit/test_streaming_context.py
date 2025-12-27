@@ -135,9 +135,7 @@ class TestStreamingChatContext:
 
     def test_reset_blocked_attempts(self):
         """reset_blocked_attempts clears the counter."""
-        ctx = StreamingChatContext(
-            user_message="test", consecutive_blocked_attempts=5
-        )
+        ctx = StreamingChatContext(user_message="test", consecutive_blocked_attempts=5)
         ctx.reset_blocked_attempts()
         assert ctx.consecutive_blocked_attempts == 0
 

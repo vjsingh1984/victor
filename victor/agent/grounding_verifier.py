@@ -53,6 +53,602 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# GROUNDING STOPWORDS
+# =============================================================================
+# Common English words that should NOT be treated as code symbols during
+# grounding verification. These words frequently appear in LLM explanations
+# but are not actual code identifiers.
+#
+# Issue Reference: GAP-15, workflow-test-issues.md Issue #3
+# =============================================================================
+
+GROUNDING_STOPWORDS: frozenset = frozenset(
+    {
+        # Articles and determiners
+        "a",
+        "an",
+        "the",
+        "this",
+        "that",
+        "these",
+        "those",
+        "some",
+        "any",
+        "each",
+        "every",
+        "all",
+        "both",
+        "few",
+        "many",
+        "much",
+        "other",
+        "another",
+        # Pronouns
+        "it",
+        "its",
+        "they",
+        "them",
+        "their",
+        "we",
+        "us",
+        "our",
+        "you",
+        "your",
+        "i",
+        "me",
+        "my",
+        "he",
+        "him",
+        "his",
+        "she",
+        "her",
+        "who",
+        "which",
+        "what",
+        # Common verbs (often in descriptions)
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "am",
+        "has",
+        "have",
+        "had",
+        "having",
+        "do",
+        "does",
+        "did",
+        "doing",
+        "done",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "can",
+        "get",
+        "gets",
+        "got",
+        "getting",
+        "make",
+        "makes",
+        "made",
+        "making",
+        "take",
+        "takes",
+        "took",
+        "taking",
+        "taken",
+        "let",
+        "lets",
+        "letting",
+        "put",
+        "puts",
+        "putting",
+        "see",
+        "sees",
+        "saw",
+        "seeing",
+        "seen",
+        "know",
+        "knows",
+        "knew",
+        "knowing",
+        "known",
+        "want",
+        "wants",
+        "wanted",
+        "wanting",
+        "need",
+        "needs",
+        "needed",
+        "needing",
+        "use",
+        "uses",
+        "used",
+        "using",
+        "find",
+        "finds",
+        "found",
+        "finding",
+        "give",
+        "gives",
+        "gave",
+        "giving",
+        "given",
+        "tell",
+        "tells",
+        "told",
+        "telling",
+        "call",
+        "calls",
+        "called",
+        "calling",
+        "try",
+        "tries",
+        "tried",
+        "trying",
+        "ask",
+        "asks",
+        "asked",
+        "asking",
+        "work",
+        "works",
+        "worked",
+        "working",
+        "seem",
+        "seems",
+        "seemed",
+        "seeming",
+        "feel",
+        "feels",
+        "felt",
+        "feeling",
+        "leave",
+        "leaves",
+        "left",
+        "leaving",
+        "keep",
+        "keeps",
+        "kept",
+        "keeping",
+        "begin",
+        "begins",
+        "began",
+        "beginning",
+        "begun",
+        "show",
+        "shows",
+        "showed",
+        "showing",
+        "shown",
+        "hear",
+        "hears",
+        "heard",
+        "hearing",
+        "run",
+        "runs",
+        "ran",
+        "running",
+        "move",
+        "moves",
+        "moved",
+        "moving",
+        "live",
+        "lives",
+        "lived",
+        "living",
+        "believe",
+        "believes",
+        "believed",
+        "believing",
+        "bring",
+        "brings",
+        "brought",
+        "bringing",
+        "happen",
+        "happens",
+        "happened",
+        "happening",
+        "write",
+        "writes",
+        "wrote",
+        "writing",
+        "written",
+        "provide",
+        "provides",
+        "provided",
+        "providing",
+        "sit",
+        "sits",
+        "sat",
+        "sitting",
+        "stand",
+        "stands",
+        "stood",
+        "standing",
+        "lose",
+        "loses",
+        "lost",
+        "losing",
+        "pay",
+        "pays",
+        "paid",
+        "paying",
+        "meet",
+        "meets",
+        "met",
+        "meeting",
+        "include",
+        "includes",
+        "included",
+        "including",
+        "continue",
+        "continues",
+        "continued",
+        "continuing",
+        "set",
+        "sets",
+        "setting",
+        "learn",
+        "learns",
+        "learned",
+        "learning",
+        "change",
+        "changes",
+        "changed",
+        "changing",
+        "lead",
+        "leads",
+        "led",
+        "leading",
+        "understand",
+        "understands",
+        "understood",
+        "understanding",
+        "watch",
+        "watches",
+        "watched",
+        "watching",
+        "follow",
+        "follows",
+        "followed",
+        "following",
+        "stop",
+        "stops",
+        "stopped",
+        "stopping",
+        "create",
+        "creates",
+        "created",
+        "creating",
+        "speak",
+        "speaks",
+        "spoke",
+        "speaking",
+        "spoken",
+        "read",
+        "reads",
+        "reading",
+        "allow",
+        "allows",
+        "allowed",
+        "allowing",
+        "add",
+        "adds",
+        "added",
+        "adding",
+        "spend",
+        "spends",
+        "spent",
+        "spending",
+        "grow",
+        "grows",
+        "grew",
+        "growing",
+        "grown",
+        "open",
+        "opens",
+        "opened",
+        "opening",
+        "walk",
+        "walks",
+        "walked",
+        "walking",
+        "win",
+        "wins",
+        "won",
+        "winning",
+        "offer",
+        "offers",
+        "offered",
+        "offering",
+        "remember",
+        "remembers",
+        "remembered",
+        "remembering",
+        "consider",
+        "considers",
+        "considered",
+        "considering",
+        "appear",
+        "appears",
+        "appeared",
+        "appearing",
+        "buy",
+        "buys",
+        "bought",
+        "buying",
+        "wait",
+        "waits",
+        "waited",
+        "waiting",
+        "serve",
+        "serves",
+        "served",
+        "serving",
+        "die",
+        "dies",
+        "died",
+        "dying",
+        "send",
+        "sends",
+        "sent",
+        "sending",
+        "expect",
+        "expects",
+        "expected",
+        "expecting",
+        "build",
+        "builds",
+        "built",
+        "building",
+        "stay",
+        "stays",
+        "stayed",
+        "staying",
+        "fall",
+        "falls",
+        "fell",
+        "falling",
+        "fallen",
+        "cut",
+        "cuts",
+        "cutting",
+        "reach",
+        "reaches",
+        "reached",
+        "reaching",
+        "kill",
+        "kills",
+        "killed",
+        "killing",
+        "remain",
+        "remains",
+        "remained",
+        "remaining",
+        # Action words commonly used in tech documentation
+        "handles",
+        "manages",
+        "supports",
+        "enables",
+        "returns",
+        "contains",
+        "removes",
+        "updates",
+        "deletes",
+        "modifies",
+        "processes",
+        "executes",
+        "implements",
+        "defines",
+        "declares",
+        "initializes",
+        "configures",
+        "validates",
+        "parses",
+        "formats",
+        "converts",
+        "transforms",
+        "maps",
+        "filters",
+        "reduces",
+        "sorts",
+        # Prepositions
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "of",
+        "with",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "under",
+        "over",
+        "against",
+        "among",
+        "throughout",
+        "around",
+        "within",
+        "without",
+        "toward",
+        "towards",
+        "upon",
+        # Conjunctions
+        "and",
+        "or",
+        "but",
+        "if",
+        "then",
+        "else",
+        "when",
+        "where",
+        "while",
+        "although",
+        "because",
+        "unless",
+        "since",
+        "whether",
+        "however",
+        "therefore",
+        "thus",
+        "hence",
+        "moreover",
+        "furthermore",
+        "nevertheless",
+        # Common words in tech contexts
+        "here",
+        "there",
+        "now",
+        "also",
+        "just",
+        "only",
+        "very",
+        "more",
+        "most",
+        "so",
+        "than",
+        "too",
+        "even",
+        "still",
+        "already",
+        "yet",
+        "again",
+        "always",
+        "never",
+        "often",
+        "sometimes",
+        "usually",
+        "really",
+        "quite",
+        "rather",
+        "almost",
+        "well",
+        "back",
+        "up",
+        "down",
+        "out",
+        "away",
+        "off",
+        "first",
+        "last",
+        "next",
+        "new",
+        "old",
+        "same",
+        "different",
+        "good",
+        "bad",
+        "great",
+        "little",
+        "big",
+        "small",
+        "long",
+        "short",
+        "high",
+        "low",
+        "right",
+        "wrong",
+        "able",
+        "available",
+        # Numbers and ordinals
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten",
+        "second",
+        "third",
+        "fourth",
+        "fifth",
+        # Question words
+        "how",
+        "why",
+        "whom",
+        "whose",
+        # Negations
+        "no",
+        "not",
+        "none",
+        "nothing",
+        "nobody",
+        "nowhere",
+        "neither",
+        "nor",
+        # Tech explanation phrases (common in LLM output)
+        "file",
+        "code",
+        "function",
+        "method",
+        "class",
+        "module",
+        "package",
+        "variable",
+        "value",
+        "data",
+        "type",
+        "object",
+        "instance",
+        "parameter",
+        "argument",
+        "result",
+        "output",
+        "input",
+        "error",
+        "exception",
+        "message",
+        "name",
+        "path",
+        "directory",
+        "folder",
+        "line",
+        "number",
+        "string",
+        "list",
+        "dict",
+        "array",
+        "example",
+        "case",
+        "issue",
+        "problem",
+        "solution",
+        "step",
+        "process",
+        "system",
+        "service",
+        "request",
+        "response",
+        "user",
+        "default",
+        "option",
+        "config",
+        "configuration",
+    }
+)
+
+
 class IssueType(Enum):
     """Types of grounding issues."""
 
@@ -245,9 +841,7 @@ class GroundingVerifier:
         if grounding_threshold_learner:
             logger.info("RL: GroundingVerifier using unified GroundingThresholdLearner")
 
-        logger.debug(
-            f"GroundingVerifier initialized with project_root={self.project_root}"
-        )
+        logger.debug(f"GroundingVerifier initialized with project_root={self.project_root}")
 
     def _get_rl_threshold(self, provider: str, response_type: str) -> Optional[float]:
         """Get RL-recommended threshold for given context.
@@ -282,6 +876,7 @@ class GroundingVerifier:
     def _record_verification_outcome(
         self,
         provider: str,
+        model: str,
         response_type: str,
         threshold_used: float,
         actual_hallucination: bool,
@@ -291,6 +886,7 @@ class GroundingVerifier:
 
         Args:
             provider: Provider name
+            model: Model name
             response_type: Type of response
             threshold_used: Threshold that was used
             actual_hallucination: Whether there was actually a hallucination
@@ -303,10 +899,11 @@ class GroundingVerifier:
             from victor.agent.rl.base import RLOutcome
 
             outcome = RLOutcome(
+                provider=provider,
+                model=model or "unknown",
+                task_type=response_type,
                 success=not actual_hallucination,  # Success if no actual hallucination
                 quality_score=1.0 if not actual_hallucination else 0.0,
-                provider=provider,
-                task_type=response_type,
                 metadata={
                     "response_type": response_type,
                     "threshold_used": threshold_used,
@@ -316,7 +913,7 @@ class GroundingVerifier:
             )
             self._grounding_threshold_learner.record_outcome(outcome)
             logger.debug(
-                f"RL: Recorded grounding outcome for {provider}: "
+                f"RL: Recorded grounding outcome for {provider}/{model}: "
                 f"actual={actual_hallucination}, detected={detected_hallucination}"
             )
         except Exception as e:
@@ -563,9 +1160,7 @@ class GroundingVerifier:
 
             # Skip verification for code generation tasks if configured
             if self.config.skip_generated_code and is_code_generation:
-                logger.debug(
-                    f"[GroundingVerifier] Skipping verification for generated code snippet"
-                )
+                logger.debug("[GroundingVerifier] Skipping verification for generated code snippet")
                 result.metadata["skipped_generated_snippets"] = (
                     result.metadata.get("skipped_generated_snippets", 0) + 1
                 )
@@ -585,7 +1180,7 @@ class GroundingVerifier:
                 if self._looks_like_generated_test(code):
                     # Skip or use very low severity for test code
                     logger.debug(
-                        f"[GroundingVerifier] Code looks like generated test - skipping issue"
+                        "[GroundingVerifier] Code looks like generated test - skipping issue"
                     )
                     result.metadata["skipped_test_snippets"] = (
                         result.metadata.get("skipped_test_snippets", 0) + 1
@@ -742,46 +1337,59 @@ class GroundingVerifier:
                 file_symbols = self.SYMBOL_PATTERN.findall(content)
                 known_symbols.update(file_symbols)
 
-        # GAP-15 FIX: Skip common keywords and built-ins that should not be flagged
-        # These are Python/JavaScript language constructs, not user-defined symbols
-        language_keywords = {
-            # Python keywords
-            "if", "else", "elif", "for", "while", "try", "except", "finally",
-            "with", "as", "import", "from", "class", "def", "return", "yield",
-            "raise", "assert", "pass", "break", "continue", "lambda", "and",
-            "or", "not", "in", "is", "True", "False", "None", "async", "await",
-            # Python built-ins commonly appearing in code
-            "print", "len", "range", "str", "int", "float", "list", "dict",
-            "set", "tuple", "type", "isinstance", "hasattr", "getattr", "setattr",
-            "open", "file", "input", "output", "read", "write", "append",
-            # JavaScript/TypeScript keywords
-            "const", "let", "var", "function", "return", "returns", "async",
-            "await", "export", "import", "default", "interface", "type",
-            # Common patterns in generated code descriptions
-            "returns", "takes", "args", "kwargs", "param", "params",
-            # Magic methods
-            "__init__", "__str__", "__repr__", "self", "cls", "__name__",
-            "__main__", "__file__", "__doc__",
-        }
-
-        # Verify each symbol
+        # Verify each symbol, filtering out stopwords and common English words
+        # that frequently appear in LLM explanations but are not code symbols
         for symbol in symbols:
+            symbol_lower = symbol.lower()
+
+            # Skip if in known symbols from files
             if symbol in known_symbols:
                 result.verified_references.append(f"symbol:{symbol}")
-            elif symbol.lower() in language_keywords or symbol in language_keywords:
-                # GAP-15 FIX: Skip language keywords - they are not user symbols
                 continue
-            else:
-                result.add_issue(
-                    GroundingIssue(
-                        issue_type=IssueType.SYMBOL_NOT_FOUND,
-                        severity=IssueSeverity.MEDIUM,
-                        description=f"Symbol '{symbol}' not found in referenced files",
-                        reference=symbol,
-                        suggestion="May be defined elsewhere or hallucinated",
-                    )
+
+            # GAP-15 FIX: Skip common English words, language keywords, and stopwords
+            # These are NOT user-defined symbols and should not be flagged
+            if symbol_lower in GROUNDING_STOPWORDS:
+                continue
+
+            # Skip very short symbols (likely not meaningful code identifiers)
+            if len(symbol) <= 2:
+                continue
+
+            # Skip Python magic methods and dunder names
+            if symbol.startswith("__") and symbol.endswith("__"):
+                continue
+
+            # Skip common built-in type names
+            builtin_types = {
+                "str",
+                "int",
+                "float",
+                "bool",
+                "list",
+                "dict",
+                "set",
+                "tuple",
+                "bytes",
+                "None",
+                "True",
+                "False",
+                "type",
+            }
+            if symbol in builtin_types:
+                continue
+
+            # If not filtered out, flag as potential issue
+            result.add_issue(
+                GroundingIssue(
+                    issue_type=IssueType.SYMBOL_NOT_FOUND,
+                    severity=IssueSeverity.MEDIUM,
+                    description=f"Symbol '{symbol}' not found in referenced files",
+                    reference=symbol,
+                    suggestion="May be defined elsewhere or hallucinated",
                 )
-                result.unverified_references.append(symbol)
+            )
+            result.unverified_references.append(symbol)
 
     async def verify(
         self,
@@ -855,16 +1463,21 @@ class GroundingVerifier:
                     "[GroundingVerifier] Skipping symbol verification for code generation task"
                 )
 
-        # Get provider and response type for RL
+        # Get provider, model, and response type for RL
         provider = context.get("provider", "unknown")
-        response_type = "code_generation" if is_code_generation else context.get("task_type", "general")
+        model = context.get("model", "unknown")
+        response_type = (
+            "code_generation" if is_code_generation else context.get("task_type", "general")
+        )
 
         # Try RL-learned threshold, fall back to config
         threshold = self._get_rl_threshold(provider, response_type)
         if threshold is None:
             threshold = self.config.min_confidence
         result.metadata["threshold_used"] = threshold
-        result.metadata["threshold_source"] = "rl" if threshold != self.config.min_confidence else "config"
+        result.metadata["threshold_source"] = (
+            "rl" if threshold != self.config.min_confidence else "config"
+        )
 
         # Determine if grounded based on confidence
         result.is_grounded = result.confidence >= threshold
@@ -889,6 +1502,7 @@ class GroundingVerifier:
         )
         self._record_verification_outcome(
             provider=provider,
+            model=model,
             response_type=response_type,
             threshold_used=threshold,
             actual_hallucination=actual_hallucination,

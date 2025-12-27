@@ -71,11 +71,7 @@ class TestArgumentNormalizerInit:
 
     def test_init_with_parameter_aliases(self):
         """Test initialization with parameter aliases."""
-        config = {
-            "parameter_aliases": {
-                "read": {"line_start": "offset"}
-            }
-        }
+        config = {"parameter_aliases": {"read": {"line_start": "offset"}}}
         normalizer = ArgumentNormalizer(config=config)
         assert normalizer.parameter_aliases == {"read": {"line_start": "offset"}}
 
@@ -101,11 +97,7 @@ class TestNormalizeParameterAliases:
 
     def test_alias_applied(self):
         """Test when alias is applied."""
-        config = {
-            "parameter_aliases": {
-                "read": {"line_start": "offset"}
-            }
-        }
+        config = {"parameter_aliases": {"read": {"line_start": "offset"}}}
         normalizer = ArgumentNormalizer(config=config)
         args = {"path": "test.py", "line_start": 10}
         result, was_aliased = normalizer.normalize_parameter_aliases(args, "read")
@@ -114,11 +106,7 @@ class TestNormalizeParameterAliases:
 
     def test_multiple_aliases(self):
         """Test multiple aliases applied."""
-        config = {
-            "parameter_aliases": {
-                "read": {"line_start": "offset", "line_end": "limit"}
-            }
-        }
+        config = {"parameter_aliases": {"read": {"line_start": "offset", "line_end": "limit"}}}
         normalizer = ArgumentNormalizer(config=config)
         args = {"path": "test.py", "line_start": 10, "line_end": 50}
         result, was_aliased = normalizer.normalize_parameter_aliases(args, "read")
@@ -127,11 +115,7 @@ class TestNormalizeParameterAliases:
 
     def test_no_matching_tool(self):
         """Test when tool has no aliases configured."""
-        config = {
-            "parameter_aliases": {
-                "read": {"line_start": "offset"}
-            }
-        }
+        config = {"parameter_aliases": {"read": {"line_start": "offset"}}}
         normalizer = ArgumentNormalizer(config=config)
         args = {"content": "hello"}
         result, was_aliased = normalizer.normalize_parameter_aliases(args, "write")
@@ -140,11 +124,7 @@ class TestNormalizeParameterAliases:
 
     def test_mixed_aliased_and_normal_params(self):
         """Test mixing aliased and normal parameters."""
-        config = {
-            "parameter_aliases": {
-                "read": {"line_start": "offset"}
-            }
-        }
+        config = {"parameter_aliases": {"read": {"line_start": "offset"}}}
         normalizer = ArgumentNormalizer(config=config)
         args = {"path": "test.py", "line_start": 10, "max_lines": 100}
         result, was_aliased = normalizer.normalize_parameter_aliases(args, "read")
@@ -240,10 +220,12 @@ class TestNormalizeArgumentsRegex:
         args = {"data": "{\\'key\\': \\'value\\'}"}
         result, strategy = normalizer.normalize_arguments(args, "test")
         # Could be REGEX_QUOTES or MANUAL_REPAIR depending on parsing
-        assert strategy in (NormalizationStrategy.REGEX_QUOTES,
-                           NormalizationStrategy.MANUAL_REPAIR,
-                           NormalizationStrategy.FAILED,
-                           NormalizationStrategy.DIRECT)
+        assert strategy in (
+            NormalizationStrategy.REGEX_QUOTES,
+            NormalizationStrategy.MANUAL_REPAIR,
+            NormalizationStrategy.FAILED,
+            NormalizationStrategy.DIRECT,
+        )
 
 
 class TestNormalizeArgumentsManualRepair:
@@ -256,8 +238,7 @@ class TestNormalizeArgumentsManualRepair:
         args = {"operations": "[{'type': 'modify'}]"}
         result, strategy = normalizer.normalize_arguments(args, "edit_files")
         # Should be normalized via AST or manual repair
-        assert strategy in (NormalizationStrategy.PYTHON_AST,
-                           NormalizationStrategy.MANUAL_REPAIR)
+        assert strategy in (NormalizationStrategy.PYTHON_AST, NormalizationStrategy.MANUAL_REPAIR)
 
 
 class TestNormalizeArgumentsFailure:
@@ -266,6 +247,7 @@ class TestNormalizeArgumentsFailure:
     def test_completely_invalid_json(self):
         """Test completely invalid JSON fails gracefully."""
         normalizer = ArgumentNormalizer()
+
         # Create an object that can't be JSON serialized
         class NotSerializable:
             pass
@@ -527,9 +509,7 @@ class TestIntegration:
     def test_ollama_python_syntax(self):
         """Test Ollama-style Python syntax is handled."""
         normalizer = ArgumentNormalizer(provider_name="ollama")
-        args = {
-            "operations": "[{'type': 'modify', 'path': 'test.sh', 'content': 'echo hello'}]"
-        }
+        args = {"operations": "[{'type': 'modify', 'path': 'test.sh', 'content': 'echo hello'}]"}
         result, strategy = normalizer.normalize_arguments(args, "edit_files")
 
         # Should successfully normalize
@@ -542,11 +522,7 @@ class TestIntegration:
 
     def test_gpt_oss_aliases(self):
         """Test gpt-oss style parameter aliases are handled."""
-        config = {
-            "parameter_aliases": {
-                "read": {"line_start": "offset", "line_end": "_line_end"}
-            }
-        }
+        config = {"parameter_aliases": {"read": {"line_start": "offset", "line_end": "_line_end"}}}
         normalizer = ArgumentNormalizer(provider_name="ollama", config=config)
         args = {"path": "test.py", "line_start": 10, "line_end": 50}
 

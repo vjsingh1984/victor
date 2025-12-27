@@ -20,7 +20,17 @@ for better testability and separation of concerns.
 
 import logging
 import time
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, Tuple, TYPE_CHECKING
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    TYPE_CHECKING,
+)
 
 from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.streaming.iteration import (
@@ -52,9 +62,7 @@ class MessageAdder(Protocol):
 class ToolExecutor(Protocol):
     """Protocol for executing tools."""
 
-    async def execute_tools(
-        self, tool_calls: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    async def execute_tools(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Execute tool calls and return results."""
         ...
 
@@ -115,9 +123,7 @@ class StreamingChatHandler:
             return result
         return None
 
-    def check_iteration_limit(
-        self, ctx: StreamingChatContext
-    ) -> Optional[IterationResult]:
+    def check_iteration_limit(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
         """Check if iteration limit has been exceeded.
 
         Args:
@@ -135,9 +141,7 @@ class StreamingChatHandler:
             )
         return None
 
-    def check_force_completion(
-        self, ctx: StreamingChatContext
-    ) -> Optional[IterationResult]:
+    def check_force_completion(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
         """Check if force completion conditions are met.
 
         Args:
@@ -151,9 +155,7 @@ class StreamingChatHandler:
             return create_force_completion_result("Forcing completion due to constraints.")
         return None
 
-    def handle_blocked_attempts(
-        self, ctx: StreamingChatContext
-    ) -> Optional[IterationResult]:
+    def handle_blocked_attempts(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
         """Handle consecutive blocked tool attempts.
 
         Args:
@@ -170,9 +172,7 @@ class StreamingChatHandler:
             )
             result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
             result.add_chunk(
-                StreamChunk(
-                    content="\n[loop] ⚠️ Multiple blocked attempts - forcing completion\n"
-                )
+                StreamChunk(content="\n[loop] ⚠️ Multiple blocked attempts - forcing completion\n")
             )
             # Add strong instruction to stop tool use
             self.message_adder.add_message(
@@ -308,9 +308,7 @@ class StreamingChatHandler:
             },
         )
 
-    def should_continue_loop(
-        self, result: IterationResult, ctx: StreamingChatContext
-    ) -> bool:
+    def should_continue_loop(self, result: IterationResult, ctx: StreamingChatContext) -> bool:
         """Determine if the streaming loop should continue.
 
         Args:
@@ -353,9 +351,7 @@ class StreamingChatHandler:
             return create_break_result("")
         return None
 
-    def handle_empty_response(
-        self, ctx: StreamingChatContext
-    ) -> Optional[IterationResult]:
+    def handle_empty_response(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
         """Handle an empty response from the model.
 
         Tracks consecutive empty responses and forces summary if threshold exceeded.
@@ -374,9 +370,7 @@ class StreamingChatHandler:
             )
             result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
             result.add_chunk(
-                StreamChunk(
-                    content="\n[recovery] Forcing summary after repeated empty responses\n"
-                )
+                StreamChunk(content="\n[recovery] Forcing summary after repeated empty responses\n")
             )
             # Add strong instruction to summarize
             self.message_adder.add_message(
@@ -458,9 +452,7 @@ class StreamingChatHandler:
 
             if block_reason:
                 # Use existing handler method to process blocked tool
-                chunk = self.handle_blocked_tool_call(
-                    ctx, tc_name, tc_args, block_reason
-                )
+                chunk = self.handle_blocked_tool_call(ctx, tc_name, tc_args, block_reason)
                 blocked_chunks.append(chunk)
                 blocked_count += 1
             else:
@@ -534,9 +526,7 @@ class StreamingChatHandler:
 
         return None
 
-    def _create_blocked_force_result(
-        self, ctx: StreamingChatContext
-    ) -> IterationResult:
+    def _create_blocked_force_result(self, ctx: StreamingChatContext) -> IterationResult:
         """Create a force completion result due to blocked attempts.
 
         Args:
@@ -547,9 +537,7 @@ class StreamingChatHandler:
         """
         result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
         result.add_chunk(
-            StreamChunk(
-                content="\n[loop] ⚠️ Multiple blocked attempts - forcing completion\n"
-            )
+            StreamChunk(content="\n[loop] ⚠️ Multiple blocked attempts - forcing completion\n")
         )
         self.message_adder.add_message(
             "user",
@@ -707,10 +695,7 @@ class StreamingChatHandler:
         Returns:
             True if this is a research loop, False otherwise
         """
-        return (
-            stop_reason_value == "loop_detected"
-            and "research" in stop_hint.lower()
-        )
+        return stop_reason_value == "loop_detected" and "research" in stop_hint.lower()
 
     def get_force_completion_chunks(
         self, ctx: StreamingChatContext, is_research_loop: bool
@@ -865,15 +850,11 @@ class StreamingChatHandler:
                     min(base_temperature + 0.1, 0.7),
                 ),
                 (
-                    maybe_prefix(
-                        "List 3 bullet points about the code you examined."
-                    ),
+                    maybe_prefix("List 3 bullet points about the code you examined."),
                     min(base_temperature + 0.2, 0.8),
                 ),
                 (
-                    maybe_prefix(
-                        "One sentence answer: What is the main thing you learned?"
-                    ),
+                    maybe_prefix("One sentence answer: What is the main thing you learned?"),
                     min(base_temperature + 0.3, 0.9),
                 ),
             ]
@@ -895,9 +876,7 @@ class StreamingChatHandler:
                 ),
             ]
 
-    def should_use_tools_for_recovery(
-        self, ctx: StreamingChatContext, attempt: int
-    ) -> bool:
+    def should_use_tools_for_recovery(self, ctx: StreamingChatContext, attempt: int) -> bool:
         """Determine if tools should be enabled for a recovery attempt.
 
         Args:
@@ -938,9 +917,7 @@ class StreamingChatHandler:
             "Please retry or simplify the request."
         )
 
-    def format_completion_metrics(
-        self, ctx: StreamingChatContext, elapsed_time: float
-    ) -> str:
+    def format_completion_metrics(self, ctx: StreamingChatContext, elapsed_time: float) -> str:
         """Format performance metrics for normal completion.
 
         This generates the detailed metrics line with cache info when available,
@@ -1136,9 +1113,7 @@ class StreamingChatHandler:
 
         # Main tool result chunk
         chunks.append(
-            self.generate_tool_result_chunk(
-                tool_name, tool_args, elapsed, success, error
-            )
+            self.generate_tool_result_chunk(tool_name, tool_args, elapsed, success, error)
         )
 
         # Generate preview chunks for successful write/edit operations
@@ -1159,9 +1134,7 @@ class StreamingChatHandler:
                     for edit in edits[:max_edits_per_file]:
                         old_str = edit.get("old_string", "")
                         new_str = edit.get("new_string", "")
-                        edit_chunk = self.generate_edit_preview_chunk(
-                            old_str, new_str, path
-                        )
+                        edit_chunk = self.generate_edit_preview_chunk(old_str, new_str, path)
                         if edit_chunk:
                             chunks.append(edit_chunk)
 
@@ -1228,9 +1201,7 @@ class StreamingChatHandler:
         Returns:
             StreamChunk with budget limit error message
         """
-        return StreamChunk(
-            content="Unable to generate summary due to budget limit.\n"
-        )
+        return StreamChunk(content="Unable to generate summary due to budget limit.\n")
 
     def generate_force_response_error_chunk(self) -> StreamChunk:
         """Generate a chunk for forced response generation error.
@@ -1238,9 +1209,7 @@ class StreamingChatHandler:
         Returns:
             StreamChunk with force response error message
         """
-        return StreamChunk(
-            content="Unable to generate final summary. Please try a simpler query."
-        )
+        return StreamChunk(content="Unable to generate final summary. Please try a simpler query.")
 
     def generate_final_marker_chunk(self) -> StreamChunk:
         """Generate an empty final marker chunk.

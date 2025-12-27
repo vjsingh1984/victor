@@ -14,8 +14,19 @@
 
 """Shared pytest fixtures and configuration."""
 
+import multiprocessing
+import sys
+
 import pytest
 from unittest.mock import MagicMock, patch
+
+# On macOS, use 'spawn' start method to avoid semaphore leak warnings
+# This is a known issue with Python multiprocessing on macOS
+if sys.platform == "darwin":
+    try:
+        multiprocessing.set_start_method("spawn", force=False)
+    except RuntimeError:
+        pass  # Already set
 
 
 @pytest.fixture

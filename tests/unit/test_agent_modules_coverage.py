@@ -32,37 +32,27 @@ class TestErrorRecoveryHandler:
 
     def test_recovery_result_with_message(self):
         """Test recovery result with message."""
-        result = RecoveryResult(
-            action=RecoveryAction.ABORT,
-            user_message="Could not recover"
-        )
+        result = RecoveryResult(action=RecoveryAction.ABORT, user_message="Could not recover")
         assert result.action == RecoveryAction.ABORT
         assert "Could not recover" in result.user_message
 
     def test_recovery_result_with_metadata(self):
         """Test recovery result with metadata."""
         metadata = {"error": "timeout", "attempt": 3}
-        result = RecoveryResult(
-            action=RecoveryAction.RETRY,
-            metadata=metadata
-        )
+        result = RecoveryResult(action=RecoveryAction.RETRY, metadata=metadata)
         assert result.metadata == metadata
 
     def test_recovery_result_with_fallback_tool(self):
         """Test recovery result with fallback tool."""
         result = RecoveryResult(
-            action=RecoveryAction.FALLBACK_TOOL,
-            fallback_tool="alternative_tool"
+            action=RecoveryAction.FALLBACK_TOOL, fallback_tool="alternative_tool"
         )
         assert result.fallback_tool == "alternative_tool"
 
     def test_recovery_result_with_modified_args(self):
         """Test recovery result with modified arguments."""
         modified = {"arg1": "new_value"}
-        result = RecoveryResult(
-            action=RecoveryAction.RETRY,
-            modified_args=modified
-        )
+        result = RecoveryResult(action=RecoveryAction.RETRY, modified_args=modified)
         assert result.modified_args == modified
 
 
@@ -81,7 +71,7 @@ class TestOutputDeduplicator:
         content = "This is a test block.\nThis is a test block.\n"
 
         # Should deduplicate
-        if hasattr(dedup, 'deduplicate'):
+        if hasattr(dedup, "deduplicate"):
             result = dedup.deduplicate(content)
             assert isinstance(result, str)
 
@@ -119,7 +109,7 @@ class TestOutputDeduplicator:
         content = ""
 
         # Should handle empty content
-        if hasattr(dedup, 'deduplicate'):
+        if hasattr(dedup, "deduplicate"):
             result = dedup.deduplicate(content)
             assert result == ""
 
@@ -139,7 +129,7 @@ class TestStreamingDeduplicator:
         chunk = StreamChunk(type="content", content="Test content")
 
         # Should process chunk
-        if hasattr(dedup, 'process_chunk'):
+        if hasattr(dedup, "process_chunk"):
             result = dedup.process_chunk(chunk)
             assert result is None or isinstance(result, StreamChunk)
 
@@ -173,7 +163,7 @@ class TestStreamingDeduplicator:
         dedup = StreamingDeduplicator()
 
         # Should support reset
-        if hasattr(dedup, 'reset'):
+        if hasattr(dedup, "reset"):
             dedup.reset()
             assert dedup is not None
 

@@ -497,7 +497,9 @@ class ToolPluginRegistry:
                         if handler_self.registry.reload_plugin(plugin_name):
                             if callback:
                                 callback(plugin_name, event_type)
-                            logger.info(f"Auto-reloaded plugin '{plugin_name}' due to file {event_type}")
+                            logger.info(
+                                f"Auto-reloaded plugin '{plugin_name}' due to file {event_type}"
+                            )
                     except Exception as e:
                         logger.error(f"Failed to auto-reload plugin '{plugin_name}': {e}")
                     finally:
@@ -533,9 +535,7 @@ class ToolPluginRegistry:
         for plugin_dir in self.plugin_dirs:
             if plugin_dir.exists():
                 self._plugin_observer.schedule(
-                    self._plugin_handler,
-                    str(plugin_dir),
-                    recursive=True
+                    self._plugin_handler, str(plugin_dir), recursive=True
                 )
                 logger.debug(f"Watching plugin directory: {plugin_dir}")
 

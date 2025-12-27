@@ -97,9 +97,7 @@ async def test_exception_logging(caplog):
 
     caplog.set_level(logging.ERROR)
 
-    task = component.create_tracked_task(
-        component.failing_work("Test error"), name="failing"
-    )
+    task = component.create_tracked_task(component.failing_work("Test error"), name="failing")
 
     # Wait for task to fail
     with pytest.raises(ValueError):
@@ -187,9 +185,7 @@ async def test_mixed_success_and_failure():
 
     # Create mix of tasks
     task1 = component.create_tracked_task(component.do_work(1, delay=0.05), name="success1")
-    task2 = component.create_tracked_task(
-        component.failing_work(), name="fail1"
-    )
+    task2 = component.create_tracked_task(component.failing_work(), name="fail1")
     task3 = component.create_tracked_task(component.do_work(2, delay=0.05), name="success2")
 
     assert component.active_task_count == 3

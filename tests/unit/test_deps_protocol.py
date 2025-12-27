@@ -88,7 +88,18 @@ class TestPackageManager:
 
     def test_all_managers_defined(self):
         """Test all expected managers are defined."""
-        expected = {"pip", "poetry", "conda", "npm", "yarn", "pnpm", "cargo", "go", "maven", "gradle"}
+        expected = {
+            "pip",
+            "poetry",
+            "conda",
+            "npm",
+            "yarn",
+            "pnpm",
+            "cargo",
+            "go",
+            "maven",
+            "gradle",
+        }
         actual = {m.value for m in PackageManager}
         assert actual == expected
 
@@ -270,54 +281,32 @@ class TestDependency:
 
     def test_is_outdated_true(self):
         """Test is_outdated when package is outdated."""
-        dep = Dependency(
-            name="test",
-            installed_version="1.0.0",
-            latest_version="2.0.0"
-        )
+        dep = Dependency(name="test", installed_version="1.0.0", latest_version="2.0.0")
         assert dep.is_outdated is True
 
     def test_is_outdated_false(self):
         """Test is_outdated when package is current."""
-        dep = Dependency(
-            name="test",
-            installed_version="2.0.0",
-            latest_version="2.0.0"
-        )
+        dep = Dependency(name="test", installed_version="2.0.0", latest_version="2.0.0")
         assert dep.is_outdated is False
 
     def test_is_outdated_no_installed(self):
         """Test is_outdated when no installed version."""
-        dep = Dependency(
-            name="test",
-            latest_version="2.0.0"
-        )
+        dep = Dependency(name="test", latest_version="2.0.0")
         assert dep.is_outdated is False
 
     def test_is_outdated_no_latest(self):
         """Test is_outdated when no latest version."""
-        dep = Dependency(
-            name="test",
-            installed_version="1.0.0"
-        )
+        dep = Dependency(name="test", installed_version="1.0.0")
         assert dep.is_outdated is False
 
     def test_update_available_when_outdated(self):
         """Test update_available when outdated."""
-        dep = Dependency(
-            name="test",
-            installed_version="1.0.0",
-            latest_version="2.0.0"
-        )
+        dep = Dependency(name="test", installed_version="1.0.0", latest_version="2.0.0")
         assert dep.update_available == "2.0.0"
 
     def test_update_available_when_current(self):
         """Test update_available when current."""
-        dep = Dependency(
-            name="test",
-            installed_version="2.0.0",
-            latest_version="2.0.0"
-        )
+        dep = Dependency(name="test", installed_version="2.0.0", latest_version="2.0.0")
         assert dep.update_available is None
 
 
@@ -327,8 +316,7 @@ class TestDependencyConflict:
     def test_default_values(self):
         """Test default values."""
         conflict = DependencyConflict(
-            package="test",
-            required_by=[("pkg1", ">=1.0"), ("pkg2", "<2.0")]
+            package="test", required_by=[("pkg1", ">=1.0"), ("pkg2", "<2.0")]
         )
         assert conflict.package == "test"
         assert len(conflict.required_by) == 2
@@ -338,10 +326,7 @@ class TestDependencyConflict:
     def test_with_custom_values(self):
         """Test with custom values."""
         conflict = DependencyConflict(
-            package="test",
-            required_by=[],
-            message="Version conflict",
-            severity="error"
+            package="test", required_by=[], message="Version conflict", severity="error"
         )
         assert conflict.message == "Version conflict"
         assert conflict.severity == "error"
@@ -356,7 +341,7 @@ class TestDependencyVulnerability:
             package="test",
             installed_version="1.0.0",
             vulnerability_id="CVE-2024-1234",
-            severity="high"
+            severity="high",
         )
         assert vuln.package == "test"
         assert vuln.installed_version == "1.0.0"
@@ -369,7 +354,7 @@ class TestDependencyVulnerability:
             package="test",
             installed_version="1.0.0",
             vulnerability_id="CVE-2024-1234",
-            severity="medium"
+            severity="medium",
         )
         assert vuln.title == ""
         assert vuln.description == ""
@@ -383,10 +368,7 @@ class TestDependencyUpdate:
     def test_required_fields(self):
         """Test required fields."""
         update = DependencyUpdate(
-            package="test",
-            current_version="1.0.0",
-            new_version="2.0.0",
-            change_type="major"
+            package="test", current_version="1.0.0", new_version="2.0.0", change_type="major"
         )
         assert update.package == "test"
         assert update.current_version == "1.0.0"
@@ -396,10 +378,7 @@ class TestDependencyUpdate:
     def test_default_values(self):
         """Test default values."""
         update = DependencyUpdate(
-            package="test",
-            current_version="1.0.0",
-            new_version="1.1.0",
-            change_type="minor"
+            package="test", current_version="1.0.0", new_version="1.1.0", change_type="minor"
         )
         assert update.breaking is False
         assert update.changelog_url is None
@@ -429,17 +408,13 @@ class TestDependencyGraph:
 
     def test_get_dependents_none(self):
         """Test get_dependents with no dependents."""
-        graph = DependencyGraph(
-            edges={"pkg-a": ["pkg-b"]}
-        )
+        graph = DependencyGraph(edges={"pkg-a": ["pkg-b"]})
         dependents = graph.get_dependents("pkg-a")
         assert dependents == []
 
     def test_get_dependencies(self):
         """Test get_dependencies method."""
-        graph = DependencyGraph(
-            edges={"pkg-a": ["pkg-b", "pkg-c"]}
-        )
+        graph = DependencyGraph(edges={"pkg-a": ["pkg-b", "pkg-c"]})
         deps = graph.get_dependencies("pkg-a")
         assert deps == ["pkg-b", "pkg-c"]
 
@@ -523,9 +498,7 @@ class TestDepsConfig:
     def test_custom_values(self):
         """Test custom values."""
         config = DepsConfig(
-            package_manager=PackageManager.POETRY,
-            check_vulnerabilities=False,
-            cache_ttl=7200
+            package_manager=PackageManager.POETRY, check_vulnerabilities=False, cache_ttl=7200
         )
         assert config.package_manager == PackageManager.POETRY
         assert config.check_vulnerabilities is False

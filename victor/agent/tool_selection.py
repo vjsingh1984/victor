@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 from victor.agent.conversation_state import ConversationStage
+from victor.protocols.mode_aware import ModeAwareMixin
 from victor.tools.base import AccessMode, ExecutionCategory
 
 if TYPE_CHECKING:
@@ -596,7 +597,7 @@ def select_tools_by_keywords(
     return selected
 
 
-class ToolSelector:
+class ToolSelector(ModeAwareMixin):
     """Unified tool selection with semantic and keyword-based approaches.
 
     This class encapsulates tool selection logic extracted from AgentOrchestrator,
@@ -607,6 +608,10 @@ class ToolSelector:
     - Keyword-based selection using category matching
     - Stage-aware prioritization using ConversationStateMachine
     - Adaptive thresholds based on model size and query complexity
+    - Mode-aware filtering (BUILD/PLAN/EXPLORE modes)
+
+    Uses ModeAwareMixin for consistent mode controller access (via self.is_build_mode,
+    self.exploration_multiplier, etc.).
 
     Example:
         selector = ToolSelector(
@@ -757,6 +762,12 @@ class ToolSelector:
         since they are essential for the vertical's operation even in early stages.
         For example, DevOps needs 'docker' and 'shell', Research needs 'web_search'.
         """
+        # Skip stage filtering in BUILD mode (allow_all_tools=True)
+        # Uses ModeAwareMixin for consistent mode controller access
+        if self.is_build_mode:
+            logger.debug("Stage filtering skipped: BUILD mode allows all tools")
+            return tools
+
         if stage not in {
             ConversationStage.INITIAL,
             ConversationStage.PLANNING,
@@ -773,17 +784,17 @@ class ToolSelector:
             preserved_tools.update(tiered_config.mandatory)
             preserved_tools.update(tiered_config.vertical_core)
             # If vertical has readonly_only_for_analysis=False, don't filter at all
-            if hasattr(tiered_config, "readonly_only_for_analysis") and not tiered_config.readonly_only_for_analysis:
+            if (
+                hasattr(tiered_config, "readonly_only_for_analysis")
+                and not tiered_config.readonly_only_for_analysis
+            ):
                 logger.debug(
-                    f"Stage filtering skipped: vertical has readonly_only_for_analysis=False"
+                    "Stage filtering skipped: vertical has readonly_only_for_analysis=False"
                 )
                 return tools
 
         # Filter to readonly tools, but always keep vertical core tools
-        filtered = [
-            t for t in tools
-            if self._is_readonly_tool(t.name) or t.name in preserved_tools
-        ]
+        filtered = [t for t in tools if self._is_readonly_tool(t.name) or t.name in preserved_tools]
 
         if filtered:
             if preserved_tools:
@@ -948,7 +959,11 @@ class ToolSelector:
         # Tier 3: Stage-specific tools
         # Use config helper method that prefers registry metadata over static stage_tools
         if stage:
-            stage_tools = config.get_tools_for_stage_from_registry(stage) if hasattr(config, 'get_tools_for_stage_from_registry') else config.stage_tools.get(stage, set())
+            stage_tools = (
+                config.get_tools_for_stage_from_registry(stage)
+                if hasattr(config, "get_tools_for_stage_from_registry")
+                else config.stage_tools.get(stage, set())
+            )
             for name in stage_tools:
                 if name in all_tools_map and name not in selected:
                     tool = all_tools_map[name]
@@ -964,7 +979,11 @@ class ToolSelector:
 
         # Tier 4: Semantic pool (selected based on query)
         # Use config helper method that prefers registry metadata over static semantic_pool
-        semantic_pool = config.get_effective_semantic_pool() if hasattr(config, 'get_effective_semantic_pool') else config.semantic_pool
+        semantic_pool = (
+            config.get_effective_semantic_pool()
+            if hasattr(config, "get_effective_semantic_pool")
+            else config.semantic_pool
+        )
         if semantic_pool:
             # Simple keyword matching for semantic pool
             message_lower = user_message.lower()
@@ -976,8 +995,8 @@ class ToolSelector:
                     should_include = False
 
                     # Check tool keywords from metadata
-                    if hasattr(tool, 'metadata') and tool.metadata:
-                        keywords = getattr(tool.metadata, 'keywords', []) or []
+                    if hasattr(tool, "metadata") and tool.metadata:
+                        keywords = getattr(tool.metadata, "keywords", []) or []
                         if any(kw.lower() in message_lower for kw in keywords):
                             should_include = True
 

@@ -199,7 +199,9 @@ class ModelSelectorLearner(BaseLearner):
             self._task_selection_counts[provider][task_type] = stats["selection_count"]
 
         # Load epsilon and total_selections
-        cursor.execute("SELECT * FROM model_selector_state WHERE key IN ('epsilon', 'total_selections')")
+        cursor.execute(
+            "SELECT * FROM model_selector_state WHERE key IN ('epsilon', 'total_selections')"
+        )
         for row in cursor.fetchall():
             stats = dict(row)
             if stats["key"] == "epsilon":
@@ -415,14 +417,12 @@ class ModelSelectorLearner(BaseLearner):
     ) -> Tuple[str, str]:
         """Select provider with highest Q-value."""
         best_provider = max(providers, key=lambda p: self._get_q_value(p, task_type))
-        reason = f"Best Q-value"
+        reason = "Best Q-value"
         if task_type:
             reason += f" [task={task_type}]"
         return best_provider, reason
 
-    def _select_ucb(
-        self, providers: List[str], task_type: Optional[str] = None
-    ) -> Tuple[str, str]:
+    def _select_ucb(self, providers: List[str], task_type: Optional[str] = None) -> Tuple[str, str]:
         """Select using Upper Confidence Bound (UCB) strategy."""
         if self._total_selections == 0:
             return random.choice(providers), "No history, random selection"
@@ -433,7 +433,9 @@ class ModelSelectorLearner(BaseLearner):
         for p in providers:
             q_value = self._get_q_value(p, task_type)
             count = self._selection_counts.get(p, 0)
-            ucb_scores[p] = float("inf") if count == 0 else q_value + self.ucb_c * math.sqrt(log_total / count)
+            ucb_scores[p] = (
+                float("inf") if count == 0 else q_value + self.ucb_c * math.sqrt(log_total / count)
+            )
 
         best_provider = max(providers, key=lambda p: ucb_scores[p])
         ucb_score = ucb_scores[best_provider]

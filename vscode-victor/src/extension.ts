@@ -10,6 +10,7 @@ import { VictorClient } from './victorClient';
 import { ChatViewProvider } from './chatViewProvider';
 import { SemanticSearchProvider } from './semanticSearch';
 import { InlineCompletionProvider } from './inlineCompletion';
+import { InlineEditProvider } from './inlineEdit';
 import { ServerManager, ServerStatus, createServerManager } from './serverManager';
 import { HistoryViewProvider, registerHistoryCommands } from './historyView';
 import { ToolsViewProvider, registerToolsCommands } from './toolsView';
@@ -22,6 +23,8 @@ import { DiagnosticsViewProvider, registerDiagnosticsCommands } from './diagnost
 import { SettingsViewProvider, registerSettingsCommands } from './settingsView';
 import { WorkspaceInsightsViewProvider, registerWorkspaceInsightsCommands } from './workspaceInsightsView';
 import { McpViewProvider, registerMcpCommands } from './mcpView';
+import { AgentsViewProvider, registerAgentCommands } from './agentsView';
+import { PlansViewProvider, registerPlanCommands } from './plansView';
 import { ToolApprovalService, registerToolApprovalCommands } from './toolApprovalService';
 import { ProviderSettingsService, registerProviderSettingsCommands } from './providerSettingsService';
 import { VictorCodeLensProvider, registerCodeLensCommands } from './codeLensProvider';
@@ -29,6 +32,10 @@ import { VictorCodeActionProvider, registerCodeActionProviderCommands } from './
 import { VictorHoverProvider, registerHoverCommands } from './hoverProvider';
 import { ToolExecutionService, registerToolExecutionCommands } from './toolExecutionService';
 import { RLService, registerRLCommands } from './rlService';
+import { TerminalAgentProvider, registerTerminalAgentCommands } from './terminalAgent';
+import { TerminalHistoryService } from './terminalHistory';
+import { SmartPasteProvider, registerSmartPasteCommands } from './smartPaste';
+import { ComposerViewProvider, registerComposerCommands } from './composer';
 import { getStore, selectors, AgentMode, ModelInfo } from './state';
 
 // Provider instances (managed centrally, accessed via module)
@@ -37,9 +44,12 @@ interface ExtensionProviders {
     chatViewProvider: ChatViewProvider;
     semanticSearchProvider: SemanticSearchProvider;
     inlineCompletionProvider: InlineCompletionProvider;
+    inlineEditProvider: InlineEditProvider;
     serverManager: ServerManager;
     historyViewProvider: HistoryViewProvider;
     toolsViewProvider: ToolsViewProvider;
+    agentsViewProvider: AgentsViewProvider;
+    plansViewProvider: PlansViewProvider;
     diffViewProvider: DiffViewProvider;
     fileWatcher: FileWatcher;
     refreshManager: ViewRefreshManager;
@@ -57,11 +67,55 @@ interface ExtensionProviders {
     hoverProvider: VictorHoverProvider;
     toolExecutionService: ToolExecutionService;
     rlService: RLService;
+    terminalAgentProvider: TerminalAgentProvider;
+    smartPasteProvider: SmartPasteProvider;
+    composerViewProvider: ComposerViewProvider;
     statusBarItem: vscode.StatusBarItem;
     serverStatusBarItem: vscode.StatusBarItem;
 }
 
 let providers: ExtensionProviders | null = null;
+
+/**
+ * Validate extension configuration values
+ */
+function validateConfiguration(config: vscode.WorkspaceConfiguration): void {
+    const warnings: string[] = [];
+
+    // Validate serverPort
+    const serverPort = config.get<number>('serverPort', 8765);
+    if (serverPort < 1 || serverPort > 65535) {
+        warnings.push(`Invalid serverPort ${serverPort}. Using default 8765.`);
+    }
+
+    // Validate fallbackPorts
+    const fallbackPorts = config.get<number[]>('fallbackPorts', []);
+    const invalidPorts = fallbackPorts.filter(p => p < 1 || p > 65535);
+    if (invalidPorts.length > 0) {
+        warnings.push(`Invalid fallback ports: ${invalidPorts.join(', ')}. These will be ignored.`);
+    }
+
+    // Validate mode
+    const mode = config.get<string>('mode', 'build');
+    const validModes = ['build', 'plan', 'explore'];
+    if (!validModes.includes(mode)) {
+        warnings.push(`Invalid mode "${mode}". Using default "build".`);
+    }
+
+    // Validate autonomy level
+    const autonomyLevel = config.get<string>('autonomy.level', 'semi-auto');
+    const validLevels = ['manual', 'semi-auto', 'auto'];
+    if (!validLevels.includes(autonomyLevel)) {
+        warnings.push(`Invalid autonomy level "${autonomyLevel}". Using default "semi-auto".`);
+    }
+
+    // Show warnings to user
+    if (warnings.length > 0) {
+        const message = `Victor configuration issues:\n${warnings.join('\n')}`;
+        console.warn('[Victor]', message);
+        vscode.window.showWarningMessage(`Victor: ${warnings[0]}${warnings.length > 1 ? ` (+${warnings.length - 1} more)` : ''}`);
+    }
+}
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Victor AI extension activating...');
@@ -71,6 +125,9 @@ export async function activate(context: vscode.ExtensionContext) {
     await store.initialize(context);
 
     const config = vscode.workspace.getConfiguration('victor');
+
+    // Validate configuration
+    validateConfiguration(config);
 
     // Initialize server manager
     const serverManager = createServerManager();
@@ -88,14 +145,19 @@ export async function activate(context: vscode.ExtensionContext) {
     // Listen for server status changes and update state store
     serverManager.onStatusChange((status) => {
         store.setServerStatus(status);
-        updateServerStatusBar(serverStatusBarItem, status);
+        const activePort = serverManager.getActivePort();
+        const configPort = config.get<number>('serverPort', 8765);
+        const usingFallback = activePort !== configPort;
+        updateServerStatusBar(serverStatusBarItem, status, activePort, usingFallback);
     });
 
     // Initialize the Victor client with server URL from state
     const apiKey = config.get<string>('serverApiKey') || undefined;
     const victorClient = new VictorClient(store.select(selectors.serverUrl), undefined, apiKey);
-    // Pre-fetch session token when API key is configured; ignore failures (server may be offline)
-    victorClient.prefetchSessionToken().catch(() => {});
+    // Pre-fetch session token when API key is configured
+    victorClient.prefetchSessionToken().catch((error) => {
+        console.warn('[Victor] Failed to prefetch session token (server may be offline):', error.message || error);
+    });
     // Keep Victor client auth in sync with configuration updates
     context.subscriptions.push(
         store.subscribe('settings', (_state) => {
@@ -129,15 +191,28 @@ export async function activate(context: vscode.ExtensionContext) {
     const chatViewProvider = new ChatViewProvider(context.extensionUri, victorClient, clientOutput);
     const semanticSearchProvider = new SemanticSearchProvider(victorClient);
     const inlineCompletionProvider = new InlineCompletionProvider(victorClient);
+    const inlineEditProvider = new InlineEditProvider(victorClient, clientOutput);
     const historyViewProvider = new HistoryViewProvider(victorClient);
     const toolsViewProvider = new ToolsViewProvider();
+    const agentsViewProvider = new AgentsViewProvider(victorClient, clientOutput);
+    const plansViewProvider = new PlansViewProvider(victorClient, clientOutput);
 
     clientOutput.appendLine('[Victor] Providers initialized');
 
-    // Register chat view
+    // Register chat view (left sidebar)
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
             'victor.chatView',
+            chatViewProvider,
+            { webviewOptions: { retainContextWhenHidden: true } }
+        )
+    );
+
+    // Register chat panel view (bottom panel / secondary sidebar)
+    // Users can drag this to the right side for Copilot-like experience
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(
+            'victor.chatPanelView',
             chatViewProvider,
             { webviewOptions: { retainContextWhenHidden: true } }
         )
@@ -160,6 +235,28 @@ export async function activate(context: vscode.ExtensionContext) {
         )
     );
     registerToolsCommands(context, toolsViewProvider);
+
+    // Register agents view (shows active agent tasks)
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider(
+            'victor.agentsView',
+            agentsViewProvider
+        )
+    );
+    context.subscriptions.push({ dispose: () => agentsViewProvider.dispose() });
+
+    // Register plans view (shows execution plans)
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider(
+            'victor.plansView',
+            plansViewProvider
+        )
+    );
+    context.subscriptions.push({ dispose: () => plansViewProvider.dispose() });
+
+    // Register agent and plan commands
+    registerAgentCommands(context, agentsViewProvider);
+    registerPlanCommands(context, plansViewProvider);
 
     // Initialize diff view provider
     const diffViewProvider = new DiffViewProvider();
@@ -190,6 +287,41 @@ export async function activate(context: vscode.ExtensionContext) {
             terminalHistoryProvider
         )
     );
+
+    // Initialize Terminal Agent provider (AI-assisted command execution)
+    const terminalAgentProvider = new TerminalAgentProvider(victorClient, clientOutput);
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider(
+            'victor.terminalAgentView',
+            terminalAgentProvider
+        )
+    );
+    registerTerminalAgentCommands(context, terminalAgentProvider);
+    context.subscriptions.push({ dispose: () => terminalAgentProvider.dispose() });
+
+    // Initialize shared Terminal History service (used by inline completions and terminal agent)
+    const terminalHistoryService = TerminalHistoryService.getInstance();
+    context.subscriptions.push({ dispose: () => terminalHistoryService.dispose() });
+
+    // Initialize Smart Paste provider (adapts pasted code to context)
+    const smartPasteProvider = new SmartPasteProvider(victorClient, clientOutput);
+    registerSmartPasteCommands(context, smartPasteProvider);
+
+    // Initialize Multi-file Composer (like Cursor's Composer)
+    const composerViewProvider = new ComposerViewProvider(
+        context.extensionUri,
+        victorClient,
+        diffViewProvider,
+        clientOutput
+    );
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(
+            ComposerViewProvider.viewType,
+            composerViewProvider
+        )
+    );
+    registerComposerCommands(context, composerViewProvider);
+    context.subscriptions.push({ dispose: () => composerViewProvider.dispose() });
 
     // Initialize diagnostics view
     const diagnosticsViewProvider = new DiagnosticsViewProvider();
@@ -307,9 +439,12 @@ export async function activate(context: vscode.ExtensionContext) {
         chatViewProvider,
         semanticSearchProvider,
         inlineCompletionProvider,
+        inlineEditProvider,
         serverManager,
         historyViewProvider,
         toolsViewProvider,
+        agentsViewProvider,
+        plansViewProvider,
         diffViewProvider,
         fileWatcher,
         refreshManager,
@@ -327,6 +462,9 @@ export async function activate(context: vscode.ExtensionContext) {
         hoverProvider,
         toolExecutionService,
         rlService,
+        terminalAgentProvider,
+        smartPasteProvider,
+        composerViewProvider,
         statusBarItem,
         serverStatusBarItem,
     };
@@ -340,6 +478,9 @@ export async function activate(context: vscode.ExtensionContext) {
             )
         );
     }
+
+    // Register inline edit provider (commands registered internally)
+    context.subscriptions.push(inlineEditProvider);
 
     // Register commands with providers
     registerCommands(context, providers);
@@ -420,7 +561,7 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
     context.subscriptions.push(
         vscode.commands.registerCommand('victor.explain', async () => {
             const editor = vscode.window.activeTextEditor;
-            if (!editor) return;
+            if (!editor) {return;}
 
             const selection = editor.selection;
             const text = editor.document.getText(selection);
@@ -440,7 +581,7 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
     context.subscriptions.push(
         vscode.commands.registerCommand('victor.refactor', async () => {
             const editor = vscode.window.activeTextEditor;
-            if (!editor) return;
+            if (!editor) {return;}
 
             const selection = editor.selection;
             const text = editor.document.getText(selection);
@@ -467,7 +608,7 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
     context.subscriptions.push(
         vscode.commands.registerCommand('victor.fix', async () => {
             const editor = vscode.window.activeTextEditor;
-            if (!editor) return;
+            if (!editor) {return;}
 
             const selection = editor.selection;
             const text = editor.document.getText(selection);
@@ -495,7 +636,7 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
     context.subscriptions.push(
         vscode.commands.registerCommand('victor.test', async () => {
             const editor = vscode.window.activeTextEditor;
-            if (!editor) return;
+            if (!editor) {return;}
 
             const selection = editor.selection;
             const text = editor.document.getText(selection);
@@ -516,7 +657,7 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
     context.subscriptions.push(
         vscode.commands.registerCommand('victor.document', async () => {
             const editor = vscode.window.activeTextEditor;
-            if (!editor) return;
+            if (!editor) {return;}
 
             const selection = editor.selection;
             const text = editor.document.getText(selection);
@@ -803,12 +944,20 @@ function updateStatusBar(statusBarItem: vscode.StatusBarItem, mode: string): voi
     statusBarItem.tooltip = `Victor AI - ${mode} mode\nClick to switch modes`;
 }
 
-function updateServerStatusBar(serverStatusBarItem: vscode.StatusBarItem, status: ServerStatus): void {
+function updateServerStatusBar(
+    serverStatusBarItem: vscode.StatusBarItem,
+    status: ServerStatus,
+    port?: number,
+    usingFallback?: boolean
+): void {
+    const portInfo = port ? ` (port ${port})` : '';
+    const fallbackNote = usingFallback ? ' [fallback]' : '';
+
     const statusConfig: Record<ServerStatus, { icon: string; color?: string; tooltip: string }> = {
         [ServerStatus.Running]: {
             icon: '$(circle-filled)',
             color: 'statusBarItem.prominentBackground',
-            tooltip: 'Victor Server: Running\nClick for options'
+            tooltip: `Victor Server: Running${portInfo}${fallbackNote}\nClick for options`
         },
         [ServerStatus.Starting]: {
             icon: '$(sync~spin)',
@@ -830,12 +979,14 @@ function updateServerStatusBar(serverStatusBarItem: vscode.StatusBarItem, status
         }
     };
 
-    const config = statusConfig[status];
-    serverStatusBarItem.text = `${config.icon} Server`;
-    serverStatusBarItem.tooltip = config.tooltip;
+    const cfg = statusConfig[status];
+    // Show port in text only when using fallback port
+    const portText = usingFallback && port ? `:${port}` : '';
+    serverStatusBarItem.text = `${cfg.icon} Server${portText}`;
+    serverStatusBarItem.tooltip = cfg.tooltip;
 
-    if (config.color) {
-        serverStatusBarItem.backgroundColor = new vscode.ThemeColor(config.color);
+    if (cfg.color) {
+        serverStatusBarItem.backgroundColor = new vscode.ThemeColor(cfg.color);
     } else {
         serverStatusBarItem.backgroundColor = undefined;
     }

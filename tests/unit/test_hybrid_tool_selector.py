@@ -313,10 +313,14 @@ class TestHybridToolSelector:
         assert "git_status" in result_names
         assert "shell" in result_names
         # Some semantic tools should be added
-        semantic_added = sum(1 for name in result_names if name in ["read_file", "write_file", "code_search"])
+        semantic_added = sum(
+            1 for name in result_names if name in ["read_file", "write_file", "code_search"]
+        )
         assert semantic_added >= 1  # At least 1 semantic added
 
-    def test_ensure_minimum_tools_adds_keyword(self, mock_semantic_selector, mock_keyword_selector, tool_definitions):
+    def test_ensure_minimum_tools_adds_keyword(
+        self, mock_semantic_selector, mock_keyword_selector, tool_definitions
+    ):
         """Test _ensure_minimum_tools adds keyword tools when below minimum."""
         config = HybridSelectorConfig(min_keyword_tools=3, enable_rl=False)
         selector = HybridToolSelector(
@@ -334,7 +338,9 @@ class TestHybridToolSelector:
 
         # Should have added keyword tools to meet minimum of 3
         result_names = [t.name for t in result]
-        keyword_added = sum(1 for name in result_names if name in ["code_search", "git_status", "shell"])
+        keyword_added = sum(
+            1 for name in result_names if name in ["code_search", "git_status", "shell"]
+        )
         assert keyword_added >= 1  # At least some keyword added
 
 
@@ -485,7 +491,11 @@ class TestHybridToolSelectorRLIntegration:
             results.append(tuple(t.name for t in result[:3]))
 
         # All results should contain same tools (just possibly shuffled)
-        expected_names = {tool_definitions[0].name, tool_definitions[1].name, tool_definitions[2].name}
+        expected_names = {
+            tool_definitions[0].name,
+            tool_definitions[1].name,
+            tool_definitions[2].name,
+        }
         for r in results:
             assert set(r) == expected_names
 

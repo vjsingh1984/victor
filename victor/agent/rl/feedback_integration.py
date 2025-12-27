@@ -323,8 +323,8 @@ class FeedbackIntegration:
         reward = feedback.compute_reward()
 
         try:
-            # Create outcome for general consumption
-            outcome = RLOutcome(
+            # Create outcome for general consumption (reserved for future learners)
+            _outcome = RLOutcome(  # noqa: F841
                 provider=feedback.provider,
                 model=feedback.model,
                 task_type=feedback.task_type,

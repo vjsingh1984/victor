@@ -79,7 +79,9 @@ class CodebaseAnalysis:
     # Enhanced fields
     dependencies: Dict[str, List[str]] = field(default_factory=dict)  # {category: [dep1, dep2]}
     test_coverage: Optional[float] = None  # Coverage percentage if available
-    loc_stats: Dict[str, int] = field(default_factory=dict)  # {total_lines, total_files, largest_file}
+    loc_stats: Dict[str, int] = field(
+        default_factory=dict
+    )  # {total_lines, total_files, largest_file}
     top_imports: List[Tuple[str, int]] = field(default_factory=list)  # [(module, import_count)]
     method_count: int = 0
     protocol_count: int = 0  # Python Protocol/ABC count
@@ -499,8 +501,10 @@ class CodebaseAnalyzer:
                 method_count += len(module.functions)
                 # Count protocols/ABCs
                 for cls in module.classes:
-                    if cls.is_abstract or "Protocol" in cls.name or any(
-                        base in ("Protocol", "ABC") for base in cls.base_classes
+                    if (
+                        cls.is_abstract
+                        or "Protocol" in cls.name
+                        or any(base in ("Protocol", "ABC") for base in cls.base_classes)
                     ):
                         protocol_count += 1
 
@@ -650,7 +654,7 @@ class CodebaseAnalyzer:
                 if deps_match:
                     deps_text = deps_match.group(1)
                     for line in deps_text.split(","):
-                        dep = line.strip().strip('"\'')
+                        dep = line.strip().strip("\"'")
                         if dep and not dep.startswith("#"):
                             # Extract package name (before version specifier)
                             pkg_name = re.split(r"[<>=~!]", dep)[0].strip()
@@ -664,10 +668,10 @@ class CodebaseAnalyzer:
                 if opt_deps_match:
                     opt_section = opt_deps_match.group(1)
                     # Extract dev dependencies
-                    dev_match = re.search(r'dev\s*=\s*\[(.*?)\]', opt_section, re.DOTALL)
+                    dev_match = re.search(r"dev\s*=\s*\[(.*?)\]", opt_section, re.DOTALL)
                     if dev_match:
                         for line in dev_match.group(1).split(","):
-                            dep = line.strip().strip('"\'')
+                            dep = line.strip().strip("\"'")
                             if dep and not dep.startswith("#"):
                                 pkg_name = re.split(r"[<>=~!]", dep)[0].strip()
                                 if pkg_name:
@@ -683,6 +687,7 @@ class CodebaseAnalyzer:
         if package_json.exists() and not self.analysis.dependencies:
             try:
                 import json
+
                 data = json.loads(package_json.read_text(encoding="utf-8"))
                 deps: Dict[str, List[str]] = {"core": [], "dev": []}
 
@@ -706,7 +711,9 @@ class CodebaseAnalyzer:
 
         # Scan all source files
         for ext in self.LANGUAGE_EXTENSIONS.keys():
-            search_dirs = [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
+            search_dirs = (
+                [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
+            )
             for search_dir in search_dirs:
                 if not search_dir.is_dir():
                     continue
@@ -743,7 +750,9 @@ class CodebaseAnalyzer:
         import_counts: Dict[str, int] = defaultdict(int)
 
         # Only scan Python files
-        search_dirs = [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
+        search_dirs = (
+            [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
+        )
         for search_dir in search_dirs:
             if not search_dir.is_dir():
                 continue
@@ -771,11 +780,36 @@ class CodebaseAnalyzer:
         # Filter out standard library and sort by count
         # Common stdlib modules to exclude from "top imports" (not exhaustive)
         stdlib = {
-            "os", "sys", "re", "json", "typing", "dataclasses", "pathlib",
-            "collections", "functools", "itertools", "logging", "abc",
-            "datetime", "time", "asyncio", "contextlib", "copy", "enum",
-            "hashlib", "io", "math", "random", "shutil", "subprocess",
-            "tempfile", "threading", "traceback", "unittest", "uuid", "warnings"
+            "os",
+            "sys",
+            "re",
+            "json",
+            "typing",
+            "dataclasses",
+            "pathlib",
+            "collections",
+            "functools",
+            "itertools",
+            "logging",
+            "abc",
+            "datetime",
+            "time",
+            "asyncio",
+            "contextlib",
+            "copy",
+            "enum",
+            "hashlib",
+            "io",
+            "math",
+            "random",
+            "shutil",
+            "subprocess",
+            "tempfile",
+            "threading",
+            "traceback",
+            "unittest",
+            "uuid",
+            "warnings",
         }
 
         # Filter and sort
@@ -805,10 +839,13 @@ class CodebaseAnalyzer:
         if coverage_db.exists():
             try:
                 import sqlite3
+
                 conn = sqlite3.connect(str(coverage_db))
                 cursor = conn.cursor()
                 # Get line counts
-                cursor.execute("SELECT SUM(num_statements), SUM(num_statements - missing_lines) FROM file_summary")
+                cursor.execute(
+                    "SELECT SUM(num_statements), SUM(num_statements - missing_lines) FROM file_summary"
+                )
                 row = cursor.fetchone()
                 if row and row[0]:
                     total, covered = row[0], row[1] or 0
@@ -823,7 +860,7 @@ class CodebaseAnalyzer:
             try:
                 content = htmlcov.read_text(encoding="utf-8")
                 # Look for coverage percentage in the HTML
-                match = re.search(r'(\d+)%\s*</span>\s*</h1>', content)
+                match = re.search(r"(\d+)%\s*</span>\s*</h1>", content)
                 if match:
                     self.analysis.test_coverage = float(match.group(1))
             except Exception:
@@ -1464,7 +1501,9 @@ def gather_project_context(
     for file_path in key_files_to_read:
         try:
             content = (root / file_path).read_text(encoding="utf-8")
-            context["key_files_content"][file_path] = content[:8192]  # Limit content size (fits 10-12 parallel reads)
+            context["key_files_content"][file_path] = content[
+                :8192
+            ]  # Limit content size (fits 10-12 parallel reads)
         except Exception:
             pass
 
@@ -1653,18 +1692,15 @@ def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[Dict[
 
         settings = load_settings()
         default_dir = get_project_paths(root).embeddings_dir
-        persist_dir = Path(
-            getattr(settings, "codebase_persist_directory", None) or default_dir
-        )
+        persist_dir = Path(getattr(settings, "codebase_persist_directory", None) or default_dir)
 
         import lancedb  # type: ignore
 
         if persist_dir.exists():
             db = lancedb.connect(str(persist_dir))
             table_names = db.table_names()
-            table_name = (
-                getattr(settings, "codebase_embedding_table", None)
-                or (table_names[0] if table_names else None)
+            table_name = getattr(settings, "codebase_embedding_table", None) or (
+                table_names[0] if table_names else None
             )
             if table_name:
                 table = db.open_table(table_name)
@@ -1748,16 +1784,12 @@ def _build_analyzer_section(
         # Highlight a few hubs and module ranks for quick navigation
         hubs = graph_insights.get("hub_classes", [])[:2]
         if hubs:
-            hub_preview = ", ".join(
-                f"`{hub['name']}` ({hub['degree']} links)" for hub in hubs
-            )
+            hub_preview = ", ".join(f"`{hub['name']}` ({hub['degree']} links)" for hub in hubs)
             lines.append(f"  - Hub classes: {hub_preview}")
 
         modules = graph_insights.get("important_modules", [])[:3]
         if modules:
-            module_preview = ", ".join(
-                f"`{mod['module']}` ({mod['role']})" for mod in modules
-            )
+            module_preview = ", ".join(f"`{mod['module']}` ({mod['role']})" for mod in modules)
             lines.append(f"  - Module PageRank leaders: {module_preview}")
 
         languages = graph_insights.get("languages", [])
@@ -1768,9 +1800,13 @@ def _build_analyzer_section(
         if edge_types:
             missing_edges = graph_insights.get("edge_gaps", [])
             if missing_edges:
-                lines.append(f"  - Missing edge types: {', '.join(missing_edges)} (re-run index with tree-sitter deps to capture)")
+                lines.append(
+                    f"  - Missing edge types: {', '.join(missing_edges)} (re-run index with tree-sitter deps to capture)"
+                )
             elif call_edges == 0:
-                lines.append("  - Calls not captured; verify tree-sitter call extraction is installed.")
+                lines.append(
+                    "  - Calls not captured; verify tree-sitter call extraction is installed."
+                )
 
         call_hotspots = graph_insights.get("call_hotspots", [])
         if call_hotspots:
@@ -1937,7 +1973,17 @@ def _find_config_files(root: Path) -> List[str]:
     """Find common config files (json/yaml/toml) while skipping vendor/venv/build artifacts."""
     exts = {".json", ".yaml", ".yml", ".toml"}
     results: List[str] = []
-    extra_skip = {"venv", "env", "node_modules", "build", "dist", "out", ".mypy_cache", ".ruff_cache", ".pytest_cache"}
+    extra_skip = {
+        "venv",
+        "env",
+        "node_modules",
+        "build",
+        "dist",
+        "out",
+        ".mypy_cache",
+        ".ruff_cache",
+        ".pytest_cache",
+    }
     skip_parts = {"htmlcov", "htmlcov_lang", "coverage", "__pycache__", "egg-info"}
 
     for path in root.rglob("*"):
@@ -1959,7 +2005,17 @@ def _find_config_files(root: Path) -> List[str]:
 def _find_docs_files(root: Path) -> List[str]:
     """Find markdown/adoc docs (top-N) while skipping vendor/venv/build artifacts."""
     results: List[tuple[int, str]] = []
-    extra_skip = {"venv", "env", "node_modules", "build", "dist", "out", ".mypy_cache", ".ruff_cache", ".pytest_cache"}
+    extra_skip = {
+        "venv",
+        "env",
+        "node_modules",
+        "build",
+        "dist",
+        "out",
+        ".mypy_cache",
+        ".ruff_cache",
+        ".pytest_cache",
+    }
     skip_parts = {"htmlcov", "htmlcov_lang", "coverage", "__pycache__", "egg-info"}
 
     for path in root.rglob("*.md"):
@@ -2118,9 +2174,7 @@ async def generate_victor_md_from_index(
                 # Truncate at last sentence boundary
                 desc = desc.rsplit(".", 1)[0] + "."
             path_with_line = f"`{comp.file_path}:{comp.line_number}`"
-            sections.append(
-                f"| {comp.name} | {comp.symbol_type} | {path_with_line} | {desc} |"
-            )
+            sections.append(f"| {comp.name} | {comp.symbol_type} | {path_with_line} | {desc} |")
 
         sections.append("")
 
@@ -2129,12 +2183,16 @@ async def generate_victor_md_from_index(
         sections.append("## Dependencies\n")
         if enhanced_info.dependencies.get("core"):
             core_deps = enhanced_info.dependencies["core"][:12]
-            sections.append(f"**Core** ({len(enhanced_info.dependencies['core'])} packages): {', '.join(core_deps)}")
+            sections.append(
+                f"**Core** ({len(enhanced_info.dependencies['core'])} packages): {', '.join(core_deps)}"
+            )
             if len(enhanced_info.dependencies["core"]) > 12:
                 sections.append(f"  ...and {len(enhanced_info.dependencies['core']) - 12} more")
         if enhanced_info.dependencies.get("dev"):
             dev_deps = enhanced_info.dependencies["dev"][:8]
-            sections.append(f"\n**Dev** ({len(enhanced_info.dependencies['dev'])} packages): {', '.join(dev_deps)}")
+            sections.append(
+                f"\n**Dev** ({len(enhanced_info.dependencies['dev'])} packages): {', '.join(dev_deps)}"
+            )
         sections.append("")
 
     # Configuration hints
@@ -2181,7 +2239,9 @@ async def generate_victor_md_from_index(
         sections.append(stats_line)
 
         if loc.get("largest_file"):
-            sections.append(f"- Largest file: `{loc['largest_file']}` ({loc.get('largest_file_lines', 0):,} lines)")
+            sections.append(
+                f"- Largest file: `{loc['largest_file']}` ({loc.get('largest_file_lines', 0):,} lines)"
+            )
 
         # Show top 3 largest files
         top_files = loc.get("top_files", [])[:3]
@@ -2219,17 +2279,20 @@ async def generate_victor_md_from_index(
             )
         if graph_insights.get("hub_classes"):
             hubs = ", ".join(
-                f"{hub['name']} ({hub['degree']} links)" for hub in graph_insights["hub_classes"][:3]
+                f"{hub['name']} ({hub['degree']} links)"
+                for hub in graph_insights["hub_classes"][:3]
             )
             sections.append(f"- Hub classes: {hubs}")
         if graph_insights.get("important_modules"):
             mods = ", ".join(
-                f"{mod['module']} ({mod['role']})" for mod in graph_insights["important_modules"][:3]
+                f"{mod['module']} ({mod['role']})"
+                for mod in graph_insights["important_modules"][:3]
             )
             sections.append(f"- Module leaders: {mods}")
         if graph_insights.get("pagerank"):
             pr_preview = ", ".join(
-                f"{pr['name']} ({pr['in_degree']}↓/{pr['out_degree']}↑)" for pr in graph_insights["pagerank"][:3]
+                f"{pr['name']} ({pr['in_degree']}↓/{pr['out_degree']}↑)"
+                for pr in graph_insights["pagerank"][:3]
             )
             sections.append(f"- PageRank leaders: {pr_preview}")
         if graph_insights.get("centrality"):
@@ -2566,7 +2629,14 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             }
             insights["languages"] = languages
             # Identify missing edge types for debugging coverage
-            expected_edges = {"CALLS", "REFERENCES", "IMPORTS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF"}
+            expected_edges = {
+                "CALLS",
+                "REFERENCES",
+                "IMPORTS",
+                "INHERITS",
+                "IMPLEMENTS",
+                "COMPOSED_OF",
+            }
             insights["edge_gaps"] = sorted(list(expected_edges - set(edge_types.keys())))
 
             # Get high-connectivity nodes (hub classes) via SQL
@@ -2667,9 +2737,9 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                             continue
                         visited.add(nid)
                         size += 1
-                        neighbors = [
-                            t for t, _et, _w in ga.outgoing.get(nid, [])
-                        ] + [s for s, _et, _w in ga.incoming.get(nid, [])]
+                        neighbors = [t for t, _et, _w in ga.outgoing.get(nid, [])] + [
+                            s for s, _et, _w in ga.incoming.get(nid, [])
+                        ]
                         for n2 in neighbors:
                             if n2 not in visited:
                                 stack.append(n2)
@@ -2746,13 +2816,15 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                     else:
                         role = "peripheral"
 
-                    insights["important_modules"].append({
-                        "module": mod,
-                        "weighted_importance": weighted_in,
-                        "in_degree": in_deg,
-                        "out_degree": out_deg,
-                        "role": role,
-                    })
+                    insights["important_modules"].append(
+                        {
+                            "module": mod,
+                            "weighted_importance": weighted_in,
+                            "in_degree": in_deg,
+                            "out_degree": out_deg,
+                            "role": role,
+                        }
+                    )
 
                 # Module coupling detection (high fan-in/fan-out)
                 coupling_issues = []
@@ -2765,12 +2837,14 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                             pattern = "high_fan_in"
                         else:
                             pattern = "high_fan_out"
-                        coupling_issues.append({
-                            "module": mod,
-                            "pattern": pattern,
-                            "in_degree": in_deg,
-                            "out_degree": out_deg,
-                        })
+                        coupling_issues.append(
+                            {
+                                "module": mod,
+                                "pattern": pattern,
+                                "in_degree": in_deg,
+                                "out_degree": out_deg,
+                            }
+                        )
 
                 insights["module_coupling"] = coupling_issues[:5]
 

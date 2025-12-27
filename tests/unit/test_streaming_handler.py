@@ -248,9 +248,7 @@ class TestProcessToolResults:
 
         assert len(chunks) >= 1
         # Find the tool result chunk
-        tool_result_chunks = [
-            c for c in chunks if c.metadata and "tool_result" in c.metadata
-        ]
+        tool_result_chunks = [c for c in chunks if c.metadata and "tool_result" in c.metadata]
         assert len(tool_result_chunks) == 1
         assert tool_result_chunks[0].metadata["tool_result"]["success"] is True
 
@@ -266,9 +264,7 @@ class TestProcessToolResults:
 
         chunks = handler.process_tool_results(execution, basic_context)
 
-        tool_result_chunks = [
-            c for c in chunks if c.metadata and "tool_result" in c.metadata
-        ]
+        tool_result_chunks = [c for c in chunks if c.metadata and "tool_result" in c.metadata]
         assert len(tool_result_chunks) == 1
         assert tool_result_chunks[0].metadata["tool_result"]["success"] is False
         assert tool_result_chunks[0].metadata["tool_result"]["error"] == "file not found"
@@ -280,9 +276,7 @@ class TestProcessToolResults:
 
         chunks = handler.process_tool_results(execution, basic_context)
 
-        status_chunks = [
-            c for c in chunks if c.metadata and c.metadata.get("status")
-        ]
+        status_chunks = [c for c in chunks if c.metadata and c.metadata.get("status")]
         assert len(status_chunks) == 1
         assert "Thinking" in status_chunks[0].metadata["status"]
 

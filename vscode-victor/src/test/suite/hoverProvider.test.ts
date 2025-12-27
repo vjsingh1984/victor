@@ -149,7 +149,7 @@ suite('HoverProvider Test Suite', () => {
                 // Prune if over limit (simple LRU simulation)
                 if (cache.size > maxCacheSize) {
                     const firstKey = cache.keys().next().value as string;
-                    if (firstKey) cache.delete(firstKey);
+                    if (firstKey) {cache.delete(firstKey);}
                 }
             }
 
@@ -322,7 +322,7 @@ suite('HoverProvider Test Suite', () => {
             const maxContextLength = 500;
 
             const truncateContext = (context: string): string => {
-                if (context.length <= maxContextLength) return context;
+                if (context.length <= maxContextLength) {return context;}
                 return context.substring(0, maxContextLength) + '...';
             };
 

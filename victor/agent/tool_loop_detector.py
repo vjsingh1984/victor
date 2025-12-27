@@ -101,20 +101,43 @@ PARAMETER_ALIASES: Dict[str, str] = {
 # Tool groups that access same resource types
 TOOL_RESOURCE_GROUPS: Dict[str, Set[str]] = {
     "file_read": {
-        "read", "read_file", "cat", "head", "tail",
-        "view", "show", "display", "get_file",
+        "read",
+        "read_file",
+        "cat",
+        "head",
+        "tail",
+        "view",
+        "show",
+        "display",
+        "get_file",
     },
     "file_list": {
-        "ls", "list", "list_directory", "dir", "tree",
-        "find", "glob", "list_files",
+        "ls",
+        "list",
+        "list_directory",
+        "dir",
+        "tree",
+        "find",
+        "glob",
+        "list_files",
     },
     "code_search": {
-        "grep", "search", "code_search", "semantic_code_search",
-        "find_in_files", "ripgrep", "ag",
+        "grep",
+        "search",
+        "code_search",
+        "semantic_code_search",
+        "find_in_files",
+        "ripgrep",
+        "ag",
     },
     "symbol_lookup": {
-        "symbol", "get_symbol", "analyze_symbol", "find_symbol",
-        "definition", "references", "go_to_definition",
+        "symbol",
+        "get_symbol",
+        "analyze_symbol",
+        "find_symbol",
+        "definition",
+        "references",
+        "go_to_definition",
     },
 }
 
@@ -232,9 +255,7 @@ class ToolLoopDetector:
         self.config = config or LoopDetectorConfig()
 
         # Recent tool calls (sliding window)
-        self._call_history: deque[ToolCallRecord] = deque(
-            maxlen=self.config.window_size
-        )
+        self._call_history: deque[ToolCallRecord] = deque(maxlen=self.config.window_size)
 
         # Track consecutive same calls: (tool, args_hash) → count
         self._consecutive_counts: Dict[Tuple[str, str], int] = defaultdict(int)
@@ -314,9 +335,7 @@ class ToolLoopDetector:
 
         return normalized
 
-    def _normalize_arguments(
-        self, arguments: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _normalize_arguments(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Normalize arguments for semantic comparison.
 
         This applies:
@@ -381,9 +400,7 @@ class ToolLoopDetector:
         content = str(sorted_items).encode("utf-8")
         return hashlib.md5(content).hexdigest()[:12]
 
-    def _extract_resource_key(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> Optional[str]:
+    def _extract_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
         """Extract resource key from tool call (e.g., file path).
 
         Uses normalized arguments to extract a canonical resource key,
@@ -408,16 +425,23 @@ class ToolLoopDetector:
     def _is_read_operation(self, tool_name: str) -> bool:
         """Determine if a tool is a read-only operation."""
         read_tools = {
-            "read_file", "read", "list_directory", "ls",
-            "code_search", "semantic_code_search", "grep",
-            "symbol", "get_symbol", "analyze_symbol",
-            "plan_files", "graph_symbol", "graph_dependencies",
+            "read_file",
+            "read",
+            "list_directory",
+            "ls",
+            "code_search",
+            "semantic_code_search",
+            "grep",
+            "symbol",
+            "get_symbol",
+            "analyze_symbol",
+            "plan_files",
+            "graph_symbol",
+            "graph_dependencies",
         }
         return tool_name.lower() in read_tools
 
-    def _detect_same_argument_loop(
-        self, tool_name: str, args_hash: str
-    ) -> LoopDetectionResult:
+    def _detect_same_argument_loop(self, tool_name: str, args_hash: str) -> LoopDetectionResult:
         """Detect consecutive calls with same tool and arguments."""
         call_key = (tool_name, args_hash)
 
@@ -475,18 +499,22 @@ class ToolLoopDetector:
         # Check for 2-element cycles (A→B→A→B)
         if len(recent_tools) >= 4:
             # Check if last 4 form A→B→A→B
-            if (recent_tools[-4] == recent_tools[-2] and
-                recent_tools[-3] == recent_tools[-1] and
-                recent_tools[-4] != recent_tools[-3]):
+            if (
+                recent_tools[-4] == recent_tools[-2]
+                and recent_tools[-3] == recent_tools[-1]
+                and recent_tools[-4] != recent_tools[-3]
+            ):
 
                 cycle = f"{recent_tools[-4]}→{recent_tools[-3]}"
 
                 # Count how many times this cycle repeats
                 cycle_count = 1
                 for i in range(len(recent_tools) - 4, -1, -2):
-                    if (i >= 1 and
-                        recent_tools[i] == recent_tools[-2] and
-                        recent_tools[i-1] == recent_tools[-1]):
+                    if (
+                        i >= 1
+                        and recent_tools[i] == recent_tools[-2]
+                        and recent_tools[i - 1] == recent_tools[-1]
+                    ):
                         cycle_count += 1
                     else:
                         break
@@ -520,8 +548,7 @@ class ToolLoopDetector:
 
         # Only keep recent access history per resource
         if len(self._resource_access[resource_key]) > 10:
-            self._resource_access[resource_key] = \
-                self._resource_access[resource_key][-10:]
+            self._resource_access[resource_key] = self._resource_access[resource_key][-10:]
 
         # Count consecutive reads since last write
         access_list = self._resource_access[resource_key]
@@ -550,9 +577,7 @@ class ToolLoopDetector:
 
         return LoopDetectionResult()
 
-    def _detect_diminishing_returns(
-        self, result_hash: Optional[str]
-    ) -> LoopDetectionResult:
+    def _detect_diminishing_returns(self, result_hash: Optional[str]) -> LoopDetectionResult:
         """Detect when tool results are becoming similar/identical."""
         if not result_hash or not self.config.enable_result_similarity:
             return LoopDetectionResult()
@@ -665,8 +690,7 @@ class ToolLoopDetector:
             "total_calls": self._total_calls,
             "loops_detected": self._loops_detected,
             "loop_rate": (
-                self._loops_detected / self._total_calls
-                if self._total_calls > 0 else 0.0
+                self._loops_detected / self._total_calls if self._total_calls > 0 else 0.0
             ),
             "history_length": len(self._call_history),
             "unique_resources_tracked": len(self._resource_access),
@@ -726,8 +750,7 @@ class LoggingLoopObserver:
         """Log the loop detection result."""
         if result.severity == LoopSeverity.CRITICAL:
             self._logger.warning(
-                f"[loop] CRITICAL: {result.loop_type.name} - "
-                f"{result.recommendation}"
+                f"[loop] CRITICAL: {result.loop_type.name} - " f"{result.recommendation}"
             )
         elif result.severity == LoopSeverity.WARNING:
             self._logger.warning(

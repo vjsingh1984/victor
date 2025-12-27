@@ -407,7 +407,9 @@ class TieredCache:
                 quality_score=1.0,
                 task_type="cache",
                 metadata={
-                    "state_key": self._build_state_key(utilization, age_seconds, hit_count, tool_name),
+                    "state_key": self._build_state_key(
+                        utilization, age_seconds, hit_count, tool_name
+                    ),
                     "action": "keep",
                     "tool_name": tool_name,
                     "hit_after": 1,

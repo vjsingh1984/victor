@@ -159,8 +159,12 @@ class TestWelchTTest:
     def test_identical_samples(self) -> None:
         """Test t-test with identical samples."""
         result = welch_t_test(
-            mean1=10.0, std1=2.0, n1=30,
-            mean2=10.0, std2=2.0, n2=30,
+            mean1=10.0,
+            std1=2.0,
+            n1=30,
+            mean2=10.0,
+            std2=2.0,
+            n2=30,
         )
 
         assert result.test_name == "Welch's t-test"
@@ -171,8 +175,12 @@ class TestWelchTTest:
     def test_significant_difference(self) -> None:
         """Test t-test with significant difference."""
         result = welch_t_test(
-            mean1=10.0, std1=2.0, n1=100,
-            mean2=12.0, std2=2.0, n2=100,
+            mean1=10.0,
+            std1=2.0,
+            n1=100,
+            mean2=12.0,
+            std2=2.0,
+            n2=100,
         )
 
         assert result.significant is True
@@ -182,8 +190,12 @@ class TestWelchTTest:
     def test_insufficient_samples(self) -> None:
         """Test t-test with insufficient samples."""
         result = welch_t_test(
-            mean1=10.0, std1=2.0, n1=1,
-            mean2=12.0, std2=2.0, n2=30,
+            mean1=10.0,
+            std1=2.0,
+            n1=1,
+            mean2=12.0,
+            std2=2.0,
+            n2=30,
         )
 
         assert result.significant is False
@@ -192,8 +204,12 @@ class TestWelchTTest:
     def test_zero_variance(self) -> None:
         """Test t-test with zero variance."""
         result = welch_t_test(
-            mean1=10.0, std1=0.0, n1=30,
-            mean2=10.0, std2=0.0, n2=30,
+            mean1=10.0,
+            std1=0.0,
+            n1=30,
+            mean2=10.0,
+            std2=0.0,
+            n2=30,
         )
 
         assert result.significant is False
@@ -202,16 +218,24 @@ class TestWelchTTest:
         """Test effect size recommendations."""
         # Large effect
         result = welch_t_test(
-            mean1=10.0, std1=1.0, n1=50,
-            mean2=11.5, std2=1.0, n2=50,
+            mean1=10.0,
+            std1=1.0,
+            n1=50,
+            mean2=11.5,
+            std2=1.0,
+            n2=50,
         )
         assert "Large" in result.recommendation or "Strong" in result.recommendation
 
     def test_confidence_interval(self) -> None:
         """Test confidence interval calculation."""
         result = welch_t_test(
-            mean1=10.0, std1=2.0, n1=50,
-            mean2=12.0, std2=2.0, n2=50,
+            mean1=10.0,
+            std1=2.0,
+            n1=50,
+            mean2=12.0,
+            std2=2.0,
+            n2=50,
         )
 
         ci_low, ci_high = result.confidence_interval
@@ -227,8 +251,10 @@ class TestTwoProportionZTest:
     def test_identical_proportions(self) -> None:
         """Test z-test with identical proportions."""
         result = two_proportion_z_test(
-            successes1=50, n1=100,
-            successes2=50, n2=100,
+            successes1=50,
+            n1=100,
+            successes2=50,
+            n2=100,
         )
 
         assert result.test_name == "Two-proportion z-test"
@@ -238,8 +264,10 @@ class TestTwoProportionZTest:
     def test_significant_difference(self) -> None:
         """Test z-test with significant difference."""
         result = two_proportion_z_test(
-            successes1=50, n1=200,
-            successes2=70, n2=200,
+            successes1=50,
+            n1=200,
+            successes2=70,
+            n2=200,
         )
 
         assert result.significant is True
@@ -248,8 +276,10 @@ class TestTwoProportionZTest:
     def test_insufficient_samples(self) -> None:
         """Test z-test with no samples."""
         result = two_proportion_z_test(
-            successes1=0, n1=0,
-            successes2=5, n2=10,
+            successes1=0,
+            n1=0,
+            successes2=5,
+            n2=10,
         )
 
         assert result.significant is False
@@ -258,8 +288,10 @@ class TestTwoProportionZTest:
     def test_all_successes_or_failures(self) -> None:
         """Test z-test with all successes or failures."""
         result = two_proportion_z_test(
-            successes1=100, n1=100,
-            successes2=100, n2=100,
+            successes1=100,
+            n1=100,
+            successes2=100,
+            n2=100,
         )
 
         assert "Zero variance" in result.recommendation or result.significant is False
@@ -267,8 +299,10 @@ class TestTwoProportionZTest:
     def test_relative_lift(self) -> None:
         """Test relative lift calculation."""
         result = two_proportion_z_test(
-            successes1=50, n1=100,  # 50%
-            successes2=60, n2=100,  # 60%
+            successes1=50,
+            n1=100,  # 50%
+            successes2=60,
+            n2=100,  # 60%
         )
 
         # 20% relative lift expected (60-50)/50 = 0.2

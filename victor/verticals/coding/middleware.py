@@ -33,27 +33,31 @@ logger = logging.getLogger(__name__)
 
 
 # Tools that write or execute code
-CODE_TOOLS: frozenset[str] = frozenset({
-    "code_executor",
-    "execute_code",
-    "run_code",
-    "write_file",
-    "file_editor",
-    "edit_file",
-    "edit_files",
-    "create_file",
-})
+CODE_TOOLS: frozenset[str] = frozenset(
+    {
+        "code_executor",
+        "execute_code",
+        "run_code",
+        "write_file",
+        "file_editor",
+        "edit_file",
+        "edit_files",
+        "create_file",
+    }
+)
 
 # Argument names that contain code
-CODE_ARGUMENT_NAMES: frozenset[str] = frozenset({
-    "code",
-    "python_code",
-    "content",
-    "source",
-    "script",
-    "new_content",
-    "file_content",
-})
+CODE_ARGUMENT_NAMES: frozenset[str] = frozenset(
+    {
+        "code",
+        "python_code",
+        "content",
+        "source",
+        "script",
+        "new_content",
+        "file_content",
+    }
+)
 
 
 class CodingMiddleware(MiddlewareProtocol):
@@ -77,9 +81,7 @@ class CodingMiddleware(MiddlewareProtocol):
         self._enabled = enabled
         self._applicable_tools = applicable_tools
 
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Called before a tool is executed.
 
         Base implementation does nothing. Override in subclasses.
@@ -212,6 +214,7 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         if inner is None:
             # Return a minimal "no issues" result
             from victor.agent.code_correction_middleware import CorrectionResult, ValidationResult
+
             return CorrectionResult(
                 validation=ValidationResult(valid=True, errors=[]),
                 was_corrected=False,
@@ -235,9 +238,7 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
             return arguments
         return inner.apply_correction(arguments, correction_result)
 
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Validate and optionally fix code before tool execution.
 
         Args:
@@ -332,19 +333,23 @@ class GitSafetyMiddleware(MiddlewareProtocol):
     """
 
     # Dangerous git operations
-    BLOCKED_OPERATIONS = frozenset({
-        "push --force",
-        "push -f",
-        "reset --hard HEAD~",
-        "clean -fd",
-    })
+    BLOCKED_OPERATIONS = frozenset(
+        {
+            "push --force",
+            "push -f",
+            "reset --hard HEAD~",
+            "clean -fd",
+        }
+    )
 
-    WARNED_OPERATIONS = frozenset({
-        "reset --hard",
-        "checkout --",
-        "stash drop",
-        "branch -D",
-    })
+    WARNED_OPERATIONS = frozenset(
+        {
+            "reset --hard",
+            "checkout --",
+            "stash drop",
+            "branch -D",
+        }
+    )
 
     def __init__(
         self,
@@ -360,9 +365,7 @@ class GitSafetyMiddleware(MiddlewareProtocol):
         self._block_dangerous = block_dangerous
         self._warn_on_risky = warn_on_risky
 
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Check git operations for safety.
 
         Args:

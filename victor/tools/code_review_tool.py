@@ -44,29 +44,8 @@ from victor.tools.language_analyzer import (
 
 logger = logging.getLogger(__name__)
 
-
-# Module-level configuration
-_max_complexity: int = 10
-
-
-def set_code_review_config(max_complexity: int = 10) -> None:
-    """Set code review configuration.
-
-    DEPRECATED: Use ToolConfig via executor context instead.
-    This function will be removed in v2.0.
-
-    Args:
-        max_complexity: Maximum allowed cyclomatic complexity (default: 10).
-    """
-    import warnings
-
-    warnings.warn(
-        "set_code_review_config() is deprecated. Use ToolConfig via executor.update_context() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    global _max_complexity
-    _max_complexity = max_complexity
+# Constants
+_DEFAULT_MAX_COMPLEXITY: int = 10
 
 
 def _issue_to_dict(issue: AnalysisIssue) -> Dict[str, Any]:
@@ -420,7 +399,7 @@ async def code_review(
 
         try:
             # Use language analyzer
-            file_issues = _analyze_file(file_path, aspects, _max_complexity)
+            file_issues = _analyze_file(file_path, aspects, _DEFAULT_MAX_COMPLEXITY)
             files_reviewed += 1
 
             # Sort issues by aspect

@@ -93,7 +93,9 @@ class TestModelSelectorLearner:
         )
         assert cursor.fetchone() is not None
 
-    def test_record_single_outcome(self, coordinator: RLCoordinator, learner: ModelSelectorLearner) -> None:
+    def test_record_single_outcome(
+        self, coordinator: RLCoordinator, learner: ModelSelectorLearner
+    ) -> None:
         """Recording one outcome updates Q-values and counts."""
         _record_selection_outcome(
             learner,
@@ -128,27 +130,40 @@ class TestModelSelectorLearner:
         q_value, count = _get_q_value_from_db(coordinator2, "openai")
         assert count == 1
         assert q_value != 0.5
-        assert learner2.epsilon < initial_epsilon_learner1  # Epsilon should decay from initial value
-        assert learner2.epsilon == learner1.epsilon # The actual decayed value should be loaded
+        assert (
+            learner2.epsilon < initial_epsilon_learner1
+        )  # Epsilon should decay from initial value
+        assert learner2.epsilon == learner1.epsilon  # The actual decayed value should be loaded
 
-
-    @pytest.mark.parametrize("strategy, expected_reason", [
-        (SelectionStrategy.EPSILON_GREEDY, "Exploration"),
-        (SelectionStrategy.EXPLOIT_ONLY, "Best Q-value"),
-    ])
+    @pytest.mark.parametrize(
+        "strategy, expected_reason",
+        [
+            (SelectionStrategy.EPSILON_GREEDY, "Exploration"),
+            (SelectionStrategy.EXPLOIT_ONLY, "Best Q-value"),
+        ],
+    )
     def test_get_recommendation_strategies(
         self, learner: ModelSelectorLearner, strategy: SelectionStrategy, expected_reason: str
     ) -> None:
         """Test different selection strategies."""
         learner.strategy = strategy
-        learner.epsilon = 1.0 if strategy == SelectionStrategy.EPSILON_GREEDY else 0.0 # Force exploration/exploitation
+        learner.epsilon = (
+            1.0 if strategy == SelectionStrategy.EPSILON_GREEDY else 0.0
+        )  # Force exploration/exploitation
 
-        _record_selection_outcome(learner, provider="provider_A", quality_score=0.9, task_type="analysis")
-        _record_selection_outcome(learner, provider="provider_B", quality_score=0.1, task_type="analysis")
+        _record_selection_outcome(
+            learner, provider="provider_A", quality_score=0.9, task_type="analysis"
+        )
+        _record_selection_outcome(
+            learner, provider="provider_B", quality_score=0.1, task_type="analysis"
+        )
 
         # Mock random.random to ensure exploration is chosen for EPSILON_GREEDY
         import random
-        with patch.object(random, 'random', return_value=0.1): # Ensure random.random() < learner.epsilon (which is 0.99)
+
+        with patch.object(
+            random, "random", return_value=0.1
+        ):  # Ensure random.random() < learner.epsilon (which is 0.99)
             # Get recommendation for providers A and B
             rec = learner.get_recommendation(
                 provider='["provider_A", "provider_B"]', model="any-model", task_type="analysis"
@@ -160,11 +175,29 @@ class TestModelSelectorLearner:
     def test_ucb_strategy(self, learner: ModelSelectorLearner) -> None:
         """Test UCB selection strategy."""
         learner.strategy = SelectionStrategy.UCB
-        
+
         # Populate some data
-        _record_selection_outcome(learner, provider="provider_X", quality_score=0.8, task_type="coding", latency_seconds=1.0)
-        _record_selection_outcome(learner, provider="provider_X", quality_score=0.8, task_type="coding", latency_seconds=1.0)
-        _record_selection_outcome(learner, provider="provider_Y", quality_score=0.2, task_type="coding", latency_seconds=10.0)
+        _record_selection_outcome(
+            learner,
+            provider="provider_X",
+            quality_score=0.8,
+            task_type="coding",
+            latency_seconds=1.0,
+        )
+        _record_selection_outcome(
+            learner,
+            provider="provider_X",
+            quality_score=0.8,
+            task_type="coding",
+            latency_seconds=1.0,
+        )
+        _record_selection_outcome(
+            learner,
+            provider="provider_Y",
+            quality_score=0.2,
+            task_type="coding",
+            latency_seconds=10.0,
+        )
 
         rec = learner.get_recommendation(
             provider='["provider_X", "provider_Y"]', model="any-model", task_type="coding"

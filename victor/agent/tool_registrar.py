@@ -172,6 +172,9 @@ class ToolRegistrar:
         # Background task callback
         self._create_background_task: Optional[Callable] = None
 
+        # Tool configuration for context injection (populated in _setup_providers)
+        self._tool_config: Dict[str, Any] = {}
+
         logger.debug("ToolRegistrar initialized")
 
     def set_background_task_callback(self, callback: Callable[[Any, str], asyncio.Task]) -> None:
@@ -240,43 +243,35 @@ class ToolRegistrar:
         return self._stats
 
     def _setup_providers(self) -> None:
-        """Set up providers for tools that need them."""
-        try:
-            from victor.tools.git_tool import set_git_provider
-            from victor.tools.batch_processor_tool import set_batch_processor_config
-            from victor.tools.code_review_tool import set_code_review_config
+        """Set up provider configuration for tool context injection.
 
-            # Set git provider
-            set_git_provider(self.provider, self.model)
+        Note: As of Phase 7, tools receive configuration via context parameter
+        at execution time rather than via global setters. This method now stores
+        configuration that will be injected into the tool execution context.
+        """
+        # Store configuration for context injection during tool execution
+        # This config will be passed to ToolConfig.from_context() at runtime
+        self._tool_config = {
+            "provider": self.provider,
+            "model": self.model,
+            "max_workers": self.config.max_workers,
+            "max_complexity": self.config.max_complexity,
+        }
 
-            # Set batch processor config
-            set_batch_processor_config(max_workers=self.config.max_workers)
-
-            # Set code review config
-            set_code_review_config(max_complexity=self.config.max_complexity)
-
-            # Set web search provider (if not air-gapped)
-            if not self.config.airgapped_mode:
-                from victor.tools.web_search_tool import (
-                    set_web_search_provider,
-                    set_web_tool_defaults,
+        # Load web tool config if not air-gapped
+        if not self.config.airgapped_mode:
+            try:
+                tool_config = self.settings.load_tool_config()
+                web_cfg = tool_config.get("web_tools", {}) or tool_config.get("web", {}) or {}
+                self._tool_config.update(
+                    {
+                        "web_fetch_top": web_cfg.get("summarize_fetch_top"),
+                        "web_fetch_pool": web_cfg.get("summarize_fetch_pool"),
+                        "max_content_length": web_cfg.get("summarize_max_content_length"),
+                    }
                 )
-
-                set_web_search_provider(self.provider, self.model)
-
-                try:
-                    tool_config = self.settings.load_tool_config()
-                    web_cfg = tool_config.get("web_tools", {}) or tool_config.get("web", {}) or {}
-                    set_web_tool_defaults(
-                        fetch_top=web_cfg.get("summarize_fetch_top"),
-                        fetch_pool=web_cfg.get("summarize_fetch_pool"),
-                        max_content_length=web_cfg.get("summarize_max_content_length"),
-                    )
-                except Exception as exc:
-                    logger.warning(f"Failed to apply web tool defaults: {exc}")
-
-        except ImportError as e:
-            logger.debug(f"Some tool providers not available: {e}")
+            except Exception as exc:
+                logger.debug(f"Failed to load web tool config: {exc}")
 
     def _register_dynamic_tools(self) -> int:
         """Dynamically discover and register tools from victor/tools directory.
@@ -638,6 +633,15 @@ class ToolRegistrar:
             RegistrationStats with all counts
         """
         return self._stats
+
+    def get_tool_config(self) -> Dict[str, Any]:
+        """Get tool configuration for context injection.
+
+        Returns:
+            Dictionary with provider, model, and tool-specific settings
+            that should be included in tool execution context.
+        """
+        return self._tool_config.copy()
 
     def get_plugin_info(self) -> Dict[str, Any]:
         """Get information about loaded plugins.

@@ -380,9 +380,7 @@ class TestVerticalExtensions:
             def get_priority(self) -> int:
                 return 50  # Higher priority (executes first)
 
-        ext = VerticalExtensions(
-            prompt_contributors=[Contributor1(), Contributor2()]
-        )
+        ext = VerticalExtensions(prompt_contributors=[Contributor1(), Contributor2()])
         hints = ext.get_all_task_hints()
 
         # Should have both hints
@@ -484,10 +482,7 @@ class TestCodingVerticalExtensions:
         assert len(hints) > 0
 
         # Should have coding-related hints
-        assert any(
-            hint_type in hints
-            for hint_type in ["edit", "code_generation", "refactor"]
-        )
+        assert any(hint_type in hints for hint_type in ["edit", "code_generation", "refactor"])
 
     def test_coding_mode_configs(self):
         """CodingAssistant should provide mode configs."""

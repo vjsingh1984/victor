@@ -335,7 +335,7 @@ export class StateStore {
      * Persist state to VS Code globalState
      */
     private async persistState(): Promise<void> {
-        if (!this.globalState) return;
+        if (!this.globalState) {return;}
 
         // Only persist certain parts of state (not transient data)
         const stateToPersist: Partial<AppState> = {

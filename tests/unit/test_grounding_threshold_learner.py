@@ -216,9 +216,7 @@ class TestGroundingThresholdLearner:
         # Check state was loaded correctly
         assert context_key in learner2._beta_params
 
-    def test_get_recommendation_thompson_sampling(
-        self, learner: GroundingThresholdLearner
-    ) -> None:
+    def test_get_recommendation_thompson_sampling(self, learner: GroundingThresholdLearner) -> None:
         """Test get_recommendation uses Thompson Sampling."""
         provider = "anthropic"
         response_type = "code_generation"
@@ -252,9 +250,7 @@ class TestGroundingThresholdLearner:
         # With many samples, should have some tracked updates
         assert rec.sample_size > 0
 
-    def test_get_optimal_threshold(
-        self, learner: GroundingThresholdLearner
-    ) -> None:
+    def test_get_optimal_threshold(self, learner: GroundingThresholdLearner) -> None:
         """Test convenience method for optimal threshold."""
         provider = "mistral"
         response_type = "edit"
@@ -283,13 +279,11 @@ class TestGroundingThresholdLearner:
         assert stats["fp_rate"] == 0.2  # 1/5
         assert stats["fn_rate"] == 0.2  # 1/5
         # Precision = tp / (tp + fp) = 2 / 3
-        assert abs(stats["precision"] - 2/3) < 0.01
+        assert abs(stats["precision"] - 2 / 3) < 0.01
         # Recall = tp / (tp + fn) = 2 / 3
-        assert abs(stats["recall"] - 2/3) < 0.01
+        assert abs(stats["recall"] - 2 / 3) < 0.01
 
-    def test_get_all_provider_stats(
-        self, learner: GroundingThresholdLearner
-    ) -> None:
+    def test_get_all_provider_stats(self, learner: GroundingThresholdLearner) -> None:
         """Test getting stats for all providers."""
         _record_grounding_outcome(learner, provider="openai", result_type="tp")
         _record_grounding_outcome(learner, provider="anthropic", result_type="tn")
@@ -328,9 +322,7 @@ class TestGroundingThresholdLearner:
         assert metrics["default_threshold"] == 0.70
         assert metrics["threshold_levels"] == learner.THRESHOLD_LEVELS
 
-    def test_no_data_returns_baseline(
-        self, learner: GroundingThresholdLearner
-    ) -> None:
+    def test_no_data_returns_baseline(self, learner: GroundingThresholdLearner) -> None:
         """Test that unknown provider returns baseline recommendation."""
         rec = learner.get_recommendation("unknown_provider", "", "general")
 
@@ -360,9 +352,7 @@ class TestGroundingThresholdLearner:
         alpha, beta, count = _get_beta_params_from_db(coordinator, context_key, 0.75)
         assert count == 1
 
-    def test_response_type_normalization(
-        self, learner: GroundingThresholdLearner
-    ) -> None:
+    def test_response_type_normalization(self, learner: GroundingThresholdLearner) -> None:
         """Test that response types are normalized."""
         valid_types = learner.RESPONSE_TYPES
 
@@ -374,9 +364,7 @@ class TestGroundingThresholdLearner:
         key = learner._build_context_key("test", "invalid_type")
         assert "general" in key
 
-    def test_mixed_outcomes_convergence(
-        self, learner: GroundingThresholdLearner
-    ) -> None:
+    def test_mixed_outcomes_convergence(self, learner: GroundingThresholdLearner) -> None:
         """Test that learner converges with mixed outcomes."""
         provider = "test_provider"
         response_type = "code_generation"

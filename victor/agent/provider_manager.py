@@ -451,7 +451,9 @@ class ProviderManager:
             "streaming_tool_calls": caps.streaming_tool_calls if caps else False,
             "parallel_tool_calls": caps.parallel_tool_calls if caps else False,
             "thinking_mode": caps.thinking_mode if caps else False,
-            "context_window": runtime_caps.context_window if runtime_caps else self.get_context_window(),
+            "context_window": (
+                runtime_caps.context_window if runtime_caps else self.get_context_window()
+            ),
             "is_cloud": self.is_cloud_provider(),
             "is_local": self.is_local_provider(),
             "is_healthy": self._current_state.is_healthy,

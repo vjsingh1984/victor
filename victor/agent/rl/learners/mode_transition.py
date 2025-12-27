@@ -346,7 +346,7 @@ class ModeTransitionLearner(BaseLearner):
         """Update task-type statistics."""
         task_type = outcome.task_type or "default"
         tool_budget_used = outcome.metadata.get("tool_budget_used", 0)
-        tool_budget_total = outcome.metadata.get("tool_budget_total", 10)
+        _tool_budget_total = outcome.metadata.get("tool_budget_total", 10)  # noqa: F841
 
         if task_type not in self._task_stats:
             self._task_stats[task_type] = {
@@ -438,7 +438,7 @@ class ModeTransitionLearner(BaseLearner):
         if random.random() < self.epsilon:
             # Exploration: random action
             action = random.choice(list(actions.keys()))
-            q_value = actions[action]
+            _q_value = actions[action]  # noqa: F841
             return RLRecommendation(
                 value=action,
                 confidence=0.3,

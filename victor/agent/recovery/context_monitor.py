@@ -197,9 +197,7 @@ class ContextWindowMonitor:
 
             if isinstance(content, list):
                 # Handle multimodal content
-                content = " ".join(
-                    c.get("text", "") for c in content if isinstance(c, dict)
-                )
+                content = " ".join(c.get("text", "") for c in content if isinstance(c, dict))
 
             tokens = self.estimate_tokens(str(content))
 
@@ -221,6 +219,7 @@ class ContextWindowMonitor:
 
         # Record history
         import time
+
         self._token_history.append((int(time.time() * 1000), metrics.total_tokens))
         if len(self._token_history) > 100:
             self._token_history.pop(0)
@@ -334,12 +333,15 @@ class ContextWindowMonitor:
 
         # Record compaction
         import time
-        self._compaction_history.append({
-            "timestamp": time.time(),
-            "before_tokens": before_tokens,
-            "freed_tokens": freed,
-            "health_before": self._metrics.health.name,
-        })
+
+        self._compaction_history.append(
+            {
+                "timestamp": time.time(),
+                "before_tokens": before_tokens,
+                "freed_tokens": freed,
+                "health_before": self._metrics.health.name,
+            }
+        )
 
         logger.info(f"Compaction freed {freed} tokens (was {before_tokens})")
         return freed
@@ -383,9 +385,7 @@ class ContextWindowMonitor:
 
         growth_total = tokens[-1] - tokens[0]
         time_span_ms = times[-1] - times[0]
-        growth_rate_per_sec = (
-            growth_total / (time_span_ms / 1000) if time_span_ms > 0 else 0
-        )
+        growth_rate_per_sec = growth_total / (time_span_ms / 1000) if time_span_ms > 0 else 0
 
         # Determine trend
         if growth_rate_per_sec > 100:
@@ -422,7 +422,7 @@ class ContextWindowMonitor:
         if growth_rate <= 0:
             return None
 
-        remaining_tokens = self._metrics.available_tokens
+        _remaining_tokens = self._metrics.available_tokens  # noqa: F841
         overflow_threshold = self._metrics.max_tokens * self._thresholds["overflow"]
         tokens_until_overflow = overflow_threshold - self._metrics.total_tokens
 

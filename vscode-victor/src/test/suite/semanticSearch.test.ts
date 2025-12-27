@@ -293,7 +293,7 @@ suite('SemanticSearchProvider Test Suite', () => {
 
         test('Should return empty on error', () => {
             const searchWithFallback = (hasError: boolean): object[] => {
-                if (hasError) return [];
+                if (hasError) {return [];}
                 return [{ path: 'test.ts' }];
             };
 
@@ -305,7 +305,7 @@ suite('SemanticSearchProvider Test Suite', () => {
             let timedOut = false;
 
             const checkTimeout = (elapsed: number) => {
-                if (elapsed > timeout) timedOut = true;
+                if (elapsed > timeout) {timedOut = true;}
             };
 
             checkTimeout(15000);
@@ -336,7 +336,7 @@ suite('SemanticSearchProvider Test Suite', () => {
 
             const addUnique = (query: string) => {
                 const index = recentSearches.indexOf(query);
-                if (index > -1) recentSearches.splice(index, 1);
+                if (index > -1) {recentSearches.splice(index, 1);}
                 recentSearches.unshift(query);
             };
 

@@ -19,43 +19,51 @@ async def async_line_generator(lines):
 # Mock get_provider_limits to prevent actual config file access
 @pytest.fixture(autouse=True)
 def mock_get_provider_limits_fixture():
-    with patch('victor.config.config_loaders.get_provider_limits') as mock_limits:
+    with patch("victor.config.config_loaders.get_provider_limits") as mock_limits:
         mock_limits.return_value = MagicMock(context_window=4096)
         yield mock_limits
 
+
 # Temporarily disabled autouse to isolate issues with function signatures
-@pytest.fixture() 
+@pytest.fixture()
 def mock_ollama_capability_detector_patterns_fixture():
     # Patch where it's imported in ollama_provider
-    with patch('victor.providers.ollama_provider.TOOL_SUPPORT_PATTERNS', ['tool_pattern']) as mock_patterns:
+    with patch(
+        "victor.providers.ollama_provider.TOOL_SUPPORT_PATTERNS", ["tool_pattern"]
+    ) as mock_patterns:
         yield mock_patterns
+
 
 @pytest.fixture
 def mock_async_client():
     """Mocks httpx.AsyncClient and its async methods directly."""
-    with patch('victor.providers.ollama_provider.httpx.AsyncClient') as MockAsyncClient:
-        mock_instance = AsyncMock() 
+    with patch("victor.providers.ollama_provider.httpx.AsyncClient") as MockAsyncClient:
+        mock_instance = AsyncMock()
 
         # Default mock response object for get/post, with non-awaitable json and awaitable aread
-        mock_response_obj = MagicMock() # Changed to MagicMock for json() to be non-awaitable
-        mock_response_obj.json.return_value = {} # json() is synchronous in httpx
+        mock_response_obj = MagicMock()  # Changed to MagicMock for json() to be non-awaitable
+        mock_response_obj.json.return_value = {}  # json() is synchronous in httpx
         mock_response_obj.raise_for_status = MagicMock()
         mock_response_obj.status_code = 200
-        mock_response_obj.aread = AsyncMock(return_value=b"") # aread() is asynchronous
+        mock_response_obj.aread = AsyncMock(return_value=b"")  # aread() is asynchronous
 
         mock_instance.get.return_value = mock_response_obj
         mock_instance.post.return_value = mock_response_obj
 
         # Mock the stream method return value (an async context manager)
-        mock_stream_response_obj = MagicMock() # This is the 'response' object inside async with
-        mock_stream_response_obj.aiter_lines.return_value = async_line_generator([]) # Default empty async iterator
+        mock_stream_response_obj = MagicMock()  # This is the 'response' object inside async with
+        mock_stream_response_obj.aiter_lines.return_value = async_line_generator(
+            []
+        )  # Default empty async iterator
         mock_stream_response_obj.raise_for_status = MagicMock()
         mock_stream_response_obj.status_code = 200
         mock_stream_response_obj.aread = AsyncMock(return_value=b"")
 
-        mock_stream_context_manager = AsyncMock() # This acts as the async context manager itself
+        mock_stream_context_manager = AsyncMock()  # This acts as the async context manager itself
         mock_stream_context_manager.__aenter__.return_value = mock_stream_response_obj
-        mock_instance.stream = MagicMock(return_value=mock_stream_context_manager) # stream() method is synchronous, returns an async context manager
+        mock_instance.stream = MagicMock(
+            return_value=mock_stream_context_manager
+        )  # stream() method is synchronous, returns an async context manager
 
         mock_instance.aclose = AsyncMock()
 
@@ -65,7 +73,7 @@ def mock_async_client():
 
 @pytest.fixture
 def mock_httpx_client():
-    with patch('httpx.Client') as mock_client:
+    with patch("httpx.Client") as mock_client:
         yield mock_client
 
 
@@ -73,28 +81,28 @@ class TestOllamaProviderInit:
     def test_init_default_base_url(self, mock_async_client):
         OllamaProvider()
         mock_async_client.assert_called_once()
-        assert mock_async_client.call_args[1]['base_url'] == "http://localhost:11434"
+        assert mock_async_client.call_args[1]["base_url"] == "http://localhost:11434"
 
     def test_init_single_base_url(self, mock_async_client):
         OllamaProvider(base_url="http://192.168.1.1:11434")
         mock_async_client.assert_called_once()
-        assert mock_async_client.call_args[1]['base_url'] == "http://192.168.1.1:11434"
+        assert mock_async_client.call_args[1]["base_url"] == "http://192.168.1.1:11434"
 
     def test_init_list_base_urls(self, mock_async_client):
         OllamaProvider(base_url=["http://host1:11434", "http://host2:11434"])
         mock_async_client.assert_called_once()
-        assert mock_async_client.call_args[1]['base_url'] == "http://host1:11434"
+        assert mock_async_client.call_args[1]["base_url"] == "http://host1:11434"
 
     @patch.dict(os.environ, {"OLLAMA_ENDPOINTS": "http://env_host:11434,http://env_host2:11434"})
     def test_init_env_var_precedence(self, mock_async_client):
         OllamaProvider(base_url="http://explicit:11434")
         mock_async_client.assert_called_once()
-        assert mock_async_client.call_args[1]['base_url'] == "http://env_host:11434"
+        assert mock_async_client.call_args[1]["base_url"] == "http://env_host:11434"
 
     def test_init_with_skip_discovery(self, mock_async_client):
         OllamaProvider(base_url="http://skip:11434", _skip_discovery=True)
         mock_async_client.assert_called_once()
-        assert mock_async_client.call_args[1]['base_url'] == "http://skip:11434"
+        assert mock_async_client.call_args[1]["base_url"] == "http://skip:11434"
 
     def test_name_property(self):
         provider = OllamaProvider()
@@ -127,35 +135,47 @@ class TestOllamaProviderInit:
 class TestOllamaProviderAsyncFactory:
     @pytest.mark.asyncio
     async def test_create_async_discovery_success(self, mock_async_client):
-        with patch.object(OllamaProvider, '_select_base_url_async', new=AsyncMock(return_value="http://async:11434")):
+        with patch.object(
+            OllamaProvider,
+            "_select_base_url_async",
+            new=AsyncMock(return_value="http://async:11434"),
+        ):
             await OllamaProvider.create(base_url="http://initial:11434")
 
         mock_async_client.assert_called_once()
-        assert mock_async_client.call_args[1]['base_url'] == "http://async:11434"
+        assert mock_async_client.call_args[1]["base_url"] == "http://async:11434"
 
     @pytest.mark.asyncio
     async def test_create_async_discovery_fallback(self, mock_async_client):
-        with patch.object(OllamaProvider, '_select_base_url_async', new=AsyncMock(return_value="http://localhost:11434")):
+        with patch.object(
+            OllamaProvider,
+            "_select_base_url_async",
+            new=AsyncMock(return_value="http://localhost:11434"),
+        ):
             await OllamaProvider.create(base_url="http://nonexistent:11434")
-        
+
         mock_async_client.assert_called_once()
-        assert mock_async_client.call_args[1]['base_url'] == "http://localhost:11434"
+        assert mock_async_client.call_args[1]["base_url"] == "http://localhost:11434"
 
 
 class TestOllamaProviderCapabilities:
     @pytest.mark.asyncio
-    @pytest.mark.usefixtures("mock_ollama_capability_detector_patterns_fixture") # Apply fixture here
+    @pytest.mark.usefixtures(
+        "mock_ollama_capability_detector_patterns_fixture"
+    )  # Apply fixture here
     async def test_discover_capabilities_success(self, mock_async_client):
         provider = OllamaProvider()
         # Configure the post return value for this specific test
         mock_async_client.return_value.post.return_value = MagicMock(
-            json=MagicMock(return_value={
-                "parameters": "some_param val\nnum_ctx 8192\nother_param",
-                "template": "tool_pattern",
-                "model_info": {} 
-            }),
+            json=MagicMock(
+                return_value={
+                    "parameters": "some_param val\nnum_ctx 8192\nother_param",
+                    "template": "tool_pattern",
+                    "model_info": {},
+                }
+            ),
             raise_for_status=MagicMock(),
-            status_code=200
+            status_code=200,
         )
 
         caps = await provider.discover_capabilities("test-model")
@@ -165,14 +185,16 @@ class TestOllamaProviderCapabilities:
         assert provider._context_window_cache["http://localhost:11434:test-model"] == 8192
 
     @pytest.mark.asyncio
-    async def test_discover_capabilities_api_failure_fallback_to_config(self, mock_async_client, mock_get_provider_limits_fixture):
+    async def test_discover_capabilities_api_failure_fallback_to_config(
+        self, mock_async_client, mock_get_provider_limits_fixture
+    ):
         provider = OllamaProvider()
         mock_async_client.return_value.post.side_effect = Exception("API error")
         mock_get_provider_limits_fixture.return_value.context_window = 4096
 
         caps = await provider.discover_capabilities("test-model")
         assert caps.context_window == 4096
-        assert caps.supports_tools is True # Default optimistic for OllamaProvider itself
+        assert caps.supports_tools is True  # Default optimistic for OllamaProvider itself
         assert caps.source == "config"
 
     def test_parse_context_window_num_ctx(self):
@@ -199,7 +221,9 @@ class TestOllamaProviderCapabilities:
         window = provider._parse_context_window(response_data)
         assert window is None
 
-    @pytest.mark.usefixtures("mock_ollama_capability_detector_patterns_fixture") # Apply fixture here
+    @pytest.mark.usefixtures(
+        "mock_ollama_capability_detector_patterns_fixture"
+    )  # Apply fixture here
     def test_detect_tool_support_true(self):
         provider = OllamaProvider()
         template = "This model supports tool_pattern calls."
@@ -209,17 +233,19 @@ class TestOllamaProviderCapabilities:
         provider = OllamaProvider()
         template = "This model does not support tools."
         # Temporarily patch TOOL_SUPPORT_PATTERNS to something that won't match
-        with patch('victor.providers.ollama_provider.TOOL_SUPPORT_PATTERNS', ['non_matching_pattern']):
+        with patch(
+            "victor.providers.ollama_provider.TOOL_SUPPORT_PATTERNS", ["non_matching_pattern"]
+        ):
             assert provider._detect_tool_support(template) is False
 
     def test_detect_tool_support_empty_template(self):
         provider = OllamaProvider()
         template = ""
-        assert provider._detect_tool_support(template) is True # Optimistic default
+        assert provider._detect_tool_support(template) is True  # Optimistic default
 
     def test_detect_tool_support_pattern_exception(self):
         provider = OllamaProvider()
-        with patch('re.search', side_effect=Exception("Regex error")):
+        with patch("re.search", side_effect=Exception("Regex error")):
             template = "tool_pattern"
             assert provider._detect_tool_support(template) is False
 
@@ -229,14 +255,16 @@ class TestOllamaProviderChat:
     async def test_chat_success(self, mock_async_client):
         provider = OllamaProvider()
         mock_async_client.return_value.post.return_value = MagicMock(
-            json=MagicMock(return_value={
-                "message": {"content": "Hello", "tool_calls": []},
-                "done_reason": "stop",
-                "prompt_eval_count": 1,
-                "eval_count": 1,
-            }),
+            json=MagicMock(
+                return_value={
+                    "message": {"content": "Hello", "tool_calls": []},
+                    "done_reason": "stop",
+                    "prompt_eval_count": 1,
+                    "eval_count": 1,
+                }
+            ),
             raise_for_status=MagicMock(),
-            status_code=200
+            status_code=200,
         )
 
         messages = [Message(role="user", content="Hi")]
@@ -248,11 +276,12 @@ class TestOllamaProviderChat:
     async def test_chat_timeout(self, mock_async_client):
         provider = OllamaProvider()
         # Mock _execute_with_circuit_breaker to raise the specific error
-        with patch.object(provider, '_execute_with_circuit_breaker', side_effect=httpx.TimeoutException("Timeout")) as mock_breaker:
+        with patch.object(
+            provider, "_execute_with_circuit_breaker", side_effect=httpx.TimeoutException("Timeout")
+        ) as mock_breaker:
             with pytest.raises(ProviderTimeoutError):
                 await provider.chat([Message(role="user", content="Hi")], model="test-model")
             mock_breaker.assert_called_once()
-
 
     @pytest.mark.asyncio
     async def test_chat_http_error(self, mock_async_client):
@@ -260,7 +289,11 @@ class TestOllamaProviderChat:
         mock_response = MagicMock(status_code=500)
         mock_response.text = "Internal Server Error"
         # Mock _execute_with_circuit_breaker to raise the specific error
-        with patch.object(provider, '_execute_with_circuit_breaker', side_effect=httpx.HTTPStatusError("Error", request=MagicMock(), response=mock_response)) as mock_breaker:
+        with patch.object(
+            provider,
+            "_execute_with_circuit_breaker",
+            side_effect=httpx.HTTPStatusError("Error", request=MagicMock(), response=mock_response),
+        ) as mock_breaker:
             with pytest.raises(ProviderError) as exc_info:
                 await provider.chat([Message(role="user", content="Hi")], model="test-model")
             assert exc_info.value.status_code == 500
@@ -274,14 +307,13 @@ class TestOllamaProviderChat:
 
         # First call fails due to tools not supported
         mock_response_400 = MagicMock(status_code=400, text="model does not support tools")
-        mock_error_400 = httpx.HTTPStatusError("Error", request=MagicMock(), response=mock_response_400)
+        mock_error_400 = httpx.HTTPStatusError(
+            "Error", request=MagicMock(), response=mock_response_400
+        )
 
         # Second call succeeds without tools
-        mock_response_200 = MagicMock(
-            raise_for_status=MagicMock(),
-            status_code=200
-        )
-        mock_response_200.json.return_value = { # Corrected json mocking
+        mock_response_200 = MagicMock(raise_for_status=MagicMock(), status_code=200)
+        mock_response_200.json.return_value = {  # Corrected json mocking
             "message": {"content": "Fallback response", "tool_calls": []},
             "done_reason": "stop",
             "prompt_eval_count": 1,
@@ -290,37 +322,43 @@ class TestOllamaProviderChat:
 
         # Patch _execute_with_circuit_breaker to return the responses
         # For async patching with side_effect list: exceptions are raised, values are returned directly
-        with patch.object(provider, '_execute_with_circuit_breaker', side_effect=[
-            mock_error_400,   # First call raises this exception
-            mock_response_200  # Second call returns this value directly
-        ]) as mock_breaker:
+        with patch.object(
+            provider,
+            "_execute_with_circuit_breaker",
+            side_effect=[
+                mock_error_400,  # First call raises this exception
+                mock_response_200,  # Second call returns this value directly
+            ],
+        ) as mock_breaker:
             response = await provider.chat(messages, model="test-model", tools=tools)
             assert response.content == "Fallback response"
             assert "test-model" in provider._models_without_tools  # Model should be cached
             assert mock_breaker.call_count == 2
             # Check that the second call had tools=None
             # _execute_with_circuit_breaker is called as: (callable, path, json=payload)
-            second_call_payload = mock_breaker.call_args_list[1].kwargs['json']
-            assert second_call_payload.get('tools') is None
+            second_call_payload = mock_breaker.call_args_list[1].kwargs["json"]
+            assert second_call_payload.get("tools") is None
 
     @pytest.mark.asyncio
     async def test_chat_tool_call_from_content_fallback(self, mock_async_client):
         provider = OllamaProvider()
         mock_async_client.return_value.post.return_value = MagicMock(
-            json=MagicMock(return_value={
-                "message": {"content": '{"name": "test_tool", "arguments": {"a": 1}}'},
-                "done_reason": "tool_code",
-                "prompt_eval_count": 1,
-                "eval_count": 1,
-            }),
+            json=MagicMock(
+                return_value={
+                    "message": {"content": '{"name": "test_tool", "arguments": {"a": 1}}'},
+                    "done_reason": "tool_code",
+                    "prompt_eval_count": 1,
+                    "eval_count": 1,
+                }
+            ),
             raise_for_status=MagicMock(),
-            status_code=200
+            status_code=200,
         )
 
         messages = [Message(role="user", content="Hi")]
         response = await provider.chat(messages, model="test-model")
-        assert response.content == "" # Content should be cleared
-        assert response.tool_calls[0]['name'] == 'test_tool'
+        assert response.content == ""  # Content should be cleared
+        assert response.tool_calls[0]["name"] == "test_tool"
 
 
 class TestOllamaProviderStream:
@@ -328,11 +366,15 @@ class TestOllamaProviderStream:
     async def test_stream_success(self, mock_async_client):
         provider = OllamaProvider()
         # Configure the mock_stream_response directly
-        mock_stream_response_obj = mock_async_client.return_value.stream.return_value.__aenter__.return_value
-        mock_stream_response_obj.aiter_lines.return_value = async_line_generator([ # Using the helper for async generator
-            '{"message": {"content": "Hello "}}',
-            '{"message": {"content": "world"}, "done": true, "done_reason": "stop", "model": "test-model"}'
-        ])
+        mock_stream_response_obj = (
+            mock_async_client.return_value.stream.return_value.__aenter__.return_value
+        )
+        mock_stream_response_obj.aiter_lines.return_value = async_line_generator(
+            [  # Using the helper for async generator
+                '{"message": {"content": "Hello "}}',
+                '{"message": {"content": "world"}, "done": true, "done_reason": "stop", "model": "test-model"}',
+            ]
+        )
 
         messages = [Message(role="user", content="Hi")]
         chunks = [chunk async for chunk in provider.stream(messages, model="test-model")]
@@ -354,10 +396,14 @@ class TestOllamaProviderStream:
     @pytest.mark.asyncio
     async def test_stream_http_error(self, mock_async_client):
         provider = OllamaProvider()
-        mock_stream_response_obj = mock_async_client.return_value.stream.return_value.__aenter__.return_value
+        mock_stream_response_obj = (
+            mock_async_client.return_value.stream.return_value.__aenter__.return_value
+        )
         mock_stream_response_obj.status_code = 500
         mock_stream_response_obj.aread.return_value = b"Internal Server Error"
-        mock_stream_response_obj.raise_for_status.side_effect = httpx.HTTPStatusError("Error", request=MagicMock(), response=mock_stream_response_obj)
+        mock_stream_response_obj.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Error", request=MagicMock(), response=mock_stream_response_obj
+        )
 
         messages = [Message(role="user", content="Hi")]
         with pytest.raises(ProviderError):
@@ -372,39 +418,49 @@ class TestOllamaProviderStream:
 
         # Mock responses for the side_effect sequence
         mock_error_response_400 = MagicMock(status_code=400)
-        mock_error_response_400.aread = AsyncMock(return_value=b"model does not support tools") 
-        mock_error_response_400.raise_for_status.side_effect = httpx.HTTPStatusError("Tools unsupported", request=MagicMock(), response=mock_error_response_400)
+        mock_error_response_400.aread = AsyncMock(return_value=b"model does not support tools")
+        mock_error_response_400.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Tools unsupported", request=MagicMock(), response=mock_error_response_400
+        )
 
-        mock_success_response_200 = MagicMock(status_code=200) 
-        mock_success_response_200.aiter_lines.return_value = async_line_generator([ # Set return_value here
+        mock_success_response_200 = MagicMock(status_code=200)
+        mock_success_response_200.aiter_lines.return_value = async_line_generator(
+            [  # Set return_value here
                 '{"message": {"content": "Retry success"}, "done": true, "model": "test-model"}'
-            ])
+            ]
+        )
         mock_success_response_200.raise_for_status.return_value = None
-        mock_success_response_200.aread = AsyncMock(return_value=b"") 
+        mock_success_response_200.aread = AsyncMock(return_value=b"")
 
         mock_async_client.return_value.stream.side_effect = [
             AsyncMock(__aenter__=AsyncMock(return_value=mock_error_response_400)),
-            AsyncMock(__aenter__=AsyncMock(return_value=mock_success_response_200))
+            AsyncMock(__aenter__=AsyncMock(return_value=mock_success_response_200)),
         ]
 
-        chunks = [chunk async for chunk in provider.stream(messages, model="test-model", tools=tools)]
+        chunks = [
+            chunk async for chunk in provider.stream(messages, model="test-model", tools=tools)
+        ]
         assert chunks[0].content == "Retry success"
         assert "test-model" in provider._models_without_tools
 
         assert mock_async_client.return_value.stream.call_count == 2
         second_call_kwargs = mock_async_client.return_value.stream.call_args_list[1].kwargs
         # When tools=None, the key may not be present at all, or it may be None
-        assert second_call_kwargs['json'].get('tools') is None
+        assert second_call_kwargs["json"].get("tools") is None
 
     @pytest.mark.asyncio
     async def test_stream_json_decode_error(self, mock_async_client):
         provider = OllamaProvider()
-        mock_stream_response = mock_async_client.return_value.stream.return_value.__aenter__.return_value
-        mock_stream_response.aiter_lines.return_value = async_line_generator([ # Set return_value here
-            '{"message": {"content": "Hello "}}',
-            'INVALID JSON LINE',  # This should cause JSONDecodeError
-            '{"message": {"content": "world"}, "done": true, "done_reason": "stop", "model": "test-model"}'
-        ])
+        mock_stream_response = (
+            mock_async_client.return_value.stream.return_value.__aenter__.return_value
+        )
+        mock_stream_response.aiter_lines.return_value = async_line_generator(
+            [  # Set return_value here
+                '{"message": {"content": "Hello "}}',
+                "INVALID JSON LINE",  # This should cause JSONDecodeError
+                '{"message": {"content": "world"}, "done": true, "done_reason": "stop", "model": "test-model"}',
+            ]
+        )
 
         messages = [Message(role="user", content="Hi")]
         chunks = [chunk async for chunk in provider.stream(messages, model="test-model")]
@@ -415,17 +471,21 @@ class TestOllamaProviderStream:
     @pytest.mark.asyncio
     async def test_stream_tool_call_from_content_fallback(self, mock_async_client):
         provider = OllamaProvider()
-        mock_stream_response = mock_async_client.return_value.stream.return_value.__aenter__.return_value
-        mock_stream_response.aiter_lines.return_value = async_line_generator([ # Set return_value here
-            '{"message": {"content": ""}}',
-            # Inner JSON must have escaped quotes for the outer JSON to be valid
-            '{"message": {"content": "{\\"name\\": \\"test_tool\\", \\"arguments\\": {\\"a\\": 1}}"}, "done": true, "model": "test-model"}'
-        ])
+        mock_stream_response = (
+            mock_async_client.return_value.stream.return_value.__aenter__.return_value
+        )
+        mock_stream_response.aiter_lines.return_value = async_line_generator(
+            [  # Set return_value here
+                '{"message": {"content": ""}}',
+                # Inner JSON must have escaped quotes for the outer JSON to be valid
+                '{"message": {"content": "{\\"name\\": \\"test_tool\\", \\"arguments\\": {\\"a\\": 1}}"}, "done": true, "model": "test-model"}',
+            ]
+        )
         messages = [Message(role="user", content="Hi")]
         chunks = [chunk async for chunk in provider.stream(messages, model="test-model")]
-        assert len(chunks) == 2 # First is empty, second is tool call
-        assert chunks[1].content == "" # Content cleared
-        assert chunks[1].tool_calls[0]['name'] == 'test_tool'
+        assert len(chunks) == 2  # First is empty, second is tool call
+        assert chunks[1].content == ""  # Content cleared
+        assert chunks[1].tool_calls[0]["name"] == "test_tool"
 
 
 class TestOllamaProviderUtilityMethods:
@@ -433,7 +493,12 @@ class TestOllamaProviderUtilityMethods:
         provider = OllamaProvider()
         messages = [Message(role="user", content="Test message")]
         payload = provider._build_request_payload(
-            messages=messages, model="test-model", temperature=0.7, max_tokens=100, tools=None, stream=False
+            messages=messages,
+            model="test-model",
+            temperature=0.7,
+            max_tokens=100,
+            tools=None,
+            stream=False,
         )
         assert "tools" not in payload
         assert payload["messages"][0]["content"] == "Test message"
@@ -443,7 +508,12 @@ class TestOllamaProviderUtilityMethods:
         messages = [Message(role="user", content="Test message")]
         tools = [ToolDefinition(name="get_weather", description="Weather tool", parameters={})]
         payload = provider._build_request_payload(
-            messages=messages, model="test-model", temperature=0.7, max_tokens=100, tools=tools, stream=True
+            messages=messages,
+            model="test-model",
+            temperature=0.7,
+            max_tokens=100,
+            tools=tools,
+            stream=True,
         )
         assert "tools" in payload
         assert payload["tools"][0]["function"]["name"] == "get_weather"
@@ -501,11 +571,11 @@ class TestOllamaProviderUtilityMethods:
         chunk_data = {
             "message": {"content": '{"name": "tool", "parameters": {"p": 1}}'},
             "done": True,
-            "model": "test-model"
+            "model": "test-model",
         }
         chunk = provider._parse_stream_chunk(chunk_data)
         assert chunk.content == ""
-        assert chunk.tool_calls[0]['name'] == 'tool'
+        assert chunk.tool_calls[0]["name"] == "tool"
         assert chunk.is_final is True
 
     @pytest.mark.asyncio
@@ -514,7 +584,7 @@ class TestOllamaProviderUtilityMethods:
         mock_async_client.return_value.get.return_value = MagicMock(
             json=MagicMock(return_value={"models": [{"name": "llama2"}]}),
             raise_for_status=MagicMock(),
-            status_code=200
+            status_code=200,
         )
 
         models = await provider.list_models()
@@ -533,11 +603,12 @@ class TestOllamaProviderUtilityMethods:
     async def test_pull_model_success(self, mock_async_client):
         provider = OllamaProvider()
         # Get the mock_stream_response from the fixture setup
-        mock_stream_response = mock_async_client.return_value.stream.return_value.__aenter__.return_value
-        mock_stream_response.aiter_lines.return_value = async_line_generator([
-            '{"status": "pulling"}',
-            '{"status": "success"}'
-        ])
+        mock_stream_response = (
+            mock_async_client.return_value.stream.return_value.__aenter__.return_value
+        )
+        mock_stream_response.aiter_lines.return_value = async_line_generator(
+            ['{"status": "pulling"}', '{"status": "success"}']
+        )
         progress_updates = [update async for update in provider.pull_model("llama2")]
         assert len(progress_updates) == 2
         assert progress_updates[0]["status"] == "pulling"

@@ -229,9 +229,7 @@ class TestPromptTemplateLearner:
         assert rec.sample_size == 0
         assert "value" in rec.value or isinstance(rec.value, dict)
 
-    def test_get_recommendation_returns_template(
-        self, learner: PromptTemplateLearner
-    ) -> None:
+    def test_get_recommendation_returns_template(self, learner: PromptTemplateLearner) -> None:
         """Test recommendation returns valid template."""
         rec = learner.get_recommendation(
             provider="anthropic",
@@ -244,9 +242,7 @@ class TestPromptTemplateLearner:
         assert template.style in PromptStyle
         assert all(e in PromptElement for e in template.elements)
 
-    def test_record_outcome_updates_posteriors(
-        self, learner: PromptTemplateLearner
-    ) -> None:
+    def test_record_outcome_updates_posteriors(self, learner: PromptTemplateLearner) -> None:
         """Test recording outcome updates posteriors."""
         # First, get a recommendation to establish context
         learner.get_recommendation(
@@ -271,9 +267,7 @@ class TestPromptTemplateLearner:
         context_key = ("analysis", "anthropic")
         assert learner._sample_counts.get(context_key, 0) > 0
 
-    def test_record_outcome_with_template(
-        self, learner: PromptTemplateLearner
-    ) -> None:
+    def test_record_outcome_with_template(self, learner: PromptTemplateLearner) -> None:
         """Test recording outcome with explicit template."""
         template = PromptTemplate(
             style=PromptStyle.COT,
@@ -294,9 +288,7 @@ class TestPromptTemplateLearner:
         key = ("debugging", "openai", "cot")
         assert key in learner._style_posteriors
 
-    def test_get_template_convenience(
-        self, learner: PromptTemplateLearner
-    ) -> None:
+    def test_get_template_convenience(self, learner: PromptTemplateLearner) -> None:
         """Test get_template convenience method."""
         template = learner.get_template(
             task_type="code_generation",
@@ -306,9 +298,7 @@ class TestPromptTemplateLearner:
         assert isinstance(template, PromptTemplate)
         assert template.style in PromptStyle
 
-    def test_get_style_probabilities(
-        self, learner: PromptTemplateLearner
-    ) -> None:
+    def test_get_style_probabilities(self, learner: PromptTemplateLearner) -> None:
         """Test getting style probabilities."""
         # Record some outcomes to establish posteriors
         for i in range(5):
@@ -318,11 +308,7 @@ class TestPromptTemplateLearner:
                 task_type="analysis",
                 success=True,
                 quality_score=0.8,
-                metadata={
-                    "template_used": PromptTemplate(
-                        style=PromptStyle.STRUCTURED
-                    ).to_dict()
-                },
+                metadata={"template_used": PromptTemplate(style=PromptStyle.STRUCTURED).to_dict()},
             )
             learner.record_outcome(outcome)
 
@@ -333,9 +319,7 @@ class TestPromptTemplateLearner:
         # Should have all styles
         assert len(probs) == len(PromptStyle)
 
-    def test_get_element_probabilities(
-        self, learner: PromptTemplateLearner
-    ) -> None:
+    def test_get_element_probabilities(self, learner: PromptTemplateLearner) -> None:
         """Test getting element probabilities."""
         probs = learner.get_element_probabilities("analysis", "anthropic")
 
@@ -365,9 +349,7 @@ class TestPromptTemplateLearner:
 class TestPromptTemplateLearnerPersistence:
     """Tests for database persistence."""
 
-    def test_state_persists_to_database(
-        self, learner: PromptTemplateLearner
-    ) -> None:
+    def test_state_persists_to_database(self, learner: PromptTemplateLearner) -> None:
         """Test state is saved to database."""
         template = PromptTemplate(
             style=PromptStyle.DETAILED,

@@ -57,7 +57,9 @@ class ContinuationStrategy:
         self._event_bus = event_bus or EventBus.get_instance()
 
     @staticmethod
-    def detect_mentioned_tools(text: str, all_tool_names: List[str], tool_aliases: Dict[str, str]) -> List[str]:
+    def detect_mentioned_tools(
+        text: str, all_tool_names: List[str], tool_aliases: Dict[str, str]
+    ) -> List[str]:
         """Detect tool names mentioned in text that model said it would call.
 
         Looks for patterns like:
@@ -245,10 +247,7 @@ class ContinuationStrategy:
                 ("default", max_cont_default),
             ]:
                 recommendation = rl_coordinator.get_recommendation(
-                    "continuation_prompts",
-                    provider_name,
-                    model,
-                    task_type_name
+                    "continuation_prompts", provider_name, model, task_type_name
                 )
                 if recommendation and recommendation.value is not None:
                     learned_val = recommendation.value
@@ -281,12 +280,12 @@ class ContinuationStrategy:
             else (max_cont_action if is_action_task else max_cont_default)
         )
 
-        # Budget/iteration thresholds
-        budget_threshold = (
+        # Budget/iteration thresholds (reserved for future use)
+        _budget_threshold = (
             tool_budget // 4 if requires_continuation_support else tool_budget // 2
-        )
+        )  # noqa: F841
         max_iterations = unified_tracker_config.get("max_total_iterations", 50)
-        iteration_threshold = (
+        _iteration_threshold = (  # noqa: F841
             max_iterations * 3 // 4 if requires_continuation_support else max_iterations // 2
         )
 
@@ -427,7 +426,11 @@ class ContinuationStrategy:
                 unit="count",
                 tags={
                     "max_prompts": str(max_continuation_prompts),
-                    "task_type": "analysis" if is_analysis_task else ("action" if is_action_task else "default"),
+                    "task_type": (
+                        "analysis"
+                        if is_analysis_task
+                        else ("action" if is_action_task else "default")
+                    ),
                 },
             )
             # Emit STATE event for summary request

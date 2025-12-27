@@ -86,16 +86,12 @@ class ErrorRecoveryHandler(ABC):
         return handler
 
     @abstractmethod
-    def can_handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> bool:
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
         """Check if this handler can handle the error."""
         pass
 
     @abstractmethod
-    def handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> RecoveryResult:
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
         """Handle the error and return recovery result."""
         pass
 
@@ -117,9 +113,7 @@ class ErrorRecoveryHandler(ABC):
         elif self._next_handler:
             return self._next_handler.process(error, tool_name, args, context)
         else:
-            self._logger.warning(
-                f"No handler could process error for {tool_name}: {error}"
-            )
+            self._logger.warning(f"No handler could process error for {tool_name}: {error}")
             return RecoveryResult(
                 action=RecoveryAction.ABORT,
                 user_message=f"Unrecoverable error in {tool_name}: {error}",
@@ -150,9 +144,7 @@ class MissingParameterHandler(ErrorRecoveryHandler):
         r"missing required argument[s]?: (\w+)",
     ]
 
-    def can_handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> bool:
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
         error_str = str(error).lower()
         # Check for various missing parameter/argument patterns
         has_missing = "missing" in error_str
@@ -176,9 +168,7 @@ class MissingParameterHandler(ErrorRecoveryHandler):
 
         return False
 
-    def handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> RecoveryResult:
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
         # Extract missing parameter from error message
         error_str = str(error)
         param_name = None
@@ -225,19 +215,13 @@ class ToolNotFoundHandler(ErrorRecoveryHandler):
         "analyze_dependencies": "grep",
     }
 
-    def can_handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> bool:
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
         error_str = str(error).lower()
         return (
-            "not found" in error_str
-            or "unknown tool" in error_str
-            or "unregistered" in error_str
+            "not found" in error_str or "unknown tool" in error_str or "unregistered" in error_str
         )
 
-    def handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> RecoveryResult:
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
         if tool_name in self.FALLBACKS:
             fallback = self.FALLBACKS[tool_name]
             self._logger.info(f"Falling back from {tool_name} to {fallback}")
@@ -268,15 +252,11 @@ class NetworkErrorHandler(ErrorRecoveryHandler):
         "certificate",
     ]
 
-    def can_handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> bool:
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
         error_str = str(error).lower()
         return any(pattern in error_str for pattern in self.NETWORK_ERROR_PATTERNS)
 
-    def handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> RecoveryResult:
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
         return RecoveryResult(
             action=RecoveryAction.RETRY,
             max_retries=3,
@@ -288,9 +268,7 @@ class NetworkErrorHandler(ErrorRecoveryHandler):
 class FileNotFoundHandler(ErrorRecoveryHandler):
     """Handle file not found errors by attempting path variations."""
 
-    def can_handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> bool:
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
         # Check error class first
         if isinstance(error, FileNotFoundError):
             return True
@@ -301,9 +279,7 @@ class FileNotFoundHandler(ErrorRecoveryHandler):
             or "does not exist" in error_str
         )
 
-    def handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> RecoveryResult:
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
         # Try common path variations
         path = args.get("path") or args.get("file_path") or args.get("file")
 
@@ -321,7 +297,7 @@ class FileNotFoundHandler(ErrorRecoveryHandler):
 
         return RecoveryResult(
             action=RecoveryAction.SKIP,
-            user_message=f"File not found and no alternatives discovered",
+            user_message="File not found and no alternatives discovered",
         )
 
     def _get_path_variations(self, path: str) -> List[str]:
@@ -359,15 +335,11 @@ class RateLimitHandler(ErrorRecoveryHandler):
         "quota exceeded",
     ]
 
-    def can_handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> bool:
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
         error_str = str(error).lower()
         return any(pattern in error_str for pattern in self.RATE_LIMIT_PATTERNS)
 
-    def handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> RecoveryResult:
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
         # Extract retry-after if present
         retry_after = 5.0  # default
         match = re.search(r"retry.after[:\s]*(\d+)", str(error), re.IGNORECASE)
@@ -385,9 +357,7 @@ class RateLimitHandler(ErrorRecoveryHandler):
 class PermissionErrorHandler(ErrorRecoveryHandler):
     """Handle permission errors."""
 
-    def can_handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> bool:
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
         # Check error class first
         if isinstance(error, PermissionError):
             return True
@@ -398,9 +368,7 @@ class PermissionErrorHandler(ErrorRecoveryHandler):
             or "forbidden" in error_str
         )
 
-    def handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> RecoveryResult:
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
         # For permission errors, we typically can't recover automatically
         return RecoveryResult(
             action=RecoveryAction.ASK_USER,
@@ -411,14 +379,10 @@ class PermissionErrorHandler(ErrorRecoveryHandler):
 class TypeErrorHandler(ErrorRecoveryHandler):
     """Handle type errors in tool arguments."""
 
-    def can_handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> bool:
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
         return isinstance(error, TypeError) or "type" in str(error).lower()
 
-    def handle(
-        self, error: Exception, tool_name: str, args: Dict[str, Any]
-    ) -> RecoveryResult:
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
         # Try to fix common type issues
         modified_args = dict(args)
         fixed = False

@@ -193,7 +193,8 @@ class TestToolOutputFormatter:
         config = ToolOutputFormatterConfig(file_structure_threshold=100)
         formatter = ToolOutputFormatter(config=config)
 
-        large_content = """class MyClass:
+        large_content = (
+            """class MyClass:
     def method1(self):
         pass
     def method2(self):
@@ -201,7 +202,9 @@ class TestToolOutputFormatter:
 
 def helper_function():
     pass
-""" * 50
+"""
+            * 50
+        )
         result = formatter.format_tool_output(
             tool_name="read_file",
             args={"path": "/path/to/file.py"},
@@ -496,9 +499,7 @@ class TestGetStatusMessage:
     def test_status_execute_bash(self):
         """Test status message for execute_bash."""
         formatter = ToolOutputFormatter()
-        result = formatter.get_status_message(
-            "execute_bash", {"command": "ls -la /home"}
-        )
+        result = formatter.get_status_message("execute_bash", {"command": "ls -la /home"})
         assert "Running execute_bash" in result
         assert "ls -la /home" in result
         assert "🔧" in result
@@ -534,9 +535,7 @@ class TestGetStatusMessage:
     def test_status_edit_files_single(self):
         """Test status message for edit_files with single file."""
         formatter = ToolOutputFormatter()
-        result = formatter.get_status_message(
-            "edit_files", {"files": [{"path": "file1.py"}]}
-        )
+        result = formatter.get_status_message("edit_files", {"files": [{"path": "file1.py"}]})
         assert "Editing" in result
         assert "file1.py" in result
 
@@ -545,13 +544,15 @@ class TestGetStatusMessage:
         formatter = ToolOutputFormatter()
         result = formatter.get_status_message(
             "edit_files",
-            {"files": [
-                {"path": "a.py"},
-                {"path": "b.py"},
-                {"path": "c.py"},
-                {"path": "d.py"},
-                {"path": "e.py"},
-            ]},
+            {
+                "files": [
+                    {"path": "a.py"},
+                    {"path": "b.py"},
+                    {"path": "c.py"},
+                    {"path": "d.py"},
+                    {"path": "e.py"},
+                ]
+            },
         )
         assert "Editing" in result
         assert "+2 more" in result  # Shows overflow
@@ -662,27 +663,21 @@ class TestEdgeCases:
     def test_newlines_in_output(self):
         """Test output with many newlines."""
         formatter = ToolOutputFormatter()
-        result = formatter.format_tool_output(
-            "test", {}, "line1\nline2\nline3\n"
-        )
+        result = formatter.format_tool_output("test", {}, "line1\nline2\nline3\n")
         assert "line1" in result
         assert "line3" in result
 
     def test_unicode_output(self):
         """Test output with unicode characters."""
         formatter = ToolOutputFormatter()
-        result = formatter.format_tool_output(
-            "test", {}, "Hello 世界 🌍 café"
-        )
+        result = formatter.format_tool_output("test", {}, "Hello 世界 🌍 café")
         assert "世界" in result
         assert "🌍" in result
 
     def test_special_xml_chars_in_output(self):
         """Test output with XML special characters."""
         formatter = ToolOutputFormatter()
-        result = formatter.format_tool_output(
-            "test", {}, "<div>test</div>"
-        )
+        result = formatter.format_tool_output("test", {}, "<div>test</div>")
         assert "<div>test</div>" in result
 
     def test_exact_max_chars_boundary(self):

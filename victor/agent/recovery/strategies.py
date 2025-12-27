@@ -140,7 +140,9 @@ class BaseRecoveryStrategy:
             state_key = context.to_state_key()
             reward = 1.0 if success else -0.5
             # Convert enum to string name for Q-learning store
-            action_key = result.action.name if hasattr(result.action, 'name') else str(result.action)
+            action_key = (
+                result.action.name if hasattr(result.action, "name") else str(result.action)
+            )
             self._q_store.update_q_value(state_key, action_key, reward)
 
 

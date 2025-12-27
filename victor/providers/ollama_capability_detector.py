@@ -68,25 +68,29 @@ class ModelToolSupport:
 
 # Known low-reliability models - these have .Tools template but don't work well
 # Based on testing with Victor's tool calling system
-LOW_RELIABILITY_MODELS = frozenset([
-    # Llama 3.3 often describes tools in prose but doesn't actually call them
-    "llama3.3",
-    "llama-3.3",
-    # DeepSeek R1 produces truncated JSON like {"tool_call": }
-    "deepseek-r1",
-    # Qwen 2.5 Coder may output PARAMETER syntax instead of JSON
-    "qwen2.5-coder",
-    "qwen25-coder",  # Shorthand naming
-])
+LOW_RELIABILITY_MODELS = frozenset(
+    [
+        # Llama 3.3 often describes tools in prose but doesn't actually call them
+        "llama3.3",
+        "llama-3.3",
+        # DeepSeek R1 produces truncated JSON like {"tool_call": }
+        "deepseek-r1",
+        # Qwen 2.5 Coder may output PARAMETER syntax instead of JSON
+        "qwen2.5-coder",
+        "qwen25-coder",  # Shorthand naming
+    ]
+)
 
 # High-reliability models - tested and work well
-HIGH_RELIABILITY_MODELS = frozenset([
-    # Qwen3 Coder with tools template works reliably
-    "qwen3-coder-tools",
-    "qwen3-coder",
-    # Base Qwen3 also works well
-    "qwen3",
-])
+HIGH_RELIABILITY_MODELS = frozenset(
+    [
+        # Qwen3 Coder with tools template works reliably
+        "qwen3-coder-tools",
+        "qwen3-coder",
+        # Base Qwen3 also works well
+        "qwen3",
+    ]
+)
 
 
 class OllamaCapabilityDetector:

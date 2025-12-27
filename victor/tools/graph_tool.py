@@ -795,17 +795,19 @@ class GraphAnalyzer:
             else:
                 role = "isolated"
 
-            results.append({
-                "rank": i + 1,
-                "module": module,
-                "score": round(score, 6),
-                "role": role,
-                "in_edges": in_edges,
-                "out_edges": out_edges,
-                "imports_from": in_modules,  # Modules that call/import this
-                "depends_on": out_modules,  # Modules this calls/imports
-                "symbols_count": len(module_to_nodes.get(module, set())),
-            })
+            results.append(
+                {
+                    "rank": i + 1,
+                    "module": module,
+                    "score": round(score, 6),
+                    "role": role,
+                    "in_edges": in_edges,
+                    "out_edges": out_edges,
+                    "imports_from": in_modules,  # Modules that call/import this
+                    "depends_on": out_modules,  # Modules this calls/imports
+                    "symbols_count": len(module_to_nodes.get(module, set())),
+                }
+            )
 
         return results
 
@@ -857,17 +859,19 @@ class GraphAnalyzer:
             else:
                 coupling = "normal"
 
-            results.append({
-                "rank": i + 1,
-                "module": module,
-                "total_degree": total,
-                "in_degree": in_deg,
-                "out_degree": out_deg,
-                "coupling_pattern": coupling,
-                "unique_importers": len(incoming.get(module, {})),
-                "unique_dependencies": len(outgoing.get(module, {})),
-                "symbols_count": len(module_to_nodes.get(module, set())),
-            })
+            results.append(
+                {
+                    "rank": i + 1,
+                    "module": module,
+                    "total_degree": total,
+                    "in_degree": in_deg,
+                    "out_degree": out_deg,
+                    "coupling_pattern": coupling,
+                    "unique_importers": len(incoming.get(module, {})),
+                    "unique_dependencies": len(outgoing.get(module, {})),
+                    "symbols_count": len(module_to_nodes.get(module, set())),
+                }
+            )
 
         return results
 
@@ -942,11 +946,13 @@ class GraphAnalyzer:
                     node = resolved_target
                     while node != resolved_source:
                         p, count = parent[node]
-                        path.append({
-                            "from": p,
-                            "to": node,
-                            "edge_count": count,
-                        })
+                        path.append(
+                            {
+                                "from": p,
+                                "to": node,
+                                "edge_count": count,
+                            }
+                        )
                         node = p
                     path.reverse()
                     return {
@@ -974,31 +980,35 @@ class GraphAnalyzer:
         # No target - show all outgoing flows from source
         direct_deps = []
         for target_mod, count in sorted(
-            outgoing.get(resolved_source, {}).items(),
-            key=lambda x: -x[1]
+            outgoing.get(resolved_source, {}).items(), key=lambda x: -x[1]
         ):
-            direct_deps.append({
-                "module": target_mod,
-                "edge_count": count,
-                "symbols_in_target": len(module_to_nodes.get(target_mod, set())),
-            })
+            direct_deps.append(
+                {
+                    "module": target_mod,
+                    "edge_count": count,
+                    "symbols_in_target": len(module_to_nodes.get(target_mod, set())),
+                }
+            )
 
         direct_importers = []
         for src_mod, count in sorted(
-            incoming.get(resolved_source, {}).items(),
-            key=lambda x: -x[1]
+            incoming.get(resolved_source, {}).items(), key=lambda x: -x[1]
         ):
-            direct_importers.append({
-                "module": src_mod,
-                "edge_count": count,
-                "symbols_in_source": len(module_to_nodes.get(src_mod, set())),
-            })
+            direct_importers.append(
+                {
+                    "module": src_mod,
+                    "edge_count": count,
+                    "symbols_in_source": len(module_to_nodes.get(src_mod, set())),
+                }
+            )
 
         # Find transitive dependencies (2-hop)
         transitive_deps: Dict[str, int] = defaultdict(int)
         for direct in outgoing.get(resolved_source, {}):
             for transitive, count in outgoing.get(direct, {}).items():
-                if transitive != resolved_source and transitive not in outgoing.get(resolved_source, {}):
+                if transitive != resolved_source and transitive not in outgoing.get(
+                    resolved_source, {}
+                ):
                     transitive_deps[transitive] += count
 
         return {
@@ -1164,8 +1174,11 @@ async def _load_graph(graph_store: GraphStoreProtocol) -> GraphAnalyzer:
     ],
     stages=["initial", "planning", "reading", "analysis"],  # Rapid discovery in early stages
     mandatory_keywords=[
-        "analyze codebase", "codebase analysis", "architecture",
-        "analyze dependencies", "dependency graph",
+        "analyze codebase",
+        "codebase analysis",
+        "architecture",
+        "analyze dependencies",
+        "dependency graph",
     ],  # From MANDATORY_TOOL_KEYWORDS
 )
 async def graph(
@@ -1359,7 +1372,10 @@ async def graph(
                     continue
                 in_edges = analyzer.incoming.get(nid, [])
                 out_edges = analyzer.outgoing.get(nid, [])
-                edge_count = lambda et, edges: len([e for e in edges if e[1] == et])
+
+                def edge_count(et: str, edges: list) -> int:
+                    return len([e for e in edges if e[1] == et])
+
                 item["edge_counts"] = {
                     "calls_in": edge_count("CALLS", in_edges) if include_calls else 0,
                     "calls_out": edge_count("CALLS", out_edges) if include_calls else 0,
@@ -1430,13 +1446,18 @@ async def graph(
                         resolved_node = nid
                         break
 
-            if mode not in ("pagerank", "centrality", "stats", "module_pagerank", "module_centrality") and not resolved_node:
+            if (
+                mode
+                not in ("pagerank", "centrality", "stats", "module_pagerank", "module_centrality")
+                and not resolved_node
+            ):
                 # Enhanced fuzzy matching with multiple strategies (SOLID: Strategy Pattern)
                 node_lower = node.lower()
 
                 # Strategy 1: Substring match in name
-                name_matches = [(nid, n) for nid, n in analyzer.nodes.items()
-                               if node_lower in n.name.lower()]
+                name_matches = [
+                    (nid, n) for nid, n in analyzer.nodes.items() if node_lower in n.name.lower()
+                ]
 
                 # Strategy 2: Match against file path (e.g., "DatabaseSchema" matches database_schema.py)
                 # Normalize search term: "DatabaseSchema" -> "database_schema" or "database-schema"
@@ -1446,14 +1467,23 @@ async def graph(
                         normalized_search += "_"
                     normalized_search += c.lower()
 
-                file_matches = [(nid, n) for nid, n in analyzer.nodes.items()
-                               if n.file and (normalized_search in n.file.lower() or
-                                             node_lower.replace("_", "") in n.file.lower().replace("_", ""))]
+                file_matches = [
+                    (nid, n)
+                    for nid, n in analyzer.nodes.items()
+                    if n.file
+                    and (
+                        normalized_search in n.file.lower()
+                        or node_lower.replace("_", "") in n.file.lower().replace("_", "")
+                    )
+                ]
 
                 # Strategy 3: Partial word match for CamelCase or snake_case variations
                 snake_case_search = normalized_search  # Already converted above
-                partial_matches = [(nid, n) for nid, n in analyzer.nodes.items()
-                                  if snake_case_search in n.name.lower().replace("_", "")]
+                partial_matches = [
+                    (nid, n)
+                    for nid, n in analyzer.nodes.items()
+                    if snake_case_search in n.name.lower().replace("_", "")
+                ]
 
                 # Combine and deduplicate (prioritize name matches)
                 all_matches: Dict[str, GraphNode] = {}
@@ -1477,7 +1507,7 @@ async def graph(
                                 {"name": m.name, "type": m.type, "file": m.file}
                                 for m in list(all_matches.values())[:10]
                             ],
-                            "hint": f"Use the exact symbol name from suggestions. For file-level analysis, try: graph(mode='file_deps', file='{list(unique_files)[0]}')"
+                            "hint": f"Use the exact symbol name from suggestions. For file-level analysis, try: graph(mode='file_deps', file='{list(unique_files)[0]}')",
                         }
                     else:
                         return {
@@ -1491,7 +1521,7 @@ async def graph(
                 if not resolved_node:
                     return {
                         "error": f"Node '{node}' not found in graph",
-                        "hint": "Try using graph(mode='find', query='your_search_term') to discover available symbols, or graph(mode='file_deps', file='filename.py') for file-level analysis."
+                        "hint": "Try using graph(mode='find', query='your_search_term') to discover available symbols, or graph(mode='file_deps', file='filename.py') for file-level analysis.",
                     }
 
         resolved_target = None
@@ -1570,9 +1600,7 @@ async def graph(
                     for n in neighs:
                         if _skip_path(n.get("file")):
                             continue
-                        neighbor_calls.append(
-                            {"name": n.get("name"), "file": n.get("file")}
-                        )
+                        neighbor_calls.append({"name": n.get("name"), "file": n.get("file")})
                 impact["callsites"] = neighbor_calls[:max_callsites]
                 if include_neighbors:
                     impact["neighbors"] = {
@@ -1701,7 +1729,7 @@ async def graph(
                 module_name = r.get("module")
                 if _skip_path(module_name):
                     continue
-                in_edges = sum(incoming_modules.get(module_name, {}).values())
+                _in_edges = sum(incoming_modules.get(module_name, {}).values())  # noqa: F841
                 out_edges = sum(outgoing_modules.get(module_name, {}).values())
                 # Merge aggregated counts with aggregate totals
                 edge_counts = module_edge_counts.get(module_name, {}).copy()
@@ -1716,7 +1744,9 @@ async def graph(
                 # Collect callsites (representative nodes in module)
                 callsites = []
                 if include_callsites_modules and module_name in module_to_nodes:
-                    for node_id in list(module_to_nodes[module_name])[: int(max_callsites_modules) * 2]:
+                    for node_id in list(module_to_nodes[module_name])[
+                        : int(max_callsites_modules) * 2
+                    ]:
                         for src, et, _w in analyzer.incoming.get(node_id, []):
                             if et == "CALLS":
                                 src_node = analyzer.nodes.get(src)
@@ -1801,7 +1831,7 @@ async def graph(
                 module_name = r.get("module")
                 if _skip_path(module_name):
                     continue
-                in_edges = sum(incoming_modules.get(module_name, {}).values())
+                _in_edges = sum(incoming_modules.get(module_name, {}).values())  # noqa: F841
                 out_edges = sum(outgoing_modules.get(module_name, {}).values())
                 edge_counts = module_edge_counts.get(module_name, {}).copy()
                 edge_counts["imports"] = out_edges
@@ -1814,13 +1844,19 @@ async def graph(
                 edge_counts.setdefault("composed_of", 0)
                 callsites = []
                 if include_callsites_modules and module_name in module_to_nodes:
-                    for node_id in list(module_to_nodes[module_name])[: int(max_callsites_modules) * 2]:
+                    for node_id in list(module_to_nodes[module_name])[
+                        : int(max_callsites_modules) * 2
+                    ]:
                         for src, et, _w in analyzer.incoming.get(node_id, []):
                             if et == "CALLS":
                                 src_node = analyzer.nodes.get(src)
                                 if src_node and not _skip_path(src_node.file):
                                     callsites.append(
-                                        {"name": src_node.name, "file": src_node.file, "line": src_node.line}
+                                        {
+                                            "name": src_node.name,
+                                            "file": src_node.file,
+                                            "line": src_node.line,
+                                        }
                                     )
                         if len(callsites) >= int(max_callsites_modules):
                             break

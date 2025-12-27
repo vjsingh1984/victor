@@ -234,7 +234,9 @@ class TestToolLoopDetectorResourceContention:
         detector.record_tool_call("read_file", {"path": "foo.py"})
         detector.record_tool_call("code_search", {"path": "foo.py", "query": "def"})
         detector.record_tool_call("list_directory", {"path": "foo.py"})
-        result = detector.record_tool_call("semantic_code_search", {"path": "foo.py", "query": "class"})
+        result = detector.record_tool_call(
+            "semantic_code_search", {"path": "foo.py", "query": "class"}
+        )
 
         assert result.loop_detected is True
         assert result.loop_type == LoopType.RESOURCE_CONTENTION

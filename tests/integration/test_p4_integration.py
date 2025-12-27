@@ -104,8 +104,8 @@ class TestThresholdLearnerIntegration:
         # Act - record a few outcomes
         learner.record_outcome(
             RLOutcome(
-                provider=embedding_model, # embedding_model is passed as provider for this learner
-                model=tool_name, # tool_name is passed as model for this learner
+                provider=embedding_model,  # embedding_model is passed as provider for this learner
+                model=tool_name,  # tool_name is passed as model for this learner
                 task_type=task_type,
                 success=True,
                 quality_score=0.8,
@@ -116,7 +116,7 @@ class TestThresholdLearnerIntegration:
                     "results_count": 5,
                     "threshold_used": 0.5,
                     "false_negatives": False,
-                }
+                },
             )
         )
 
@@ -134,7 +134,7 @@ class TestThresholdLearnerIntegration:
                     "results_count": 0,
                     "threshold_used": 0.5,
                     "false_negatives": True,
-                }
+                },
             )
         )
 
@@ -147,7 +147,7 @@ class TestThresholdLearnerIntegration:
         cursor.execute("SELECT * FROM semantic_threshold_stats")
         rows = cursor.fetchall()
         assert len(rows) > 0
-        
+
         db.close()
 
     def test_threshold_learner_recommends_adjustment(self):
@@ -155,10 +155,10 @@ class TestThresholdLearnerIntegration:
         # Arrange
         import sqlite3
         from victor.agent.rl.base import RLOutcome
-        
+
         db = sqlite3.connect(":memory:")
         learner = SemanticThresholdLearner(name="semantic_threshold", db_connection=db)
-        
+
         embedding_model = "bge-small"
         task_type = "search"
         tool_name = "code_search"
@@ -179,15 +179,17 @@ class TestThresholdLearnerIntegration:
                         "results_count": 0,
                         "threshold_used": 0.7,
                         "false_negatives": True,
-                    }
+                    },
                 )
             )
 
         # Assert - should recommend lowering threshold
-        recommendation = learner.get_recommendation(provider=embedding_model, model=tool_name, task_type=task_type)
+        recommendation = learner.get_recommendation(
+            provider=embedding_model, model=tool_name, task_type=task_type
+        )
         assert recommendation is not None
         assert recommendation.value < 0.7  # Should recommend lower threshold
-        
+
         db.close()
 
     def test_threshold_learner_get_recommendations(self):
@@ -198,7 +200,7 @@ class TestThresholdLearnerIntegration:
 
         db = sqlite3.connect(":memory:")
         learner = SemanticThresholdLearner(name="semantic_threshold", db_connection=db)
-        
+
         embedding_model = "bge-small"
         task_type = "search"
         tool_name = "code_search"
@@ -219,18 +221,20 @@ class TestThresholdLearnerIntegration:
                         "results_count": 0 if i < 6 else 5,  # 60% false negatives
                         "threshold_used": 0.7,
                         "false_negatives": (i < 6),
-                    }
+                    },
                 )
             )
 
         # Act - get recommendation
-        recommendation = learner.get_recommendation(provider=embedding_model, model=tool_name, task_type=task_type)
+        recommendation = learner.get_recommendation(
+            provider=embedding_model, model=tool_name, task_type=task_type
+        )
 
         # Assert - should have recommendation for this context
         assert recommendation is not None
         # Should recommend a lower threshold due to high false negatives
         assert recommendation.value < 0.7
-        
+
         db.close()
 
 
@@ -244,7 +248,9 @@ class TestToolDeduplicationIntegration:
 
         # Act
         tracker.add_call("code_search", {"query": "tool registration", "path": "."})
-        is_redundant = tracker.is_redundant("code_search", {"query": "tool registration", "path": "."})
+        is_redundant = tracker.is_redundant(
+            "code_search", {"query": "tool registration", "path": "."}
+        )
 
         # Assert
         assert is_redundant is True
@@ -310,7 +316,9 @@ class TestToolPipelineDeduplicationIntegration:
         # Arrange
         tools = ToolRegistry()
         executor = Mock(spec=ToolExecutor)
-        executor.execute = AsyncMock(return_value=Mock(success=True, result="test result", error=None))
+        executor.execute = AsyncMock(
+            return_value=Mock(success=True, result="test result", error=None)
+        )
 
         tracker = ToolDeduplicationTracker(window_size=10)
 

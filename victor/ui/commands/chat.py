@@ -293,7 +293,10 @@ def chat(
                     enable_observability=enable_observability,
                     legacy_mode=legacy_mode,
                     # Smart TUI detection: disable if non-interactive terminal or automation mode
-                    use_tui=tui and not automation_mode and sys.stdin.isatty() and sys.stdout.isatty(),
+                    use_tui=tui
+                    and not automation_mode
+                    and sys.stdin.isatty()
+                    and sys.stdout.isatty(),
                 )
             )
 

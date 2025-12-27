@@ -430,6 +430,62 @@ def get_evaluation_criteria(cls):
 | `list_all()` | Get all registered verticals |
 | `list_names()` | Get all vertical names |
 
+## Multi-Provider Testing
+
+Verticals have been tested across multiple LLM providers. Results from testing (December 2025):
+
+### Test Matrix
+
+| Vertical | OpenAI GPT-4o | DeepSeek R1 | Notes |
+|----------|--------------|-------------|-------|
+| Coding | ✅ Pass | ⚠️ Stream errors | OpenAI reliable; DeepSeek has stream handling issues |
+| Research | ✅ Pass | ✅ Pass | Both providers work well |
+| DevOps | ⚠️ Edit tool error | ✅ Pass | OpenAI missed `ops` parameter (now fixed) |
+| Data Analysis | ✅ Pass | ⏱️ Timeout | DeepSeek times out on complex analysis |
+
+### Key Findings
+
+1. **Edit Tool Parameter Validation**: LLMs sometimes call `edit()` without the required `ops` parameter. This is now handled gracefully with helpful error messages and examples.
+
+2. **Mode Exploration Multipliers**: Plan mode (2.5x) and Explore mode (3.0x) multipliers allow more thorough exploration before forcing completion, critical for complex verticals.
+
+3. **Sandbox Editing**: Plan and Explore modes restrict file edits to `.victor/sandbox/` directory, preventing accidental modifications during exploration.
+
+### Test Commands
+
+```bash
+# Test coding vertical with different providers
+victor chat --vertical coding --provider openai "Write a function to validate email"
+victor chat --vertical coding --provider deepseek "Refactor the auth module"
+
+# Test research vertical
+victor chat -V research --provider openai "Research GraphQL best practices"
+
+# Test DevOps vertical
+victor chat -V devops --provider deepseek "Setup Docker Compose for development"
+
+# Test data analysis vertical
+victor chat -V data_analysis --provider openai "Analyze CSV data trends"
+
+# Use plan mode for thorough exploration
+victor chat --mode plan --vertical coding "Understand the caching system"
+```
+
+### Provider-Specific Notes
+
+**OpenAI (GPT-4o)**:
+- Reliable tool calling with consistent parameter formatting
+- Good at following structured output requirements
+
+**DeepSeek (R1)**:
+- Supports thinking tags (`<think>...</think>`)
+- May require longer timeouts for complex tasks
+- Occasional stream handling issues (handled by provider adapter)
+
+**Anthropic (Claude)**:
+- Best overall tool calling support
+- Recommended for complex multi-tool workflows
+
 ## Related Documentation
 
 - [STATE_MACHINE.md](./STATE_MACHINE.md) - Stage architecture details

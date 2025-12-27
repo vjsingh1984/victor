@@ -24,24 +24,7 @@ Tests the consolidated code_review function with various aspects:
 
 import pytest
 
-from victor.tools.code_review_tool import (
-    code_review,
-    set_code_review_config,
-)
-
-
-class TestSetCodeReviewConfig:
-    """Tests for set_code_review_config function."""
-
-    def test_set_config_default(self):
-        """Test setting config with default values."""
-        set_code_review_config()
-        # Should not raise
-
-    def test_set_config_custom(self):
-        """Test setting config with custom values."""
-        set_code_review_config(max_complexity=15)
-        # Should not raise
+from victor.tools.code_review_tool import code_review
 
 
 class TestCodeReviewBasic:

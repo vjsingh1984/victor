@@ -85,7 +85,9 @@ class TestContinuationPatienceLearner:
         )
         assert cursor.fetchone() is not None
 
-    def test_record_outcome_false_positive(self, coordinator: RLCoordinator, learner: ContinuationPatienceLearner) -> None:
+    def test_record_outcome_false_positive(
+        self, coordinator: RLCoordinator, learner: ContinuationPatienceLearner
+    ) -> None:
         """Test recording an outcome with a false positive stuck flag."""
         _record_patience_outcome(
             learner,
@@ -101,7 +103,9 @@ class TestContinuationPatienceLearner:
         assert stats["true_positives"] == 0
         assert stats["missed_stuck_loops"] == 0
 
-    def test_record_outcome_true_positive(self, coordinator: RLCoordinator, learner: ContinuationPatienceLearner) -> None:
+    def test_record_outcome_true_positive(
+        self, coordinator: RLCoordinator, learner: ContinuationPatienceLearner
+    ) -> None:
         """Test recording an outcome with a true positive stuck flag."""
         _record_patience_outcome(
             learner,
@@ -117,7 +121,9 @@ class TestContinuationPatienceLearner:
         assert stats["true_positives"] == 1
         assert stats["missed_stuck_loops"] == 0
 
-    def test_record_outcome_missed_stuck_loop(self, coordinator: RLCoordinator, learner: ContinuationPatienceLearner) -> None:
+    def test_record_outcome_missed_stuck_loop(
+        self, coordinator: RLCoordinator, learner: ContinuationPatienceLearner
+    ) -> None:
         """Test recording an outcome where a stuck loop was missed."""
         _record_patience_outcome(
             learner,
@@ -133,7 +139,9 @@ class TestContinuationPatienceLearner:
         assert stats["true_positives"] == 0
         assert stats["missed_stuck_loops"] == 1
 
-    def test_get_recommendation_insufficient_data(self, learner: ContinuationPatienceLearner) -> None:
+    def test_get_recommendation_insufficient_data(
+        self, learner: ContinuationPatienceLearner
+    ) -> None:
         """Should return a baseline recommendation with insufficient data."""
         _record_patience_outcome(learner)  # Only one session
         rec = learner.get_recommendation("ollama", "test-model", "analysis")
@@ -155,7 +163,9 @@ class TestContinuationPatienceLearner:
         assert rec.is_baseline is True
         assert rec.confidence == 0.0
 
-    def test_patience_increases_with_false_positives(self, coordinator: RLCoordinator, learner: ContinuationPatienceLearner) -> None:
+    def test_patience_increases_with_false_positives(
+        self, coordinator: RLCoordinator, learner: ContinuationPatienceLearner
+    ) -> None:
         """Patience should increase if many false positives."""
         initial_patience = 3
         # Ensure the baseline is set for consistency in this test
@@ -170,20 +180,22 @@ class TestContinuationPatienceLearner:
                 flagged_as_stuck=True,
                 actually_stuck=False,
                 eventually_made_progress=True,
-                patience_threshold=initial_patience # Ensure patience threshold is consistent
+                patience_threshold=initial_patience,  # Ensure patience threshold is consistent
             )
-        
+
         # After 5 sessions, update_patience would have been called
         stats = _get_patience_stats(coordinator, "ollama", "test-model", "analysis")
         assert stats["false_positives"] == 10
         assert stats["total_sessions"] == 10
-        
+
         rec = learner.get_recommendation("ollama", "test-model", "analysis")
         assert rec is not None
         assert rec.value > initial_patience  # Expect patience to increase
         assert rec.confidence > 0.0
 
-    def test_patience_decreases_with_missed_stuck_loops(self, coordinator: RLCoordinator, learner: ContinuationPatienceLearner) -> None:
+    def test_patience_decreases_with_missed_stuck_loops(
+        self, coordinator: RLCoordinator, learner: ContinuationPatienceLearner
+    ) -> None:
         """Patience should decrease if many stuck loops are missed."""
         initial_patience = 5
         # Ensure the baseline is set for consistency in this test
@@ -198,20 +210,22 @@ class TestContinuationPatienceLearner:
                 flagged_as_stuck=False,
                 actually_stuck=True,
                 eventually_made_progress=False,
-                patience_threshold=initial_patience # Ensure patience threshold is consistent
+                patience_threshold=initial_patience,  # Ensure patience threshold is consistent
             )
 
         # After 5 sessions, update_patience would have been called
         stats = _get_patience_stats(coordinator, "ollama", "test-model", "analysis")
         assert stats["missed_stuck_loops"] == 10
         assert stats["total_sessions"] == 10
-        
+
         rec = learner.get_recommendation("ollama", "test-model", "analysis")
         assert rec is not None
         assert rec.value < initial_patience  # Expect patience to decrease
         assert rec.confidence > 0.0
 
-    def test_patience_stays_within_bounds(self, coordinator: RLCoordinator, learner: ContinuationPatienceLearner) -> None:
+    def test_patience_stays_within_bounds(
+        self, coordinator: RLCoordinator, learner: ContinuationPatienceLearner
+    ) -> None:
         """Patience recommendation should stay within [1, 15] bounds."""
         mock_adapter = MagicMock()
         mock_adapter.capabilities.continuation_patience = 1
@@ -224,7 +238,7 @@ class TestContinuationPatienceLearner:
                 flagged_as_stuck=False,
                 actually_stuck=True,
                 eventually_made_progress=False,
-                patience_threshold=1
+                patience_threshold=1,
             )
         rec = learner.get_recommendation("ollama", "test-model", "analysis")
         assert rec.value == 1  # Should not go below 1
@@ -239,7 +253,7 @@ class TestContinuationPatienceLearner:
                 flagged_as_stuck=True,
                 actually_stuck=False,
                 eventually_made_progress=True,
-                patience_threshold=15
+                patience_threshold=15,
             )
         rec = learner.get_recommendation("ollama", "test-model", "analysis")
         assert rec.value == 15  # Should not go above 15

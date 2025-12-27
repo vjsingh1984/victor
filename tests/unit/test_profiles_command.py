@@ -131,6 +131,7 @@ class TestSaveProfilesYaml:
 
         # Make directory read-only - skip on Windows
         import sys
+
         if sys.platform != "win32":
             readonly_dir.chmod(0o444)
             try:
@@ -209,11 +210,7 @@ class TestCreateProfile:
     def test_create_profile_already_exists(self, tmp_path):
         """Test creating a profile that already exists shows error."""
         profiles_file = tmp_path / "profiles.yaml"
-        existing_data = {
-            "profiles": {
-                "existing": {"provider": "ollama", "model": "llama2"}
-            }
-        }
+        existing_data = {"profiles": {"existing": {"provider": "ollama", "model": "llama2"}}}
         with open(profiles_file, "w") as f:
             yaml.safe_dump(existing_data, f)
 
@@ -290,11 +287,7 @@ class TestEditProfile:
     def test_edit_no_changes(self, tmp_path):
         """Test editing with no changes specified."""
         profiles_file = tmp_path / "profiles.yaml"
-        existing_data = {
-            "profiles": {
-                "no_change": {"provider": "ollama", "model": "llama2"}
-            }
-        }
+        existing_data = {"profiles": {"no_change": {"provider": "ollama", "model": "llama2"}}}
         with open(profiles_file, "w") as f:
             yaml.safe_dump(existing_data, f)
 
@@ -352,20 +345,14 @@ class TestDeleteProfile:
     def test_delete_with_force(self, tmp_path):
         """Test deleting a profile with --force flag."""
         profiles_file = tmp_path / "profiles.yaml"
-        existing_data = {
-            "profiles": {
-                "delete_me": {"provider": "ollama", "model": "llama2"}
-            }
-        }
+        existing_data = {"profiles": {"delete_me": {"provider": "ollama", "model": "llama2"}}}
         with open(profiles_file, "w") as f:
             yaml.safe_dump(existing_data, f)
 
         with patch("victor.ui.commands.profiles.Settings") as mock_settings_cls:
             mock_settings_cls.get_config_dir.return_value = tmp_path
 
-            result = runner.invoke(
-                profiles_app, ["delete", "delete_me", "--force"]
-            )
+            result = runner.invoke(profiles_app, ["delete", "delete_me", "--force"])
 
         assert result.exit_code == 0
         assert "Deleted profile" in result.stdout
@@ -378,49 +365,35 @@ class TestDeleteProfile:
         with patch("victor.ui.commands.profiles.Settings") as mock_settings_cls:
             mock_settings_cls.get_config_dir.return_value = tmp_path
 
-            result = runner.invoke(
-                profiles_app, ["delete", "nonexistent", "--force"]
-            )
+            result = runner.invoke(profiles_app, ["delete", "nonexistent", "--force"])
 
         assert "not found" in result.stdout
 
     def test_delete_with_confirmation_yes(self, tmp_path):
         """Test deleting a profile with confirmation."""
         profiles_file = tmp_path / "profiles.yaml"
-        existing_data = {
-            "profiles": {
-                "confirm_delete": {"provider": "ollama", "model": "llama2"}
-            }
-        }
+        existing_data = {"profiles": {"confirm_delete": {"provider": "ollama", "model": "llama2"}}}
         with open(profiles_file, "w") as f:
             yaml.safe_dump(existing_data, f)
 
         with patch("victor.ui.commands.profiles.Settings") as mock_settings_cls:
             mock_settings_cls.get_config_dir.return_value = tmp_path
 
-            result = runner.invoke(
-                profiles_app, ["delete", "confirm_delete"], input="y\n"
-            )
+            result = runner.invoke(profiles_app, ["delete", "confirm_delete"], input="y\n")
 
         assert "Deleted profile" in result.stdout
 
     def test_delete_with_confirmation_no(self, tmp_path):
         """Test cancelling profile deletion."""
         profiles_file = tmp_path / "profiles.yaml"
-        existing_data = {
-            "profiles": {
-                "keep_me": {"provider": "ollama", "model": "llama2"}
-            }
-        }
+        existing_data = {"profiles": {"keep_me": {"provider": "ollama", "model": "llama2"}}}
         with open(profiles_file, "w") as f:
             yaml.safe_dump(existing_data, f)
 
         with patch("victor.ui.commands.profiles.Settings") as mock_settings_cls:
             mock_settings_cls.get_config_dir.return_value = tmp_path
 
-            result = runner.invoke(
-                profiles_app, ["delete", "keep_me"], input="n\n"
-            )
+            result = runner.invoke(profiles_app, ["delete", "keep_me"], input="n\n")
 
         assert "Cancelled" in result.stdout
 
@@ -571,9 +544,7 @@ class TestProfilesAppIntegration:
             assert "Updated" in result.stdout
 
             # Delete
-            result = runner.invoke(
-                profiles_app, ["delete", "workflow_test", "--force"]
-            )
+            result = runner.invoke(profiles_app, ["delete", "workflow_test", "--force"])
             assert "Deleted" in result.stdout
 
 

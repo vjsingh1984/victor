@@ -547,7 +547,7 @@ def function_two():
         """Test chunking a JavaScript file."""
         chunker = ASTAwareChunker()
 
-        js_code = '''function hello() {
+        js_code = """function hello() {
     console.log("Hello");
 }
 
@@ -556,7 +556,7 @@ class Greeter {
         return "Hi";
     }
 }
-'''
+"""
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".js", delete=False) as f:
             f.write(js_code)
@@ -591,7 +591,9 @@ def greet(name):
     return f"Hello, {name}! 你好！"
 '''
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".py", delete=False, encoding="utf-8"
+        ) as f:
             f.write(unicode_code)
             f.flush()
 

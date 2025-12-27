@@ -356,12 +356,12 @@ class ProfileConfig(BaseSettings):
 
     # Timeout and session limits
     session_idle_timeout: Optional[int] = Field(
-        None, gt=0, description="Maximum idle time in seconds (resets on provider response/tool execution)"
+        None,
+        gt=0,
+        description="Maximum idle time in seconds (resets on provider response/tool execution)",
     )
     # Future: session_time_limit for total session duration cap (regardless of activity)
-    timeout: Optional[int] = Field(
-        None, gt=0, description="Request timeout in seconds"
-    )
+    timeout: Optional[int] = Field(None, gt=0, description="Request timeout in seconds")
 
     @field_validator("tool_selection")
     @classmethod
@@ -539,7 +539,9 @@ class Settings(BaseSettings):
     core_readonly_tools: Optional[List[str]] = None  # Override/extend curated read-only tool set
 
     # Semantic Search Quality Improvements (P4.X - Multi-Provider Excellence)
-    semantic_similarity_threshold: float = 0.5  # Min score [0.1-0.9], lowered from 0.7 to reduce false negatives
+    semantic_similarity_threshold: float = (
+        0.5  # Min score [0.1-0.9], lowered from 0.7 to reduce false negatives
+    )
     semantic_query_expansion_enabled: bool = True  # Expand queries with synonyms/related terms
     semantic_max_query_expansions: int = 5  # Max query variations to try (including original)
 
@@ -640,15 +642,17 @@ class Settings(BaseSettings):
 
     # Exploration Loop Settings (prevents endless exploration without output)
     # Higher values = more thorough exploration, slower responses
-    max_exploration_iterations: int = 8  # Max consecutive read-only tool calls with minimal output
+    # Significantly increased to match Claude Code's unlimited exploration approach
+    # Mode multipliers further increase these (PLAN: 10x, EXPLORE: 20x)
+    max_exploration_iterations: int = 200  # Base limit - multiplied by mode (was 25)
     max_exploration_iterations_action: int = (
-        12  # More lenient for action tasks (create, write, etc.)
+        500  # Very lenient for action tasks - let task completion detect finish (was 35)
     )
     max_exploration_iterations_analysis: int = (
-        50  # Very lenient for analysis tasks (uses loop detection instead)
+        1000  # Effectively unlimited for analysis - rely on task completion (was 75)
     )
-    min_content_threshold: int = 150  # Minimum chars to consider "substantial" output
-    max_research_iterations: int = 6  # Force synthesis after N consecutive web searches
+    min_content_threshold: int = 50  # Minimum chars to consider "substantial" output (was 100)
+    max_research_iterations: int = 50  # Allow thorough web research (was 15)
 
     # ==========================================================================
     # Recovery & Loop Detection Thresholds

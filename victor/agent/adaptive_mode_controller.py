@@ -429,7 +429,9 @@ class QLearningStore:
                         # Very efficient - gradually decrease budget
                         # But never drop below what was actually used + buffer
                         target_budget = max(tool_budget_used + 3, current_budget - 2)
-                        new_budget = int((1 - base_alpha) * current_budget + base_alpha * target_budget)
+                        new_budget = int(
+                            (1 - base_alpha) * current_budget + base_alpha * target_budget
+                        )
                     else:
                         # Normal completion - keep budget stable, slight move toward usage
                         alpha = base_alpha * 0.5  # Even slower for stable scenarios
@@ -461,7 +463,9 @@ class QLearningStore:
                 # Update quality and completion rate with standard EMA
                 alpha = 0.1
                 new_quality = (1 - alpha) * current_quality + alpha * quality_score
-                completion_rate = (1 - alpha) * current_completion + alpha * (1.0 if completed else 0.0)
+                completion_rate = (1 - alpha) * current_completion + alpha * (
+                    1.0 if completed else 0.0
+                )
             else:
                 # First sample - initialize with reasonable defaults
                 count = 1
@@ -608,6 +612,7 @@ class AdaptiveModeController:
         profile_name: str = "default",
         q_store: Optional[QLearningStore] = None,
         provider_name: Optional[str] = None,
+        model_name: Optional[str] = None,
         provider_adapter: Optional[Any] = None,
         mode_transition_learner: Optional[Any] = None,
     ):
@@ -617,12 +622,14 @@ class AdaptiveModeController:
             profile_name: Profile name for tracking
             q_store: Optional Q-learning store (creates one if not provided)
             provider_name: Provider name for provider-aware thresholds (e.g., "deepseek", "anthropic")
+            model_name: Model name for RL tracking (e.g., "deepseek-chat", "gpt-4")
             provider_adapter: Optional provider adapter for capability-based thresholds
             mode_transition_learner: Optional ModeTransitionLearner for unified RL tracking
         """
         self.profile_name = profile_name
         self._q_store = q_store or QLearningStore()
         self._provider_name = self._normalize_provider_name(provider_name)
+        self._model_name = model_name or profile_name  # Fall back to profile name
         self._provider_adapter = provider_adapter
         self._mode_transition_learner = mode_transition_learner
 
@@ -682,8 +689,7 @@ class AdaptiveModeController:
             Dict with 'min_iterations_before_loop' and 'no_tool_threshold'
         """
         return self.PROVIDER_ITERATION_THRESHOLDS.get(
-            self._provider_name,
-            self.PROVIDER_ITERATION_THRESHOLDS["default"]
+            self._provider_name, self.PROVIDER_ITERATION_THRESHOLDS["default"]
         )
 
     def get_quality_thresholds(self) -> Dict[str, float]:
@@ -702,8 +708,7 @@ class AdaptiveModeController:
 
         # Fall back to hardcoded provider-specific thresholds
         return self.PROVIDER_QUALITY_THRESHOLDS.get(
-            self._provider_name,
-            self.PROVIDER_QUALITY_THRESHOLDS["default"]
+            self._provider_name, self.PROVIDER_QUALITY_THRESHOLDS["default"]
         )
 
     def set_provider(self, provider_name: str) -> None:
@@ -992,9 +997,7 @@ class AdaptiveModeController:
 
         # Update task stats with outcome-aware budget learning
         # Detect if budget was exhausted (used >= budget)
-        budget_exhausted = (
-            self._current_state.tool_calls_made >= self._current_state.tool_budget
-        )
+        budget_exhausted = self._current_state.tool_calls_made >= self._current_state.tool_budget
 
         self._q_store.update_task_stats(
             task_type=self._current_state.task_type,
@@ -1002,7 +1005,8 @@ class AdaptiveModeController:
             quality_score=quality_score,
             completed=completed,
             tool_budget_total=self._current_state.tool_budget,
-            budget_exhausted=budget_exhausted and not success,  # Only counts as exhaustion failure if not successful
+            budget_exhausted=budget_exhausted
+            and not success,  # Only counts as exhaustion failure if not successful
         )
 
         # Record to unified ModeTransitionLearner for centralized observability
@@ -1061,6 +1065,8 @@ class AdaptiveModeController:
             )
 
             outcome = RLOutcome(
+                provider=self._provider_name or "unknown",
+                model=self._model_name or "unknown",
                 success=success,
                 quality_score=quality_score,
                 task_type=self._current_state.task_type if self._current_state else "general",
@@ -1070,8 +1076,12 @@ class AdaptiveModeController:
                     "state_key": state_key,
                     "action_key": action_key,
                     "task_completed": completed,
-                    "tool_budget_used": self._current_state.tool_calls_made if self._current_state else 0,
-                    "tool_budget_total": self._current_state.tool_budget if self._current_state else 10,
+                    "tool_budget_used": (
+                        self._current_state.tool_calls_made if self._current_state else 0
+                    ),
+                    "tool_budget_total": (
+                        self._current_state.tool_budget if self._current_state else 10
+                    ),
                 },
             )
 
@@ -1181,7 +1191,7 @@ class AdaptiveModeController:
             Tuple of (should_continue, reason)
         """
         # Get provider-specific thresholds
-        iter_thresholds = self.get_iteration_thresholds()
+        _iter_thresholds = self.get_iteration_thresholds()  # noqa: F841
         quality_thresholds = self.get_quality_thresholds()
 
         # Hard limits
@@ -1194,7 +1204,10 @@ class AdaptiveModeController:
         # Provider-aware quality threshold
         quality_threshold = quality_thresholds.get("min_quality", 0.70)
         if quality_score > quality_threshold + 0.15:  # High quality achieved
-            return False, f"High quality achieved ({quality_score:.2f} > {quality_threshold + 0.15:.2f})"
+            return (
+                False,
+                f"High quality achieved ({quality_score:.2f} > {quality_threshold + 0.15:.2f})",
+            )
 
         # Provider-aware loop detection
         loop_detected, loop_reason = self.check_loop_detection(

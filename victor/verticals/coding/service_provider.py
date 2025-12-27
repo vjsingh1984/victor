@@ -35,16 +35,19 @@ logger = logging.getLogger(__name__)
 # Protocol definitions for coding services (for type checking)
 class CodingMiddlewareProtocol:
     """Protocol for coding middleware."""
+
     pass
 
 
 class CodingSafetyProtocol:
     """Protocol for coding safety extension."""
+
     pass
 
 
 class CodingPromptProtocol:
     """Protocol for coding prompt contributor."""
+
     pass
 
 

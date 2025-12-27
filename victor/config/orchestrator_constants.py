@@ -126,13 +126,15 @@ class BudgetLimits:
     - warning_threshold_pct (0.83) gives early warning at 250/300 calls
     """
 
-    simple_task: int = 2
-    medium_task: int = 6
-    complex_task: int = 15
-    action_task: int = 50
-    analysis_task: int = 60
-    max_session_budget: int = 300
-    warning_threshold_pct: float = 0.83  # 250/300
+    # Significantly increased to match Claude Code's approach of unlimited exploration
+    # Claude Code lets the model explore as much as needed to complete the task
+    simple_task: int = 20  # Quick tasks still bounded (was 5)
+    medium_task: int = 50  # Multi-file tasks need room (was 15)
+    complex_task: int = 100  # Complex tasks get generous budget (was 30)
+    action_task: int = 200  # BUILD mode tasks - let task completion decide (was 75)
+    analysis_task: int = 500  # PLAN/EXPLORE modes - effectively unlimited (was 100)
+    max_session_budget: int = 2000  # Very high - rely on task completion detection (was 500)
+    warning_threshold_pct: float = 0.90  # Only warn at 90% (1800/2000)
 
 
 @dataclass(frozen=True)
@@ -192,26 +194,46 @@ class ToolSelectionPresets:
 
     def __post_init__(self):
         # Use object.__setattr__ since dataclass is frozen
-        object.__setattr__(self, 'tiny', {
-            'base_threshold': 0.35,
-            'base_max_tools': 5,
-        })
-        object.__setattr__(self, 'small', {
-            'base_threshold': 0.25,
-            'base_max_tools': 7,
-        })
-        object.__setattr__(self, 'medium', {
-            'base_threshold': 0.20,
-            'base_max_tools': 10,
-        })
-        object.__setattr__(self, 'large', {
-            'base_threshold': 0.15,
-            'base_max_tools': 12,
-        })
-        object.__setattr__(self, 'cloud', {
-            'base_threshold': 0.18,
-            'base_max_tools': 10,
-        })
+        object.__setattr__(
+            self,
+            "tiny",
+            {
+                "base_threshold": 0.35,
+                "base_max_tools": 5,
+            },
+        )
+        object.__setattr__(
+            self,
+            "small",
+            {
+                "base_threshold": 0.25,
+                "base_max_tools": 7,
+            },
+        )
+        object.__setattr__(
+            self,
+            "medium",
+            {
+                "base_threshold": 0.20,
+                "base_max_tools": 10,
+            },
+        )
+        object.__setattr__(
+            self,
+            "large",
+            {
+                "base_threshold": 0.15,
+                "base_max_tools": 12,
+            },
+        )
+        object.__setattr__(
+            self,
+            "cloud",
+            {
+                "base_threshold": 0.18,
+                "base_max_tools": 10,
+            },
+        )
 
 
 # ============================================================================
@@ -231,6 +253,7 @@ TOOL_SELECTION_PRESETS = ToolSelectionPresets()
 # Convenience functions
 # ============================================================================
 
+
 def get_budget_for_task(task_type: str) -> int:
     """Get recommended tool budget for a task type.
 
@@ -245,15 +268,15 @@ def get_budget_for_task(task_type: str) -> int:
     """
     task_type_lower = task_type.lower()
 
-    if task_type_lower in ('simple', 'quick', 'trivial'):
+    if task_type_lower in ("simple", "quick", "trivial"):
         return BUDGET_LIMITS.simple_task
-    elif task_type_lower in ('medium', 'moderate', 'standard'):
+    elif task_type_lower in ("medium", "moderate", "standard"):
         return BUDGET_LIMITS.medium_task
-    elif task_type_lower in ('complex', 'difficult', 'advanced'):
+    elif task_type_lower in ("complex", "difficult", "advanced"):
         return BUDGET_LIMITS.complex_task
-    elif task_type_lower in ('action', 'build', 'implement', 'feature'):
+    elif task_type_lower in ("action", "build", "implement", "feature"):
         return BUDGET_LIMITS.action_task
-    elif task_type_lower in ('analysis', 'explore', 'research', 'audit'):
+    elif task_type_lower in ("analysis", "explore", "research", "audit"):
         return BUDGET_LIMITS.analysis_task
     else:
         raise ValueError(

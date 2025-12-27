@@ -456,7 +456,7 @@ class PolicyManager:
                 target_checkpoint = checkpoints[current_idx + 1]
 
         if not target_checkpoint:
-            logger.warning(f"PolicyManager: Target checkpoint not found for rollback")
+            logger.warning("PolicyManager: Target checkpoint not found for rollback")
             return False
 
         # Get learner
