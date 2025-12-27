@@ -51,10 +51,8 @@ nosetests.xml
 coverage.xml
 *.coveragerc
 
-# Environment variables
-.env
-.env.local
-.env.*.local
+# Environment variables (use victor keys --keyring for API keys)
+.env*
 
 # Configuration (user-specific)
 *.local.yaml
