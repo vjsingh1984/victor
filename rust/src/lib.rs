@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Allow false positive from pyo3 macro-generated code
+#![allow(clippy::useless_conversion)]
+
 //! Victor Native Extensions
 //!
 //! High-performance Rust implementations of CPU-intensive operations

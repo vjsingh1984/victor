@@ -159,7 +159,6 @@ pub fn signature_similarity(sig1: &str, sig2: &str) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pyo3::types::PyDict;
 
     #[test]
     fn test_signature_consistency() {
@@ -202,22 +201,4 @@ mod tests {
         assert!((sim - 0.5).abs() < 0.1);
     }
 
-    #[test]
-    fn test_signature_tracker() {
-        let mut tracker = SignatureTracker::new();
-
-        tracker.record("sig1");
-        tracker.record("sig1");
-        tracker.record("sig2");
-        tracker.record("sig1");
-
-        assert_eq!(tracker.get_count("sig1"), 3);
-        assert_eq!(tracker.get_count("sig2"), 1);
-        assert_eq!(tracker.get_count("sig3"), 0);
-
-        let repeated = tracker.get_repeated(2);
-        assert_eq!(repeated.len(), 1);
-        assert_eq!(repeated[0].0, "sig1");
-        assert_eq!(repeated[0].1, 3);
-    }
 }

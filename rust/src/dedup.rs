@@ -66,7 +66,7 @@ fn normalize_block_internal(block: &str) -> String {
     }
 
     // Remove trailing punctuation
-    let trimmed_result = result.trim_end_matches(|c| matches!(c, '.' | ',' | ';' | ':'));
+    let trimmed_result = result.trim_end_matches(['.', ',', ';', ':']);
     trimmed_result.to_string()
 }
 

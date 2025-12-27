@@ -396,15 +396,13 @@ pub fn extract_thinking_content(content: &str) -> (String, String) {
                 main_content.push_str(&content[pos..]);
                 break;
             }
+        } else if let Some(mat) = end_matcher.find(&content[pos..]) {
+            thinking_content.push_str(&content[pos..pos + mat.start()]);
+            in_thinking = false;
+            pos += mat.start() + mat.len();
         } else {
-            if let Some(mat) = end_matcher.find(&content[pos..]) {
-                thinking_content.push_str(&content[pos..pos + mat.start()]);
-                in_thinking = false;
-                pos += mat.start() + mat.len();
-            } else {
-                thinking_content.push_str(&content[pos..]);
-                break;
-            }
+            thinking_content.push_str(&content[pos..]);
+            break;
         }
     }
 

@@ -272,9 +272,8 @@ fn find_matching_bracket(input: &str, is_object: bool) -> Option<(usize, String)
     let mut depth = 0;
     let mut in_string = false;
     let mut escape_next = false;
-    let mut chars = input.char_indices();
 
-    while let Some((i, c)) = chars.next() {
+    for (i, c) in input.char_indices() {
         if escape_next {
             escape_next = false;
             continue;
