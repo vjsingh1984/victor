@@ -28,11 +28,15 @@ runner = CliRunner()
 class TestConfigValidateCommand:
     """Tests for victor config-validate command."""
 
-    def test_config_validate_basic(self):
+    def test_config_validate_basic(self, tmp_path):
         """Test basic config validation with existing config."""
-        # Mock settings to return valid config
+        config_dir = tmp_path / ".victor"
+        config_dir.mkdir()
+        profiles_file = config_dir / "profiles.yaml"
+        profiles_file.write_text("profiles:\n  default:\n    provider: ollama\n")
+
         mock_settings = MagicMock()
-        mock_settings.get_config_dir.return_value = Path.home() / ".victor"
+        mock_settings.get_config_dir.return_value = config_dir
         mock_settings.load_profiles.return_value = {
             "default": MagicMock(
                 provider="ollama",
@@ -43,16 +47,19 @@ class TestConfigValidateCommand:
         }
 
         with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
-            with patch("builtins.open", MagicMock()):
-                with patch("yaml.safe_load", return_value={"profiles": {"default": {}}}):
-                    result = runner.invoke(app, ["config", "validate"])
-                    # Should pass or fail gracefully
-                    assert result.exit_code in [0, 1]
+            result = runner.invoke(app, ["config", "validate"])
+            # Should pass or fail gracefully
+            assert result.exit_code in [0, 1]
 
-    def test_config_validate_verbose_flag(self):
+    def test_config_validate_verbose_flag(self, tmp_path):
         """Test verbose output flag."""
+        config_dir = tmp_path / ".victor"
+        config_dir.mkdir()
+        profiles_file = config_dir / "profiles.yaml"
+        profiles_file.write_text("profiles:\n  default:\n    provider: ollama\n")
+
         mock_settings = MagicMock()
-        mock_settings.get_config_dir.return_value = Path.home() / ".victor"
+        mock_settings.get_config_dir.return_value = config_dir
         mock_settings.load_profiles.return_value = {
             "default": MagicMock(
                 provider="ollama",
@@ -63,10 +70,8 @@ class TestConfigValidateCommand:
         }
 
         with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
-            with patch("builtins.open", MagicMock()):
-                with patch("yaml.safe_load", return_value={"profiles": {"default": {}}}):
-                    result = runner.invoke(app, ["config", "validate", "--verbose"])
-                    assert result.exit_code in [0, 1]
+            result = runner.invoke(app, ["config", "validate", "--verbose"])
+            assert result.exit_code in [0, 1]
 
     def test_config_validate_missing_config_dir(self):
         """Test handling of missing config directory."""
@@ -79,36 +84,47 @@ class TestConfigValidateCommand:
             assert result.exit_code == 1
             assert "not found" in result.output.lower() or "init" in result.output.lower()
 
-    def test_config_validate_invalid_yaml(self):
+    def test_config_validate_invalid_yaml(self, tmp_path):
         """Test handling of invalid YAML file."""
-        import yaml
+        config_dir = tmp_path / ".victor"
+        config_dir.mkdir()
+        profiles_file = config_dir / "profiles.yaml"
+        # Write invalid YAML that will cause a parse error
+        profiles_file.write_text("profiles:\n  default:\n    - invalid: [unclosed")
 
         mock_settings = MagicMock()
-        mock_settings.get_config_dir.return_value = Path.home() / ".victor"
+        mock_settings.get_config_dir.return_value = config_dir
 
         with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
-            with patch("builtins.open", MagicMock()):
-                with patch("yaml.safe_load", side_effect=yaml.YAMLError("Invalid YAML")):
-                    result = runner.invoke(app, ["config", "validate"])
-                    assert result.exit_code == 1
-                    assert "yaml" in result.output.lower() or "invalid" in result.output.lower()
+            result = runner.invoke(app, ["config", "validate"])
+            assert result.exit_code == 1
+            assert "yaml" in result.output.lower() or "invalid" in result.output.lower()
 
-    def test_config_validate_missing_profiles_section(self):
+    def test_config_validate_missing_profiles_section(self, tmp_path):
         """Test handling of config without profiles section."""
+        config_dir = tmp_path / ".victor"
+        config_dir.mkdir()
+        profiles_file = config_dir / "profiles.yaml"
+        # Write YAML without profiles section
+        profiles_file.write_text("other_key: value\n")
+
         mock_settings = MagicMock()
-        mock_settings.get_config_dir.return_value = Path.home() / ".victor"
+        mock_settings.get_config_dir.return_value = config_dir
 
         with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
-            with patch("builtins.open", MagicMock()):
-                with patch("yaml.safe_load", return_value={"other_key": "value"}):
-                    result = runner.invoke(app, ["config", "validate"])
-                    assert result.exit_code == 1
-                    assert "profiles" in result.output.lower()
+            result = runner.invoke(app, ["config", "validate"])
+            assert result.exit_code == 1
+            assert "profiles" in result.output.lower()
 
-    def test_config_validate_invalid_temperature(self):
+    def test_config_validate_invalid_temperature(self, tmp_path):
         """Test detection of invalid temperature value."""
+        config_dir = tmp_path / ".victor"
+        config_dir.mkdir()
+        profiles_file = config_dir / "profiles.yaml"
+        profiles_file.write_text("profiles:\n  invalid:\n    provider: ollama\n")
+
         mock_settings = MagicMock()
-        mock_settings.get_config_dir.return_value = Path.home() / ".victor"
+        mock_settings.get_config_dir.return_value = config_dir
         mock_settings.load_profiles.return_value = {
             "invalid": MagicMock(
                 provider="ollama",
@@ -120,16 +136,19 @@ class TestConfigValidateCommand:
         mock_settings.get_provider_settings.return_value = {}
 
         with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
-            with patch("builtins.open", MagicMock()):
-                with patch("yaml.safe_load", return_value={"profiles": {"invalid": {}}}):
-                    result = runner.invoke(app, ["config", "validate", "--verbose"])
-                    assert result.exit_code == 1
-                    assert "temperature" in result.output.lower()
+            result = runner.invoke(app, ["config", "validate", "--verbose"])
+            assert result.exit_code == 1
+            assert "temperature" in result.output.lower()
 
-    def test_config_validate_invalid_max_tokens(self):
+    def test_config_validate_invalid_max_tokens(self, tmp_path):
         """Test detection of invalid max_tokens value."""
+        config_dir = tmp_path / ".victor"
+        config_dir.mkdir()
+        profiles_file = config_dir / "profiles.yaml"
+        profiles_file.write_text("profiles:\n  invalid:\n    provider: ollama\n")
+
         mock_settings = MagicMock()
-        mock_settings.get_config_dir.return_value = Path.home() / ".victor"
+        mock_settings.get_config_dir.return_value = config_dir
         mock_settings.load_profiles.return_value = {
             "invalid": MagicMock(
                 provider="ollama",
@@ -141,18 +160,19 @@ class TestConfigValidateCommand:
         mock_settings.get_provider_settings.return_value = {}
 
         with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
-            with patch("builtins.open", MagicMock()):
-                with patch("yaml.safe_load", return_value={"profiles": {"invalid": {}}}):
-                    result = runner.invoke(app, ["config", "validate", "--verbose"])
-                    assert result.exit_code == 1
-                    assert (
-                        "max_tokens" in result.output.lower() or "invalid" in result.output.lower()
-                    )
+            result = runner.invoke(app, ["config", "validate", "--verbose"])
+            assert result.exit_code == 1
+            assert "max_tokens" in result.output.lower() or "invalid" in result.output.lower()
 
-    def test_config_validate_unknown_provider(self):
+    def test_config_validate_unknown_provider(self, tmp_path):
         """Test detection of unknown provider."""
+        config_dir = tmp_path / ".victor"
+        config_dir.mkdir()
+        profiles_file = config_dir / "profiles.yaml"
+        profiles_file.write_text("profiles:\n  unknown:\n    provider: fake_provider\n")
+
         mock_settings = MagicMock()
-        mock_settings.get_config_dir.return_value = Path.home() / ".victor"
+        mock_settings.get_config_dir.return_value = config_dir
         mock_settings.load_profiles.return_value = {
             "unknown": MagicMock(
                 provider="fake_provider",  # Unknown provider
@@ -164,16 +184,19 @@ class TestConfigValidateCommand:
         mock_settings.get_provider_settings.return_value = {}
 
         with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
-            with patch("builtins.open", MagicMock()):
-                with patch("yaml.safe_load", return_value={"profiles": {"unknown": {}}}):
-                    result = runner.invoke(app, ["config", "validate", "--verbose"])
-                    assert result.exit_code == 1
-                    assert "unknown" in result.output.lower() or "provider" in result.output.lower()
+            result = runner.invoke(app, ["config", "validate", "--verbose"])
+            assert result.exit_code == 1
+            assert "unknown" in result.output.lower() or "provider" in result.output.lower()
 
-    def test_config_validate_cloud_provider_missing_api_key(self):
+    def test_config_validate_cloud_provider_missing_api_key(self, tmp_path):
         """Test warning for cloud provider without API key."""
+        config_dir = tmp_path / ".victor"
+        config_dir.mkdir()
+        profiles_file = config_dir / "profiles.yaml"
+        profiles_file.write_text("profiles:\n  cloud:\n    provider: anthropic\n")
+
         mock_settings = MagicMock()
-        mock_settings.get_config_dir.return_value = Path.home() / ".victor"
+        mock_settings.get_config_dir.return_value = config_dir
         mock_settings.load_profiles.return_value = {
             "cloud": MagicMock(
                 provider="anthropic",
@@ -185,17 +208,20 @@ class TestConfigValidateCommand:
         mock_settings.get_provider_settings.return_value = {"api_key": None}  # No API key
 
         with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
-            with patch("builtins.open", MagicMock()):
-                with patch("yaml.safe_load", return_value={"profiles": {"cloud": {}}}):
-                    result = runner.invoke(app, ["config", "validate", "--verbose"])
-                    # Should pass with warning (exit code 0)
-                    assert result.exit_code == 0
-                    assert "api key" in result.output.lower() or "warning" in result.output.lower()
+            result = runner.invoke(app, ["config", "validate", "--verbose"])
+            # Should pass with warning (exit code 0)
+            assert result.exit_code == 0
+            assert "api key" in result.output.lower() or "warning" in result.output.lower()
 
-    def test_config_validate_cloud_provider_with_api_key(self):
+    def test_config_validate_cloud_provider_with_api_key(self, tmp_path):
         """Test cloud provider with API key configured."""
+        config_dir = tmp_path / ".victor"
+        config_dir.mkdir()
+        profiles_file = config_dir / "profiles.yaml"
+        profiles_file.write_text("profiles:\n  cloud:\n    provider: anthropic\n")
+
         mock_settings = MagicMock()
-        mock_settings.get_config_dir.return_value = Path.home() / ".victor"
+        mock_settings.get_config_dir.return_value = config_dir
         mock_settings.load_profiles.return_value = {
             "cloud": MagicMock(
                 provider="anthropic",
@@ -207,16 +233,21 @@ class TestConfigValidateCommand:
         mock_settings.get_provider_settings.return_value = {"api_key": "sk-test-key"}
 
         with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
-            with patch("builtins.open", MagicMock()):
-                with patch("yaml.safe_load", return_value={"profiles": {"cloud": {}}}):
-                    result = runner.invoke(app, ["config", "validate", "--verbose"])
-                    assert result.exit_code == 0
-                    assert "api key configured" in result.output.lower()
+            result = runner.invoke(app, ["config", "validate", "--verbose"])
+            assert result.exit_code == 0
+            assert "api key configured" in result.output.lower()
 
-    def test_config_validate_multiple_profiles(self):
+    def test_config_validate_multiple_profiles(self, tmp_path):
         """Test validation of multiple profiles."""
+        config_dir = tmp_path / ".victor"
+        config_dir.mkdir()
+        profiles_file = config_dir / "profiles.yaml"
+        profiles_file.write_text(
+            "profiles:\n  local:\n    provider: ollama\n  cloud:\n    provider: anthropic\n"
+        )
+
         mock_settings = MagicMock()
-        mock_settings.get_config_dir.return_value = Path.home() / ".victor"
+        mock_settings.get_config_dir.return_value = config_dir
         mock_settings.load_profiles.return_value = {
             "local": MagicMock(
                 provider="ollama",
@@ -234,14 +265,9 @@ class TestConfigValidateCommand:
         mock_settings.get_provider_settings.return_value = {"api_key": "sk-test"}
 
         with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
-            with patch("builtins.open", MagicMock()):
-                with patch(
-                    "yaml.safe_load",
-                    return_value={"profiles": {"local": {}, "cloud": {}}},
-                ):
-                    result = runner.invoke(app, ["config", "validate", "--verbose"])
-                    assert result.exit_code == 0
-                    assert "2 profile" in result.output.lower()
+            result = runner.invoke(app, ["config", "validate", "--verbose"])
+            assert result.exit_code == 0
+            assert "2 profile" in result.output.lower()
 
 
 class TestConfigValidateHelp:
