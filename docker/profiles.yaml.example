@@ -1,0 +1,21 @@
+# Victor Docker Profiles Configuration
+# Copy this file to profiles.yaml and configure your providers
+
+default_profile: local
+
+profiles:
+  local:
+    provider: ollama
+    model: qwen2.5-coder:7b
+    endpoint: http://localhost:11434
+
+  # Uncomment and configure for cloud providers
+  # anthropic:
+  #   provider: anthropic
+  #   model: claude-sonnet-4-20250514
+  #   # Set ANTHROPIC_API_KEY environment variable
+
+  # openai:
+  #   provider: openai
+  #   model: gpt-4o
+  #   # Set OPENAI_API_KEY environment variable
