@@ -435,21 +435,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ==========================================================================
-  # Update Homebrew formula
+  # Homebrew formula auto-updates via polling in vjsingh1984/homebrew-tap
+  # No action needed here - the tap checks for new releases every 6 hours
   # ==========================================================================
-  update-homebrew:
-    name: Update Homebrew Formula
-    needs: create-release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Extract version
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Trigger Homebrew update
-        uses: peter-evans/repository-dispatch@v2
-        with:
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          repository: vjsingh1984/homebrew-tap
-          event-type: update-formula
-          client-payload: '{"version": "${{ steps.version.outputs.VERSION }}"}'
