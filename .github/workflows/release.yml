@@ -161,15 +161,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Linux x64
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
-          # Linux ARM64 (via QEMU)
-          - os: ubuntu-latest
-            platform: linux
-            arch: arm64
-            qemu: true
+          # Linux binaries skipped - PyInstaller + PyTorch/sentence-transformers too complex
+          # Linux users should use: pip install victor-ai
           # macOS ARM64 (M1/M2/M3)
           - os: macos-latest
             platform: macos
@@ -186,13 +179,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Set up QEMU for ARM64 cross-compilation
-      - name: Set up QEMU
-        if: matrix.qemu
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -205,9 +191,6 @@ jobs:
       - name: Build binary
         run: |
           python scripts/build_binary.py --onefile --output victor
-        env:
-          # For ARM64 cross-compilation
-          PYINSTALLER_CROSS_COMPILE: ${{ matrix.arch == 'arm64' && matrix.platform == 'linux' && 'arm64' || '' }}
 
       - name: Create archive (Unix)
         if: runner.os != 'Windows'
@@ -235,9 +218,6 @@ jobs:
     name: Build Docker Image
     needs: test
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -268,13 +248,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Extract version
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
@@ -287,8 +260,6 @@ jobs:
           tags: |
             vjsingh1984/victor:${{ steps.version.outputs.VERSION }}
             vjsingh1984/victor:latest
-            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
-            ghcr.io/${{ github.repository }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -426,11 +397,10 @@ jobs:
 
           | Platform | Architecture | Download |
           |----------|--------------|----------|
-          | Linux | x64 | \`victor-linux-x64.tar.gz\` |
-          | Linux | ARM64 | \`victor-linux-arm64.tar.gz\` |
           | macOS | ARM64 (M1/M2/M3) | \`victor-macos-arm64.tar.gz\` |
           | macOS | x64 (Intel) | \`victor-macos-x64.tar.gz\` |
           | Windows | x64 | \`victor-windows-x64.zip\` |
+          | Linux | Any | Use \`pip install victor-ai\` |
 
           ## Verification
 

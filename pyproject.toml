@@ -18,7 +18,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-ai"
-version = "0.2.2"
+version = "0.2.3"
 description = "Enterprise-Ready AI Coding Assistant - Code to Victory with Any AI"
 readme = "README.md"
 license = {text = "Apache-2.0"}
