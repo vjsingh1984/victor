@@ -6,10 +6,11 @@
 
 *Any model. Any provider. Your infrastructure.*
 
+[![PyPI version](https://badge.fury.io/py/victor.svg)](https://pypi.org/project/victor/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/tests-7500%2B%20passing-brightgreen.svg)](#project-status)
+[![Tests](https://img.shields.io/badge/tests-11100%2B%20passing-brightgreen.svg)](#project-status)
 
 [Quick Start](#quick-start) • [Why Victor](#why-victor) • [Features](#features) • [Documentation](#documentation)
 
@@ -463,17 +464,18 @@ See [Installation Guide](docs/guides/INSTALLATION.md) for details.
 
 ## Project Status
 
-Victor is in active development with 7500+ passing tests. Core functionality is stable.
+Victor is in active development with **11,100+ passing tests**. Core functionality is stable and production-ready.
 
 | Component | Status | Evidence |
 |-----------|--------|----------|
-| Agent Orchestrator | Stable | Phase 10 DI migration in progress |
+| Agent Orchestrator | Stable | DI migration complete, async support |
 | 45 Tools | Stable | Documented in TOOL_CATALOG.md |
 | 25+ Providers | Stable | victor/providers/ directory |
 | 4 Domain Verticals | Stable | victor/verticals/ directory |
 | Semantic Search | Stable | 10 languages, AST parsing |
 | VS Code Extension | Beta | vscode-victor/ directory |
 | MCP Support | Stable | Client + server modes |
+| PyPI Package | v0.2.0 | `pip install victor` |
 
 ---
 

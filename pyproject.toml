@@ -17,7 +17,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "victor-ai"
+name = "victor"
 version = "0.2.0"
 description = "Enterprise-Ready AI Coding Assistant - Code to Victory with Any AI"
 readme = "README.md"
