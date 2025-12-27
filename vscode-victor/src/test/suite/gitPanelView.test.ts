@@ -54,9 +54,9 @@ suite('GitPanelViewProvider Test Suite', () => {
 
         test('Should get status color', () => {
             const getColor = (status: string): string => {
-                if (status === 'M') return 'yellow';
-                if (status === 'A') return 'green';
-                if (status === 'D') return 'red';
+                if (status === 'M') {return 'yellow';}
+                if (status === 'A') {return 'green';}
+                if (status === 'D') {return 'red';}
                 return 'inherit';
             };
 
@@ -237,7 +237,7 @@ suite('GitPanelViewProvider Test Suite', () => {
         test('Should get diff stats', () => {
             const parseDiffStats = (stats: string): { added: number; removed: number } => {
                 const match = stats.match(/(\d+) insertions?\(\+\), (\d+) deletions?\(-\)/);
-                if (!match) return { added: 0, removed: 0 };
+                if (!match) {return { added: 0, removed: 0 };}
                 return { added: parseInt(match[1]), removed: parseInt(match[2]) };
             };
 
@@ -270,8 +270,8 @@ suite('GitPanelViewProvider Test Suite', () => {
         test('Should format branch badge', () => {
             const formatBadge = (branch: string, ahead: number, behind: number): string => {
                 let badge = branch;
-                if (ahead > 0) badge += ` ↑${ahead}`;
-                if (behind > 0) badge += ` ↓${behind}`;
+                if (ahead > 0) {badge += ` ↑${ahead}`;}
+                if (behind > 0) {badge += ` ↓${behind}`;}
                 return badge;
             };
 
@@ -354,7 +354,7 @@ suite('GitPanelViewProvider Test Suite', () => {
 
         test('Should show empty message', () => {
             const getEmptyMessage = (isRepo: boolean): string => {
-                if (!isRepo) return 'Not a git repository';
+                if (!isRepo) {return 'Not a git repository';}
                 return 'Working tree clean';
             };
 
@@ -398,7 +398,7 @@ suite('GitPanelViewProvider Test Suite', () => {
         test('Should find git root', () => {
             const findGitRoot = (path: string, gitFolders: string[]): string | null => {
                 for (const folder of gitFolders) {
-                    if (path.startsWith(folder)) return folder;
+                    if (path.startsWith(folder)) {return folder;}
                 }
                 return null;
             };

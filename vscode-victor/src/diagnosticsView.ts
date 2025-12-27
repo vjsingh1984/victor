@@ -70,7 +70,7 @@ export class DiagnosticsViewProvider implements vscode.TreeDataProvider<Diagnost
         const items: DiagnosticItem[] = [];
 
         for (const [uri, diagnostics] of allDiagnostics) {
-            if (diagnostics.length === 0) continue;
+            if (diagnostics.length === 0) {continue;}
 
             const errorCount = diagnostics.filter(
                 d => d.severity === vscode.DiagnosticSeverity.Error
@@ -268,7 +268,7 @@ export function registerDiagnosticsCommands(
         vscode.commands.registerCommand(
             'victor.fixDiagnosticFromView',
             async (item: DiagnosticItem) => {
-                if (!item.uri || !item.diagnostic) return;
+                if (!item.uri || !item.diagnostic) {return;}
 
                 const document = await vscode.workspace.openTextDocument(item.uri);
                 const code = document.getText(item.diagnostic.range);
@@ -296,7 +296,7 @@ Provide the corrected code.`;
         vscode.commands.registerCommand(
             'victor.fixAllInFile',
             async (item: DiagnosticItem) => {
-                if (!item.uri) return;
+                if (!item.uri) {return;}
 
                 const document = await vscode.workspace.openTextDocument(item.uri);
                 const diagnostics = vscode.languages.getDiagnostics(item.uri);

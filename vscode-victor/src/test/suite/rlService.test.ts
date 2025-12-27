@@ -140,7 +140,7 @@ suite('Q-Value Calculations', () => {
     test('Handle empty Q-table', () => {
         const qTable: Record<string, number> = {};
 
-        let topProvider: string | null = null;
+        const topProvider: string | null = null;
 
         for (const [provider, q] of Object.entries(qTable)) {
             // Won't execute

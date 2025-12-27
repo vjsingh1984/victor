@@ -561,7 +561,7 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
     context.subscriptions.push(
         vscode.commands.registerCommand('victor.explain', async () => {
             const editor = vscode.window.activeTextEditor;
-            if (!editor) return;
+            if (!editor) {return;}
 
             const selection = editor.selection;
             const text = editor.document.getText(selection);
@@ -581,7 +581,7 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
     context.subscriptions.push(
         vscode.commands.registerCommand('victor.refactor', async () => {
             const editor = vscode.window.activeTextEditor;
-            if (!editor) return;
+            if (!editor) {return;}
 
             const selection = editor.selection;
             const text = editor.document.getText(selection);
@@ -608,7 +608,7 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
     context.subscriptions.push(
         vscode.commands.registerCommand('victor.fix', async () => {
             const editor = vscode.window.activeTextEditor;
-            if (!editor) return;
+            if (!editor) {return;}
 
             const selection = editor.selection;
             const text = editor.document.getText(selection);
@@ -636,7 +636,7 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
     context.subscriptions.push(
         vscode.commands.registerCommand('victor.test', async () => {
             const editor = vscode.window.activeTextEditor;
-            if (!editor) return;
+            if (!editor) {return;}
 
             const selection = editor.selection;
             const text = editor.document.getText(selection);
@@ -657,7 +657,7 @@ function registerCommands(context: vscode.ExtensionContext, p: ExtensionProvider
     context.subscriptions.push(
         vscode.commands.registerCommand('victor.document', async () => {
             const editor = vscode.window.activeTextEditor;
-            if (!editor) return;
+            if (!editor) {return;}
 
             const selection = editor.selection;
             const text = editor.document.getText(selection);

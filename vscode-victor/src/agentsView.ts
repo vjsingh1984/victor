@@ -91,9 +91,9 @@ class AgentTaskItem extends vscode.TreeItem {
         const end = this.task.endTime || Date.now();
         const elapsed = end - this.task.startTime;
 
-        if (elapsed < 1000) return '<1s';
-        if (elapsed < 60000) return `${Math.floor(elapsed / 1000)}s`;
-        if (elapsed < 3600000) return `${Math.floor(elapsed / 60000)}m`;
+        if (elapsed < 1000) {return '<1s';}
+        if (elapsed < 60000) {return `${Math.floor(elapsed / 1000)}s`;}
+        if (elapsed < 3600000) {return `${Math.floor(elapsed / 60000)}m`;}
         return `${Math.floor(elapsed / 3600000)}h`;
     }
 
@@ -168,7 +168,7 @@ class AgentToolCallItem extends vscode.TreeItem {
     }
 
     private _getElapsedTime(): string {
-        if (!this.toolCall.endTime) return '';
+        if (!this.toolCall.endTime) {return '';}
         const elapsed = this.toolCall.endTime - this.toolCall.startTime;
         return elapsed < 1000 ? '<1s' : `${Math.floor(elapsed / 1000)}s`;
     }
@@ -407,7 +407,7 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
         }
         this._lastFetchTime = now;
 
-        if (this._isLoading) return;
+        if (this._isLoading) {return;}
         this._isLoading = true;
 
         try {
@@ -637,7 +637,7 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
                 [AgentStatus.Cancelled]: 5,
             };
             const statusDiff = statusOrder[a.status] - statusOrder[b.status];
-            if (statusDiff !== 0) return statusDiff;
+            if (statusDiff !== 0) {return statusDiff;}
             return b.startTime - a.startTime;  // Newer first
         });
 
@@ -720,7 +720,7 @@ export function registerAgentCommands(
                 }
             });
 
-            if (!task) return;
+            if (!task) {return;}
 
             // Get mode from user
             const modeOption = await vscode.window.showQuickPick([
@@ -731,7 +731,7 @@ export function registerAgentCommands(
                 placeHolder: 'Select agent mode',
             });
 
-            if (!modeOption) return;
+            if (!modeOption) {return;}
 
             // Combine task with context
             const fullTask = task + contextInfo;
@@ -743,7 +743,7 @@ export function registerAgentCommands(
             }
         }),
         vscode.commands.registerCommand('victor.viewAgentOutput', async (item: AgentTaskItem) => {
-            if (!item?.task) return;
+            if (!item?.task) {return;}
 
             const agent = item.task;
             const content = [

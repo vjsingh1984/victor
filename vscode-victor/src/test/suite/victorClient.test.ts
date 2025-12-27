@@ -256,7 +256,7 @@ suite('VictorClient Test Suite', () => {
             const emptyResponse = '';
 
             const parseResponse = (text: string): object | null => {
-                if (!text || text.trim() === '') return null;
+                if (!text || text.trim() === '') {return null;}
                 try {
                     return JSON.parse(text);
                 } catch {
@@ -273,10 +273,10 @@ suite('VictorClient Test Suite', () => {
     suite('Error Classification', () => {
         test('Should classify HTTP status codes', () => {
             const classifyError = (status: number): VictorErrorType => {
-                if (status === 401 || status === 403) return VictorErrorType.Auth;
-                if (status === 404) return VictorErrorType.NotFound;
-                if (status === 400 || status === 422) return VictorErrorType.Validation;
-                if (status >= 500) return VictorErrorType.ServerError;
+                if (status === 401 || status === 403) {return VictorErrorType.Auth;}
+                if (status === 404) {return VictorErrorType.NotFound;}
+                if (status === 400 || status === 422) {return VictorErrorType.Validation;}
+                if (status >= 500) {return VictorErrorType.ServerError;}
                 return VictorErrorType.Unknown;
             };
 

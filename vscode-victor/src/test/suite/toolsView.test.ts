@@ -96,7 +96,7 @@ suite('ToolsViewProvider Test Suite', () => {
 
             const grouped: Record<string, typeof tools> = {};
             tools.forEach(t => {
-                if (!grouped[t.category]) grouped[t.category] = [];
+                if (!grouped[t.category]) {grouped[t.category] = [];}
                 grouped[t.category].push(t);
             });
 
@@ -259,7 +259,7 @@ suite('ToolsViewProvider Test Suite', () => {
     suite('Empty State', () => {
         test('Should show empty message', () => {
             const getEmptyMessage = (isLoading: boolean): string => {
-                if (isLoading) return 'Loading tools...';
+                if (isLoading) {return 'Loading tools...';}
                 return 'No tools available';
             };
 

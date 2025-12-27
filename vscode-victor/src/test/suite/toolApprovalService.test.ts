@@ -14,7 +14,7 @@ suite('ToolApprovalService Test Suite', () => {
             const lowRiskTools = ['read_file', 'list_directory', 'code_search', 'git_status'];
 
             const getRiskLevel = (toolName: string): string => {
-                if (lowRiskTools.includes(toolName)) return 'low';
+                if (lowRiskTools.includes(toolName)) {return 'low';}
                 return 'medium';
             };
 
@@ -29,8 +29,8 @@ suite('ToolApprovalService Test Suite', () => {
                 const lowRisk = ['read_file', 'list_directory', 'code_search'];
                 const highRisk = ['bash', 'delete_file', 'docker_run'];
 
-                if (lowRisk.includes(toolName)) return 'low';
-                if (highRisk.includes(toolName)) return 'high';
+                if (lowRisk.includes(toolName)) {return 'low';}
+                if (highRisk.includes(toolName)) {return 'high';}
                 return 'medium';
             };
 
@@ -42,7 +42,7 @@ suite('ToolApprovalService Test Suite', () => {
             const highRiskTools = ['bash', 'delete_file', 'docker_run', 'execute_command'];
 
             const getRiskLevel = (toolName: string): string => {
-                if (highRiskTools.includes(toolName)) return 'high';
+                if (highRiskTools.includes(toolName)) {return 'high';}
                 return 'medium';
             };
 
@@ -55,7 +55,7 @@ suite('ToolApprovalService Test Suite', () => {
             const criticalRiskTools = ['rm_rf', 'drop_database', 'format_disk'];
 
             const getRiskLevel = (toolName: string): string => {
-                if (criticalRiskTools.includes(toolName)) return 'critical';
+                if (criticalRiskTools.includes(toolName)) {return 'critical';}
                 return 'low';
             };
 
@@ -134,7 +134,7 @@ suite('ToolApprovalService Test Suite', () => {
 
             const approve = (id: string) => {
                 const index = pendingApprovals.findIndex(a => a.id === id);
-                if (index !== -1) pendingApprovals.splice(index, 1);
+                if (index !== -1) {pendingApprovals.splice(index, 1);}
             };
 
             approve('a2');

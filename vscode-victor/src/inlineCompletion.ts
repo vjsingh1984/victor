@@ -273,7 +273,7 @@ export class ContextManager {
     static async resolveFileContext(mention: string): Promise<string> {
         // Parse @file:path/to/file.ts
         const match = mention.match(/@file:(.+)/);
-        if (!match) return '';
+        if (!match) {return '';}
 
         const filePath = match[1].trim();
         try {
@@ -290,7 +290,7 @@ export class ContextManager {
      */
     static async resolveFolderContext(mention: string): Promise<string> {
         const match = mention.match(/@folder:(.+)/);
-        if (!match) return '';
+        if (!match) {return '';}
 
         const folderPath = match[1].trim();
         try {

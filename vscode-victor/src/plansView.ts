@@ -419,7 +419,7 @@ export class PlansViewProvider implements vscode.TreeDataProvider<PlanTreeItem>,
                 'failed': 4,
             };
             const statusDiff = statusOrder[a.status] - statusOrder[b.status];
-            if (statusDiff !== 0) return statusDiff;
+            if (statusDiff !== 0) {return statusDiff;}
             return b.createdAt - a.createdAt;  // Newer first
         });
 

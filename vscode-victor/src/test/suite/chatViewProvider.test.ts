@@ -143,7 +143,7 @@ suite('ChatViewProvider Test Suite', () => {
 
         test('Should format tool arguments', () => {
             const formatToolArgs = (args: Record<string, unknown>): string => {
-                if (!args || Object.keys(args).length === 0) return '';
+                if (!args || Object.keys(args).length === 0) {return '';}
                 return Object.entries(args)
                     .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
                     .join(', ');
@@ -158,7 +158,7 @@ suite('ChatViewProvider Test Suite', () => {
 
         test('Should truncate long argument values', () => {
             const truncate = (value: string, maxLength: number): string => {
-                if (value.length <= maxLength) return value;
+                if (value.length <= maxLength) {return value;}
                 return value.substring(0, maxLength) + '...';
             };
 
@@ -176,9 +176,9 @@ suite('ChatViewProvider Test Suite', () => {
             type ToolStatus = 'pending' | 'running' | 'success' | 'error';
 
             const updateStatus = (current: ToolStatus, event: string): ToolStatus => {
-                if (event === 'start') return 'running';
-                if (event === 'complete') return 'success';
-                if (event === 'error') return 'error';
+                if (event === 'start') {return 'running';}
+                if (event === 'complete') {return 'success';}
+                if (event === 'error') {return 'error';}
                 return current;
             };
 

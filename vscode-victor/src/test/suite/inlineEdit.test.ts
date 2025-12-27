@@ -271,7 +271,7 @@ suite('Processing State', () => {
     });
 
     test('Processing prevents concurrent edits', () => {
-        let isProcessing = true;
+        const isProcessing = true;
 
         // Simulate attempt to start new edit
         const canStart = !isProcessing;

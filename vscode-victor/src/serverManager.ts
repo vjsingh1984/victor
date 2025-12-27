@@ -679,7 +679,7 @@ export function createServerManager(): ServerManager {
  * Detect a workspace-local Python (common venv layouts)
  */
 function detectWorkspacePython(workspacePath?: string): string | undefined {
-    if (!workspacePath) return undefined;
+    if (!workspacePath) {return undefined;}
 
     const candidates = [
         path.join(workspacePath, 'venv', 'bin', 'python'),

@@ -190,7 +190,7 @@ export class VictorCodeActionProvider implements vscode.CodeActionProvider {
     }
 
     private _truncate(text: string, maxLength: number): string {
-        if (text.length <= maxLength) return text;
+        if (text.length <= maxLength) {return text;}
         return text.substring(0, maxLength - 3) + '...';
     }
 }
@@ -269,7 +269,7 @@ What causes this error and how can I fix it?`;
                     placeHolder: 'e.g., simplify, make more readable, use modern syntax',
                 });
 
-                if (!suggestion) return;
+                if (!suggestion) {return;}
 
                 const prompt = `Refactor this ${document.languageId} code (${suggestion}):
 
@@ -296,7 +296,7 @@ Provide the refactored code.`;
                     placeHolder: 'e.g., calculateTotal, handleSubmit',
                 });
 
-                if (!functionName) return;
+                if (!functionName) {return;}
 
                 const prompt = `Extract this ${document.languageId} code into a function named "${functionName}":
 

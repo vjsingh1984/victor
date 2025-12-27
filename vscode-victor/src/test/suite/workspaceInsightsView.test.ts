@@ -39,7 +39,7 @@ suite('WorkspaceInsightsViewProvider Test Suite', () => {
 
         test('Should format file count', () => {
             const formatCount = (count: number): string => {
-                if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
+                if (count >= 1000) {return `${(count / 1000).toFixed(1)}k`;}
                 return count.toString();
             };
 
@@ -49,8 +49,8 @@ suite('WorkspaceInsightsViewProvider Test Suite', () => {
 
         test('Should format line count', () => {
             const formatLines = (lines: number): string => {
-                if (lines >= 1000000) return `${(lines / 1000000).toFixed(1)}M`;
-                if (lines >= 1000) return `${(lines / 1000).toFixed(1)}k`;
+                if (lines >= 1000000) {return `${(lines / 1000000).toFixed(1)}M`;}
+                if (lines >= 1000) {return `${(lines / 1000).toFixed(1)}k`;}
                 return lines.toString();
             };
 
@@ -267,8 +267,8 @@ suite('WorkspaceInsightsViewProvider Test Suite', () => {
 
         test('Should format file size', () => {
             const formatSize = (bytes: number): string => {
-                if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
-                if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+                if (bytes >= 1048576) {return `${(bytes / 1048576).toFixed(1)} MB`;}
+                if (bytes >= 1024) {return `${(bytes / 1024).toFixed(1)} KB`;}
                 return `${bytes} B`;
             };
 
@@ -316,7 +316,7 @@ suite('WorkspaceInsightsViewProvider Test Suite', () => {
     suite('Empty State', () => {
         test('Should show empty message', () => {
             const getMessage = (hasWorkspace: boolean): string => {
-                if (!hasWorkspace) return 'No workspace open';
+                if (!hasWorkspace) {return 'No workspace open';}
                 return 'Analyzing workspace...';
             };
 

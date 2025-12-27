@@ -111,7 +111,7 @@ export class ContextProvider {
         if (!query) {
             // Use current active file
             const editor = vscode.window.activeTextEditor;
-            if (!editor) return [];
+            if (!editor) {return [];}
 
             const content = editor.document.getText();
             const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
@@ -157,7 +157,7 @@ export class ContextProvider {
      * Resolve @symbol:name mention using workspace symbols
      */
     private async _resolveSymbolContext(query: string): Promise<ContextItem[]> {
-        if (!query) return [];
+        if (!query) {return [];}
 
         // Search workspace symbols
         const symbols = await vscode.commands.executeCommand<vscode.SymbolInformation[]>(
@@ -165,7 +165,7 @@ export class ContextProvider {
             query
         );
 
-        if (!symbols || symbols.length === 0) return [];
+        if (!symbols || symbols.length === 0) {return [];}
 
         const items: ContextItem[] = [];
 
@@ -236,7 +236,7 @@ export class ContextProvider {
      */
     private async _resolveSelectionContext(): Promise<ContextItem[]> {
         const editor = vscode.window.activeTextEditor;
-        if (!editor || editor.selection.isEmpty) return [];
+        if (!editor || editor.selection.isEmpty) {return [];}
 
         const selection = editor.selection;
         const content = editor.document.getText(selection);
@@ -257,10 +257,10 @@ export class ContextProvider {
      */
     private async _resolveDiagnosticsContext(): Promise<ContextItem[]> {
         const editor = vscode.window.activeTextEditor;
-        if (!editor) return [];
+        if (!editor) {return [];}
 
         const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
-        if (diagnostics.length === 0) return [];
+        if (diagnostics.length === 0) {return [];}
 
         const content = diagnostics
             .map(d => {
@@ -335,7 +335,7 @@ export class ContextProvider {
      * Format context items for inclusion in prompt
      */
     formatContextForPrompt(items: ContextItem[]): string {
-        if (items.length === 0) return '';
+        if (items.length === 0) {return '';}
 
         const sections = items.map(item => {
             const header = this._formatContextHeader(item);
@@ -385,7 +385,7 @@ export class MentionCompletionProvider implements vscode.CompletionItemProvider 
 
         // Check if we're after an @
         const atMatch = linePrefix.match(/@(\w*)$/);
-        if (!atMatch) return [];
+        if (!atMatch) {return [];}
 
         const prefix = atMatch[1].toLowerCase();
         const items: vscode.CompletionItem[] = [];
@@ -433,7 +433,7 @@ export async function showContextPicker(): Promise<ContextItem[]> {
         canPickMany: true,
     });
 
-    if (!selected) return [];
+    if (!selected) {return [];}
 
     const contextProvider = new ContextProvider();
     const items: ContextItem[] = [];
