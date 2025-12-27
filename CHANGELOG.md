@@ -5,6 +5,55 @@ All notable changes to Victor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2025-12-27
+
+### Added
+- **Homebrew Tap** - Install via `brew install vjsingh1984/tap/victor`
+- **Auto-updating Homebrew Formula** - Polls PyPI every 6 hours for new releases
+
+### Changed
+- **Docker Hub Only** - Removed GHCR push to simplify deployment (Docker Hub: `vjsingh1984/victor`)
+- **Simplified Binary Builds** - macOS and Windows binaries only; Linux users should use `pip install victor-ai`
+
+### Fixed
+- **Docker Build Disk Space** - Added cleanup step to free ~25GB on GitHub Actions runners
+- **macOS Runners** - Updated to `macos-15-intel` (macos-13 was retired)
+- **CI/CD Reliability** - Streamlined release workflow for consistent builds
+
+## [0.2.2] - 2025-12-27
+
+### Fixed
+- **Docker Build** - Added disk space cleanup for large PyTorch builds
+- **GHCR Permissions** - Added packages:write permission (later removed in 0.2.3)
+
+## [0.2.1] - 2025-12-27
+
+### Fixed
+- **Docker profiles.yaml** - Created `docker/profiles.yaml.example` for containerized deployments
+- **Dockerfile** - Falls back to example file when profiles.yaml is gitignored
+
+## [0.2.0] - 2025-12-27
+
+### Added
+
+#### Release Infrastructure
+- **PyPI Trusted Publishing** - OIDC-based publishing without API tokens
+- **GitHub Actions Release Pipeline** - Automated builds on tag push
+- **Multi-Platform Binaries** - macOS ARM64/x64, Windows x64 via PyInstaller
+- **Docker Images** - Pre-built containers with embedded models at `vjsingh1984/victor`
+- **Rust Native Extensions** - PyO3 bindings for SIMD-optimized operations
+- **Homebrew Tap** - `vjsingh1984/homebrew-tap` with auto-update workflow
+
+#### Provider Enhancements
+- **Cerebras Provider** - Qwen-3 thinking filter and deduplication
+- **vLLM Provider** - Local production serving with fallback tool parsing
+- **llama.cpp Provider** - Direct GGUF model support
+- **Keyring Support** - Secure API key storage for all cloud providers
+- **TDD Tests** - Comprehensive provider integration tests
+
+### Changed
+- **Version** - Bumped to 0.2.0 for first public release
+
 ## [Unreleased]
 
 ### Added

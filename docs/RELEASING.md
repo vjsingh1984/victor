@@ -122,20 +122,19 @@ When a tag matching `v*` is pushed, GitHub Actions automatically:
 **Standalone Binaries:**
 - `victor-macos-arm64.tar.gz`
 - `victor-macos-x64.tar.gz`
-- `victor-linux-x64.tar.gz`
 - `victor-windows-x64.zip`
+- Linux: Use `pip install victor-ai` (PyInstaller + PyTorch too complex)
 
 **Docker Images:**
-- `vijayksingh/victor:<version>`
-- `vijayksingh/victor:latest`
-- `ghcr.io/vijayksingh/victor:<version>`
+- `vjsingh1984/victor:<version>`
+- `vjsingh1984/victor:latest`
 
 ### 3. Publishes to Distribution Channels
 
-- **PyPI**: Automatic via trusted publishing
-- **GitHub Releases**: Creates release with artifacts
-- **Docker Hub**: Pushes multi-platform images
-- **GitHub Container Registry**: Pushes images
+- **PyPI**: Automatic via trusted publishing (OIDC, no token needed)
+- **GitHub Releases**: Creates release with artifacts and checksums
+- **Docker Hub**: Pushes images to `vjsingh1984/victor`
+- **Homebrew**: Auto-updates via PyPI polling (every 6 hours)
 
 ### Required Secrets
 
@@ -143,11 +142,12 @@ Configure these in GitHub repository settings:
 
 | Secret | Purpose |
 |--------|---------|
-| `DOCKERHUB_USERNAME` | Docker Hub username |
+| `DOCKERHUB_USERNAME` | Docker Hub username (`vjsingh1984`) |
 | `DOCKERHUB_TOKEN` | Docker Hub access token |
-| `HOMEBREW_TAP_TOKEN` | Token for Homebrew tap repo |
 
-**Note:** PyPI uses trusted publishing (no token needed).
+**Notes:**
+- PyPI uses trusted publishing (OIDC, no token needed)
+- Homebrew tap uses PyPI polling (no cross-repo token needed)
 
 ## Manual Release Steps
 
@@ -184,12 +184,12 @@ ls dist/
 
 ```bash
 # Build
-docker build -t vijayksingh/victor:0.2.0 .
-docker tag vijayksingh/victor:0.2.0 vijayksingh/victor:latest
+docker build -t vjsingh1984/victor:0.2.3 .
+docker tag vjsingh1984/victor:0.2.3 vjsingh1984/victor:latest
 
 # Push
-docker push vijayksingh/victor:0.2.0
-docker push vijayksingh/victor:latest
+docker push vjsingh1984/victor:0.2.3
+docker push vjsingh1984/victor:latest
 ```
 
 ### Create GitHub Release
@@ -215,17 +215,13 @@ docker push vijayksingh/victor:latest
 - **Contains**: Source code, binaries, changelog
 
 ### Docker Hub
-- **URL**: https://hub.docker.com/r/vijayksingh/victor
-- **Pull**: `docker pull vijayksingh/victor:latest`
-
-### GitHub Container Registry
-- **URL**: ghcr.io/vijayksingh/victor
-- **Pull**: `docker pull ghcr.io/vijayksingh/victor:latest`
+- **URL**: https://hub.docker.com/r/vjsingh1984/victor
+- **Pull**: `docker pull vjsingh1984/victor:latest`
 
 ### Homebrew
-- **Tap**: `vijayksingh/tap`
-- **Install**: `brew install vijayksingh/tap/victor`
-- **Formula**: Updated automatically via workflow
+- **Tap**: `vjsingh1984/tap`
+- **Install**: `brew install vjsingh1984/tap/victor`
+- **Formula**: Auto-updates every 6 hours via PyPI polling
 
 ## Post-Release Tasks
 
@@ -239,8 +235,8 @@ After a successful release:
 
 2. **Test Docker Image**
    ```bash
-   docker pull vijayksingh/victor:0.2.0
-   docker run vijayksingh/victor:0.2.0 victor --version
+   docker pull vjsingh1984/victor:0.2.3
+   docker run vjsingh1984/victor:0.2.3 victor --version
    ```
 
 3. **Update Documentation**
@@ -335,22 +331,22 @@ pip install -e ".[build]"
 
 ### Homebrew Formula Not Updated
 
-1. Check `HOMEBREW_TAP_TOKEN` is valid
-2. Manually update formula in tap repository
-3. Run: `brew update && brew upgrade victor`
+1. Check `vjsingh1984/homebrew-tap` workflow ran successfully
+2. Formula auto-updates via PyPI polling (every 6 hours)
+3. Manually trigger: Go to Actions → "Update Formula" → Run workflow
+4. Run: `brew update && brew upgrade victor`
 
 ## Release Artifacts Reference
 
 | Artifact | Location | Purpose |
 |----------|----------|---------|
-| `victor-0.2.0.tar.gz` | PyPI, GitHub | Source distribution |
-| `victor-0.2.0-py3-none-any.whl` | PyPI, GitHub | Python wheel |
+| `victor_ai-0.2.3.tar.gz` | PyPI, GitHub | Source distribution |
+| `victor_ai-0.2.3-py3-none-any.whl` | PyPI, GitHub | Python wheel |
 | `victor-macos-arm64.tar.gz` | GitHub | macOS Apple Silicon binary |
 | `victor-macos-x64.tar.gz` | GitHub | macOS Intel binary |
-| `victor-linux-x64.tar.gz` | GitHub | Linux binary |
 | `victor-windows-x64.zip` | GitHub | Windows binary |
-| `vijayksingh/victor:0.2.0` | Docker Hub | Docker image |
-| `ghcr.io/vijayksingh/victor:0.2.0` | GHCR | Docker image |
+| `vjsingh1984/victor:0.2.3` | Docker Hub | Docker image |
+| `checksums.txt` | GitHub | SHA256 checksums |
 
 ## See Also
 

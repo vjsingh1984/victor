@@ -33,7 +33,7 @@ iwr -useb https://raw.githubusercontent.com/vijayksingh/victor/main/scripts/inst
 ### pip Install
 
 ```bash
-pip install victor
+pip install victor-ai
 ```
 
 ## Installation Methods
@@ -44,13 +44,13 @@ The simplest way to install Victor if you have Python 3.10+ installed.
 
 ```bash
 # Basic installation
-pip install victor
+pip install victor-ai
 
 # With development tools
-pip install "victor[dev]"
+pip install "victor-ai[dev]"
 
 # With all optional dependencies
-pip install "victor[all]"
+pip install "victor-ai[all]"
 ```
 
 **Requirements:**
@@ -72,7 +72,7 @@ pip install pipx
 pipx ensurepath
 
 # Install Victor
-pipx install victor
+pipx install victor-ai
 ```
 
 **Benefits:**
@@ -106,12 +106,12 @@ pip install git+https://github.com/vijayksingh/victor.git@develop
 Pre-built binaries that don't require Python installation.
 
 **Download from GitHub Releases:**
-1. Go to [GitHub Releases](https://github.com/vijayksingh/victor/releases/latest)
+1. Go to [GitHub Releases](https://github.com/vjsingh1984/victor/releases/latest)
 2. Download the appropriate binary for your platform:
    - `victor-macos-arm64.tar.gz` - macOS Apple Silicon
    - `victor-macos-x64.tar.gz` - macOS Intel
-   - `victor-linux-x64.tar.gz` - Linux x86_64
    - `victor-windows-x64.zip` - Windows x64
+   - **Linux**: Use `pip install victor-ai` (binaries not available)
 
 **Install on macOS/Linux:**
 ```bash
@@ -138,20 +138,20 @@ For containerized environments or when you want complete isolation.
 
 ```bash
 # Pull the latest image
-docker pull vijayksingh/victor:latest
+docker pull vjsingh1984/victor:latest
 
 # Run interactively
 docker run -it --rm \
   -v $(pwd):/workspace \
   -v ~/.victor:/home/victor/.victor \
-  vijayksingh/victor:latest \
+  vjsingh1984/victor:latest \
   victor chat
 
 # Run as a service
 docker run -d --name victor-server \
   -p 8765:8765 \
   -v $(pwd):/workspace \
-  vijayksingh/victor:latest \
+  vjsingh1984/victor:latest \
   victor serve
 ```
 
@@ -161,7 +161,7 @@ docker run -d --name victor-server \
 version: '3.8'
 services:
   victor:
-    image: vijayksingh/victor:latest
+    image: vjsingh1984/victor:latest
     volumes:
       - .:/workspace
       - victor-config:/home/victor/.victor
@@ -188,13 +188,13 @@ docker build -t victor:airgapped .
 docker run --network none -it victor:airgapped victor chat
 ```
 
-### Homebrew (macOS)
+### Homebrew (macOS/Linux)
 
-For macOS users who prefer Homebrew.
+For macOS and Linux users who prefer Homebrew.
 
 ```bash
 # Add the tap (first time only)
-brew tap vijayksingh/tap
+brew tap vjsingh1984/tap
 
 # Install
 brew install victor
@@ -202,6 +202,8 @@ brew install victor
 # Upgrade
 brew upgrade victor
 ```
+
+**Note**: The Homebrew formula auto-updates within 6 hours of new PyPI releases.
 
 ## Platform-Specific Instructions
 
@@ -216,10 +218,10 @@ brew upgrade victor
 ```bash
 # Using pip with Homebrew Python
 brew install python@3.12
-pip3 install victor
+pip3 install victor-ai
 
 # Or using Homebrew tap
-brew tap vijayksingh/tap
+brew tap vjsingh1984/tap
 brew install victor
 ```
 
@@ -233,7 +235,7 @@ sudo apt install -y python3.12 python3.12-venv python3-pip git
 
 **Install:**
 ```bash
-pip3 install victor
+pip3 install victor-ai
 ```
 
 ### Linux (Fedora/RHEL)
@@ -245,7 +247,7 @@ sudo dnf install -y python3.12 python3-pip git
 
 **Install:**
 ```bash
-pip3 install victor
+pip3 install victor-ai
 ```
 
 ### Windows
@@ -257,7 +259,7 @@ pip3 install victor
 
 **Install via PowerShell:**
 ```powershell
-pip install victor
+pip install victor-ai
 ```
 
 **Or use the standalone binary** (no Python required):
@@ -269,7 +271,7 @@ pip install victor
 Follow the Linux instructions within your WSL distribution:
 ```bash
 # In WSL terminal
-pip3 install victor
+pip3 install victor-ai
 ```
 
 ## Post-Installation Setup
@@ -334,12 +336,12 @@ victor chat
 
 ### pip
 ```bash
-pip install --upgrade victor
+pip install --upgrade victor-ai
 ```
 
 ### pipx
 ```bash
-pipx upgrade victor
+pipx upgrade victor-ai
 ```
 
 ### Homebrew
@@ -349,19 +351,19 @@ brew upgrade victor
 
 ### Docker
 ```bash
-docker pull vijayksingh/victor:latest
+docker pull vjsingh1984/victor:latest
 ```
 
 ## Uninstalling
 
 ### pip
 ```bash
-pip uninstall victor
+pip uninstall victor-ai
 ```
 
 ### pipx
 ```bash
-pipx uninstall victor
+pipx uninstall victor-ai
 ```
 
 ### Homebrew

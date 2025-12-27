@@ -432,7 +432,7 @@ victor chat --vertical data_analysis "Profile this dataset and identify correlat
 |--------|---------|-------|
 | **pip** | `pip install victor-ai` | Recommended |
 | **pipx** | `pipx install victor-ai` | Isolated environment |
-| **Docker** | `docker run vijayksingh/victor` | Containerized |
+| **Docker** | `docker pull vjsingh1984/victor` | Containerized |
 | **Source** | `pip install -e ".[dev]"` | Development |
 
 See [Installation Guide](docs/guides/INSTALLATION.md) for details.
@@ -475,7 +475,7 @@ Victor is in active development with **11,100+ passing tests**. Core functionali
 | Semantic Search | Stable | 10 languages, AST parsing |
 | VS Code Extension | Beta | vscode-victor/ directory |
 | MCP Support | Stable | Client + server modes |
-| PyPI Package | v0.2.0 | `pip install victor-ai` |
+| PyPI Package | v0.2.3 | `pip install victor-ai` |
 
 ---
 
