@@ -265,8 +265,8 @@ jobs:
           context: .
           push: true
           tags: |
-            vijayksingh/victor:${{ steps.version.outputs.VERSION }}
-            vijayksingh/victor:latest
+            vjsingh1984/victor:${{ steps.version.outputs.VERSION }}
+            vjsingh1984/victor:latest
             ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
             ghcr.io/${{ github.repository }}:latest
           cache-from: type=gha
@@ -398,8 +398,8 @@ jobs:
 
           ### Using Docker
           \`\`\`bash
-          docker pull vijayksingh/victor:${{ steps.version.outputs.VERSION }}
-          docker run -it --rm vijayksingh/victor:${{ steps.version.outputs.VERSION }}
+          docker pull vjsingh1984/victor:${{ steps.version.outputs.VERSION }}
+          docker run -it --rm vjsingh1984/victor:${{ steps.version.outputs.VERSION }}
           \`\`\`
 
           ## Platform Binaries
