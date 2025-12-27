@@ -57,6 +57,10 @@ from rich.console import Console
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator_integration import OrchestratorIntegration
+    from victor.agent.recovery_coordinator import RecoveryCoordinator
+    from victor.agent.chunk_generator import ChunkGenerator
+    from victor.agent.tool_planner import ToolPlanner
+    from victor.agent.task_coordinator import TaskCoordinator
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.message_history import MessageHistory
@@ -515,9 +519,7 @@ class AgentOrchestrator(ModeAwareMixin):
             try:
                 self._init_conversation_embedding_store()
             except Exception as embed_err:
-                logger.warning(
-                    f"Failed to initialize ConversationEmbeddingStore: {embed_err}"
-                )
+                logger.warning(f"Failed to initialize ConversationEmbeddingStore: {embed_err}")
 
         # Conversation state machine for intelligent stage detection (via factory, DI with fallback)
         self.conversation_state = self._factory.create_conversation_state_machine()
@@ -1335,7 +1337,9 @@ class AgentOrchestrator(ModeAwareMixin):
                         },
                         vertical="coding",
                     )
-                    self._rl_coordinator.record_outcome("continuation_patience", patience_outcome, "coding")
+                    self._rl_coordinator.record_outcome(
+                        "continuation_patience", patience_outcome, "coding"
+                    )
 
             except Exception as e:
                 logger.warning(f"RL: Failed to record RL outcomes: {e}")
@@ -2736,10 +2740,7 @@ class AgentOrchestrator(ModeAwareMixin):
                 ("default", max_cont_default),
             ]:
                 recommendation = self._rl_coordinator.get_recommendation(
-                    "continuation_prompts",
-                    self.provider.name,
-                    self.model,
-                    task_type_name
+                    "continuation_prompts", self.provider.name, self.model, task_type_name
                 )
                 if recommendation and recommendation.value is not None:
                     learned_val = recommendation.value
@@ -3990,9 +3991,7 @@ class AgentOrchestrator(ModeAwareMixin):
         # Get elapsed time from streaming controller
         elapsed_time = 0.0
         if self._streaming_controller.current_session:
-            elapsed_time = (
-                time.time() - self._streaming_controller.current_session.start_time
-            )
+            elapsed_time = time.time() - self._streaming_controller.current_session.start_time
 
         return RecoveryContext(
             iteration=stream_ctx.total_iterations,
@@ -4157,7 +4156,7 @@ class AgentOrchestrator(ModeAwareMixin):
 
         Creates RecoveryContext and delegates to recovery_coordinator viacheck_blocked_threshold() directly.
 
-        
+
         Args:
             stream_ctx: The streaming context
             all_blocked: Whether all tool calls were blocked
@@ -4169,9 +4168,7 @@ class AgentOrchestrator(ModeAwareMixin):
         recovery_ctx = self._create_recovery_context(stream_ctx)
 
         # Delegate to RecoveryCoordinator (thresholds are read from settings internally)
-        return self._recovery_coordinator.check_blocked_threshold(
-            recovery_ctx, all_blocked
-        )
+        return self._recovery_coordinator.check_blocked_threshold(recovery_ctx, all_blocked)
 
     async def _handle_recovery_with_integration(
         self,
@@ -4184,7 +4181,7 @@ class AgentOrchestrator(ModeAwareMixin):
 
         Creates RecoveryContext and delegates to recovery_coordinator viahandle_recovery_with_integration() directly.
 
-        
+
         Args:
             stream_ctx: The streaming context
             full_content: Full response content
@@ -4215,7 +4212,7 @@ class AgentOrchestrator(ModeAwareMixin):
 
         Creates RecoveryContext and delegates to recovery_coordinator viaapply_recovery_action() directly.
 
-        
+
         Args:
             recovery_action: The recovery action to apply
             stream_ctx: The streaming context
@@ -4240,7 +4237,7 @@ class AgentOrchestrator(ModeAwareMixin):
 
         Creates RecoveryContext and delegates to recovery_coordinator viafilter_blocked_tool_calls() directly.
 
-        
+
         Args:
             stream_ctx: The streaming context
             tool_calls: List of tool calls to filter
@@ -4262,7 +4259,7 @@ class AgentOrchestrator(ModeAwareMixin):
 
         Creates RecoveryContext and delegates to recovery_coordinator viacheck_force_action() directly.
 
-        
+
         Args:
             stream_ctx: The streaming context
 
@@ -4288,14 +4285,14 @@ class AgentOrchestrator(ModeAwareMixin):
 
         Creates RecoveryContext and delegates to recovery_coordinator viahandle_force_tool_execution() directly.
 
-        
+
         Args:
             stream_ctx: The streaming context
             mentioned_tools: Tools that were mentioned but not executed
             force_message: Optional pre-crafted message to use instead of default
         """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
+        # Create recovery context from current state (reserved for RecoveryCoordinator)
+        _recovery_ctx = self._create_recovery_context(stream_ctx)  # noqa: F841
 
         # Delegate to RecoveryCoordinator
         # Note: RecoveryCoordinator's implementation is currently a stub
@@ -4314,7 +4311,7 @@ class AgentOrchestrator(ModeAwareMixin):
 
         Creates RecoveryContext and delegates to recovery_coordinator viacheck_tool_budget() directly.
 
-        
+
         Args:
             stream_ctx: The streaming context
 
@@ -4333,7 +4330,7 @@ class AgentOrchestrator(ModeAwareMixin):
 
         Creates RecoveryContext and delegates to recovery_coordinator viacheck_progress() directly.
 
-        
+
         Args:
             stream_ctx: The streaming context
 
@@ -4364,7 +4361,7 @@ class AgentOrchestrator(ModeAwareMixin):
 
         Creates RecoveryContext and delegates to recovery_coordinator viatruncate_tool_calls() directly.
 
-        
+
         Args:
             tool_calls: List of tool calls
             stream_ctx: The streaming context
@@ -4390,7 +4387,7 @@ class AgentOrchestrator(ModeAwareMixin):
 
         Creates RecoveryContext and delegates to recovery_coordinator viahandle_force_completion() directly.
 
-        
+
         Args:
             stream_ctx: The streaming context
 
@@ -4400,8 +4397,8 @@ class AgentOrchestrator(ModeAwareMixin):
         if not stream_ctx.force_completion:
             return None
 
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
+        # Create recovery context from current state (reserved for RecoveryCoordinator)
+        _recovery_ctx = self._create_recovery_context(stream_ctx)  # noqa: F841
 
         # Get stop decision from unified tracker for context
         stop_decision = self.unified_tracker.should_stop()
@@ -4424,15 +4421,15 @@ class AgentOrchestrator(ModeAwareMixin):
 
         Creates RecoveryContext and delegates to recovery_coordinator viaget_recovery_prompts() directly.
 
-        
+
         Args:
             stream_ctx: The streaming context
 
         Returns:
             List of (prompt, temperature) tuples for recovery attempts
         """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
+        # Create recovery context from current state (reserved for RecoveryCoordinator)
+        _recovery_ctx = self._create_recovery_context(stream_ctx)  # noqa: F841
 
         # Get thinking mode settings
         has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
@@ -4455,7 +4452,7 @@ class AgentOrchestrator(ModeAwareMixin):
 
         Creates RecoveryContext and delegates to recovery_coordinator viashould_use_tools_for_recovery() directly.
 
-        
+
         Args:
             stream_ctx: The streaming context
             attempt: The recovery attempt number (1-indexed)
@@ -4463,8 +4460,8 @@ class AgentOrchestrator(ModeAwareMixin):
         Returns:
             True if tools should be enabled, False otherwise
         """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
+        # Create recovery context from current state (reserved for RecoveryCoordinator)
+        _recovery_ctx = self._create_recovery_context(stream_ctx)  # noqa: F841
 
         # Delegate to streaming handler (RecoveryCoordinator doesn't take attempt parameter)
         return self._streaming_handler.should_use_tools_for_recovery(stream_ctx, attempt)
@@ -4477,7 +4474,7 @@ class AgentOrchestrator(ModeAwareMixin):
 
         Creates RecoveryContext and delegates to recovery_coordinator viaget_recovery_fallback_message() directly.
 
-        
+
         Args:
             stream_ctx: The streaming context
 
@@ -4499,7 +4496,7 @@ class AgentOrchestrator(ModeAwareMixin):
 
         Creates RecoveryContext and delegates to recovery_coordinator viahandle_loop_warning() directly.
 
-        
+
         Args:
             stream_ctx: The streaming context
             warning_message: The warning message from unified tracker
@@ -4507,8 +4504,8 @@ class AgentOrchestrator(ModeAwareMixin):
         Returns:
             StreamChunk with warning if applicable, None otherwise
         """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
+        # Create recovery context from current state (reserved for RecoveryCoordinator)
+        _recovery_ctx = self._create_recovery_context(stream_ctx)  # noqa: F841
 
         # Delegate to streaming handler (RecoveryCoordinator signature is different)
         return self._streaming_handler.handle_loop_warning(stream_ctx, warning_message)
@@ -5231,7 +5228,9 @@ class AgentOrchestrator(ModeAwareMixin):
                         one_shot_mode=one_shot_mode,
                         mentioned_tools=mentioned_tools_detected,  # Pass hallucinated tool mentions
                         # Context from orchestrator
-                        max_prompts_summary_requested=getattr(self, "_max_prompts_summary_requested", False),
+                        max_prompts_summary_requested=getattr(
+                            self, "_max_prompts_summary_requested", False
+                        ),
                         settings=self.settings,
                         rl_coordinator=self._rl_coordinator,
                         provider_name=self.provider.name,
@@ -5303,7 +5302,8 @@ class AgentOrchestrator(ModeAwareMixin):
                             )
                             try:
                                 response = await self.provider.chat(
-                                    messages=self.messages + [
+                                    messages=self.messages
+                                    + [
                                         Message(
                                             role="user",
                                             content="CRITICAL: Provide your FINAL ANALYSIS NOW. "
@@ -5320,7 +5320,9 @@ class AgentOrchestrator(ModeAwareMixin):
                                     sanitized = self._sanitize_response(response.content)
                                     if sanitized:
                                         self.add_message("assistant", sanitized)
-                                        yield self._chunk_generator.generate_content_chunk(sanitized)
+                                        yield self._chunk_generator.generate_content_chunk(
+                                            sanitized
+                                        )
 
                                 # Display metrics and exit
                                 elapsed_time = time.time() - stream_ctx.start_time
@@ -5826,7 +5828,7 @@ class AgentOrchestrator(ModeAwareMixin):
             error_msg = exec_result.error
 
             # Reset activity timer after tool execution to prevent idle timeout during active work
-            if hasattr(self, '_current_stream_context') and self._current_stream_context:
+            if hasattr(self, "_current_stream_context") and self._current_stream_context:
                 self._current_stream_context.reset_activity_timer()
 
             # Update counters and tracking

@@ -101,9 +101,7 @@ def normalize_block(block: str) -> str:
     return normalized.lower()
 
 
-def rolling_hash_blocks(
-    content: str, min_block_length: int = 50
-) -> List[Tuple[str, str, bool]]:
+def rolling_hash_blocks(content: str, min_block_length: int = 50) -> List[Tuple[str, str, bool]]:
     """Process content and compute hashes for all blocks.
 
     Args:
@@ -136,9 +134,7 @@ def rolling_hash_blocks(
     return results
 
 
-def find_duplicate_blocks(
-    content: str, min_block_length: int = 50
-) -> List[Tuple[int, str]]:
+def find_duplicate_blocks(content: str, min_block_length: int = 50) -> List[Tuple[int, str]]:
     """Find duplicate blocks in content and return their indices.
 
     Args:
@@ -238,9 +234,7 @@ def cosine_similarity(a: List[float], b: List[float]) -> float:
     return float(np.dot(a_arr, b_arr) / (norm_a * norm_b))
 
 
-def batch_cosine_similarity(
-    query: List[float], corpus: List[List[float]]
-) -> List[float]:
+def batch_cosine_similarity(query: List[float], corpus: List[List[float]]) -> List[float]:
     """Compute cosine similarity between a query vector and multiple corpus vectors.
 
     Args:
@@ -271,9 +265,7 @@ def batch_cosine_similarity(
 
     # Normalize
     query_norm = query_arr / (np.linalg.norm(query_arr) + 1e-9)
-    corpus_norms = corpus_arr / (
-        np.linalg.norm(corpus_arr, axis=1, keepdims=True) + 1e-9
-    )
+    corpus_norms = corpus_arr / (np.linalg.norm(corpus_arr, axis=1, keepdims=True) + 1e-9)
 
     # Compute similarities
     similarities = np.dot(corpus_norms, query_norm)
@@ -469,9 +461,7 @@ def compute_signature(tool_name: str, arguments: Dict[str, Any]) -> str:
     return hashlib.md5(combined.encode()).hexdigest()[:16]
 
 
-def compute_batch_signatures(
-    tool_calls: List[Tuple[str, Dict[str, Any]]]
-) -> List[str]:
+def compute_batch_signatures(tool_calls: List[Tuple[str, Dict[str, Any]]]) -> List[str]:
     """Compute signatures for multiple tool calls in batch.
 
     Args:
@@ -522,6 +512,532 @@ def _value_to_str(value: Any) -> str:
 
 
 # =============================================================================
+# STREAMING FILTER (Thinking Token Detection)
+# =============================================================================
+
+
+class StreamingChunkResultFallback:
+    """Fallback result class for streaming content filter."""
+
+    def __init__(
+        self,
+        content: str,
+        is_thinking: bool = False,
+        state_changed: bool = False,
+        entering_thinking: bool = False,
+        exiting_thinking: bool = False,
+    ):
+        self.content = content
+        self.is_thinking = is_thinking
+        self.state_changed = state_changed
+        self.entering_thinking = entering_thinking
+        self.exiting_thinking = exiting_thinking
+
+
+# Thinking token patterns
+_THINKING_START_PATTERNS = [
+    "<｜begin▁of▁thinking｜>",  # DeepSeek Unicode
+    "<|begin_of_thinking|>",  # DeepSeek ASCII
+    "<think>",  # Qwen3
+]
+
+_THINKING_END_PATTERNS = [
+    "<｜end▁of▁thinking｜>",  # DeepSeek Unicode
+    "<|end_of_thinking|>",  # DeepSeek ASCII
+    "</think>",  # Qwen3
+]
+
+_ALL_THINKING_PATTERNS = _THINKING_START_PATTERNS + _THINKING_END_PATTERNS
+
+
+def strip_thinking_tokens(content: str) -> str:
+    """Strip all thinking tokens from content.
+
+    Args:
+        content: Text potentially containing thinking tokens
+
+    Returns:
+        Content with thinking tokens removed
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.strip_thinking_tokens(content)
+
+    # Pure Python fallback
+    result = content
+    for pattern in _ALL_THINKING_PATTERNS:
+        result = result.replace(pattern, "")
+    return result
+
+
+def contains_thinking_tokens(content: str) -> bool:
+    """Check if content contains any thinking tokens.
+
+    Args:
+        content: Text to check
+
+    Returns:
+        True if thinking tokens are present
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.contains_thinking_tokens(content)
+
+    # Pure Python fallback
+    return any(pattern in content for pattern in _ALL_THINKING_PATTERNS)
+
+
+def find_thinking_tokens(content: str) -> List[Tuple[int, int, int]]:
+    """Find all thinking token positions in content.
+
+    Args:
+        content: Text to search
+
+    Returns:
+        List of (start, end, pattern_index) tuples
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.find_thinking_tokens(content)
+
+    # Pure Python fallback
+    results = []
+    for idx, pattern in enumerate(_ALL_THINKING_PATTERNS):
+        pos = 0
+        while True:
+            found = content.find(pattern, pos)
+            if found == -1:
+                break
+            results.append((found, found + len(pattern), idx))
+            pos = found + 1
+
+    results.sort(key=lambda x: x[0])
+    return results
+
+
+def extract_thinking_content(content: str) -> Tuple[str, str]:
+    """Extract thinking content from a complete response.
+
+    Args:
+        content: Full response text
+
+    Returns:
+        Tuple of (main_content, thinking_content)
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.extract_thinking_content(content)
+
+    # Pure Python fallback
+    main_content = []
+    thinking_content = []
+    in_thinking = False
+    pos = 0
+
+    while pos < len(content):
+        if not in_thinking:
+            # Look for start pattern
+            earliest_start = len(content)
+            start_pattern_len = 0
+            for pattern in _THINKING_START_PATTERNS:
+                idx = content.find(pattern, pos)
+                if idx != -1 and idx < earliest_start:
+                    earliest_start = idx
+                    start_pattern_len = len(pattern)
+
+            if earliest_start < len(content):
+                main_content.append(content[pos:earliest_start])
+                in_thinking = True
+                pos = earliest_start + start_pattern_len
+            else:
+                main_content.append(content[pos:])
+                break
+        else:
+            # Look for end pattern
+            earliest_end = len(content)
+            end_pattern_len = 0
+            for pattern in _THINKING_END_PATTERNS:
+                idx = content.find(pattern, pos)
+                if idx != -1 and idx < earliest_end:
+                    earliest_end = idx
+                    end_pattern_len = len(pattern)
+
+            if earliest_end < len(content):
+                thinking_content.append(content[pos:earliest_end])
+                in_thinking = False
+                pos = earliest_end + end_pattern_len
+            else:
+                thinking_content.append(content[pos:])
+                break
+
+    return "".join(main_content), "".join(thinking_content)
+
+
+# Re-export native classes when available
+if _NATIVE_AVAILABLE:
+    StreamingFilter = _native.StreamingFilter
+    StreamingChunkResult = _native.StreamingChunkResult
+else:
+    # Use Python fallback from response_sanitizer
+    try:
+        from victor.agent.response_sanitizer import (
+            StreamingContentFilter as StreamingFilter,
+            StreamingChunkResult,
+        )
+    except ImportError:
+        StreamingFilter = None
+        StreamingChunkResult = StreamingChunkResultFallback
+
+
+# =============================================================================
+# TASK CLASSIFIER
+# =============================================================================
+
+
+def classify_task_native(text: str) -> Any:
+    """Classify a task using native classifier.
+
+    Args:
+        text: User message to classify
+
+    Returns:
+        ClassificationResult with task type and confidence
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.classify_task(text)
+
+    # Fallback to unified classifier
+    from victor.agent.unified_classifier import classify_task
+
+    return classify_task(text)
+
+
+def has_action_keywords(text: str) -> bool:
+    """Check if text contains action keywords.
+
+    Args:
+        text: Text to check
+
+    Returns:
+        True if action keywords are present
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.has_action_keywords(text)
+
+    # Pure Python fallback
+    action_keywords = [
+        "execute",
+        "apply",
+        "run",
+        "deploy",
+        "build",
+        "install",
+        "start",
+        "stop",
+        "restart",
+        "test",
+        "commit",
+        "push",
+        "pull",
+        "merge",
+    ]
+    text_lower = text.lower()
+    return any(kw in text_lower for kw in action_keywords)
+
+
+def has_analysis_keywords(text: str) -> bool:
+    """Check if text contains analysis keywords.
+
+    Args:
+        text: Text to check
+
+    Returns:
+        True if analysis keywords are present
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.has_analysis_keywords(text)
+
+    # Pure Python fallback
+    analysis_keywords = [
+        "analyze",
+        "explore",
+        "review",
+        "understand",
+        "explain",
+        "describe",
+        "investigate",
+        "examine",
+        "study",
+        "assess",
+        "evaluate",
+        "summarize",
+    ]
+    text_lower = text.lower()
+    return any(kw in text_lower for kw in analysis_keywords)
+
+
+def has_generation_keywords(text: str) -> bool:
+    """Check if text contains generation keywords.
+
+    Args:
+        text: Text to check
+
+    Returns:
+        True if generation keywords are present
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.has_generation_keywords(text)
+
+    # Pure Python fallback
+    generation_keywords = [
+        "create",
+        "generate",
+        "write",
+        "implement",
+        "add",
+        "new",
+        "scaffold",
+        "initialize",
+        "setup",
+        "bootstrap",
+    ]
+    text_lower = text.lower()
+    return any(kw in text_lower for kw in generation_keywords)
+
+
+def has_negation(text: str) -> bool:
+    """Check if text contains negation patterns.
+
+    Args:
+        text: Text to check
+
+    Returns:
+        True if negation patterns are present
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.has_negation(text)
+
+    # Pure Python fallback
+    negation_patterns = [
+        "don't",
+        "do not",
+        "dont",
+        "shouldn't",
+        "should not",
+        "wouldn't",
+        "would not",
+        "can't",
+        "cannot",
+        "not",
+        "never",
+        "without",
+        "avoid",
+        "skip",
+        "ignore",
+    ]
+    text_lower = text.lower()
+    return any(pattern in text_lower for pattern in negation_patterns)
+
+
+def find_all_keywords(text: str) -> List[Tuple[int, int, str, str]]:
+    """Find all keyword matches in text.
+
+    Args:
+        text: Text to search
+
+    Returns:
+        List of (start, end, matched_text, category) tuples
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.find_all_keywords(text)
+
+    # Pure Python fallback
+    results = []
+    text_lower = text.lower()
+
+    keyword_categories = {
+        "action": [
+            "execute",
+            "apply",
+            "run",
+            "deploy",
+            "build",
+            "install",
+            "start",
+            "stop",
+            "restart",
+            "test",
+            "commit",
+            "push",
+        ],
+        "analysis": [
+            "analyze",
+            "explore",
+            "review",
+            "understand",
+            "explain",
+            "describe",
+            "investigate",
+            "examine",
+        ],
+        "generation": [
+            "create",
+            "generate",
+            "write",
+            "implement",
+            "add",
+            "scaffold",
+        ],
+        "search": ["find", "search", "locate", "grep", "look for", "where is"],
+        "edit": [
+            "modify",
+            "refactor",
+            "fix",
+            "update",
+            "change",
+            "edit",
+            "rename",
+        ],
+    }
+
+    for category, keywords in keyword_categories.items():
+        for keyword in keywords:
+            pos = 0
+            while True:
+                found = text_lower.find(keyword, pos)
+                if found == -1:
+                    break
+                end = found + len(keyword)
+                matched = text[found:end]
+                results.append((found, end, matched, category))
+                pos = found + 1
+
+    results.sort(key=lambda x: x[0])
+    return results
+
+
+# Re-export native classes when available
+if _NATIVE_AVAILABLE:
+    NativeTaskClassifier = _native.TaskClassifier
+    NativeClassificationResult = _native.ClassificationResult
+    NativeTaskType = _native.TaskType
+else:
+    NativeTaskClassifier = None
+    NativeClassificationResult = None
+    NativeTaskType = None
+
+
+# =============================================================================
+# THINKING DETECTOR
+# =============================================================================
+
+# Circular thinking patterns
+_CIRCULAR_PATTERNS = [
+    "let me read",
+    "let me check",
+    "let me look at",
+    "let me examine",
+    "let me see",
+    "i need to read",
+    "i need to check",
+    "i need to look at",
+    "first let me",
+    "now let me",
+    "let me first",
+    "let me start by",
+    "i'll need to",
+    "i will need to",
+    "let me actually use",
+    "let me use the",
+    "i'll actually read",
+    "i'll read",
+    "now i'll",
+    "now i will",
+    "i should read",
+    "i should examine",
+    "i should check",
+    "let me continue",
+    "let me proceed",
+]
+
+
+def detect_circular_phrases(text: str) -> bool:
+    """Detect if text contains circular thinking phrases.
+
+    Args:
+        text: Text to check
+
+    Returns:
+        True if circular phrases are detected
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.detect_circular_phrases(text)
+
+    # Pure Python fallback
+    text_lower = text.lower()
+    return any(pattern in text_lower for pattern in _CIRCULAR_PATTERNS)
+
+
+def count_circular_patterns(text: str) -> int:
+    """Count circular patterns in text.
+
+    Args:
+        text: Text to analyze
+
+    Returns:
+        Number of circular pattern matches
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.count_circular_patterns(text)
+
+    # Pure Python fallback
+    text_lower = text.lower()
+    count = 0
+    for pattern in _CIRCULAR_PATTERNS:
+        pos = 0
+        while True:
+            found = text_lower.find(pattern, pos)
+            if found == -1:
+                break
+            count += 1
+            pos = found + 1
+    return count
+
+
+def find_circular_patterns(text: str) -> List[Tuple[int, int, str]]:
+    """Find all circular pattern matches.
+
+    Args:
+        text: Text to search
+
+    Returns:
+        List of (start, end, matched_text) tuples
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.find_circular_patterns(text)
+
+    # Pure Python fallback
+    text_lower = text.lower()
+    results = []
+    for pattern in _CIRCULAR_PATTERNS:
+        pos = 0
+        while True:
+            found = text_lower.find(pattern, pos)
+            if found == -1:
+                break
+            end = found + len(pattern)
+            results.append((found, end, text[found:end]))
+            pos = found + 1
+    results.sort(key=lambda x: x[0])
+    return results
+
+
+# Re-export native classes when available
+if _NATIVE_AVAILABLE:
+    ThinkingDetector = _native.ThinkingDetector
+    PatternAnalysis = _native.PatternAnalysis
+else:
+    ThinkingDetector = None
+    PatternAnalysis = None
+
+
+# =============================================================================
 # EXPORTS
 # =============================================================================
 
@@ -544,4 +1060,27 @@ __all__ = [
     "compute_signature",
     "compute_batch_signatures",
     "signature_similarity",
+    # Streaming filter (NEW)
+    "StreamingFilter",
+    "StreamingChunkResult",
+    "strip_thinking_tokens",
+    "contains_thinking_tokens",
+    "find_thinking_tokens",
+    "extract_thinking_content",
+    # Task classifier (NEW)
+    "NativeTaskClassifier",
+    "NativeClassificationResult",
+    "NativeTaskType",
+    "classify_task_native",
+    "has_action_keywords",
+    "has_analysis_keywords",
+    "has_generation_keywords",
+    "has_negation",
+    "find_all_keywords",
+    # Thinking detector (NEW)
+    "ThinkingDetector",
+    "PatternAnalysis",
+    "detect_circular_phrases",
+    "count_circular_patterns",
+    "find_circular_patterns",
 ]

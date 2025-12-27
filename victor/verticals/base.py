@@ -120,7 +120,9 @@ class VerticalConfig:
         return {
             "tools": self.tools.tools if self.tools else [],
             "system_prompt": self.system_prompt,
-            "stages": {k: {"name": v.name, "description": v.description} for k, v in self.stages.items()},
+            "stages": {
+                k: {"name": v.name, "description": v.description} for k, v in self.stages.items()
+            },
             "provider_hints": self.provider_hints,
             "evaluation_criteria": self.evaluation_criteria,
             "metadata": self.metadata,
@@ -516,6 +518,7 @@ class VerticalBase(ABC):
         """
         try:
             from victor.verticals.base_service_provider import VerticalServiceProviderFactory
+
             return VerticalServiceProviderFactory.create(cls)
         except ImportError:
             return None

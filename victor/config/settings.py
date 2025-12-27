@@ -356,12 +356,12 @@ class ProfileConfig(BaseSettings):
 
     # Timeout and session limits
     session_idle_timeout: Optional[int] = Field(
-        None, gt=0, description="Maximum idle time in seconds (resets on provider response/tool execution)"
+        None,
+        gt=0,
+        description="Maximum idle time in seconds (resets on provider response/tool execution)",
     )
     # Future: session_time_limit for total session duration cap (regardless of activity)
-    timeout: Optional[int] = Field(
-        None, gt=0, description="Request timeout in seconds"
-    )
+    timeout: Optional[int] = Field(None, gt=0, description="Request timeout in seconds")
 
     @field_validator("tool_selection")
     @classmethod
@@ -539,7 +539,9 @@ class Settings(BaseSettings):
     core_readonly_tools: Optional[List[str]] = None  # Override/extend curated read-only tool set
 
     # Semantic Search Quality Improvements (P4.X - Multi-Provider Excellence)
-    semantic_similarity_threshold: float = 0.5  # Min score [0.1-0.9], lowered from 0.7 to reduce false negatives
+    semantic_similarity_threshold: float = (
+        0.5  # Min score [0.1-0.9], lowered from 0.7 to reduce false negatives
+    )
     semantic_query_expansion_enabled: bool = True  # Expand queries with synonyms/related terms
     semantic_max_query_expansions: int = 5  # Max query variations to try (including original)
 

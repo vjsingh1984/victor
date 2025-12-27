@@ -208,9 +208,7 @@ class TestCheckpointStore:
     def test_create_checkpoint_with_parent(self, store: CheckpointStore) -> None:
         """Test creating checkpoint with parent."""
         cp1 = store.create_checkpoint("learner", "v1", {"state": 1})
-        cp2 = store.create_checkpoint(
-            "learner", "v2", {"state": 2}, parent_id=cp1.checkpoint_id
-        )
+        cp2 = store.create_checkpoint("learner", "v2", {"state": 2}, parent_id=cp1.checkpoint_id)
 
         assert cp2.parent_id == cp1.checkpoint_id
 
@@ -313,14 +311,22 @@ class TestCheckpointStore:
 
     def test_diff_checkpoints_nested(self, store: CheckpointStore) -> None:
         """Test comparing checkpoints with nested state."""
-        store.create_checkpoint("learner", "v1", {
-            "q_values": {"ctx1": 0.5, "ctx2": 0.6},
-            "config": {"lr": 0.01},
-        })
-        store.create_checkpoint("learner", "v2", {
-            "q_values": {"ctx1": 0.7, "ctx2": 0.6},
-            "config": {"lr": 0.01},
-        })
+        store.create_checkpoint(
+            "learner",
+            "v1",
+            {
+                "q_values": {"ctx1": 0.5, "ctx2": 0.6},
+                "config": {"lr": 0.01},
+            },
+        )
+        store.create_checkpoint(
+            "learner",
+            "v2",
+            {
+                "q_values": {"ctx1": 0.7, "ctx2": 0.6},
+                "config": {"lr": 0.01},
+            },
+        )
 
         diff = store.diff_checkpoints("learner", "v1", "v2")
 
@@ -434,6 +440,7 @@ class TestGlobalSingleton:
     def test_get_checkpoint_store(self) -> None:
         """Test getting global singleton."""
         import victor.agent.rl.checkpoint_store as module
+
         module._checkpoint_store = None
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -445,6 +452,7 @@ class TestGlobalSingleton:
     def test_singleton_preserves_state(self) -> None:
         """Test singleton preserves state."""
         import victor.agent.rl.checkpoint_store as module
+
         module._checkpoint_store = None
 
         with tempfile.TemporaryDirectory() as tmpdir:

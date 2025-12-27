@@ -119,14 +119,10 @@ class MiddlewareChain:
     def _ensure_sorted(self) -> None:
         """Ensure middleware is sorted by priority."""
         if not self._sorted:
-            self._middleware.sort(
-                key=lambda m: m.get_priority().value
-            )
+            self._middleware.sort(key=lambda m: m.get_priority().value)
             self._sorted = True
 
-    def _get_applicable_middleware(
-        self, tool_name: str
-    ) -> List[MiddlewareProtocol]:
+    def _get_applicable_middleware(self, tool_name: str) -> List[MiddlewareProtocol]:
         """Get middleware applicable to a specific tool.
 
         Args:

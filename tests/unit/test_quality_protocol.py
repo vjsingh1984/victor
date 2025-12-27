@@ -393,9 +393,7 @@ def example():
     return 42
 ```
 """
-        dim_score = assessor._assess_dimension(
-            QualityDimension.CORRECTNESS, response, {}
-        )
+        dim_score = assessor._assess_dimension(QualityDimension.CORRECTNESS, response, {})
 
         assert "provider adjustment" in dim_score.reason
 

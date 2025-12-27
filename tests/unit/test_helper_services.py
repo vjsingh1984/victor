@@ -110,4 +110,4 @@ def test_all_helper_services_resolve(container):
             assert service is not None, f"{name} failed to resolve"
             print(f"✓ {name:30s} resolved: {type(service).__name__}")
     print("=" * 55)
-    print(f"✓ All 7 Phase 2C services resolved successfully\n")
+    print("✓ All 7 Phase 2C services resolved successfully\n")

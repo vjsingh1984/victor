@@ -195,9 +195,7 @@ class PlanCommand(BaseSlashCommand):
             ctx.agent._current_mode = AgentMode.PLAN
 
         ctx.console.print("[green]Switched to planning mode[/]")
-        ctx.console.print(
-            "[dim]Sandbox edits enabled in .victor/sandbox/ directory[/]"
-        )
+        ctx.console.print("[dim]Sandbox edits enabled in .victor/sandbox/ directory[/]")
 
         # If task description provided, start planning
         if ctx.args:
@@ -379,8 +377,7 @@ class PlanCommand(BaseSlashCommand):
 
         if not current_plan:
             ctx.console.print(
-                "[dim]No active plan.[/]\n"
-                "[dim]Start planning with /plan <task>[/]"
+                "[dim]No active plan.[/]\n" "[dim]Start planning with /plan <task>[/]"
             )
             return
 

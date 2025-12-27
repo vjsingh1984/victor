@@ -185,9 +185,7 @@ class TestBaseProviderAdapter:
         class CustomAdapter(BaseProviderAdapter):
             @property
             def capabilities(self):
-                return ProviderCapabilities(
-                    continuation_markers=["...", "---"]
-                )
+                return ProviderCapabilities(continuation_markers=["...", "---"])
 
         adapter = CustomAdapter()
         assert adapter.detect_continuation_needed("Some text...") is True
@@ -235,9 +233,7 @@ class TestBaseProviderAdapter:
 
     def test_normalize_tool_calls_generates_id(self, adapter):
         """Test that missing IDs are generated."""
-        raw_calls = [
-            {"function": {"name": "test_tool", "arguments": {}}}
-        ]
+        raw_calls = [{"function": {"name": "test_tool", "arguments": {}}}]
         normalized = adapter.normalize_tool_calls(raw_calls)
         assert normalized[0].id == "call_0"
 

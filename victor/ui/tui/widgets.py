@@ -115,13 +115,15 @@ class StatusBar(Static):
         self.provider = provider
         self.model = model
         provider_label = self.query_one(".provider-info")
-        provider_label.update(Text.assemble(
-            ("Victor ", "bold #7cb7ff"),
-            "| ",
-            (f"{self.provider}", ""),
-            (" / ", ""),
-            (f"{self.model}", "bold"),
-        ))
+        provider_label.update(
+            Text.assemble(
+                ("Victor ", "bold #7cb7ff"),
+                "| ",
+                (f"{self.provider}", ""),
+                (" / ", ""),
+                (f"{self.model}", "bold"),
+            )
+        )
         self.refresh()
 
 
@@ -351,9 +353,7 @@ class InputWidget(Static):
         elif event.key == "down":
             # Allow "down" to navigate history only if already browsing
             if self._history_index != -1:
-                is_at_bottom = (
-                    self._input.cursor_location[0] == len(self._input.document.lines) - 1
-                )
+                is_at_bottom = self._input.cursor_location[0] == len(self._input.document.lines) - 1
                 if is_at_bottom:
                     self._history_next()
                     event.prevent_default()

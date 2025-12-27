@@ -107,6 +107,7 @@ class TestDirectProtocolAdapterChat:
     @pytest.mark.asyncio
     async def test_stream_chat(self, adapter):
         """Test streaming chat."""
+
         async def mock_stream(msg):
             chunks = [
                 MagicMock(content="Hello", finish_reason=None),
@@ -157,9 +158,7 @@ class TestDirectProtocolAdapterSearch:
         mock_result = MagicMock()
         mock_result.success = True
         mock_result.data = {
-            "matches": [
-                {"file": "test.py", "line": 10, "content": "def test()", "score": 0.9}
-            ]
+            "matches": [{"file": "test.py", "line": 10, "content": "def test()", "score": 0.9}]
         }
 
         # Create mock module and class
@@ -196,11 +195,7 @@ class TestDirectProtocolAdapterSearch:
         """Test successful code search."""
         mock_result = MagicMock()
         mock_result.success = True
-        mock_result.data = {
-            "matches": [
-                {"file": "main.py", "line": 5, "content": "import os"}
-            ]
-        }
+        mock_result.data = {"matches": [{"file": "main.py", "line": 5, "content": "import os"}]}
 
         mock_tool = MagicMock()
         mock_tool.execute = AsyncMock(return_value=mock_result)
@@ -289,7 +284,7 @@ class TestDirectProtocolAdapterUndoRedo:
         adapter._orchestrator.change_tracker.undo.return_value = {
             "success": True,
             "message": "Undone",
-            "files": ["test.py"]
+            "files": ["test.py"],
         }
 
         result = await adapter.undo()
@@ -314,7 +309,7 @@ class TestDirectProtocolAdapterUndoRedo:
         adapter._orchestrator.change_tracker.redo.return_value = {
             "success": True,
             "message": "Redone",
-            "files": ["main.py"]
+            "files": ["main.py"],
         }
 
         result = await adapter.redo()
@@ -393,10 +388,7 @@ class TestHTTPProtocolAdapterInit:
 
     def test_init_custom(self):
         """Test custom initialization."""
-        adapter = HTTPProtocolAdapter(
-            base_url="http://localhost:9000/",
-            timeout=30.0
-        )
+        adapter = HTTPProtocolAdapter(base_url="http://localhost:9000/", timeout=30.0)
         assert adapter._base_url == "http://localhost:9000"
         assert adapter._timeout == 30.0
 
@@ -416,7 +408,7 @@ class TestHTTPProtocolAdapterChat:
             "content": "Hello!",
             "tool_calls": [],
             "finish_reason": "stop",
-            "usage": {}
+            "usage": {},
         }
         mock_response.raise_for_status = MagicMock()
 
@@ -452,9 +444,7 @@ class TestHTTPProtocolAdapterSearch:
         """Test semantic search via HTTP."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "results": [
-                {"file": "test.py", "line": 1, "content": "code", "score": 0.9}
-            ]
+            "results": [{"file": "test.py", "line": 1, "content": "code", "score": 0.9}]
         }
         mock_response.raise_for_status = MagicMock()
         adapter._client.post = AsyncMock(return_value=mock_response)
@@ -494,8 +484,7 @@ class TestHTTPProtocolAdapterModel:
         await adapter.switch_model("anthropic", "claude-3")
 
         adapter._client.post.assert_called_once_with(
-            "/model/switch",
-            json={"provider": "anthropic", "model": "claude-3"}
+            "/model/switch", json={"provider": "anthropic", "model": "claude-3"}
         )
 
     @pytest.mark.asyncio
@@ -507,10 +496,7 @@ class TestHTTPProtocolAdapterModel:
 
         await adapter.switch_mode(AgentMode.EXPLORE)
 
-        adapter._client.post.assert_called_once_with(
-            "/mode/switch",
-            json={"mode": "explore"}
-        )
+        adapter._client.post.assert_called_once_with("/mode/switch", json={"mode": "explore"})
 
 
 class TestHTTPProtocolAdapterStatus:
@@ -530,7 +516,7 @@ class TestHTTPProtocolAdapterStatus:
             "mode": "build",  # Valid AgentMode value
             "connected": True,
             "tools_available": 10,
-            "conversation_length": 5
+            "conversation_length": 5,
         }
         mock_response.raise_for_status = MagicMock()
         adapter._client.get = AsyncMock(return_value=mock_response)
@@ -556,7 +542,7 @@ class TestHTTPProtocolAdapterUndoRedo:
         mock_response.json.return_value = {
             "success": True,
             "message": "Undone",
-            "files_modified": ["test.py"]
+            "files_modified": ["test.py"],
         }
         mock_response.raise_for_status = MagicMock()
         adapter._client.post = AsyncMock(return_value=mock_response)
@@ -573,7 +559,7 @@ class TestHTTPProtocolAdapterUndoRedo:
         mock_response.json.return_value = {
             "success": True,
             "message": "Redone",
-            "files_modified": []
+            "files_modified": [],
         }
         mock_response.raise_for_status = MagicMock()
         adapter._client.post = AsyncMock(return_value=mock_response)
@@ -614,8 +600,7 @@ class TestHTTPProtocolAdapterPatch:
 
         assert result["success"] is True
         adapter._client.post.assert_called_once_with(
-            "/patch/apply",
-            json={"patch": "--- a\n+++ b", "dry_run": True}
+            "/patch/apply", json={"patch": "--- a\n+++ b", "dry_run": True}
         )
 
 

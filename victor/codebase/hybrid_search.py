@@ -120,17 +120,13 @@ class HybridSearchEngine:
             # Get semantic ranking/score
             semantic_rank, semantic_score = semantic_map.get(file_path, (-1, 0.0))
             semantic_rrf = (
-                self.semantic_weight / (self.rrf_k + semantic_rank)
-                if semantic_rank >= 0
-                else 0.0
+                self.semantic_weight / (self.rrf_k + semantic_rank) if semantic_rank >= 0 else 0.0
             )
 
             # Get keyword ranking/score
             keyword_rank, keyword_score = keyword_map.get(file_path, (-1, 0.0))
             keyword_rrf = (
-                self.keyword_weight / (self.rrf_k + keyword_rank)
-                if keyword_rank >= 0
-                else 0.0
+                self.keyword_weight / (self.rrf_k + keyword_rank) if keyword_rank >= 0 else 0.0
             )
 
             # Combined RRF score
@@ -234,8 +230,7 @@ class HybridSearchEngine:
 
         if result.keyword_rank >= 0:
             lines.append(
-                f"  Keyword: rank #{result.keyword_rank + 1}, "
-                f"score {result.keyword_score:.1f}"
+                f"  Keyword: rank #{result.keyword_rank + 1}, " f"score {result.keyword_score:.1f}"
             )
         else:
             lines.append("  Keyword: not in results")

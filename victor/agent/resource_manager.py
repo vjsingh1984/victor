@@ -88,9 +88,7 @@ class IResourceManager(Protocol):
         """Register a cleanup callback."""
         ...
 
-    def register_resource(
-        self, resource: Any, name: str, cleanup_method: str
-    ) -> None:
+    def register_resource(self, resource: Any, name: str, cleanup_method: str) -> None:
         """Register a resource for cleanup."""
         ...
 
@@ -269,9 +267,7 @@ class ResourceManager:
 
         self._cleanup_done = True
         success_count = sum(1 for v in results.values() if v)
-        logger.info(
-            f"Cleanup complete: {success_count}/{len(results)} succeeded"
-        )
+        logger.info(f"Cleanup complete: {success_count}/{len(results)} succeeded")
 
         return results
 
@@ -312,9 +308,7 @@ class ResourceManager:
                     "callbacks_registered": len(self._cleanup_callbacks),
                     "cleanup_done": self._cleanup_done,
                     "active_resources": sum(
-                        1
-                        for m in self._resources.values()
-                        if m.state == ResourceState.ACTIVE
+                        1 for m in self._resources.values() if m.state == ResourceState.ACTIVE
                     ),
                 }
 
@@ -377,9 +371,7 @@ def register_for_cleanup(
         cleanup_method: Cleanup method name
         priority: Cleanup priority
     """
-    get_resource_manager().register_resource(
-        resource, name, cleanup_method, priority
-    )
+    get_resource_manager().register_resource(resource, name, cleanup_method, priority)
 
 
 @contextmanager

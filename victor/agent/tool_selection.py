@@ -784,17 +784,17 @@ class ToolSelector(ModeAwareMixin):
             preserved_tools.update(tiered_config.mandatory)
             preserved_tools.update(tiered_config.vertical_core)
             # If vertical has readonly_only_for_analysis=False, don't filter at all
-            if hasattr(tiered_config, "readonly_only_for_analysis") and not tiered_config.readonly_only_for_analysis:
+            if (
+                hasattr(tiered_config, "readonly_only_for_analysis")
+                and not tiered_config.readonly_only_for_analysis
+            ):
                 logger.debug(
-                    f"Stage filtering skipped: vertical has readonly_only_for_analysis=False"
+                    "Stage filtering skipped: vertical has readonly_only_for_analysis=False"
                 )
                 return tools
 
         # Filter to readonly tools, but always keep vertical core tools
-        filtered = [
-            t for t in tools
-            if self._is_readonly_tool(t.name) or t.name in preserved_tools
-        ]
+        filtered = [t for t in tools if self._is_readonly_tool(t.name) or t.name in preserved_tools]
 
         if filtered:
             if preserved_tools:
@@ -959,7 +959,11 @@ class ToolSelector(ModeAwareMixin):
         # Tier 3: Stage-specific tools
         # Use config helper method that prefers registry metadata over static stage_tools
         if stage:
-            stage_tools = config.get_tools_for_stage_from_registry(stage) if hasattr(config, 'get_tools_for_stage_from_registry') else config.stage_tools.get(stage, set())
+            stage_tools = (
+                config.get_tools_for_stage_from_registry(stage)
+                if hasattr(config, "get_tools_for_stage_from_registry")
+                else config.stage_tools.get(stage, set())
+            )
             for name in stage_tools:
                 if name in all_tools_map and name not in selected:
                     tool = all_tools_map[name]
@@ -975,7 +979,11 @@ class ToolSelector(ModeAwareMixin):
 
         # Tier 4: Semantic pool (selected based on query)
         # Use config helper method that prefers registry metadata over static semantic_pool
-        semantic_pool = config.get_effective_semantic_pool() if hasattr(config, 'get_effective_semantic_pool') else config.semantic_pool
+        semantic_pool = (
+            config.get_effective_semantic_pool()
+            if hasattr(config, "get_effective_semantic_pool")
+            else config.semantic_pool
+        )
         if semantic_pool:
             # Simple keyword matching for semantic pool
             message_lower = user_message.lower()
@@ -987,8 +995,8 @@ class ToolSelector(ModeAwareMixin):
                     should_include = False
 
                     # Check tool keywords from metadata
-                    if hasattr(tool, 'metadata') and tool.metadata:
-                        keywords = getattr(tool.metadata, 'keywords', []) or []
+                    if hasattr(tool, "metadata") and tool.metadata:
+                        keywords = getattr(tool.metadata, "keywords", []) or []
                         if any(kw.lower() in message_lower for kw in keywords):
                             should_include = True
 

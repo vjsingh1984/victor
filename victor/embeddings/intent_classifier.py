@@ -116,15 +116,15 @@ def _has_stuck_loop_heuristic(text: str) -> bool:
 
     # The repeating pattern is a strong signal on its own (implies 2+ I'll use statements)
     if has_repeating_pattern:
-        logger.debug(
-            f"Stuck loop heuristic: found repeating 'I'll use X... I'll use Y' pattern"
-        )
+        logger.debug("Stuck loop heuristic: found repeating 'I'll use X... I'll use Y' pattern")
         return True
 
     # Require 3+ planning statements OR 2+ from different pattern types
     # This prevents false positives for legitimate planning responses
     if planning_count >= 3:
-        logger.debug(f"Stuck loop heuristic: found {planning_count} planning statements (threshold=3)")
+        logger.debug(
+            f"Stuck loop heuristic: found {planning_count} planning statements (threshold=3)"
+        )
         return True
 
     # 2+ statements from different pattern types indicates diverse planning without action
@@ -651,9 +651,7 @@ class IntentClassifier:
         # it's likely stuck and not actually making progress
         if _has_stuck_loop_heuristic(text):
             top_matches.append(("heuristic:stuck_loop_pattern", 0.85))
-            logger.debug(
-                "STUCK_LOOP detected via heuristic override (conf=0.85)"
-            )
+            logger.debug("STUCK_LOOP detected via heuristic override (conf=0.85)")
             return IntentResult(
                 intent=IntentType.STUCK_LOOP,
                 confidence=0.85,
@@ -799,9 +797,7 @@ class IntentClassifier:
         # it's likely stuck and not actually making progress
         if _has_stuck_loop_heuristic(text):
             top_matches.append(("heuristic:stuck_loop_pattern", 0.85))
-            logger.debug(
-                "STUCK_LOOP detected via heuristic override (conf=0.85)"
-            )
+            logger.debug("STUCK_LOOP detected via heuristic override (conf=0.85)")
             return IntentResult(
                 intent=IntentType.STUCK_LOOP,
                 confidence=0.85,

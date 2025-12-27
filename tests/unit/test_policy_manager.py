@@ -64,9 +64,7 @@ def mock_learner() -> MagicMock:
 
 
 @pytest.fixture
-def manager(
-    mock_coordinator: MagicMock, checkpoint_store: CheckpointStore
-) -> PolicyManager:
+def manager(mock_coordinator: MagicMock, checkpoint_store: CheckpointStore) -> PolicyManager:
     """Fixture for PolicyManager."""
     return PolicyManager(coordinator=mock_coordinator, checkpoint_store=checkpoint_store)
 
@@ -230,9 +228,7 @@ class TestPolicyManager:
 
         assert manager.should_rollback("learner") is False
 
-    def test_should_rollback_with_baseline_degradation(
-        self, manager: PolicyManager
-    ) -> None:
+    def test_should_rollback_with_baseline_degradation(self, manager: PolicyManager) -> None:
         """Test rollback triggered by baseline degradation."""
         manager.set_performance_baseline("learner", success_rate=0.8, quality_score=0.8)
 
@@ -242,9 +238,7 @@ class TestPolicyManager:
 
         assert manager.should_rollback("learner") is True
 
-    def test_should_rollback_with_recent_degradation(
-        self, manager: PolicyManager
-    ) -> None:
+    def test_should_rollback_with_recent_degradation(self, manager: PolicyManager) -> None:
         """Test rollback triggered by recent degradation."""
         # Good early performance
         for _ in range(50):
@@ -390,7 +384,8 @@ class TestPolicyManager:
         assert state.shadow_version is None
 
     def test_promote_shadow(
-        self, manager: PolicyManager,
+        self,
+        manager: PolicyManager,
         checkpoint_store: CheckpointStore,
         mock_coordinator: MagicMock,
         mock_learner: MagicMock,
@@ -511,6 +506,7 @@ class TestGlobalSingleton:
     def test_get_policy_manager(self) -> None:
         """Test getting global singleton."""
         import victor.agent.rl.policy_manager as module
+
         module._policy_manager = None
 
         manager1 = get_policy_manager()
@@ -521,6 +517,7 @@ class TestGlobalSingleton:
     def test_singleton_with_coordinator(self, mock_coordinator: MagicMock) -> None:
         """Test singleton initialization with coordinator."""
         import victor.agent.rl.policy_manager as module
+
         module._policy_manager = None
 
         manager = get_policy_manager(coordinator=mock_coordinator)

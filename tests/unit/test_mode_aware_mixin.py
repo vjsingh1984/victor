@@ -460,6 +460,7 @@ class TestIModeControllerProtocol:
 
     def test_protocol_runtime_checkable(self):
         """Test that IModeController is runtime checkable."""
+
         @dataclass
         class SimpleController:
             current_mode: MagicMock

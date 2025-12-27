@@ -39,8 +39,14 @@ class TestVictorSettingsBasic:
         """Test provider name validation."""
         # Valid providers
         valid_providers = [
-            "ollama", "anthropic", "openai", "google",
-            "groq", "lmstudio", "vllm", "deepseek"
+            "ollama",
+            "anthropic",
+            "openai",
+            "google",
+            "groq",
+            "lmstudio",
+            "vllm",
+            "deepseek",
         ]
         for provider in valid_providers:
             settings = VictorSettings(default_provider=provider)

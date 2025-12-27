@@ -58,9 +58,7 @@ def test_service_builder_initialization_with_factory(mock_settings, mock_factory
 
 
 @patch("victor.agent.builders.service_builder.ensure_bootstrapped")
-def test_service_builder_build_bootstraps_container(
-    mock_bootstrap, mock_settings, mock_factory
-):
+def test_service_builder_build_bootstraps_container(mock_bootstrap, mock_settings, mock_factory):
     """Test that build() bootstraps the DI container."""
     mock_container = MagicMock()
     mock_bootstrap.return_value = mock_container
@@ -73,9 +71,7 @@ def test_service_builder_build_bootstraps_container(
 
 
 @patch("victor.agent.builders.service_builder.ensure_bootstrapped")
-def test_service_builder_build_creates_core_services(
-    mock_bootstrap, mock_settings, mock_factory
-):
+def test_service_builder_build_creates_core_services(mock_bootstrap, mock_settings, mock_factory):
     """Test that build() creates core services."""
     mock_bootstrap.return_value = MagicMock()
 
@@ -190,9 +186,7 @@ def test_service_builder_build_creates_task_analyzer(
 
 
 @patch("victor.agent.builders.service_builder.ensure_bootstrapped")
-def test_service_builder_build_registers_components(
-    mock_bootstrap, mock_settings, mock_factory
-):
+def test_service_builder_build_registers_components(mock_bootstrap, mock_settings, mock_factory):
     """Test that build() registers all built components."""
     mock_bootstrap.return_value = MagicMock()
 
@@ -207,9 +201,7 @@ def test_service_builder_build_registers_components(
 
 
 @patch("victor.agent.builders.service_builder.ensure_bootstrapped")
-def test_service_builder_build_conversation_controller(
-    mock_bootstrap, mock_settings, mock_factory
-):
+def test_service_builder_build_conversation_controller(mock_bootstrap, mock_settings, mock_factory):
     """Test building conversation controller."""
     mock_bootstrap.return_value = MagicMock()
     mock_controller = Mock(name="conversation_controller")
@@ -239,9 +231,7 @@ def test_service_builder_build_conversation_controller(
 
 
 @patch("victor.agent.builders.service_builder.ensure_bootstrapped")
-def test_service_builder_build_streaming_controller(
-    mock_bootstrap, mock_settings, mock_factory
-):
+def test_service_builder_build_streaming_controller(mock_bootstrap, mock_settings, mock_factory):
     """Test building streaming controller."""
     mock_bootstrap.return_value = MagicMock()
     mock_controller = Mock(name="streaming_controller")
@@ -263,9 +253,7 @@ def test_service_builder_build_streaming_controller(
 
 
 @patch("victor.agent.builders.service_builder.ensure_bootstrapped")
-def test_service_builder_build_context_compactor(
-    mock_bootstrap, mock_settings, mock_factory
-):
+def test_service_builder_build_context_compactor(mock_bootstrap, mock_settings, mock_factory):
     """Test building context compactor."""
     mock_bootstrap.return_value = MagicMock()
     mock_compactor = Mock(name="context_compactor")
@@ -276,9 +264,7 @@ def test_service_builder_build_context_compactor(
 
     mock_conv_controller = Mock()
 
-    compactor = builder.build_context_compactor(
-        conversation_controller=mock_conv_controller
-    )
+    compactor = builder.build_context_compactor(conversation_controller=mock_conv_controller)
 
     assert compactor is mock_compactor
     assert builder.has_component("context_compactor")

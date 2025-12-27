@@ -60,7 +60,7 @@ class OllamaProvider(BaseProvider):
 
         # Resolve candidates (logic from _select_base_url but without network I/O)
         candidates: List[str] = []
-        
+
         # Check environment variable first
         env_endpoints = os.environ.get("OLLAMA_ENDPOINTS", "")
         if env_endpoints:
@@ -68,7 +68,7 @@ class OllamaProvider(BaseProvider):
 
         if not candidates:
             if base_url is None:
-                 candidates = ["http://localhost:11434"]
+                candidates = ["http://localhost:11434"]
             elif isinstance(base_url, (list, tuple)):
                 candidates = [str(u).strip() for u in base_url if str(u).strip()]
             elif isinstance(base_url, str):
@@ -78,9 +78,9 @@ class OllamaProvider(BaseProvider):
                     candidates = [base_url]
             else:
                 candidates = [str(base_url)]
-        
+
         if not candidates:
-             candidates = ["http://localhost:11434"]
+            candidates = ["http://localhost:11434"]
 
         # Pick first candidate (blindly)
         chosen_base = candidates[0]
@@ -160,9 +160,7 @@ class OllamaProvider(BaseProvider):
             supports_tools = self._detect_tool_support(template)
 
         except Exception as exc:
-            logger.warning(
-                f"Failed to discover capabilities for {model} on {self.base_url}: {exc}"
-            )
+            logger.warning(f"Failed to discover capabilities for {model} on {self.base_url}: {exc}")
 
         from victor.config.config_loaders import get_provider_limits
 

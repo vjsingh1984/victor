@@ -134,7 +134,9 @@ class RecoveryContext:
         # Discretize continuous values
         budget_ratio = self._discretize_ratio(self.tool_calls_made / max(self.tool_budget, 1))
         iter_ratio = self._discretize_ratio(self.iteration_count / max(self.max_iterations, 1))
-        time_ratio = self._discretize_ratio(self.elapsed_time_seconds / max(self.session_idle_timeout, 1))
+        time_ratio = self._discretize_ratio(
+            self.elapsed_time_seconds / max(self.session_idle_timeout, 1)
+        )
         quality_bucket = self._discretize_quality(self.last_quality_score)
         temp_bucket = self._discretize_temperature(self.current_temperature)
 
@@ -258,7 +260,7 @@ class TemperaturePolicy:
     ) -> float:
         """Calculate new temperature based on failures."""
         # Adjust with decay for consecutive failures
-        adjustment = self.base_adjustment * (self.decay_factor ** consecutive_failures)
+        adjustment = self.base_adjustment * (self.decay_factor**consecutive_failures)
         new_temp = current_temp + adjustment
         return max(self.min_temperature, min(self.max_temperature, new_temp))
 
@@ -320,7 +322,9 @@ class RecoveryStrategy(Protocol):
         """
         ...
 
-    def record_outcome(self, context: RecoveryContext, result: RecoveryResult, success: bool) -> None:
+    def record_outcome(
+        self, context: RecoveryContext, result: RecoveryResult, success: bool
+    ) -> None:
         """Record the outcome of a recovery attempt for learning.
 
         Args:

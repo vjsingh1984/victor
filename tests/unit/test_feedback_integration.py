@@ -66,9 +66,7 @@ class TestFeedbackIntegration:
         integration.set_enabled(True)
         assert integration._enabled is True
 
-    def test_start_tracking_creates_session(
-        self, integration: FeedbackIntegration
-    ) -> None:
+    def test_start_tracking_creates_session(self, integration: FeedbackIntegration) -> None:
         """Test starting tracking creates session."""
         session = integration.start_tracking(
             session_id="test-session-1",
@@ -81,9 +79,7 @@ class TestFeedbackIntegration:
         assert session.session_id == "test-session-1"
         assert "test-session-1" in integration._active_sessions
 
-    def test_start_tracking_disabled(
-        self, integration: FeedbackIntegration
-    ) -> None:
+    def test_start_tracking_disabled(self, integration: FeedbackIntegration) -> None:
         """Test starting tracking when disabled returns None."""
         integration.set_enabled(False)
 
@@ -106,9 +102,7 @@ class TestFeedbackIntegration:
         assert session is not None
         assert session.session_id == "test-session-1"
 
-    def test_get_session_not_found(
-        self, integration: FeedbackIntegration
-    ) -> None:
+    def test_get_session_not_found(self, integration: FeedbackIntegration) -> None:
         """Test getting non-existent session."""
         session = integration.get_session("nonexistent")
         assert session is None
@@ -131,9 +125,7 @@ class TestFeedbackIntegration:
         session = integration.get_session("test-session-1")
         assert len(session.tool_executions) > 0
 
-    def test_record_tool_disabled(
-        self, integration: FeedbackIntegration
-    ) -> None:
+    def test_record_tool_disabled(self, integration: FeedbackIntegration) -> None:
         """Test recording tool when disabled."""
         integration.start_tracking(
             session_id="test-session-1",
@@ -155,9 +147,7 @@ class TestFeedbackIntegration:
         session = integration.get_session("test-session-1")
         assert len(session.tool_executions) == initial_count
 
-    def test_record_tool_nonexistent_session(
-        self, integration: FeedbackIntegration
-    ) -> None:
+    def test_record_tool_nonexistent_session(self, integration: FeedbackIntegration) -> None:
         """Test recording tool for non-existent session."""
         # Should not raise
         integration.record_tool(
@@ -204,9 +194,7 @@ class TestFeedbackIntegration:
         session = integration.get_session("test-session-1")
         assert session.workflow_patterns_started >= 1
 
-    def test_end_tracking_returns_feedback(
-        self, integration: FeedbackIntegration
-    ) -> None:
+    def test_end_tracking_returns_feedback(self, integration: FeedbackIntegration) -> None:
         """Test ending tracking returns feedback."""
         integration.start_tracking(
             session_id="test-session-1",
@@ -229,9 +217,7 @@ class TestFeedbackIntegration:
         assert feedback.task_completed is True
         assert "test-session-1" not in integration._active_sessions
 
-    def test_end_tracking_disabled(
-        self, integration: FeedbackIntegration
-    ) -> None:
+    def test_end_tracking_disabled(self, integration: FeedbackIntegration) -> None:
         """Test ending tracking when disabled."""
         integration.start_tracking(
             session_id="test-session-1",
@@ -243,9 +229,7 @@ class TestFeedbackIntegration:
 
         assert feedback is None
 
-    def test_end_tracking_nonexistent_session(
-        self, integration: FeedbackIntegration
-    ) -> None:
+    def test_end_tracking_nonexistent_session(self, integration: FeedbackIntegration) -> None:
         """Test ending non-existent session."""
         feedback = integration.end_tracking("nonexistent", completed=True)
         assert feedback is None
@@ -293,16 +277,12 @@ class TestFeedbackIntegrationWithCoordinator:
         # Coordinator should have received outcome
         assert mock_coordinator.record_outcome.called
 
-    def test_get_quality_weights_no_coordinator(
-        self, integration: FeedbackIntegration
-    ) -> None:
+    def test_get_quality_weights_no_coordinator(self, integration: FeedbackIntegration) -> None:
         """Test getting quality weights without coordinator."""
         weights = integration.get_quality_weights("analysis")
         assert weights == {}
 
-    def test_get_quality_weights_with_coordinator(
-        self, integration: FeedbackIntegration
-    ) -> None:
+    def test_get_quality_weights_with_coordinator(self, integration: FeedbackIntegration) -> None:
         """Test getting quality weights with coordinator."""
         mock_coordinator = MagicMock()
         mock_learner = MagicMock()
@@ -321,9 +301,7 @@ class TestFeedbackIntegrationWithCoordinator:
 class TestSessionTracking:
     """Tests for session tracking lifecycle."""
 
-    def test_full_session_lifecycle(
-        self, integration: FeedbackIntegration
-    ) -> None:
+    def test_full_session_lifecycle(self, integration: FeedbackIntegration) -> None:
         """Test complete session lifecycle."""
         # Start
         session = integration.start_tracking(
@@ -337,12 +315,8 @@ class TestSessionTracking:
 
         # Record activity
         integration.record_iteration("lifecycle-test")
-        integration.record_tool(
-            "lifecycle-test", "code_search", True, 100.0
-        )
-        integration.record_tool(
-            "lifecycle-test", "read_file", True, 50.0
-        )
+        integration.record_tool("lifecycle-test", "code_search", True, 100.0)
+        integration.record_tool("lifecycle-test", "read_file", True, 50.0)
         integration.record_grounding("lifecycle-test", 0.9)
         integration.record_workflow("lifecycle-test", started=True)
         integration.record_workflow("lifecycle-test", completed=True)
@@ -360,9 +334,7 @@ class TestSessionTracking:
         assert feedback.task_completed is True
         assert feedback.tool_count == 2
 
-    def test_multiple_concurrent_sessions(
-        self, integration: FeedbackIntegration
-    ) -> None:
+    def test_multiple_concurrent_sessions(self, integration: FeedbackIntegration) -> None:
         """Test multiple concurrent sessions."""
         # Start multiple sessions
         session1 = integration.start_tracking(

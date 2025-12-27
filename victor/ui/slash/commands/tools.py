@@ -60,7 +60,8 @@ class ToolsCommand(BaseSlashCommand):
 
         if search:
             tools = [
-                t for t in tools
+                t
+                for t in tools
                 if search in getattr(t, "name", "").lower()
                 or search in getattr(t, "description", "").lower()
             ]
@@ -191,9 +192,7 @@ class LMStudioCommand(BaseSlashCommand):
 
             content += "\n[dim]Tip: Use /provider lmstudio to switch[/]"
 
-            ctx.console.print(
-                Panel(content, title="LMStudio Status", border_style="green")
-            )
+            ctx.console.print(Panel(content, title="LMStudio Status", border_style="green"))
 
         except ImportError:
             ctx.console.print("[red]LMStudio provider not available[/]")

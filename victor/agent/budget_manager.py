@@ -255,7 +255,10 @@ class ModeCompletionCriteria:
         if mode_upper == "BUILD":
             # BUILD mode requires file(s) to be written
             if files_written < criteria.min_files_written:
-                return False, f"Need {criteria.min_files_written - files_written} more file(s) written"
+                return (
+                    False,
+                    f"Need {criteria.min_files_written - files_written} more file(s) written",
+                )
         else:
             # EXPLORE and PLAN require files to be read
             if files_read < criteria.min_files_read:
@@ -371,6 +374,7 @@ class BudgetState:
         base_maximum: Base maximum before multipliers
         last_tool: Last tool that consumed this budget
     """
+
     current: int = 0
     base_maximum: int = 0
     last_tool: Optional[str] = None
@@ -416,18 +420,12 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
     def _initialize_budgets(self) -> None:
         """Set up initial budget states from config."""
         self._budgets = {
-            BudgetType.TOOL_CALLS: BudgetState(
-                current=0, base_maximum=self.config.base_tool_calls
-            ),
-            BudgetType.ITERATIONS: BudgetState(
-                current=0, base_maximum=self.config.base_iterations
-            ),
+            BudgetType.TOOL_CALLS: BudgetState(current=0, base_maximum=self.config.base_tool_calls),
+            BudgetType.ITERATIONS: BudgetState(current=0, base_maximum=self.config.base_iterations),
             BudgetType.EXPLORATION: BudgetState(
                 current=0, base_maximum=self.config.base_exploration
             ),
-            BudgetType.ACTION: BudgetState(
-                current=0, base_maximum=self.config.base_action
-            ),
+            BudgetType.ACTION: BudgetState(current=0, base_maximum=self.config.base_action),
         }
 
     def _calculate_effective_max(self, budget_type: BudgetType) -> int:
@@ -539,9 +537,7 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         self._model_multiplier = max(0.5, min(3.0, multiplier))
 
         if old_multiplier != self._model_multiplier:
-            logger.debug(
-                f"BudgetManager: model_multiplier={self._model_multiplier}"
-            )
+            logger.debug(f"BudgetManager: model_multiplier={self._model_multiplier}")
 
     def set_mode_multiplier(self, multiplier: float) -> None:
         """Set the mode-specific multiplier.
@@ -558,9 +554,7 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         self._mode_multiplier = max(0.5, min(5.0, multiplier))
 
         if old_multiplier != self._mode_multiplier:
-            logger.debug(
-                f"BudgetManager: mode_multiplier={self._mode_multiplier}"
-            )
+            logger.debug(f"BudgetManager: mode_multiplier={self._mode_multiplier}")
 
     def set_productivity_multiplier(self, multiplier: float) -> None:
         """Set the productivity multiplier.
@@ -577,9 +571,7 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         self._productivity_multiplier = max(0.5, min(3.0, multiplier))
 
         if old_multiplier != self._productivity_multiplier:
-            logger.debug(
-                f"BudgetManager: productivity_multiplier={self._productivity_multiplier}"
-            )
+            logger.debug(f"BudgetManager: productivity_multiplier={self._productivity_multiplier}")
 
     def reset(self, budget_type: Optional[BudgetType] = None) -> None:
         """Reset budget(s) to initial state.
@@ -621,9 +613,7 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
             "productivity_multiplier": self._productivity_multiplier,
         }
 
-    def record_tool_call(
-        self, tool_name: str, is_write_operation: bool = False
-    ) -> bool:
+    def record_tool_call(self, tool_name: str, is_write_operation: bool = False) -> bool:
         """Record a tool call and consume appropriate budget.
 
         Automatically routes to EXPLORATION or ACTION budget based
@@ -678,9 +668,7 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         state = self._budgets.get(budget_type)
         if state:
             state.base_maximum = max(1, base)
-            logger.debug(
-                f"BudgetManager: {budget_type.value} base set to {base}"
-            )
+            logger.debug(f"BudgetManager: {budget_type.value} base set to {base}")
 
     def set_on_exhausted(self, callback: Callable[[BudgetType], None]) -> None:
         """Set callback for when a budget is exhausted.
@@ -710,9 +698,7 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
                 "mode": self._mode_multiplier,
                 "productivity": self._productivity_multiplier,
                 "combined": (
-                    self._model_multiplier
-                    * self._mode_multiplier
-                    * self._productivity_multiplier
+                    self._model_multiplier * self._mode_multiplier * self._productivity_multiplier
                 ),
             },
             "budgets": {},
@@ -781,9 +767,7 @@ class ExtendedBudgetManager(BudgetManager):
         """Record a file write operation."""
         self._files_written += 1
 
-    def record_tool_call(
-        self, tool_name: str, is_write_operation: bool = False
-    ) -> bool:
+    def record_tool_call(self, tool_name: str, is_write_operation: bool = False) -> bool:
         """Record tool call with file tracking.
 
         Extends parent to track file read/write operations.

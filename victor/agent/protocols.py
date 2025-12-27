@@ -841,9 +841,7 @@ class ToolDeduplicationTrackerProtocol(Protocol):
         """
         ...
 
-    def is_redundant(
-        self, tool_name: str, args: Dict[str, Any], explain: bool = False
-    ) -> bool:
+    def is_redundant(self, tool_name: str, args: Dict[str, Any], explain: bool = False) -> bool:
         """Check if a tool call is redundant given recent history.
 
         Args:
@@ -1070,9 +1068,7 @@ class RecoveryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def check_blocked_threshold(
-        self, ctx: Any, all_blocked: bool
-    ) -> Optional[Tuple[Any, bool]]:
+    def check_blocked_threshold(self, ctx: Any, all_blocked: bool) -> Optional[Tuple[Any, bool]]:
         """Check if too many tools have been blocked.
 
         Returns:
@@ -1311,9 +1307,7 @@ class ChunkGeneratorProtocol(Protocol):
         """
         ...
 
-    def generate_content_chunk(
-        self, content: str, is_final: bool = False, suffix: str = ""
-    ) -> Any:
+    def generate_content_chunk(self, content: str, is_final: bool = False, suffix: str = "") -> Any:
         """Generate chunk for content display.
 
         Args:
@@ -1403,10 +1397,7 @@ class TaskCoordinatorProtocol(Protocol):
     """
 
     def prepare_task(
-        self,
-        user_message: str,
-        unified_task_type: Any,
-        conversation_controller: Any
+        self, user_message: str, unified_task_type: Any, conversation_controller: Any
     ) -> tuple[Any, int]:
         """Prepare task-specific guidance and budget adjustments.
 
@@ -1420,9 +1411,7 @@ class TaskCoordinatorProtocol(Protocol):
         """
         ...
 
-    def apply_intent_guard(
-        self, user_message: str, conversation_controller: Any
-    ) -> None:
+    def apply_intent_guard(self, user_message: str, conversation_controller: Any) -> None:
         """Detect intent and inject prompt guards for read-only tasks.
 
         Args:
@@ -2281,9 +2270,7 @@ class IToolAccessController(Protocol):
         """
         ...
 
-    def get_allowed_tools(
-        self, context: Optional[ToolAccessContext] = None
-    ) -> Set[str]:
+    def get_allowed_tools(self, context: Optional[ToolAccessContext] = None) -> Set[str]:
         """Get all tools allowed in the given context.
 
         Args:
@@ -2294,9 +2281,7 @@ class IToolAccessController(Protocol):
         """
         ...
 
-    def explain_decision(
-        self, tool_name: str, context: Optional[ToolAccessContext] = None
-    ) -> str:
+    def explain_decision(self, tool_name: str, context: Optional[ToolAccessContext] = None) -> str:
         """Get detailed explanation for a tool access decision.
 
         Args:
@@ -2487,9 +2472,7 @@ class IBudgetManager(Protocol):
         """
         ...
 
-    def record_tool_call(
-        self, tool_name: str, is_write_operation: bool = False
-    ) -> bool:
+    def record_tool_call(self, tool_name: str, is_write_operation: bool = False) -> bool:
         """Record a tool call and consume appropriate budget.
 
         Automatically routes to EXPLORATION or ACTION budget based

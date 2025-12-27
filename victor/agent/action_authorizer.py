@@ -242,17 +242,33 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
         "create_for_project",
     ),
     # "Implement {feature}" - explicit implementation request
-    (r"\bimplement\s+(\w+\s+)?(feature|functionality|module|component|system|service)", 0.85, "implement_feature"),
+    (
+        r"\bimplement\s+(\w+\s+)?(feature|functionality|module|component|system|service)",
+        0.85,
+        "implement_feature",
+    ),
     # "Implement {something}" - any implementation task (user authentication, login, etc.)
-    (r"\bimplement\s+(the\s+)?[\w\s]+(authentication|login|logout|auth|api|endpoint|handler|service)", 0.85, "implement_auth"),
+    (
+        r"\bimplement\s+(the\s+)?[\w\s]+(authentication|login|logout|auth|api|endpoint|handler|service)",
+        0.85,
+        "implement_auth",
+    ),
     # Generic "implement" followed by a noun phrase
     (r"\bimplement\s+[\w\s]{3,30}$", 0.75, "implement_generic"),
     # "Add {feature/functionality} to" - adding to existing codebase
-    (r"\badd\s+(\w+\s+)?(feature|functionality|support|capability|module)\s+(to|for)\b", 0.85, "add_feature"),
+    (
+        r"\badd\s+(\w+\s+)?(feature|functionality|support|capability|module)\s+(to|for)\b",
+        0.85,
+        "add_feature",
+    ),
     # "Set up/Configure {tool/system}" - setup tasks
     (r"\b(set\s*up|configure|initialize|bootstrap)\s+(a\s+)?\w+", 0.8, "setup_configure"),
     # "Build/Deploy {service/app}" - deployment tasks
-    (r"\b(build|deploy|release)\s+(the\s+)?\w+\s*(service|app|application|container)?", 0.8, "build_deploy"),
+    (
+        r"\b(build|deploy|release)\s+(the\s+)?\w+\s*(service|app|application|container)?",
+        0.8,
+        "build_deploy",
+    ),
     # "Create a {type} that {does something}" - functional creation for project artifacts
     # EXCLUDES function/class/method/script (those are DISPLAY_ONLY patterns)
     (
@@ -261,7 +277,11 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
         "create_functional",
     ),
     # "Write/Create tests for" - test creation
-    (r"\b(write|create|add|implement)\s+(unit\s+|integration\s+)?tests?\s+(for|to)\b", 0.85, "write_tests"),
+    (
+        r"\b(write|create|add|implement)\s+(unit\s+|integration\s+)?tests?\s+(for|to)\b",
+        0.85,
+        "write_tests",
+    ),
 ]
 
 # Safe actions by intent type

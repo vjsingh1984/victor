@@ -159,7 +159,9 @@ async def _parallel_replace(
     return results
 
 
-async def _parallel_analyze(files: List[Path], max_workers: int = _DEFAULT_MAX_WORKERS) -> List[Dict[str, Any]]:
+async def _parallel_analyze(
+    files: List[Path], max_workers: int = _DEFAULT_MAX_WORKERS
+) -> List[Dict[str, Any]]:
     """Analyze files in parallel with progress indication."""
     results = []
 

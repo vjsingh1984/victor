@@ -12,41 +12,35 @@ RESEARCH_TASK_TYPE_HINTS: Dict[str, str] = {
 2. Cross-reference with authoritative databases
 3. Check recency and relevance of sources
 4. Note any conflicting information found""",
-
     "literature_review": """[LITERATURE] Systematic review of existing knowledge:
 1. Define scope and search criteria
 2. Search academic and authoritative sources
 3. Extract key findings and methodologies
 4. Synthesize patterns and gaps
 5. Provide structured bibliography""",
-
     "competitive_analysis": """[ANALYSIS] Compare products, services, or approaches:
 1. Identify key comparison criteria
 2. Gather data from official sources
 3. Create objective comparison matrix
 4. Note strengths, weaknesses, limitations
 5. Avoid promotional language""",
-
     "trend_research": """[TRENDS] Identify patterns and emerging developments:
 1. Search recent news and publications
 2. Look for quantitative data and statistics
 3. Identify key players and innovations
 4. Note methodology limitations
 5. Distinguish facts from speculation""",
-
     "technical_research": """[TECHNICAL] Deep dive into technical topics:
 1. Start with official documentation
 2. Search code repositories and examples
 3. Look for benchmarks and comparisons
 4. Note version-specific information
 5. Verify with multiple technical sources""",
-
     "general_query": """[QUERY] Answer factual questions:
 1. Search for authoritative sources
 2. Provide direct answer with context
 3. Cite sources with URLs
 4. Note any uncertainty or limitations""",
-
     # Default fallback for 'general' task type
     "general": """[GENERAL RESEARCH] For general research queries:
 1. Use web_search to find relevant sources

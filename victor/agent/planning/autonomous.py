@@ -198,16 +198,20 @@ class AutonomousPlanner:
         ]
 
         if context:
-            prompt_parts.extend([
-                "Context:",
-                context,
-                "",
-            ])
+            prompt_parts.extend(
+                [
+                    "Context:",
+                    context,
+                    "",
+                ]
+            )
 
-        prompt_parts.extend([
-            f"Generate a plan with at most {max_steps} steps.",
-            "Output only the JSON array, no additional text.",
-        ])
+        prompt_parts.extend(
+            [
+                f"Generate a plan with at most {max_steps} steps.",
+                "Output only the JSON array, no additional text.",
+            ]
+        )
 
         return "\n".join(prompt_parts)
 
@@ -425,16 +429,20 @@ class AutonomousPlanner:
                         progress_callback(step, StepStatus.IN_PROGRESS)
 
                     role = self._map_role_string(step.sub_agent_role)
-                    tasks.append(SubAgentTask(
-                        role=role,
-                        task=step.description,
-                        tool_budget=step.estimated_tool_calls,
-                    ))
+                    tasks.append(
+                        SubAgentTask(
+                            role=role,
+                            task=step.description,
+                            tool_budget=step.estimated_tool_calls,
+                        )
+                    )
 
                 fan_out_result = await self.sub_agent_orchestrator.fan_out(tasks, max_concurrent)
 
                 # Process results
-                for step, subagent_result in zip(subagent_steps[:max_concurrent], fan_out_result.results):
+                for step, subagent_result in zip(
+                    subagent_steps[:max_concurrent], fan_out_result.results
+                ):
                     step_result = StepResult(
                         success=subagent_result.success,
                         output=subagent_result.summary,
@@ -524,11 +532,13 @@ class AutonomousPlanner:
         ]
 
         if step.context:
-            parts.extend([
-                "Context from previous steps:",
-                json.dumps(step.context, indent=2),
-                "",
-            ])
+            parts.extend(
+                [
+                    "Context from previous steps:",
+                    json.dumps(step.context, indent=2),
+                    "",
+                ]
+            )
 
         type_instructions = {
             StepType.RESEARCH: "Focus on reading and understanding. Do not make changes.",

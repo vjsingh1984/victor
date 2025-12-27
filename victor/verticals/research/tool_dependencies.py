@@ -131,7 +131,13 @@ class ResearchToolDependencyProvider(ToolDependencyProviderProtocol):
         Returns:
             Set of optional tool names.
         """
-        return {"code_search", "semantic_code_search", "codebase_overview", "list_directory", "edit_files"}
+        return {
+            "code_search",
+            "semantic_code_search",
+            "codebase_overview",
+            "list_directory",
+            "edit_files",
+        }
 
     def get_tool_sequences(self) -> List[List[str]]:
         """Return recommended tool sequences for research workflows.
@@ -139,9 +145,7 @@ class ResearchToolDependencyProvider(ToolDependencyProviderProtocol):
         Returns:
             List of tool sequences (each sequence is a list of tool names).
         """
-        return [
-            list(seq) for seq in RESEARCH_TOOL_SEQUENCES.values()
-        ]
+        return [list(seq) for seq in RESEARCH_TOOL_SEQUENCES.values()]
 
     def suggest_next_tool(self, current_tool: str, used_tools: List[str]) -> str:
         """Suggest the next tool based on current tool and history.

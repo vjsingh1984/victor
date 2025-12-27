@@ -1205,9 +1205,7 @@ class ToolMetadataRegistry:
         }
 
         if category in CATEGORY_TO_EXECUTION:
-            return self._by_execution_category.get(
-                CATEGORY_TO_EXECUTION[category], set()
-            ).copy()
+            return self._by_execution_category.get(CATEGORY_TO_EXECUTION[category], set()).copy()
 
         # Try direct category lookup
         return self._by_category.get(category, set()).copy()

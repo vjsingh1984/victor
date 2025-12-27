@@ -56,6 +56,7 @@ logger = logging.getLogger(__name__)
 
 class AgentStatus(str, Enum):
     """Agent execution status."""
+
     PENDING = "pending"
     RUNNING = "running"
     PAUSED = "paused"
@@ -67,6 +68,7 @@ class AgentStatus(str, Enum):
 @dataclass
 class ToolCallRecord:
     """Record of a tool call made by an agent."""
+
     id: str
     name: str
     status: str  # pending, running, success, error
@@ -80,6 +82,7 @@ class ToolCallRecord:
 @dataclass
 class BackgroundAgent:
     """Represents a background agent task."""
+
     id: str
     name: str
     description: str
@@ -296,7 +299,8 @@ class BackgroundAgentManager:
         to_remove = [
             agent_id
             for agent_id, agent in self._agents.items()
-            if agent.status in (
+            if agent.status
+            in (
                 AgentStatus.COMPLETED,
                 AgentStatus.ERROR,
                 AgentStatus.CANCELLED,
@@ -351,14 +355,17 @@ class BackgroundAgentManager:
                     # Update progress (rough estimate)
                     agent.progress = min(90, agent.progress + 10)
 
-                    self._emit_event("agent_tool_call", {
-                        "agent_id": agent.id,
-                        "tool_call": {
-                            "id": tool_call.id,
-                            "name": tool_call.name,
-                            "status": tool_call.status,
+                    self._emit_event(
+                        "agent_tool_call",
+                        {
+                            "agent_id": agent.id,
+                            "tool_call": {
+                                "id": tool_call.id,
+                                "name": tool_call.name,
+                                "status": tool_call.status,
+                            },
                         },
-                    })
+                    )
 
                 elif chunk_type == "tool_result":
                     # Update the last tool call with result
@@ -368,11 +375,14 @@ class BackgroundAgentManager:
                         tc.end_time = time.time()
                         tc.result = str(chunk.get("result", ""))[:500]
 
-                        self._emit_event("agent_tool_result", {
-                            "agent_id": agent.id,
-                            "tool_call_id": tc.id,
-                            "status": tc.status,
-                        })
+                        self._emit_event(
+                            "agent_tool_result",
+                            {
+                                "agent_id": agent.id,
+                                "tool_call_id": tc.id,
+                                "status": tc.status,
+                            },
+                        )
 
             # Agent completed successfully
             agent.output = "".join(response_chunks)
@@ -393,10 +403,13 @@ class BackgroundAgentManager:
             agent.error = str(e)
             agent.end_time = time.time()
             logger.exception(f"Agent error: {agent.id}")
-            self._emit_event("agent_error", {
-                "agent_id": agent.id,
-                "error": str(e),
-            })
+            self._emit_event(
+                "agent_error",
+                {
+                    "agent_id": agent.id,
+                    "error": str(e),
+                },
+            )
 
         finally:
             async with self._lock:

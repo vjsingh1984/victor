@@ -12,7 +12,17 @@ console = Console()
 logger = logging.getLogger(__name__)
 
 # Supported providers for model listing
-SUPPORTED_PROVIDERS = ["ollama", "lmstudio", "llamacpp", "vllm", "anthropic", "openai", "google", "cerebras", "groqcloud"]
+SUPPORTED_PROVIDERS = [
+    "ollama",
+    "lmstudio",
+    "llamacpp",
+    "vllm",
+    "anthropic",
+    "openai",
+    "google",
+    "cerebras",
+    "groqcloud",
+]
 
 
 @models_app.command("list")
@@ -219,12 +229,16 @@ async def _list_lmstudio_models(settings, endpoint: str = None) -> None:
         if thinking_models:
             console.print(f"[yellow]Thinking models: {len(thinking_models)}[/]")
 
-        console.print("\n[dim]Use a model with: [bold]victor chat --provider lmstudio --model <model>[/dim]")
+        console.print(
+            "\n[dim]Use a model with: [bold]victor chat --provider lmstudio --model <model>[/dim]"
+        )
 
         # Show best recommendations
         if tool_models:
             best = tool_models[0]
-            console.print(f"\n[green]Recommended:[/] victor chat --provider lmstudio --model {best}")
+            console.print(
+                f"\n[green]Recommended:[/] victor chat --provider lmstudio --model {best}"
+            )
 
     except Exception as e:
         console.print(f"[red]Error listing models:[/] {e}")
@@ -383,13 +397,17 @@ async def _list_vllm_models(settings, endpoint: str = None) -> None:
         else:
             console.print("[yellow]Server health: Unknown[/]")
 
-        console.print("\n[dim]Use a model with: [bold]victor chat --provider vllm --model <model>[/dim]")
+        console.print(
+            "\n[dim]Use a model with: [bold]victor chat --provider vllm --model <model>[/dim]"
+        )
 
         # Show recommendation if available
         for model in models_list:
             model_id = model.get("id", "")
             if _model_supports_tools(model_id):
-                console.print(f"\n[green]Recommended:[/] victor chat --provider vllm --model {model_id}")
+                console.print(
+                    f"\n[green]Recommended:[/] victor chat --provider vllm --model {model_id}"
+                )
                 break
 
     except Exception as e:
@@ -568,6 +586,7 @@ async def _list_cerebras_models(settings) -> None:
     try:
         # List models from API
         import httpx
+
         async with httpx.AsyncClient(
             base_url="https://api.cerebras.ai/v1",
             headers={"Authorization": f"Bearer {api_key}"},

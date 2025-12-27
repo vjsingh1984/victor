@@ -33,9 +33,7 @@ class ToolGuidanceStrategy(ABC):
     """
 
     @abstractmethod
-    def get_guidance_prompt(
-        self, task_type: str, available_tools: List[str]
-    ) -> str:
+    def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
         """
         Return provider-specific tool usage guidance.
 
@@ -103,9 +101,7 @@ class ToolGuidanceStrategy(ABC):
         """
         pass
 
-    def adjust_tool_scores(
-        self, tool_scores: Dict[str, float]
-    ) -> Dict[str, float]:
+    def adjust_tool_scores(self, tool_scores: Dict[str, float]) -> Dict[str, float]:
         """
         Adjust tool scores based on provider preferences.
 
@@ -131,13 +127,16 @@ class GrokToolGuidance(ToolGuidanceStrategy):
     """
 
     PREFERRED_TOOLS = {
-        "read_file", "code_search", "grep", "write_file", "edit_file",
-        "list_directory", "shell"
+        "read_file",
+        "code_search",
+        "grep",
+        "write_file",
+        "edit_file",
+        "list_directory",
+        "shell",
     }
 
-    def get_guidance_prompt(
-        self, task_type: str, available_tools: List[str]
-    ) -> str:
+    def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
         # Grok handles tools well, minimal guidance needed
         return ""
 
@@ -175,13 +174,15 @@ class DeepSeekToolGuidance(ToolGuidanceStrategy):
 
     SYNTHESIS_THRESHOLD = 5  # Trigger synthesis after N tool calls
     PREFERRED_TOOLS = {
-        "architectural_summary", "code_review", "refactor_code",
-        "plan_implementation", "security_scan", "code_metrics"
+        "architectural_summary",
+        "code_review",
+        "refactor_code",
+        "plan_implementation",
+        "security_scan",
+        "code_metrics",
     }
 
-    def get_guidance_prompt(
-        self, task_type: str, available_tools: List[str]
-    ) -> str:
+    def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
         base_guidance = """
 IMPORTANT - Tool Usage Guidelines:
 1. Be efficient with tool calls - minimize redundant operations
@@ -191,18 +192,27 @@ IMPORTANT - Tool Usage Guidelines:
 """
 
         if task_type == "simple":
-            return base_guidance + """
+            return (
+                base_guidance
+                + """
 For this simple task, aim to complete with 1-2 tool calls.
 """
+            )
         elif task_type == "medium":
-            return base_guidance + """
+            return (
+                base_guidance
+                + """
 After 5 tool calls, pause to synthesize your findings before continuing.
 """
+            )
         else:  # complex
-            return base_guidance + """
+            return (
+                base_guidance
+                + """
 For complex tasks, regularly synthesize findings (every 5-7 tool calls).
 Focus on depth over breadth when exploring.
 """
+            )
 
     def should_consolidate_calls(self, tool_history: List[Dict[str, Any]]) -> bool:
         if len(tool_history) < 2:
@@ -271,14 +281,17 @@ class OllamaToolGuidance(ToolGuidanceStrategy):
     """
 
     PREFERRED_TOOLS = {
-        "read_file", "write_file", "edit_file", "list_directory",
-        "grep", "shell", "code_search"
+        "read_file",
+        "write_file",
+        "edit_file",
+        "list_directory",
+        "grep",
+        "shell",
+        "code_search",
     }
     AVOIDED_TOOLS = {"web_search", "web_fetch"}  # Air-gapped environments
 
-    def get_guidance_prompt(
-        self, task_type: str, available_tools: List[str]
-    ) -> str:
+    def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
         tools_str = ", ".join(available_tools[:5])  # Limit displayed tools
 
         return f"""
@@ -333,13 +346,16 @@ class AnthropicToolGuidance(ToolGuidanceStrategy):
     """
 
     PREFERRED_TOOLS = {
-        "code_review", "architectural_summary", "refactor_code",
-        "security_scan", "write_file", "generate_docs", "edit_file"
+        "code_review",
+        "architectural_summary",
+        "refactor_code",
+        "security_scan",
+        "write_file",
+        "generate_docs",
+        "edit_file",
     }
 
-    def get_guidance_prompt(
-        self, task_type: str, available_tools: List[str]
-    ) -> str:
+    def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
         # Claude handles tools well, minimal guidance needed
         return ""
 
@@ -375,13 +391,16 @@ class OpenAIToolGuidance(ToolGuidanceStrategy):
     """
 
     PREFERRED_TOOLS = {
-        "write_file", "edit_file", "plan_implementation", "shell",
-        "read_file", "grep", "list_directory"
+        "write_file",
+        "edit_file",
+        "plan_implementation",
+        "shell",
+        "read_file",
+        "grep",
+        "list_directory",
     }
 
-    def get_guidance_prompt(
-        self, task_type: str, available_tools: List[str]
-    ) -> str:
+    def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
         if task_type == "simple":
             return "Be efficient with tool calls."
         return ""
@@ -429,9 +448,7 @@ class DefaultToolGuidance(ToolGuidanceStrategy):
     different providers.
     """
 
-    def get_guidance_prompt(
-        self, task_type: str, available_tools: List[str]
-    ) -> str:
+    def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
         return "Use tools efficiently and synthesize findings clearly."
 
     def should_consolidate_calls(self, tool_history: List[Dict[str, Any]]) -> bool:

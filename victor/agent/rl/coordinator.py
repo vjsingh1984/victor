@@ -206,21 +206,15 @@ class RLCoordinator:
                     SemanticThresholdLearner,
                 )
 
-                return SemanticThresholdLearner(
-                    name=name, db_connection=self.db, learning_rate=0.1
-                )
+                return SemanticThresholdLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "model_selector":
                 from victor.agent.rl.learners.model_selector import ModelSelectorLearner
 
-                return ModelSelectorLearner(
-                    name=name, db_connection=self.db, learning_rate=0.1
-                )
+                return ModelSelectorLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "cache_eviction":
                 from victor.agent.rl.learners.cache_eviction import CacheEvictionLearner
 
-                return CacheEvictionLearner(
-                    name=name, db_connection=self.db, learning_rate=0.1
-                )
+                return CacheEvictionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "grounding_threshold":
                 from victor.agent.rl.learners.grounding_threshold import GroundingThresholdLearner
 
@@ -230,27 +224,19 @@ class RLCoordinator:
             elif name == "quality_weights":
                 from victor.agent.rl.learners.quality_weights import QualityWeightLearner
 
-                return QualityWeightLearner(
-                    name=name, db_connection=self.db, learning_rate=0.05
-                )
+                return QualityWeightLearner(name=name, db_connection=self.db, learning_rate=0.05)
             elif name == "tool_selector":
                 from victor.agent.rl.learners.tool_selector import ToolSelectorLearner
 
-                return ToolSelectorLearner(
-                    name=name, db_connection=self.db, learning_rate=0.05
-                )
+                return ToolSelectorLearner(name=name, db_connection=self.db, learning_rate=0.05)
             elif name == "mode_transition":
                 from victor.agent.rl.learners.mode_transition import ModeTransitionLearner
 
-                return ModeTransitionLearner(
-                    name=name, db_connection=self.db, learning_rate=0.1
-                )
+                return ModeTransitionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "prompt_template":
                 from victor.agent.rl.learners.prompt_template import PromptTemplateLearner
 
-                return PromptTemplateLearner(
-                    name=name, db_connection=self.db, learning_rate=0.1
-                )
+                return PromptTemplateLearner(name=name, db_connection=self.db, learning_rate=0.1)
             else:
                 logger.warning(f"RL: Unknown learner '{name}'")
                 return None
@@ -342,9 +328,7 @@ class RLCoordinator:
         try:
             return learner.get_recommendation(provider, model, task_type)
         except Exception as e:
-            logger.error(
-                f"RL: Failed to get recommendation from {learner_name}: {e}"
-            )
+            logger.error(f"RL: Failed to get recommendation from {learner_name}: {e}")
             return None
 
     # =========================================================================
@@ -406,9 +390,7 @@ class RLCoordinator:
         Returns:
             Dictionary mapping learner name to recommendation
         """
-        return await asyncio.to_thread(
-            self.get_all_recommendations, provider, model, task_type
-        )
+        return await asyncio.to_thread(self.get_all_recommendations, provider, model, task_type)
 
     async def export_metrics_async(self) -> Dict[str, Any]:
         """Async version of export_metrics.

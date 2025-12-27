@@ -112,6 +112,7 @@ class MetricsCommand(BaseSlashCommand):
             if subcommand == "export":
                 if export_format == "json":
                     import json
+
                     data = collector.export_json()
                     ctx.console.print(json.dumps(data, indent=2))
                 elif export_format == "csv":
@@ -261,7 +262,9 @@ class SerializationCommand(BaseSlashCommand):
             content += "\n[dim]Use /serialization tools for per-tool breakdown[/]"
             content += "\n[dim]Use /serialization formats for format comparison[/]"
 
-            ctx.console.print(Panel(content, title="Serialization Statistics", border_style="green"))
+            ctx.console.print(
+                Panel(content, title="Serialization Statistics", border_style="green")
+            )
 
         except ImportError:
             ctx.console.print("[yellow]Adaptive serializer not available[/]")
@@ -310,7 +313,9 @@ class LearningCommand(BaseSlashCommand):
                     mode_controller = getattr(ctx.agent, "_mode_controller", None)
                     if mode_controller:
                         mode_controller.adjust_exploration_rate(rate)
-                        ctx.console.print(f"[green]Mode controller exploration rate set to:[/] {rate:.2f}")
+                        ctx.console.print(
+                            f"[green]Mode controller exploration rate set to:[/] {rate:.2f}"
+                        )
 
                 # Set on model selector learner
                 from victor.agent.rl.coordinator import get_rl_coordinator
@@ -319,7 +324,9 @@ class LearningCommand(BaseSlashCommand):
                 learner = coordinator.get_learner("model_selector")
                 if learner and hasattr(learner, "set_exploration_rate"):
                     learner.set_exploration_rate(rate)
-                    ctx.console.print(f"[green]Model selector exploration rate set to:[/] {rate:.2f}")
+                    ctx.console.print(
+                        f"[green]Model selector exploration rate set to:[/] {rate:.2f}"
+                    )
 
             except ValueError:
                 ctx.console.print(f"[red]Invalid rate:[/] {rate_str}")
@@ -425,8 +432,12 @@ class LearningCommand(BaseSlashCommand):
                         content += f"\n[bold cyan]Mode Learning:[/]\n"
                         content += f"  Profile: {session_stats.get('profile_name', 'unknown')}\n"
                         content += f"  Total Reward: {session_stats.get('total_reward', 0):.2f}\n"
-                        content += f"  Mode Transitions: {session_stats.get('mode_transitions', 0)}\n"
-                        content += f"  Exploration Rate: {session_stats.get('exploration_rate', 0):.2f}\n"
+                        content += (
+                            f"  Mode Transitions: {session_stats.get('mode_transitions', 0)}\n"
+                        )
+                        content += (
+                            f"  Exploration Rate: {session_stats.get('exploration_rate', 0):.2f}\n"
+                        )
 
                         modes_visited = session_stats.get("modes_visited", [])
                         if modes_visited:
@@ -446,7 +457,12 @@ class LearningCommand(BaseSlashCommand):
                 if rankings:
                     content += "[bold cyan]Model Selector (Provider Rankings):[/]\n"
                     for rank in rankings[:5]:
-                        current = " (current)" if ctx.agent and rank["provider"].lower() == ctx.agent.provider_name.lower() else ""
+                        current = (
+                            " (current)"
+                            if ctx.agent
+                            and rank["provider"].lower() == ctx.agent.provider_name.lower()
+                            else ""
+                        )
                         content += f"  {rank['provider']}: Q={rank['q_value']:.2f} (n={rank['sample_count']}){current}\n"
 
                     exploration = getattr(learner, "_exploration_rate", 0.1)

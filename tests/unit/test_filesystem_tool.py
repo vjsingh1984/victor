@@ -697,6 +697,7 @@ class TestFileContentCache:
     def test_cache_invalidate_on_mtime_change(self):
         """Test cache invalidates when file mtime changes."""
         import time
+
         cache = FileContentCache()
 
         with tempfile.NamedTemporaryFile(delete=False, mode="w") as f:

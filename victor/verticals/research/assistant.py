@@ -36,16 +36,16 @@ class ResearchAssistant(VerticalBase):
         return [
             # Core research tools
             ToolNames.WEB_SEARCH,  # Web search (internet search)
-            ToolNames.WEB_FETCH,   # Fetch URL content
+            ToolNames.WEB_FETCH,  # Fetch URL content
             # File operations for reading/writing reports
-            ToolNames.READ,   # read_file → read
+            ToolNames.READ,  # read_file → read
             ToolNames.WRITE,  # write_file → write
-            ToolNames.EDIT,   # edit_files → edit
-            ToolNames.LS,     # list_directory → ls
+            ToolNames.EDIT,  # edit_files → edit
+            ToolNames.LS,  # list_directory → ls
             # Code search for technical research
-            ToolNames.GREP,        # Keyword search
-            ToolNames.CODE_SEARCH, # Semantic code search
-            ToolNames.OVERVIEW,    # codebase_overview → overview
+            ToolNames.GREP,  # Keyword search
+            ToolNames.CODE_SEARCH,  # Semantic code search
+            ToolNames.OVERVIEW,  # codebase_overview → overview
         ]
 
     @classmethod
@@ -56,6 +56,7 @@ class ResearchAssistant(VerticalBase):
     @classmethod
     def get_config(cls) -> VerticalConfig:
         from victor.framework.tools import ToolSet
+
         return VerticalConfig(
             tools=ToolSet.from_tools(cls.get_tools()),
             system_prompt=cls._get_system_prompt(),
@@ -197,21 +198,25 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
     @classmethod
     def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
         from victor.verticals.research.prompts import ResearchPromptContributor
+
         return ResearchPromptContributor()
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
         from victor.verticals.research.mode_config import ResearchModeConfigProvider
+
         return ResearchModeConfigProvider()
 
     @classmethod
     def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
         from victor.verticals.research.safety import ResearchSafetyExtension
+
         return ResearchSafetyExtension()
 
     @classmethod
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
         from victor.verticals.research.tool_dependencies import ResearchToolDependencyProvider
+
         return ResearchToolDependencyProvider()
 
     @classmethod
@@ -233,14 +238,14 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
             # Tier 1: Mandatory - always included for any task
             mandatory={
                 ToolNames.READ,  # Read files - essential
-                ToolNames.LS,    # List directory - essential
+                ToolNames.LS,  # List directory - essential
                 ToolNames.GREP,  # Search - essential for research
             },
             # Tier 2: Vertical Core - essential for research tasks
             vertical_core={
                 ToolNames.WEB_SEARCH,  # Web search is core to research
-                ToolNames.WEB_FETCH,   # Fetching content is core to research
-                ToolNames.OVERVIEW,    # Codebase overview - core for understanding
+                ToolNames.WEB_FETCH,  # Fetching content is core to research
+                ToolNames.OVERVIEW,  # Codebase overview - core for understanding
             },
             # semantic_pool and stage_tools are now derived from @tool decorator metadata
             # Use get_effective_semantic_pool() and get_tools_for_stage_from_registry()

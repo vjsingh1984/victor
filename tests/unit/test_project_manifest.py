@@ -210,9 +210,7 @@ class TestProjectManifest:
             (root / "src" / "app.py").write_text(
                 '"""App module."""\nfrom .utils import helper\nclass App: pass'
             )
-            (root / "src" / "utils.py").write_text(
-                '"""Utility functions."""\ndef helper(): pass'
-            )
+            (root / "src" / "utils.py").write_text('"""Utility functions."""\ndef helper(): pass')
             (root / "tests" / "test_main.py").write_text("def test_main(): pass")
 
             # Create config files

@@ -220,6 +220,7 @@ class VictorAPIServer:
         else:
             # Fallback to global mode controller
             from victor.agent.mode_controller import get_mode_controller
+
             mode_manager = get_mode_controller()
             current_mode = mode_manager.current_mode.value
 
@@ -1087,9 +1088,7 @@ class VictorAPIServer:
 
             # Get updated Q-value for logging
             rankings = learner.get_provider_rankings()
-            provider_ranking = next(
-                (r for r in rankings if r["provider"] == provider.name), None
-            )
+            provider_ranking = next((r for r in rankings if r["provider"] == provider.name), None)
             new_q = provider_ranking["q_value"] if provider_ranking else 0.0
 
             logger.info(
@@ -1811,6 +1810,7 @@ class VictorAPIServer:
 
             # Build task-specific Q-table summary from database
             import sqlite3
+
             task_q_summary = {}
             conn = sqlite3.connect(str(coordinator.db_path))
             cursor = conn.cursor()
@@ -1876,9 +1876,7 @@ class VictorAPIServer:
             )
 
             if recommendation is None:
-                return web.json_response(
-                    {"error": "No recommendation available"}, status=500
-                )
+                return web.json_response({"error": "No recommendation available"}, status=500)
 
             # Get rankings for alternatives
             rankings = learner.get_provider_rankings()
@@ -1886,7 +1884,9 @@ class VictorAPIServer:
                 {"provider": r["provider"], "q_value": round(r["q_value"], 3)}
                 for r in rankings
                 if r["provider"] != recommendation.value
-            ][:5]  # Top 5 alternatives
+            ][
+                :5
+            ]  # Top 5 alternatives
 
             return web.json_response(
                 {
@@ -2006,6 +2006,7 @@ class VictorAPIServer:
 
             # Reset Q-values by clearing database tables
             import sqlite3
+
             db_path = coordinator.db_path
             conn = sqlite3.connect(str(db_path))
             cursor = conn.cursor()
@@ -2042,15 +2043,17 @@ class VictorAPIServer:
 
             agents_list = []
             for agent_id, agent in self._agents.items():
-                agents_list.append({
-                    "id": agent_id,
-                    "task": agent.get("task", ""),
-                    "status": agent.get("status", "unknown"),
-                    "started_at": agent.get("started_at"),
-                    "completed_at": agent.get("completed_at"),
-                    "tool_calls": agent.get("tool_calls", []),
-                    "progress": agent.get("progress", 0),
-                })
+                agents_list.append(
+                    {
+                        "id": agent_id,
+                        "task": agent.get("task", ""),
+                        "status": agent.get("status", "unknown"),
+                        "started_at": agent.get("started_at"),
+                        "completed_at": agent.get("completed_at"),
+                        "tool_calls": agent.get("tool_calls", []),
+                        "progress": agent.get("progress", 0),
+                    }
+                )
 
             return web.json_response({"agents": agents_list})
 
@@ -2138,11 +2141,13 @@ class VictorAPIServer:
             task_handle = asyncio.create_task(run_agent())
             self._agents[agent_id]["task_handle"] = task_handle
 
-            return web.json_response({
-                "id": agent_id,
-                "status": "running",
-                "message": f"Agent started for task: {task[:50]}..."
-            })
+            return web.json_response(
+                {
+                    "id": agent_id,
+                    "status": "running",
+                    "message": f"Agent started for task: {task[:50]}...",
+                }
+            )
 
         except Exception as e:
             logger.exception("Start agent error")
@@ -2159,17 +2164,19 @@ class VictorAPIServer:
                 return web.json_response({"error": "Agent not found"}, status=404)
 
             agent = self._agents[agent_id]
-            return web.json_response({
-                "id": agent_id,
-                "task": agent.get("task", ""),
-                "status": agent.get("status", "unknown"),
-                "started_at": agent.get("started_at"),
-                "completed_at": agent.get("completed_at"),
-                "tool_calls": agent.get("tool_calls", []),
-                "output": agent.get("output", ""),
-                "progress": agent.get("progress", 0),
-                "error": agent.get("error"),
-            })
+            return web.json_response(
+                {
+                    "id": agent_id,
+                    "task": agent.get("task", ""),
+                    "status": agent.get("status", "unknown"),
+                    "started_at": agent.get("started_at"),
+                    "completed_at": agent.get("completed_at"),
+                    "tool_calls": agent.get("tool_calls", []),
+                    "output": agent.get("output", ""),
+                    "progress": agent.get("progress", 0),
+                    "error": agent.get("error"),
+                }
+            )
 
         except Exception as e:
             logger.exception("Get agent error")
@@ -2187,9 +2194,9 @@ class VictorAPIServer:
 
             agent = self._agents[agent_id]
             if agent.get("status") != "running":
-                return web.json_response({
-                    "error": f"Agent is not running (status: {agent.get('status')})"
-                }, status=400)
+                return web.json_response(
+                    {"error": f"Agent is not running (status: {agent.get('status')})"}, status=400
+                )
 
             # Cancel the task
             task_handle = agent.get("task_handle")
@@ -2199,10 +2206,7 @@ class VictorAPIServer:
             agent["status"] = "cancelled"
             agent["completed_at"] = asyncio.get_event_loop().time()
 
-            return web.json_response({
-                "success": True,
-                "message": f"Agent {agent_id} cancelled"
-            })
+            return web.json_response({"success": True, "message": f"Agent {agent_id} cancelled"})
 
         except Exception as e:
             logger.exception("Cancel agent error")
@@ -2226,10 +2230,7 @@ class VictorAPIServer:
 
             del self._agents[agent_id]
 
-            return web.json_response({
-                "success": True,
-                "message": f"Agent {agent_id} deleted"
-            })
+            return web.json_response({"success": True, "message": f"Agent {agent_id} deleted"})
 
         except Exception as e:
             logger.exception("Delete agent error")
@@ -2253,11 +2254,9 @@ class VictorAPIServer:
                 del self._agents[agent_id]
                 cleared += 1
 
-            return web.json_response({
-                "success": True,
-                "cleared": cleared,
-                "message": f"Cleared {cleared} agents"
-            })
+            return web.json_response(
+                {"success": True, "cleared": cleared, "message": f"Cleared {cleared} agents"}
+            )
 
         except Exception as e:
             logger.exception("Clear agents error")
@@ -2275,16 +2274,18 @@ class VictorAPIServer:
 
             plans_list = []
             for plan_id, plan in self._plans.items():
-                plans_list.append({
-                    "id": plan_id,
-                    "title": plan.get("title", ""),
-                    "description": plan.get("description", ""),
-                    "status": plan.get("status", "draft"),
-                    "created_at": plan.get("created_at"),
-                    "approved_at": plan.get("approved_at"),
-                    "executed_at": plan.get("executed_at"),
-                    "steps": plan.get("steps", []),
-                })
+                plans_list.append(
+                    {
+                        "id": plan_id,
+                        "title": plan.get("title", ""),
+                        "description": plan.get("description", ""),
+                        "status": plan.get("status", "draft"),
+                        "created_at": plan.get("created_at"),
+                        "approved_at": plan.get("approved_at"),
+                        "executed_at": plan.get("executed_at"),
+                        "steps": plan.get("steps", []),
+                    }
+                )
 
             return web.json_response({"plans": plans_list})
 
@@ -2319,11 +2320,9 @@ class VictorAPIServer:
                 "output": "",
             }
 
-            return web.json_response({
-                "id": plan_id,
-                "status": "draft",
-                "message": f"Plan created: {title}"
-            })
+            return web.json_response(
+                {"id": plan_id, "status": "draft", "message": f"Plan created: {title}"}
+            )
 
         except Exception as e:
             logger.exception("Create plan error")
@@ -2358,18 +2357,17 @@ class VictorAPIServer:
 
             plan = self._plans[plan_id]
             if plan.get("status") != "draft":
-                return web.json_response({
-                    "error": f"Plan is not in draft status (status: {plan.get('status')})"
-                }, status=400)
+                return web.json_response(
+                    {"error": f"Plan is not in draft status (status: {plan.get('status')})"},
+                    status=400,
+                )
 
             plan["status"] = "approved"
             plan["approved_at"] = asyncio.get_event_loop().time()
 
-            return web.json_response({
-                "success": True,
-                "message": f"Plan {plan_id} approved",
-                "status": "approved"
-            })
+            return web.json_response(
+                {"success": True, "message": f"Plan {plan_id} approved", "status": "approved"}
+            )
 
         except Exception as e:
             logger.exception("Approve plan error")
@@ -2387,9 +2385,12 @@ class VictorAPIServer:
 
             plan = self._plans[plan_id]
             if plan.get("status") != "approved":
-                return web.json_response({
-                    "error": f"Plan must be approved before execution (status: {plan.get('status')})"
-                }, status=400)
+                return web.json_response(
+                    {
+                        "error": f"Plan must be approved before execution (status: {plan.get('status')})"
+                    },
+                    status=400,
+                )
 
             plan["status"] = "executing"
             plan["executed_at"] = asyncio.get_event_loop().time()
@@ -2405,7 +2406,9 @@ class VictorAPIServer:
                             break  # Plan was deleted
 
                         plan["current_step"] = i
-                        step_desc = step.get("description", step) if isinstance(step, dict) else step
+                        step_desc = (
+                            step.get("description", step) if isinstance(step, dict) else step
+                        )
 
                         # Execute step
                         response = await orchestrator.chat(f"Execute this step: {step_desc}")
@@ -2431,11 +2434,13 @@ class VictorAPIServer:
             # Start execution task
             asyncio.create_task(execute_steps())
 
-            return web.json_response({
-                "success": True,
-                "message": f"Plan {plan_id} execution started",
-                "status": "executing"
-            })
+            return web.json_response(
+                {
+                    "success": True,
+                    "message": f"Plan {plan_id} execution started",
+                    "status": "executing",
+                }
+            )
 
         except Exception as e:
             logger.exception("Execute plan error")
@@ -2453,10 +2458,7 @@ class VictorAPIServer:
 
             del self._plans[plan_id]
 
-            return web.json_response({
-                "success": True,
-                "message": f"Plan {plan_id} deleted"
-            })
+            return web.json_response({"success": True, "message": f"Plan {plan_id} deleted"})
 
         except Exception as e:
             logger.exception("Delete plan error")

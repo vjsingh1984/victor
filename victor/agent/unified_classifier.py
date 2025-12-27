@@ -57,6 +57,18 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Try to import native extensions for fast keyword detection
+_NATIVE_AVAILABLE = False
+_native = None
+
+try:
+    import victor_native as _native
+
+    _NATIVE_AVAILABLE = True
+    logger.debug(f"Native classifier loaded (v{_native.__version__})")
+except ImportError:
+    logger.debug("Native extensions not available, using Python classifier")
+
 # Cache configuration
 CLASSIFICATION_CACHE_SIZE = 256  # Max cached classifications
 CLASSIFICATION_CACHE_TTL = 300  # 5 minutes TTL
@@ -268,6 +280,57 @@ POSITIVE_OVERRIDE_PATTERNS: List[re.Pattern] = [
 
 # Window size for negation detection (chars before keyword)
 NEGATION_WINDOW = 30
+
+
+def _has_action_keywords_fast(message: str) -> bool:
+    """Fast check for action keywords using native extension.
+
+    Used as early-exit optimization before detailed analysis.
+
+    Args:
+        message: Message to check
+
+    Returns:
+        True if action keywords are likely present
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.has_action_keywords(message)
+    # Fallback to quick string check
+    message_lower = message.lower()
+    quick_action = ["run", "execute", "deploy", "build", "test", "commit", "push"]
+    return any(kw in message_lower for kw in quick_action)
+
+
+def _has_analysis_keywords_fast(message: str) -> bool:
+    """Fast check for analysis keywords using native extension.
+
+    Args:
+        message: Message to check
+
+    Returns:
+        True if analysis keywords are likely present
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.has_analysis_keywords(message)
+    message_lower = message.lower()
+    quick_analysis = ["analyze", "explore", "review", "understand", "explain"]
+    return any(kw in message_lower for kw in quick_analysis)
+
+
+def _has_negation_fast(message: str) -> bool:
+    """Fast check for negation using native extension.
+
+    Args:
+        message: Message to check
+
+    Returns:
+        True if negation patterns are present
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.has_negation(message)
+    message_lower = message.lower()
+    negations = ["don't", "do not", "not", "never", "skip", "without", "avoid"]
+    return any(neg in message_lower for neg in negations)
 
 
 def _is_keyword_negated(message: str, keyword: str, position: int) -> bool:
@@ -533,6 +596,10 @@ class UnifiedTaskClassifier:
             cached = self._check_cache(message)
             if cached is not None:
                 return cached
+
+        # Note: Native extensions accelerate keyword detection within _find_keywords_with_positions
+        # and _has_*_keywords_fast functions, but we don't short-circuit the full analysis
+        # to maintain consistent output format with all_matches populated.
 
         # Find all keyword matches
         action_matches = _find_keywords_with_positions(message, ACTION_KEYWORDS)

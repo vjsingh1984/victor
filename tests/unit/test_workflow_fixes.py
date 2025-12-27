@@ -261,8 +261,16 @@ class TestGroundingStopwordFilter:
         from victor.agent.grounding_verifier import GROUNDING_STOPWORDS
 
         tech_words = [
-            "handles", "manages", "provides", "supports", "allows",
-            "creates", "returns", "contains", "includes", "uses",
+            "handles",
+            "manages",
+            "provides",
+            "supports",
+            "allows",
+            "creates",
+            "returns",
+            "contains",
+            "includes",
+            "uses",
         ]
         for word in tech_words:
             assert word in GROUNDING_STOPWORDS, f"'{word}' should be in stopwords"
@@ -288,8 +296,13 @@ class TestGroundingStopwordFilter:
 
         # These look like code symbols, not common English words
         code_identifiers = [
-            "RSSClient", "fetch_feed", "parse_xml", "get_articles",
-            "UserModel", "async_handler", "calculate_total",
+            "RSSClient",
+            "fetch_feed",
+            "parse_xml",
+            "get_articles",
+            "UserModel",
+            "async_handler",
+            "calculate_total",
         ]
         for identifier in code_identifiers:
             assert identifier.lower() not in GROUNDING_STOPWORDS
@@ -361,9 +374,7 @@ class TestContextAwareLoopSignatures:
 
         tracker = UnifiedTaskTracker()
 
-        sig = tracker._get_signature(
-            "read_file", {"path": "/test.py"}, include_stage=False
-        )
+        sig = tracker._get_signature("read_file", {"path": "/test.py"}, include_stage=False)
 
         assert "stage:" not in sig
 
@@ -526,11 +537,19 @@ class TestWorkflowFixesIntegration:
 
         # These words appeared in actual error logs
         false_positive_words = [
-            "that", "handles", "should", "has", "provides",
-            "supports", "allows", "enables", "creates", "returns",
+            "that",
+            "handles",
+            "should",
+            "has",
+            "provides",
+            "supports",
+            "allows",
+            "enables",
+            "creates",
+            "returns",
         ]
 
         for word in false_positive_words:
-            assert word in GROUNDING_STOPWORDS, (
-                f"'{word}' should be filtered to prevent false positives"
-            )
+            assert (
+                word in GROUNDING_STOPWORDS
+            ), f"'{word}' should be filtered to prevent false positives"

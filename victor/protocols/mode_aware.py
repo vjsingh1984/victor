@@ -85,6 +85,7 @@ class ModeInfo:
         allowed_tools: Set of explicitly allowed tools
         disallowed_tools: Set of explicitly disallowed tools
     """
+
     name: str = "BUILD"
     allow_all_tools: bool = True
     exploration_multiplier: float = 1.0
@@ -153,6 +154,7 @@ class ModeAwareMixin:
         if self._mode_controller is None:
             try:
                 from victor.agent.mode_controller import get_mode_controller
+
                 self._mode_controller = get_mode_controller()
             except Exception as e:
                 logger.debug(f"Mode controller not available: {e}")

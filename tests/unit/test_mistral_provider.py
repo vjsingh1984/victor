@@ -181,7 +181,9 @@ class TestMistralRequestPayload:
         assert payload["tools"][0]["function"]["name"] == "calculator"
         assert payload["tool_choice"] == "auto"
 
-    def test_tool_format_matches_mistral_spec(self, mistral_provider, sample_messages, sample_tools):
+    def test_tool_format_matches_mistral_spec(
+        self, mistral_provider, sample_messages, sample_tools
+    ):
         """Test that tool format matches Mistral API specification."""
         payload = mistral_provider._build_request_payload(
             messages=sample_messages,

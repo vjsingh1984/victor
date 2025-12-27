@@ -251,9 +251,7 @@ class TestOpenAIAdapter:
 
         async def mock_stream():
             yield MockChunk(
-                choices=[
-                    MockChoice(delta=MockDelta(content="", tool_calls=[MockToolCall()]))
-                ]
+                choices=[MockChoice(delta=MockDelta(content="", tool_calls=[MockToolCall()]))]
             )
 
         results = []

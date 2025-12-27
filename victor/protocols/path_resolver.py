@@ -70,6 +70,7 @@ class PathResolution:
         is_file: True if resolved path is a file
         is_directory: True if resolved path is a directory
     """
+
     original_path: str
     resolved_path: Path
     was_normalized: bool = False
@@ -86,7 +87,9 @@ class PathResolution:
     def __str__(self) -> str:
         """Human-readable representation."""
         if self.was_normalized:
-            return f"'{self.original_path}' -> '{self.resolved_path}' ({self.normalization_applied})"
+            return (
+                f"'{self.original_path}' -> '{self.resolved_path}' ({self.normalization_applied})"
+            )
         return str(self.resolved_path)
 
 
@@ -177,7 +180,7 @@ def strip_cwd_prefix(path: str, cwd: Path) -> Tuple[Optional[str], str]:
 
     # Check if path starts with cwd name
     if path.startswith(f"{cwd_name}/"):
-        stripped = path[len(cwd_name) + 1:]
+        stripped = path[len(cwd_name) + 1 :]
         if stripped:
             return stripped, f"stripped_cwd_prefix:{cwd_name}"
 
@@ -237,7 +240,7 @@ def strip_common_prefix(path: str, cwd: Path) -> Tuple[Optional[str], str]:
     # Look for repeated sequences
     for seq_len in range(1, n // 2 + 1):
         prefix = parts[:seq_len]
-        if parts[seq_len:seq_len + seq_len] == prefix:
+        if parts[seq_len : seq_len + seq_len] == prefix:
             # Found duplicate prefix
             stripped = "/".join(parts[seq_len:])
             check_path = cwd / stripped
@@ -348,9 +351,7 @@ class PathResolver(IPathResolver):
 
         if nested_dir.is_dir() and nested_dir not in self.additional_roots:
             # Check if it looks like a Python package (has __init__.py or .py files)
-            has_python_files = any(
-                nested_dir.glob("*.py")
-            ) or any(
+            has_python_files = any(nested_dir.glob("*.py")) or any(
                 nested_dir.glob("**/__init__.py")
             )
 

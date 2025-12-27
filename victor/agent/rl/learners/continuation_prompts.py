@@ -101,9 +101,7 @@ class ContinuationPromptLearner(BaseLearner):
         Args:
             outcome: Outcome with continuation prompts data
         """
-        context_key = self._get_context_key(
-            outcome.provider, outcome.model, outcome.task_type
-        )
+        context_key = self._get_context_key(outcome.provider, outcome.model, outcome.task_type)
 
         cursor = self.db.cursor()
 

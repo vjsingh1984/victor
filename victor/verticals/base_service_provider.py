@@ -52,16 +52,19 @@ logger = logging.getLogger(__name__)
 # Protocol definitions for vertical services
 class VerticalMiddlewareProtocol:
     """Protocol for vertical middleware."""
+
     pass
 
 
 class VerticalSafetyProtocol:
     """Protocol for vertical safety extension."""
+
     pass
 
 
 class VerticalPromptProtocol:
     """Protocol for vertical prompt contributor."""
+
     pass
 
 

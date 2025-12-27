@@ -94,7 +94,10 @@ async def mcp(
     """
     mcp_client = _get_mcp_client(context)
     if not mcp_client:
-        return {"success": False, "error": "MCP client not configured. Provide mcp_client in context."}
+        return {
+            "success": False,
+            "error": "MCP client not configured. Provide mcp_client in context.",
+        }
     if not mcp_client.initialized:
         return {"success": False, "error": "MCP client not initialized"}
 

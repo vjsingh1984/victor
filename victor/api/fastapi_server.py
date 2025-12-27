@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from fastapi import (
+    Body,
     FastAPI,
     HTTPException,
     Query,
@@ -399,7 +400,10 @@ class VictorFastAPIServer:
                     provider_name = getattr(orchestrator.provider, "name", "unknown")
                     model_name = getattr(orchestrator.provider, "model", "unknown")
 
-                if hasattr(orchestrator, "adaptive_controller") and orchestrator.adaptive_controller:
+                if (
+                    hasattr(orchestrator, "adaptive_controller")
+                    and orchestrator.adaptive_controller
+                ):
                     mode = orchestrator.adaptive_controller.current_mode.value
 
                 return StatusResponse(
@@ -443,9 +447,7 @@ class VictorFastAPIServer:
             async def event_generator() -> AsyncIterator[str]:
                 try:
                     orchestrator = await self._get_orchestrator()
-                    async for chunk in orchestrator.stream_chat(
-                        request.messages[-1].content
-                    ):
+                    async for chunk in orchestrator.stream_chat(request.messages[-1].content):
                         if hasattr(chunk, "content") or hasattr(chunk, "tool_calls"):
                             content = getattr(chunk, "content", "")
                             tool_calls = getattr(chunk, "tool_calls", None)
@@ -760,9 +762,7 @@ class VictorFastAPIServer:
                             "description": tool.description or "",
                             "category": category,
                             "cost_tier": cost_tier,
-                            "parameters": (
-                                tool.parameters if hasattr(tool, "parameters") else {}
-                            ),
+                            "parameters": (tool.parameters if hasattr(tool, "parameters") else {}),
                             "is_dangerous": self._is_dangerous_tool(tool.name),
                             "requires_approval": cost_tier in ("medium", "high")
                             or self._is_dangerous_tool(tool.name),
@@ -891,9 +891,7 @@ class VictorFastAPIServer:
             """Apply a patch."""
             from victor.tools import patch_tool
 
-            result = await patch_tool.apply_patch(
-                patch=request.patch, dry_run=request.dry_run
-            )
+            result = await patch_tool.apply_patch(patch=request.patch, dry_run=request.dry_run)
             return JSONResponse(result)
 
         @app.post("/patch/create", tags=["Patch"])
@@ -943,9 +941,7 @@ class VictorFastAPIServer:
                 from victor.lsp.manager import get_lsp_manager
 
                 manager = get_lsp_manager()
-                hover = await manager.get_hover(
-                    request.file, request.line, request.character
-                )
+                hover = await manager.get_hover(request.file, request.line, request.character)
 
                 return JSONResponse({"contents": hover.contents if hover else None})
 
@@ -1059,16 +1055,12 @@ class VictorFastAPIServer:
                         "staged": staged,
                         "unstaged": unstaged,
                         "untracked": untracked,
-                        "is_clean": len(staged) == 0
-                        and len(unstaged) == 0
-                        and len(untracked) == 0,
+                        "is_clean": len(staged) == 0 and len(unstaged) == 0 and len(untracked) == 0,
                     }
                 )
 
             except subprocess.TimeoutExpired:
-                return JSONResponse(
-                    {"error": "Git command timed out"}, status_code=500
-                )
+                return JSONResponse({"error": "Git command timed out"}, status_code=500)
             except FileNotFoundError:
                 return JSONResponse({"is_git_repo": False, "error": "Git not installed"})
             except Exception as e:
@@ -1110,9 +1102,7 @@ class VictorFastAPIServer:
                             message = message[1:-1]
 
                 if not message:
-                    raise HTTPException(
-                        status_code=400, detail="Commit message required"
-                    )
+                    raise HTTPException(status_code=400, detail="Commit message required")
 
                 result = subprocess.run(
                     ["git", "commit", "-m", message],
@@ -1127,9 +1117,7 @@ class VictorFastAPIServer:
                         {"success": False, "error": result.stderr or "Commit failed"}
                     )
 
-                return JSONResponse(
-                    {"success": True, "message": message, "output": result.stdout}
-                )
+                return JSONResponse({"success": True, "message": message, "output": result.stdout})
 
             except HTTPException:
                 raise
@@ -1238,19 +1226,29 @@ Respond with just the command to run."""
 
                 # Check if command is dangerous
                 dangerous_patterns = [
-                    "rm -rf /", "rm -rf ~", "> /dev/sd", "mkfs.", "dd if=",
-                    "sudo rm", ":(){", "chmod -R 777", "curl | sh", "wget | sh"
+                    "rm -rf /",
+                    "rm -rf ~",
+                    "> /dev/sd",
+                    "mkfs.",
+                    "dd if=",
+                    "sudo rm",
+                    ":(){",
+                    "chmod -R 777",
+                    "curl | sh",
+                    "wget | sh",
                 ]
                 is_dangerous = any(p in command.lower() for p in dangerous_patterns)
 
                 cmd_id = f"cmd-{int(time.time() * 1000)}"
-                return JSONResponse({
-                    "command_id": cmd_id,
-                    "command": command,
-                    "description": intent,
-                    "is_dangerous": is_dangerous,
-                    "status": "pending"
-                })
+                return JSONResponse(
+                    {
+                        "command_id": cmd_id,
+                        "command": command,
+                        "description": intent,
+                        "is_dangerous": is_dangerous,
+                        "status": "pending",
+                    }
+                )
 
             except Exception as e:
                 logger.exception("Terminal suggest error")
@@ -1266,8 +1264,14 @@ Respond with just the command to run."""
 
             # Check for dangerous commands
             dangerous_patterns = [
-                "rm -rf /", "rm -rf ~", "> /dev/sd", "mkfs.", "dd if=",
-                "sudo rm", ":(){", "chmod -R 777"
+                "rm -rf /",
+                "rm -rf ~",
+                "> /dev/sd",
+                "mkfs.",
+                "dd if=",
+                "sudo rm",
+                ":(){",
+                "chmod -R 777",
             ]
             is_dangerous = any(p in request.command.lower() for p in dangerous_patterns)
 
@@ -1290,10 +1294,7 @@ Respond with just the command to run."""
                 )
 
                 try:
-                    stdout, _ = await asyncio.wait_for(
-                        proc.communicate(),
-                        timeout=request.timeout
-                    )
+                    stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=request.timeout)
                     output = stdout.decode("utf-8", errors="replace")
                     exit_code = proc.returncode
 
@@ -1462,9 +1463,7 @@ Respond with just the command to run."""
                         ext = path.suffix.lower()
                         if ext in code_extensions:
                             try:
-                                with open(
-                                    path, "r", encoding="utf-8", errors="ignore"
-                                ) as f:
+                                with open(path, "r", encoding="utf-8", errors="ignore") as f:
                                     lines = len(f.readlines())
                                     metrics["lines_of_code"] += lines
                                     metrics["files_by_type"][ext] = (
@@ -1502,9 +1501,7 @@ Respond with just the command to run."""
                         scan_type="secrets",
                     )
                     if tool_result.success:
-                        return JSONResponse(
-                            {"scan_completed": True, "results": tool_result.data}
-                        )
+                        return JSONResponse({"scan_completed": True, "results": tool_result.data})
                 except Exception:
                     pass
 
@@ -1598,9 +1595,7 @@ Respond with just the command to run."""
                             for line in req_path.read_text().splitlines():
                                 line = line.strip()
                                 if line and not line.startswith("#"):
-                                    deps.append(
-                                        line.split("==")[0].split(">=")[0].split("<")[0]
-                                    )
+                                    deps.append(line.split("==")[0].split(">=")[0].split("<")[0])
                             dependencies["python"] = {
                                 "file": req_file,
                                 "count": len(deps),
@@ -1634,9 +1629,7 @@ Respond with just the command to run."""
                 if go_mod.exists():
                     dependencies["go"] = {"file": "go.mod", "exists": True}
 
-                return JSONResponse(
-                    {"workspace": str(root), "dependencies": dependencies}
-                )
+                return JSONResponse({"workspace": str(root), "dependencies": dependencies})
 
             except Exception as e:
                 logger.exception("Workspace dependencies error")
@@ -1716,7 +1709,9 @@ Respond with just the command to run."""
                 learner = coordinator.get_learner("model_selector")
 
                 if not learner:
-                    return JSONResponse({"error": "Model selector learner not available"}, status_code=503)
+                    return JSONResponse(
+                        {"error": "Model selector learner not available"}, status_code=503
+                    )
 
                 # Get rankings
                 rankings = learner.get_provider_rankings()
@@ -1725,8 +1720,7 @@ Respond with just the command to run."""
                 task_q_summary = {}
                 for provider, task_q_table in learner._q_table_by_task.items():
                     task_q_summary[provider] = {
-                        task_type: round(q_val, 3)
-                        for task_type, q_val in task_q_table.items()
+                        task_type: round(q_val, 3) for task_type, q_val in task_q_table.items()
                     }
 
                 stats = {
@@ -1768,16 +1762,15 @@ Respond with just the command to run."""
                 learner = coordinator.get_learner("model_selector")
 
                 if not learner:
-                    return JSONResponse({"error": "Model selector learner not available"}, status_code=503)
+                    return JSONResponse(
+                        {"error": "Model selector learner not available"}, status_code=503
+                    )
 
                 available = list(learner._q_table.keys()) if learner._q_table else ["ollama"]
 
                 # Get recommendation
                 recommendation = coordinator.get_recommendation(
-                    "model_selector",
-                    json.dumps(available),
-                    "",
-                    task_type or "unknown"
+                    "model_selector", json.dumps(available), "", task_type or "unknown"
                 )
 
                 if not recommendation:
@@ -1827,7 +1820,9 @@ Respond with just the command to run."""
                 learner = coordinator.get_learner("model_selector")
 
                 if not learner:
-                    return JSONResponse({"error": "Model selector learner not available"}, status_code=503)
+                    return JSONResponse(
+                        {"error": "Model selector learner not available"}, status_code=503
+                    )
 
                 old_rate = learner.epsilon
                 learner.epsilon = request.rate
@@ -1855,7 +1850,9 @@ Respond with just the command to run."""
                 learner = coordinator.get_learner("model_selector")
 
                 if not learner:
-                    return JSONResponse({"error": "Model selector learner not available"}, status_code=503)
+                    return JSONResponse(
+                        {"error": "Model selector learner not available"}, status_code=503
+                    )
 
                 try:
                     strategy = SelectionStrategy(request.strategy.lower())
@@ -1898,6 +1895,7 @@ Respond with just the command to run."""
 
                 # Reset Q-values by clearing database tables
                 import sqlite3
+
                 db_path = coordinator.db_path
                 conn = sqlite3.connect(str(db_path))
                 cursor = conn.cursor()
@@ -1955,11 +1953,13 @@ Respond with just the command to run."""
                     name=name,
                 )
 
-                return JSONResponse({
-                    "success": True,
-                    "agent_id": agent_id,
-                    "message": f"Agent started: {agent_id}",
-                })
+                return JSONResponse(
+                    {
+                        "success": True,
+                        "agent_id": agent_id,
+                        "message": f"Agent started: {agent_id}",
+                    }
+                )
 
             except RuntimeError as e:
                 return JSONResponse({"error": str(e)}, status_code=429)
@@ -1988,10 +1988,12 @@ Respond with just the command to run."""
                         pass
 
                 agents = manager.list_agents(status=status_filter, limit=limit)
-                return JSONResponse({
-                    "agents": agents,
-                    "active_count": manager.active_count,
-                })
+                return JSONResponse(
+                    {
+                        "agents": agents,
+                        "active_count": manager.active_count,
+                    }
+                )
 
             except Exception as e:
                 logger.exception("Failed to list agents")
@@ -2029,10 +2031,12 @@ Respond with just the command to run."""
 
                 cancelled = await manager.cancel_agent(agent_id)
                 if cancelled:
-                    return JSONResponse({
-                        "success": True,
-                        "message": f"Agent {agent_id} cancelled",
-                    })
+                    return JSONResponse(
+                        {
+                            "success": True,
+                            "message": f"Agent {agent_id} cancelled",
+                        }
+                    )
                 else:
                     return JSONResponse(
                         {"error": "Agent not found or not running"},
@@ -2054,11 +2058,13 @@ Respond with just the command to run."""
                     return JSONResponse({"cleared": 0})
 
                 cleared = manager.clear_completed()
-                return JSONResponse({
-                    "success": True,
-                    "cleared": cleared,
-                    "message": f"Cleared {cleared} agents",
-                })
+                return JSONResponse(
+                    {
+                        "success": True,
+                        "cleared": cleared,
+                        "message": f"Cleared {cleared} agents",
+                    }
+                )
 
             except Exception as e:
                 logger.exception("Failed to clear agents")
@@ -2076,16 +2082,18 @@ Respond with just the command to run."""
             """List all plans."""
             plans_list = []
             for plan_id, plan in _plans.items():
-                plans_list.append({
-                    "id": plan_id,
-                    "title": plan.get("title", ""),
-                    "description": plan.get("description", ""),
-                    "status": plan.get("status", "draft"),
-                    "created_at": plan.get("created_at"),
-                    "approved_at": plan.get("approved_at"),
-                    "executed_at": plan.get("executed_at"),
-                    "steps": plan.get("steps", []),
-                })
+                plans_list.append(
+                    {
+                        "id": plan_id,
+                        "title": plan.get("title", ""),
+                        "description": plan.get("description", ""),
+                        "status": plan.get("status", "draft"),
+                        "created_at": plan.get("created_at"),
+                        "approved_at": plan.get("approved_at"),
+                        "executed_at": plan.get("executed_at"),
+                        "steps": plan.get("steps", []),
+                    }
+                )
             return JSONResponse({"plans": plans_list})
 
         @app.post("/plans", tags=["Plans"])
@@ -2099,6 +2107,7 @@ Respond with just the command to run."""
 
                 plan_id = str(uuid.uuid4())[:8]
                 import time
+
                 _plans[plan_id] = {
                     "id": plan_id,
                     "title": title,
@@ -2113,11 +2122,9 @@ Respond with just the command to run."""
                     "output": "",
                 }
 
-                return JSONResponse({
-                    "id": plan_id,
-                    "status": "draft",
-                    "message": f"Plan created: {title}"
-                })
+                return JSONResponse(
+                    {"id": plan_id, "status": "draft", "message": f"Plan created: {title}"}
+                )
 
             except Exception as e:
                 logger.exception("Failed to create plan")
@@ -2138,19 +2145,19 @@ Respond with just the command to run."""
 
             plan = _plans[plan_id]
             if plan.get("status") != "draft":
-                return JSONResponse({
-                    "error": f"Plan is not in draft status (status: {plan.get('status')})"
-                }, status_code=400)
+                return JSONResponse(
+                    {"error": f"Plan is not in draft status (status: {plan.get('status')})"},
+                    status_code=400,
+                )
 
             import time
+
             plan["status"] = "approved"
             plan["approved_at"] = time.time()
 
-            return JSONResponse({
-                "success": True,
-                "message": f"Plan {plan_id} approved",
-                "status": "approved"
-            })
+            return JSONResponse(
+                {"success": True, "message": f"Plan {plan_id} approved", "status": "approved"}
+            )
 
         @app.post("/plans/{plan_id}/execute", tags=["Plans"])
         async def execute_plan(plan_id: str) -> JSONResponse:
@@ -2160,11 +2167,15 @@ Respond with just the command to run."""
 
             plan = _plans[plan_id]
             if plan.get("status") != "approved":
-                return JSONResponse({
-                    "error": f"Plan must be approved before execution (status: {plan.get('status')})"
-                }, status_code=400)
+                return JSONResponse(
+                    {
+                        "error": f"Plan must be approved before execution (status: {plan.get('status')})"
+                    },
+                    status_code=400,
+                )
 
             import time
+
             plan["status"] = "executing"
             plan["executed_at"] = time.time()
 
@@ -2176,7 +2187,9 @@ Respond with just the command to run."""
                         if plan_id not in _plans:
                             break
                         plan["current_step"] = i
-                        step_desc = step.get("description", step) if isinstance(step, dict) else step
+                        step_desc = (
+                            step.get("description", step) if isinstance(step, dict) else step
+                        )
                         plan["output"] += f"\n## Step {i+1}: {step_desc}\n"
                         if isinstance(step, dict):
                             step["status"] = "completed"
@@ -2191,13 +2204,16 @@ Respond with just the command to run."""
                         plan["error"] = str(e)
 
             import asyncio
+
             asyncio.create_task(execute_steps())
 
-            return JSONResponse({
-                "success": True,
-                "message": f"Plan {plan_id} execution started",
-                "status": "executing"
-            })
+            return JSONResponse(
+                {
+                    "success": True,
+                    "message": f"Plan {plan_id} execution started",
+                    "status": "executing",
+                }
+            )
 
         @app.delete("/plans/{plan_id}", tags=["Plans"])
         async def delete_plan(plan_id: str) -> JSONResponse:
@@ -2206,10 +2222,7 @@ Respond with just the command to run."""
                 return JSONResponse({"error": "Plan not found"}, status_code=404)
 
             del _plans[plan_id]
-            return JSONResponse({
-                "success": True,
-                "message": f"Plan {plan_id} deleted"
-            })
+            return JSONResponse({"success": True, "message": f"Plan {plan_id} deleted"})
 
         # Placeholder endpoints
         @app.get("/credentials/get", tags=["System"])
@@ -2257,9 +2270,7 @@ Respond with just the command to run."""
             finally:
                 if websocket in self._ws_clients:
                     self._ws_clients.remove(websocket)
-                logger.info(
-                    f"WebSocket client disconnected. Total: {len(self._ws_clients)}"
-                )
+                logger.info(f"WebSocket client disconnected. Total: {len(self._ws_clients)}")
 
     # =========================================================================
     # Helper Methods
@@ -2344,9 +2355,7 @@ Respond with just the command to run."""
 
             # Get updated Q-value for logging
             rankings = learner.get_provider_rankings()
-            provider_ranking = next(
-                (r for r in rankings if r["provider"] == provider.name), None
-            )
+            provider_ranking = next((r for r in rankings if r["provider"] == provider.name), None)
             new_q = provider_ranking["q_value"] if provider_ranking else 0.0
 
             logger.info(
@@ -2357,9 +2366,7 @@ Respond with just the command to run."""
         except Exception as e:
             logger.debug(f"RL feedback recording skipped: {e}")
 
-    async def _handle_ws_message(
-        self, ws: WebSocket, data: Dict[str, Any]
-    ) -> None:
+    async def _handle_ws_message(self, ws: WebSocket, data: Dict[str, Any]) -> None:
         """Handle incoming WebSocket messages."""
         msg_type = data.get("type", "")
 
@@ -2372,17 +2379,11 @@ Respond with just the command to run."""
             orchestrator = await self._get_orchestrator()
 
             try:
-                async for chunk in orchestrator.stream_chat(
-                    messages[-1].get("content", "")
-                ):
+                async for chunk in orchestrator.stream_chat(messages[-1].get("content", "")):
                     if chunk.get("type") == "content":
-                        await ws.send_json(
-                            {"type": "content", "content": chunk["content"]}
-                        )
+                        await ws.send_json({"type": "content", "content": chunk["content"]})
                     elif chunk.get("type") == "tool_call":
-                        await ws.send_json(
-                            {"type": "tool_call", "tool_call": chunk["tool_call"]}
-                        )
+                        await ws.send_json({"type": "tool_call", "tool_call": chunk["tool_call"]})
 
                 await ws.send_json({"type": "done"})
             except Exception as e:

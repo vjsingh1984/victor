@@ -897,21 +897,25 @@ class MCPRegistry:
         # Discover Claude Desktop servers
         claude_servers = cls._discover_claude_desktop_servers()
         for server in claude_servers:
-            result["claude_desktop"].append({
-                "name": server.name,
-                "command": server.command,
-                "description": server.description,
-            })
+            result["claude_desktop"].append(
+                {
+                    "name": server.name,
+                    "command": server.command,
+                    "description": server.description,
+                }
+            )
 
         # Discover executables
         exec_servers = cls._discover_mcp_executables()
         for server in exec_servers:
-            result["executables"].append({
-                "name": server.name,
-                "command": server.command,
-                "description": server.description,
-                "tags": server.tags,
-            })
+            result["executables"].append(
+                {
+                    "name": server.name,
+                    "command": server.command,
+                    "description": server.description,
+                    "tags": server.tags,
+                }
+            )
 
         return result
 

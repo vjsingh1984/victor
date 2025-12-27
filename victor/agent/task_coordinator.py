@@ -100,7 +100,7 @@ class TaskCoordinator:
         self,
         user_message: str,
         unified_task_type: "TaskType",
-        conversation_controller: "ConversationController"
+        conversation_controller: "ConversationController",
     ) -> tuple[Any, int]:
         """Prepare task-specific guidance and budget adjustments.
 
@@ -230,12 +230,8 @@ class TaskCoordinator:
 
         if intent_result.intent in (ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY):
             if intent_result.prompt_guard:
-                conversation_controller.add_message(
-                    "system", intent_result.prompt_guard.strip()
-                )
-                logger.info(
-                    f"Intent: {intent_result.intent.value}, injected prompt guard"
-                )
+                conversation_controller.add_message("system", intent_result.prompt_guard.strip())
+                logger.info(f"Intent: {intent_result.intent.value}, injected prompt guard")
         elif intent_result.intent == ActionIntent.WRITE_ALLOWED:
             logger.info("Intent: write_allowed, no prompt guard needed")
 

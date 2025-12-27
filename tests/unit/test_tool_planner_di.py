@@ -226,9 +226,7 @@ class TestToolPlannerDIIntegration:
         for attr in expected_attrs:
             assert hasattr(tool_planner, attr), f"Missing attribute: {attr}"
 
-    def test_full_orchestrator_initialization_with_tool_planner(
-        self, service_provider
-    ):
+    def test_full_orchestrator_initialization_with_tool_planner(self, service_provider):
         """Test full orchestrator initialization includes ToolPlanner."""
         from victor.agent.orchestrator_factory import OrchestratorFactory
         from unittest.mock import Mock

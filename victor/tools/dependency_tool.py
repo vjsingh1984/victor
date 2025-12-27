@@ -199,9 +199,7 @@ async def _do_security() -> Dict[str, Any]:
 
     if not vulnerabilities:
         report.append("No known vulnerabilities found!")
-        report.append(
-            "\nNote: This is a basic check. For comprehensive auditing, use: pip-audit"
-        )
+        report.append("\nNote: This is a basic check. For comprehensive auditing, use: pip-audit")
     else:
         report.append(f"Found {len(vulnerabilities)} potential vulnerabilities:\n")
         for vuln in vulnerabilities:

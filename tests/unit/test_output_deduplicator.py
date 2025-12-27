@@ -232,9 +232,7 @@ class TestStreamingDeduplicator:
 
     def test_add_chunk_with_boundary(self, dedup):
         """Test adding chunk with paragraph boundary."""
-        result = dedup.add_chunk(
-            "First paragraph with content.\n\nSecond paragraph here."
-        )
+        result = dedup.add_chunk("First paragraph with content.\n\nSecond paragraph here.")
         # Should return processed content
         assert result is None or isinstance(result, str)
 
@@ -340,6 +338,7 @@ class TestIntelligentPipelineDeduplication:
     def grok_pipeline(self):
         """Create pipeline for Grok provider (deduplication enabled)."""
         from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+
         return IntelligentAgentPipeline(
             provider_name="grok",
             model="grok-beta",
@@ -350,6 +349,7 @@ class TestIntelligentPipelineDeduplication:
     def xai_pipeline(self):
         """Create pipeline for xAI provider (deduplication enabled)."""
         from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+
         return IntelligentAgentPipeline(
             provider_name="xai",
             model="grok-2-1212",
@@ -360,6 +360,7 @@ class TestIntelligentPipelineDeduplication:
     def anthropic_pipeline(self):
         """Create pipeline for Anthropic provider (deduplication disabled)."""
         from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+
         return IntelligentAgentPipeline(
             provider_name="anthropic",
             model="claude-3-5-sonnet",
@@ -370,6 +371,7 @@ class TestIntelligentPipelineDeduplication:
     def deepseek_pipeline(self):
         """Create pipeline for DeepSeek provider (deduplication disabled)."""
         from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+
         return IntelligentAgentPipeline(
             provider_name="deepseek",
             model="deepseek-chat",

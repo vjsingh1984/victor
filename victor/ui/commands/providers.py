@@ -73,5 +73,7 @@ def list_providers() -> None:
             table.add_row(provider, "❓ Unknown", "", "")
 
     console.print(table)
-    console.print(f"\n[dim]Total: {len(primary_providers)} providers ({len(available_providers) - len(primary_providers)} aliases hidden)[/]")
+    console.print(
+        f"\n[dim]Total: {len(primary_providers)} providers ({len(available_providers) - len(primary_providers)} aliases hidden)[/]"
+    )
     console.print("[dim]Use 'victor profiles' to see configured profiles[/]")

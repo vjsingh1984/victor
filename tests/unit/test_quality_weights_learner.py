@@ -258,8 +258,8 @@ class TestQualityWeightLearner:
                 task_type=task_type,
                 dimension_scores={
                     QualityDimension.RELEVANCE: success,  # Correlated
-                    QualityDimension.COMPLETENESS: 0.5,   # Uncorrelated
-                    QualityDimension.ACCURACY: success,   # Correlated
+                    QualityDimension.COMPLETENESS: 0.5,  # Uncorrelated
+                    QualityDimension.ACCURACY: success,  # Correlated
                     QualityDimension.CONCISENESS: 0.5,
                     QualityDimension.ACTIONABILITY: 0.5,
                     QualityDimension.COHERENCE: 0.5,
@@ -271,7 +271,9 @@ class TestQualityWeightLearner:
         correlations = learner.get_correlation_analysis(task_type)
 
         # Relevance and accuracy should have higher correlation
-        assert correlations[QualityDimension.RELEVANCE] > correlations[QualityDimension.COMPLETENESS]
+        assert (
+            correlations[QualityDimension.RELEVANCE] > correlations[QualityDimension.COMPLETENESS]
+        )
         assert correlations[QualityDimension.ACCURACY] > correlations[QualityDimension.COMPLETENESS]
 
     def test_export_metrics(self, learner: QualityWeightLearner) -> None:

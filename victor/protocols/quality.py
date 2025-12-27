@@ -358,7 +358,11 @@ class SimpleQualityAssessor(BaseQualityAssessor):
         return DimensionScore(
             dimension=QualityDimension.COVERAGE,
             score=score,
-            reason=f"Covered {covered}/{len(key_terms)} key terms" if key_terms else "No query terms to cover",
+            reason=(
+                f"Covered {covered}/{len(key_terms)} key terms"
+                if key_terms
+                else "No query terms to cover"
+            ),
             evidence={"key_terms": list(key_terms)},
         )
 

@@ -228,11 +228,17 @@ def _list_keys():
     console.print(table)
 
     # Count stats
-    configured_count = sum(1 for p in primary_providers if p in configured or PROVIDER_ALIAS_DISPLAY.get(p, "") in configured)
+    configured_count = sum(
+        1
+        for p in primary_providers
+        if p in configured or PROVIDER_ALIAS_DISPLAY.get(p, "") in configured
+    )
     total_count = len(primary_providers)
     alias_count = len(PROVIDER_ALIASES)
 
-    console.print(f"\n[dim]Configured: {configured_count}/{total_count} providers ({alias_count} aliases hidden)[/]")
+    console.print(
+        f"\n[dim]Configured: {configured_count}/{total_count} providers ({alias_count} aliases hidden)[/]"
+    )
 
     # Show keyring status
     backend_name, status = _get_keyring_info()

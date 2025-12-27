@@ -71,9 +71,7 @@ def test_tool_builder_build_without_factory_raises_error(mock_settings):
         builder.build()
 
 
-def test_tool_builder_build_creates_tool_budget(
-    mock_settings, mock_factory, mock_provider
-):
+def test_tool_builder_build_creates_tool_budget(mock_settings, mock_factory, mock_provider):
     """Test that build() creates tool budget."""
     mock_caps = Mock()
     mock_caps.recommended_tool_budget = 15
@@ -88,9 +86,7 @@ def test_tool_builder_build_creates_tool_budget(
     assert components["tool_budget"] == 15
 
 
-def test_tool_builder_build_creates_tool_cache(
-    mock_settings, mock_factory, mock_provider
-):
+def test_tool_builder_build_creates_tool_cache(mock_settings, mock_factory, mock_provider):
     """Test that build() creates tool cache."""
     mock_cache = Mock(name="tool_cache")
     mock_factory.create_tool_cache.return_value = mock_cache
@@ -102,9 +98,7 @@ def test_tool_builder_build_creates_tool_cache(
     assert components["tool_cache"] is mock_cache
 
 
-def test_tool_builder_build_creates_tool_graph(
-    mock_settings, mock_factory, mock_provider
-):
+def test_tool_builder_build_creates_tool_graph(mock_settings, mock_factory, mock_provider):
     """Test that build() creates tool dependency graph."""
     mock_graph = Mock(name="tool_graph")
     mock_factory.create_tool_dependency_graph.return_value = mock_graph
@@ -116,9 +110,7 @@ def test_tool_builder_build_creates_tool_graph(
     assert components["tool_graph"] is mock_graph
 
 
-def test_tool_builder_build_creates_tool_registry(
-    mock_settings, mock_factory, mock_provider
-):
+def test_tool_builder_build_creates_tool_registry(mock_settings, mock_factory, mock_provider):
     """Test that build() creates tool registry."""
     mock_registry = Mock(name="tools")
     mock_factory.create_tool_registry.return_value = mock_registry
@@ -130,9 +122,7 @@ def test_tool_builder_build_creates_tool_registry(
     assert components["tools"] is mock_registry
 
 
-def test_tool_builder_build_creates_tool_registrar(
-    mock_settings, mock_factory, mock_provider
-):
+def test_tool_builder_build_creates_tool_registrar(mock_settings, mock_factory, mock_provider):
     """Test that build() creates tool registrar."""
     mock_registrar = Mock(name="tool_registrar")
     mock_factory.create_tool_registrar.return_value = mock_registrar
@@ -144,9 +134,7 @@ def test_tool_builder_build_creates_tool_registrar(
     assert components["tool_registrar"] is mock_registrar
 
 
-def test_tool_builder_build_creates_argument_normalizer(
-    mock_settings, mock_factory, mock_provider
-):
+def test_tool_builder_build_creates_argument_normalizer(mock_settings, mock_factory, mock_provider):
     """Test that build() creates argument normalizer."""
     mock_normalizer = Mock(name="argument_normalizer")
     mock_factory.create_argument_normalizer.return_value = mock_normalizer
@@ -158,9 +146,7 @@ def test_tool_builder_build_creates_argument_normalizer(
     assert components["argument_normalizer"] is mock_normalizer
 
 
-def test_tool_builder_build_creates_middleware_chain(
-    mock_settings, mock_factory, mock_provider
-):
+def test_tool_builder_build_creates_middleware_chain(mock_settings, mock_factory, mock_provider):
     """Test that build() creates middleware chain."""
     mock_chain = [Mock(name="middleware1"), Mock(name="middleware2")]
     mock_correction = Mock(name="code_correction")
@@ -175,9 +161,7 @@ def test_tool_builder_build_creates_middleware_chain(
     assert components["code_correction_middleware"] is mock_correction
 
 
-def test_tool_builder_build_creates_safety_checker(
-    mock_settings, mock_factory, mock_provider
-):
+def test_tool_builder_build_creates_safety_checker(mock_settings, mock_factory, mock_provider):
     """Test that build() creates safety checker."""
     mock_checker = Mock(name="safety_checker")
     mock_factory.create_safety_checker.return_value = mock_checker
@@ -189,9 +173,7 @@ def test_tool_builder_build_creates_safety_checker(
     assert components["safety_checker"] is mock_checker
 
 
-def test_tool_builder_build_creates_tool_executor(
-    mock_settings, mock_factory, mock_provider
-):
+def test_tool_builder_build_creates_tool_executor(mock_settings, mock_factory, mock_provider):
     """Test that build() creates tool executor."""
     mock_executor = Mock(name="tool_executor")
     mock_factory.create_tool_executor.return_value = mock_executor
@@ -203,9 +185,7 @@ def test_tool_builder_build_creates_tool_executor(
     assert components["tool_executor"] is mock_executor
 
 
-def test_tool_builder_build_creates_parallel_executor(
-    mock_settings, mock_factory, mock_provider
-):
+def test_tool_builder_build_creates_parallel_executor(mock_settings, mock_factory, mock_provider):
     """Test that build() creates parallel executor."""
     mock_parallel = Mock(name="parallel_executor")
     mock_factory.create_parallel_executor.return_value = mock_parallel
@@ -217,9 +197,7 @@ def test_tool_builder_build_creates_parallel_executor(
     assert components["parallel_executor"] is mock_parallel
 
 
-def test_tool_builder_build_creates_tool_selector(
-    mock_settings, mock_factory, mock_provider
-):
+def test_tool_builder_build_creates_tool_selector(mock_settings, mock_factory, mock_provider):
     """Test that build() creates tool selector."""
     mock_selector = Mock(name="tool_selector")
     mock_factory.create_tool_selector.return_value = mock_selector
@@ -231,9 +209,7 @@ def test_tool_builder_build_creates_tool_selector(
     assert components["tool_selector"] is mock_selector
 
 
-def test_tool_builder_build_creates_tool_pipeline(
-    mock_settings, mock_factory, mock_provider
-):
+def test_tool_builder_build_creates_tool_pipeline(mock_settings, mock_factory, mock_provider):
     """Test that build() creates tool pipeline."""
     mock_pipeline = Mock(name="tool_pipeline")
     mock_factory.create_tool_pipeline.return_value = mock_pipeline
@@ -250,9 +226,7 @@ def test_tool_builder_build_creates_tool_pipeline(
     assert components["tool_pipeline"] is mock_pipeline
 
 
-def test_tool_builder_build_registers_components(
-    mock_settings, mock_factory, mock_provider
-):
+def test_tool_builder_build_registers_components(mock_settings, mock_factory, mock_provider):
     """Test that build() registers all built components."""
     builder = ToolBuilder(mock_settings, factory=mock_factory)
     components = builder.build(provider=mock_provider, model="test-model")
@@ -326,14 +300,10 @@ def test_tool_builder_build_with_callbacks(mock_settings, mock_factory, mock_pro
     )
 
     # Verify callback was set on registrar
-    mock_registrar.set_background_task_callback.assert_called_once_with(
-        mock_background_callback
-    )
+    mock_registrar.set_background_task_callback.assert_called_once_with(mock_background_callback)
 
 
-def test_tool_builder_build_creates_workflow_components(
-    mock_settings, mock_factory, mock_provider
-):
+def test_tool_builder_build_creates_workflow_components(mock_settings, mock_factory, mock_provider):
     """Test that build() creates workflow and code execution components."""
     mock_workflow_registry = Mock(name="workflow_registry")
     mock_code_manager = Mock(name="code_manager")

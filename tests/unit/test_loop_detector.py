@@ -421,9 +421,7 @@ class TestFactoryFunctions:
 
     def test_classify_and_create_tracker(self):
         """Test classify_and_create_tracker function."""
-        tracker, hint, classification = classify_and_create_tracker(
-            "List all Python files"
-        )
+        tracker, hint, classification = classify_and_create_tracker("List all Python files")
 
         assert isinstance(tracker, LoopDetector)
         assert isinstance(hint, str)

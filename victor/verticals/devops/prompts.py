@@ -16,14 +16,12 @@ DEVOPS_TASK_TYPE_HINTS: Dict[str, str] = {
 3. Define resource limits and requests for Kubernetes
 4. Use ConfigMaps/Secrets for configuration management
 5. Tag all resources for cost tracking and organization""",
-
     "ci_cd": """[CI/CD] Configure continuous integration/deployment:
 1. Define clear stages: lint, test, build, deploy
 2. Cache dependencies for faster builds
 3. Use matrix builds for cross-platform testing
 4. Implement proper secret management (GitHub Secrets, Vault)
 5. Add manual approval for production deployments""",
-
     # Granular hints for specific technologies (context_hints)
     "dockerfile": """[DOCKER] Create or optimize Dockerfile:
 1. Use official base images with specific tags
@@ -31,37 +29,31 @@ DEVOPS_TASK_TYPE_HINTS: Dict[str, str] = {
 3. Order layers for cache optimization
 4. Add health checks and proper signal handling
 5. Run as non-root user when possible""",
-
     "docker_compose": """[COMPOSE] Create Docker Compose configuration:
 1. Define all services with explicit dependencies
 2. Use named volumes for persistent data
 3. Configure proper network isolation
 4. Add health checks for service readiness
 5. Use environment files for secrets (never hardcode)""",
-
     # Note: ci_cd_pipeline removed as duplicate - use ci_cd key which aligns with TaskType.CI_CD
-
     "kubernetes": """[K8S] Create Kubernetes manifests:
 1. Use Deployments for stateless apps, StatefulSets for stateful
 2. Define resource requests and limits
 3. Add liveness and readiness probes
 4. Use ConfigMaps for config, Secrets for sensitive data
 5. Implement NetworkPolicies for security""",
-
     "terraform": """[TERRAFORM] Write Infrastructure as Code:
 1. Organize into modules for reusability
 2. Use remote state with locking
 3. Implement proper variable typing and validation
 4. Tag all resources for cost tracking
 5. Use data sources instead of hardcoded IDs""",
-
     "monitoring": """[MONITOR] Set up observability:
 1. Define key metrics and SLIs/SLOs
 2. Configure alerting with appropriate thresholds
 3. Set up distributed tracing for microservices
 4. Implement structured logging
 5. Create dashboards for visibility""",
-
     # Default fallback for 'general' task type
     "general": """[GENERAL DEVOPS] For general infrastructure queries:
 1. Read existing configuration files first (ls, read)

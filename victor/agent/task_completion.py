@@ -139,68 +139,76 @@ class TaskCompletionDetector:
     """
 
     # Phrases indicating task completion
-    COMPLETION_PHRASES: frozenset = frozenset({
-        # File operations
-        "successfully created",
-        "has been created",
-        "file created",
-        "has been implemented",
-        "implementation complete",
-        "successfully written",
-        "has been written",
-        "file saved",
-        # Task completion
-        "task complete",
-        "task completed",
-        "done",
-        "finished",
-        "completed successfully",
-        # Delivery phrases
-        "here's the",
-        "here is the",
-        "i've created",
-        "i have created",
-        "the file is now",
-        "the implementation is",
-        # Summary phrases
-        "in summary",
-        "to summarize",
-        "that covers",
-        "this completes",
-    })
+    COMPLETION_PHRASES: frozenset = frozenset(
+        {
+            # File operations
+            "successfully created",
+            "has been created",
+            "file created",
+            "has been implemented",
+            "implementation complete",
+            "successfully written",
+            "has been written",
+            "file saved",
+            # Task completion
+            "task complete",
+            "task completed",
+            "done",
+            "finished",
+            "completed successfully",
+            # Delivery phrases
+            "here's the",
+            "here is the",
+            "i've created",
+            "i have created",
+            "the file is now",
+            "the implementation is",
+            # Summary phrases
+            "in summary",
+            "to summarize",
+            "that covers",
+            "this completes",
+        }
+    )
 
     # Phrases indicating continuation loop (agent asking to continue)
-    CONTINUATION_PHRASES: frozenset = frozenset({
-        "continue with the implementation",
-        "what would you like me to",
-        "how would you like to proceed",
-        "if you need further",
-        "let me know if you",
-        "would you like me to",
-        "please specify",
-        "please provide more details",
-        "if there's anything else",
-        "any other",
-    })
+    CONTINUATION_PHRASES: frozenset = frozenset(
+        {
+            "continue with the implementation",
+            "what would you like me to",
+            "how would you like to proceed",
+            "if you need further",
+            "let me know if you",
+            "would you like me to",
+            "please specify",
+            "please provide more details",
+            "if there's anything else",
+            "any other",
+        }
+    )
 
     # Tools that produce file deliverables
-    WRITE_TOOLS: frozenset = frozenset({
-        "write",
-        "edit",
-        "create_file",
-        "write_file",
-        "save_file",
-        "create",
-    })
+    WRITE_TOOLS: frozenset = frozenset(
+        {
+            "write",
+            "edit",
+            "create_file",
+            "write_file",
+            "save_file",
+            "create",
+        }
+    )
 
     # Tools that execute code
-    EXECUTE_TOOLS: frozenset = frozenset({
-        "execute_bash",
-        "bash",
-        "run_command",
-        "execute_code",
-        "run_python",
-    })
+    EXECUTE_TOOLS: frozenset = frozenset(
+        {
+            "execute_bash",
+            "bash",
+            "run_command",
+            "execute_code",
+            "run_python",
+        }
+    )
 
     def __init__(self):
         """Initialize the task completion detector."""
@@ -248,7 +256,7 @@ class TaskCompletionDetector:
         deliverables: Set[DeliverableType] = set()
 
         # Check for file extension mentions (strong signal for file creation)
-        if re.search(r'\.\w{2,4}\b', user_message):  # .py, .js, .yaml, etc.
+        if re.search(r"\.\w{2,4}\b", user_message):  # .py, .js, .yaml, etc.
             deliverables.add(DeliverableType.FILE_CREATED)
 
         # Check for intent keywords

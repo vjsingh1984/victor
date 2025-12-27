@@ -250,6 +250,3 @@ def _get_default_stage_keywords() -> Dict[str, StageConfig]:
             min_score=2,
         ),
     }
-
-
-

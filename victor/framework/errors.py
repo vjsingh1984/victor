@@ -77,11 +77,7 @@ class ProviderError(CoreProviderError, AgentError):
     ) -> None:
         # Initialize core ProviderError with all its expected parameters
         CoreProviderError.__init__(
-            self,
-            message=message,
-            provider=provider,
-            status_code=status_code,
-            **kwargs
+            self, message=message, provider=provider, status_code=status_code, **kwargs
         )
         # Also set AgentError attributes for framework compatibility
         self.recoverable = recoverable
@@ -89,8 +85,8 @@ class ProviderError(CoreProviderError, AgentError):
 
     def __str__(self) -> str:
         # Framework-friendly formatting
-        if hasattr(self, 'provider') and self.provider:
-            if hasattr(self, 'status_code') and self.status_code:
+        if hasattr(self, "provider") and self.provider:
+            if hasattr(self, "status_code") and self.status_code:
                 return f"[{self.provider}] {self.message} (status: {self.status_code})"
             return f"[{self.provider}] {self.message}"
         return self.message
@@ -124,12 +120,7 @@ class ToolError(CoreToolError, AgentError):
         **kwargs: Any,
     ) -> None:
         # Initialize core ToolError
-        CoreToolError.__init__(
-            self,
-            message=message,
-            tool_name=tool_name,
-            **kwargs
-        )
+        CoreToolError.__init__(self, message=message, tool_name=tool_name, **kwargs)
         # Set framework-specific attributes
         self.arguments = arguments or {}
         self.recoverable = recoverable
@@ -137,7 +128,7 @@ class ToolError(CoreToolError, AgentError):
 
     def __str__(self) -> str:
         # Framework-friendly formatting
-        if hasattr(self, 'tool_name') and self.tool_name:
+        if hasattr(self, "tool_name") and self.tool_name:
             return f"[{self.tool_name}] {self.message}"
         return self.message
 
@@ -169,12 +160,7 @@ class ConfigurationError(CoreConfigurationError, AgentError):
         **kwargs: Any,
     ) -> None:
         # Initialize core ConfigurationError
-        CoreConfigurationError.__init__(
-            self,
-            message=message,
-            config_key=config_key,
-            **kwargs
-        )
+        CoreConfigurationError.__init__(self, message=message, config_key=config_key, **kwargs)
         # Set framework-specific attributes
         self.invalid_fields = invalid_fields or []
         self.recoverable = False  # Configuration errors are not recoverable

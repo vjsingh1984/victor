@@ -160,9 +160,7 @@ class ToolExecutionResult:
             self.all_succeeded = False
 
 
-def create_break_result(
-    content: str = "", error: Optional[str] = None
-) -> IterationResult:
+def create_break_result(content: str = "", error: Optional[str] = None) -> IterationResult:
     """Create an iteration result that breaks the loop."""
     result = IterationResult(action=IterationAction.BREAK, content=content, error=error)
     if content:

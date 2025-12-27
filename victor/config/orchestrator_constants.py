@@ -194,26 +194,46 @@ class ToolSelectionPresets:
 
     def __post_init__(self):
         # Use object.__setattr__ since dataclass is frozen
-        object.__setattr__(self, 'tiny', {
-            'base_threshold': 0.35,
-            'base_max_tools': 5,
-        })
-        object.__setattr__(self, 'small', {
-            'base_threshold': 0.25,
-            'base_max_tools': 7,
-        })
-        object.__setattr__(self, 'medium', {
-            'base_threshold': 0.20,
-            'base_max_tools': 10,
-        })
-        object.__setattr__(self, 'large', {
-            'base_threshold': 0.15,
-            'base_max_tools': 12,
-        })
-        object.__setattr__(self, 'cloud', {
-            'base_threshold': 0.18,
-            'base_max_tools': 10,
-        })
+        object.__setattr__(
+            self,
+            "tiny",
+            {
+                "base_threshold": 0.35,
+                "base_max_tools": 5,
+            },
+        )
+        object.__setattr__(
+            self,
+            "small",
+            {
+                "base_threshold": 0.25,
+                "base_max_tools": 7,
+            },
+        )
+        object.__setattr__(
+            self,
+            "medium",
+            {
+                "base_threshold": 0.20,
+                "base_max_tools": 10,
+            },
+        )
+        object.__setattr__(
+            self,
+            "large",
+            {
+                "base_threshold": 0.15,
+                "base_max_tools": 12,
+            },
+        )
+        object.__setattr__(
+            self,
+            "cloud",
+            {
+                "base_threshold": 0.18,
+                "base_max_tools": 10,
+            },
+        )
 
 
 # ============================================================================
@@ -233,6 +253,7 @@ TOOL_SELECTION_PRESETS = ToolSelectionPresets()
 # Convenience functions
 # ============================================================================
 
+
 def get_budget_for_task(task_type: str) -> int:
     """Get recommended tool budget for a task type.
 
@@ -247,15 +268,15 @@ def get_budget_for_task(task_type: str) -> int:
     """
     task_type_lower = task_type.lower()
 
-    if task_type_lower in ('simple', 'quick', 'trivial'):
+    if task_type_lower in ("simple", "quick", "trivial"):
         return BUDGET_LIMITS.simple_task
-    elif task_type_lower in ('medium', 'moderate', 'standard'):
+    elif task_type_lower in ("medium", "moderate", "standard"):
         return BUDGET_LIMITS.medium_task
-    elif task_type_lower in ('complex', 'difficult', 'advanced'):
+    elif task_type_lower in ("complex", "difficult", "advanced"):
         return BUDGET_LIMITS.complex_task
-    elif task_type_lower in ('action', 'build', 'implement', 'feature'):
+    elif task_type_lower in ("action", "build", "implement", "feature"):
         return BUDGET_LIMITS.action_task
-    elif task_type_lower in ('analysis', 'explore', 'research', 'audit'):
+    elif task_type_lower in ("analysis", "explore", "research", "audit"):
         return BUDGET_LIMITS.analysis_task
     else:
         raise ValueError(

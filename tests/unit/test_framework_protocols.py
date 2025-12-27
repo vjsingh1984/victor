@@ -260,7 +260,7 @@ class TestBudgetManager:
 
         # Set multipliers
         manager.set_model_multiplier(1.5)  # 1.5x
-        manager.set_mode_multiplier(2.0)   # 2.0x
+        manager.set_mode_multiplier(2.0)  # 2.0x
         # Combined: 10 * 1.5 * 2.0 = 30
 
         status = manager.get_status(BudgetType.EXPLORATION)
@@ -506,9 +506,7 @@ class TestFrameworkIntegration:
 
         # Create both controllers
         access_controller = create_tool_access_controller()
-        budget_manager = create_budget_manager(
-            config=BudgetConfig(base_exploration=3)
-        )
+        budget_manager = create_budget_manager(config=BudgetConfig(base_exploration=3))
 
         tools = ["read_file", "code_search", "list_directory"]
 

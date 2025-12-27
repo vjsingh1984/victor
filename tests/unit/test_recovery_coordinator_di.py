@@ -247,9 +247,7 @@ class TestRecoveryCoordinatorDI:
 class TestRecoveryCoordinatorDIIntegration:
     """Integration tests for RecoveryCoordinator DI."""
 
-    def test_full_orchestrator_initialization_with_recovery_coordinator(
-        self, service_provider
-    ):
+    def test_full_orchestrator_initialization_with_recovery_coordinator(self, service_provider):
         """Test full orchestrator initialization includes RecoveryCoordinator."""
         from unittest.mock import MagicMock
 

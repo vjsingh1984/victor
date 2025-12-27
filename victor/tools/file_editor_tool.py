@@ -157,6 +157,7 @@ def normalize_edit_operations(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]
     # Only normalize actual dicts; pass through non-dicts for validation to catch
     return [normalize_edit_operation(op) if isinstance(op, dict) else op for op in ops]
 
+
 from victor.editing import FileEditor
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
@@ -174,6 +175,18 @@ from victor.tools.filesystem import enforce_sandbox_path
     task_types=["edit", "action"],  # Task types for classification-aware selection
     execution_category="write",  # Cannot run in parallel with conflicting ops
     keywords=["edit", "modify", "replace", "create", "delete", "rename", "file", "text"],
+    # Examples help LLMs understand correct parameter format
+    examples=[
+        'edit(ops=[{"type": "replace", "path": "config.py", "old_str": "DEBUG = True", "new_str": "DEBUG = False"}])',
+        'edit(ops=[{"type": "create", "path": "README.md", "content": "# Project\\nDescription here"}])',
+        'edit(ops=[{"type": "delete", "path": "temp_file.txt"}])',
+        'edit(ops=[{"type": "rename", "path": "old.py", "new_path": "new.py"}])',
+    ],
+    priority_hints=[
+        "The 'ops' parameter is REQUIRED - it must be a list of operation dictionaries",
+        "Each operation needs 'type' (replace/create/delete/rename) and 'path'",
+        "For replace: also include 'old_str' and 'new_str'",
+    ],
 )
 async def edit(
     ops: Optional[List[Dict[str, Any]]] = None,
@@ -182,30 +195,34 @@ async def edit(
     desc: str = "",
     ctx: int = 3,
 ) -> Dict[str, Any]:
-    """[TEXT-BASED] Edit files atomically with undo. NOT code-aware.
+    """Edit files atomically with undo. REQUIRED: 'ops' parameter with operation list.
+
+    IMPORTANT: You MUST provide the 'ops' parameter. Example:
+        edit(ops=[{"type": "replace", "path": "file.py", "old_str": "old", "new_str": "new"}])
 
     Performs literal string replacement. Does NOT understand code structure.
     WARNING: May cause false positives in code (e.g., 'foo' matches 'foobar').
     For Python symbol renaming, use rename() from refactor_tool instead.
 
-    Ops: replace/create/modify/delete/rename.
+    Operation types:
+        - replace: Find and replace text. Requires: path, old_str, new_str
+        - create: Create new file. Requires: path, content
+        - modify: Overwrite file content. Requires: path, content
+        - delete: Remove file. Requires: path
+        - rename: Rename/move file. Requires: path, new_path
 
     Args:
-        ops: [{type, path, ...}] - replace needs old_str/new_str
-        preview: Show diff without applying
-        commit: Auto-apply changes
-        desc: Change description
-        ctx: Diff context lines
+        ops: REQUIRED! List of operations. Each op must have 'type' and 'path'.
+             Example: [{"type": "replace", "path": "f.py", "old_str": "x", "new_str": "y"}]
+        preview: Show diff without applying (default: False)
+        commit: Auto-apply changes (default: True)
+        desc: Change description for tracking
+        ctx: Diff context lines (default: 3)
 
     When to use:
         - Config files (JSON, YAML, TOML, etc.)
         - Documentation (Markdown, text files)
-        - Any non-code text changes
-        - Creating/deleting/renaming files
-
-    When NOT to use:
-        - Renaming Python symbols (use rename() instead - AST-aware)
-        - Code refactoring where false positives matter
+        - Any text-based file changes
 
     Note:
         In EXPLORE/PLAN modes, edits are restricted to .victor/sandbox/.
@@ -216,9 +233,9 @@ async def edit(
         return {
             "error": "Missing required parameter: 'ops'",
             "hint": "The 'ops' parameter must be a list of edit operations. Example:\n"
-                    '  ops=[{"type": "replace", "path": "file.py", "old_str": "foo", "new_str": "bar"}]\n'
-                    "  ops=[{\"type\": \"create\", \"path\": \"new_file.txt\", \"content\": \"Hello\"}]\n"
-                    "  ops=[{\"type\": \"delete\", \"path\": \"old_file.txt\"}]",
+            '  ops=[{"type": "replace", "path": "file.py", "old_str": "foo", "new_str": "bar"}]\n'
+            '  ops=[{"type": "create", "path": "new_file.txt", "content": "Hello"}]\n'
+            '  ops=[{"type": "delete", "path": "old_file.txt"}]',
             "success": False,
         }
 

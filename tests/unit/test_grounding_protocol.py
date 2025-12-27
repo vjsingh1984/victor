@@ -419,14 +419,14 @@ class TestContentMatchStrategy:
 
     def test_extract_claims_code_block(self, strategy):
         """Test extracting claims from code blocks."""
-        response = '''Here's the code:
+        response = """Here's the code:
 
 ```python
 # test.py
 def example():
     return 42
 ```
-'''
+"""
         claims = strategy.extract_claims(response, {})
         # Should extract claims from code blocks with file paths
         assert isinstance(claims, list)

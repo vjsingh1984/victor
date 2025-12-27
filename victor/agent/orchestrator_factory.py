@@ -267,6 +267,7 @@ class OrchestratorFactory(ModeAwareMixin):
         """Get or create the DI container."""
         if self._container is None:
             from victor.core.bootstrap import ensure_bootstrapped
+
             self._container = ensure_bootstrapped(self.settings)
         return self._container
 
@@ -748,9 +749,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ResponseCompleter created")
         return response_completer
 
-    def create_unified_tracker(
-        self, tool_calling_caps: "ToolCallingCapabilities"
-    ) -> Any:
+    def create_unified_tracker(self, tool_calling_caps: "ToolCallingCapabilities") -> Any:
         """Create unified task tracker with model-specific exploration settings.
 
         The UnifiedTaskTracker is the single source of truth for task progress,
@@ -817,9 +816,7 @@ class OrchestratorFactory(ModeAwareMixin):
         formatter = create_tool_output_formatter(
             config=ToolOutputFormatterConfig(
                 max_output_chars=getattr(self.settings, "max_tool_output_chars", 15000),
-                file_structure_threshold=getattr(
-                    self.settings, "file_structure_threshold", 50000
-                ),
+                file_structure_threshold=getattr(self.settings, "file_structure_threshold", 50000),
             ),
             truncator=context_compactor,
         )
@@ -1191,9 +1188,7 @@ class OrchestratorFactory(ModeAwareMixin):
             enable_tool_truncation=getattr(self.settings, "tool_result_truncation", True),
         )
 
-        logger.debug(
-            f"ContextCompactor created with truncation_strategy={truncation_strategy}"
-        )
+        logger.debug(f"ContextCompactor created with truncation_strategy={truncation_strategy}")
         return compactor
 
     def create_argument_normalizer(self, provider: "BaseProvider") -> Any:
@@ -1491,9 +1486,7 @@ class OrchestratorFactory(ModeAwareMixin):
             on_selection_recorded=on_selection_recorded,
         )
 
-        logger.debug(
-            f"ToolSelector created with fallback_max_tools={fallback_max_tools}"
-        )
+        logger.debug(f"ToolSelector created with fallback_max_tools={fallback_max_tools}")
         return selector
 
     def create_intent_classifier(self) -> Any:
@@ -1656,9 +1649,7 @@ class OrchestratorFactory(ModeAwareMixin):
             ],
         )
 
-        logger.debug(
-            f"ToolCallingMatrix created with {len(tool_calling_models)} model configs"
-        )
+        logger.debug(f"ToolCallingMatrix created with {len(tool_calling_models)} model configs")
         return (tool_calling_models, tool_capabilities)
 
     def create_system_prompt_builder(
@@ -1883,9 +1874,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug(f"ReadResultCache created (ttl={ttl_seconds}s, max={max_entries})")
         return cache
 
-    def create_time_aware_executor(
-        self, timeout_seconds: Optional[float] = None
-    ) -> Any:
+    def create_time_aware_executor(self, timeout_seconds: Optional[float] = None) -> Any:
         """Create TimeAwareExecutor for time-aware execution management.
 
         Issue Reference: workflow-test-issues-v2.md Issue #3

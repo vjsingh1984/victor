@@ -107,9 +107,7 @@ class ChunkGenerator:
                 source="ChunkGenerator",
             )
         )
-        return self.streaming_handler.generate_tool_start_chunk(
-            tool_name, tool_args, status_msg
-        )
+        return self.streaming_handler.generate_tool_start_chunk(tool_name, tool_args, status_msg)
 
     def generate_tool_result_chunks(
         self,

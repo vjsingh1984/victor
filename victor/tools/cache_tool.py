@@ -84,7 +84,9 @@ async def _do_stats(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     return {"success": True, "stats": stats, "formatted_report": "\n".join(report)}
 
 
-async def _do_clear(namespace: Optional[str] = None, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def _do_clear(
+    namespace: Optional[str] = None, context: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Clear cache entries."""
     cache_manager = _get_cache_manager(context)
     if cache_manager is None:

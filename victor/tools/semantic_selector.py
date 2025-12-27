@@ -856,7 +856,11 @@ class SemanticToolSelector:
                 content = str(msg.get("content", "")).lower()
                 if action == "show_diff" and ("diff" in content or "git diff" in content):
                     return True
-                elif action == "test" and "test" in content and ("passed" in content or "failed" in content):
+                elif (
+                    action == "test"
+                    and "test" in content
+                    and ("passed" in content or "failed" in content)
+                ):
                     return True
 
         # Check user messages for tool output markers (TOOL_OUTPUT tags)

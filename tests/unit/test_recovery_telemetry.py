@@ -199,7 +199,9 @@ class TestRecoveryTelemetryCollector:
         context.model_name = "claude-3-sonnet"
         context.task_type = "code_generation"
         context.consecutive_failures = 2
-        context.to_state_key.return_value = "mock_state_key_123456789012345678901234567890123456789012345678901234567890"
+        context.to_state_key.return_value = (
+            "mock_state_key_123456789012345678901234567890123456789012345678901234567890"
+        )
         return context
 
     @pytest.fixture
@@ -314,7 +316,9 @@ class TestRecoveryTelemetryCollector:
 
         assert collector._success_counts.get("CompactContextStrategy", 0) == 0
 
-    def test_record_recovery_outcome_with_db(self, collector_with_db, mock_context, mock_result, temp_db):
+    def test_record_recovery_outcome_with_db(
+        self, collector_with_db, mock_context, mock_result, temp_db
+    ):
         """Test recording recovery outcome persists to database."""
         collector_with_db.record_recovery_outcome(mock_context, mock_result, True, 0.5)
 
@@ -567,8 +571,11 @@ class TestRecoveryTelemetryCollector:
 
     def test_multiple_failure_types_stats(self, collector):
         """Test stats with multiple failure types."""
-        for failure_type in [FailureType.STUCK_LOOP, FailureType.HALLUCINATED_TOOL,
-                            FailureType.TIMEOUT_APPROACHING]:
+        for failure_type in [
+            FailureType.STUCK_LOOP,
+            FailureType.HALLUCINATED_TOOL,
+            FailureType.TIMEOUT_APPROACHING,
+        ]:
             context = MagicMock(spec=RecoveryContext)
             context.failure_type = failure_type
             context.provider_name = "test"

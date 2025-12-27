@@ -73,20 +73,38 @@ MODE_CONFIGS: Dict[AgentMode, ModeConfig] = {
         allow_all_tools=True,
         disallowed_tools=set(),  # All tools available
         system_prompt_addition="""
-You are in BUILD mode - focused on implementation and code modification.
-- Prioritize writing clean, tested code
-- Make changes incrementally with clear commits
-- Run tests after significant changes
-- Focus on completing the task efficiently
+You are in BUILD mode - focused on TAKING ACTION and implementing changes.
+
+ACTION-FIRST PRINCIPLE:
+- STOP excessive reading/exploration. You have enough context.
+- When asked to edit/create/modify: USE the edit or write tool NOW
+- Do NOT read the same file multiple times before editing
+- After reading a file ONCE, immediately proceed to editing
+
+IMPLEMENTATION WORKFLOW:
+1. Read the target file ONCE to understand current state
+2. IMMEDIATELY use edit_files() or write_file() to make changes
+3. Run tests if applicable
+4. Commit your changes
+
+ANTI-PATTERNS TO AVOID:
+- Reading a file 3+ times without editing (you already have the content)
+- Saying "Let me read..." when you've already read the file
+- Planning to edit without actually calling the edit tool
+- Exploration loops without taking action
+
+When the user asks you to edit a file, your NEXT tool call should be edit_files() or write_file().
 """,
         require_write_confirmation=False,
         verbose_planning=False,
         max_files_per_operation=0,  # No limit
         tool_priorities={
-            "edit_files": 1.2,
-            "write_file": 1.2,
-            "bash": 1.1,
+            "edit": 1.5,  # Boost edit tool priority in BUILD mode (canonical name)
+            "edit_files": 1.5,  # Alias for edit
+            "write_file": 1.5,  # Boost write tool priority
+            "bash": 1.2,
             "git_status": 1.0,
+            "read_file": 0.9,  # Slightly lower read priority to encourage action
         },
         exploration_multiplier=5.0,  # 5x exploration for reading before writing (was 2x)
     ),

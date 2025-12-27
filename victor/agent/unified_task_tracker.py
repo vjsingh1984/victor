@@ -764,9 +764,18 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
     # Tools that perform write/modify actions (don't count toward exploration limit)
     WRITE_TOOLS = {
-        "edit_files", "write_file", "shell", "bash", "git_commit",
-        "git_push", "create_file", "delete_file", "rename_file",
-        "notebook_edit", "refactor", "rename",
+        "edit_files",
+        "write_file",
+        "shell",
+        "bash",
+        "git_commit",
+        "git_push",
+        "create_file",
+        "delete_file",
+        "rename_file",
+        "notebook_edit",
+        "refactor",
+        "rename",
     }
 
     def record_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> None:
@@ -919,7 +928,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         # In BUILD mode, use exploration_iterations; otherwise use total iteration_count
         exploration_count = (
-            self._progress.exploration_iterations if is_build_mode
+            self._progress.exploration_iterations
+            if is_build_mode
             else self._progress.iteration_count
         )
 
@@ -1350,8 +1360,17 @@ class UnifiedTaskTracker(ModeAwareMixin):
         # Volatile fields that shouldn't count towards loop detection
         # Reading the same file with different offsets is NOT a loop
         volatile_fields = {
-            "offset", "limit", "line_start", "line_end", "start_line", "end_line",
-            "page", "page_size", "count", "max_results", "timeout",
+            "offset",
+            "limit",
+            "line_start",
+            "line_end",
+            "start_line",
+            "end_line",
+            "page",
+            "page_size",
+            "count",
+            "max_results",
+            "timeout",
         }
 
         params = get_progress_params_for_tool(tool_name)
@@ -1373,10 +1392,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
             return "|".join(sig_parts)
         else:
             # Filter out volatile fields for non-progressive tools too
-            stable_args = {
-                k: v for k, v in arguments.items()
-                if k not in volatile_fields
-            }
+            stable_args = {k: v for k, v in arguments.items() if k not in volatile_fields}
             args_str = str(sorted(stable_args.items()))
             base_sig = f"{tool_name}:{hashlib.md5(args_str.encode()).hexdigest()[:8]}"
 

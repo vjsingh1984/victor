@@ -150,7 +150,9 @@ async def jira(
                 "success": True,
                 "key": new_issue.key,
                 "summary": new_issue.fields.summary,
-                "url": f"{context.get('jira_server', '')}/browse/{new_issue.key}" if context else "",
+                "url": (
+                    f"{context.get('jira_server', '')}/browse/{new_issue.key}" if context else ""
+                ),
             }
 
         elif operation == "get_issue":

@@ -87,10 +87,7 @@ class TestCircuitBreaker:
 
     def test_half_open_closes_on_success(self):
         """Test half-open state closes on sufficient successes."""
-        cb = CircuitBreaker(
-            provider="test", model="test-model",
-            success_threshold=2
-        )
+        cb = CircuitBreaker(provider="test", model="test-model", success_threshold=2)
         cb._transition_to(CircuitState.HALF_OPEN)
 
         cb.record_success()
@@ -197,9 +194,7 @@ class TestAutomaticModelFallback:
 
     def test_custom_fallback_chains(self):
         """Test custom fallback chains."""
-        custom_chains = {
-            "test": [("test", "model-1"), ("test", "model-2")]
-        }
+        custom_chains = {"test": [("test", "model-1"), ("test", "model-2")]}
         fallback = AutomaticModelFallback(fallback_chains=custom_chains)
         assert "test" in fallback._fallback_chains
 
@@ -221,11 +216,7 @@ class TestAutomaticModelFallback:
     def test_get_fallback_model_basic(self):
         """Test getting fallback model."""
         fallback = AutomaticModelFallback()
-        result = fallback.get_fallback_model(
-            "anthropic",
-            "claude-3-sonnet",
-            FailureType.STUCK_LOOP
-        )
+        result = fallback.get_fallback_model("anthropic", "claude-3-sonnet", FailureType.STUCK_LOOP)
         # Should return a fallback
         assert result is not None
         assert isinstance(result, tuple)
@@ -234,11 +225,7 @@ class TestAutomaticModelFallback:
     def test_get_fallback_model_no_chain(self):
         """Test getting fallback when no chain exists."""
         fallback = AutomaticModelFallback(fallback_chains={})
-        result = fallback.get_fallback_model(
-            "unknown",
-            "model",
-            FailureType.STUCK_LOOP
-        )
+        result = fallback.get_fallback_model("unknown", "model", FailureType.STUCK_LOOP)
         assert result is None
 
     def test_get_fallback_model_airgapped_filters(self):
@@ -250,34 +237,22 @@ class TestAutomaticModelFallback:
                     ("openai", "gpt-4"),
                     ("ollama", "llama3"),
                 ]
-            }
+            },
         )
-        result = fallback.get_fallback_model(
-            "test",
-            "current",
-            FailureType.STUCK_LOOP
-        )
+        result = fallback.get_fallback_model("test", "current", FailureType.STUCK_LOOP)
         if result:
             # Should only return local providers
             assert result[0] in ("ollama", "lmstudio", "vllm")
 
     def test_get_fallback_model_all_circuit_broken(self):
         """Test getting fallback when all are circuit-broken."""
-        fallback = AutomaticModelFallback(
-            fallback_chains={
-                "test": [("test", "model-1")]
-            }
-        )
+        fallback = AutomaticModelFallback(fallback_chains={"test": [("test", "model-1")]})
         # Break the circuit
         cb = fallback._get_circuit_breaker("test", "model-1")
         cb._transition_to(CircuitState.OPEN)
         cb.last_state_change = time.time() + 1000  # Future time
 
-        result = fallback.get_fallback_model(
-            "test",
-            "current",
-            FailureType.STUCK_LOOP
-        )
+        result = fallback.get_fallback_model("test", "current", FailureType.STUCK_LOOP)
         assert result is None
 
     def test_find_capability_key(self):
@@ -385,9 +360,7 @@ class TestAutomaticModelFallbackEdgeCases:
     def test_current_model_excluded_from_fallback(self):
         """Test current model is excluded from fallback candidates."""
         fallback = AutomaticModelFallback(
-            fallback_chains={
-                "test": [("test", "same-model"), ("test", "other-model")]
-            }
+            fallback_chains={"test": [("test", "same-model"), ("test", "other-model")]}
         )
         result = fallback.get_fallback_model("test", "same-model", FailureType.STUCK_LOOP)
         if result:

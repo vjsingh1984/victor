@@ -236,10 +236,7 @@ class TestDetermineContinuationAction:
         mock_intent = MagicMock()
         mock_intent.intent = IntentType.CONTINUATION
 
-        result = strategy.determine_continuation_action(
-            intent_result=mock_intent,
-            **base_kwargs
-        )
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
         assert result["action"] == "finish"
         assert "already requested" in result["reason"]
@@ -249,10 +246,7 @@ class TestDetermineContinuationAction:
         mock_intent = MagicMock()
         mock_intent.intent = IntentType.STUCK_LOOP
 
-        result = strategy.determine_continuation_action(
-            intent_result=mock_intent,
-            **base_kwargs
-        )
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
         assert result["action"] == "request_summary"
         assert "STUCK_LOOP" in result["reason"]
@@ -264,10 +258,7 @@ class TestDetermineContinuationAction:
         mock_intent = MagicMock()
         mock_intent.intent = IntentType.CONTINUATION
 
-        result = strategy.determine_continuation_action(
-            intent_result=mock_intent,
-            **base_kwargs
-        )
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
         assert result["action"] == "force_tool_execution"
         assert "Hallucinated" in result["reason"]
@@ -279,10 +270,7 @@ class TestDetermineContinuationAction:
         mock_intent = MagicMock()
         mock_intent.intent = IntentType.ASKING_INPUT
 
-        result = strategy.determine_continuation_action(
-            intent_result=mock_intent,
-            **base_kwargs
-        )
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
         assert result["action"] == "return_to_user"
 
@@ -291,10 +279,7 @@ class TestDetermineContinuationAction:
         mock_intent = MagicMock()
         mock_intent.intent = IntentType.ASKING_INPUT
 
-        result = strategy.determine_continuation_action(
-            intent_result=mock_intent,
-            **base_kwargs
-        )
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
         assert result["action"] == "continue_asking_input"
         assert "asking_input_prompts" in result["updates"]
@@ -306,10 +291,7 @@ class TestDetermineContinuationAction:
         mock_intent = MagicMock()
         mock_intent.intent = IntentType.ASKING_INPUT
 
-        result = strategy.determine_continuation_action(
-            intent_result=mock_intent,
-            **base_kwargs
-        )
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
         assert result["action"] == "return_to_user"
 
@@ -318,10 +300,7 @@ class TestDetermineContinuationAction:
         mock_intent = MagicMock()
         mock_intent.intent = IntentType.COMPLETION
 
-        result = strategy.determine_continuation_action(
-            intent_result=mock_intent,
-            **base_kwargs
-        )
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
         assert result["action"] == "finish"
         assert "completion" in result["reason"].lower()
@@ -333,10 +312,7 @@ class TestDetermineContinuationAction:
         mock_intent = MagicMock()
         mock_intent.intent = IntentType.CONTINUATION
 
-        result = strategy.determine_continuation_action(
-            intent_result=mock_intent,
-            **base_kwargs
-        )
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
         assert result["action"] == "prompt_tool_call"
         assert "analysis" in result["message"].lower()
@@ -348,10 +324,7 @@ class TestDetermineContinuationAction:
         mock_intent = MagicMock()
         mock_intent.intent = IntentType.CONTINUATION
 
-        result = strategy.determine_continuation_action(
-            intent_result=mock_intent,
-            **base_kwargs
-        )
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
         assert result["action"] == "prompt_tool_call"
         assert "implementation" in result["message"].lower()
@@ -364,10 +337,7 @@ class TestDetermineContinuationAction:
         mock_intent = MagicMock()
         mock_intent.intent = IntentType.CONTINUATION
 
-        result = strategy.determine_continuation_action(
-            intent_result=mock_intent,
-            **base_kwargs
-        )
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
         assert result["action"] == "request_summary"
         assert result["updates"].get("max_prompts_summary_requested") is True
@@ -378,10 +348,7 @@ class TestDetermineContinuationAction:
         # Use a neutral intent that doesn't match specific handlers
         mock_intent.intent = IntentType.NEUTRAL
 
-        result = strategy.determine_continuation_action(
-            intent_result=mock_intent,
-            **base_kwargs
-        )
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
         assert result["action"] == "finish"
 
@@ -429,10 +396,7 @@ class TestRLCoordinator:
         mock_intent = MagicMock()
         mock_intent.intent = IntentType.CONTINUATION
 
-        result = strategy.determine_continuation_action(
-            intent_result=mock_intent,
-            **base_kwargs
-        )
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
         # RL coordinator should have been called
         mock_rl.get_recommendation.assert_called()

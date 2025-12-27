@@ -263,11 +263,13 @@ class ToolRegistrar:
             try:
                 tool_config = self.settings.load_tool_config()
                 web_cfg = tool_config.get("web_tools", {}) or tool_config.get("web", {}) or {}
-                self._tool_config.update({
-                    "web_fetch_top": web_cfg.get("summarize_fetch_top"),
-                    "web_fetch_pool": web_cfg.get("summarize_fetch_pool"),
-                    "max_content_length": web_cfg.get("summarize_max_content_length"),
-                })
+                self._tool_config.update(
+                    {
+                        "web_fetch_top": web_cfg.get("summarize_fetch_top"),
+                        "web_fetch_pool": web_cfg.get("summarize_fetch_pool"),
+                        "max_content_length": web_cfg.get("summarize_max_content_length"),
+                    }
+                )
             except Exception as exc:
                 logger.debug(f"Failed to load web tool config: {exc}")
 

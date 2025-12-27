@@ -394,6 +394,7 @@ class ReadCacheMiddleware:
         Returns:
             Wrapped function with caching
         """
+
         def cached_read(path: str, **kwargs):
             # Try cache first
             offset = kwargs.get("offset", 0)

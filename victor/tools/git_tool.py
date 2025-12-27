@@ -29,6 +29,7 @@ from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priori
 from victor.tools.decorators import tool
 from victor.tools.subprocess_executor import run_command_async
 
+
 def _get_provider_and_model(context: Optional[Dict[str, Any]] = None) -> Tuple[Any, Optional[str]]:
     """Get provider and model from ToolConfig in execution context.
 
@@ -125,7 +126,12 @@ async def _run_git_async(
         "Supports custom author name and email for commits",
         "Can stage individual files or all changes",
     ],
-    mandatory_keywords=["commit", "git commit", "git status", "git diff"],  # From MANDATORY_TOOL_KEYWORDS
+    mandatory_keywords=[
+        "commit",
+        "git commit",
+        "git status",
+        "git diff",
+    ],  # From MANDATORY_TOOL_KEYWORDS
 )
 async def git(
     operation: str,
@@ -505,7 +511,9 @@ DESCRIPTION:
         pr_description = "Automatically generated PR description"
 
     # Push branch first
-    success, stdout, stderr = await _run_git_async("push", "--set-upstream", "origin", current_branch)
+    success, stdout, stderr = await _run_git_async(
+        "push", "--set-upstream", "origin", current_branch
+    )
 
     if not success:
         return {"success": False, "output": "", "error": f"Failed to push branch: {stderr}"}
@@ -641,7 +649,9 @@ async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
                         conflicts_in_file.append(conflict_block[:500])  # Limit size
                         pos = end_line
                     if conflicts_in_file:
-                        conflict_details.append(f"File: {file}\n" + "\n---\n".join(conflicts_in_file[:2]))
+                        conflict_details.append(
+                            f"File: {file}\n" + "\n---\n".join(conflicts_in_file[:2])
+                        )
                 except Exception:
                     pass
 

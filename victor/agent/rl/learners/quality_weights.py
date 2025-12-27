@@ -192,7 +192,7 @@ class QualityWeightLearner(BaseLearner):
 
                 if task_type not in self._weights:
                     self._weights[task_type] = dict(self.DEFAULT_WEIGHTS)
-                    self._velocities[task_type] = {d: 0.0 for d in QualityDimension.ALL}
+                    self._velocities[task_type] = dict.fromkeys(QualityDimension.ALL, 0.0)
                     self._sample_counts[task_type] = 0
 
                 self._weights[task_type][dimension] = row_dict["weight"]
@@ -230,7 +230,7 @@ class QualityWeightLearner(BaseLearner):
         # Ensure task type exists
         if task_type not in self._weights:
             self._weights[task_type] = dict(self.DEFAULT_WEIGHTS)
-            self._velocities[task_type] = {d: 0.0 for d in QualityDimension.ALL}
+            self._velocities[task_type] = dict.fromkeys(QualityDimension.ALL, 0.0)
             self._sample_counts[task_type] = 0
             self._recent_outcomes[task_type] = []
 
@@ -432,7 +432,7 @@ class QualityWeightLearner(BaseLearner):
             Dictionary of dimension -> adjustment (positive = increased, negative = decreased)
         """
         if task_type not in self._weights:
-            return {d: 0.0 for d in QualityDimension.ALL}
+            return dict.fromkeys(QualityDimension.ALL, 0.0)
 
         return {
             dim: self._weights[task_type][dim] - self.DEFAULT_WEIGHTS[dim]
@@ -490,11 +490,11 @@ class QualityWeightLearner(BaseLearner):
             Dictionary of dimension -> correlation coefficient
         """
         if task_type not in self._recent_outcomes:
-            return {d: 0.0 for d in QualityDimension.ALL}
+            return dict.fromkeys(QualityDimension.ALL, 0.0)
 
         outcomes = self._recent_outcomes[task_type]
         if len(outcomes) < 5:
-            return {d: 0.0 for d in QualityDimension.ALL}
+            return dict.fromkeys(QualityDimension.ALL, 0.0)
 
         correlations = {}
 

@@ -133,13 +133,19 @@ class DevOpsToolDependencyProvider(ToolDependencyProviderProtocol):
 
     def get_optional_tools(self) -> Set[str]:
         """Return tools that enhance DevOps but aren't essential."""
-        return {"code_search", "semantic_code_search", "git_status", "git_diff", "git_commit", "web_search", "web_fetch"}
+        return {
+            "code_search",
+            "semantic_code_search",
+            "git_status",
+            "git_diff",
+            "git_commit",
+            "web_search",
+            "web_fetch",
+        }
 
     def get_tool_sequences(self) -> List[List[str]]:
         """Return recommended tool sequences for DevOps workflows."""
-        return [
-            list(seq) for seq in DEVOPS_TOOL_SEQUENCES.values()
-        ]
+        return [list(seq) for seq in DEVOPS_TOOL_SEQUENCES.values()]
 
     def suggest_next_tool(self, current_tool: str, used_tools: List[str]) -> str:
         """Suggest the next tool based on current tool and history."""

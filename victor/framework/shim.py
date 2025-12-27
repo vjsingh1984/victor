@@ -439,8 +439,7 @@ class FrameworkShim:
         self._orchestrator._vertical_tool_dependencies = dependencies
         self._orchestrator._vertical_tool_sequences = sequences
         logger.debug(
-            f"Applied {len(dependencies)} tool dependencies, "
-            f"{len(sequences)} sequences"
+            f"Applied {len(dependencies)} tool dependencies, " f"{len(sequences)} sequences"
         )
 
     def _apply_system_prompt(self, system_prompt: str) -> None:

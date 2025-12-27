@@ -558,6 +558,7 @@ class TestGlobalSingleton:
     def test_get_hierarchical_policy(self) -> None:
         """Test getting global singleton."""
         import victor.agent.rl.hierarchical_policy as module
+
         module._hierarchical_policy = None
 
         policy1 = get_hierarchical_policy()
@@ -568,6 +569,7 @@ class TestGlobalSingleton:
     def test_singleton_preserves_state(self) -> None:
         """Test singleton preserves state."""
         import victor.agent.rl.hierarchical_policy as module
+
         module._hierarchical_policy = None
 
         policy = get_hierarchical_policy()

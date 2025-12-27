@@ -30,8 +30,10 @@ from victor.tools.enums import (
     ExecutionCategory,
     Priority,
 )
+
 # Import metadata classes from separate module
 from victor.tools.metadata import ToolMetadata, ToolMetadataRegistry
+
 # Import registry classes from separate module (for backward compatibility)
 from victor.tools.registry import Hook, HookError, ToolRegistry
 

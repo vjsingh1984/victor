@@ -749,7 +749,9 @@ class TestCodingMiddlewareIntegration:
             {"command": "git push --force origin main"},
         )
         assert result.proceed is False
-        assert "dangerous" in result.error_message.lower() or "block" in result.error_message.lower()
+        assert (
+            "dangerous" in result.error_message.lower() or "block" in result.error_message.lower()
+        )
 
         # Test allowed command
         result = await chain.process_before(

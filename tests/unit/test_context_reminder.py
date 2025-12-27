@@ -166,9 +166,7 @@ class TestContextReminderManager:
 
     def test_init_with_custom_configs(self):
         """Test initialization with custom configs."""
-        custom_config = {
-            ReminderType.EVIDENCE: ReminderConfig(frequency=10)
-        }
+        custom_config = {ReminderType.EVIDENCE: ReminderConfig(frequency=10)}
         manager = ContextReminderManager(configs=custom_config)
         assert manager.configs[ReminderType.EVIDENCE].frequency == 10
 
@@ -421,12 +419,11 @@ class TestGetReminder:
 
     def test_get_reminder_custom_formatter(self):
         """Test get_reminder with custom formatter."""
+
         def custom_formatter(state):
             return f"Custom: {len(state.observed_files)} files"
 
-        manager = ContextReminderManager(
-            custom_formatters={ReminderType.CUSTOM: custom_formatter}
-        )
+        manager = ContextReminderManager(custom_formatters={ReminderType.CUSTOM: custom_formatter})
         manager.configs[ReminderType.CUSTOM] = ReminderConfig(enabled=True)
         manager.update_state(observed_files={"a.py", "b.py"}, tool_calls=1)
 
@@ -681,12 +678,11 @@ class TestEdgeCases:
 
     def test_custom_formatter_none_return(self):
         """Test custom formatter returning empty string."""
+
         def empty_formatter(state):
             return ""
 
-        manager = ContextReminderManager(
-            custom_formatters={ReminderType.CUSTOM: empty_formatter}
-        )
+        manager = ContextReminderManager(custom_formatters={ReminderType.CUSTOM: empty_formatter})
         manager.configs[ReminderType.CUSTOM] = ReminderConfig(enabled=True)
         manager.update_state(tool_calls=1)
 

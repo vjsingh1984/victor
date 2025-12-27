@@ -104,9 +104,7 @@ class VerticalLoader:
 
         if vertical is None:
             available = self._get_available_names()
-            raise ValueError(
-                f"Vertical '{name}' not found. Available: {', '.join(available)}"
-            )
+            raise ValueError(f"Vertical '{name}' not found. Available: {', '.join(available)}")
 
         self._activate(vertical)
         return vertical

@@ -412,12 +412,46 @@ class TestAllCommandsRegistered:
 
     # Complete list of expected commands
     EXPECTED_COMMANDS = [
-        "help", "init", "model", "profile", "provider", "clear", "context",
-        "lmstudio", "tools", "status", "config", "save", "load", "sessions",
-        "compact", "mcp", "review", "bug", "exit", "undo", "redo",
-        "theme", "changes", "cost", "approvals", "resume", "plan", "search",
-        "copy", "directory", "snapshots", "commit", "mode", "build", "explore",
-        "reindex", "metrics", "serialization", "learning", "mlstats",
+        "help",
+        "init",
+        "model",
+        "profile",
+        "provider",
+        "clear",
+        "context",
+        "lmstudio",
+        "tools",
+        "status",
+        "config",
+        "save",
+        "load",
+        "sessions",
+        "compact",
+        "mcp",
+        "review",
+        "bug",
+        "exit",
+        "undo",
+        "redo",
+        "theme",
+        "changes",
+        "cost",
+        "approvals",
+        "resume",
+        "plan",
+        "search",
+        "copy",
+        "directory",
+        "snapshots",
+        "commit",
+        "mode",
+        "build",
+        "explore",
+        "reindex",
+        "metrics",
+        "serialization",
+        "learning",
+        "mlstats",
     ]
 
     # Expected aliases mapping
@@ -468,7 +502,9 @@ class TestAllCommandsRegistered:
 
         for cmd_name, aliases in self.EXPECTED_ALIASES.items():
             for alias in aliases:
-                assert handler.registry.has(alias), f"Alias '{alias}' for '{cmd_name}' not registered"
+                assert handler.registry.has(
+                    alias
+                ), f"Alias '{alias}' for '{cmd_name}' not registered"
 
     def test_command_count(self):
         """Test we have at least 40 commands."""
@@ -549,7 +585,16 @@ class TestCommandRegistry:
         registry = get_command_registry()
         categories = registry.categories()
 
-        expected = ["system", "session", "model", "tools", "mode", "metrics", "navigation", "codebase"]
+        expected = [
+            "system",
+            "session",
+            "model",
+            "tools",
+            "mode",
+            "metrics",
+            "navigation",
+            "codebase",
+        ]
         for cat in expected:
             assert cat in categories, f"Category '{cat}' not found"
 

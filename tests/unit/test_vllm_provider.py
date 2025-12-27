@@ -66,9 +66,7 @@ def sample_tool():
         description="Get the weather for a location",
         parameters={
             "type": "object",
-            "properties": {
-                "location": {"type": "string", "description": "The city name"}
-            },
+            "properties": {"location": {"type": "string", "description": "The city name"}},
             "required": ["location"],
         },
     )
@@ -210,7 +208,7 @@ class TestExtractToolCallsFromContent:
 
     def test_invalid_json(self):
         """Test handling of invalid JSON."""
-        content = '```json\n{invalid json here}\n```'
+        content = "```json\n{invalid json here}\n```"
         tool_calls, remaining = _extract_tool_calls_from_content(content)
         assert len(tool_calls) == 0
 
@@ -354,9 +352,7 @@ class TestVLLMAvailableModel:
         """Test available model is set when connecting to server."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": [{"id": "Qwen/Qwen2.5-Coder-7B-Instruct"}]
-        }
+        mock_response.json.return_value = {"data": [{"id": "Qwen/Qwen2.5-Coder-7B-Instruct"}]}
 
         with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = mock_response

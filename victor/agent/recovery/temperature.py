@@ -178,7 +178,7 @@ class ProgressiveTemperatureAdjuster:
 
         # Calculate base adjustment
         consecutive = context.consecutive_failures
-        adjustment = policy.base_adjustment * (policy.decay_factor ** consecutive)
+        adjustment = policy.base_adjustment * (policy.decay_factor**consecutive)
 
         # Apply model-specific bounds
         min_temp, max_temp = self._get_model_bounds(model_name)
@@ -208,10 +208,7 @@ class ProgressiveTemperatureAdjuster:
             if session.adjustments_made > 3:
                 reason += f" (adjustment #{session.adjustments_made})"
 
-        logger.debug(
-            f"Temperature adjustment: {current_temp:.2f} -> {new_temp:.2f} "
-            f"({reason})"
-        )
+        logger.debug(f"Temperature adjustment: {current_temp:.2f} -> {new_temp:.2f} " f"({reason})")
 
         return new_temp, reason
 
@@ -280,6 +277,7 @@ class ProgressiveTemperatureAdjuster:
 
         # Update Q-value (using ADJUST_TEMPERATURE action)
         from victor.agent.recovery.protocols import RecoveryAction
+
         self._q_store.update_q_value(
             state_key,
             RecoveryAction.ADJUST_TEMPERATURE,

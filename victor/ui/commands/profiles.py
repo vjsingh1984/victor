@@ -48,11 +48,15 @@ def list_profiles() -> None:
 @profiles_app.command("create")
 def create_profile(
     name: str = typer.Argument(..., help="Profile name"),
-    provider: str = typer.Option(..., "--provider", "-p", help="Provider name (ollama, anthropic, openai, google)"),
+    provider: str = typer.Option(
+        ..., "--provider", "-p", help="Provider name (ollama, anthropic, openai, google)"
+    ),
     model: str = typer.Option(..., "--model", "-m", help="Model identifier"),
     temperature: float = typer.Option(0.7, "--temperature", "-t", help="Temperature (0.0-2.0)"),
     max_tokens: int = typer.Option(4096, "--max-tokens", help="Maximum output tokens"),
-    description: Optional[str] = typer.Option(None, "--description", "-d", help="Profile description"),
+    description: Optional[str] = typer.Option(
+        None, "--description", "-d", help="Profile description"
+    ),
 ) -> None:
     """Create a new profile.
 
@@ -103,9 +107,13 @@ def edit_profile(
     name: str = typer.Argument(..., help="Profile name to edit"),
     provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Provider name"),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="Model identifier"),
-    temperature: Optional[float] = typer.Option(None, "--temperature", "-t", help="Temperature (0.0-2.0)"),
+    temperature: Optional[float] = typer.Option(
+        None, "--temperature", "-t", help="Temperature (0.0-2.0)"
+    ),
     max_tokens: Optional[int] = typer.Option(None, "--max-tokens", help="Maximum output tokens"),
-    description: Optional[str] = typer.Option(None, "--description", "-d", help="Profile description"),
+    description: Optional[str] = typer.Option(
+        None, "--description", "-d", help="Profile description"
+    ),
 ) -> None:
     """Edit an existing profile.
 

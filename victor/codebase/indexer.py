@@ -1289,7 +1289,11 @@ class CodebaseIndex:
                     if isinstance(node, py_ast.ClassDef):
                         for base in node.bases:
                             try:
-                                base_name = py_ast.unparse(base) if hasattr(py_ast, "unparse") else getattr(base, "id", None)
+                                base_name = (
+                                    py_ast.unparse(base)
+                                    if hasattr(py_ast, "unparse")
+                                    else getattr(base, "id", None)
+                                )
                             except Exception:
                                 base_name = getattr(base, "id", None)
                             if base_name:

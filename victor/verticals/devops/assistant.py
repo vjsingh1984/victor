@@ -35,24 +35,24 @@ class DevOpsAssistant(VerticalBase):
 
         return [
             # Core filesystem
-            ToolNames.READ,      # read_file → read
-            ToolNames.WRITE,     # write_file → write
-            ToolNames.EDIT,      # edit_files → edit
-            ToolNames.LS,        # list_directory → ls
+            ToolNames.READ,  # read_file → read
+            ToolNames.WRITE,  # write_file → write
+            ToolNames.EDIT,  # edit_files → edit
+            ToolNames.LS,  # list_directory → ls
             # Shell for infrastructure commands
-            ToolNames.SHELL,     # bash → shell
+            ToolNames.SHELL,  # bash → shell
             # Git for version control
-            ToolNames.GIT,       # Git operations
+            ToolNames.GIT,  # Git operations
             # Container and infrastructure tools
-            ToolNames.DOCKER,    # Docker operations - essential for DevOps
-            ToolNames.TEST,      # Run tests - essential for validation
+            ToolNames.DOCKER,  # Docker operations - essential for DevOps
+            ToolNames.TEST,  # Run tests - essential for validation
             # Code search for configurations
-            ToolNames.GREP,        # Keyword search
-            ToolNames.CODE_SEARCH, # Semantic code search
-            ToolNames.OVERVIEW,    # codebase_overview → overview
+            ToolNames.GREP,  # Keyword search
+            ToolNames.CODE_SEARCH,  # Semantic code search
+            ToolNames.OVERVIEW,  # codebase_overview → overview
             # Web for documentation
             ToolNames.WEB_SEARCH,  # Web search (internet search)
-            ToolNames.WEB_FETCH,   # Fetch URL content
+            ToolNames.WEB_FETCH,  # Fetch URL content
         ]
 
     @classmethod
@@ -210,21 +210,25 @@ When creating configurations:
     @classmethod
     def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
         from victor.verticals.devops.prompts import DevOpsPromptContributor
+
         return DevOpsPromptContributor()
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
         from victor.verticals.devops.mode_config import DevOpsModeConfigProvider
+
         return DevOpsModeConfigProvider()
 
     @classmethod
     def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
         from victor.verticals.devops.safety import DevOpsSafetyExtension
+
         return DevOpsSafetyExtension()
 
     @classmethod
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
         from victor.verticals.devops.tool_dependencies import DevOpsToolDependencyProvider
+
         return DevOpsToolDependencyProvider()
 
     @classmethod
@@ -245,15 +249,15 @@ When creating configurations:
         return TieredToolConfig(
             # Tier 1: Mandatory - always included for any task
             mandatory={
-                ToolNames.READ,      # Read files - essential
-                ToolNames.LS,        # List directory - essential
-                ToolNames.GREP,      # Search code/configs - essential for DevOps
+                ToolNames.READ,  # Read files - essential
+                ToolNames.LS,  # List directory - essential
+                ToolNames.GREP,  # Search code/configs - essential for DevOps
             },
             # Tier 2: Vertical Core - essential for DevOps tasks
             vertical_core={
-                ToolNames.SHELL,     # Shell commands - core for infrastructure
-                ToolNames.GIT,       # Git operations - core for version control
-                ToolNames.DOCKER,    # Docker - core for containers
+                ToolNames.SHELL,  # Shell commands - core for infrastructure
+                ToolNames.GIT,  # Git operations - core for version control
+                ToolNames.DOCKER,  # Docker - core for containers
                 ToolNames.OVERVIEW,  # Codebase overview - core for understanding
             },
             # semantic_pool and stage_tools are now derived from @tool decorator metadata

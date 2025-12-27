@@ -44,7 +44,6 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
         "PluginRegistry",
         "load_plugin",
     ],
-
     # Provider/Model Architecture
     "provider": [
         "LLM provider",
@@ -60,7 +59,6 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
         "stream_chat",
         "provider adapter",
     ],
-
     # Error Handling
     "error handling": [
         "exception",
@@ -78,7 +76,6 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
         "raise exception",
         "catch exception",
     ],
-
     # Configuration
     "configuration": [
         "config",
@@ -95,7 +92,6 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
         "environment variables",
         "profiles",
     ],
-
     # Testing
     "test": [
         "unit test",
@@ -112,7 +108,6 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
         "test suite",
         "test coverage",
     ],
-
     # Logging/Monitoring
     "logging": [
         "logger",
@@ -130,7 +125,6 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
         "performance tracking",
         "instrumentation",
     ],
-
     # Authentication/Authorization
     "authentication": [
         "auth",
@@ -147,7 +141,6 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
         "authorize",
         "allowed",
     ],
-
     # Validation
     "validation": [
         "validate",
@@ -157,7 +150,6 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
         "verify",
         "pydantic",
     ],
-
     # Caching
     "caching": [
         "cache",
@@ -174,7 +166,6 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
         "cache_key",
         "LRU cache",
     ],
-
     # Database/Storage
     "database": [
         "db",
@@ -191,7 +182,6 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
         "save",
         "load",
     ],
-
     # API/Endpoints
     "api": [
         "endpoint",
@@ -207,7 +197,6 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
         "URL",
         "HTTP endpoint",
     ],
-
     # Code Structure
     "class": [
         "class definition",
@@ -230,7 +219,6 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
         "static method",
         "def",
     ],
-
     # Documentation
     "documentation": [
         "docs",
@@ -245,7 +233,6 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
         "triple quotes",
         "function documentation",
     ],
-
     # Imports/Dependencies
     "import": [
         "import statement",
@@ -261,7 +248,6 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
         "library",
         "module",
     ],
-
     # Async/Concurrency
     "async": [
         "asynchronous",

@@ -490,9 +490,7 @@ def _ensure_vertical_activated(
 
         # If no vertical active or different vertical requested, (re)activate
         if current_vertical is None or current_vertical != vertical_name:
-            logger.info(
-                f"Switching vertical: {current_vertical or 'none'} -> {vertical_name}"
-            )
+            logger.info(f"Switching vertical: {current_vertical or 'none'} -> {vertical_name}")
             # Load and activate the new vertical
             loader.load(vertical_name)
 

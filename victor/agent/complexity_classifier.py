@@ -80,7 +80,11 @@ PATTERNS = {
         ),
         # Migration and restructuring tasks require deep codebase understanding
         (r"\b(migrate|upgrade)\s+", 0.9, "migration"),
-        (r"\b(restructure|reorganize)\s+(the\s+)?(project|code|module|layout)\b", 0.9, "restructure"),
+        (
+            r"\b(restructure|reorganize)\s+(the\s+)?(project|code|module|layout)\b",
+            0.9,
+            "restructure",
+        ),
         (r"\bconvert\s+.+\s+(to|into)\s+", 0.9, "convert_code"),
         (r"\bconsolidate\s+(the\s+)?(code|duplicate|files?)\b", 0.9, "consolidate"),
     ],

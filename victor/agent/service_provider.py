@@ -990,7 +990,13 @@ class OrchestratorServiceProvider:
         if not use_semantic_selection:
             # Return a no-op selector that just returns all tools
             class NoOpSelector:
-                def select_tools(self, query: str, available_tools: list, max_tools: int = 10, threshold: float = 0.3) -> list:
+                def select_tools(
+                    self,
+                    query: str,
+                    available_tools: list,
+                    max_tools: int = 10,
+                    threshold: float = 0.3,
+                ) -> list:
                     return available_tools[:max_tools]
 
                 def compute_similarity(self, query: str, tool_description: str) -> float:
@@ -1119,7 +1125,9 @@ class OrchestratorServiceProvider:
 
             return NoOpStreamingMetrics()
 
-        export_path = Path(getattr(self._settings, "cache_dir", ".victor/cache")) / "streaming_metrics.json"
+        export_path = (
+            Path(getattr(self._settings, "cache_dir", ".victor/cache")) / "streaming_metrics.json"
+        )
 
         return StreamingMetricsCollector(max_history=max_history, export_path=export_path)
 
@@ -1130,7 +1138,9 @@ class OrchestratorServiceProvider:
         from pathlib import Path
 
         embedding_model = getattr(self._settings, "embedding_model", "all-MiniLM-L12-v2")
-        cache_dir = Path(getattr(self._settings, "cache_dir", ".victor/cache")) / "intent_classifier"
+        cache_dir = (
+            Path(getattr(self._settings, "cache_dir", ".victor/cache")) / "intent_classifier"
+        )
 
         # Create embedding service
         embedding_service = EmbeddingService(model_name=embedding_model)

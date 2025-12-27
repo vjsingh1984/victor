@@ -243,7 +243,10 @@ class TestEdgeCases:
     @patch("victor.ui.commands.providers.ProviderRegistry")
     def test_special_characters_in_provider_name(self, mock_registry):
         """Test handling of special characters in provider names."""
-        mock_registry.list_providers.return_value = ["provider-with-dash", "provider_with_underscore"]
+        mock_registry.list_providers.return_value = [
+            "provider-with-dash",
+            "provider_with_underscore",
+        ]
 
         result = runner.invoke(providers_app, [])
         assert result.exit_code == 0

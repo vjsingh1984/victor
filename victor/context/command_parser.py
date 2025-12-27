@@ -154,7 +154,9 @@ class URLResolver(ContextResolver):
                     # Truncate if too long
                     if len(content) > self.max_content_length:
                         content = content[: self.max_content_length]
-                        content += f"\n\n[Content truncated at {self.max_content_length} characters]"
+                        content += (
+                            f"\n\n[Content truncated at {self.max_content_length} characters]"
+                        )
 
                     return ContextItem(
                         source_type="url",
@@ -355,9 +357,7 @@ class FolderResolver(ContextResolver):
 
             if entry.is_dir():
                 lines.append(f"{prefix}{connector}{entry.name}/\n")
-                subtree = self._build_tree(
-                    entry, prefix + extension, depth + 1, file_count
-                )
+                subtree = self._build_tree(entry, prefix + extension, depth + 1, file_count)
                 lines.append(subtree)
             else:
                 file_count[0] += 1

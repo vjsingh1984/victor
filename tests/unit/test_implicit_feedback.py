@@ -234,9 +234,7 @@ class TestImplicitFeedbackCollector:
 
     def test_end_session_completed(self, collector: ImplicitFeedbackCollector) -> None:
         """Test ending a completed session."""
-        session = collector.start_session(
-            "sess_1", "analysis", provider="openai", model="gpt-4"
-        )
+        session = collector.start_session("sess_1", "analysis", provider="openai", model="gpt-4")
 
         # Simulate some activity
         collector.record_tool_execution(session, "search", True, 100.0)

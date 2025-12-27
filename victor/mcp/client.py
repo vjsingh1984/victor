@@ -241,7 +241,7 @@ class MCPClient:
         if self._sandboxed_process is not None:
             try:
                 # Try to get running loop and schedule cleanup
-                loop = asyncio.get_running_loop()
+                _loop = asyncio.get_running_loop()  # noqa: F841
                 # If we're in an async context, schedule the cleanup
                 asyncio.create_task(self._sandboxed_process.terminate())
             except RuntimeError:
@@ -469,7 +469,7 @@ class MCPClient:
         if self._sandboxed_process is not None:
             try:
                 # Try to get running loop and schedule cleanup
-                loop = asyncio.get_running_loop()
+                _loop = asyncio.get_running_loop()  # noqa: F841
                 asyncio.create_task(self._sandboxed_process.terminate())
             except RuntimeError:
                 # No running loop, we're in sync context

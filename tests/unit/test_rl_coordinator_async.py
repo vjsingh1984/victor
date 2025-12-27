@@ -76,9 +76,7 @@ class TestAsyncWrappers:
     ) -> None:
         """Test record_outcome_async offloads to thread pool."""
         # Should not block event loop
-        await coordinator.record_outcome_async(
-            "continuation_patience", sample_outcome, "coding"
-        )
+        await coordinator.record_outcome_async("continuation_patience", sample_outcome, "coding")
 
         # Verify outcome was recorded by checking stats
         stats = coordinator.get_stats()
@@ -105,9 +103,7 @@ class TestAsyncWrappers:
         assert rec is None or isinstance(rec, RLRecommendation)
 
     @pytest.mark.asyncio
-    async def test_get_all_recommendations_async(
-        self, coordinator: RLCoordinator
-    ) -> None:
+    async def test_get_all_recommendations_async(self, coordinator: RLCoordinator) -> None:
         """Test get_all_recommendations_async offloads to thread pool."""
         recommendations = await coordinator.get_all_recommendations_async(
             "anthropic", "claude-3-opus", "analysis"
@@ -193,9 +189,7 @@ class TestConcurrentAccess:
     """Tests for concurrent async access."""
 
     @pytest.mark.asyncio
-    async def test_sequential_record_outcomes(
-        self, coordinator: RLCoordinator
-    ) -> None:
+    async def test_sequential_record_outcomes(self, coordinator: RLCoordinator) -> None:
         """Test sequential record_outcome_async calls complete without error."""
         outcomes = [
             RLOutcome(
@@ -265,9 +259,7 @@ class TestEventLoopNonBlocking:
         assert other_task_ran
 
     @pytest.mark.asyncio
-    async def test_export_metrics_allows_concurrent_tasks(
-        self, coordinator: RLCoordinator
-    ) -> None:
+    async def test_export_metrics_allows_concurrent_tasks(self, coordinator: RLCoordinator) -> None:
         """Test export_metrics_async allows other tasks to run."""
         counter = 0
 

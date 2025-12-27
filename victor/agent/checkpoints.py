@@ -248,9 +248,7 @@ class CheckpointManager:
                 logger.warning("Failed to restore staging info, applying changes only")
                 self._run_git_command(["stash", "apply", stash_ref])
 
-            logger.info(
-                f"Created checkpoint {checkpoint_id}: {description or '(no description)'}"
-            )
+            logger.info(f"Created checkpoint {checkpoint_id}: {description or '(no description)'}")
 
             return Checkpoint(
                 id=checkpoint_id,
@@ -298,9 +296,7 @@ class CheckpointManager:
                         break
 
             if not stash_ref:
-                raise CheckpointNotFoundError(
-                    f"Checkpoint {checkpoint_id} not found in stash list"
-                )
+                raise CheckpointNotFoundError(f"Checkpoint {checkpoint_id} not found in stash list")
 
             # Reset working tree to clean state
             self._run_git_command(["reset", "--hard"])
@@ -347,9 +343,7 @@ class CheckpointManager:
 
                 # Parse stash list output
                 # Format: stash@{N}: On branch: message
-                match = re.match(
-                    r"(stash@\{\d+\}):\s+(?:On [^:]+|WIP on [^:]+):\s*(.+)", line
-                )
+                match = re.match(r"(stash@\{\d+\}):\s+(?:On [^:]+|WIP on [^:]+):\s*(.+)", line)
                 if not match:
                     continue
 

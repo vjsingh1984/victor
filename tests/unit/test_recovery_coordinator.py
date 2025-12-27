@@ -49,7 +49,9 @@ def mock_streaming_handler():
     mock.check_iteration_limit = Mock(return_value=None)
     mock.check_natural_completion = Mock(return_value=False)
     mock.handle_empty_response = Mock(return_value=None)
-    mock.handle_blocked_tool_call = Mock(return_value=StreamChunk(content="blocked", is_final=False))
+    mock.handle_blocked_tool_call = Mock(
+        return_value=StreamChunk(content="blocked", is_final=False)
+    )
     mock.check_blocked_threshold = Mock(return_value=None)
     mock.filter_blocked_tool_calls = Mock(return_value=([], [], 0))
     mock.check_force_action = Mock(return_value=(False, None))
@@ -252,7 +254,7 @@ class TestConditionChecking:
     ):
         """Test check_tool_budget when approaching limit."""
         recovery_context.tool_calls_used = 250  # At warning threshold
-        recovery_context.tool_budget = 300     # Still have remaining budget
+        recovery_context.tool_budget = 300  # Still have remaining budget
 
         result = recovery_coordinator.check_tool_budget(recovery_context, warning_threshold=250)
 
@@ -299,9 +301,7 @@ class TestConditionChecking:
         """Test check_blocked_threshold when threshold not exceeded."""
         mock_streaming_handler.check_blocked_threshold.return_value = None
 
-        result = recovery_coordinator.check_blocked_threshold(
-            recovery_context, all_blocked=False
-        )
+        result = recovery_coordinator.check_blocked_threshold(recovery_context, all_blocked=False)
 
         assert result is None
 
@@ -314,9 +314,7 @@ class TestConditionChecking:
         mock_result.clear_tool_calls = True
         mock_streaming_handler.check_blocked_threshold.return_value = mock_result
 
-        result = recovery_coordinator.check_blocked_threshold(
-            recovery_context, all_blocked=True
-        )
+        result = recovery_coordinator.check_blocked_threshold(recovery_context, all_blocked=True)
 
         assert result is not None
         chunk, clear_tools = result
@@ -409,9 +407,7 @@ class TestActionHandling:
         assert should_execute is False
         assert chunks is None
 
-    def test_handle_force_completion_not_forced(
-        self, recovery_coordinator, recovery_context
-    ):
+    def test_handle_force_completion_not_forced(self, recovery_coordinator, recovery_context):
         """Test handle_force_completion when not forced."""
         result = recovery_coordinator.handle_force_completion(recovery_context)
 
@@ -454,9 +450,7 @@ class TestActionHandling:
         assert "loop" in result[0].content.lower()
 
     @pytest.mark.asyncio
-    async def test_handle_recovery_with_integration_disabled(
-        self, recovery_context
-    ):
+    async def test_handle_recovery_with_integration_disabled(self, recovery_context):
         """Test handle_recovery_with_integration when disabled."""
         from victor.agent.orchestrator_recovery import OrchestratorRecoveryAction
 
@@ -577,9 +571,7 @@ class TestFilteringAndTruncation:
         assert len(chunks) == 1
         assert count == 1
 
-    def test_truncate_tool_calls_within_budget(
-        self, recovery_coordinator, recovery_context
-    ):
+    def test_truncate_tool_calls_within_budget(self, recovery_coordinator, recovery_context):
         """Test truncate_tool_calls when within budget."""
         tool_calls = [{"name": "tool1"}, {"name": "tool2"}]
 
@@ -590,9 +582,7 @@ class TestFilteringAndTruncation:
         assert len(truncated) == 2
         assert was_truncated is False
 
-    def test_truncate_tool_calls_exceeds_budget(
-        self, recovery_coordinator, recovery_context
-    ):
+    def test_truncate_tool_calls_exceeds_budget(self, recovery_coordinator, recovery_context):
         """Test truncate_tool_calls when exceeds budget."""
         tool_calls = [{"name": f"tool{i}"} for i in range(10)]
 

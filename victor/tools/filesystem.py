@@ -99,7 +99,7 @@ def _normalize_path(path: str) -> Optional[str]:
 
         # Check if path starts with cwd name (common pattern)
         if path.startswith(f"{cwd_name}/"):
-            stripped = path[len(cwd_name) + 1:]
+            stripped = path[len(cwd_name) + 1 :]
             if stripped and (cwd / stripped).exists():
                 return stripped
 
@@ -403,7 +403,9 @@ def get_sandbox_path() -> Optional[Path]:
         if config.sandbox_dir and config.allow_sandbox_edits:
             # Sandbox is enabled for this mode
             return Path.cwd() / config.sandbox_dir
-        elif not config.allow_all_tools and ("write_file" in config.disallowed_tools or "edit_files" in config.disallowed_tools):
+        elif not config.allow_all_tools and (
+            "write_file" in config.disallowed_tools or "edit_files" in config.disallowed_tools
+        ):
             # Writing is disallowed in this mode (no sandbox exception)
             return None
 
@@ -1116,7 +1118,9 @@ TEXT_EXTENSIONS = {
         "explain this code",
         "what does this",
         # Additional keywords from MANDATORY_TOOL_KEYWORDS
-        "explain", "describe", "what does",
+        "explain",
+        "describe",
+        "what does",
     ],  # Force inclusion
     priority_hints=[
         "TRUNCATION: Output limited to ~15,000 chars. Use offset/limit for large files.",
@@ -1191,8 +1195,7 @@ async def read(
             if suggestions:
                 suggestion_list = "\n  - ".join(suggestions[:5])
                 raise FileNotFoundError(
-                    f"File not found: {path}\n"
-                    f"Did you mean one of these?\n  - {suggestion_list}"
+                    f"File not found: {path}\n" f"Did you mean one of these?\n  - {suggestion_list}"
                 )
             else:
                 raise FileNotFoundError(f"File not found: {path}")
@@ -2029,7 +2032,9 @@ async def overview(
             if parent.is_dir():
                 root = parent
             else:
-                raise NotADirectoryError(f"Path is not a directory: {path}. Use the parent directory or a directory path.")
+                raise NotADirectoryError(
+                    f"Path is not a directory: {path}. Use the parent directory or a directory path."
+                )
 
         # Excluded directories
         exclude_dirs = {

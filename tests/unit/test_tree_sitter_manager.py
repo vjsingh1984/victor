@@ -76,6 +76,7 @@ class TestGetLanguage:
     def test_import_error_message(self):
         """Test ImportError includes install instructions."""
         import builtins
+
         original_import = builtins.__import__
 
         def mock_import(name, *args, **kwargs):
@@ -93,13 +94,16 @@ class TestGetLanguage:
     def test_attribute_error_message(self):
         """Test AttributeError includes helpful message."""
         import builtins
+
         original_import = builtins.__import__
 
         def mock_import(name, *args, **kwargs):
             if name == "tree_sitter_python":
                 mock_module = MagicMock()
                 # Configure getattr to raise AttributeError for 'language'
-                mock_module.configure_mock(**{"language": MagicMock(side_effect=AttributeError("no attribute"))})
+                mock_module.configure_mock(
+                    **{"language": MagicMock(side_effect=AttributeError("no attribute"))}
+                )
                 del mock_module.language
                 return mock_module
             return original_import(name, *args, **kwargs)
@@ -247,11 +251,7 @@ class TestRealTreeSitterIntegration:
         try:
             parser = get_parser("python")
             tree = parser.parse(b"def foo():\n    pass\ndef bar():\n    return 42")
-            captures = run_query(
-                tree,
-                "(function_definition name: (identifier) @name)",
-                "python"
-            )
+            captures = run_query(tree, "(function_definition name: (identifier) @name)", "python")
             # Should find function names
             assert "name" in captures
             assert len(captures["name"]) >= 2

@@ -109,9 +109,7 @@ class TestSetupObservabilityIntegration:
             mock_integration = MagicMock()
             MockIntegration.return_value = mock_integration
 
-            setup_observability_integration(
-                mock_orchestrator, session_id="test-session-123"
-            )
+            setup_observability_integration(mock_orchestrator, session_id="test-session-123")
 
             MockIntegration.assert_called_once_with(session_id="test-session-123")
 

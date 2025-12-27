@@ -8,7 +8,15 @@ from victor.tools.graph_tool import graph
     name="arch_summary",  # short canonical name; legacy alias via TOOL_ALIASES maps architecture_summary -> arch_summary
     category="code_intelligence",
     priority=Priority.CRITICAL,
-    mandatory_keywords=["architecture", "overview", "hotspot", "coupling", "executive summary", "impact", "module hubs"],
+    mandatory_keywords=[
+        "architecture",
+        "overview",
+        "hotspot",
+        "coupling",
+        "executive summary",
+        "impact",
+        "module hubs",
+    ],
     access_mode=AccessMode.READONLY,
     danger_level=DangerLevel.SAFE,
     execution_category=ExecutionCategory.READ_ONLY,
@@ -92,5 +100,7 @@ async def architecture_summary(
             "pagerank": mod_pr.get("modules", []) if isinstance(mod_pr, dict) else [],
             "centrality": mod_central.get("modules", []) if isinstance(mod_central, dict) else [],
         },
-        "symbols": symbol_pr.get("symbols", []) if include_symbols and isinstance(symbol_pr, dict) else [],
+        "symbols": (
+            symbol_pr.get("symbols", []) if include_symbols and isinstance(symbol_pr, dict) else []
+        ),
     }

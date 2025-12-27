@@ -95,7 +95,9 @@ def mock_container():
             ProjectContextProtocol: ProjectContext(),
             UsageAnalyticsProtocol: UsageAnalytics(),
             ToolSequenceTrackerProtocol: ToolSequenceTracker(),
-            RecoveryHandlerProtocol: MagicMock(spec=RecoveryHandler),  # Use mock for complex dependency
+            RecoveryHandlerProtocol: MagicMock(
+                spec=RecoveryHandler
+            ),  # Use mock for complex dependency
         }
         return protocol_map.get(protocol, MagicMock())
 
@@ -181,9 +183,7 @@ class TestCreateProjectContext:
         context = factory.create_project_context()
         assert isinstance(context, ProjectContext)
 
-    def test_create_project_context_uses_di_if_available(
-        self, factory, mock_container
-    ):
+    def test_create_project_context_uses_di_if_available(self, factory, mock_container):
         """create_project_context uses DI container (always)."""
         from victor.agent.protocols import ProjectContextProtocol
 
@@ -234,12 +234,14 @@ class TestCreateCoreServices:
         mock_adapter = MagicMock()
         mock_capabilities = MagicMock()
 
-        with patch.object(factory, "create_sanitizer") as mock_san, \
-             patch.object(factory, "create_prompt_builder") as mock_pb, \
-             patch.object(factory, "create_project_context") as mock_pc, \
-             patch.object(factory, "create_complexity_classifier") as mock_cc, \
-             patch.object(factory, "create_action_authorizer") as mock_aa, \
-             patch.object(factory, "create_search_router") as mock_sr:
+        with (
+            patch.object(factory, "create_sanitizer") as mock_san,
+            patch.object(factory, "create_prompt_builder") as mock_pb,
+            patch.object(factory, "create_project_context") as mock_pc,
+            patch.object(factory, "create_complexity_classifier") as mock_cc,
+            patch.object(factory, "create_action_authorizer") as mock_aa,
+            patch.object(factory, "create_search_router") as mock_sr,
+        ):
 
             services = factory.create_core_services(mock_adapter, mock_capabilities)
 
@@ -255,9 +257,7 @@ class TestCreateCoreServices:
 class TestCreateStreamingMetricsCollector:
     """Tests for create_streaming_metrics_collector method."""
 
-    def test_create_streaming_metrics_collector_when_enabled(
-        self, factory, mock_settings
-    ):
+    def test_create_streaming_metrics_collector_when_enabled(self, factory, mock_settings):
         """create_streaming_metrics_collector returns collector when enabled."""
         from victor.analytics.streaming_metrics import StreamingMetricsCollector
 
@@ -266,9 +266,7 @@ class TestCreateStreamingMetricsCollector:
         collector = factory.create_streaming_metrics_collector()
         assert isinstance(collector, StreamingMetricsCollector)
 
-    def test_create_streaming_metrics_collector_when_disabled(
-        self, factory, mock_settings
-    ):
+    def test_create_streaming_metrics_collector_when_disabled(self, factory, mock_settings):
         """create_streaming_metrics_collector returns None when disabled."""
         mock_settings.streaming_metrics_enabled = False
 
@@ -348,9 +346,7 @@ class TestCreateObservability:
 class TestCreateOrchestratorFactory:
     """Tests for create_orchestrator_factory convenience function."""
 
-    def test_create_orchestrator_factory_returns_factory(
-        self, mock_settings, mock_provider
-    ):
+    def test_create_orchestrator_factory_returns_factory(self, mock_settings, mock_provider):
         """create_orchestrator_factory returns OrchestratorFactory."""
         factory = create_orchestrator_factory(
             settings=mock_settings,
@@ -445,9 +441,7 @@ class TestContainerProperty:
         assert factory._container is None
 
         # Access triggers initialization
-        with patch(
-            "victor.core.bootstrap.ensure_bootstrapped"
-        ) as mock_bootstrap:
+        with patch("victor.core.bootstrap.ensure_bootstrapped") as mock_bootstrap:
             mock_bootstrap.return_value = MagicMock()
             container = factory.container
             mock_bootstrap.assert_called_once_with(mock_settings)
@@ -496,9 +490,7 @@ class TestCreateMemoryComponents:
             mock_project.project_root = "/tmp/project"
             mock_paths.return_value = mock_project
 
-            with patch(
-                "victor.agent.conversation_memory.ConversationStore"
-            ) as mock_store_cls:
+            with patch("victor.agent.conversation_memory.ConversationStore") as mock_store_cls:
                 mock_store = MagicMock()
                 mock_session = MagicMock()
                 mock_session.session_id = "test-session-id"
@@ -565,6 +557,7 @@ class TestWorkflowOptimizationComponents:
         detector = factory.create_task_completion_detector()
 
         from victor.agent.task_completion import TaskCompletionDetector
+
         assert isinstance(detector, TaskCompletionDetector)
 
     def test_create_read_cache(self, factory, mock_settings):
@@ -575,6 +568,7 @@ class TestWorkflowOptimizationComponents:
         cache = factory.create_read_cache()
 
         from victor.agent.read_cache import ReadResultCache
+
         assert isinstance(cache, ReadResultCache)
         assert cache._ttl == 120.0
         assert cache._max_entries == 50
@@ -590,6 +584,7 @@ class TestWorkflowOptimizationComponents:
         cache = factory.create_read_cache()
 
         from victor.agent.read_cache import ReadResultCache
+
         assert isinstance(cache, ReadResultCache)
         assert cache._ttl == 300.0  # default
         assert cache._max_entries == 100  # default
@@ -599,6 +594,7 @@ class TestWorkflowOptimizationComponents:
         executor = factory.create_time_aware_executor(timeout_seconds=60.0)
 
         from victor.agent.time_aware_executor import TimeAwareExecutor
+
         assert isinstance(executor, TimeAwareExecutor)
         assert executor.get_remaining_seconds() is not None
 
@@ -611,6 +607,7 @@ class TestWorkflowOptimizationComponents:
         executor = factory.create_time_aware_executor()
 
         from victor.agent.time_aware_executor import TimeAwareExecutor
+
         assert isinstance(executor, TimeAwareExecutor)
         assert executor.get_remaining_seconds() is None
 
@@ -622,6 +619,7 @@ class TestWorkflowOptimizationComponents:
         detector = factory.create_thinking_detector()
 
         from victor.agent.thinking_detector import ThinkingPatternDetector
+
         assert isinstance(detector, ThinkingPatternDetector)
         assert detector._repetition_threshold == 4
         assert detector._similarity_threshold == 0.7
@@ -646,6 +644,7 @@ class TestWorkflowOptimizationComponents:
         criteria = factory.create_mode_completion_criteria()
 
         from victor.agent.budget_manager import ModeCompletionCriteria
+
         assert isinstance(criteria, ModeCompletionCriteria)
 
     def test_create_workflow_optimization_components(self, factory):
@@ -658,6 +657,7 @@ class TestWorkflowOptimizationComponents:
         components = factory.create_workflow_optimization_components(timeout_seconds=30.0)
 
         from victor.agent.orchestrator_factory import WorkflowOptimizationComponents
+
         assert isinstance(components, WorkflowOptimizationComponents)
         assert components.task_completion_detector is not None
         assert components.read_cache is not None

@@ -434,22 +434,24 @@ class TestAutonomousPlanner:
         """Test parsing valid plan JSON."""
         planner = AutonomousPlanner(mock_orchestrator)
 
-        json_str = json.dumps([
-            {
-                "id": "1",
-                "description": "Step 1",
-                "step_type": "research",
-                "depends_on": [],
-                "estimated_tool_calls": 5,
-            },
-            {
-                "id": "2",
-                "description": "Step 2",
-                "step_type": "implementation",
-                "depends_on": ["1"],
-                "estimated_tool_calls": 15,
-            },
-        ])
+        json_str = json.dumps(
+            [
+                {
+                    "id": "1",
+                    "description": "Step 1",
+                    "step_type": "research",
+                    "depends_on": [],
+                    "estimated_tool_calls": 5,
+                },
+                {
+                    "id": "2",
+                    "description": "Step 2",
+                    "step_type": "implementation",
+                    "depends_on": ["1"],
+                    "estimated_tool_calls": 15,
+                },
+            ]
+        )
 
         plan = planner._parse_plan_json("Test goal", json_str)
         assert plan.goal == "Test goal"
@@ -534,15 +536,17 @@ class TestPlanningIntegration:
             StepType,
         )
 
-        assert all([
-            AutonomousPlanner,
-            ExecutionPlan,
-            PlanResult,
-            PlanStep,
-            StepResult,
-            StepStatus,
-            StepType,
-        ])
+        assert all(
+            [
+                AutonomousPlanner,
+                ExecutionPlan,
+                PlanResult,
+                PlanStep,
+                StepResult,
+                StepStatus,
+                StepType,
+            ]
+        )
 
     def test_step_workflow(self):
         """Test realistic step workflow."""

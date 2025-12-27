@@ -64,9 +64,7 @@ def sample_tool():
         description="Get the weather for a location",
         parameters={
             "type": "object",
-            "properties": {
-                "location": {"type": "string", "description": "The city name"}
-            },
+            "properties": {"location": {"type": "string", "description": "The city name"}},
             "required": ["location"],
         },
     )
@@ -184,7 +182,7 @@ class TestExtractToolCallsFromContent:
 
     def test_invalid_json(self):
         """Test handling of invalid JSON."""
-        content = '```json\n{invalid json}\n```'
+        content = "```json\n{invalid json}\n```"
         tool_calls, remaining = _extract_tool_calls_from_content(content)
         assert len(tool_calls) == 0
 

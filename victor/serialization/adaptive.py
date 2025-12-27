@@ -263,9 +263,7 @@ class AdaptiveSerializer:
             except Exception as e:
                 logger.debug(f"Failed to record metrics: {e}")
 
-        serialization_result = self._build_result(
-            result, selected_format, config, characteristics
-        )
+        serialization_result = self._build_result(result, selected_format, config, characteristics)
 
         # Update internal statistics
         if result.success:
@@ -317,9 +315,7 @@ class AdaptiveSerializer:
         """
         avg_savings = 0.0
         if self._total_original_tokens > 0:
-            avg_savings = (
-                (self._total_tokens_saved / self._total_original_tokens) * 100
-            )
+            avg_savings = (self._total_tokens_saved / self._total_original_tokens) * 100
 
         # Build by_format list sorted by usage
         format_list = [
@@ -384,9 +380,8 @@ class AdaptiveSerializer:
             ts["total_savings"] += saved
             # Running average
             ts["avg_savings_percent"] = (
-                (ts["avg_savings_percent"] * (ts["usage_count"] - 1) + savings_pct)
-                / ts["usage_count"]
-            )
+                ts["avg_savings_percent"] * (ts["usage_count"] - 1) + savings_pct
+            ) / ts["usage_count"]
             ts["preferred_format"] = result.format.value
 
         # Update format stats
@@ -400,9 +395,7 @@ class AdaptiveSerializer:
         fs = self._format_stats[fmt_name]
         fs["count"] += 1
         fs["total_savings"] += saved
-        fs["avg_savings"] = (
-            (fs["avg_savings"] * (fs["count"] - 1) + savings_pct) / fs["count"]
-        )
+        fs["avg_savings"] = (fs["avg_savings"] * (fs["count"] - 1) + savings_pct) / fs["count"]
 
     def _get_config(self, context: SerializationContext) -> SerializationConfig:
         """Get serialization config for context.

@@ -19,13 +19,11 @@ _DEVOPS_DANGER_TUPLES: List[Tuple[str, str, str]] = [
     (r"docker\s+system\s+prune\s+-a", "Docker full system prune", HIGH),
     (r"DROP\s+DATABASE|DROP\s+TABLE", "Database destruction", HIGH),
     (r"--force\s+push|push\s+--force|-f\s+push", "Force push to remote", HIGH),
-
     # Secrets exposure
     (r"password\s*[=:]\s*['\"][^'\"]+['\"]", "Hardcoded password", HIGH),
     (r"api[_-]?key\s*[=:]\s*['\"][^'\"]+['\"]", "Hardcoded API key", HIGH),
     (r"AWS_SECRET_ACCESS_KEY\s*=\s*['\"][^'\"]+['\"]", "AWS secret in code", HIGH),
     (r"PRIVATE[_-]?KEY\s*[=:]\s*['\"]", "Private key in code", HIGH),
-
     # Medium-risk patterns - need review
     (r"privileged:\s*true", "Privileged container mode", MEDIUM),
     (r"hostNetwork:\s*true", "Host network access", MEDIUM),
@@ -34,7 +32,6 @@ _DEVOPS_DANGER_TUPLES: List[Tuple[str, str, str]] = [
     (r"allowPrivilegeEscalation:\s*true", "Privilege escalation enabled", MEDIUM),
     (r"runAsUser:\s*0", "Running as root", MEDIUM),
     (r"--net=host", "Docker host networking", MEDIUM),
-
     # Low-risk patterns - style/best practices
     (r"FROM\s+\S+:latest", "Using latest tag", LOW),
     (r"resources:\s*\{\s*\}", "Missing resource limits", LOW),

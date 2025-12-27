@@ -211,9 +211,7 @@ class TestCacheEvictionLearner:
         assert state_key in learner2._q_values
         assert action in learner2._q_values[state_key]
 
-    def test_get_recommendation_exploitation(
-        self, learner: CacheEvictionLearner
-    ) -> None:
+    def test_get_recommendation_exploitation(self, learner: CacheEvictionLearner) -> None:
         """Test get_recommendation returns best action in exploitation mode."""
         state_key = "high:stale:zero:other"
 
@@ -249,17 +247,13 @@ class TestCacheEvictionLearner:
         assert rec is not None
         assert rec.value == CacheEvictionAction.EVICT  # Higher Q-value action
 
-    def test_get_recommendation_exploration(
-        self, learner: CacheEvictionLearner
-    ) -> None:
+    def test_get_recommendation_exploration(self, learner: CacheEvictionLearner) -> None:
         """Test get_recommendation can explore with high epsilon."""
         import random
 
         state_key = "medium:recent:low:search"
 
-        _record_eviction_outcome(
-            learner, state_key=state_key, action=CacheEvictionAction.KEEP
-        )
+        _record_eviction_outcome(learner, state_key=state_key, action=CacheEvictionAction.KEEP)
 
         # Force exploration
         learner.epsilon = 1.0
@@ -377,12 +371,8 @@ class TestCacheEvictionLearner:
 
     def test_export_metrics(self, learner: CacheEvictionLearner) -> None:
         """Test metrics export."""
-        _record_eviction_outcome(
-            learner, action=CacheEvictionAction.KEEP, tool_name="code_search"
-        )
-        _record_eviction_outcome(
-            learner, action=CacheEvictionAction.EVICT, tool_name="web_search"
-        )
+        _record_eviction_outcome(learner, action=CacheEvictionAction.KEEP, tool_name="code_search")
+        _record_eviction_outcome(learner, action=CacheEvictionAction.EVICT, tool_name="web_search")
 
         metrics = learner.export_metrics()
 
@@ -430,8 +420,6 @@ class TestCacheEvictionLearner:
             hit_after=True,
         )
 
-        q_value, count = _get_q_value_from_db(
-            coordinator, state_key, CacheEvictionAction.DEMOTE_L2
-        )
+        q_value, count = _get_q_value_from_db(coordinator, state_key, CacheEvictionAction.DEMOTE_L2)
         assert count == 1
         assert q_value >= 0  # Demotion with hit is acceptable

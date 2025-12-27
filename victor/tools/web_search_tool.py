@@ -184,7 +184,12 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
         "summarize",
         "web search",
     ],
-    mandatory_keywords=["search web", "search online", "look up online", "web search"],  # Force inclusion
+    mandatory_keywords=[
+        "search web",
+        "search online",
+        "look up online",
+        "web search",
+    ],  # Force inclusion
     aliases=["web"],  # Backward compatibility alias
 )
 async def web_search(
@@ -228,8 +233,14 @@ async def web_search(
     # Route to summarize implementation if ai_summarize is True
     if ai_summarize:
         return await _summarize_search(
-            query, max_results, region, safe_search, fetch_top, fetch_pool, max_content_length,
-            context=context
+            query,
+            max_results,
+            region,
+            safe_search,
+            fetch_top,
+            fetch_pool,
+            max_content_length,
+            context=context,
         )
     if not query:
         return {"success": False, "error": "Missing required parameter: query"}

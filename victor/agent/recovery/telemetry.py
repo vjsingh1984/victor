@@ -141,7 +141,8 @@ class RecoveryTelemetryCollector:
             conn = sqlite3.connect(str(self._db_path))
             cursor = conn.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS failure_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT NOT NULL,
@@ -152,9 +153,11 @@ class RecoveryTelemetryCollector:
                     consecutive_count INTEGER,
                     context_hash TEXT
                 )
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS recovery_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT NOT NULL,
@@ -167,17 +170,22 @@ class RecoveryTelemetryCollector:
                     model TEXT,
                     context_hash TEXT
                 )
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_failure_timestamp
                 ON failure_events(timestamp)
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_recovery_timestamp
                 ON recovery_events(timestamp)
-            """)
+            """
+            )
 
             conn.commit()
             conn.close()
@@ -295,19 +303,22 @@ class RecoveryTelemetryCollector:
         try:
             conn = sqlite3.connect(str(self._db_path))
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO failure_events
                 (timestamp, failure_type, provider, model, task_type, consecutive_count, context_hash)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                event.timestamp.isoformat(),
-                event.failure_type.name,
-                event.provider,
-                event.model,
-                event.task_type,
-                event.consecutive_count,
-                event.context_hash,
-            ))
+            """,
+                (
+                    event.timestamp.isoformat(),
+                    event.failure_type.name,
+                    event.provider,
+                    event.model,
+                    event.task_type,
+                    event.consecutive_count,
+                    event.context_hash,
+                ),
+            )
             conn.commit()
             conn.close()
         except Exception as e:
@@ -318,21 +329,24 @@ class RecoveryTelemetryCollector:
         try:
             conn = sqlite3.connect(str(self._db_path))
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO recovery_events
                 (timestamp, failure_type, strategy_name, action, success, quality_improvement, provider, model, context_hash)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                event.timestamp.isoformat(),
-                event.failure_type.name,
-                event.strategy_name,
-                event.action.name,
-                1 if event.success else 0,
-                event.quality_improvement,
-                event.provider,
-                event.model,
-                event.context_hash,
-            ))
+            """,
+                (
+                    event.timestamp.isoformat(),
+                    event.failure_type.name,
+                    event.strategy_name,
+                    event.action.name,
+                    1 if event.success else 0,
+                    event.quality_improvement,
+                    event.provider,
+                    event.model,
+                    event.context_hash,
+                ),
+            )
             conn.commit()
             conn.close()
         except Exception as e:
@@ -343,14 +357,8 @@ class RecoveryTelemetryCollector:
         cutoff = datetime.now() - timedelta(hours=time_window_hours)
 
         with self._lock:
-            recent_failures = [
-                e for e in self._failure_events
-                if e.timestamp >= cutoff
-            ]
-            recent_recoveries = [
-                e for e in self._recovery_events
-                if e.timestamp >= cutoff
-            ]
+            recent_failures = [e for e in self._failure_events if e.timestamp >= cutoff]
+            recent_recoveries = [e for e in self._recovery_events if e.timestamp >= cutoff]
 
         # Aggregate by type
         failures_by_type: Dict[str, int] = defaultdict(int)
@@ -418,7 +426,9 @@ class RecoveryTelemetryCollector:
             for key, count in self._failure_counts.items():
                 if ":" in key:
                     provider, failure_type = key.split(":", 1)
-                    lines.append(f'recovery_failures_total{{provider="{provider}",type="{failure_type}"}} {count}')
+                    lines.append(
+                        f'recovery_failures_total{{provider="{provider}",type="{failure_type}"}} {count}'
+                    )
                 else:
                     lines.append(f'recovery_failures_total{{type="{key}"}} {count}')
 

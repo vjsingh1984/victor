@@ -339,6 +339,7 @@ class TestEnforceParametersDecorator:
 
     def test_decorator_passes_valid_args(self):
         """Test decorator passes when args are valid."""
+
         @enforce_parameters(
             tool_name="test_tool",
             specs=[
@@ -357,6 +358,7 @@ class TestEnforceParametersDecorator:
 
     def test_decorator_fills_defaults(self):
         """Test decorator fills in defaults."""
+
         @enforce_parameters(
             tool_name="test_tool",
             specs=[

@@ -585,7 +585,9 @@ class TestGitCreatePR:
                 error_type=CommandErrorType.NOT_FOUND,
                 error_message="command not found: gh",
             )
-            with patch("victor.tools.git_tool.run_command_async", new_callable=AsyncMock) as mock_run:
+            with patch(
+                "victor.tools.git_tool.run_command_async", new_callable=AsyncMock
+            ) as mock_run:
                 mock_run.return_value = gh_result
                 result = await pr()
                 assert result["success"] is False
@@ -610,7 +612,9 @@ class TestGitCreatePR:
                 return_code=0,
                 error_type=CommandErrorType.SUCCESS,
             )
-            with patch("victor.tools.git_tool.run_command_async", new_callable=AsyncMock) as mock_run:
+            with patch(
+                "victor.tools.git_tool.run_command_async", new_callable=AsyncMock
+            ) as mock_run:
                 mock_run.return_value = gh_result
                 result = await pr(pr_title="Test PR", pr_description="Test desc")
                 assert result["success"] is True
@@ -635,7 +639,9 @@ class TestGitCreatePR:
                 return_code=1,
                 error_type=CommandErrorType.EXECUTION_ERROR,
             )
-            with patch("victor.tools.git_tool.run_command_async", new_callable=AsyncMock) as mock_run:
+            with patch(
+                "victor.tools.git_tool.run_command_async", new_callable=AsyncMock
+            ) as mock_run:
                 mock_run.return_value = gh_result
                 result = await pr(pr_title="Test", pr_description="Desc")
                 assert result["success"] is False

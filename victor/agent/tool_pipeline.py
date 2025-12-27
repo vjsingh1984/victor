@@ -105,16 +105,18 @@ class ToolPipelineConfig:
 
 
 # Tools that are safe to cache (read-only, deterministic for same arguments)
-IDEMPOTENT_TOOLS = frozenset({
-    "read",
-    "list_directory",
-    "grep",
-    "code_search",
-    "semantic_code_search",
-    "graph",  # Graph queries are read-only
-    "refs",  # Reference lookup is read-only
-    "ls",  # Directory listing
-})
+IDEMPOTENT_TOOLS = frozenset(
+    {
+        "read",
+        "list_directory",
+        "grep",
+        "code_search",
+        "semantic_code_search",
+        "graph",  # Graph queries are read-only
+        "refs",  # Reference lookup is read-only
+        "ls",  # Directory listing
+    }
+)
 
 
 @dataclass
@@ -494,9 +496,7 @@ class ToolPipeline:
         """
         return tool_name in IDEMPOTENT_TOOLS
 
-    def get_cached_result(
-        self, tool_name: str, args: Dict[str, Any]
-    ) -> Optional[ToolCallResult]:
+    def get_cached_result(self, tool_name: str, args: Dict[str, Any]) -> Optional[ToolCallResult]:
         """Get cached result for an idempotent tool call.
 
         Args:
@@ -725,13 +725,15 @@ class ToolPipeline:
                 )
 
             # Track for synthesis checkpoint
-            tool_history.append({
-                "tool": tool_name,
-                "args": raw_args,
-                "success": call_result.success,
-                "result": str(call_result.result)[:500] if call_result.result else "",
-                "error": call_result.error,
-            })
+            tool_history.append(
+                {
+                    "tool": tool_name,
+                    "args": raw_args,
+                    "success": call_result.success,
+                    "result": str(call_result.result)[:500] if call_result.result else "",
+                    "error": call_result.error,
+                }
+            )
 
             if call_result.skipped:
                 result.skipped_calls += 1
@@ -790,7 +792,9 @@ class ToolPipeline:
             ):
                 if not result.synthesis_recommended:
                     result.synthesis_recommended = True
-                    result.synthesis_reason = f"Aggregation state: {self._output_aggregator.state.value}"
+                    result.synthesis_reason = (
+                        f"Aggregation state: {self._output_aggregator.state.value}"
+                    )
                     result.synthesis_prompt = self._output_aggregator.get_synthesis_prompt()
 
         result.total_time_ms = (time.monotonic() - start_time) * 1000

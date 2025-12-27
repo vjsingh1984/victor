@@ -305,7 +305,10 @@ class ModelSpecificPromptRegistry:
             if self._q_store:
                 state_key = f"{context.to_state_key()}:template={template.id}"
                 from victor.agent.recovery.protocols import RecoveryAction
-                q_value = self._q_store.get_q_value(state_key, RecoveryAction.RETRY_WITH_TEMPLATE.name)
+
+                q_value = self._q_store.get_q_value(
+                    state_key, RecoveryAction.RETRY_WITH_TEMPLATE.name
+                )
                 score += q_value * 0.2
 
             candidates.append((template, score))
@@ -325,9 +328,20 @@ class ModelSpecificPromptRegistry:
 
         # Group by assertiveness level (based on name convention)
         gentle = [c for c in candidates if "gentle" in c[0].name.lower()]
-        specific = [c for c in candidates if "specific" in c[0].name.lower() or "direct" in c[0].name.lower()]
-        assertive = [c for c in candidates if "assertive" in c[0].name.lower() or "critical" in c[0].name.lower() or "force" in c[0].name.lower() or "final" in c[0].name.lower()]
-        other = [c for c in candidates if c not in gentle + specific + assertive]
+        specific = [
+            c
+            for c in candidates
+            if "specific" in c[0].name.lower() or "direct" in c[0].name.lower()
+        ]
+        assertive = [
+            c
+            for c in candidates
+            if "assertive" in c[0].name.lower()
+            or "critical" in c[0].name.lower()
+            or "force" in c[0].name.lower()
+            or "final" in c[0].name.lower()
+        ]
+        _other = [c for c in candidates if c not in gentle + specific + assertive]  # noqa: F841
 
         # Select based on escalation level
         if escalation_level == 0 and gentle:
@@ -408,6 +422,7 @@ class ModelSpecificPromptRegistry:
             state_key = f"{context.to_state_key()}:template={template_id}"
             reward = 0.5 + quality_improvement if success else -0.3
             from victor.agent.recovery.protocols import RecoveryAction
+
             self._q_store.update_q_value(
                 state_key,
                 RecoveryAction.RETRY_WITH_TEMPLATE.name,
@@ -428,7 +443,9 @@ class ModelSpecificPromptRegistry:
         """Get statistics for all templates."""
         return {
             tid: {
-                "name": self._templates.get(tid, PromptTemplate(id=tid, name="Unknown", template="", failure_types=[])).name,
+                "name": self._templates.get(
+                    tid, PromptTemplate(id=tid, name="Unknown", template="", failure_types=[])
+                ).name,
                 "usage_count": stats.usage_count,
                 "success_rate": stats.success_rate,
                 "avg_quality_improvement": stats.avg_quality_improvement,
@@ -503,7 +520,8 @@ class ModelSpecificPromptRegistry:
             conn = sqlite3.connect(str(self._db_path))
             cursor = conn.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS template_stats (
                     template_id TEXT PRIMARY KEY,
                     usage_count INTEGER DEFAULT 0,
@@ -511,7 +529,8 @@ class ModelSpecificPromptRegistry:
                     total_quality_improvement REAL DEFAULT 0.0,
                     last_used TEXT
                 )
-            """)
+            """
+            )
 
             cursor.execute("SELECT * FROM template_stats")
             for row in cursor.fetchall():
@@ -538,7 +557,8 @@ class ModelSpecificPromptRegistry:
             conn = sqlite3.connect(str(self._db_path))
             cursor = conn.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS template_stats (
                     template_id TEXT PRIMARY KEY,
                     usage_count INTEGER DEFAULT 0,
@@ -546,20 +566,24 @@ class ModelSpecificPromptRegistry:
                     total_quality_improvement REAL DEFAULT 0.0,
                     last_used TEXT
                 )
-            """)
+            """
+            )
 
             stats = self._stats[template_id]
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO template_stats
                 (template_id, usage_count, success_count, total_quality_improvement, last_used)
                 VALUES (?, ?, ?, ?, ?)
-            """, (
-                template_id,
-                stats.usage_count,
-                stats.success_count,
-                stats.total_quality_improvement,
-                stats.last_used.isoformat() if stats.last_used else None,
-            ))
+            """,
+                (
+                    template_id,
+                    stats.usage_count,
+                    stats.success_count,
+                    stats.total_quality_improvement,
+                    stats.last_used.isoformat() if stats.last_used else None,
+                ),
+            )
 
             conn.commit()
             conn.close()
