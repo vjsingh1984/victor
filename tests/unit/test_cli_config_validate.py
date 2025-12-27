@@ -14,6 +14,7 @@
 
 """Tests for the config-validate CLI command."""
 
+import re
 import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -23,6 +24,12 @@ from victor.ui.cli import app
 
 
 runner = CliRunner()
+
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes from text."""
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    return ansi_escape.sub("", text)
 
 
 class TestConfigValidateCommand:
@@ -276,10 +283,12 @@ class TestConfigValidateHelp:
     def test_config_validate_help(self):
         """Test that help text is displayed correctly."""
         result = runner.invoke(app, ["config", "validate", "--help"])
+        # Strip ANSI codes since they can split option names in rich output
+        clean_output = strip_ansi(result.output)
         assert result.exit_code == 0
-        assert "validate" in result.output.lower()
-        assert "--verbose" in result.output
-        assert "--check-connectivity" in result.output
+        assert "validate" in clean_output.lower()
+        assert "--verbose" in clean_output
+        assert "--check-connectivity" in clean_output
 
 
 if __name__ == "__main__":
