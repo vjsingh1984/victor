@@ -271,11 +271,52 @@ class ResourceManager:
 
         return results
 
+    def _cleanup_all_silent(self) -> None:
+        """Silent cleanup for atexit - no logging to avoid closed file errors."""
+        results: Dict[str, bool] = {}
+
+        # Clean up resources
+        with self._resource_lock:
+            sorted_resources = sorted(
+                self._resources.items(),
+                key=lambda x: -x[1].priority,
+            )
+
+            for name, managed in sorted_resources:
+                try:
+                    success = managed.cleanup()
+                    results[f"resource:{name}"] = success
+                except Exception:
+                    results[f"resource:{name}"] = False
+
+            self._resources.clear()
+
+        # Run callbacks
+        with self._callback_lock:
+            for i, (priority, callback) in enumerate(self._cleanup_callbacks):
+                callback_name = f"callback:{i}"
+                try:
+                    callback()
+                    results[callback_name] = True
+                except Exception:
+                    results[callback_name] = False
+
+            self._cleanup_callbacks.clear()
+
+        self._cleanup_done = True
+
     def _atexit_cleanup(self) -> None:
-        """Cleanup handler for process exit."""
+        """Cleanup handler for process exit.
+
+        Note: During interpreter shutdown, logging may fail with
+        'I/O operation on closed file' - we silently ignore these.
+        """
         if not self._cleanup_done:
-            logger.debug("Running atexit cleanup")
-            self.cleanup_all()
+            try:
+                logger.debug("Running atexit cleanup")
+            except (ValueError, OSError):
+                pass  # Logging system already shut down
+            self._cleanup_all_silent()
 
     def get_resource_status(self) -> Dict[str, Dict[str, Any]]:
         """Get status of all registered resources.
