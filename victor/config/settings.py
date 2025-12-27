@@ -555,8 +555,8 @@ class Settings(BaseSettings):
     semantic_threshold_overrides: dict = {}  # Format: {"model:task:tool": threshold}
 
     # Tool call deduplication
-    enable_tool_deduplication: bool = False  # Enable deduplication tracker
-    tool_deduplication_window_size: int = 10  # Number of recent calls to track
+    enable_tool_deduplication: bool = True  # Enable deduplication tracker to prevent redundant calls
+    tool_deduplication_window_size: int = 20  # Number of recent calls to track (increased for better coverage)
 
     # UI
     theme: str = "monokai"
