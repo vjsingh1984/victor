@@ -4643,7 +4643,9 @@ class AgentOrchestrator(ModeAwareMixin):
 
         # Try to extract "try again in X.XXs" or "Please retry after Xs" patterns
         exc_str = str(exc)
-        wait_match = re.search(r"(?:try again|retry after)\s*(?:in\s*)?(\d+(?:\.\d+)?)\s*s", exc_str, re.I)
+        wait_match = re.search(
+            r"(?:try again|retry after)\s*(?:in\s*)?(\d+(?:\.\d+)?)\s*s", exc_str, re.I
+        )
         if wait_match:
             return min(float(wait_match.group(1)) + 0.5, 60.0)
 
@@ -4674,7 +4676,9 @@ class AgentOrchestrator(ModeAwareMixin):
 
         for attempt in range(max_retries + 1):
             try:
-                return await self._stream_provider_response_inner(tools, provider_kwargs, stream_ctx)
+                return await self._stream_provider_response_inner(
+                    tools, provider_kwargs, stream_ctx
+                )
             except ProviderRateLimitError as e:
                 last_exception = e
                 if attempt < max_retries:
