@@ -114,8 +114,8 @@ jobs:
           # macOS ARM64 (M1/M2/M3)
           - os: macos-latest
             target: aarch64-apple-darwin
-          # macOS x64 (Intel)
-          - os: macos-13
+          # macOS x64 (Intel) - using macos-15-intel since macos-13 is retired
+          - os: macos-15-intel
             target: x86_64-apple-darwin
           # Windows x64
           - os: windows-latest
@@ -175,8 +175,8 @@ jobs:
           - os: macos-latest
             platform: macos
             arch: arm64
-          # macOS x64 (Intel)
-          - os: macos-13
+          # macOS x64 (Intel) - using macos-15-intel since macos-13 is retired
+          - os: macos-15-intel
             platform: macos
             arch: x64
           # Windows x64
@@ -450,6 +450,6 @@ jobs:
         uses: peter-evans/repository-dispatch@v2
         with:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          repository: vijayksingh/homebrew-tap
+          repository: vjsingh1984/homebrew-tap
           event-type: update-formula
           client-payload: '{"version": "${{ steps.version.outputs.VERSION }}"}'
