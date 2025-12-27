@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 from pathlib import Path
@@ -6,6 +7,8 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.common import EXCLUDE_DIRS, DEFAULT_CODE_EXTENSIONS, latest_mtime
 from victor.tools.decorators import tool
+
+logger = logging.getLogger(__name__)
 
 
 # Cache for semantic indexes to avoid re-embedding on every call
@@ -360,8 +363,22 @@ async def code_search(
     search_root = path
     try:
         root_path = Path(search_root).resolve()
-        if not root_path.exists():
-            return {"success": False, "error": f"Root not found: {search_root}"}
+        # If path is a file, use its parent directory (model passed file path instead of directory)
+        if root_path.is_file():
+            root_path = root_path.parent
+            logger.debug(f"Path '{search_root}' is a file, using parent: {root_path}")
+        # If path doesn't exist, try parent directory (model may have passed path with extra segment)
+        elif not root_path.exists():
+            parent_path = root_path.parent
+            if parent_path.exists() and parent_path.is_dir():
+                root_path = parent_path
+                logger.debug(f"Path '{search_root}' not found, using parent: {root_path}")
+            else:
+                # Path and parent don't exist - return error with helpful message
+                return {
+                    "success": False,
+                    "error": f"Search root '{search_root}' not found. Please provide a valid directory path.",
+                }
 
         settings = _exec_ctx.get("settings") if _exec_ctx else None
         if settings is None:

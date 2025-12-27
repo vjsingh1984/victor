@@ -749,6 +749,11 @@ class StreamingChatHandler:
         if not ctx.force_completion:
             return None
 
+        # Only emit warning once to avoid spamming the user
+        if ctx.force_completion_warning_shown:
+            return None
+        ctx.force_completion_warning_shown = True
+
         is_research = self.is_research_loop(stop_reason_value, stop_hint)
         warning_chunk, system_message = self.get_force_completion_chunks(ctx, is_research)
 

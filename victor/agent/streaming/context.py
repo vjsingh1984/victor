@@ -62,6 +62,7 @@ class StreamingChatContext:
     max_exploration_iterations: int = 10
     total_iterations: int = 0
     force_completion: bool = False
+    force_completion_warning_shown: bool = False  # Prevent duplicate warnings
 
     # Task classification
     unified_task_type: TaskType = TaskType.DEFAULT

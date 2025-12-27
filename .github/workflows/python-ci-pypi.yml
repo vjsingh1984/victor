@@ -47,9 +47,11 @@ jobs:
     name: Deploy to PyPI
     needs: [lint, test]
     runs-on: ubuntu-latest
-    environment: pypi
+    # Note: If you want manual approval before publishing, create an environment
+    # named 'pypi' in GitHub Settings > Environments and uncomment the line below
+    # environment: pypi
     permissions:
-      id-token: write
+      id-token: write  # Required for trusted publishing via OIDC
     steps:
       - uses: actions/checkout@v4
 
@@ -60,13 +62,12 @@ jobs:
           cache: pip
 
       - name: Install build tools
-        run: pip install build twine
+        run: pip install build
 
       - name: Build package
         run: python -m build
 
-      - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: twine upload dist/*
+      - name: Publish to PyPI (Trusted Publisher)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true

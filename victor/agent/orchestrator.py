@@ -223,6 +223,7 @@ from victor.providers.base import (
     ToolDefinition,
 )
 from victor.providers.registry import ProviderRegistry
+from victor.core.errors import ProviderRateLimitError
 from victor.tools.base import CostTier, ToolRegistry
 from victor.tools.code_executor_tool import CodeExecutionManager
 from victor.tools.mcp_bridge_tool import configure_mcp_client, get_mcp_tool_definitions
@@ -4607,6 +4608,8 @@ class AgentOrchestrator(ModeAwareMixin):
         """
         Stream response from provider and return the full content, tool_calls, total tokens, and garbage detection flag.
 
+        Includes automatic retry with exponential backoff for rate limit errors (HTTP 429).
+
         Args:
             tools: Available tools for the provider
             provider_kwargs: Additional kwargs for the provider
@@ -4618,6 +4621,102 @@ class AgentOrchestrator(ModeAwareMixin):
                 - tool_calls (Any): Tool calls detected in the stream, if any.
                 - total_tokens (float): Estimated total tokens in the streamed content.
                 - garbage_detected (bool): True if garbage content was detected and the stream was stopped early, otherwise False.
+        """
+        # Delegate to rate-limit-aware wrapper
+        return await self._stream_with_rate_limit_retry(tools, provider_kwargs, stream_ctx)
+
+    def _get_rate_limit_wait_time(self, exc: Exception, attempt: int) -> float:
+        """Extract wait time from rate limit error or calculate exponential backoff.
+
+        Args:
+            exc: The rate limit exception
+            attempt: Current retry attempt number (0-indexed)
+
+        Returns:
+            Number of seconds to wait before retrying
+        """
+        import re
+
+        # Check if it's a ProviderRateLimitError with retry_after
+        if isinstance(exc, ProviderRateLimitError) and exc.retry_after:
+            return min(float(exc.retry_after) + 0.5, 60.0)
+
+        # Try to extract "try again in X.XXs" or "Please retry after Xs" patterns
+        exc_str = str(exc)
+        wait_match = re.search(r"(?:try again|retry after)\s*(?:in\s*)?(\d+(?:\.\d+)?)\s*s", exc_str, re.I)
+        if wait_match:
+            return min(float(wait_match.group(1)) + 0.5, 60.0)
+
+        # Default exponential backoff: 2, 4, 8, 16, 32 seconds (capped at 32)
+        return min(2 ** (attempt + 1), 32.0)
+
+    async def _stream_with_rate_limit_retry(
+        self,
+        tools: Any,
+        provider_kwargs: Dict[str, Any],
+        stream_ctx: "StreamingChatContext",
+        max_retries: int = 3,
+    ) -> tuple[str, Any, float, bool]:
+        """Stream provider response with automatic rate limit retry.
+
+        Wraps _stream_provider_response_inner with retry logic for rate limit errors.
+
+        Args:
+            tools: Available tools for the provider
+            provider_kwargs: Additional kwargs for the provider
+            stream_ctx: The streaming context containing metrics and usage tracking
+            max_retries: Maximum number of retry attempts for rate limits
+
+        Returns:
+            Same tuple as _stream_provider_response
+        """
+        last_exception = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                return await self._stream_provider_response_inner(tools, provider_kwargs, stream_ctx)
+            except ProviderRateLimitError as e:
+                last_exception = e
+                if attempt < max_retries:
+                    wait_time = self._get_rate_limit_wait_time(e, attempt)
+                    logger.warning(
+                        f"Rate limit hit (attempt {attempt + 1}/{max_retries + 1}). "
+                        f"Waiting {wait_time:.1f}s before retry..."
+                    )
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"Rate limit persisted after {max_retries + 1} attempts")
+            except Exception as e:
+                # Check for rate limit errors that aren't wrapped in ProviderRateLimitError
+                exc_str = str(e).lower()
+                if "rate_limit" in exc_str or "429" in exc_str or "rate limit" in exc_str:
+                    last_exception = e
+                    if attempt < max_retries:
+                        wait_time = self._get_rate_limit_wait_time(e, attempt)
+                        logger.warning(
+                            f"Rate limit detected (attempt {attempt + 1}/{max_retries + 1}). "
+                            f"Waiting {wait_time:.1f}s before retry..."
+                        )
+                        await asyncio.sleep(wait_time)
+                    else:
+                        logger.error(f"Rate limit persisted after {max_retries + 1} attempts")
+                else:
+                    raise  # Re-raise non-rate-limit errors immediately
+
+        # All retries exhausted - re-raise the last exception
+        if last_exception:
+            raise last_exception
+        raise RuntimeError("Rate limit retry exhausted without exception")
+
+    async def _stream_provider_response_inner(
+        self,
+        tools: Any,
+        provider_kwargs: Dict[str, Any],
+        stream_ctx: "StreamingChatContext",
+    ) -> tuple[str, Any, float, bool]:
+        """Inner implementation of stream_provider_response without retry logic.
+
+        This is the actual streaming logic, called by _stream_with_rate_limit_retry.
         """
         full_content = ""
         tool_calls = None
@@ -4667,11 +4766,8 @@ class AgentOrchestrator(ModeAwareMixin):
 
         if garbage_detected and not tool_calls:
             logger.info("Setting force_completion due to garbage detection")
-            # Caller will set force_completion on return
 
-        # Store total_tokens back to context for later use
         stream_ctx.total_tokens = total_tokens
-
         return full_content, tool_calls, total_tokens, garbage_detected
 
     def _handle_stream_chunk(

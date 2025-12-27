@@ -320,10 +320,10 @@ class VictorSettings(BaseSettings):
     # ==========================================================================
 
     enable_tool_deduplication: bool = Field(
-        default=False, description="Enable deduplication tracker"
+        default=True, description="Enable deduplication tracker to prevent redundant calls"
     )
     tool_deduplication_window_size: int = Field(
-        default=10, ge=1, description="Number of recent calls to track"
+        default=20, ge=1, description="Number of recent calls to track"
     )
 
     # ==========================================================================

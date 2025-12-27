@@ -95,12 +95,19 @@ class MoonshotProvider(BaseProvider):
             timeout: Request timeout (default: 120s)
             **kwargs: Additional configuration
         """
-        # Get API key from parameter or environment
+        # Get API key from parameter, environment, or keyring
         self._api_key = api_key or os.environ.get("MOONSHOT_API_KEY", "")
         if not self._api_key:
+            try:
+                from victor.config.api_keys import get_api_key
+
+                self._api_key = get_api_key("moonshot") or ""
+            except ImportError:
+                pass
+        if not self._api_key:
             logger.warning(
-                "Moonshot API key not provided. Set MOONSHOT_API_KEY environment variable "
-                "or pass api_key parameter."
+                "Moonshot API key not provided. Set MOONSHOT_API_KEY environment variable, "
+                "use 'victor keys --set moonshot --keyring', or pass api_key parameter."
             )
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)

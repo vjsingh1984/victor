@@ -1064,6 +1064,10 @@ class GroundingVerifier:
                 elif len(partial_matches) == 1 and partial_matches[0] == clean_path:
                     # Single match and path is correct - count as verified
                     result.verified_references.append(path)
+                elif len(partial_matches) == 1 and partial_matches[0].endswith("/" + clean_path):
+                    # Single match and given path is a valid suffix of actual path
+                    # (model used relative path from subdirectory which is fine)
+                    result.verified_references.append(path)
                 elif len(partial_matches) == 1:
                     # Single match but wrong directory path - flag it but low severity
                     result.add_issue(

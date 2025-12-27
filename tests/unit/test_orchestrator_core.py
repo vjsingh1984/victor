@@ -5415,3 +5415,48 @@ class TestHandleForceCompletionWithHandler:
         # Verify it's a StreamChunk with content
         assert hasattr(result, "content")
         assert len(result.content) > 0
+
+
+class TestRateLimitRetry:
+    """Tests for rate limit retry logic in _stream_provider_response."""
+
+    def test_get_rate_limit_wait_time_with_retry_after(self, orchestrator):
+        """Extract wait time from ProviderRateLimitError.retry_after."""
+        from victor.core.errors import ProviderRateLimitError
+
+        exc = ProviderRateLimitError("Rate limit hit", retry_after=10)
+        wait_time = orchestrator._get_rate_limit_wait_time(exc, attempt=0)
+        # Should be retry_after + 0.5 buffer
+        assert wait_time == 10.5
+
+    def test_get_rate_limit_wait_time_extracts_from_message(self, orchestrator):
+        """Extract wait time from 'try again in X.XXs' pattern."""
+        exc = Exception("Rate limit exceeded. Please try again in 5.5s")
+        wait_time = orchestrator._get_rate_limit_wait_time(exc, attempt=0)
+        assert wait_time == 6.0  # 5.5 + 0.5 buffer
+
+    def test_get_rate_limit_wait_time_extracts_retry_after_pattern(self, orchestrator):
+        """Extract wait time from 'retry after Xs' pattern."""
+        exc = Exception("Too many requests. Please retry after 3 seconds")
+        wait_time = orchestrator._get_rate_limit_wait_time(exc, attempt=0)
+        assert wait_time == 3.5  # 3 + 0.5 buffer
+
+    def test_get_rate_limit_wait_time_exponential_backoff(self, orchestrator):
+        """Use exponential backoff when no wait time in error message."""
+        exc = Exception("429 Too Many Requests")
+        # Attempt 0: 2^1 = 2 seconds
+        assert orchestrator._get_rate_limit_wait_time(exc, attempt=0) == 2.0
+        # Attempt 1: 2^2 = 4 seconds
+        assert orchestrator._get_rate_limit_wait_time(exc, attempt=1) == 4.0
+        # Attempt 2: 2^3 = 8 seconds
+        assert orchestrator._get_rate_limit_wait_time(exc, attempt=2) == 8.0
+        # Attempt 4: 2^5 = 32 seconds (capped)
+        assert orchestrator._get_rate_limit_wait_time(exc, attempt=4) == 32.0
+        # Attempt 5: would be 64 but capped at 32
+        assert orchestrator._get_rate_limit_wait_time(exc, attempt=5) == 32.0
+
+    def test_get_rate_limit_wait_time_caps_at_60_seconds(self, orchestrator):
+        """Wait time from error message capped at 60 seconds."""
+        exc = Exception("Rate limit exceeded. Please try again in 120s")
+        wait_time = orchestrator._get_rate_limit_wait_time(exc, attempt=0)
+        assert wait_time == 60.0  # Capped at 60
