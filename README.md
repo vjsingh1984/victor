@@ -6,7 +6,7 @@
 
 *Any model. Any provider. Your infrastructure.*
 
-[![PyPI version](https://badge.fury.io/py/victor.svg)](https://pypi.org/project/victor/)
+[![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
@@ -136,7 +136,7 @@ victor mcp
 
 ```bash
 # Install
-pip install victor
+pip install victor-ai
 
 # Initialize and start
 victor init
@@ -430,8 +430,8 @@ victor chat --vertical data_analysis "Profile this dataset and identify correlat
 
 | Method | Command | Notes |
 |--------|---------|-------|
-| **pip** | `pip install victor` | Recommended |
-| **pipx** | `pipx install victor` | Isolated environment |
+| **pip** | `pip install victor-ai` | Recommended |
+| **pipx** | `pipx install victor-ai` | Isolated environment |
 | **Docker** | `docker run vijayksingh/victor` | Containerized |
 | **Source** | `pip install -e ".[dev]"` | Development |
 
@@ -475,7 +475,7 @@ Victor is in active development with **11,100+ passing tests**. Core functionali
 | Semantic Search | Stable | 10 languages, AST parsing |
 | VS Code Extension | Beta | vscode-victor/ directory |
 | MCP Support | Stable | Client + server modes |
-| PyPI Package | v0.2.0 | `pip install victor` |
+| PyPI Package | v0.2.0 | `pip install victor-ai` |
 
 ---
 
