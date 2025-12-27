@@ -12,8 +12,8 @@
 #   - GitHub Release with checksums
 #
 # Installation:
-#   pip install victor
-#   pipx install victor
+#   pip install victor-ai
+#   pipx install victor-ai
 #   brew install vijayksingh/tap/victor
 
 name: Release
@@ -273,17 +273,15 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ==========================================================================
-  # Publish to PyPI
+  # Publish to PyPI (Trusted Publishing - no API token needed)
   # ==========================================================================
   publish-pypi:
     name: Publish to PyPI
     needs: build-python
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/project/victor/
+    # No environment required - trusted publisher configured without environment
     permissions:
-      id-token: write  # For trusted publishing
+      id-token: write  # Required for OIDC trusted publishing
 
     steps:
       - name: Download artifacts
@@ -294,7 +292,8 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        # Uses trusted publishing - no API token needed
+        with:
+          verbose: true
 
   # ==========================================================================
   # Publish to TestPyPI (for pre-releases or manual testing)
