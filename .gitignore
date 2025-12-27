@@ -182,7 +182,7 @@ vscode-victor/webview-ui/node_modules/
 # Audit logs (contain sensitive metadata - never commit)
 audit/
 docs/security/audit/
-victor/audit/
+# Note: victor/audit/ is source code, not logs - it should be tracked
 *.jsonl
 
 # HumanEval benchmark test outputs (orphaned in root)
