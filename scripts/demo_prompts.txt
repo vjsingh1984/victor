@@ -1,0 +1,83 @@
+# Victor AI Demo Prompts - Copy/Paste Ready
+# ==========================================
+
+# ============ SIMPLE PROMPTS ============
+
+# Simple 1 - File listing (any provider)
+List all Python files in this project and give me a one-line description of each
+
+# Simple 2 - Quick question
+What does this project do? Give me a brief overview.
+
+# Simple 3 - Find a file
+Find where the database models are defined
+
+# ============ MEDIUM PROMPTS ============
+
+# Medium 1 - Code analysis
+Analyze the database_schema.py file. What design improvements would you recommend for better data integrity and query performance?
+
+# Medium 2 - Architecture review
+How does the protocols/ directory implement SOLID principles? Show me the interface definitions and explain the pattern.
+
+# Medium 3 - Dependency analysis
+What external APIs does this project integrate with? List them with their purpose.
+
+# ============ COMPLEX PROMPTS ============
+
+# Complex 1 - Test generation (Plan mode recommended)
+Create a comprehensive pytest test suite for the WebSearchClient class in utils/web_search_client.py. Include tests for:
+- Initialization and configuration
+- Google Custom Search API calls (success and error cases)
+- News API integration
+- Database operations
+- Edge cases and error handling
+Use proper mocking with unittest.mock.patch for all external dependencies.
+
+# Complex 2 - Feature planning (Plan mode)
+I want to add a new data provider for Yahoo Finance that follows the existing protocol patterns. Create a detailed implementation plan including:
+1. Interface compliance with IDataProvider
+2. Rate limiting strategy
+3. Error handling approach
+4. Integration with existing NewsModel
+
+# Complex 3 - Refactoring (Build mode)
+Refactor the web_search_client.py to use async/await for all HTTP calls. Maintain backward compatibility with sync callers by adding wrapper methods.
+
+# ============ MODE-SPECIFIC DEMOS ============
+
+# Explore Mode - Research question
+What are the main components of this codebase and how do they interact? Create a dependency diagram.
+
+# Plan Mode - Architecture decision
+Design a caching layer for API responses that supports both Redis and in-memory backends with a unified interface.
+
+# Build Mode - Implementation
+Add a retry decorator with exponential backoff to the web_search_client.py file. It should:
+- Retry up to 3 times
+- Use exponential backoff (1s, 2s, 4s delays)
+- Log retry attempts
+- Re-raise the final exception if all retries fail
+
+# ============ SLASH COMMANDS ============
+
+/help           # Show all commands
+/mode explore   # Research mode
+/mode plan      # Architecture mode
+/mode build     # Implementation mode
+/tools          # List 45 tools
+/profile        # Current settings
+/stats          # Session metrics
+/clear          # New conversation
+
+# ============ PROVIDER SWITCHING ============
+
+# In TUI, use:
+/profile deepseek
+/profile gpt-4.1
+/profile default
+
+# Or start with specific profile:
+# victor --profile deepseek --mode explore
+# victor --profile gpt-4.1 --mode plan
+# victor --profile default --mode build

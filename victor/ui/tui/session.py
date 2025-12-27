@@ -142,6 +142,7 @@ class SessionManager:
                     name TEXT,
                     provider TEXT,
                     model TEXT,
+                    profile TEXT,
                     created_at TEXT,
                     updated_at TEXT,
                     data TEXT
