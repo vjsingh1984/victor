@@ -22,12 +22,10 @@
 //! - Batch processing for multiple tool calls
 //! - Signature similarity computation for fuzzy matching
 
-use ahash::AHashMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use serde_json;
 use smallvec::SmallVec;
-use xxhash_rust::xxh3::{xxh3_64, xxh3_128};
+use xxhash_rust::xxh3::xxh3_128;
 
 /// Compute a signature hash for a tool call.
 ///
@@ -156,38 +154,6 @@ pub fn signature_similarity(sig1: &str, sig2: &str) -> f64 {
         .count();
 
     matching as f64 / sig1.len() as f64
-}
-
-/// Internal struct for tracking signature frequencies
-#[derive(Default)]
-struct SignatureTracker {
-    counts: AHashMap<String, usize>,
-}
-
-impl SignatureTracker {
-    fn new() -> Self {
-        Self {
-            counts: AHashMap::new(),
-        }
-    }
-
-    fn record(&mut self, signature: &str) -> usize {
-        let count = self.counts.entry(signature.to_string()).or_insert(0);
-        *count += 1;
-        *count
-    }
-
-    fn get_count(&self, signature: &str) -> usize {
-        *self.counts.get(signature).unwrap_or(&0)
-    }
-
-    fn get_repeated(&self, threshold: usize) -> Vec<(String, usize)> {
-        self.counts
-            .iter()
-            .filter(|(_, &count)| count >= threshold)
-            .map(|(sig, &count)| (sig.clone(), count))
-            .collect()
-    }
 }
 
 #[cfg(test)]

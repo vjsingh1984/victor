@@ -46,6 +46,18 @@ rayon = "1.10"
 # Memory-efficient collections
 smallvec = "1.13"
 
+# Multi-pattern matching (Aho-Corasick algorithm)
+aho-corasick = "1.1"
+
+# LRU cache for memoization
+lru = "0.12"
+
+# Fast synchronization primitives
+parking_lot = "0.12"
+
+# Regex for pattern compilation (optional fallback)
+regex = "1.10"
+
 [profile.release]
 opt-level = 3
 lto = "fat"

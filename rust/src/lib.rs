@@ -23,13 +23,19 @@
 //! - `similarity`: SIMD-optimized cosine similarity for embeddings
 //! - `json_repair`: Fast JSON repair via streaming parser
 //! - `hashing`: High-performance signature hashing for loop detection
+//! - `streaming_filter`: Fast thinking token detection for streaming
+//! - `thinking`: Thinking pattern detection for breaking loops
+//! - `classifier`: Fast task classification with weighted patterns
 
 use pyo3::prelude::*;
 
+mod classifier;
 mod dedup;
 mod hashing;
 mod json_repair;
 mod similarity;
+mod streaming_filter;
+mod thinking;
 
 /// Victor Native Extensions Module
 ///
@@ -59,6 +65,32 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hashing::compute_signature, m)?)?;
     m.add_function(wrap_pyfunction!(hashing::compute_batch_signatures, m)?)?;
     m.add_function(wrap_pyfunction!(hashing::signature_similarity, m)?)?;
+
+    // Streaming filter classes and functions
+    m.add_class::<streaming_filter::StreamingFilter>()?;
+    m.add_class::<streaming_filter::StreamingChunkResult>()?;
+    m.add_function(wrap_pyfunction!(streaming_filter::strip_thinking_tokens, m)?)?;
+    m.add_function(wrap_pyfunction!(streaming_filter::contains_thinking_tokens, m)?)?;
+    m.add_function(wrap_pyfunction!(streaming_filter::find_thinking_tokens, m)?)?;
+    m.add_function(wrap_pyfunction!(streaming_filter::extract_thinking_content, m)?)?;
+
+    // Thinking pattern detection classes and functions
+    m.add_class::<thinking::ThinkingDetector>()?;
+    m.add_class::<thinking::PatternAnalysis>()?;
+    m.add_function(wrap_pyfunction!(thinking::detect_circular_phrases, m)?)?;
+    m.add_function(wrap_pyfunction!(thinking::count_circular_patterns, m)?)?;
+    m.add_function(wrap_pyfunction!(thinking::find_circular_patterns, m)?)?;
+
+    // Task classification classes and functions
+    m.add_class::<classifier::TaskClassifier>()?;
+    m.add_class::<classifier::ClassificationResult>()?;
+    m.add_class::<classifier::TaskType>()?;
+    m.add_function(wrap_pyfunction!(classifier::classify_task, m)?)?;
+    m.add_function(wrap_pyfunction!(classifier::has_action_keywords, m)?)?;
+    m.add_function(wrap_pyfunction!(classifier::has_analysis_keywords, m)?)?;
+    m.add_function(wrap_pyfunction!(classifier::has_generation_keywords, m)?)?;
+    m.add_function(wrap_pyfunction!(classifier::has_negation, m)?)?;
+    m.add_function(wrap_pyfunction!(classifier::find_all_keywords, m)?)?;
 
     Ok(())
 }
