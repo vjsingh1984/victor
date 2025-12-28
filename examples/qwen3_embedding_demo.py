@@ -35,8 +35,8 @@ MTEB Performance:
 import asyncio
 from pathlib import Path
 
-from victor_coding.codebase.embeddings.base import EmbeddingConfig
-from victor_coding.codebase.embeddings.chromadb_provider import ChromaDBProvider
+from victor.vector_stores.base import EmbeddingConfig
+from victor.vector_stores.chromadb_provider import ChromaDBProvider
 
 
 async def main():
