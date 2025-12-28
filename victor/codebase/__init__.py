@@ -12,7 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Codebase intelligence module for code awareness and understanding."""
+"""Codebase intelligence module for code awareness and understanding.
+
+.. deprecated:: 0.3.0
+    This module has moved to ``victor_coding.codebase``.
+    Please update your imports::
+
+        # Old (deprecated)
+        from victor.codebase import CodebaseIndex
+
+        # New (recommended)
+        from victor_coding.codebase import CodebaseIndex
+
+    This compatibility shim will be removed in version 0.5.0.
+"""
+
+import warnings
+
+warnings.warn(
+    "Importing from 'victor.codebase' is deprecated. "
+    "Please use 'victor_coding.codebase' instead. "
+    "This compatibility shim will be removed in version 0.5.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from victor.codebase.indexer import CodebaseIndex, FileMetadata, Symbol
 

@@ -55,6 +55,17 @@ Example usage:
     )
 """
 
+import warnings
+
+warnings.warn(
+    "Importing from 'victor.review' is deprecated. "
+    "Please use 'victor_coding.review' instead. "
+    "This compatibility shim will be removed in version 0.5.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+
 from victor.review.protocol import (
     ComplexityMetrics,
     DuplicationResult,

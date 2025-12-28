@@ -1,0 +1,193 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "victor-coding"
+version = "0.1.0"
+description = "Victor AI Coding Vertical - Code intelligence, Tree-sitter, LSP, and 25 coding tools"
+readme = "../../README.md"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Vijaykumar Singh", email = "singhvjd@gmail.com"}
+]
+requires-python = ">=3.10"
+keywords = [
+    "ai",
+    "coding-agent",
+    "code-intelligence",
+    "tree-sitter",
+    "lsp",
+    "code-review",
+    "refactoring",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+dependencies = [
+    # Requires victor-core framework
+    "victor-core>=0.3.0",
+
+    # Code Analysis (Tree-sitter)
+    "tree-sitter>=0.23",
+
+    # Core language grammars (always installed)
+    "tree-sitter-python>=0.23",
+    "tree-sitter-javascript>=0.23",
+    "tree-sitter-typescript>=0.23",
+    "tree-sitter-go>=0.23",
+    "tree-sitter-rust>=0.23",
+    "tree-sitter-java>=0.23",
+    "tree-sitter-cpp>=0.23",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "pytest-mock>=3.12",
+    "respx>=0.21",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "black>=24.0",
+]
+
+# Additional language grammars (optional)
+lang-c = ["tree-sitter-c>=0.23"]
+lang-csharp = ["tree-sitter-c-sharp>=0.23"]
+lang-ruby = ["tree-sitter-ruby>=0.23"]
+lang-php = ["tree-sitter-php>=0.24"]
+lang-swift = ["tree-sitter-swift>=0.0.1"]
+lang-scala = ["tree-sitter-scala>=0.23"]
+lang-kotlin = ["tree-sitter-kotlin>=1.0"]
+lang-bash = ["tree-sitter-bash>=0.23"]
+lang-lua = ["tree-sitter-lua>=0.2"]
+lang-elixir = ["tree-sitter-elixir>=0.3"]
+lang-haskell = ["tree-sitter-haskell>=0.23"]
+lang-sql = ["tree-sitter-sql>=0.3"]
+lang-html = ["tree-sitter-html>=0.23"]
+lang-css = ["tree-sitter-css>=0.23"]
+lang-json = ["tree-sitter-json>=0.23"]
+lang-yaml = ["tree-sitter-yaml>=0.6"]
+lang-toml = ["tree-sitter-toml>=0.6"]
+lang-markdown = ["tree-sitter-markdown>=0.5"]
+lang-xml = ["tree-sitter-xml>=0.6"]
+
+# Language bundles
+lang-web = [
+    "tree-sitter-html>=0.23",
+    "tree-sitter-css>=0.23",
+    "tree-sitter-json>=0.23",
+]
+lang-config = [
+    "tree-sitter-json>=0.23",
+    "tree-sitter-yaml>=0.6",
+    "tree-sitter-toml>=0.6",
+    "tree-sitter-xml>=0.6",
+    "tree-sitter-markdown>=0.5",
+]
+lang-jvm = [
+    "tree-sitter-scala>=0.23",
+    "tree-sitter-kotlin>=1.0",
+]
+lang-systems = [
+    "tree-sitter-c>=0.23",
+    "tree-sitter-bash>=0.23",
+]
+lang-dotnet = ["tree-sitter-c-sharp>=0.23"]
+lang-scripting = [
+    "tree-sitter-ruby>=0.23",
+    "tree-sitter-php>=0.24",
+    "tree-sitter-lua>=0.2",
+]
+lang-functional = [
+    "tree-sitter-elixir>=0.3",
+    "tree-sitter-haskell>=0.23",
+    "tree-sitter-scala>=0.23",
+]
+lang-all = [
+    "tree-sitter-c>=0.23",
+    "tree-sitter-c-sharp>=0.23",
+    "tree-sitter-ruby>=0.23",
+    "tree-sitter-php>=0.24",
+    "tree-sitter-swift>=0.0.1",
+    "tree-sitter-scala>=0.23",
+    "tree-sitter-kotlin>=1.0",
+    "tree-sitter-bash>=0.23",
+    "tree-sitter-lua>=0.2",
+    "tree-sitter-elixir>=0.3",
+    "tree-sitter-haskell>=0.23",
+    "tree-sitter-sql>=0.3",
+    "tree-sitter-html>=0.23",
+    "tree-sitter-css>=0.23",
+    "tree-sitter-json>=0.23",
+    "tree-sitter-yaml>=0.6",
+    "tree-sitter-toml>=0.6",
+    "tree-sitter-markdown>=0.5",
+    "tree-sitter-xml>=0.6",
+]
+
+# Native Rust extensions for performance
+native = ["maturin>=1.4"]
+
+[project.urls]
+Homepage = "https://github.com/vijayksingh/victor"
+Documentation = "https://github.com/vijayksingh/victor#readme"
+Repository = "https://github.com/vijayksingh/victor"
+Issues = "https://github.com/vijayksingh/victor/issues"
+
+# Entry points - register coding vertical and tools with victor-core
+[project.entry-points."victor.verticals"]
+coding = "victor_coding:CodingVertical"
+
+[project.entry-points."victor.tools"]
+# Coding-specific tools (25 tools)
+code_search = "victor_coding.tools.code_search:CodeSearchTool"
+semantic_code_search = "victor_coding.tools.semantic_code_search:SemanticCodeSearchTool"
+code_review = "victor_coding.tools.code_review:CodeReviewTool"
+refactor = "victor_coding.tools.refactor:RefactorTool"
+test_generator = "victor_coding.tools.test_generator:TestGeneratorTool"
+symbol_lookup = "victor_coding.tools.symbol_lookup:SymbolLookupTool"
+ast_query = "victor_coding.tools.ast_query:ASTQueryTool"
+dependency_analyzer = "victor_coding.tools.dependency_analyzer:DependencyAnalyzerTool"
+complexity_analyzer = "victor_coding.tools.complexity_analyzer:ComplexityAnalyzerTool"
+dead_code_finder = "victor_coding.tools.dead_code_finder:DeadCodeFinderTool"
+code_explain = "victor_coding.tools.code_explain:CodeExplainTool"
+documentation_generator = "victor_coding.tools.documentation_generator:DocumentationGeneratorTool"
+import_organizer = "victor_coding.tools.import_organizer:ImportOrganizerTool"
+type_inference = "victor_coding.tools.type_inference:TypeInferenceTool"
+security_scanner = "victor_coding.tools.security_scanner:SecurityScannerTool"
+performance_analyzer = "victor_coding.tools.performance_analyzer:PerformanceAnalyzerTool"
+code_formatter = "victor_coding.tools.code_formatter:CodeFormatterTool"
+linter = "victor_coding.tools.linter:LinterTool"
+project_analyzer = "victor_coding.tools.project_analyzer:ProjectAnalyzerTool"
+git_diff_analyzer = "victor_coding.tools.git_diff_analyzer:GitDiffAnalyzerTool"
+commit_message_generator = "victor_coding.tools.commit_message_generator:CommitMessageGeneratorTool"
+pr_reviewer = "victor_coding.tools.pr_reviewer:PRReviewerTool"
+code_completion = "victor_coding.tools.code_completion:CodeCompletionTool"
+snippet_search = "victor_coding.tools.snippet_search:SnippetSearchTool"
+api_endpoint_finder = "victor_coding.tools.api_endpoint_finder:APIEndpointFinderTool"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/victor_coding"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/victor_coding",
+    "README.md",
+    "LICENSE",
+]

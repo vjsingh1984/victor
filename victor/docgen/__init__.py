@@ -46,6 +46,17 @@ Example usage:
         print(f"{file}: {stats['coverage_percent']:.1f}% documented")
 """
 
+import warnings
+
+warnings.warn(
+    "Importing from 'victor.docgen' is deprecated. "
+    "Please use 'victor_coding.docgen' instead. "
+    "This compatibility shim will be removed in version 0.5.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+
 from victor.docgen.protocol import (
     Attribute,
     ClassDoc,

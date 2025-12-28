@@ -47,6 +47,17 @@ Example usage:
     print(report)
 """
 
+import warnings
+
+warnings.warn(
+    "Importing from 'victor.deps' is deprecated. "
+    "Please use 'victor_coding.deps' instead. "
+    "This compatibility shim will be removed in version 0.5.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+
 from victor.deps.protocol import (
     Dependency,
     DependencyAnalysis,

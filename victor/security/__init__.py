@@ -54,6 +54,17 @@ Example usage:
     asyncio.run(scan_project())
 """
 
+import warnings
+
+warnings.warn(
+    "Importing from 'victor.security' is deprecated. "
+    "Please use 'victor_coding.security' instead. "
+    "This compatibility shim will be removed in version 0.5.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+
 from victor.security.protocol import (
     CVE,
     CVSSMetrics,

@@ -1,0 +1,141 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "victor-core"
+version = "0.3.0"
+description = "Victor AI Framework Core - Multi-provider LLM orchestration, tools, and protocols"
+readme = "../../README.md"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Vijaykumar Singh", email = "singhvjd@gmail.com"}
+]
+requires-python = ">=3.10"
+keywords = [
+    "ai",
+    "llm",
+    "framework",
+    "agent",
+    "anthropic",
+    "openai",
+    "ollama",
+    "multi-provider",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    # Core configuration
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "python-dotenv>=1.0",
+
+    # Async HTTP
+    "httpx>=0.27",
+    "aiofiles>=23.0",
+    "aiohttp>=3.9",
+
+    # CLI/UI (provider-agnostic)
+    "typer>=0.12",
+    "rich>=13.7",
+    "prompt-toolkit>=3.0",
+    "textual>=0.89",
+
+    # LLM Providers (core - always installed)
+    "anthropic>=0.34",
+    "openai>=1.40",
+
+    # Generic tools dependencies
+    "gitpython>=3.1",
+    "jsonschema>=4.20",
+    "tiktoken>=0.7",
+    "pyyaml>=6.0",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
+    "pygments>=2.17",
+
+    # Caching
+    "cachetools>=5.3",
+    "diskcache>=5.6",
+    "docker>=7.0",
+    "docstring-parser>=0.15",
+
+    # Semantic Tool Selection
+    "sentence-transformers>=2.2.0",
+
+    # Vector Storage (conversation embeddings)
+    "lancedb>=0.6.0",
+    "pyarrow>=14.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "pytest-mock>=3.12",
+    "respx>=0.21",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "black>=24.0",
+    "types-pyyaml",
+    "types-aiofiles",
+]
+
+docs = [
+    "mkdocs>=1.5",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.24",
+]
+
+# Google Gemini provider
+google = [
+    "google-genai>=1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/vijayksingh/victor"
+Documentation = "https://github.com/vijayksingh/victor#readme"
+Repository = "https://github.com/vijayksingh/victor"
+Issues = "https://github.com/vijayksingh/victor/issues"
+
+[project.scripts]
+victor = "victor.ui.cli:app"
+vic = "victor.ui.cli:app"
+
+# Entry points for plugin discovery
+[project.entry-points."victor.verticals"]
+# Core verticals registered here (currently none - verticals are in separate packages)
+
+[project.entry-points."victor.tools"]
+# Core tools - automatically discovered
+bash = "victor.tools.bash:BashTool"
+read_file = "victor.tools.filesystem:ReadFileTool"
+write_file = "victor.tools.filesystem:WriteFileTool"
+list_directory = "victor.tools.filesystem:ListDirectoryTool"
+search_files = "victor.tools.filesystem:SearchFilesTool"
+web_search = "victor.tools.web_search:WebSearchTool"
+web_fetch = "victor.tools.web_fetch:WebFetchTool"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/victor"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/victor",
+    "README.md",
+    "LICENSE",
+]

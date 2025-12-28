@@ -21,6 +21,17 @@ Provides safe, atomic operations for modifying multiple files with:
 - Backup management
 """
 
+import warnings
+
+warnings.warn(
+    "Importing from 'victor.editing' is deprecated. "
+    "Please use 'victor_coding.editing' instead. "
+    "This compatibility shim will be removed in version 0.5.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+
 from victor.editing.editor import FileEditor, EditOperation, EditTransaction
 
 __all__ = ["FileEditor", "EditOperation", "EditTransaction"]

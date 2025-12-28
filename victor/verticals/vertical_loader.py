@@ -18,6 +18,10 @@ This module provides functionality for loading, activating, and managing
 verticals at runtime. It integrates with the DI container to register
 vertical-specific services.
 
+Supports plugin discovery via entry points:
+- victor.verticals: Entry point group for vertical plugins
+- victor.tools: Entry point group for tool plugins
+
 Usage:
     from victor.verticals.vertical_loader import VerticalLoader
 
@@ -30,14 +34,25 @@ Usage:
 
     # Register services with DI container
     loader.register_services(container, settings)
+
+    # Discover installed plugins
+    verticals = loader.discover_verticals()
+    tools = loader.discover_tools()
 """
 
 from __future__ import annotations
 
 import logging
+import sys
 from typing import TYPE_CHECKING, Dict, List, Optional, Type
 
 from victor.verticals.base import VerticalBase, VerticalRegistry
+
+# Python 3.10+ has entry_points with group parameter
+if sys.version_info >= (3, 10):
+    from importlib.metadata import entry_points
+else:
+    from importlib_metadata import entry_points
 
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
@@ -60,11 +75,18 @@ class VerticalLoader:
     """Loader for dynamic vertical activation and management.
 
     Handles loading verticals by name, activating them, and integrating
-    their extensions with the framework.
+    their extensions with the framework. Supports plugin discovery via
+    Python entry points for verticals and tools.
+
+    Entry Point Groups:
+        - victor.verticals: Vertical plugins (e.g., coding, research)
+        - victor.tools: Tool plugins (e.g., code_search, refactor)
 
     Attributes:
         _active_vertical: Currently active vertical class
         _extensions: Cached extensions from active vertical
+        _discovered_verticals: Cache of discovered vertical entry points
+        _discovered_tools: Cache of discovered tool entry points
     """
 
     def __init__(self) -> None:
@@ -72,6 +94,8 @@ class VerticalLoader:
         self._active_vertical: Optional[Type[VerticalBase]] = None
         self._extensions: Optional["VerticalExtensions"] = None
         self._registered_services: bool = False
+        self._discovered_verticals: Optional[Dict[str, Type[VerticalBase]]] = None
+        self._discovered_tools: Optional[Dict[str, Type]] = None
 
     @property
     def active_vertical(self) -> Optional[Type[VerticalBase]]:
@@ -85,6 +109,11 @@ class VerticalLoader:
 
     def load(self, name: str) -> Type[VerticalBase]:
         """Load and activate a vertical by name.
+
+        Searches for verticals in this order:
+        1. Global VerticalRegistry
+        2. Built-in vertical mappings
+        3. Entry point plugins (victor.verticals group)
 
         Args:
             name: Vertical name (e.g., "coding", "research")
@@ -101,6 +130,10 @@ class VerticalLoader:
         if vertical is None:
             # Try to import from built-in mappings
             vertical = self._import_builtin(name)
+
+        if vertical is None:
+            # Try to load from entry points (plugins)
+            vertical = self._import_from_entrypoint(name)
 
         if vertical is None:
             available = self._get_available_names()
@@ -138,6 +171,111 @@ class VerticalLoader:
             logger.warning("Failed to import vertical '%s': %s", name, e)
             return None
 
+    def _import_from_entrypoint(self, name: str) -> Optional[Type[VerticalBase]]:
+        """Import a vertical from entry points.
+
+        Args:
+            name: Vertical name
+
+        Returns:
+            Vertical class or None
+        """
+        discovered = self.discover_verticals()
+        return discovered.get(name)
+
+    def discover_verticals(self) -> Dict[str, Type[VerticalBase]]:
+        """Discover verticals from installed packages via entry points.
+
+        Scans the 'victor.verticals' entry point group for installed
+        vertical plugins. Results are cached for performance.
+
+        Returns:
+            Dictionary mapping vertical names to their classes
+
+        Example:
+            # In victor-coding's pyproject.toml:
+            # [project.entry-points."victor.verticals"]
+            # coding = "victor_coding:CodingVertical"
+
+            loader = VerticalLoader()
+            verticals = loader.discover_verticals()
+            # {'coding': <class 'victor_coding.CodingVertical'>}
+        """
+        if self._discovered_verticals is not None:
+            return self._discovered_verticals
+
+        self._discovered_verticals = {}
+
+        try:
+            eps = entry_points(group="victor.verticals")
+            for ep in eps:
+                try:
+                    vertical_cls = ep.load()
+                    if isinstance(vertical_cls, type) and issubclass(
+                        vertical_cls, VerticalBase
+                    ):
+                        self._discovered_verticals[ep.name] = vertical_cls
+                        # Also register in the global registry
+                        VerticalRegistry.register(vertical_cls)
+                        logger.debug("Discovered vertical plugin: %s", ep.name)
+                    else:
+                        logger.warning(
+                            "Entry point '%s' is not a VerticalBase subclass",
+                            ep.name,
+                        )
+                except Exception as e:
+                    logger.warning("Failed to load vertical entry point '%s': %s", ep.name, e)
+        except Exception as e:
+            logger.warning("Failed to discover vertical entry points: %s", e)
+
+        return self._discovered_verticals
+
+    def discover_tools(self) -> Dict[str, Type]:
+        """Discover tools from installed packages via entry points.
+
+        Scans the 'victor.tools' entry point group for installed
+        tool plugins. Results are cached for performance.
+
+        Returns:
+            Dictionary mapping tool names to their classes
+
+        Example:
+            # In victor-coding's pyproject.toml:
+            # [project.entry-points."victor.tools"]
+            # code_search = "victor_coding.tools:CodeSearchTool"
+
+            loader = VerticalLoader()
+            tools = loader.discover_tools()
+            # {'code_search': <class 'victor_coding.tools.CodeSearchTool'>}
+        """
+        if self._discovered_tools is not None:
+            return self._discovered_tools
+
+        self._discovered_tools = {}
+
+        try:
+            eps = entry_points(group="victor.tools")
+            for ep in eps:
+                try:
+                    tool_cls = ep.load()
+                    self._discovered_tools[ep.name] = tool_cls
+                    logger.debug("Discovered tool plugin: %s", ep.name)
+                except Exception as e:
+                    logger.warning("Failed to load tool entry point '%s': %s", ep.name, e)
+        except Exception as e:
+            logger.warning("Failed to discover tool entry points: %s", e)
+
+        return self._discovered_tools
+
+    def refresh_plugins(self) -> None:
+        """Refresh the cached plugin discovery.
+
+        Call this after installing new packages to re-scan entry points.
+        """
+        self._discovered_verticals = None
+        self._discovered_tools = None
+        logger.info("Plugin cache cleared, will re-discover on next access")
+
     def _activate(self, vertical: Type[VerticalBase]) -> None:
         """Activate a vertical.
 
@@ -152,11 +290,18 @@ class VerticalLoader:
     def _get_available_names(self) -> List[str]:
         """Get list of available vertical names.
 
+        Includes:
+        - Registered verticals
+        - Built-in verticals
+        - Entry point plugin verticals
+
         Returns:
             List of vertical names
         """
         names = set(VerticalRegistry.list_names())
         names.update(BUILTIN_VERTICALS.keys())
+        # Include entry point discovered verticals
+        names.update(self.discover_verticals().keys())
         return sorted(names)
 
     def get_extensions(self) -> Optional["VerticalExtensions"]:
@@ -286,11 +431,31 @@ def get_vertical_extensions() -> Optional["VerticalExtensions"]:
     return get_vertical_loader().get_extensions()
 
 
+def discover_vertical_plugins() -> Dict[str, Type[VerticalBase]]:
+    """Discover vertical plugins from entry points (convenience function).
+
+    Returns:
+        Dictionary mapping vertical names to their classes
+    """
+    return get_vertical_loader().discover_verticals()
+
+
+def discover_tool_plugins() -> Dict[str, Type]:
+    """Discover tool plugins from entry points (convenience function).
+
+    Returns:
+        Dictionary mapping tool names to their classes
+    """
+    return get_vertical_loader().discover_tools()
+
+
 __all__ = [
     "VerticalLoader",
     "get_vertical_loader",
     "load_vertical",
     "get_active_vertical",
     "get_vertical_extensions",
+    "discover_vertical_plugins",
+    "discover_tool_plugins",
     "BUILTIN_VERTICALS",
 ]

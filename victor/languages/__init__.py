@@ -49,6 +49,17 @@ Each language plugin provides:
 - Language server configuration
 """
 
+import warnings
+
+warnings.warn(
+    "Importing from 'victor.languages' is deprecated. "
+    "Please use 'victor_coding.languages' instead. "
+    "This compatibility shim will be removed in version 0.5.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+
 from victor.languages.base import (
     LanguagePlugin,
     LanguageCapabilities,

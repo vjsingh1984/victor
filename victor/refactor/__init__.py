@@ -52,6 +52,17 @@ Example usage:
         manager.undo(result)
 """
 
+import warnings
+
+warnings.warn(
+    "Importing from 'victor.refactor' is deprecated. "
+    "Please use 'victor_coding.refactor' instead. "
+    "This compatibility shim will be removed in version 0.5.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+
 from victor.refactor.protocol import (
     CodeEdit,
     CodePattern,

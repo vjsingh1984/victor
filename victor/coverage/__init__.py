@@ -62,6 +62,17 @@ Example usage:
         print(f"Coverage change: {diff.coverage_delta:+.1f}%")
 """
 
+import warnings
+
+warnings.warn(
+    "Importing from 'victor.coverage' is deprecated. "
+    "Please use 'victor_coding.coverage' instead. "
+    "This compatibility shim will be removed in version 0.5.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+
 from victor.coverage.protocol import (
     BranchCoverage,
     CoverageDiff,

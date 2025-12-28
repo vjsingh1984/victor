@@ -50,6 +50,17 @@ Example usage:
         print(token, end="", flush=True)
 """
 
+import warnings
+
+warnings.warn(
+    "Importing from 'victor.completion' is deprecated. "
+    "Please use 'victor_coding.completion' instead. "
+    "This compatibility shim will be removed in version 0.5.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+
 from victor.completion.protocol import (
     CompletionCapabilities,
     CompletionContext,

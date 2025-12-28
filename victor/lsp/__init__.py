@@ -18,6 +18,17 @@ This module provides LSP client functionality for code intelligence features
 like completion, go-to-definition, find references, and diagnostics.
 """
 
+import warnings
+
+warnings.warn(
+    "Importing from 'victor.lsp' is deprecated. "
+    "Please use 'victor_coding.lsp' instead. "
+    "This compatibility shim will be removed in version 0.5.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+
 from victor.lsp.client import LSPClient
 from victor.lsp.manager import LSPManager, get_lsp_manager
 from victor.lsp.config import LSPServerConfig, LANGUAGE_SERVERS
