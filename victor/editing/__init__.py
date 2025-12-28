@@ -1,34 +1,48 @@
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: Apache-2.0
 
-"""File editing and transaction support.
+"""Generic file editing and transaction support for Victor framework.
 
-.. deprecated:: 0.3.0
-    This module has moved to ``victor_coding.editing``.
-    Please update your imports.
+This module provides safe, transaction-based file editing with:
+- Atomic multi-file operations
+- Automatic backups
+- Rollback capability
+- Diff preview
+- Dry-run mode
+
+Example:
+    ```python
+    from victor.editing import FileEditor
+
+    editor = FileEditor(backup_dir="~/.victor/backups")
+
+    # Start a transaction
+    editor.start_transaction("Add authentication module")
+
+    # Queue edits
+    editor.create_file("auth.py", "class Auth:\\n    pass")
+    editor.modify_file("config.py", old_content, new_content)
+
+    # Preview changes
+    print(editor.preview_changes())
+
+    # Commit or rollback
+    editor.commit()  # or editor.rollback()
+    ```
+
+This is a core framework module available to all verticals, not just coding.
 """
 
-import warnings
-
-warnings.warn(
-    "Importing from 'victor.editing' is deprecated. "
-    "Please use 'victor_coding.editing' instead. "
-    "This compatibility shim will be removed in version 0.5.0.",
-    DeprecationWarning,
-    stacklevel=2,
+from victor.editing.editor import (
+    OperationType,
+    EditOperation,
+    EditTransaction,
+    FileEditor,
 )
 
-# Re-export from victor_coding for backward compatibility
-from victor_coding.editing import *  # noqa: F401, F403
-from victor_coding.editing import __all__  # noqa: F401
+__all__ = [
+    "OperationType",
+    "EditOperation",
+    "EditTransaction",
+    "FileEditor",
+]
