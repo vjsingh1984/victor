@@ -14,40 +14,23 @@
 
 """Smart dependency management module.
 
-This module provides dependency analysis, conflict detection,
-and update management for various package managers.
+DEPRECATED: This module has been promoted to victor-core.
+Please use `from victor.deps import ...` instead.
 
-Example usage:
-    from victor_coding.deps import get_deps_manager, DepsConfig
-    from pathlib import Path
-
-    # Get manager
-    manager = get_deps_manager()
-
-    # Analyze dependencies
-    analysis = manager.analyze(Path("my_project/"))
-    print(f"Total packages: {analysis.total_packages}")
-    print(f"Outdated: {analysis.outdated_packages}")
-
-    # Get outdated dependencies
-    outdated = manager.get_outdated()
-    for update in outdated:
-        print(f"{update.package}: {update.current_version} -> {update.new_version}")
-
-    # Get conflicts
-    conflicts = manager.get_conflicts()
-    for conflict in conflicts:
-        print(f"Conflict: {conflict.package} - {conflict.message}")
-
-    # Get dependency tree
-    tree = manager.get_dependency_tree("requests")
-
-    # Format report
-    report = manager.format_report(analysis, format="markdown")
-    print(report)
+This module re-exports from victor.deps for backward compatibility.
 """
 
-from victor_coding.deps.protocol import (
+import warnings
+
+warnings.warn(
+    "victor_coding.deps is deprecated. Use victor.deps instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+# Re-export from victor-core for backward compatibility
+from victor.deps import (
+    # Protocol types
     Dependency,
     DependencyAnalysis,
     DependencyConflict,
@@ -60,8 +43,7 @@ from victor_coding.deps.protocol import (
     PackageManager,
     Version,
     VersionConstraint,
-)
-from victor_coding.deps.parsers import (
+    # Parsers
     BaseDependencyParser,
     CargoTomlParser,
     GoModParser,
@@ -70,8 +52,7 @@ from victor_coding.deps.parsers import (
     RequirementsTxtParser,
     detect_package_manager,
     get_parser,
-)
-from victor_coding.deps.manager import (
+    # Manager
     DepsManager,
     get_deps_manager,
     reset_deps_manager,

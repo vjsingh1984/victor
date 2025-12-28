@@ -14,47 +14,23 @@
 
 """Security scanning and CVE database integration.
 
-This module provides comprehensive security scanning capabilities
-including vulnerability detection, CVE database integration, and
-security reporting.
+DEPRECATED: This module has been promoted to victor-core.
+Please use `from victor.security import ...` instead.
 
-Example usage:
-    from victor_coding.security import get_security_manager, SecurityPolicy
-    from pathlib import Path
-    import asyncio
-
-    async def scan_project():
-        # Get manager with custom policy
-        manager = get_security_manager(project_root=Path("."))
-        manager.policy = SecurityPolicy(
-            fail_on_critical=True,
-            fail_on_high=True,
-            max_medium=10,
-        )
-
-        # Scan project
-        result = await manager.scan()
-
-        # Generate report
-        print(manager.generate_report(format="text"))
-
-        # Check policy
-        passed, failures = manager.check_policy()
-        if not passed:
-            for failure in failures:
-                print(f"FAIL: {failure}")
-
-        # Get fix commands
-        fixes = manager.get_fix_commands()
-        for ecosystem, commands in fixes.items():
-            print(f"\\n{ecosystem} fixes:")
-            for cmd in commands:
-                print(f"  {cmd}")
-
-    asyncio.run(scan_project())
+This module re-exports from victor.security for backward compatibility.
 """
 
-from victor_coding.security.protocol import (
+import warnings
+
+warnings.warn(
+    "victor_coding.security is deprecated. Use victor.security instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+# Re-export from victor-core for backward compatibility
+from victor.security import (
+    # Protocol types
     CVE,
     CVSSMetrics,
     Dependency,
@@ -63,8 +39,7 @@ from victor_coding.security.protocol import (
     Severity,
     Vulnerability,
     VulnerabilityStatus,
-)
-from victor_coding.security.cve_database import (
+    # CVE database
     BaseCVEDatabase,
     CachingCVEDatabase,
     CVEDatabase,
@@ -72,8 +47,7 @@ from victor_coding.security.cve_database import (
     OfflineCVEDatabase,
     OSVDatabase,
     get_cve_database,
-)
-from victor_coding.security.scanner import (
+    # Scanners
     BaseDependencyParser,
     DependencyParser,
     GoDependencyParser,
@@ -82,8 +56,7 @@ from victor_coding.security.scanner import (
     RustDependencyParser,
     SecurityScanner,
     get_scanner,
-)
-from victor_coding.security.manager import (
+    # Manager
     SecurityManager,
     get_security_manager,
     reset_security_manager,

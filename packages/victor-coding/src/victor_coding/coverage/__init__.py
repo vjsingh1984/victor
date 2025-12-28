@@ -14,55 +14,23 @@
 
 """Coverage visualization and analysis system.
 
-This module provides comprehensive code coverage collection, parsing,
-analysis, and visualization capabilities. Supports multiple coverage
-formats and languages.
+DEPRECATED: This module has been promoted to victor-core.
+Please use `from victor.coverage import ...` instead.
 
-Example usage:
-    from victor_coding.coverage import get_coverage_manager, CoverageThreshold
-    from pathlib import Path
-
-    # Get manager with custom thresholds
-    manager = get_coverage_manager(project_root=Path("."))
-    manager.threshold = CoverageThreshold(
-        line_coverage=80.0,
-        branch_coverage=70.0,
-    )
-
-    # Collect coverage
-    report = manager.collect_coverage(
-        test_command=["pytest", "--cov=mypackage", "--cov-report=xml"]
-    )
-
-    # Or parse existing coverage file
-    report = manager.parse_coverage(Path("coverage.xml"))
-
-    # Generate reports
-    text_report = manager.generate_text_report()
-    print(text_report)
-
-    html_path = manager.generate_html_report(output_dir=Path("htmlcov"))
-    print(f"HTML report: {html_path}")
-
-    # Check thresholds
-    passed, failures = manager.check_threshold()
-    if not passed:
-        for failure in failures:
-            print(f"FAIL: {failure}")
-
-    # Save to history
-    manager.save_report()
-
-    # Compare with previous
-    history = manager.get_coverage_history(limit=2)
-    if len(history) >= 2:
-        _, current = history[0]
-        _, previous = history[1]
-        diff = manager.compare_reports(previous, current)
-        print(f"Coverage change: {diff.coverage_delta:+.1f}%")
+This module re-exports from victor.coverage for backward compatibility.
 """
 
-from victor_coding.coverage.protocol import (
+import warnings
+
+warnings.warn(
+    "victor_coding.coverage is deprecated. Use victor.coverage instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+# Re-export from victor-core for backward compatibility
+from victor.coverage import (
+    # Protocol types
     BranchCoverage,
     CoverageDiff,
     CoverageReport,
@@ -72,8 +40,7 @@ from victor_coding.coverage.protocol import (
     FileCoverage,
     FunctionCoverage,
     LineCoverage,
-)
-from victor_coding.coverage.parser import (
+    # Parsers
     BaseCoverageParser,
     CloverParser,
     CoberturaParser,
@@ -83,9 +50,9 @@ from victor_coding.coverage.parser import (
     LcovParser,
     get_parser_for_file,
     parse_coverage_file,
-)
-from victor_coding.coverage.visualizer import CoverageVisualizer
-from victor_coding.coverage.manager import (
+    # Visualizer
+    CoverageVisualizer,
+    # Manager
     CoverageManager,
     get_coverage_manager,
     reset_coverage_manager,
