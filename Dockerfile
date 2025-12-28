@@ -35,11 +35,21 @@ WORKDIR /app
 # Copy only requirements first for better caching
 COPY requirements.txt pyproject.toml README.md ./
 COPY victor ./victor
+COPY packages ./packages
 
 # Install Python dependencies
+# Option 1: Install from main package (current, includes all features)
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -e . && \
     pip install --no-cache-dir lancedb
+
+# Option 2: Install from split packages (uncomment to use)
+# This provides the same functionality via the new package structure
+# RUN pip install --no-cache-dir --upgrade pip && \
+#     pip install --no-cache-dir ./packages/victor-core && \
+#     pip install --no-cache-dir ./packages/victor-coding && \
+#     pip install --no-cache-dir ./packages/victor-ai && \
+#     pip install --no-cache-dir lancedb
 
 # Pre-download embedding model for air-gapped deployment
 # This downloads all-MiniLM-L12-v2 (120MB) during build time
