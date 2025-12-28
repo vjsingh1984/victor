@@ -28,7 +28,7 @@ Usage:
 import asyncio
 import tempfile
 from pathlib import Path
-from victor.editing import FileEditor
+from victor_coding.editing import FileEditor
 
 
 def main():

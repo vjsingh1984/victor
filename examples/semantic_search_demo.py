@@ -24,7 +24,7 @@ Usage:
 """
 
 import asyncio
-from victor.codebase.indexer import CodebaseIndex
+from victor_coding.codebase.indexer import CodebaseIndex
 
 
 async def main():
@@ -129,7 +129,7 @@ async def main():
     print("  ✓ Ask questions in natural language")
 
     print("\n💡 Try your own queries:")
-    print("   from victor.codebase.indexer import CodebaseIndex")
+    print("   from victor_coding.codebase.indexer import CodebaseIndex")
     print("   indexer = CodebaseIndex('.', use_embeddings=True)")
     print("   await indexer.index_codebase()")
     print("   results = await indexer.semantic_search('your question here')")

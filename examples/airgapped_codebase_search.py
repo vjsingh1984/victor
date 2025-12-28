@@ -24,8 +24,8 @@ No external servers required!
 import asyncio
 from pathlib import Path
 
-from victor.codebase.embeddings.base import EmbeddingConfig
-from victor.codebase.embeddings.lancedb_provider import LanceDBProvider
+from victor_coding.codebase.embeddings.base import EmbeddingConfig
+from victor_coding.codebase.embeddings.lancedb_provider import LanceDBProvider
 
 
 async def main():
