@@ -17,7 +17,7 @@
 import pytest
 from pathlib import Path
 
-from victor_coding.deps.protocol import (
+from victor.deps.protocol import (
     DependencyType,
     PackageManager,
     VersionConstraint,
