@@ -12,23 +12,96 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Dependency management and analysis.
+"""Smart dependency management module.
 
-.. deprecated:: 0.3.0
-    This module has moved to ``victor_coding.deps``.
-    Please update your imports.
+This module provides dependency analysis, conflict detection,
+and update management for various package managers.
+
+Example usage:
+    from victor.deps import get_deps_manager, DepsConfig
+    from pathlib import Path
+
+    # Get manager
+    manager = get_deps_manager()
+
+    # Analyze dependencies
+    analysis = manager.analyze(Path("my_project/"))
+    print(f"Total packages: {analysis.total_packages}")
+    print(f"Outdated: {analysis.outdated_packages}")
+
+    # Get outdated dependencies
+    outdated = manager.get_outdated()
+    for update in outdated:
+        print(f"{update.package}: {update.current_version} -> {update.new_version}")
+
+    # Get conflicts
+    conflicts = manager.get_conflicts()
+    for conflict in conflicts:
+        print(f"Conflict: {conflict.package} - {conflict.message}")
+
+    # Get dependency tree
+    tree = manager.get_dependency_tree("requests")
+
+    # Format report
+    report = manager.format_report(analysis, format="markdown")
+    print(report)
 """
 
-import warnings
-
-warnings.warn(
-    "Importing from 'victor.deps' is deprecated. "
-    "Please use 'victor_coding.deps' instead. "
-    "This compatibility shim will be removed in version 0.5.0.",
-    DeprecationWarning,
-    stacklevel=2,
+from victor.deps.protocol import (
+    Dependency,
+    DependencyAnalysis,
+    DependencyConflict,
+    DependencyGraph,
+    DependencyType,
+    DependencyUpdate,
+    DependencyVulnerability,
+    DepsConfig,
+    LockFile,
+    PackageManager,
+    Version,
+    VersionConstraint,
+)
+from victor.deps.parsers import (
+    BaseDependencyParser,
+    CargoTomlParser,
+    GoModParser,
+    PackageJsonParser,
+    PyprojectParser,
+    RequirementsTxtParser,
+    detect_package_manager,
+    get_parser,
+)
+from victor.deps.manager import (
+    DepsManager,
+    get_deps_manager,
+    reset_deps_manager,
 )
 
-# Re-export from victor_coding for backward compatibility
-from victor_coding.deps import *  # noqa: F401, F403
-from victor_coding.deps import __all__  # noqa: F401
+__all__ = [
+    # Protocol types
+    "Dependency",
+    "DependencyAnalysis",
+    "DependencyConflict",
+    "DependencyGraph",
+    "DependencyType",
+    "DependencyUpdate",
+    "DependencyVulnerability",
+    "DepsConfig",
+    "LockFile",
+    "PackageManager",
+    "Version",
+    "VersionConstraint",
+    # Parsers
+    "BaseDependencyParser",
+    "CargoTomlParser",
+    "GoModParser",
+    "PackageJsonParser",
+    "PyprojectParser",
+    "RequirementsTxtParser",
+    "detect_package_manager",
+    "get_parser",
+    # Manager
+    "DepsManager",
+    "get_deps_manager",
+    "reset_deps_manager",
+]
