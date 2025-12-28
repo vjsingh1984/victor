@@ -1,34 +1,55 @@
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: Apache-2.0
 
-"""Embedding system for Victor codebase intelligence.
+"""Embedding system for codebase intelligence.
 
 .. deprecated:: 0.3.0
-    This module has moved to ``victor_coding.codebase.embeddings``.
+    The generic vector storage has moved to ``victor.vector_stores``.
     Please update your imports. This shim will be removed in version 0.5.0.
+
+For new code, prefer importing directly from victor.vector_stores:
+    from victor.vector_stores import EmbeddingConfig, EmbeddingRegistry
+
+For code-specific AST-aware chunking:
+    from victor_coding.codebase.embeddings.chunker import ASTAwareChunker
 """
 
 import warnings
 
 warnings.warn(
     "Importing from 'victor.codebase.embeddings' is deprecated. "
-    "Please use 'victor_coding.codebase.embeddings' instead. "
+    "Please use 'victor.vector_stores' for vector storage or "
+    "'victor_coding.codebase.embeddings' for code-specific features. "
     "This compatibility shim will be removed in version 0.5.0.",
     DeprecationWarning,
     stacklevel=2,
 )
 
-# Re-export from victor_coding for backward compatibility
-from victor_coding.codebase.embeddings import *  # noqa: F401, F403
-from victor_coding.codebase.embeddings import __all__  # noqa: F401
+# Re-export from victor.vector_stores (the canonical location for generic parts)
+from victor.vector_stores import (
+    BaseEmbeddingProvider,
+    BaseEmbeddingModel,
+    EmbeddingConfig,
+    EmbeddingModelConfig,
+    SearchResult,
+    SentenceTransformerModel,
+    OllamaEmbeddingModel,
+    OpenAIEmbeddingModel,
+    CohereEmbeddingModel,
+    create_embedding_model,
+    EmbeddingRegistry,
+)
+
+__all__ = [
+    "BaseEmbeddingProvider",
+    "BaseEmbeddingModel",
+    "EmbeddingConfig",
+    "EmbeddingModelConfig",
+    "SearchResult",
+    "SentenceTransformerModel",
+    "OllamaEmbeddingModel",
+    "OpenAIEmbeddingModel",
+    "CohereEmbeddingModel",
+    "create_embedding_model",
+    "EmbeddingRegistry",
+]
