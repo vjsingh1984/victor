@@ -1,12 +1,25 @@
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 # SPDX-License-Identifier: Apache-2.0
 
-"""Graph storage module for codebase analysis."""
+"""Graph storage module for codebase analysis.
 
-from victor_coding.codebase.graph.protocol import GraphNode, GraphEdge, GraphStoreProtocol
-from victor_coding.codebase.graph.registry import create_graph_store
-from victor_coding.codebase.graph.sqlite_store import SqliteGraphStore
-from victor_coding.codebase.graph.memory_store import MemoryGraphStore
+This module re-exports from the core victor.graph module for backward
+compatibility. The graph storage infrastructure is now part of victor-core
+and available to all verticals.
+
+For new code, prefer importing directly from victor.graph:
+    from victor.graph import GraphNode, GraphEdge, create_graph_store
+"""
+
+# Re-export from victor-core
+from victor.graph import (
+    GraphNode,
+    GraphEdge,
+    GraphStoreProtocol,
+    create_graph_store,
+    SqliteGraphStore,
+    MemoryGraphStore,
+)
 
 __all__ = [
     "GraphNode",

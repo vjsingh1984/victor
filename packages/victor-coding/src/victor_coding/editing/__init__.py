@@ -1,26 +1,27 @@
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: Apache-2.0
 
-"""Multi-file editing with diff preview and rollback.
+"""File editing and transaction support.
 
-Provides safe, atomic operations for modifying multiple files with:
-- Diff preview before applying
-- Rollback capability
-- Transaction-like editing
-- Backup management
+This module re-exports from the core victor.editing module for backward
+compatibility. The file editing infrastructure is now part of victor-core
+and available to all verticals.
+
+For new code, prefer importing directly from victor.editing:
+    from victor.editing import FileEditor, EditTransaction
 """
 
-from victor_coding.editing.editor import FileEditor, EditOperation, EditTransaction
+# Re-export from victor-core
+from victor.editing import (
+    OperationType,
+    EditOperation,
+    EditTransaction,
+    FileEditor,
+)
 
-__all__ = ["FileEditor", "EditOperation", "EditTransaction"]
+__all__ = [
+    "OperationType",
+    "EditOperation",
+    "EditTransaction",
+    "FileEditor",
+]
