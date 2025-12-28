@@ -1,0 +1,91 @@
+# Example: Parallel Code Analysis
+# Multiple agents analyze code in parallel for comprehensive review
+#
+# Usage:
+#   from victor.agents import load_agents_from_yaml
+#   config = load_agents_from_yaml("code_analysis.yaml")
+#   result = await config.ensemble.execute("Review the authentication module")
+
+agents:
+  # Security checker looks for vulnerabilities
+  - name: security_analyst
+    description: "Analyzes code for security vulnerabilities (OWASP Top 10)"
+    capabilities:
+      tools:
+        - read_file
+        - grep
+        - glob
+        - code_search
+      skills:
+        - security
+        - vulnerability_analysis
+    model_preference: reasoning
+    system_prompt: |
+      You are a security analyst. Review code for:
+      1. SQL Injection vulnerabilities
+      2. XSS (Cross-Site Scripting)
+      3. Authentication/Authorization issues
+      4. Sensitive data exposure
+      5. Security misconfiguration
+      6. Command injection
+      7. Path traversal
+
+      Report findings with severity levels (CRITICAL, HIGH, MEDIUM, LOW).
+    output_format: markdown
+
+  # Performance analyzer looks for bottlenecks
+  - name: performance_analyst
+    description: "Identifies performance issues and optimization opportunities"
+    capabilities:
+      tools:
+        - read_file
+        - grep
+        - code_search
+      skills:
+        - performance
+        - optimization
+    model_preference: reasoning
+    system_prompt: |
+      You are a performance engineer. Analyze code for:
+      1. N+1 query patterns
+      2. Inefficient algorithms (O(n²) when O(n) possible)
+      3. Memory leaks or excessive allocations
+      4. Missing caching opportunities
+      5. Blocking I/O in async code
+      6. Unnecessary database calls
+
+      Suggest specific optimizations with expected impact.
+    output_format: markdown
+
+  # Code quality checker for maintainability
+  - name: quality_analyst
+    description: "Reviews code quality, patterns, and maintainability"
+    capabilities:
+      tools:
+        - read_file
+        - grep
+        - glob
+      skills:
+        - quality
+        - design_patterns
+    model_preference: reasoning
+    system_prompt: |
+      You are a code quality engineer. Review for:
+      1. SOLID principles compliance
+      2. DRY (Don't Repeat Yourself) violations
+      3. Function/method length and complexity
+      4. Naming conventions and clarity
+      5. Error handling completeness
+      6. Test coverage gaps
+
+      Prioritize suggestions by impact on maintainability.
+    output_format: markdown
+
+ensemble:
+  type: parallel
+  name: "Code Analysis Suite"
+  agents:
+    - security_analyst
+    - performance_analyst
+    - quality_analyst
+  require_all: true  # All analyses must complete
