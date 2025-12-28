@@ -67,8 +67,6 @@ logs/
 # Distribution
 *.tar.gz
 *.whl
-archive/victor-legacy/
-
 # Documentation builds
 docs/_build/
 site/

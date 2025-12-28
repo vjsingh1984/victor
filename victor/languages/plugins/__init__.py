@@ -1,96 +1,23 @@
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: Apache-2.0
 
-"""Built-in language plugins.
+"""Language plugins module.
 
-Provides language support for:
-- Python (pytest, black, ruff)
-- JavaScript (jest, prettier, eslint)
-- TypeScript (jest, prettier, eslint)
-- Rust (cargo test, rustfmt, clippy)
-- Go (go test, gofmt, golint)
-- Java (junit, google-java-format, checkstyle)
-- C/C++ (gtest, clang-format, clang-tidy)
-- Config files (JSON, YAML, TOML, INI, HOCON)
-- Additional: Kotlin, C#, Ruby, PHP, Swift, Scala, Bash, SQL, HTML, CSS, Lua, Elixir, Haskell, R, Markdown, XML
+.. deprecated:: 0.3.0
+    This module has moved to ``victor_coding.languages.plugins``.
+    Please update your imports. This shim will be removed in version 0.5.0.
 """
 
-from victor.languages.plugins.python import PythonPlugin
-from victor.languages.plugins.javascript import JavaScriptPlugin
-from victor.languages.plugins.typescript import TypeScriptPlugin
-from victor.languages.plugins.rust import RustPlugin
-from victor.languages.plugins.go import GoPlugin
-from victor.languages.plugins.java import JavaPlugin
-from victor.languages.plugins.cpp import CppPlugin
-from victor.languages.plugins.config import (
-    JsonPlugin,
-    YamlPlugin,
-    TomlPlugin,
-    IniPlugin,
-    HoconPlugin,
-)
-from victor.languages.plugins.additional import (
-    CPlugin,
-    KotlinPlugin,
-    CSharpPlugin,
-    RubyPlugin,
-    PhpPlugin,
-    SwiftPlugin,
-    ScalaPlugin,
-    BashPlugin,
-    SqlPlugin,
-    HtmlPlugin,
-    CssPlugin,
-    LuaPlugin,
-    ElixirPlugin,
-    HaskellPlugin,
-    RPlugin,
-    MarkdownPlugin,
-    XmlPlugin,
+import warnings
+
+warnings.warn(
+    "Importing from 'victor.languages.plugins' is deprecated. "
+    "Please use 'victor_coding.languages.plugins' instead. "
+    "This compatibility shim will be removed in version 0.5.0.",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
-__all__ = [
-    # Core languages
-    "PythonPlugin",
-    "JavaScriptPlugin",
-    "TypeScriptPlugin",
-    "RustPlugin",
-    "GoPlugin",
-    "JavaPlugin",
-    "CppPlugin",
-    # Config files
-    "JsonPlugin",
-    "YamlPlugin",
-    "TomlPlugin",
-    "IniPlugin",
-    "HoconPlugin",
-    # Additional languages
-    "CPlugin",
-    "KotlinPlugin",
-    "CSharpPlugin",
-    "RubyPlugin",
-    "PhpPlugin",
-    "SwiftPlugin",
-    "ScalaPlugin",
-    "BashPlugin",
-    "SqlPlugin",
-    "HtmlPlugin",
-    "CssPlugin",
-    "LuaPlugin",
-    "ElixirPlugin",
-    "HaskellPlugin",
-    "RPlugin",
-    "MarkdownPlugin",
-    "XmlPlugin",
-]
+# Re-export from victor_coding for backward compatibility
+from victor_coding.languages.plugins import *  # noqa: F401, F403
+from victor_coding.languages.plugins import __all__  # noqa: F401
