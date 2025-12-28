@@ -430,6 +430,261 @@ class TestDelegateTool:
         assert result.metadata["async"] is True
 
 
+class TestDelegationHandlerAsyncMethods:
+    """Test async methods of DelegationHandler."""
+
+    @pytest.mark.asyncio
+    async def test_handle_validates_request(self):
+        """handle should validate request before processing."""
+        mock_orchestrator = MagicMock()
+        handler = DelegationHandler(mock_orchestrator)
+
+        # Create request that will fail validation (budget > 100)
+        request = DelegationRequest(task="Test", tool_budget=150)
+        response = await handler.handle(request)
+
+        assert response.accepted is False
+        assert "maximum" in response.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_handle_rejects_max_concurrent(self):
+        """handle should reject when max concurrent reached."""
+        mock_orchestrator = MagicMock()
+        handler = DelegationHandler(mock_orchestrator, max_concurrent=1)
+
+        # Simulate one active delegation
+        handler._active["existing"] = MagicMock()
+
+        request = DelegationRequest(task="Test task", suggested_role="researcher")
+        response = await handler.handle(request)
+
+        assert response.accepted is False
+        assert "concurrent" in response.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_handle_rejects_unknown_role(self):
+        """handle should reject unknown role."""
+        mock_orchestrator = MagicMock()
+        handler = DelegationHandler(mock_orchestrator)
+
+        # Patch _resolve_role to return None
+        with patch.object(handler, "_resolve_role", return_value=None):
+            request = DelegationRequest(task="Test task", suggested_role="unknown_role")
+            response = await handler.handle(request)
+
+        assert response.accepted is False
+        assert "unknown role" in response.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_cancel_returns_false_for_unknown(self):
+        """cancel should return False for unknown delegation."""
+        mock_orchestrator = MagicMock()
+        handler = DelegationHandler(mock_orchestrator)
+
+        result = await handler.cancel("nonexistent_id")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_cancel_cancels_active_task(self):
+        """cancel should cancel active task and remove from active."""
+        mock_orchestrator = MagicMock()
+        handler = DelegationHandler(mock_orchestrator)
+
+        # Create a mock delegation with a task
+        mock_task = MagicMock()
+        mock_task.done.return_value = False
+        mock_delegation = MagicMock()
+        mock_delegation.task = mock_task
+
+        handler._active["test_id"] = mock_delegation
+
+        result = await handler.cancel("test_id")
+
+        assert result is True
+        mock_task.cancel.assert_called_once()
+        assert "test_id" not in handler._active
+
+    def test_get_status_returns_none_for_unknown(self):
+        """get_status should return None for unknown delegation."""
+        mock_orchestrator = MagicMock()
+        handler = DelegationHandler(mock_orchestrator)
+
+        status = handler.get_status("nonexistent_id")
+        assert status is None
+
+    def test_get_status_returns_dict_for_known(self):
+        """get_status should return dict for known delegation."""
+        from victor.agent.delegation.handler import ActiveDelegation
+
+        mock_orchestrator = MagicMock()
+        handler = DelegationHandler(mock_orchestrator)
+
+        # Create an active delegation
+        request = DelegationRequest(task="Test task", suggested_role="researcher")
+        delegation = ActiveDelegation(request, "delegate_123")
+        delegation.task = None  # Not running
+
+        handler._active["test_id"] = delegation
+
+        status = handler.get_status("test_id")
+
+        assert status is not None
+        assert status["delegation_id"] == "test_id"
+        assert status["delegate_id"] == "delegate_123"
+        assert status["role"] == "researcher"
+        assert status["running"] is False
+
+    @pytest.mark.asyncio
+    async def test_wait_for_completion_unknown_delegation(self):
+        """wait_for_completion should return None for unknown delegation."""
+        mock_orchestrator = MagicMock()
+        handler = DelegationHandler(mock_orchestrator)
+
+        result = await handler.wait_for_completion("nonexistent")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_wait_for_completion_no_task(self):
+        """wait_for_completion should return result if no task."""
+        from victor.agent.delegation.handler import ActiveDelegation
+
+        mock_orchestrator = MagicMock()
+        handler = DelegationHandler(mock_orchestrator)
+
+        request = DelegationRequest(task="Test")
+        delegation = ActiveDelegation(request, "delegate_123")
+        delegation.task = None
+        delegation.result = DelegationResponse(
+            delegation_id="test_id",
+            accepted=True,
+            status=DelegationStatus.COMPLETED,
+            result="Done",
+        )
+
+        handler._active["test_id"] = delegation
+
+        result = await handler.wait_for_completion("test_id")
+        assert result.result == "Done"
+
+    def test_set_completion_callback(self):
+        """set_completion_callback should set the callback."""
+        mock_orchestrator = MagicMock()
+        handler = DelegationHandler(mock_orchestrator)
+
+        callback = MagicMock()
+        handler.set_completion_callback(callback)
+
+        assert handler._on_complete == callback
+
+
+class TestDelegationHandlerConvertResult:
+    """Test _convert_result method."""
+
+    def test_convert_successful_result(self):
+        """_convert_result should convert successful result."""
+        from victor.agent.delegation.handler import ActiveDelegation
+        from victor.agent.subagents.base import SubAgentResult
+
+        mock_orchestrator = MagicMock()
+        handler = DelegationHandler(mock_orchestrator)
+
+        request = DelegationRequest(task="Test")
+        delegation = ActiveDelegation(request, "delegate_123")
+
+        sub_result = SubAgentResult(
+            success=True,
+            summary="Found 5 endpoints\nDiscovered 3 issues",
+            details={},
+            tool_calls_used=10,
+            context_size=1000,
+            duration_seconds=15.5,
+        )
+
+        response = handler._convert_result(request, delegation, sub_result)
+
+        assert response.status == DelegationStatus.COMPLETED
+        assert response.result == "Found 5 endpoints\nDiscovered 3 issues"
+        assert response.tool_calls_used == 10
+        assert response.duration_seconds == 15.5
+
+    def test_convert_failed_result(self):
+        """_convert_result should convert failed result."""
+        from victor.agent.delegation.handler import ActiveDelegation
+        from victor.agent.subagents.base import SubAgentResult
+
+        mock_orchestrator = MagicMock()
+        handler = DelegationHandler(mock_orchestrator)
+
+        request = DelegationRequest(task="Test")
+        delegation = ActiveDelegation(request, "delegate_123")
+
+        sub_result = SubAgentResult(
+            success=False,
+            summary="",
+            details={},
+            tool_calls_used=0,
+            context_size=0,
+            duration_seconds=0.0,
+            error="Something went wrong",
+        )
+
+        response = handler._convert_result(request, delegation, sub_result)
+
+        assert response.status == DelegationStatus.FAILED
+        assert response.result is None
+        assert response.error == "Something went wrong"
+
+    def test_convert_extracts_discoveries(self):
+        """_convert_result should extract discoveries from summary."""
+        from victor.agent.delegation.handler import ActiveDelegation
+        from victor.agent.subagents.base import SubAgentResult
+
+        mock_orchestrator = MagicMock()
+        handler = DelegationHandler(mock_orchestrator)
+
+        request = DelegationRequest(task="Test")
+        delegation = ActiveDelegation(request, "delegate_123")
+
+        sub_result = SubAgentResult(
+            success=True,
+            summary=(
+                "Some intro text\n"
+                "Found 5 API endpoints\n"
+                "Regular line\n"
+                "Discovered a security issue\n"
+                "Identified the root cause\n"
+                "Located the config file"
+            ),
+            details={},
+            tool_calls_used=5,
+            context_size=500,
+            duration_seconds=10.0,
+        )
+
+        response = handler._convert_result(request, delegation, sub_result)
+
+        assert len(response.discoveries) == 4
+        assert any("Found 5 API endpoints" in d for d in response.discoveries)
+        assert any("Discovered a security issue" in d for d in response.discoveries)
+
+
+class TestActiveDelegation:
+    """Test ActiveDelegation class."""
+
+    def test_initialization(self):
+        """ActiveDelegation should initialize correctly."""
+        from victor.agent.delegation.handler import ActiveDelegation
+
+        request = DelegationRequest(task="Test")
+        delegation = ActiveDelegation(request, "delegate_123")
+
+        assert delegation.request == request
+        assert delegation.delegate_id == "delegate_123"
+        assert delegation.start_time > 0
+        assert delegation.task is None
+        assert delegation.result is None
+
+
 class TestModuleExports:
     """Test module exports are correct."""
 
@@ -444,4 +699,13 @@ class TestModuleExports:
             DelegateTool,
         )
         # If we get here without ImportError, all exports work
+        assert True
+
+    def test_handler_exports(self):
+        """Handler module exports all expected symbols."""
+        from victor.agent.delegation.handler import (
+            DelegationHandler,
+            ActiveDelegation,
+            ROLE_MAPPING,
+        )
         assert True

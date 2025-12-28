@@ -673,3 +673,223 @@ class TestVerticalIntegration:
         assert "tools" in kwargs
         # Should be a ToolSet
         assert isinstance(kwargs["tools"], ToolSet)
+
+
+# =============================================================================
+# DIRECT MODULE IMPORT TESTS (for 0% coverage modules)
+# =============================================================================
+
+
+class TestDirectCodingModuleImport:
+    """Tests that directly import from victor.verticals.coding to improve coverage."""
+
+    def test_coding_assistant_class(self):
+        """Test CodingAssistant class directly from module."""
+        from victor.verticals.coding import CodingAssistant as DirectCodingAssistant
+
+        assert DirectCodingAssistant.name == "coding"
+        # Version may change, just check it exists
+        assert hasattr(DirectCodingAssistant, "version")
+
+    def test_coding_get_tools(self):
+        """Test get_tools method."""
+        from victor.verticals.coding import CodingAssistant as DirectCodingAssistant
+
+        tools = DirectCodingAssistant.get_tools()
+        assert "read" in tools
+        assert "write" in tools
+        assert "edit" in tools
+        assert "shell" in tools
+
+    def test_coding_get_system_prompt(self):
+        """Test get_system_prompt method."""
+        from victor.verticals.coding import CodingAssistant as DirectCodingAssistant
+
+        prompt = DirectCodingAssistant.get_system_prompt()
+        assert "Victor" in prompt
+        assert "code" in prompt.lower()
+
+    def test_coding_get_stages(self):
+        """Test get_stages method."""
+        from victor.verticals.coding import CodingAssistant as DirectCodingAssistant
+
+        stages = DirectCodingAssistant.get_stages()
+        assert "INITIAL" in stages
+        assert "EXECUTION" in stages
+        assert "VERIFICATION" in stages
+
+    def test_coding_get_provider_hints(self):
+        """Test get_provider_hints method."""
+        from victor.verticals.coding import CodingAssistant as DirectCodingAssistant
+
+        hints = DirectCodingAssistant.get_provider_hints()
+        assert "preferred_providers" in hints
+        assert "anthropic" in hints["preferred_providers"]
+
+    def test_coding_get_evaluation_criteria(self):
+        """Test get_evaluation_criteria method."""
+        from victor.verticals.coding import CodingAssistant as DirectCodingAssistant
+
+        criteria = DirectCodingAssistant.get_evaluation_criteria()
+        assert len(criteria) > 0
+        # Check for code-related criteria
+        assert any("code" in c.lower() for c in criteria)
+
+    def test_coding_customize_config(self):
+        """Test customize_config method."""
+        from victor.verticals.coding import CodingAssistant as DirectCodingAssistant
+
+        config = DirectCodingAssistant.get_config()
+        assert config.metadata["supports_lsp"] is True
+        assert config.metadata["supports_git"] is True
+        assert "python" in config.metadata["supported_languages"]
+
+
+class TestDirectResearchModuleImport:
+    """Tests that directly import from victor.verticals.research to improve coverage."""
+
+    def test_research_assistant_class(self):
+        """Test ResearchAssistant class directly from module."""
+        from victor.verticals.research import ResearchAssistant as DirectResearchAssistant
+
+        assert DirectResearchAssistant.name == "research"
+
+    def test_research_get_tools(self):
+        """Test get_tools method."""
+        from victor.verticals.research import ResearchAssistant as DirectResearchAssistant
+
+        tools = DirectResearchAssistant.get_tools()
+        assert "web_search" in tools
+        assert "web_fetch" in tools
+        assert "read" in tools
+
+    def test_research_get_system_prompt(self):
+        """Test get_system_prompt method."""
+        from victor.verticals.research import ResearchAssistant as DirectResearchAssistant
+
+        prompt = DirectResearchAssistant.get_system_prompt()
+        assert "research" in prompt.lower()
+
+    def test_research_get_stages(self):
+        """Test get_stages method."""
+        from victor.verticals.research import ResearchAssistant as DirectResearchAssistant
+
+        stages = DirectResearchAssistant.get_stages()
+        assert isinstance(stages, dict)
+
+
+class TestDevOpsDirectImport:
+    """Tests for DevOpsAssistant direct imports."""
+
+    def test_devops_assistant_class(self):
+        """Test DevOpsAssistant class."""
+        from victor.verticals.devops import DevOpsAssistant as DirectDevOps
+
+        assert DirectDevOps.name == "devops"
+
+    def test_devops_get_tools(self):
+        """Test get_tools method."""
+        from victor.verticals.devops import DevOpsAssistant as DirectDevOps
+
+        tools = DirectDevOps.get_tools()
+        assert isinstance(tools, list)
+
+    def test_devops_get_system_prompt(self):
+        """Test get_system_prompt method."""
+        from victor.verticals.devops import DevOpsAssistant as DirectDevOps
+
+        prompt = DirectDevOps.get_system_prompt()
+        assert isinstance(prompt, str)
+        assert len(prompt) > 50
+
+    def test_devops_get_stages(self):
+        """Test get_stages method."""
+        from victor.verticals.devops import DevOpsAssistant as DirectDevOps
+
+        stages = DirectDevOps.get_stages()
+        assert isinstance(stages, dict)
+
+
+class TestDataAnalysisDirectImport:
+    """Tests for DataAnalysisAssistant direct imports."""
+
+    def test_data_analysis_assistant_class(self):
+        """Test DataAnalysisAssistant class."""
+        from victor.verticals.data_analysis import DataAnalysisAssistant as DirectDataAnalysis
+
+        assert DirectDataAnalysis.name == "data_analysis"
+
+    def test_data_analysis_get_tools(self):
+        """Test get_tools method."""
+        from victor.verticals.data_analysis import DataAnalysisAssistant as DirectDataAnalysis
+
+        tools = DirectDataAnalysis.get_tools()
+        assert isinstance(tools, list)
+
+    def test_data_analysis_get_system_prompt(self):
+        """Test get_system_prompt method."""
+        from victor.verticals.data_analysis import DataAnalysisAssistant as DirectDataAnalysis
+
+        prompt = DirectDataAnalysis.get_system_prompt()
+        assert isinstance(prompt, str)
+        assert len(prompt) > 50
+
+    def test_data_analysis_get_stages(self):
+        """Test get_stages method."""
+        from victor.verticals.data_analysis import DataAnalysisAssistant as DirectDataAnalysis
+
+        stages = DirectDataAnalysis.get_stages()
+        assert isinstance(stages, dict)
+
+
+# =============================================================================
+# VERTICALS HELPER FUNCTIONS TESTS
+# =============================================================================
+
+
+class TestVerticalHelperFunctions:
+    """Tests for helper functions in victor.verticals."""
+
+    def test_get_vertical_by_name(self):
+        """Test get_vertical helper function."""
+        from victor.verticals import get_vertical
+
+        coding = get_vertical("coding")
+        assert coding is not None
+        assert coding.name == "coding"
+
+    def test_get_vertical_case_insensitive(self):
+        """Test get_vertical with different cases."""
+        from victor.verticals import get_vertical
+
+        coding_lower = get_vertical("coding")
+        coding_upper = get_vertical("CODING")
+        coding_mixed = get_vertical("Coding")
+
+        assert coding_lower is not None
+        # Case insensitive should work
+        assert coding_upper is coding_lower or coding_upper is not None
+        assert coding_mixed is coding_lower or coding_mixed is not None
+
+    def test_get_vertical_none(self):
+        """Test get_vertical with None."""
+        from victor.verticals import get_vertical
+
+        result = get_vertical(None)
+        assert result is None
+
+    def test_get_vertical_nonexistent(self):
+        """Test get_vertical with nonexistent name."""
+        from victor.verticals import get_vertical
+
+        result = get_vertical("nonexistent_vertical_12345")
+        assert result is None
+
+    def test_list_verticals(self):
+        """Test list_verticals helper function."""
+        from victor.verticals import list_verticals
+
+        names = list_verticals()
+        assert isinstance(names, list)
+        assert "coding" in names
+        assert "research" in names

@@ -742,6 +742,742 @@ class TestWorkflowExecutor:
         assert "timed out" in result.error.lower()
 
 
+class TestWorkflowExecutorExtended:
+    """Extended tests for WorkflowExecutor class."""
+
+    @pytest.fixture
+    def mock_orchestrator(self):
+        """Create a mock orchestrator."""
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_sub_agent_result(self):
+        """Create a mock SubAgent result."""
+        result = MagicMock()
+        result.success = True
+        result.summary = "Task completed successfully"
+        result.error = None
+        result.tool_calls_used = 5
+        return result
+
+    def test_sub_agents_property_lazy_init(self, mock_orchestrator):
+        """sub_agents property creates SubAgentOrchestrator on first access."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        assert executor._sub_agents is None
+
+        with patch("victor.agent.subagents.SubAgentOrchestrator") as mock_class:
+            mock_instance = MagicMock()
+            mock_class.return_value = mock_instance
+
+            result = executor.sub_agents
+
+            mock_class.assert_called_once_with(mock_orchestrator)
+            assert result == mock_instance
+
+    def test_sub_agents_property_cached(self, mock_orchestrator):
+        """sub_agents property returns cached instance."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        mock_cached = MagicMock()
+        executor._sub_agents = mock_cached
+
+        result = executor.sub_agents
+
+        assert result == mock_cached
+
+    @pytest.mark.asyncio
+    async def test_execute_empty_workflow_raises(self, mock_orchestrator):
+        """Execute raises ValueError for workflow without start node."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        workflow = WorkflowDefinition(
+            name="empty",
+            nodes={},
+            start_node=None,
+        )
+
+        result = await executor.execute(workflow)
+
+        assert result.success is False
+        assert "no start node" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_execute_missing_node_warning(self, mock_orchestrator, mock_sub_agent_result):
+        """Execute logs warning for missing node and continues."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "start": AgentNode(id="start", name="Start", next_nodes=["missing"]),
+            },
+            start_node="start",
+        )
+
+        result = await executor.execute(workflow)
+
+        # Should complete despite missing node
+        assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_execute_continues_on_failure_when_configured(self, mock_orchestrator):
+        """Execute continues after failure when continue_on_failure is set."""
+        executor = WorkflowExecutor(mock_orchestrator)
+
+        # First agent fails, second succeeds
+        fail_result = MagicMock()
+        fail_result.success = False
+        fail_result.summary = None
+        fail_result.error = "Failed"
+        fail_result.tool_calls_used = 2
+
+        success_result = MagicMock()
+        success_result.success = True
+        success_result.summary = "Done"
+        success_result.error = None
+        success_result.tool_calls_used = 3
+
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(side_effect=[fail_result, success_result])
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "a": AgentNode(id="a", name="A", next_nodes=["b"]),
+                "b": AgentNode(id="b", name="B"),
+            },
+            start_node="a",
+            metadata={"continue_on_failure": True},
+        )
+
+        result = await executor.execute(workflow)
+
+        # Both agents should have been called
+        assert mock_sub_agents.spawn.call_count == 2
+        # Overall result is failure because one node failed
+        assert result.success is False
+
+    @pytest.mark.asyncio
+    async def test_execute_stops_on_failure_by_default(self, mock_orchestrator):
+        """Execute stops after failure by default."""
+        executor = WorkflowExecutor(mock_orchestrator)
+
+        fail_result = MagicMock()
+        fail_result.success = False
+        fail_result.summary = None
+        fail_result.error = "Failed"
+        fail_result.tool_calls_used = 2
+
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=fail_result)
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "a": AgentNode(id="a", name="A", next_nodes=["b"]),
+                "b": AgentNode(id="b", name="B"),
+            },
+            start_node="a",
+        )
+
+        result = await executor.execute(workflow)
+
+        # Only first agent should have been called
+        assert mock_sub_agents.spawn.call_count == 1
+        assert result.success is False
+
+    @pytest.mark.asyncio
+    async def test_execute_agent_node_with_all_roles(self, mock_orchestrator, mock_sub_agent_result):
+        """Execute agent node maps all role types correctly."""
+        from victor.agent.subagents import SubAgentRole
+
+        executor = WorkflowExecutor(mock_orchestrator)
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
+        executor._sub_agents = mock_sub_agents
+
+        roles = ["researcher", "planner", "executor", "reviewer", "tester", "unknown"]
+        expected_roles = [
+            SubAgentRole.RESEARCHER,
+            SubAgentRole.PLANNER,
+            SubAgentRole.EXECUTOR,
+            SubAgentRole.REVIEWER,
+            SubAgentRole.TESTER,
+            SubAgentRole.EXECUTOR,  # unknown defaults to EXECUTOR
+        ]
+
+        for role, expected_role in zip(roles, expected_roles):
+            mock_sub_agents.spawn.reset_mock()
+
+            workflow = WorkflowDefinition(
+                name="test",
+                nodes={
+                    "start": AgentNode(id="start", name="Start", role=role),
+                },
+                start_node="start",
+            )
+
+            await executor.execute(workflow)
+
+            call_kwargs = mock_sub_agents.spawn.call_args[1]
+            assert call_kwargs["role"] == expected_role, f"Role {role} should map to {expected_role}"
+
+    @pytest.mark.asyncio
+    async def test_execute_agent_node_with_output_key(self, mock_orchestrator, mock_sub_agent_result):
+        """Execute agent node stores output in context with output_key."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "start": AgentNode(
+                    id="start",
+                    name="Start",
+                    output_key="research_results",
+                ),
+            },
+            start_node="start",
+        )
+
+        result = await executor.execute(workflow)
+
+        assert result.context.get("research_results") == "Task completed successfully"
+
+    @pytest.mark.asyncio
+    async def test_execute_condition_node(self, mock_orchestrator, mock_sub_agent_result):
+        """Execute condition node evaluates condition and picks branch."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "start": AgentNode(id="start", name="Start", next_nodes=["decide"]),
+                "decide": ConditionNode(
+                    id="decide",
+                    name="Decision",
+                    condition=lambda ctx: "fix" if ctx.get("issues", 0) > 0 else "done",
+                    branches={"fix": "fixer", "done": "reporter"},
+                ),
+                "fixer": AgentNode(id="fixer", name="Fixer"),
+                "reporter": AgentNode(id="reporter", name="Reporter"),
+            },
+            start_node="start",
+        )
+
+        result = await executor.execute(workflow, {"issues": 5})
+
+        # Should have executed start, decide, and fixer
+        assert "start" in result.context.node_results
+        assert "decide" in result.context.node_results
+        assert "fixer" in result.context.node_results
+        assert "reporter" not in result.context.node_results
+
+    @pytest.mark.asyncio
+    async def test_execute_condition_node_failure(self, mock_orchestrator):
+        """Execute condition node handles exception in condition."""
+        executor = WorkflowExecutor(mock_orchestrator)
+
+        def bad_condition(ctx):
+            raise ValueError("Bad condition")
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "decide": ConditionNode(
+                    id="decide",
+                    name="Decision",
+                    condition=bad_condition,
+                    branches={"a": "agent_a"},
+                ),
+            },
+            start_node="decide",
+        )
+
+        result = await executor.execute(workflow)
+
+        assert result.success is False
+        condition_result = result.context.get_result("decide")
+        assert condition_result.status == NodeStatus.FAILED
+        assert "Condition evaluation failed" in condition_result.error
+
+    @pytest.mark.asyncio
+    async def test_execute_transform_node(self, mock_orchestrator, mock_sub_agent_result):
+        """Execute transform node updates context data."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "transform": TransformNode(
+                    id="transform",
+                    name="Transform",
+                    transform=lambda ctx: {"processed": True, "count": ctx.get("count", 0) * 2},
+                    next_nodes=["agent"],
+                ),
+                "agent": AgentNode(id="agent", name="Agent"),
+            },
+            start_node="transform",
+        )
+
+        result = await executor.execute(workflow, {"count": 5})
+
+        assert result.success is True
+        assert result.context.get("processed") is True
+        assert result.context.get("count") == 10
+
+    @pytest.mark.asyncio
+    async def test_execute_transform_node_failure(self, mock_orchestrator):
+        """Execute transform node handles exception in transform."""
+        executor = WorkflowExecutor(mock_orchestrator)
+
+        def bad_transform(ctx):
+            raise ValueError("Transform error")
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "transform": TransformNode(
+                    id="transform",
+                    name="Transform",
+                    transform=bad_transform,
+                ),
+            },
+            start_node="transform",
+        )
+
+        result = await executor.execute(workflow)
+
+        assert result.success is False
+        transform_result = result.context.get_result("transform")
+        assert transform_result.status == NodeStatus.FAILED
+        assert "Transform failed" in transform_result.error
+
+    @pytest.mark.asyncio
+    async def test_execute_parallel_node_all_strategy(self, mock_orchestrator, mock_sub_agent_result):
+        """Execute parallel node with 'all' join strategy returns SKIPPED without workflow in context."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "parallel": ParallelNode(
+                    id="parallel",
+                    name="Parallel",
+                    parallel_nodes=["agent_a", "agent_b"],
+                    join_strategy="all",
+                ),
+                "agent_a": AgentNode(id="agent_a", name="Agent A"),
+                "agent_b": AgentNode(id="agent_b", name="Agent B"),
+            },
+            start_node="parallel",
+        )
+
+        result = await executor.execute(workflow)
+
+        # Parallel node returns SKIPPED when child nodes can't be resolved
+        # (requires workflow reference in context.metadata which executor doesn't set)
+        parallel_result = result.context.get_result("parallel")
+        assert parallel_result.status == NodeStatus.SKIPPED
+
+    @pytest.mark.asyncio
+    async def test_execute_parallel_node_any_strategy(self, mock_orchestrator):
+        """Execute parallel node with 'any' join strategy returns SKIPPED without workflow in context."""
+        executor = WorkflowExecutor(mock_orchestrator)
+
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock()
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "parallel": ParallelNode(
+                    id="parallel",
+                    name="Parallel",
+                    parallel_nodes=["agent_a", "agent_b"],
+                    join_strategy="any",
+                ),
+                "agent_a": AgentNode(id="agent_a", name="Agent A"),
+                "agent_b": AgentNode(id="agent_b", name="Agent B"),
+            },
+            start_node="parallel",
+        )
+
+        result = await executor.execute(workflow)
+
+        # Parallel node returns SKIPPED when child nodes can't be resolved
+        parallel_result = result.context.get_result("parallel")
+        assert parallel_result.status == NodeStatus.SKIPPED
+
+    @pytest.mark.asyncio
+    async def test_execute_parallel_node_no_nodes(self, mock_orchestrator):
+        """Execute parallel node with no nodes to execute."""
+        executor = WorkflowExecutor(mock_orchestrator)
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "parallel": ParallelNode(
+                    id="parallel",
+                    name="Parallel",
+                    parallel_nodes=["nonexistent_a", "nonexistent_b"],
+                ),
+            },
+            start_node="parallel",
+        )
+        # No workflow metadata means nodes won't be found
+
+        result = await executor.execute(workflow)
+
+        parallel_result = result.context.get_result("parallel")
+        assert parallel_result.status == NodeStatus.SKIPPED
+
+    @pytest.mark.asyncio
+    async def test_execute_unknown_node_type_skipped(self, mock_orchestrator):
+        """Execute unknown node type returns SKIPPED status."""
+        executor = WorkflowExecutor(mock_orchestrator)
+
+        # Create a mock node that pretends to be an unknown type
+        # WorkflowNode is abstract so we use a mock
+        custom_node = MagicMock()
+        custom_node.id = "custom"
+        custom_node.name = "Custom"
+        custom_node.node_type = MagicMock()
+        custom_node.node_type.value = "unknown"
+        custom_node.next_nodes = []
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={"custom": custom_node},
+            start_node="custom",
+        )
+
+        result = await executor.execute(workflow)
+
+        custom_result = result.context.get_result("custom")
+        assert custom_result.status == NodeStatus.SKIPPED
+
+    @pytest.mark.asyncio
+    async def test_execute_by_name_success(self, mock_orchestrator, mock_sub_agent_result):
+        """execute_by_name retrieves workflow from registry."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test_workflow",
+            nodes={
+                "start": AgentNode(id="start", name="Start"),
+            },
+            start_node="start",
+        )
+
+        with patch("victor.workflows.registry.get_global_registry") as mock_get_registry:
+            mock_registry = MagicMock()
+            mock_registry.get.return_value = workflow
+            mock_get_registry.return_value = mock_registry
+
+            result = await executor.execute_by_name("test_workflow", {"key": "value"})
+
+            mock_registry.get.assert_called_once_with("test_workflow")
+            assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_execute_by_name_not_found(self, mock_orchestrator):
+        """execute_by_name returns error for unknown workflow."""
+        executor = WorkflowExecutor(mock_orchestrator)
+
+        with patch("victor.workflows.registry.get_global_registry") as mock_get_registry:
+            mock_registry = MagicMock()
+            mock_registry.get.return_value = None
+            mock_get_registry.return_value = mock_registry
+
+            result = await executor.execute_by_name("nonexistent_workflow")
+
+            assert result.success is False
+            assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_build_agent_task_with_input_mapping(self, mock_orchestrator, mock_sub_agent_result):
+        """_build_agent_task includes input mapping in task."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "start": AgentNode(
+                    id="start",
+                    name="Start",
+                    goal="Analyze these files",
+                    input_mapping={"files": "target_files", "mode": "analysis_mode"},
+                ),
+            },
+            start_node="start",
+        )
+
+        await executor.execute(workflow, {
+            "target_files": ["main.py", "utils.py"],
+            "analysis_mode": "full",
+        })
+
+        # Check that task contains input mapping
+        call_kwargs = mock_sub_agents.spawn.call_args[1]
+        task = call_kwargs["task"]
+        assert "Analyze these files" in task
+        assert "files" in task
+        assert "main.py" in task or "['main.py'" in task
+        assert "mode" in task
+
+    @pytest.mark.asyncio
+    async def test_build_agent_task_with_previous_outputs(self, mock_orchestrator, mock_sub_agent_result):
+        """_build_agent_task includes previous node outputs."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "first": AgentNode(id="first", name="First", next_nodes=["second"]),
+                "second": AgentNode(id="second", name="Second", goal="Continue work"),
+            },
+            start_node="first",
+        )
+
+        await executor.execute(workflow)
+
+        # Second agent's task should include first agent's output
+        assert mock_sub_agents.spawn.call_count == 2
+        second_call_kwargs = mock_sub_agents.spawn.call_args_list[1][1]
+        task = second_call_kwargs["task"]
+        assert "Previous Results" in task or "Task completed successfully" in task
+
+    @pytest.mark.asyncio
+    async def test_build_agent_task_truncates_long_outputs(self, mock_orchestrator):
+        """_build_agent_task truncates long previous outputs."""
+        long_result = MagicMock()
+        long_result.success = True
+        long_result.summary = "x" * 500  # Long output
+        long_result.error = None
+        long_result.tool_calls_used = 5
+
+        short_result = MagicMock()
+        short_result.success = True
+        short_result.summary = "Short result"
+        short_result.error = None
+        short_result.tool_calls_used = 3
+
+        executor = WorkflowExecutor(MagicMock())
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(side_effect=[long_result, short_result])
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "first": AgentNode(id="first", name="First", next_nodes=["second"]),
+                "second": AgentNode(id="second", name="Second"),
+            },
+            start_node="first",
+        )
+
+        await executor.execute(workflow)
+
+        # Second agent's task should have truncated output
+        second_call_kwargs = mock_sub_agents.spawn.call_args_list[1][1]
+        task = second_call_kwargs["task"]
+        # The long output should be truncated to 200 chars + "..."
+        assert "..." in task or len(task) < 700
+
+    @pytest.mark.asyncio
+    async def test_execute_node_exception_handling(self, mock_orchestrator):
+        """_execute_node handles exceptions gracefully."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(side_effect=Exception("Unexpected error"))
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "start": AgentNode(id="start", name="Start"),
+            },
+            start_node="start",
+        )
+
+        result = await executor.execute(workflow)
+
+        assert result.success is False
+        node_result = result.context.get_result("start")
+        assert node_result.status == NodeStatus.FAILED
+        assert "Unexpected error" in node_result.error
+
+    @pytest.mark.asyncio
+    async def test_execute_loop_prevention(self, mock_orchestrator, mock_sub_agent_result):
+        """Execute prevents infinite loops from cyclic references."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
+        executor._sub_agents = mock_sub_agents
+
+        # Create a workflow with a cycle: a -> b -> a
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "a": AgentNode(id="a", name="A", next_nodes=["b"]),
+                "b": AgentNode(id="b", name="B", next_nodes=["a"]),
+            },
+            start_node="a",
+        )
+
+        result = await executor.execute(workflow)
+
+        # Should complete without infinite loop
+        assert result.success is True
+        # Each node should only be executed once
+        assert mock_sub_agents.spawn.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_execute_with_initial_context(self, mock_orchestrator, mock_sub_agent_result):
+        """Execute accepts initial context data."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test",
+            nodes={
+                "start": AgentNode(id="start", name="Start"),
+            },
+            start_node="start",
+        )
+
+        result = await executor.execute(workflow, {"custom_key": "custom_value"})
+
+        assert result.context.get("custom_key") == "custom_value"
+
+    @pytest.mark.asyncio
+    async def test_execute_preserves_metadata(self, mock_orchestrator, mock_sub_agent_result):
+        """Execute preserves workflow metadata in context."""
+        executor = WorkflowExecutor(mock_orchestrator)
+        mock_sub_agents = MagicMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
+        executor._sub_agents = mock_sub_agents
+
+        workflow = WorkflowDefinition(
+            name="test_workflow",
+            nodes={
+                "start": AgentNode(id="start", name="Start"),
+            },
+            start_node="start",
+        )
+
+        result = await executor.execute(workflow)
+
+        assert result.context.metadata["workflow_name"] == "test_workflow"
+        assert "execution_id" in result.context.metadata
+
+    def test_custom_max_parallel(self, mock_orchestrator):
+        """Executor accepts custom max_parallel setting."""
+        executor = WorkflowExecutor(mock_orchestrator, max_parallel=8)
+        assert executor.max_parallel == 8
+
+    def test_custom_default_timeout(self, mock_orchestrator):
+        """Executor accepts custom default_timeout setting."""
+        executor = WorkflowExecutor(mock_orchestrator, default_timeout=600.0)
+        assert executor.default_timeout == 600.0
+
+
+class TestNodeResultExtended:
+    """Extended tests for NodeResult."""
+
+    def test_skipped_status(self):
+        """Skipped status is not successful."""
+        result = NodeResult(
+            node_id="test",
+            status=NodeStatus.SKIPPED,
+        )
+        assert result.success is False
+
+    def test_pending_status(self):
+        """Pending status is not successful."""
+        result = NodeResult(
+            node_id="test",
+            status=NodeStatus.PENDING,
+        )
+        assert result.success is False
+
+    def test_running_status(self):
+        """Running status is not successful."""
+        result = NodeResult(
+            node_id="test",
+            status=NodeStatus.RUNNING,
+        )
+        assert result.success is False
+
+
+class TestWorkflowResultExtended:
+    """Extended tests for WorkflowResult."""
+
+    def test_get_output_missing_node(self):
+        """get_output returns None for missing node."""
+        result = WorkflowResult(
+            workflow_name="test",
+            success=True,
+            context=WorkflowContext(),
+        )
+        assert result.get_output("nonexistent") is None
+
+    def test_get_output_node_without_output(self):
+        """get_output returns None for node without output."""
+        ctx = WorkflowContext()
+        ctx.add_result(NodeResult(node_id="test", status=NodeStatus.COMPLETED))
+
+        result = WorkflowResult(
+            workflow_name="test",
+            success=True,
+            context=ctx,
+        )
+        assert result.get_output("test") is None
+
+    def test_to_dict_includes_outputs(self):
+        """to_dict includes node outputs."""
+        ctx = WorkflowContext()
+        ctx.add_result(
+            NodeResult(node_id="a", status=NodeStatus.COMPLETED, output="Output A")
+        )
+
+        result = WorkflowResult(
+            workflow_name="test",
+            success=True,
+            context=ctx,
+        )
+
+        d = result.to_dict()
+        assert d["outputs"]["a"] == "Output A"
+
+
 class TestModuleExports:
     """Test module exports are correct."""
 

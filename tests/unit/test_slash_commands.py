@@ -724,3 +724,436 @@ class TestLearningCommandUnified:
 
         # Should show some output
         assert len(output) > 0
+
+
+# =============================================================================
+# SYSTEM COMMANDS TESTS
+# =============================================================================
+
+
+class TestSystemCommands:
+    """Tests for system slash commands (help, config, status, exit, clear)."""
+
+    def test_help_command_metadata(self):
+        """Test HelpCommand metadata."""
+        from victor.ui.slash.commands.system import HelpCommand
+
+        cmd = HelpCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "help"
+        assert "?" in meta.aliases
+        assert meta.category == "system"
+
+    def test_config_command_metadata(self):
+        """Test ConfigCommand metadata."""
+        from victor.ui.slash.commands.system import ConfigCommand
+
+        cmd = ConfigCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "config"
+        assert meta.category == "system"
+
+    def test_status_command_metadata(self):
+        """Test StatusCommand metadata."""
+        from victor.ui.slash.commands.system import StatusCommand
+
+        cmd = StatusCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "status"
+        assert meta.category == "system"
+
+    def test_exit_command_metadata(self):
+        """Test ExitCommand metadata."""
+        from victor.ui.slash.commands.system import ExitCommand
+
+        cmd = ExitCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "exit"
+        assert "quit" in meta.aliases
+
+    def test_clear_command_metadata(self):
+        """Test ClearCommand metadata."""
+        from victor.ui.slash.commands.system import ClearCommand
+
+        cmd = ClearCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "clear"
+        assert "reset" in meta.aliases
+
+    @pytest.mark.asyncio
+    async def test_config_command_execution(self):
+        """Test ConfigCommand execution."""
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        settings.default_provider = "anthropic"
+        settings.default_model = "claude-3-5-sonnet"
+        settings.ollama_base_url = "http://localhost:11434"
+        settings.airgapped_mode = False
+        settings.use_semantic_tool_selection = True
+        settings.unified_embedding_model = "all-MiniLM-L6-v2"
+        settings.codebase_graph_store = "sqlite"
+        settings.graph_enabled = True
+
+        handler = SlashCommandHandler(console=console, settings=settings)
+        await handler.execute("/config")
+
+        output = stdout.getvalue()
+        assert "anthropic" in output or "Provider" in output
+
+
+# =============================================================================
+# MODE COMMANDS TESTS
+# =============================================================================
+
+
+class TestModeCommands:
+    """Tests for mode slash commands."""
+
+    def test_mode_command_metadata(self):
+        """Test ModeCommand metadata."""
+        from victor.ui.slash.commands.mode import ModeCommand
+
+        cmd = ModeCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "mode"
+        assert meta.category in ["mode", "system", "general"]
+
+    def test_build_command_metadata(self):
+        """Test BuildCommand metadata."""
+        from victor.ui.slash.commands.mode import BuildCommand
+
+        cmd = BuildCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "build"
+        assert meta.category in ["mode", "system", "general"]
+
+    def test_plan_command_metadata(self):
+        """Test PlanCommand metadata."""
+        from victor.ui.slash.commands.mode import PlanCommand
+
+        cmd = PlanCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "plan"
+        assert meta.category in ["mode", "system", "general"]
+
+    def test_explore_command_metadata(self):
+        """Test ExploreCommand metadata."""
+        from victor.ui.slash.commands.mode import ExploreCommand
+
+        cmd = ExploreCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "explore"
+        assert meta.category in ["mode", "system", "general"]
+
+
+# =============================================================================
+# MODEL COMMANDS TESTS
+# =============================================================================
+
+
+class TestModelCommands:
+    """Tests for model slash commands."""
+
+    def test_model_command_metadata(self):
+        """Test ModelCommand metadata."""
+        from victor.ui.slash.commands.model import ModelCommand
+
+        cmd = ModelCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "model"
+        assert "models" in meta.aliases
+        assert meta.category in ["model", "system", "general"]
+
+    def test_provider_command_metadata(self):
+        """Test ProviderCommand metadata."""
+        from victor.ui.slash.commands.model import ProviderCommand
+
+        cmd = ProviderCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "provider"
+        assert meta.category in ["model", "system", "general"]
+
+
+# =============================================================================
+# NAVIGATION COMMANDS TESTS
+# =============================================================================
+
+
+class TestNavigationCommands:
+    """Tests for navigation slash commands."""
+
+    def test_directory_command_metadata(self):
+        """Test DirectoryCommand metadata."""
+        from victor.ui.slash.commands.navigation import DirectoryCommand
+
+        cmd = DirectoryCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "directory"
+        assert meta.category in ["navigation", "filesystem", "general"]
+
+    def test_changes_command_metadata(self):
+        """Test ChangesCommand metadata."""
+        from victor.ui.slash.commands.navigation import ChangesCommand
+
+        cmd = ChangesCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "changes"
+
+    def test_undo_command_metadata(self):
+        """Test UndoCommand metadata."""
+        from victor.ui.slash.commands.navigation import UndoCommand
+
+        cmd = UndoCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "undo"
+
+    def test_redo_command_metadata(self):
+        """Test RedoCommand metadata."""
+        from victor.ui.slash.commands.navigation import RedoCommand
+
+        cmd = RedoCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "redo"
+
+    def test_history_command_metadata(self):
+        """Test HistoryCommand metadata."""
+        from victor.ui.slash.commands.navigation import HistoryCommand
+
+        cmd = HistoryCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "filehistory"
+
+    def test_snapshots_command_metadata(self):
+        """Test SnapshotsCommand metadata."""
+        from victor.ui.slash.commands.navigation import SnapshotsCommand
+
+        cmd = SnapshotsCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "snapshots"
+
+    def test_commit_command_metadata(self):
+        """Test CommitCommand metadata."""
+        from victor.ui.slash.commands.navigation import CommitCommand
+
+        cmd = CommitCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "commit"
+
+    def test_copy_command_metadata(self):
+        """Test CopyCommand metadata."""
+        from victor.ui.slash.commands.navigation import CopyCommand
+
+        cmd = CopyCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "copy"
+
+
+# =============================================================================
+# SESSION COMMANDS TESTS
+# =============================================================================
+
+
+class TestSessionCommands:
+    """Tests for session slash commands."""
+
+    def test_save_command_metadata(self):
+        """Test SaveCommand metadata."""
+        from victor.ui.slash.commands.session import SaveCommand
+
+        cmd = SaveCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "save"
+        assert meta.category in ["session", "general"]
+
+    def test_load_command_metadata(self):
+        """Test LoadCommand metadata."""
+        from victor.ui.slash.commands.session import LoadCommand
+
+        cmd = LoadCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "load"
+        assert meta.category in ["session", "general"]
+
+    def test_sessions_command_metadata(self):
+        """Test SessionsCommand metadata."""
+        from victor.ui.slash.commands.session import SessionsCommand
+
+        cmd = SessionsCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "sessions"
+
+
+# =============================================================================
+# TOOLS COMMANDS TESTS
+# =============================================================================
+
+
+class TestToolsCommands:
+    """Tests for tools slash commands."""
+
+    def test_tools_command_metadata(self):
+        """Test ToolsCommand metadata."""
+        from victor.ui.slash.commands.tools import ToolsCommand
+
+        cmd = ToolsCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "tools"
+        assert meta.category in ["tools", "system", "general"]
+
+    def test_context_command_metadata(self):
+        """Test ContextCommand metadata."""
+        from victor.ui.slash.commands.tools import ContextCommand
+
+        cmd = ContextCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "context"
+
+    def test_lmstudio_command_metadata(self):
+        """Test LMStudioCommand metadata."""
+        from victor.ui.slash.commands.tools import LMStudioCommand
+
+        cmd = LMStudioCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "lmstudio"
+
+    def test_mcp_command_metadata(self):
+        """Test MCPCommand metadata."""
+        from victor.ui.slash.commands.tools import MCPCommand
+
+        cmd = MCPCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "mcp"
+
+    def test_review_command_metadata(self):
+        """Test ReviewCommand metadata."""
+        from victor.ui.slash.commands.tools import ReviewCommand
+
+        cmd = ReviewCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "review"
+
+    @pytest.mark.asyncio
+    async def test_tools_command_lists_tools(self):
+        """Test ToolsCommand lists available tools."""
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+
+        handler = SlashCommandHandler(console=console, settings=settings)
+        await handler.execute("/tools")
+
+        output = stdout.getvalue()
+        # Should output something (tool list or message)
+        assert len(output) > 0
+
+
+# =============================================================================
+# METRICS COMMANDS TESTS
+# =============================================================================
+
+
+class TestMetricsCommands:
+    """Tests for metrics slash commands."""
+
+    def test_metrics_command_metadata(self):
+        """Test MetricsCommand metadata."""
+        from victor.ui.slash.commands.metrics import MetricsCommand
+
+        cmd = MetricsCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "metrics"
+        assert meta.category in ["metrics", "system", "general"]
+
+    def test_cost_command_metadata(self):
+        """Test CostCommand metadata."""
+        from victor.ui.slash.commands.metrics import CostCommand
+
+        cmd = CostCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "cost"
+
+    def test_serialization_command_metadata(self):
+        """Test SerializationCommand metadata."""
+        from victor.ui.slash.commands.metrics import SerializationCommand
+
+        cmd = SerializationCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "serialization"
+
+    def test_learning_command_metadata(self):
+        """Test LearningCommand metadata."""
+        from victor.ui.slash.commands.metrics import LearningCommand
+
+        cmd = LearningCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "learning"
+        assert "rl" in meta.aliases or "qlearn" in meta.aliases
+
+    def test_mlstats_command_metadata(self):
+        """Test MLStatsCommand metadata."""
+        from victor.ui.slash.commands.metrics import MLStatsCommand
+
+        cmd = MLStatsCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "mlstats"
+
+
+# =============================================================================
+# CODEBASE COMMANDS TESTS
+# =============================================================================
+
+
+class TestCodebaseCommands:
+    """Tests for codebase slash commands."""
+
+    def test_reindex_command_metadata(self):
+        """Test ReindexCommand metadata."""
+        from victor.ui.slash.commands.codebase import ReindexCommand
+
+        cmd = ReindexCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "reindex"
+        assert meta.category in ["codebase", "code", "general"]
+
+    def test_init_command_metadata(self):
+        """Test InitCommand metadata."""
+        from victor.ui.slash.commands.codebase import InitCommand
+
+        cmd = InitCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "init"
