@@ -4,6 +4,9 @@ from typing import Dict, List, Tuple
 
 from victor.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
 
+# Import credential patterns from core safety module
+from victor.safety.secrets import CREDENTIAL_PATTERNS, SecretScanner
+
 
 # Risk levels
 HIGH = "HIGH"
@@ -11,6 +14,7 @@ MEDIUM = "MEDIUM"
 LOW = "LOW"
 
 # DevOps-specific danger patterns as tuples
+# Note: Secret detection patterns are now in victor.safety.secrets
 _DEVOPS_DANGER_TUPLES: List[Tuple[str, str, str]] = [
     # High-risk patterns - destructive operations
     (r"rm\s+-rf\s+/(?!tmp)", "Destructive filesystem deletion", HIGH),
@@ -19,11 +23,6 @@ _DEVOPS_DANGER_TUPLES: List[Tuple[str, str, str]] = [
     (r"docker\s+system\s+prune\s+-a", "Docker full system prune", HIGH),
     (r"DROP\s+DATABASE|DROP\s+TABLE", "Database destruction", HIGH),
     (r"--force\s+push|push\s+--force|-f\s+push", "Force push to remote", HIGH),
-    # Secrets exposure
-    (r"password\s*[=:]\s*['\"][^'\"]+['\"]", "Hardcoded password", HIGH),
-    (r"api[_-]?key\s*[=:]\s*['\"][^'\"]+['\"]", "Hardcoded API key", HIGH),
-    (r"AWS_SECRET_ACCESS_KEY\s*=\s*['\"][^'\"]+['\"]", "AWS secret in code", HIGH),
-    (r"PRIVATE[_-]?KEY\s*[=:]\s*['\"]", "Private key in code", HIGH),
     # Medium-risk patterns - need review
     (r"privileged:\s*true", "Privileged container mode", MEDIUM),
     (r"hostNetwork:\s*true", "Host network access", MEDIUM),
@@ -37,14 +36,6 @@ _DEVOPS_DANGER_TUPLES: List[Tuple[str, str, str]] = [
     (r"resources:\s*\{\s*\}", "Missing resource limits", LOW),
     (r"replicas:\s*1(?:\s|$)", "Single replica deployment", LOW),
 ]
-
-# Credential patterns to detect
-CREDENTIAL_PATTERNS: Dict[str, str] = {
-    "aws_access_key": r"AKIA[0-9A-Z]{16}",
-    "aws_secret_key": r"[0-9a-zA-Z/+]{40}",
-    "github_token": r"gh[ps]_[0-9a-zA-Z]{36}",
-    "generic_secret": r"(?i)(password|secret|token|key)\s*[=:]\s*['\"][^'\"]{8,}['\"]",
-}
 
 
 class DevOpsSafetyExtension(SafetyExtensionProtocol):
@@ -87,10 +78,37 @@ class DevOpsSafetyExtension(SafetyExtensionProtocol):
     def get_credential_patterns(self) -> Dict[str, str]:
         """Return patterns for detecting credentials.
 
+        Uses patterns from victor.safety.secrets for comprehensive detection.
+
         Returns:
             Dict of credential_type -> regex_pattern.
         """
-        return CREDENTIAL_PATTERNS
+        # Return simplified dict format for backward compatibility
+        return {
+            name: pattern
+            for name, (pattern, _, _) in CREDENTIAL_PATTERNS.items()
+        }
+
+    def scan_for_secrets(self, content: str) -> List[Dict]:
+        """Scan content for secrets using the core SecretScanner.
+
+        Args:
+            content: Text content to scan
+
+        Returns:
+            List of secret match dictionaries
+        """
+        scanner = SecretScanner()
+        matches = scanner.scan(content)
+        return [
+            {
+                "type": m.secret_type,
+                "severity": m.severity.value,
+                "line": m.line_number,
+                "suggestion": m.suggestion,
+            }
+            for m in matches
+        ]
 
     def validate_dockerfile(self, content: str) -> List[str]:
         """Validate Dockerfile security best practices.

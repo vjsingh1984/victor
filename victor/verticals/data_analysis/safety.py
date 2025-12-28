@@ -4,6 +4,15 @@ from typing import Dict, List, Tuple
 
 from victor.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
 
+# Import PII detection from core safety module
+from victor.safety.pii import (
+    PIIScanner,
+    PIIType,
+    detect_pii_columns as core_detect_pii_columns,
+    get_anonymization_suggestion as core_get_anonymization_suggestion,
+    get_safety_reminders as core_get_safety_reminders,
+)
+
 
 # Risk levels
 HIGH = "HIGH"
@@ -11,8 +20,9 @@ MEDIUM = "MEDIUM"
 LOW = "LOW"
 
 # Data analysis-specific safety patterns as tuples
+# Note: PII detection patterns are now in victor.safety.pii
 _DATA_ANALYSIS_SAFETY_TUPLES: List[Tuple[str, str, str]] = [
-    # High-risk patterns - PII exposure
+    # High-risk patterns - PII exposure (kept for SafetyPattern interface)
     (r"(?i)(social[_\s-]?security|ssn)[^\w]", "Social Security Number exposure", HIGH),
     (r"(?i)(credit[_\s-]?card|card[_\s-]?number)", "Credit card data exposure", HIGH),
     (r"\b\d{3}[-.]?\d{2}[-.]?\d{4}\b", "SSN pattern detected", HIGH),
@@ -30,17 +40,6 @@ _DATA_ANALYSIS_SAFETY_TUPLES: List[Tuple[str, str, str]] = [
     (r"\.to_csv\([^)]*index\s*=\s*True", "Index in CSV output", LOW),
     (r"(?i)random_state\s*=\s*None", "Non-reproducible random state", LOW),
 ]
-
-# PII column patterns
-PII_COLUMN_PATTERNS: Dict[str, str] = {
-    "name": r"(?i)^(first|last|full)?[_\s-]?name$",
-    "email": r"(?i)e?mail",
-    "phone": r"(?i)(phone|mobile|cell)",
-    "address": r"(?i)(address|street|city|state|zip)",
-    "ssn": r"(?i)(ssn|social[_\s-]?security)",
-    "dob": r"(?i)(dob|birth|bday)",
-    "id": r"(?i)(user[_\s-]?id|customer[_\s-]?id|account)",
-}
 
 
 class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
@@ -82,13 +81,23 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
     def get_pii_patterns(self) -> Dict[str, str]:
         """Return patterns for detecting PII columns.
 
+        Uses patterns from victor.safety.pii for comprehensive detection.
+
         Returns:
             Dict of pii_type -> regex_pattern for column names.
         """
-        return PII_COLUMN_PATTERNS
+        from victor.safety.pii import PII_COLUMN_PATTERNS as CORE_PII_PATTERNS
+
+        # Return simplified dict format for backward compatibility
+        return {
+            pii_type.value: pattern
+            for pii_type, pattern in CORE_PII_PATTERNS.items()
+        }
 
     def detect_pii_columns(self, columns: List[str]) -> List[Tuple[str, str]]:
         """Detect potential PII columns in a dataframe.
+
+        Uses victor.safety.pii.detect_pii_columns for detection.
 
         Args:
             columns: List of column names.
@@ -96,43 +105,52 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
         Returns:
             List of (column_name, pii_type) tuples.
         """
-        import re
-
-        detected = []
-        for col in columns:
-            for pii_type, pattern in PII_COLUMN_PATTERNS.items():
-                if re.search(pattern, col):
-                    detected.append((col, pii_type))
-                    break
-        return detected
+        results = core_detect_pii_columns(columns)
+        # Convert PIIType enum to string for backward compatibility
+        return [(col, pii_type.value) for col, pii_type in results]
 
     def get_anonymization_suggestions(self, pii_type: str) -> str:
         """Get suggestions for anonymizing a PII type.
 
+        Uses victor.safety.pii.get_anonymization_suggestion.
+
         Args:
-            pii_type: Type of PII detected.
+            pii_type: Type of PII detected (string).
 
         Returns:
             Suggestion string for anonymization.
         """
-        suggestions = {
-            "name": "Replace with fake names (faker library) or hash",
-            "email": "Replace domain, hash local part, or remove entirely",
-            "phone": "Remove or replace with random numbers",
-            "address": "Generalize to region/zip prefix only",
-            "ssn": "Remove entirely - never store in analysis",
-            "dob": "Convert to age ranges or year only",
-            "id": "Hash with salt or replace with sequential IDs",
-        }
-        return suggestions.get(pii_type, "Consider removing or hashing")
+        # Convert string to PIIType enum
+        try:
+            pii_enum = PIIType(pii_type)
+            return core_get_anonymization_suggestion(pii_enum)
+        except ValueError:
+            return "Consider removing or hashing"
 
     def get_safety_reminders(self) -> List[str]:
-        """Return safety reminders for data analysis."""
+        """Return safety reminders for data analysis.
+
+        Uses victor.safety.pii.get_safety_reminders.
+        """
+        return core_get_safety_reminders()
+
+    def scan_for_pii(self, content: str) -> List[Dict]:
+        """Scan content for PII using the core PIIScanner.
+
+        Args:
+            content: Text content to scan
+
+        Returns:
+            List of PII match dictionaries
+        """
+        scanner = PIIScanner()
+        matches = scanner.scan_content(content)
         return [
-            "Check for PII before sharing results",
-            "Use sample data for development, not full production data",
-            "Anonymize sensitive columns before analysis",
-            "Document data sources and permissions",
-            "Set random_state for reproducibility",
-            "Never commit data files to version control",
+            {
+                "type": m.pii_type.value,
+                "severity": m.severity.value,
+                "source": m.source,
+                "suggestion": m.suggestion,
+            }
+            for m in matches
         ]
