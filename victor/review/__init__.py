@@ -12,47 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Automated code review module.
+"""Code review and analysis.
 
-This module provides automated code review capabilities with
-configurable rules and multiple analyzers.
-
-Example usage:
-    from victor.review import get_review_manager, ReviewConfig
-    from pathlib import Path
-
-    # Get manager
-    manager = get_review_manager()
-
-    # Review a single file
-    result = manager.review_file(Path("my_module.py"))
-
-    # Review with specific ruleset
-    result = manager.review_file(
-        Path("my_module.py"),
-        ruleset_name="strict",
-    )
-
-    # Review a directory
-    result = manager.review_directory(
-        Path("src/"),
-        recursive=True,
-    )
-
-    # Review only changed files
-    result = manager.review_diff(base_ref="main")
-
-    # Format as report
-    report = manager.format_report(result, format="markdown")
-    print(report)
-
-    # Configure rules
-    from victor.review import get_rule_registry
-    registry = get_rule_registry()
-    registry.configure_rule(
-        "complexity-cyclomatic",
-        parameters={"max": 15},
-    )
+.. deprecated:: 0.3.0
+    This module has moved to ``victor_coding.review``.
+    Please update your imports.
 """
 
 import warnings
@@ -65,71 +29,6 @@ warnings.warn(
     stacklevel=2,
 )
 
-
-from victor.review.protocol import (
-    ComplexityMetrics,
-    DuplicationResult,
-    FileReview,
-    ReviewCategory,
-    ReviewConfig,
-    ReviewFinding,
-    ReviewResult,
-    ReviewRule,
-    ReviewRuleSet,
-    SecurityIssue,
-    Severity,
-    SourceLocation,
-)
-from victor.review.analyzers import (
-    BaseAnalyzer,
-    BestPracticesAnalyzer,
-    ComplexityAnalyzer,
-    DocumentationAnalyzer,
-    NamingAnalyzer,
-    SecurityAnalyzer,
-)
-from victor.review.rules import (
-    DEFAULT_RULES,
-    DEFAULT_RULESETS,
-    RuleRegistry,
-    get_rule_registry,
-    reset_rule_registry,
-)
-from victor.review.manager import (
-    ReviewManager,
-    get_review_manager,
-    reset_review_manager,
-)
-
-__all__ = [
-    # Protocol types
-    "ComplexityMetrics",
-    "DuplicationResult",
-    "FileReview",
-    "ReviewCategory",
-    "ReviewConfig",
-    "ReviewFinding",
-    "ReviewResult",
-    "ReviewRule",
-    "ReviewRuleSet",
-    "SecurityIssue",
-    "Severity",
-    "SourceLocation",
-    # Analyzers
-    "BaseAnalyzer",
-    "BestPracticesAnalyzer",
-    "ComplexityAnalyzer",
-    "DocumentationAnalyzer",
-    "NamingAnalyzer",
-    "SecurityAnalyzer",
-    # Rules
-    "DEFAULT_RULES",
-    "DEFAULT_RULESETS",
-    "RuleRegistry",
-    "get_rule_registry",
-    "reset_rule_registry",
-    # Manager
-    "ReviewManager",
-    "get_review_manager",
-    "reset_review_manager",
-]
+# Re-export from victor_coding for backward compatibility
+from victor_coding.review import *  # noqa: F401, F403
+from victor_coding.review import __all__  # noqa: F401

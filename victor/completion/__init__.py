@@ -12,42 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Inline completion API for IDE integration.
+"""Code completion providers.
 
-This module provides an extensible completion system for code editors
-and IDE integrations. Supports multiple completion sources:
-- LSP servers for language-aware completions
-- AI models for intelligent suggestions
-- Snippets for template-based completions
-
-Example usage:
-    from victor.completion import get_completion_manager
-    from pathlib import Path
-
-    manager = get_completion_manager()
-
-    # Get standard completions
-    completions = await manager.complete(
-        file_path=Path("main.py"),
-        line=10,
-        character=5,
-    )
-
-    # Get inline (ghost text) completions
-    inline = await manager.complete_inline(
-        file_path=Path("main.py"),
-        line=10,
-        character=5,
-        file_content="def hello():\n    ",
-    )
-
-    # Stream inline completions
-    async for token in manager.stream_inline_completion(
-        file_path=Path("main.py"),
-        line=10,
-        character=5,
-    ):
-        print(token, end="", flush=True)
+.. deprecated:: 0.3.0
+    This module has moved to ``victor_coding.completion``.
+    Please update your imports.
 """
 
 import warnings
@@ -60,71 +29,6 @@ warnings.warn(
     stacklevel=2,
 )
 
-
-from victor.completion.protocol import (
-    CompletionCapabilities,
-    CompletionContext,
-    CompletionItem,
-    CompletionItemKind,
-    CompletionList,
-    CompletionMetrics,
-    CompletionParams,
-    CompletionTriggerKind,
-    InlineCompletionItem,
-    InlineCompletionList,
-    InlineCompletionParams,
-    InsertTextFormat,
-    Position,
-    Range,
-    TextEdit,
-)
-from victor.completion.provider import (
-    BaseCompletionProvider,
-    CachingCompletionProvider,
-    CompositeCompletionProvider,
-    CompletionProvider,
-    StreamingCompletionProvider,
-)
-from victor.completion.registry import (
-    CompletionProviderRegistry,
-    get_completion_registry,
-    reset_completion_registry,
-)
-from victor.completion.manager import (
-    CompletionManager,
-    get_completion_manager,
-    reset_completion_manager,
-)
-
-__all__ = [
-    # Protocol types
-    "CompletionCapabilities",
-    "CompletionContext",
-    "CompletionItem",
-    "CompletionItemKind",
-    "CompletionList",
-    "CompletionMetrics",
-    "CompletionParams",
-    "CompletionTriggerKind",
-    "InlineCompletionItem",
-    "InlineCompletionList",
-    "InlineCompletionParams",
-    "InsertTextFormat",
-    "Position",
-    "Range",
-    "TextEdit",
-    # Provider classes
-    "BaseCompletionProvider",
-    "CachingCompletionProvider",
-    "CompositeCompletionProvider",
-    "CompletionProvider",
-    "StreamingCompletionProvider",
-    # Registry
-    "CompletionProviderRegistry",
-    "get_completion_registry",
-    "reset_completion_registry",
-    # Manager
-    "CompletionManager",
-    "get_completion_manager",
-    "reset_completion_manager",
-]
+# Re-export from victor_coding for backward compatibility
+from victor_coding.completion import *  # noqa: F401, F403
+from victor_coding.completion import __all__  # noqa: F401

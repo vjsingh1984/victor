@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Multi-file editing with diff preview and rollback.
+"""File editing and transaction support.
 
-Provides safe, atomic operations for modifying multiple files with:
-- Diff preview before applying
-- Rollback capability
-- Transaction-like editing
-- Backup management
+.. deprecated:: 0.3.0
+    This module has moved to ``victor_coding.editing``.
+    Please update your imports.
 """
 
 import warnings
@@ -31,7 +29,6 @@ warnings.warn(
     stacklevel=2,
 )
 
-
-from victor.editing.editor import FileEditor, EditOperation, EditTransaction
-
-__all__ = ["FileEditor", "EditOperation", "EditTransaction"]
+# Re-export from victor_coding for backward compatibility
+from victor_coding.editing import *  # noqa: F401, F403
+from victor_coding.editing import __all__  # noqa: F401

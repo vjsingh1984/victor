@@ -33,8 +33,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 
-from victor.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
-from victor.codebase.graph.registry import create_graph_store
+from victor_coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
+from victor_coding.codebase.graph.registry import create_graph_store
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 

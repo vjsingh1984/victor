@@ -171,7 +171,7 @@ async def _get_or_build_index(
     2. Persistent disk storage in {root}/.victor/embeddings/
     3. Incremental updates for changed files only (not full rebuild)
     """
-    from victor.codebase.indexer import CodebaseIndex
+    from victor_coding.codebase.indexer import CodebaseIndex
 
     cache_entry = _INDEX_CACHE.get(str(root))
     cached_index = cache_entry["index"] if cache_entry else None
@@ -487,7 +487,7 @@ async def code_search(
         # Optionally combine with keyword search using hybrid RRF
         if enable_hybrid and results:
             try:
-                from victor.codebase.hybrid_search import create_hybrid_search_engine
+                from victor_coding.codebase.hybrid_search import create_hybrid_search_engine
 
                 # Get keyword search results
                 keyword_results = await _literal_search(query, str(root_path), k * 2, exts=None)

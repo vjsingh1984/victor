@@ -12,41 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Multi-language support infrastructure for Victor.
+"""Language-specific handlers and plugins for code analysis.
 
-This module provides a pluggable language support system enabling:
-- Language detection from files and content
-- Language-specific syntax analysis
-- Test runner integration per language
-- Build system integration
-- Formatter and linter integration
-
-Architecture:
-    ┌─────────────────────────────────────────────────────────────┐
-    │                   Language Manager                           │
-    │  (Discovers plugins, routes requests to language handlers)  │
-    └─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-    ┌─────────────────────────────────────────────────────────────┐
-    │                   Language Registry                          │
-    │  (Maps extensions/names to language plugins)                │
-    └─────────────────────────────────────────────────────────────┘
-                              │
-          ┌───────────────────┼───────────────────┐
-          ▼                   ▼                   ▼
-    ┌───────────┐       ┌───────────┐       ┌───────────┐
-    │  Python   │       │ JavaScript│       │   Rust    │
-    │  Plugin   │       │  Plugin   │       │  Plugin   │
-    └───────────┘       └───────────┘       └───────────┘
-
-Each language plugin provides:
-- File extension mappings
-- Syntax configuration
-- Test runner commands
-- Build/run commands
-- Formatter/linter commands
-- Language server configuration
+.. deprecated:: 0.3.0
+    This module has moved to ``victor_coding.languages``.
+    Please update your imports.
 """
 
 import warnings
@@ -59,30 +29,6 @@ warnings.warn(
     stacklevel=2,
 )
 
-
-from victor.languages.base import (
-    LanguagePlugin,
-    LanguageCapabilities,
-    TestRunner,
-    BuildSystem,
-    Formatter,
-    Linter,
-    LanguageConfig,
-)
-from victor.languages.registry import LanguageRegistry, get_language_registry
-from victor.languages.manager import LanguageManager
-
-__all__ = [
-    # Base types
-    "LanguagePlugin",
-    "LanguageCapabilities",
-    "TestRunner",
-    "BuildSystem",
-    "Formatter",
-    "Linter",
-    "LanguageConfig",
-    # Registry and manager
-    "LanguageRegistry",
-    "get_language_registry",
-    "LanguageManager",
-]
+# Re-export from victor_coding for backward compatibility
+from victor_coding.languages import *  # noqa: F401, F403
+from victor_coding.languages import __all__  # noqa: F401

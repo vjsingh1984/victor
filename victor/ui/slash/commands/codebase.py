@@ -47,7 +47,7 @@ class ReindexCommand(BaseSlashCommand):
         show_stats = self._has_flag(ctx, "--stats", "-s")
 
         try:
-            from victor.codebase.embeddings.manager import get_embedding_manager
+            from victor_coding.codebase.embeddings.manager import get_embedding_manager
 
             manager = get_embedding_manager()
 

@@ -909,7 +909,7 @@ class VictorFastAPIServer:
         async def lsp_completions(request: LSPRequest) -> JSONResponse:
             """LSP completions."""
             try:
-                from victor.lsp.manager import get_lsp_manager
+                from victor_coding.lsp.manager import get_lsp_manager
 
                 manager = get_lsp_manager()
                 completions = await manager.get_completions(
@@ -938,7 +938,7 @@ class VictorFastAPIServer:
         async def lsp_hover(request: LSPRequest) -> JSONResponse:
             """LSP hover."""
             try:
-                from victor.lsp.manager import get_lsp_manager
+                from victor_coding.lsp.manager import get_lsp_manager
 
                 manager = get_lsp_manager()
                 hover = await manager.get_hover(request.file, request.line, request.character)
@@ -953,7 +953,7 @@ class VictorFastAPIServer:
         async def lsp_definition(request: LSPRequest) -> JSONResponse:
             """LSP definition."""
             try:
-                from victor.lsp.manager import get_lsp_manager
+                from victor_coding.lsp.manager import get_lsp_manager
 
                 manager = get_lsp_manager()
                 locations = await manager.get_definition(
@@ -970,7 +970,7 @@ class VictorFastAPIServer:
         async def lsp_references(request: LSPRequest) -> JSONResponse:
             """LSP references."""
             try:
-                from victor.lsp.manager import get_lsp_manager
+                from victor_coding.lsp.manager import get_lsp_manager
 
                 manager = get_lsp_manager()
                 locations = await manager.get_references(
@@ -987,7 +987,7 @@ class VictorFastAPIServer:
         async def lsp_diagnostics(request: LSPRequest) -> JSONResponse:
             """LSP diagnostics."""
             try:
-                from victor.lsp.manager import get_lsp_manager
+                from victor_coding.lsp.manager import get_lsp_manager
 
                 manager = get_lsp_manager()
                 diagnostics = manager.get_diagnostics(request.file)

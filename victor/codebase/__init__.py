@@ -37,6 +37,6 @@ warnings.warn(
     stacklevel=2,
 )
 
-from victor.codebase.indexer import CodebaseIndex, FileMetadata, Symbol
-
-__all__ = ["CodebaseIndex", "FileMetadata", "Symbol"]
+# Re-export from victor_coding for backward compatibility
+from victor_coding.codebase import *  # noqa: F401, F403
+from victor_coding.codebase import __all__  # noqa: F401

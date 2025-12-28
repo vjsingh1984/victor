@@ -17,7 +17,7 @@ from victor.agent.safety import (
     RiskLevel,
     set_confirmation_callback,
 )
-from victor.codebase.indexer import CodebaseIndex
+from victor_coding.codebase.indexer import CodebaseIndex
 from victor.tools.code_search_tool import _get_or_build_index, _INDEX_CACHE
 
 logger = logging.getLogger(__name__)

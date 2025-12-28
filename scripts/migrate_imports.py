@@ -41,15 +41,16 @@ MIGRATED_MODULES = [
 ]
 
 # Patterns to match and replace
+# Note: Use non-capturing group for submodules to capture full path
 IMPORT_PATTERNS = [
-    # from victor.module import X
+    # from victor.module.submodule import X
     (
-        r"from victor\.({modules})(\.\w+)* import",
+        r"from victor\.({modules})((?:\.\w+)*) import",
         r"from victor_coding.\1\2 import",
     ),
-    # import victor.module
+    # import victor.module.submodule
     (
-        r"import victor\.({modules})(\.\w+)*",
+        r"import victor\.({modules})((?:\.\w+)*)",
         r"import victor_coding.\1\2",
     ),
     # from victor import module (less common but possible)

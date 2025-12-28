@@ -12,46 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Security scanning and CVE database integration.
+"""Security scanning and vulnerability detection.
 
-This module provides comprehensive security scanning capabilities
-including vulnerability detection, CVE database integration, and
-security reporting.
-
-Example usage:
-    from victor.security import get_security_manager, SecurityPolicy
-    from pathlib import Path
-    import asyncio
-
-    async def scan_project():
-        # Get manager with custom policy
-        manager = get_security_manager(project_root=Path("."))
-        manager.policy = SecurityPolicy(
-            fail_on_critical=True,
-            fail_on_high=True,
-            max_medium=10,
-        )
-
-        # Scan project
-        result = await manager.scan()
-
-        # Generate report
-        print(manager.generate_report(format="text"))
-
-        # Check policy
-        passed, failures = manager.check_policy()
-        if not passed:
-            for failure in failures:
-                print(f"FAIL: {failure}")
-
-        # Get fix commands
-        fixes = manager.get_fix_commands()
-        for ecosystem, commands in fixes.items():
-            print(f"\\n{ecosystem} fixes:")
-            for cmd in commands:
-                print(f"  {cmd}")
-
-    asyncio.run(scan_project())
+.. deprecated:: 0.3.0
+    This module has moved to ``victor_coding.security``.
+    Please update your imports.
 """
 
 import warnings
@@ -64,71 +29,6 @@ warnings.warn(
     stacklevel=2,
 )
 
-
-from victor.security.protocol import (
-    CVE,
-    CVSSMetrics,
-    Dependency,
-    SecurityPolicy,
-    SecurityScanResult,
-    Severity,
-    Vulnerability,
-    VulnerabilityStatus,
-)
-from victor.security.cve_database import (
-    BaseCVEDatabase,
-    CachingCVEDatabase,
-    CVEDatabase,
-    LocalCVECache,
-    OfflineCVEDatabase,
-    OSVDatabase,
-    get_cve_database,
-)
-from victor.security.scanner import (
-    BaseDependencyParser,
-    DependencyParser,
-    GoDependencyParser,
-    NodeDependencyParser,
-    PythonDependencyParser,
-    RustDependencyParser,
-    SecurityScanner,
-    get_scanner,
-)
-from victor.security.manager import (
-    SecurityManager,
-    get_security_manager,
-    reset_security_manager,
-)
-
-__all__ = [
-    # Protocol types
-    "CVE",
-    "CVSSMetrics",
-    "Dependency",
-    "SecurityPolicy",
-    "SecurityScanResult",
-    "Severity",
-    "Vulnerability",
-    "VulnerabilityStatus",
-    # CVE database
-    "BaseCVEDatabase",
-    "CachingCVEDatabase",
-    "CVEDatabase",
-    "LocalCVECache",
-    "OfflineCVEDatabase",
-    "OSVDatabase",
-    "get_cve_database",
-    # Scanners
-    "BaseDependencyParser",
-    "DependencyParser",
-    "GoDependencyParser",
-    "NodeDependencyParser",
-    "PythonDependencyParser",
-    "RustDependencyParser",
-    "SecurityScanner",
-    "get_scanner",
-    # Manager
-    "SecurityManager",
-    "get_security_manager",
-    "reset_security_manager",
-]
+# Re-export from victor_coding for backward compatibility
+from victor_coding.security import *  # noqa: F401, F403
+from victor_coding.security import __all__  # noqa: F401

@@ -12,44 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""AST-based refactoring engine.
+"""Code refactoring engine.
 
-This module provides code refactoring capabilities using AST analysis
-for safe and accurate code transformations.
-
-Example usage:
-    from victor.refactor import get_refactor_manager, RefactorType
-    from pathlib import Path
-
-    # Get manager
-    manager = get_refactor_manager()
-
-    # Rename a symbol
-    result = manager.rename_symbol(
-        file_path=Path("main.py"),
-        line=10,
-        column=4,
-        new_name="new_function_name",
-    )
-
-    # Extract code to function
-    result = manager.extract_function(
-        file_path=Path("main.py"),
-        start_line=15,
-        start_column=0,
-        end_line=25,
-        end_column=0,
-        function_name="extracted_function",
-    )
-
-    # Get refactoring suggestions
-    suggestions = manager.suggest_refactorings(Path("main.py"))
-    for suggestion in suggestions:
-        print(f"{suggestion.refactor_type.value}: {suggestion.reason}")
-
-    # Undo if needed
-    if result.success and result.can_undo():
-        manager.undo(result)
+.. deprecated:: 0.3.0
+    This module has moved to ``victor_coding.refactor``.
+    Please update your imports.
 """
 
 import warnings
@@ -62,71 +29,6 @@ warnings.warn(
     stacklevel=2,
 )
 
-
-from victor.refactor.protocol import (
-    CodeEdit,
-    CodePattern,
-    RefactorCapabilities,
-    RefactorPreview,
-    RefactorRequest,
-    RefactorResult,
-    RefactorRisk,
-    RefactorScope,
-    RefactorSuggestion,
-    RefactorType,
-    SourceLocation,
-    Symbol,
-)
-from victor.refactor.analyzer import (
-    BaseCodeAnalyzer,
-    CodeAnalyzer,
-    PythonAnalyzer,
-    get_analyzer,
-)
-from victor.refactor.transforms import (
-    BaseTransform,
-    CodeTransform,
-    ExtractConstantTransform,
-    ExtractFunctionTransform,
-    ExtractVariableTransform,
-    RenameFileTransform,
-    RenameSymbolTransform,
-)
-from victor.refactor.manager import (
-    RefactorManager,
-    get_refactor_manager,
-    reset_refactor_manager,
-)
-
-__all__ = [
-    # Protocol types
-    "CodeEdit",
-    "CodePattern",
-    "RefactorCapabilities",
-    "RefactorPreview",
-    "RefactorRequest",
-    "RefactorResult",
-    "RefactorRisk",
-    "RefactorScope",
-    "RefactorSuggestion",
-    "RefactorType",
-    "SourceLocation",
-    "Symbol",
-    # Analyzers
-    "BaseCodeAnalyzer",
-    "CodeAnalyzer",
-    "PythonAnalyzer",
-    "get_analyzer",
-    # Transforms
-    "BaseTransform",
-    "CodeTransform",
-    "ExtractConstantTransform",
-    "ExtractFunctionTransform",
-    "ExtractVariableTransform",
-    "RenameFileTransform",
-    "RenameSymbolTransform",
-    # Manager
-    "RefactorManager",
-    "get_refactor_manager",
-    "reset_refactor_manager",
-]
+# Re-export from victor_coding for backward compatibility
+from victor_coding.refactor import *  # noqa: F401, F403
+from victor_coding.refactor import __all__  # noqa: F401

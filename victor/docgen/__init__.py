@@ -12,38 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Automated documentation generation module.
+"""Documentation generation.
 
-This module provides automated documentation generation from
-Python source code with support for multiple output formats.
-
-Example usage:
-    from victor.docgen import get_docgen_manager, DocConfig, DocFormat
-    from pathlib import Path
-
-    # Get manager
-    manager = get_docgen_manager()
-
-    # Generate documentation for a file
-    result = manager.generate_for_file(
-        Path("my_module.py"),
-        config=DocConfig(output_format=DocFormat.MARKDOWN),
-    )
-
-    # Generate documentation for a package
-    result = manager.generate_for_package(
-        Path("my_package/"),
-        write_files=True,
-    )
-
-    # Preview without writing
-    content = manager.preview_documentation(Path("my_module.py"))
-    print(content)
-
-    # Analyze documentation coverage
-    coverage = manager.analyze_documentation_coverage(Path("src/"))
-    for file, stats in coverage.items():
-        print(f"{file}: {stats['coverage_percent']:.1f}% documented")
+.. deprecated:: 0.3.0
+    This module has moved to ``victor_coding.docgen``.
+    Please update your imports.
 """
 
 import warnings
@@ -56,71 +29,6 @@ warnings.warn(
     stacklevel=2,
 )
 
-
-from victor.docgen.protocol import (
-    Attribute,
-    ClassDoc,
-    DocConfig,
-    DocFormat,
-    DocGenResult,
-    DocStyle,
-    Example,
-    FunctionDoc,
-    GeneratedDoc,
-    ModuleDoc,
-    PackageDoc,
-    Parameter,
-    RaisedException,
-    ReturnValue,
-)
-from victor.docgen.parser import (
-    BaseDocstringParser,
-    CodeAnalyzer,
-    GoogleDocstringParser,
-    NumpyDocstringParser,
-)
-from victor.docgen.formatter import (
-    BaseFormatter,
-    HTMLFormatter,
-    MarkdownFormatter,
-    RSTFormatter,
-    get_formatter,
-)
-from victor.docgen.manager import (
-    DocGenManager,
-    get_docgen_manager,
-    reset_docgen_manager,
-)
-
-__all__ = [
-    # Protocol types
-    "Attribute",
-    "ClassDoc",
-    "DocConfig",
-    "DocFormat",
-    "DocGenResult",
-    "DocStyle",
-    "Example",
-    "FunctionDoc",
-    "GeneratedDoc",
-    "ModuleDoc",
-    "PackageDoc",
-    "Parameter",
-    "RaisedException",
-    "ReturnValue",
-    # Parsers
-    "BaseDocstringParser",
-    "CodeAnalyzer",
-    "GoogleDocstringParser",
-    "NumpyDocstringParser",
-    # Formatters
-    "BaseFormatter",
-    "HTMLFormatter",
-    "MarkdownFormatter",
-    "RSTFormatter",
-    "get_formatter",
-    # Manager
-    "DocGenManager",
-    "get_docgen_manager",
-    "reset_docgen_manager",
-]
+# Re-export from victor_coding for backward compatibility
+from victor_coding.docgen import *  # noqa: F401, F403
+from victor_coding.docgen import __all__  # noqa: F401

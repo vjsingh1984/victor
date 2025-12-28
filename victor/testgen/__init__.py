@@ -12,49 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Automated test generation module.
+"""Test generation and analysis.
 
-This module provides automated test generation capabilities using
-static code analysis to create comprehensive test suites.
-
-Example usage:
-    from victor.testgen import get_testgen_manager, TestGenConfig, TestFramework
-    from pathlib import Path
-
-    # Get manager
-    manager = get_testgen_manager()
-
-    # Generate tests for a file
-    result = manager.generate_for_file(
-        Path("my_module.py"),
-        config=TestGenConfig(
-            framework=TestFramework.PYTEST,
-            include_edge_cases=True,
-            include_error_cases=True,
-        ),
-    )
-
-    # Generate tests for a directory
-    result = manager.generate_for_directory(
-        Path("src/"),
-        write_files=True,
-    )
-
-    # Preview without writing
-    content = manager.preview_generation(Path("my_module.py"))
-    print(content)
-
-    # Analyze coverage gaps
-    gaps = manager.analyze_coverage_gaps(
-        source_dir=Path("src/"),
-        test_dir=Path("tests/"),
-    )
-
-    # Suggest additional tests
-    suggestions = manager.suggest_additional_tests(
-        Path("my_module.py"),
-        existing_tests=Path("tests/test_my_module.py"),
-    )
+.. deprecated:: 0.3.0
+    This module has moved to ``victor_coding.testgen``.
+    Please update your imports.
 """
 
 import warnings
@@ -67,57 +29,6 @@ warnings.warn(
     stacklevel=2,
 )
 
-
-from victor.testgen.protocol import (
-    AssertionType,
-    ClassSignature,
-    FunctionSignature,
-    GeneratedTest,
-    TestAssertion,
-    TestCase,
-    TestFramework,
-    TestGenConfig,
-    TestGenResult,
-    TestInput,
-    TestSuite,
-    TestType,
-)
-from victor.testgen.analyzer import TestTargetAnalyzer
-from victor.testgen.generator import (
-    BaseTestGenerator,
-    PytestGenerator,
-    TestCaseGenerator,
-    UnittestGenerator,
-)
-from victor.testgen.manager import (
-    TestGenManager,
-    get_testgen_manager,
-    reset_testgen_manager,
-)
-
-__all__ = [
-    # Protocol types
-    "AssertionType",
-    "ClassSignature",
-    "FunctionSignature",
-    "GeneratedTest",
-    "TestAssertion",
-    "TestCase",
-    "TestFramework",
-    "TestGenConfig",
-    "TestGenResult",
-    "TestInput",
-    "TestSuite",
-    "TestType",
-    # Analyzer
-    "TestTargetAnalyzer",
-    # Generators
-    "BaseTestGenerator",
-    "PytestGenerator",
-    "TestCaseGenerator",
-    "UnittestGenerator",
-    # Manager
-    "TestGenManager",
-    "get_testgen_manager",
-    "reset_testgen_manager",
-]
+# Re-export from victor_coding for backward compatibility
+from victor_coding.testgen import *  # noqa: F401, F403
+from victor_coding.testgen import __all__  # noqa: F401
