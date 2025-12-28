@@ -1950,6 +1950,50 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ModeCompletionCriteria created")
         return criteria
 
+    def create_checkpoint_manager(self) -> Optional[Any]:
+        """Create CheckpointManager for time-travel debugging.
+
+        Creates the checkpoint manager based on settings configuration.
+        Returns None if checkpointing is disabled.
+
+        Returns:
+            CheckpointManager instance or None if disabled
+        """
+        if not getattr(self.settings, "checkpoint_enabled", True):
+            logger.debug("Checkpoint system disabled via settings")
+            return None
+
+        try:
+            from victor.checkpoints import CheckpointManager, SQLiteCheckpointBackend
+            from victor.config.settings import get_project_paths
+
+            # Get project paths for checkpoint storage
+            paths = get_project_paths()
+            checkpoint_db_path = paths.project_victor_dir / "checkpoints.db"
+
+            # Create SQLite backend
+            backend = SQLiteCheckpointBackend(str(checkpoint_db_path))
+
+            # Get settings
+            auto_interval = getattr(self.settings, "checkpoint_auto_interval", 5)
+            max_per_session = getattr(self.settings, "checkpoint_max_per_session", 50)
+
+            manager = CheckpointManager(
+                backend=backend,
+                auto_checkpoint_interval=auto_interval,
+                max_checkpoints_per_session=max_per_session,
+            )
+
+            logger.info(
+                f"CheckpointManager created (auto_interval={auto_interval}, "
+                f"max_per_session={max_per_session})"
+            )
+            return manager
+
+        except Exception as e:
+            logger.warning(f"Failed to create CheckpointManager: {e}")
+            return None
+
     def create_workflow_optimization_components(
         self, timeout_seconds: Optional[float] = None
     ) -> WorkflowOptimizationComponents:

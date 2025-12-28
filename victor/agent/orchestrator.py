@@ -714,6 +714,10 @@ class AgentOrchestrator(ModeAwareMixin):
         # Initialize ObservabilityIntegration for unified event bus (via factory)
         self._observability = self._factory.create_observability()
 
+        # Initialize CheckpointManager for time-travel debugging (via factory)
+        # Provides save/restore/fork capabilities for conversation state
+        self._checkpoint_manager = self._factory.create_checkpoint_manager()
+
         # =================================================================
         # Workflow Optimization Components - MODE workflow optimizations
         # These address issues identified during EXPLORE/PLAN/BUILD testing
@@ -1146,6 +1150,137 @@ class AgentOrchestrator(ModeAwareMixin):
                 self._subagent_orchestration_enabled = False
 
         return self._subagent_orchestrator
+
+    @property
+    def checkpoint_manager(self) -> Optional[Any]:
+        """Get the checkpoint manager for time-travel debugging.
+
+        Use this for:
+        - Saving conversation state snapshots
+        - Restoring to previous states
+        - Forking sessions from checkpoints
+        - Comparing state differences
+
+        Returns:
+            CheckpointManager instance or None if disabled
+        """
+        return self._checkpoint_manager
+
+    async def save_checkpoint(
+        self,
+        description: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+    ) -> Optional[str]:
+        """Save a manual checkpoint of the current conversation state.
+
+        Args:
+            description: Human-readable description for the checkpoint
+            tags: Optional tags for categorization
+
+        Returns:
+            Checkpoint ID if saved, None if checkpointing is disabled
+        """
+        if not self._checkpoint_manager:
+            logger.debug("Checkpoint save skipped - manager not initialized")
+            return None
+
+        # Build conversation state for checkpointing
+        state = self._get_checkpoint_state()
+
+        try:
+            checkpoint_id = await self._checkpoint_manager.save_checkpoint(
+                session_id=self._memory_session_id or "default",
+                state=state,
+                description=description,
+                tags=tags,
+            )
+            logger.info(f"Manual checkpoint saved: {checkpoint_id[:20]}...")
+            return checkpoint_id
+        except Exception as e:
+            logger.warning(f"Failed to save checkpoint: {e}")
+            return None
+
+    async def restore_checkpoint(self, checkpoint_id: str) -> bool:
+        """Restore conversation state from a checkpoint.
+
+        Args:
+            checkpoint_id: ID of checkpoint to restore
+
+        Returns:
+            True if restored successfully, False otherwise
+        """
+        if not self._checkpoint_manager:
+            logger.warning("Cannot restore - checkpoint manager not initialized")
+            return False
+
+        try:
+            state = await self._checkpoint_manager.restore_checkpoint(checkpoint_id)
+            self._apply_checkpoint_state(state)
+            logger.info(f"Restored checkpoint: {checkpoint_id[:20]}...")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to restore checkpoint: {e}")
+            return False
+
+    async def maybe_auto_checkpoint(self) -> Optional[str]:
+        """Trigger auto-checkpoint if interval threshold is met.
+
+        This should be called after tool executions to maintain
+        automatic checkpointing based on configured interval.
+
+        Returns:
+            Checkpoint ID if auto-checkpoint was created, None otherwise
+        """
+        if not self._checkpoint_manager:
+            return None
+
+        state = self._get_checkpoint_state()
+
+        try:
+            return await self._checkpoint_manager.maybe_auto_checkpoint(
+                session_id=self._memory_session_id or "default",
+                state=state,
+            )
+        except Exception as e:
+            logger.debug(f"Auto-checkpoint failed: {e}")
+            return None
+
+    def _get_checkpoint_state(self) -> dict:
+        """Build a dictionary representing current conversation state for checkpointing."""
+        return {
+            "stage": (
+                self.conversation_state.get_current_stage().name
+                if self.conversation_state.get_current_stage()
+                else "INITIAL"
+            ),
+            "tool_history": list(self.executed_tools),
+            "observed_files": list(self.observed_files),
+            "modified_files": list(
+                getattr(self._conversation_controller, "_modified_files", set())
+            ),
+            "message_count": len(self.conversation.messages) if self.conversation else 0,
+            "tool_calls_used": self.tool_calls_used,
+            "tool_budget": self.tool_budget,
+        }
+
+    def _apply_checkpoint_state(self, state: dict) -> None:
+        """Apply a checkpoint state to restore the orchestrator.
+
+        Args:
+            state: State dictionary from checkpoint
+        """
+        # Restore execution tracking
+        self.executed_tools = set(state.get("tool_history", []))
+        self.observed_files = set(state.get("observed_files", []))
+        self.tool_calls_used = state.get("tool_calls_used", 0)
+
+        # Restore stage if present
+        stage_name = state.get("stage", "INITIAL")
+        try:
+            stage = ConversationStage[stage_name]
+            self.conversation_state.set_stage(stage)
+        except (KeyError, AttributeError):
+            logger.debug(f"Could not restore stage: {stage_name}")
 
     async def _prepare_intelligent_request(
         self, task: str, task_type: str

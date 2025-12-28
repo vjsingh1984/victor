@@ -563,3 +563,152 @@ def set_confirmation_callback(callback: ConfirmationCallback) -> None:
     """
     checker = get_safety_checker()
     checker.confirmation_callback = callback
+
+
+# =============================================================================
+# HITL Integration
+# =============================================================================
+# These functions bridge SafetyChecker with the Human-in-the-Loop workflow system,
+# enabling consistent confirmation UX across CLI/TUI/API.
+
+
+def create_hitl_confirmation_callback(
+    hitl_handler: Optional[Any] = None,
+    timeout: Optional[float] = None,
+    fallback: Optional[str] = None,
+) -> ConfirmationCallback:
+    """Create a HITL-backed confirmation callback for SafetyChecker.
+
+    This bridges the SafetyChecker's confirmation mechanism with the HITL workflow
+    system, enabling consistent UI handling across CLI, TUI, and API modes.
+
+    Args:
+        hitl_handler: HITLHandler implementation (defaults to DefaultHITLHandler)
+        timeout: Override timeout in seconds (default from settings)
+        fallback: Override fallback behavior ("abort", "continue", "skip")
+
+    Returns:
+        Async callback suitable for SafetyChecker.confirmation_callback
+    """
+    from victor.workflows.hitl import (
+        HITLRequest,
+        HITLNodeType,
+        HITLFallback,
+        HITLStatus,
+        DefaultHITLHandler,
+    )
+    import asyncio
+    import uuid
+
+    # Resolve handler
+    if hitl_handler is None:
+        hitl_handler = DefaultHITLHandler()
+
+    # Resolve settings defaults
+    default_timeout = 300.0
+    default_fallback = "abort"
+
+    try:
+        from victor.config.settings import load_settings
+        settings = load_settings()
+        default_timeout = getattr(settings, "hitl_default_timeout", 300.0)
+        default_fallback = getattr(settings, "hitl_default_fallback", "abort")
+    except Exception:
+        pass
+
+    effective_timeout = timeout if timeout is not None else default_timeout
+    effective_fallback = fallback if fallback is not None else default_fallback
+
+    # Map fallback string to enum
+    fallback_map = {
+        "abort": HITLFallback.ABORT,
+        "continue": HITLFallback.CONTINUE,
+        "skip": HITLFallback.SKIP,
+        "retry": HITLFallback.RETRY,
+    }
+    fallback_enum = fallback_map.get(effective_fallback.lower(), HITLFallback.ABORT)
+
+    async def hitl_confirmation_callback(request: ConfirmationRequest) -> bool:
+        """Convert SafetyChecker request to HITL and get response."""
+        # Map risk level to context for display
+        risk_icon = {
+            RiskLevel.SAFE: "✅",
+            RiskLevel.LOW: "📝",
+            RiskLevel.MEDIUM: "⚠️",
+            RiskLevel.HIGH: "🔴",
+            RiskLevel.CRITICAL: "⛔",
+        }.get(request.risk_level, "❓")
+
+        # Create HITL request
+        hitl_request = HITLRequest(
+            request_id=f"safety_{uuid.uuid4().hex[:12]}",
+            node_id="safety_check",
+            hitl_type=HITLNodeType.APPROVAL,
+            prompt=f"{risk_icon} {request.risk_level.value.upper()} RISK: {request.description}",
+            context={
+                "tool": request.tool_name,
+                "risk_level": request.risk_level.value,
+                "details": request.details,
+                "arguments": {k: str(v)[:200] for k, v in request.arguments.items()},
+            },
+            timeout=effective_timeout,
+            fallback=fallback_enum,
+        )
+
+        try:
+            # Request human input with timeout
+            response = await asyncio.wait_for(
+                hitl_handler.request_human_input(hitl_request),
+                timeout=effective_timeout,
+            )
+
+            # Return approval status
+            if response.status == HITLStatus.APPROVED:
+                return True
+            elif response.status == HITLStatus.TIMEOUT:
+                # On timeout, use fallback behavior
+                if fallback_enum == HITLFallback.CONTINUE:
+                    logger.warning(
+                        f"Safety confirmation timed out, continuing: {request.tool_name}"
+                    )
+                    return True
+                else:
+                    logger.warning(
+                        f"Safety confirmation timed out, aborting: {request.tool_name}"
+                    )
+                    return False
+            else:
+                # Rejected or other status
+                logger.info(
+                    f"Operation rejected: {request.tool_name} - {response.reason or 'no reason'}"
+                )
+                return False
+
+        except asyncio.TimeoutError:
+            logger.warning(f"HITL timeout for safety confirmation: {request.tool_name}")
+            if fallback_enum == HITLFallback.CONTINUE:
+                return True
+            return False
+
+        except Exception as e:
+            logger.error(f"HITL confirmation error: {e}")
+            # Block high-risk operations on error
+            if request.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL):
+                return False
+            return True
+
+    return hitl_confirmation_callback
+
+
+def setup_hitl_safety_integration(hitl_handler: Optional[Any] = None) -> None:
+    """Configure SafetyChecker to use HITL for confirmations.
+
+    Call this once during application startup to enable HITL-backed
+    confirmation prompts for dangerous operations.
+
+    Args:
+        hitl_handler: Optional custom HITLHandler implementation
+    """
+    callback = create_hitl_confirmation_callback(hitl_handler)
+    set_confirmation_callback(callback)
+    logger.info("SafetyChecker configured with HITL confirmation handler")

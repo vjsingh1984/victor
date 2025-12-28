@@ -625,6 +625,27 @@ class Settings(BaseSettings):
     context_recency_weight: float = 2.0  # Boost for recent messages
     context_semantic_threshold: float = 0.3  # Min similarity for semantic retention
 
+    # ==========================================================================
+    # Checkpoint Settings (Time-Travel Debugging)
+    # ==========================================================================
+    # Controls state checkpointing for conversation replay, forking, and debugging.
+    # Inspired by LangGraph's checkpoint system.
+    checkpoint_enabled: bool = True  # Enable checkpoint system
+    checkpoint_auto_interval: int = 5  # Tool calls between auto-checkpoints
+    checkpoint_max_per_session: int = 50  # Maximum checkpoints to keep per session
+    checkpoint_compression_enabled: bool = True  # Compress checkpoint state data
+    checkpoint_compression_threshold: int = 1024  # Min bytes before compression
+
+    # ==========================================================================
+    # HITL Settings (Human-in-the-Loop)
+    # ==========================================================================
+    # Controls human-in-the-loop workflow interrupts for approval/review/choice.
+    # Integrates with SafetyChecker for high-risk action approval.
+    hitl_default_timeout: float = 300.0  # Default timeout in seconds (5 minutes)
+    hitl_default_fallback: str = "abort"  # Default on timeout: abort, continue, or skip
+    hitl_auto_approve_low_risk: bool = False  # Auto-approve LOW risk actions
+    hitl_keyboard_shortcuts_enabled: bool = True  # Enable y/n shortcuts in TUI
+
     # Plugin System
     plugin_enabled: bool = True  # Enable plugin system
     # Note: plugin_dirs now uses get_project_paths().global_plugins_dir

@@ -53,6 +53,7 @@ class NodeType(Enum):
     CONDITION = "condition"  # Branch based on condition
     PARALLEL = "parallel"  # Execute multiple nodes in parallel
     TRANSFORM = "transform"  # Transform context data
+    HITL = "hitl"  # Human-in-the-loop interrupt
     START = "start"  # Entry point
     END = "end"  # Terminal node
 
@@ -485,6 +486,189 @@ class WorkflowBuilder:
             id=node_id,
             name=name or node_id,
             transform=transform,
+            next_nodes=next_nodes or [],
+        )
+        return self._add_node(node)
+
+    def add_hitl_approval(
+        self,
+        node_id: str,
+        prompt: str,
+        *,
+        name: Optional[str] = None,
+        context_keys: Optional[List[str]] = None,
+        timeout: float = 300.0,
+        fallback: str = "abort",
+        next_nodes: Optional[List[str]] = None,
+    ) -> "WorkflowBuilder":
+        """Add a human approval gate.
+
+        Pauses workflow execution until a human approves or rejects.
+
+        Args:
+            node_id: Unique identifier
+            prompt: Message to display for approval
+            name: Optional display name
+            context_keys: Keys from context to include in display
+            timeout: Timeout in seconds (default: 5 minutes)
+            fallback: Behavior on timeout (abort, continue, skip)
+            next_nodes: Nodes to execute after approval
+
+        Returns:
+            Self for chaining
+
+        Example:
+            workflow.add_hitl_approval(
+                "approve_changes",
+                prompt="Proceed with the following changes?",
+                context_keys=["files_to_modify"],
+                timeout=300.0,
+            )
+        """
+        from victor.workflows.hitl import HITLNode, HITLNodeType, HITLFallback
+
+        fallback_enum = HITLFallback(fallback) if fallback else HITLFallback.ABORT
+
+        node = HITLNode(
+            id=node_id,
+            name=name or node_id,
+            hitl_type=HITLNodeType.APPROVAL,
+            prompt=prompt,
+            context_keys=context_keys or [],
+            timeout=timeout,
+            fallback=fallback_enum,
+            next_nodes=next_nodes or [],
+        )
+        return self._add_node(node)
+
+    def add_hitl_choice(
+        self,
+        node_id: str,
+        prompt: str,
+        choices: List[str],
+        *,
+        name: Optional[str] = None,
+        context_keys: Optional[List[str]] = None,
+        default_value: Optional[str] = None,
+        timeout: float = 300.0,
+        fallback: str = "continue",
+        next_nodes: Optional[List[str]] = None,
+    ) -> "WorkflowBuilder":
+        """Add a human choice selection node.
+
+        Pauses workflow until human selects from options.
+
+        Args:
+            node_id: Unique identifier
+            prompt: Message to display
+            choices: Available options
+            name: Optional display name
+            context_keys: Keys from context to include in display
+            default_value: Default choice if timeout
+            timeout: Timeout in seconds
+            fallback: Behavior on timeout
+            next_nodes: Nodes to execute after
+
+        Returns:
+            Self for chaining
+        """
+        from victor.workflows.hitl import HITLNode, HITLNodeType, HITLFallback
+
+        fallback_enum = HITLFallback(fallback) if fallback else HITLFallback.CONTINUE
+
+        node = HITLNode(
+            id=node_id,
+            name=name or node_id,
+            hitl_type=HITLNodeType.CHOICE,
+            prompt=prompt,
+            context_keys=context_keys or [],
+            choices=choices,
+            default_value=default_value,
+            timeout=timeout,
+            fallback=fallback_enum,
+            next_nodes=next_nodes or [],
+        )
+        return self._add_node(node)
+
+    def add_hitl_review(
+        self,
+        node_id: str,
+        prompt: str,
+        *,
+        name: Optional[str] = None,
+        context_keys: Optional[List[str]] = None,
+        timeout: float = 600.0,
+        fallback: str = "abort",
+        next_nodes: Optional[List[str]] = None,
+    ) -> "WorkflowBuilder":
+        """Add a human review/modification node.
+
+        Pauses workflow until human reviews and optionally modifies context.
+
+        Args:
+            node_id: Unique identifier
+            prompt: Message to display
+            name: Optional display name
+            context_keys: Keys from context to include in review
+            timeout: Timeout in seconds (default: 10 minutes)
+            fallback: Behavior on timeout
+            next_nodes: Nodes to execute after
+
+        Returns:
+            Self for chaining
+        """
+        from victor.workflows.hitl import HITLNode, HITLNodeType, HITLFallback
+
+        fallback_enum = HITLFallback(fallback) if fallback else HITLFallback.ABORT
+
+        node = HITLNode(
+            id=node_id,
+            name=name or node_id,
+            hitl_type=HITLNodeType.REVIEW,
+            prompt=prompt,
+            context_keys=context_keys or [],
+            timeout=timeout,
+            fallback=fallback_enum,
+            next_nodes=next_nodes or [],
+        )
+        return self._add_node(node)
+
+    def add_hitl_confirmation(
+        self,
+        node_id: str,
+        prompt: str = "Press Enter to continue",
+        *,
+        name: Optional[str] = None,
+        timeout: float = 60.0,
+        fallback: str = "continue",
+        next_nodes: Optional[List[str]] = None,
+    ) -> "WorkflowBuilder":
+        """Add a simple confirmation gate.
+
+        Pauses briefly for human to acknowledge before continuing.
+
+        Args:
+            node_id: Unique identifier
+            prompt: Message to display
+            name: Optional display name
+            timeout: Timeout in seconds (default: 1 minute)
+            fallback: Behavior on timeout (default: continue)
+            next_nodes: Nodes to execute after
+
+        Returns:
+            Self for chaining
+        """
+        from victor.workflows.hitl import HITLNode, HITLNodeType, HITLFallback
+
+        fallback_enum = HITLFallback(fallback) if fallback else HITLFallback.CONTINUE
+
+        node = HITLNode(
+            id=node_id,
+            name=name or node_id,
+            hitl_type=HITLNodeType.CONFIRMATION,
+            prompt=prompt,
+            timeout=timeout,
+            fallback=fallback_enum,
             next_nodes=next_nodes or [],
         )
         return self._add_node(node)
