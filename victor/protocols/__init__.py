@@ -69,6 +69,34 @@ from victor.protocols.path_resolver import (
     create_path_resolver,
 )
 
+from victor.protocols.lsp_types import (
+    # Enumerations
+    DiagnosticSeverity,
+    CompletionItemKind,
+    SymbolKind,
+    DiagnosticTag,
+    # Position and Range
+    Position,
+    Range,
+    Location,
+    LocationLink,
+    # Diagnostics
+    DiagnosticRelatedInformation,
+    Diagnostic,
+    # Completions
+    CompletionItem,
+    # Hover
+    Hover,
+    # Symbols
+    DocumentSymbol,
+    SymbolInformation,
+    # Text Edits
+    TextEdit,
+    TextDocumentIdentifier,
+    VersionedTextDocumentIdentifier,
+    TextDocumentEdit,
+)
+
 __all__ = [
     # Provider Adapter
     "IProviderAdapter",
@@ -106,4 +134,29 @@ __all__ = [
     "PathResolution",
     "PathResolver",
     "create_path_resolver",
+    # LSP Types - Enumerations
+    "DiagnosticSeverity",
+    "CompletionItemKind",
+    "SymbolKind",
+    "DiagnosticTag",
+    # LSP Types - Position and Range
+    "Position",
+    "Range",
+    "Location",
+    "LocationLink",
+    # LSP Types - Diagnostics
+    "DiagnosticRelatedInformation",
+    "Diagnostic",
+    # LSP Types - Completions
+    "CompletionItem",
+    # LSP Types - Hover
+    "Hover",
+    # LSP Types - Symbols
+    "DocumentSymbol",
+    "SymbolInformation",
+    # LSP Types - Text Edits
+    "TextEdit",
+    "TextDocumentIdentifier",
+    "VersionedTextDocumentIdentifier",
+    "TextDocumentEdit",
 ]
