@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from victor.codebase.ignore_patterns import DEFAULT_SKIP_DIRS, is_hidden_path, should_ignore_path
+from victor_coding.codebase.ignore_patterns import DEFAULT_SKIP_DIRS, is_hidden_path, should_ignore_path
 from victor.config.settings import VICTOR_CONTEXT_FILE, get_project_paths
 
 logger = logging.getLogger(__name__)
@@ -2054,7 +2054,7 @@ async def generate_victor_md_from_index(
     Returns:
         Generated markdown content for .victor/init.md.
     """
-    from victor.codebase.symbol_store import SymbolStore
+    from victor_coding.codebase.symbol_store import SymbolStore
 
     root = Path(root_path).resolve() if root_path else Path.cwd()
     store = SymbolStore(str(root), include_dirs=include_dirs, exclude_dirs=exclude_dirs)
@@ -2565,7 +2565,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
     """
     from pathlib import Path
     from victor.tools.graph_tool import GraphAnalyzer, _load_graph
-    from victor.codebase.graph.registry import create_graph_store
+    from victor_coding.codebase.graph.registry import create_graph_store
 
     root = Path(root_path).resolve() if root_path else Path.cwd()
     graph_dir = root / ".victor" / "graph"
@@ -2689,7 +2689,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             # Optional richer graph analytics
             try:
                 from victor.tools.graph_tool import GraphAnalyzer
-                from victor.codebase.graph.sqlite_store import SQLiteGraphStore
+                from victor_coding.codebase.graph.sqlite_store import SQLiteGraphStore
 
                 ga = GraphAnalyzer()
                 store = SQLiteGraphStore(graph_db_path)

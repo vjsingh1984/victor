@@ -113,7 +113,7 @@ class LSPCompletionProvider(BaseCompletionProvider):
             return self._lsp_manager
 
         try:
-            from victor.lsp.manager import LSPManager
+            from victor_coding.lsp.manager import LSPManager
 
             self._lsp_manager = LSPManager()
             return self._lsp_manager

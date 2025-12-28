@@ -12,10 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Coverage parsers subpackage."""
+"""Coverage parsers subpackage.
 
-# Re-export from parent parser module for convenience
-from victor.coverage.parser import (
+.. deprecated:: 0.3.0
+    This module has moved to ``victor_coding.coverage.parsers``.
+    Please update your imports. This shim will be removed in version 0.5.0.
+"""
+
+import warnings
+
+warnings.warn(
+    "Importing from 'victor.coverage.parsers' is deprecated. "
+    "Please use 'victor_coding.coverage.parser' instead. "
+    "This compatibility shim will be removed in version 0.5.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+# Re-export from victor_coding for backward compatibility
+from victor_coding.coverage.parser import (
     BaseCoverageParser,
     CloverParser,
     CoberturaParser,
