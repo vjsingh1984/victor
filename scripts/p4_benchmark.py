@@ -82,7 +82,7 @@ async def run_query_benchmark(
 ) -> BenchmarkResult:
     """Run a single query with given configuration."""
     from victor.config.settings import Settings
-    from victor.codebase.indexer import CodebaseIndex
+    from victor_coding.codebase.indexer import CodebaseIndex
 
     # Create settings with benchmark config
     settings = Settings()
