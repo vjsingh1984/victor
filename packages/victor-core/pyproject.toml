@@ -9,7 +9,7 @@ build-backend = "hatchling.build"
 name = "victor-core"
 version = "0.3.0"
 description = "Victor AI Framework Core - Multi-provider LLM orchestration, tools, and protocols"
-readme = "../../README.md"
+readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [
     {name = "Vijaykumar Singh", email = "singhvjd@gmail.com"}

@@ -9,7 +9,7 @@ build-backend = "hatchling.build"
 name = "victor-coding"
 version = "0.1.0"
 description = "Victor AI Coding Vertical - Code intelligence, Tree-sitter, LSP, and 25 coding tools"
-readme = "../../README.md"
+readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [
     {name = "Vijaykumar Singh", email = "singhvjd@gmail.com"}
