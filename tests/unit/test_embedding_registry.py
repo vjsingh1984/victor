@@ -16,8 +16,8 @@
 
 import pytest
 
-from victor_coding.codebase.embeddings.registry import EmbeddingRegistry
-from victor_coding.codebase.embeddings.base import BaseEmbeddingProvider, EmbeddingConfig
+from victor.vector_stores.registry import EmbeddingRegistry
+from victor.vector_stores.base import BaseEmbeddingProvider, EmbeddingConfig
 
 
 class MockEmbeddingProvider(BaseEmbeddingProvider):

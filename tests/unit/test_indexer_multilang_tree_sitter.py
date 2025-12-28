@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from victor_coding.codebase.graph.registry import create_graph_store
+from victor.graph.registry import create_graph_store
 from victor_coding.codebase.indexer import CodebaseIndex
 
 

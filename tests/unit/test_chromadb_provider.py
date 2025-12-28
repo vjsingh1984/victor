@@ -17,8 +17,8 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor_coding.codebase.embeddings.base import EmbeddingConfig, SearchResult
-from victor_coding.codebase.embeddings.chromadb_provider import ChromaDBProvider
+from victor.vector_stores.base import EmbeddingConfig, SearchResult
+from victor.vector_stores.chromadb_provider import ChromaDBProvider
 
 
 @pytest.fixture

@@ -17,8 +17,8 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor_coding.codebase.embeddings.base import EmbeddingConfig, SearchResult
-from victor_coding.codebase.embeddings.lancedb_provider import LanceDBProvider
+from victor.vector_stores.base import EmbeddingConfig, SearchResult
+from victor.vector_stores.lancedb_provider import LanceDBProvider
 
 
 @pytest.fixture

@@ -19,9 +19,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 
-from victor_coding.codebase.graph.protocol import GraphNode, GraphEdge
-from victor_coding.codebase.graph.registry import create_graph_store
-from victor_coding.codebase.graph.memory_store import MemoryGraphStore
+from victor.graph.protocol import GraphNode, GraphEdge
+from victor.graph.registry import create_graph_store
+from victor.graph.memory_store import MemoryGraphStore
 
 
 class TestGraphNode:
@@ -553,7 +553,7 @@ class TestGraphStoreProtocol:
 
     def test_protocol_methods_exist(self):
         """Test that protocol defines all required methods."""
-        from victor_coding.codebase.graph.protocol import GraphStoreProtocol
+        from victor.graph.protocol import GraphStoreProtocol
         import inspect
 
         # Get all abstract methods from protocol
