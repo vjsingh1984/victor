@@ -2,7 +2,7 @@
 
 import pytest
 
-from victor.codebase.query_expander import (
+from victor_coding.codebase.query_expander import (
     QueryExpander,
     expand_query,
     get_query_expander,

@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-from victor.codebase.symbol_store import SymbolStore, SymbolInfo
+from victor_coding.codebase.symbol_store import SymbolStore, SymbolInfo
 
 
 class TestPythonExtraction:

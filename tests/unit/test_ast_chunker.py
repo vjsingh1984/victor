@@ -19,8 +19,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, MagicMock, patch
 
-from victor.codebase.embeddings.chunker import ASTAwareChunker
-from victor.languages.base import CodeChunk
+from victor_coding.codebase.embeddings.chunker import ASTAwareChunker
+from victor_coding.languages.base import CodeChunk
 
 
 class TestASTAwareChunkerInit:

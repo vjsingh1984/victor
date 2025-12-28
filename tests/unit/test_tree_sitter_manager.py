@@ -17,7 +17,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from victor.codebase.tree_sitter_manager import (
+from victor_coding.codebase.tree_sitter_manager import (
     LANGUAGE_MODULES,
     _language_cache,
     _parser_cache,

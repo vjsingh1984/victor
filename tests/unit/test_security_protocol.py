@@ -18,7 +18,7 @@ import pytest
 from datetime import datetime
 from pathlib import Path
 
-from victor.security.protocol import (
+from victor_coding.security.protocol import (
     CVE,
     CVSSMetrics,
     Dependency,

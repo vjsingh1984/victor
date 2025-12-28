@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor.editing.editor import (
+from victor_coding.editing.editor import (
     OperationType,
     EditOperation,
     EditTransaction,

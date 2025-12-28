@@ -20,10 +20,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 import numpy as np
 
-from victor.codebase.embeddings.base import EmbeddingConfig
-from victor.codebase.embeddings.lancedb_provider import LanceDBProvider
-from victor.codebase.embeddings.chromadb_provider import ChromaDBProvider
-from victor.codebase.embeddings.models import SentenceTransformerModel, EmbeddingModelConfig
+from victor_coding.codebase.embeddings.base import EmbeddingConfig
+from victor_coding.codebase.embeddings.lancedb_provider import LanceDBProvider
+from victor_coding.codebase.embeddings.chromadb_provider import ChromaDBProvider
+from victor_coding.codebase.embeddings.models import SentenceTransformerModel, EmbeddingModelConfig
 
 # Check if chromadb is available
 import importlib.util
