@@ -491,6 +491,61 @@
       {
         "command": "victor.addToComposer",
         "title": "Victor: Add to Composer"
+      },
+      {
+        "command": "victor.refreshTeams",
+        "title": "Victor: Refresh Teams",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "victor.clearTeams",
+        "title": "Victor: Clear Completed Teams",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "victor.createTeam",
+        "title": "Victor: Create Agent Team",
+        "icon": "$(add)"
+      },
+      {
+        "command": "victor.startTeam",
+        "title": "Victor: Start Team",
+        "icon": "$(play)"
+      },
+      {
+        "command": "victor.cancelTeam",
+        "title": "Victor: Cancel Team",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "victor.viewTeamOutput",
+        "title": "Victor: View Team Output",
+        "icon": "$(output)"
+      },
+      {
+        "command": "victor.refreshWorkflows",
+        "title": "Victor: Refresh Workflows",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "victor.toggleWorkflowView",
+        "title": "Victor: Toggle Workflow View",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "victor.executeWorkflow",
+        "title": "Victor: Execute Workflow",
+        "icon": "$(play)"
+      },
+      {
+        "command": "victor.cancelWorkflow",
+        "title": "Victor: Cancel Workflow",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "victor.viewWorkflowOutput",
+        "title": "Victor: View Workflow Output",
+        "icon": "$(output)"
       }
     ],
     "menus": {
@@ -589,6 +644,31 @@
           "command": "victor.addMcpServer",
           "when": "view == victor.mcpView",
           "group": "navigation"
+        },
+        {
+          "command": "victor.createTeam",
+          "when": "view == victor.teamsView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "victor.refreshTeams",
+          "when": "view == victor.teamsView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "victor.clearTeams",
+          "when": "view == victor.teamsView",
+          "group": "navigation@3"
+        },
+        {
+          "command": "victor.refreshWorkflows",
+          "when": "view == victor.workflowsView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "victor.toggleWorkflowView",
+          "when": "view == victor.workflowsView",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
@@ -641,6 +721,36 @@
           "command": "victor.disconnectMcpServer",
           "when": "view == victor.mcpView && viewItem == connectedServer",
           "group": "inline"
+        },
+        {
+          "command": "victor.startTeam",
+          "when": "view == victor.teamsView && viewItem == team-draft",
+          "group": "inline@1"
+        },
+        {
+          "command": "victor.cancelTeam",
+          "when": "view == victor.teamsView && viewItem == team-running",
+          "group": "inline@1"
+        },
+        {
+          "command": "victor.viewTeamOutput",
+          "when": "view == victor.teamsView && viewItem =~ /^team-.+/",
+          "group": "inline@2"
+        },
+        {
+          "command": "victor.executeWorkflow",
+          "when": "view == victor.workflowsView && viewItem == workflow-template",
+          "group": "inline"
+        },
+        {
+          "command": "victor.cancelWorkflow",
+          "when": "view == victor.workflowsView && viewItem == workflow-execution-running",
+          "group": "inline@1"
+        },
+        {
+          "command": "victor.viewWorkflowOutput",
+          "when": "view == victor.workflowsView && viewItem =~ /^workflow-execution-.+/",
+          "group": "inline@2"
         }
       ]
     },
@@ -1125,6 +1235,16 @@
         {
           "id": "victor.mcpView",
           "name": "MCP Servers"
+        },
+        {
+          "id": "victor.teamsView",
+          "name": "Teams",
+          "contextualTitle": "Agent Teams"
+        },
+        {
+          "id": "victor.workflowsView",
+          "name": "Workflows",
+          "contextualTitle": "Workflow Templates"
         }
       ]
     },

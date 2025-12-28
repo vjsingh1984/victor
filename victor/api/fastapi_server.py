@@ -2224,6 +2224,524 @@ Respond with just the command to run."""
             del _plans[plan_id]
             return JSONResponse({"success": True, "message": f"Plan {plan_id} deleted"})
 
+        # =====================================================================
+        # Teams API Endpoints
+        # =====================================================================
+
+        # In-memory team storage
+        _teams: Dict[str, Dict[str, Any]] = {}
+        _team_messages: Dict[str, List[Dict[str, Any]]] = {}
+
+        @app.post("/teams", tags=["Teams"])
+        async def create_team(request: Request) -> JSONResponse:
+            """Create a new agent team."""
+            try:
+                data = await request.json()
+                name = data.get("name", "Unnamed Team")
+                goal = data.get("goal", "")
+                formation = data.get("formation", "sequential")
+                members = data.get("members", [])
+                total_tool_budget = data.get("total_tool_budget", 100)
+
+                team_id = str(uuid.uuid4())[:8]
+
+                # Build member list with default values
+                team_members = []
+                for i, m in enumerate(members):
+                    member = {
+                        "id": m.get("id", f"member_{i+1}"),
+                        "role": m.get("role", "executor"),
+                        "name": m.get("name", f"Agent {i+1}"),
+                        "goal": m.get("goal", ""),
+                        "status": "pending",
+                        "tool_budget": total_tool_budget // len(members) if members else 0,
+                        "tools_used": 0,
+                        "discoveries": [],
+                        "is_manager": m.get("is_manager", False),
+                    }
+                    team_members.append(member)
+
+                # Set first member as manager for hierarchical formation
+                if formation == "hierarchical" and team_members:
+                    team_members[0]["is_manager"] = True
+
+                _teams[team_id] = {
+                    "id": team_id,
+                    "name": name,
+                    "goal": goal,
+                    "formation": formation,
+                    "status": "draft",
+                    "members": team_members,
+                    "total_tool_budget": total_tool_budget,
+                    "total_tools_used": 0,
+                    "start_time": None,
+                    "end_time": None,
+                    "current_step": None,
+                    "output": None,
+                    "error": None,
+                }
+                _team_messages[team_id] = []
+
+                # Broadcast team created event
+                await self._broadcast_ws({
+                    "type": "agent_event",
+                    "event": "team_created",
+                    "data": _teams[team_id],
+                    "timestamp": time.time(),
+                })
+
+                return JSONResponse({
+                    "success": True,
+                    "team_id": team_id,
+                    "message": f"Team '{name}' created",
+                })
+
+            except Exception as e:
+                logger.exception("Failed to create team")
+                return JSONResponse({"error": str(e)}, status_code=500)
+
+        @app.get("/teams", tags=["Teams"])
+        async def list_teams(
+            status: Optional[str] = Query(None, description="Filter by status"),
+        ) -> JSONResponse:
+            """List all teams."""
+            teams_list = []
+            for team in _teams.values():
+                if status is None or team.get("status") == status:
+                    teams_list.append(team)
+            return JSONResponse({"teams": teams_list})
+
+        @app.get("/teams/{team_id}", tags=["Teams"])
+        async def get_team(team_id: str) -> JSONResponse:
+            """Get team details."""
+            if team_id not in _teams:
+                return JSONResponse({"error": "Team not found"}, status_code=404)
+            return JSONResponse(_teams[team_id])
+
+        @app.post("/teams/{team_id}/start", tags=["Teams"])
+        async def start_team(team_id: str) -> JSONResponse:
+            """Start team execution."""
+            if team_id not in _teams:
+                return JSONResponse({"error": "Team not found"}, status_code=404)
+
+            team = _teams[team_id]
+            if team["status"] not in ("draft", "paused"):
+                return JSONResponse(
+                    {"error": f"Cannot start team in status: {team['status']}"},
+                    status_code=400,
+                )
+
+            team["status"] = "running"
+            team["start_time"] = time.time()
+
+            # Set all members to pending
+            for member in team["members"]:
+                member["status"] = "pending"
+
+            # Broadcast team started event
+            await self._broadcast_ws({
+                "type": "agent_event",
+                "event": "team_started",
+                "data": team,
+                "timestamp": time.time(),
+            })
+
+            # Start team execution in background
+            async def execute_team():
+                try:
+                    from victor.agent.teams import (
+                        TeamConfig,
+                        TeamMember,
+                        TeamFormation,
+                        TeamCoordinator,
+                    )
+                    from victor.agent.subagents import SubAgentRole
+
+                    orchestrator = await self._get_orchestrator()
+
+                    # Build TeamConfig
+                    role_map = {
+                        "researcher": SubAgentRole.RESEARCHER,
+                        "planner": SubAgentRole.PLANNER,
+                        "executor": SubAgentRole.EXECUTOR,
+                        "reviewer": SubAgentRole.REVIEWER,
+                        "tester": SubAgentRole.TESTER,
+                    }
+                    formation_map = {
+                        "sequential": TeamFormation.SEQUENTIAL,
+                        "parallel": TeamFormation.PARALLEL,
+                        "hierarchical": TeamFormation.HIERARCHICAL,
+                        "pipeline": TeamFormation.PIPELINE,
+                    }
+
+                    members = []
+                    for m in team["members"]:
+                        role = role_map.get(m["role"], SubAgentRole.EXECUTOR)
+                        members.append(TeamMember(
+                            id=m["id"],
+                            role=role,
+                            name=m["name"],
+                            goal=m["goal"],
+                            tool_budget=m["tool_budget"],
+                            is_manager=m.get("is_manager", False),
+                        ))
+
+                    config = TeamConfig(
+                        name=team["name"],
+                        goal=team["goal"],
+                        members=members,
+                        formation=formation_map.get(team["formation"], TeamFormation.SEQUENTIAL),
+                        total_tool_budget=team["total_tool_budget"],
+                    )
+
+                    coordinator = TeamCoordinator(orchestrator)
+                    result = await coordinator.execute_team(config)
+
+                    # Update team status
+                    if team_id in _teams:
+                        team["status"] = "completed" if result.success else "failed"
+                        team["end_time"] = time.time()
+                        team["output"] = result.final_output
+                        team["total_tools_used"] = result.total_tool_calls
+
+                        # Update member results
+                        for member in team["members"]:
+                            if member["id"] in result.member_results:
+                                mr = result.member_results[member["id"]]
+                                member["status"] = "completed" if mr.success else "failed"
+                                member["tools_used"] = mr.tool_calls_used
+                                member["discoveries"] = mr.discoveries
+
+                        # Broadcast completion
+                        await self._broadcast_ws({
+                            "type": "agent_event",
+                            "event": "team_completed" if result.success else "team_failed",
+                            "data": team,
+                            "timestamp": time.time(),
+                        })
+
+                except Exception as e:
+                    logger.exception(f"Team {team_id} execution error")
+                    if team_id in _teams:
+                        team["status"] = "failed"
+                        team["error"] = str(e)
+                        team["end_time"] = time.time()
+
+                        await self._broadcast_ws({
+                            "type": "agent_event",
+                            "event": "team_failed",
+                            "data": team,
+                            "timestamp": time.time(),
+                        })
+
+            asyncio.create_task(execute_team())
+
+            return JSONResponse({
+                "success": True,
+                "message": f"Team {team_id} started",
+            })
+
+        @app.post("/teams/{team_id}/cancel", tags=["Teams"])
+        async def cancel_team(team_id: str) -> JSONResponse:
+            """Cancel a running team."""
+            if team_id not in _teams:
+                return JSONResponse({"error": "Team not found"}, status_code=404)
+
+            team = _teams[team_id]
+            if team["status"] != "running":
+                return JSONResponse(
+                    {"error": f"Cannot cancel team in status: {team['status']}"},
+                    status_code=400,
+                )
+
+            team["status"] = "cancelled"
+            team["end_time"] = time.time()
+
+            # Broadcast cancellation
+            await self._broadcast_ws({
+                "type": "agent_event",
+                "event": "team_cancelled",
+                "data": team,
+                "timestamp": time.time(),
+            })
+
+            return JSONResponse({
+                "success": True,
+                "message": f"Team {team_id} cancelled",
+            })
+
+        @app.post("/teams/clear", tags=["Teams"])
+        async def clear_teams() -> JSONResponse:
+            """Clear completed/failed/cancelled teams."""
+            cleared = 0
+            to_delete = []
+            for team_id, team in _teams.items():
+                if team["status"] in ("completed", "failed", "cancelled"):
+                    to_delete.append(team_id)
+
+            for team_id in to_delete:
+                del _teams[team_id]
+                if team_id in _team_messages:
+                    del _team_messages[team_id]
+                cleared += 1
+
+            return JSONResponse({
+                "success": True,
+                "cleared": cleared,
+            })
+
+        @app.get("/teams/{team_id}/messages", tags=["Teams"])
+        async def get_team_messages(team_id: str) -> JSONResponse:
+            """Get team inter-agent messages."""
+            if team_id not in _teams:
+                return JSONResponse({"error": "Team not found"}, status_code=404)
+
+            messages = _team_messages.get(team_id, [])
+            return JSONResponse({"messages": messages})
+
+        # =====================================================================
+        # Workflows API Endpoints
+        # =====================================================================
+
+        # In-memory workflow storage
+        _workflow_executions: Dict[str, Dict[str, Any]] = {}
+
+        @app.get("/workflows/templates", tags=["Workflows"])
+        async def list_workflow_templates() -> JSONResponse:
+            """List available workflow templates."""
+            try:
+                from victor.workflows import get_workflow_registry
+
+                registry = get_workflow_registry()
+                templates = []
+
+                for workflow_id, workflow_def in registry._workflows.items():
+                    templates.append({
+                        "id": workflow_id,
+                        "name": workflow_def.name,
+                        "description": workflow_def.description or "",
+                        "category": workflow_def.metadata.get("category", "General"),
+                        "steps": [
+                            {
+                                "id": node.id,
+                                "name": node.name or node.id,
+                                "type": node.type.value,
+                                "role": getattr(node, "role", None),
+                                "goal": getattr(node, "goal", None),
+                            }
+                            for node in workflow_def.nodes.values()
+                        ],
+                        "tags": workflow_def.metadata.get("tags", []),
+                        "estimated_duration": workflow_def.metadata.get("estimated_duration"),
+                    })
+
+                return JSONResponse({"templates": templates})
+
+            except ImportError:
+                # Workflows module not available - return empty list
+                return JSONResponse({"templates": []})
+            except Exception as e:
+                logger.exception("Failed to list workflow templates")
+                return JSONResponse({"error": str(e)}, status_code=500)
+
+        @app.get("/workflows/templates/{template_id}", tags=["Workflows"])
+        async def get_workflow_template(template_id: str) -> JSONResponse:
+            """Get workflow template details."""
+            try:
+                from victor.workflows import get_workflow_registry
+
+                registry = get_workflow_registry()
+                workflow_def = registry.get(template_id)
+
+                if workflow_def is None:
+                    return JSONResponse({"error": "Template not found"}, status_code=404)
+
+                return JSONResponse({
+                    "id": template_id,
+                    "name": workflow_def.name,
+                    "description": workflow_def.description or "",
+                    "category": workflow_def.metadata.get("category", "General"),
+                    "steps": [
+                        {
+                            "id": node.id,
+                            "name": node.name or node.id,
+                            "type": node.type.value,
+                            "role": getattr(node, "role", None),
+                            "goal": getattr(node, "goal", None),
+                        }
+                        for node in workflow_def.nodes.values()
+                    ],
+                    "tags": workflow_def.metadata.get("tags", []),
+                })
+
+            except ImportError:
+                return JSONResponse({"error": "Workflows module not available"}, status_code=404)
+            except Exception as e:
+                logger.exception("Failed to get workflow template")
+                return JSONResponse({"error": str(e)}, status_code=500)
+
+        @app.post("/workflows/execute", tags=["Workflows"])
+        async def execute_workflow(request: Request) -> JSONResponse:
+            """Execute a workflow."""
+            try:
+                data = await request.json()
+                template_id = data.get("template_id")
+                parameters = data.get("parameters", {})
+
+                if not template_id:
+                    return JSONResponse({"error": "template_id required"}, status_code=400)
+
+                from victor.workflows import get_workflow_registry, WorkflowExecutor
+
+                registry = get_workflow_registry()
+                workflow_def = registry.get(template_id)
+
+                if workflow_def is None:
+                    return JSONResponse({"error": "Template not found"}, status_code=404)
+
+                execution_id = str(uuid.uuid4())[:8]
+
+                # Initialize execution state
+                _workflow_executions[execution_id] = {
+                    "id": execution_id,
+                    "workflow_id": template_id,
+                    "workflow_name": workflow_def.name,
+                    "status": "running",
+                    "parameters": parameters,
+                    "current_step": None,
+                    "progress": 0,
+                    "start_time": time.time(),
+                    "end_time": None,
+                    "steps": [
+                        {
+                            "id": node.id,
+                            "name": node.name or node.id,
+                            "type": node.type.value,
+                            "status": "pending",
+                        }
+                        for node in workflow_def.nodes.values()
+                    ],
+                    "output": None,
+                    "error": None,
+                }
+
+                # Broadcast workflow started
+                await self._broadcast_ws({
+                    "type": "agent_event",
+                    "event": "workflow_started",
+                    "data": _workflow_executions[execution_id],
+                    "timestamp": time.time(),
+                })
+
+                # Execute in background
+                async def run_workflow():
+                    try:
+                        orchestrator = await self._get_orchestrator()
+                        executor = WorkflowExecutor(orchestrator)
+
+                        result = await executor.execute(
+                            workflow_def,
+                            initial_context=parameters,
+                        )
+
+                        if execution_id in _workflow_executions:
+                            exec_state = _workflow_executions[execution_id]
+                            exec_state["status"] = "completed" if result.success else "failed"
+                            exec_state["end_time"] = time.time()
+                            exec_state["progress"] = 100
+                            exec_state["output"] = str(result.final_output) if result.final_output else None
+
+                            # Update step statuses
+                            for step in exec_state["steps"]:
+                                node_result = result.node_results.get(step["id"])
+                                if node_result:
+                                    step["status"] = "completed" if node_result.success else "failed"
+                                    step["duration"] = node_result.duration_ms / 1000 if node_result.duration_ms else None
+
+                            # Broadcast completion
+                            await self._broadcast_ws({
+                                "type": "agent_event",
+                                "event": "workflow_completed" if result.success else "workflow_failed",
+                                "data": exec_state,
+                                "timestamp": time.time(),
+                            })
+
+                    except Exception as e:
+                        logger.exception(f"Workflow {execution_id} error")
+                        if execution_id in _workflow_executions:
+                            exec_state = _workflow_executions[execution_id]
+                            exec_state["status"] = "failed"
+                            exec_state["error"] = str(e)
+                            exec_state["end_time"] = time.time()
+
+                            await self._broadcast_ws({
+                                "type": "agent_event",
+                                "event": "workflow_failed",
+                                "data": exec_state,
+                                "timestamp": time.time(),
+                            })
+
+                asyncio.create_task(run_workflow())
+
+                return JSONResponse({
+                    "success": True,
+                    "execution_id": execution_id,
+                    "message": f"Workflow '{workflow_def.name}' started",
+                })
+
+            except ImportError:
+                return JSONResponse({"error": "Workflows module not available"}, status_code=500)
+            except Exception as e:
+                logger.exception("Failed to execute workflow")
+                return JSONResponse({"error": str(e)}, status_code=500)
+
+        @app.get("/workflows/executions", tags=["Workflows"])
+        async def list_workflow_executions(
+            status: Optional[str] = Query(None, description="Filter by status"),
+        ) -> JSONResponse:
+            """List workflow executions."""
+            executions = []
+            for exec_state in _workflow_executions.values():
+                if status is None or exec_state.get("status") == status:
+                    executions.append(exec_state)
+            return JSONResponse({"executions": executions})
+
+        @app.get("/workflows/executions/{execution_id}", tags=["Workflows"])
+        async def get_workflow_execution(execution_id: str) -> JSONResponse:
+            """Get workflow execution details."""
+            if execution_id not in _workflow_executions:
+                return JSONResponse({"error": "Execution not found"}, status_code=404)
+            return JSONResponse(_workflow_executions[execution_id])
+
+        @app.post("/workflows/executions/{execution_id}/cancel", tags=["Workflows"])
+        async def cancel_workflow_execution(execution_id: str) -> JSONResponse:
+            """Cancel a workflow execution."""
+            if execution_id not in _workflow_executions:
+                return JSONResponse({"error": "Execution not found"}, status_code=404)
+
+            exec_state = _workflow_executions[execution_id]
+            if exec_state["status"] != "running":
+                return JSONResponse(
+                    {"error": f"Cannot cancel execution in status: {exec_state['status']}"},
+                    status_code=400,
+                )
+
+            exec_state["status"] = "cancelled"
+            exec_state["end_time"] = time.time()
+
+            # Broadcast cancellation
+            await self._broadcast_ws({
+                "type": "agent_event",
+                "event": "workflow_cancelled",
+                "data": exec_state,
+                "timestamp": time.time(),
+            })
+
+            return JSONResponse({
+                "success": True,
+                "message": f"Workflow execution {execution_id} cancelled",
+            })
+
         # Placeholder endpoints
         @app.get("/credentials/get", tags=["System"])
         async def credentials_get(provider: str = Query("")) -> JSONResponse:

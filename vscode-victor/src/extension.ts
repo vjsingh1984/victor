@@ -36,6 +36,8 @@ import { TerminalAgentProvider, registerTerminalAgentCommands } from './terminal
 import { TerminalHistoryService } from './terminalHistory';
 import { SmartPasteProvider, registerSmartPasteCommands } from './smartPaste';
 import { ComposerViewProvider, registerComposerCommands } from './composer';
+import { TeamsViewProvider, registerTeamCommands } from './teamsView';
+import { WorkflowsViewProvider, registerWorkflowCommands } from './workflowsView';
 import { getStore, selectors, AgentMode, ModelInfo } from './state';
 
 // Provider instances (managed centrally, accessed via module)
@@ -70,6 +72,8 @@ interface ExtensionProviders {
     terminalAgentProvider: TerminalAgentProvider;
     smartPasteProvider: SmartPasteProvider;
     composerViewProvider: ComposerViewProvider;
+    teamsViewProvider: TeamsViewProvider;
+    workflowsViewProvider: WorkflowsViewProvider;
     statusBarItem: vscode.StatusBarItem;
     serverStatusBarItem: vscode.StatusBarItem;
 }
@@ -257,6 +261,28 @@ export async function activate(context: vscode.ExtensionContext) {
     // Register agent and plan commands
     registerAgentCommands(context, agentsViewProvider);
     registerPlanCommands(context, plansViewProvider);
+
+    // Initialize teams view
+    const teamsViewProvider = new TeamsViewProvider(victorClient, clientOutput);
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider(
+            'victor.teamsView',
+            teamsViewProvider
+        )
+    );
+    context.subscriptions.push({ dispose: () => teamsViewProvider.dispose() });
+    registerTeamCommands(context, teamsViewProvider);
+
+    // Initialize workflows view
+    const workflowsViewProvider = new WorkflowsViewProvider(victorClient, clientOutput);
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider(
+            'victor.workflowsView',
+            workflowsViewProvider
+        )
+    );
+    context.subscriptions.push({ dispose: () => workflowsViewProvider.dispose() });
+    registerWorkflowCommands(context, workflowsViewProvider);
 
     // Initialize diff view provider
     const diffViewProvider = new DiffViewProvider();
@@ -465,6 +491,8 @@ export async function activate(context: vscode.ExtensionContext) {
         terminalAgentProvider,
         smartPasteProvider,
         composerViewProvider,
+        teamsViewProvider,
+        workflowsViewProvider,
         statusBarItem,
         serverStatusBarItem,
     };
