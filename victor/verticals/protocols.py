@@ -694,6 +694,90 @@ class ServiceProviderProtocol(Protocol):
 
 
 # =============================================================================
+# RL Config Provider Protocol
+# =============================================================================
+
+
+@runtime_checkable
+class RLConfigProviderProtocol(Protocol):
+    """Protocol for providing RL (Reinforcement Learning) configuration.
+
+    Enables verticals to configure RL learners, task type mappings,
+    and quality thresholds for adaptive behavior.
+
+    Example:
+        class CodingRLConfigProvider(RLConfigProviderProtocol):
+            def get_rl_config(self) -> Dict[str, Any]:
+                return {
+                    "active_learners": ["tool_selection", "semantic_threshold"],
+                    "quality_thresholds": {"code_review": 0.8, "bugfix": 0.85},
+                }
+    """
+
+    @abstractmethod
+    def get_rl_config(self) -> Dict[str, Any]:
+        """Get RL configuration for this vertical.
+
+        Returns:
+            Dict with RL configuration including:
+            - active_learners: List of learner types to enable
+            - quality_thresholds: Task-specific quality thresholds
+            - task_type_mappings: Map task types to learner configs
+        """
+        ...
+
+    def get_rl_hooks(self) -> Optional[Any]:
+        """Get RL hooks for outcome recording.
+
+        Returns:
+            RLHooks instance or None
+        """
+        return None
+
+
+# =============================================================================
+# Team Spec Provider Protocol
+# =============================================================================
+
+
+@runtime_checkable
+class TeamSpecProviderProtocol(Protocol):
+    """Protocol for providing team specifications.
+
+    Enables verticals to define multi-agent team configurations
+    for complex task execution.
+
+    Example:
+        class CodingTeamSpecProvider(TeamSpecProviderProtocol):
+            def get_team_specs(self) -> Dict[str, Any]:
+                return {
+                    "code_review_team": TeamSpec(
+                        name="code_review_team",
+                        formation=TeamFormation.PIPELINE,
+                        agents=[...],
+                    ),
+                }
+    """
+
+    @abstractmethod
+    def get_team_specs(self) -> Dict[str, Any]:
+        """Get team specifications for this vertical.
+
+        Returns:
+            Dict mapping team names to TeamSpec instances
+        """
+        ...
+
+    def get_default_team(self) -> Optional[str]:
+        """Get the default team name.
+
+        Returns:
+            Default team name or None
+        """
+        return None
+
+
+# =============================================================================
 # Composite Vertical Extension
 # =============================================================================
 
@@ -722,6 +806,8 @@ class VerticalExtensions:
     tool_dependency_provider: Optional[ToolDependencyProviderProtocol] = None
     workflow_provider: Optional[WorkflowProviderProtocol] = None
     service_provider: Optional[ServiceProviderProtocol] = None
+    rl_config_provider: Optional[RLConfigProviderProtocol] = None
+    team_spec_provider: Optional[TeamSpecProviderProtocol] = None
 
     def get_all_task_hints(self) -> Dict[str, TaskTypeHint]:
         """Merge task hints from all contributors.
@@ -768,6 +854,7 @@ __all__ = [
     "TaskTypeHint",
     "ModeConfig",
     "ToolDependency",
+    "TieredToolConfig",
     # Protocols
     "MiddlewareProtocol",
     "SafetyExtensionProtocol",
@@ -776,6 +863,8 @@ __all__ = [
     "ToolDependencyProviderProtocol",
     "WorkflowProviderProtocol",
     "ServiceProviderProtocol",
+    "RLConfigProviderProtocol",
+    "TeamSpecProviderProtocol",
     # Composite
     "VerticalExtensions",
 ]
