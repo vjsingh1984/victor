@@ -256,6 +256,24 @@ from victor.core.tool_types import (
     ToolDependencyProviderProtocol,
 )
 
+from victor.core.database import (
+    DatabaseManager,
+    ProjectDatabaseManager,
+    get_database,
+    get_project_database,
+    reset_database,
+    reset_project_database,
+    reset_all_databases,
+)
+
+from victor.core.schema import (
+    Tables,
+    LearnerID,
+    Schema,
+    CURRENT_SCHEMA_VERSION,
+    get_migration_sql,
+)
+
 __all__ = [
     # Container
     "ServiceContainer",
@@ -451,4 +469,18 @@ __all__ = [
     # Tool Types
     "ToolDependency",
     "ToolDependencyProviderProtocol",
+    # Database
+    "DatabaseManager",
+    "ProjectDatabaseManager",
+    "get_database",
+    "get_project_database",
+    "reset_database",
+    "reset_project_database",
+    "reset_all_databases",
+    # Schema
+    "Tables",
+    "LearnerID",
+    "Schema",
+    "CURRENT_SCHEMA_VERSION",
+    "get_migration_sql",
 ]
