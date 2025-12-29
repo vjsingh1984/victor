@@ -72,6 +72,26 @@ from typing import Dict, FrozenSet, List, Optional, Set, Tuple
 
 
 @dataclass
+class ToolDependency:
+    """Simplified tool dependency specification.
+
+    A compact representation of tool dependencies used for defining
+    relationships between tools in the execution graph.
+
+    Attributes:
+        tool_name: Name of the tool
+        depends_on: List of tools that must be called before this one
+        enables: List of tools that are enabled after this one succeeds
+        transition_weight: Weight for transitions from this tool (0.0 to 1.0)
+    """
+
+    tool_name: str
+    depends_on: List[str] = field(default_factory=list)
+    enables: List[str] = field(default_factory=list)
+    transition_weight: float = 1.0
+
+
+@dataclass
 class ToolNode:
     """Node in the tool execution graph.
 
@@ -92,6 +112,16 @@ class ToolNode:
     outputs: Set[str] = field(default_factory=set)
     weight: float = 1.0
     metadata: Dict[str, any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dependency(cls, dep: ToolDependency) -> "ToolNode":
+        """Create a ToolNode from a ToolDependency."""
+        return cls(
+            name=dep.tool_name,
+            depends_on=set(dep.depends_on),
+            enables=set(dep.enables),
+            weight=dep.transition_weight,
+        )
 
 
 @dataclass
@@ -217,25 +247,36 @@ class ToolExecutionGraph:
 
     def add_dependency(
         self,
-        tool_name: str,
+        tool_name_or_dep: str | ToolDependency,
         depends_on: Optional[Set[str]] = None,
         enables: Optional[Set[str]] = None,
         weight: float = 1.0,
     ) -> None:
         """Add tool dependency (coding format).
 
+        Can accept either explicit parameters or a ToolDependency dataclass.
+
         Args:
-            tool_name: Tool name
-            depends_on: Tools that should be called first
-            enables: Tools enabled after success
-            weight: Transition weight
+            tool_name_or_dep: Tool name string or ToolDependency object
+            depends_on: Tools that should be called first (ignored if ToolDependency)
+            enables: Tools enabled after success (ignored if ToolDependency)
+            weight: Transition weight (ignored if ToolDependency)
         """
-        self.add_node(
-            name=tool_name,
-            depends_on=depends_on,
-            enables=enables,
-            weight=weight,
-        )
+        if isinstance(tool_name_or_dep, ToolDependency):
+            dep = tool_name_or_dep
+            self.add_node(
+                name=dep.tool_name,
+                depends_on=set(dep.depends_on),
+                enables=set(dep.enables),
+                weight=dep.transition_weight,
+            )
+        else:
+            self.add_node(
+                name=tool_name_or_dep,
+                depends_on=depends_on,
+                enables=enables,
+                weight=weight,
+            )
 
     def add_dependencies(
         self,
@@ -608,6 +649,69 @@ class ToolExecutionGraph:
         missing = prereqs - executed_tools
         return len(missing) == 0, list(missing)
 
+    def get_next_tools(self, current_tool: str) -> List[Tuple[str, float]]:
+        """Get enabled tools with their transition weights.
+
+        Returns tools that can be called after the current tool based on
+        dependencies and transitions in the graph.
+
+        Args:
+            current_tool: Currently executing tool
+
+        Returns:
+            List of (tool_name, weight) tuples sorted by weight descending
+        """
+        candidates: Dict[str, float] = {}
+
+        # 1. Add tools enabled by this tool
+        node = self._nodes.get(current_tool)
+        if node:
+            for enabled in node.enables:
+                candidates[enabled] = node.weight * 0.85
+
+        # 2. Add transition-based candidates
+        for transition in self._transitions.get(current_tool, []):
+            candidates[transition.to_tool] = max(
+                candidates.get(transition.to_tool, 0), transition.weight
+            )
+
+        # 3. Add tools that depend on this tool (reverse lookup)
+        for tool_name, deps in self._reverse_deps.items():
+            if current_tool in deps:
+                # This tool depends on current_tool, so it's a candidate
+                dep_node = self._nodes.get(tool_name)
+                if dep_node:
+                    candidates[tool_name] = max(
+                        candidates.get(tool_name, 0), dep_node.weight * 0.9
+                    )
+
+        # Sort by weight descending
+        return sorted(candidates.items(), key=lambda x: x[1], reverse=True)
+
+    def validate_sequence(self, sequence: List[str]) -> bool:
+        """Validate if a tool sequence respects dependencies.
+
+        Checks that each tool in the sequence has its dependencies
+        satisfied by tools that appear earlier in the sequence.
+
+        Args:
+            sequence: List of tool names in execution order
+
+        Returns:
+            True if the sequence is valid (all dependencies satisfied),
+            False if any tool's dependencies are not met
+        """
+        executed: Set[str] = set()
+
+        for tool_name in sequence:
+            prereqs = self.get_prerequisites(tool_name)
+            if prereqs and not prereqs.issubset(executed):
+                # Tool has unmet dependencies
+                return False
+            executed.add(tool_name)
+
+        return True
+
     # =========================================================================
     # Merge and Export
     # =========================================================================
@@ -790,6 +894,7 @@ class ToolGraphRegistry:
 
 __all__ = [
     # Dataclasses
+    "ToolDependency",
     "ToolNode",
     "ToolTransition",
     # Main class

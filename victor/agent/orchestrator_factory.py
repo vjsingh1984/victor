@@ -2056,6 +2056,86 @@ class OrchestratorFactory(ModeAwareMixin):
         )
         return coordinator
 
+    # =========================================================================
+    # Orchestrator Decomposition Components (Phase 1)
+    # =========================================================================
+
+    def create_streaming_loop_coordinator(
+        self,
+        termination_handler: Any,
+        tool_call_handler: Any,
+        recovery_handler: Any,
+        chunk_generator: Any,
+        intent_classifier: Any,
+        continuation_strategy: Any,
+    ) -> Any:
+        """Create StreamingLoopCoordinator for managing streaming iteration loop.
+
+        This coordinator is extracted from AgentOrchestrator to reduce class size
+        while maintaining the same functionality.
+
+        Args:
+            termination_handler: Handler for loop termination conditions
+            tool_call_handler: Handler for tool call processing
+            recovery_handler: Handler for recovery integration
+            chunk_generator: Generator for stream chunks
+            intent_classifier: Classifier for response intent
+            continuation_strategy: Strategy for continuation decisions
+
+        Returns:
+            StreamingLoopCoordinator instance
+        """
+        from victor.agent.streaming_loop_coordinator import StreamingLoopCoordinator
+
+        coordinator = StreamingLoopCoordinator(
+            termination_handler=termination_handler,
+            tool_call_handler=tool_call_handler,
+            recovery_handler=recovery_handler,
+            chunk_generator=chunk_generator,
+            intent_classifier=intent_classifier,
+            continuation_strategy=continuation_strategy,
+            settings=self.settings,
+        )
+
+        logger.debug("StreamingLoopCoordinator created")
+        return coordinator
+
+    def create_response_processor(
+        self,
+        tool_adapter: Any,
+        tool_registry: Any,
+        sanitizer: Any,
+        shell_resolver: Optional[Any] = None,
+        output_formatter: Optional[Any] = None,
+    ) -> Any:
+        """Create ResponseProcessor for tool call parsing and response handling.
+
+        This processor is extracted from AgentOrchestrator to reduce class size
+        while maintaining the same functionality.
+
+        Args:
+            tool_adapter: Tool calling adapter for parsing
+            tool_registry: Registry for checking enabled tools
+            sanitizer: Validator for tool names and content
+            shell_resolver: Optional resolver for shell variants
+            output_formatter: Optional formatter for tool output
+
+        Returns:
+            ResponseProcessor instance
+        """
+        from victor.agent.response_processor import ResponseProcessor
+
+        processor = ResponseProcessor(
+            tool_adapter=tool_adapter,
+            tool_registry=tool_registry,
+            sanitizer=sanitizer,
+            shell_resolver=shell_resolver,
+            output_formatter=output_formatter,
+        )
+
+        logger.debug("ResponseProcessor created")
+        return processor
+
 
 # Convenience function for creating factory
 def create_orchestrator_factory(

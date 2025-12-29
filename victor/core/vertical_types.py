@@ -131,6 +131,201 @@ class TaskTypeHint:
 
 
 # =============================================================================
+# Standard Task Hints (Common patterns across verticals)
+# =============================================================================
+
+
+class StandardTaskHints:
+    """Standard task hints shared across verticals.
+
+    Provides common task type hints that apply to multiple verticals,
+    reducing duplication while allowing vertical-specific customization.
+
+    Example:
+        # Get a standard hint
+        general_hint = StandardTaskHints.get("general")
+
+        # Merge with vertical-specific hints
+        vertical_hints = StandardTaskHints.merge_with(my_vertical_hints)
+
+        # Get all standard hints for a vertical type
+        hints = StandardTaskHints.for_vertical("coding")
+    """
+
+    # Base hint templates that can be customized
+    GENERAL: TaskTypeHint = TaskTypeHint(
+        task_type="general",
+        hint="[GENERAL] Moderate exploration. 3-6 tool calls. Answer concisely.",
+        tool_budget=8,
+        priority_tools=["read", "grep", "ls"],
+    )
+
+    SEARCH: TaskTypeHint = TaskTypeHint(
+        task_type="search",
+        hint="[SEARCH] Use grep/ls for exploration. Summarize after 2-4 calls.",
+        tool_budget=6,
+        priority_tools=["grep", "ls", "read"],
+    )
+
+    CREATE: TaskTypeHint = TaskTypeHint(
+        task_type="create",
+        hint="[CREATE] Read 1-2 relevant files for context, then create. Follow existing patterns.",
+        tool_budget=5,
+        priority_tools=["read", "write"],
+    )
+
+    EDIT: TaskTypeHint = TaskTypeHint(
+        task_type="edit",
+        hint="[EDIT] Read target file first, then modify. Focused changes only.",
+        tool_budget=5,
+        priority_tools=["read", "edit"],
+    )
+
+    ANALYZE: TaskTypeHint = TaskTypeHint(
+        task_type="analyze",
+        hint="[ANALYZE] Examine content carefully. Read related files. Structured findings.",
+        tool_budget=12,
+        priority_tools=["read", "grep"],
+    )
+
+    # Standard hints as a dictionary
+    _STANDARD_HINTS: Dict[str, TaskTypeHint] = {}
+
+    @classmethod
+    def _init_standard_hints(cls) -> None:
+        """Initialize standard hints dictionary (lazy)."""
+        if not cls._STANDARD_HINTS:
+            cls._STANDARD_HINTS = {
+                "general": cls.GENERAL,
+                "search": cls.SEARCH,
+                "create": cls.CREATE,
+                "edit": cls.EDIT,
+                "analyze": cls.ANALYZE,
+            }
+
+    @classmethod
+    def get(cls, task_type: str) -> Optional[TaskTypeHint]:
+        """Get a standard hint by task type.
+
+        Args:
+            task_type: Task type name
+
+        Returns:
+            TaskTypeHint or None if not found
+        """
+        cls._init_standard_hints()
+        return cls._STANDARD_HINTS.get(task_type.lower())
+
+    @classmethod
+    def all(cls) -> Dict[str, TaskTypeHint]:
+        """Get all standard hints.
+
+        Returns:
+            Dict of task type to TaskTypeHint
+        """
+        cls._init_standard_hints()
+        return cls._STANDARD_HINTS.copy()
+
+    @classmethod
+    def merge_with(cls, vertical_hints: Dict[str, TaskTypeHint]) -> Dict[str, TaskTypeHint]:
+        """Merge standard hints with vertical-specific hints.
+
+        Vertical-specific hints override standard hints with the same key.
+
+        Args:
+            vertical_hints: Vertical-specific task type hints
+
+        Returns:
+            Merged dict with standard + vertical hints
+        """
+        cls._init_standard_hints()
+        result = cls._STANDARD_HINTS.copy()
+        result.update(vertical_hints)
+        return result
+
+
+# =============================================================================
+# Standard Grounding Rules
+# =============================================================================
+
+
+class StandardGroundingRules:
+    """Standard grounding rules shared across verticals.
+
+    Provides base grounding rule templates that verticals can use
+    or extend with domain-specific rules.
+    """
+
+    # Base grounding rule - applies to all verticals
+    BASE: str = (
+        "GROUNDING: Base ALL responses on tool output only. "
+        "Never invent file paths or content. "
+        "Quote exactly from tool output. If more info needed, call another tool."
+    )
+
+    # Extended grounding for local models
+    EXTENDED: str = """CRITICAL - TOOL OUTPUT GROUNDING:
+When you receive tool output in <TOOL_OUTPUT> tags:
+1. The content between ═══ markers is ACTUAL file/command output - NEVER ignore it
+2. You MUST base your analysis ONLY on this actual content
+3. NEVER fabricate, invent, or imagine content that differs from tool output
+4. If you need more information, call another tool - do NOT guess
+5. When citing content, quote EXACTLY from the tool output
+6. If tool output is empty or truncated, acknowledge this limitation
+
+VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS."""
+
+    # Research-specific addendum
+    RESEARCH_ADDENDUM: str = (
+        "Always cite URLs for claims. Acknowledge uncertainty when sources conflict."
+    )
+
+    # Data-specific addendum
+    DATA_ADDENDUM: str = (
+        "Verify calculations with actual data. Always show code that produced results."
+    )
+
+    # DevOps-specific addendum
+    DEVOPS_ADDENDUM: str = (
+        "Verify configuration syntax before suggesting. Always check existing resources first."
+    )
+
+    @classmethod
+    def get_base(cls, extended: bool = False) -> str:
+        """Get base grounding rules.
+
+        Args:
+            extended: Whether to use extended rules (for local models)
+
+        Returns:
+            Grounding rules string
+        """
+        return cls.EXTENDED if extended else cls.BASE
+
+    @classmethod
+    def for_vertical(cls, vertical: str, extended: bool = False) -> str:
+        """Get grounding rules for a specific vertical.
+
+        Args:
+            vertical: Vertical name
+            extended: Whether to use extended rules
+
+        Returns:
+            Grounding rules string with vertical addendum
+        """
+        base = cls.get_base(extended)
+        addendums = {
+            "research": cls.RESEARCH_ADDENDUM,
+            "data_analysis": cls.DATA_ADDENDUM,
+            "devops": cls.DEVOPS_ADDENDUM,
+        }
+        addendum = addendums.get(vertical, "")
+        if addendum:
+            return f"{base}\n{addendum}"
+        return base
+
+
+# =============================================================================
 # Middleware Types
 # =============================================================================
 
@@ -331,16 +526,158 @@ class VerticalConfigBase:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+# =============================================================================
+# Tiered Tool Template (Factory for Reducing Duplication)
+# =============================================================================
+
+
+class TieredToolTemplate:
+    """Factory for creating TieredToolConfig with common patterns.
+
+    This template reduces duplication by providing:
+    1. Standard mandatory tools used by all verticals
+    2. Pre-built configurations for common verticals
+    3. Easy customization via factory methods
+
+    Example usage:
+        # Simple: use pre-built vertical config
+        config = TieredToolTemplate.for_vertical("coding")
+
+        # Custom: specify only vertical-specific tools
+        config = TieredToolTemplate.create(
+            vertical_core={"edit", "write", "shell", "git"},
+            readonly_only_for_analysis=False,
+        )
+
+        # Override mandatory tools (rare)
+        config = TieredToolTemplate.create(
+            mandatory={"read", "ls"},  # Custom mandatory set
+            vertical_core={"web_search", "web_fetch"},
+        )
+    """
+
+    # Standard mandatory tools - essential for any task across all verticals
+    DEFAULT_MANDATORY: Set[str] = {"read", "ls", "grep"}
+
+    # Pre-configured vertical cores
+    VERTICAL_CORES: Dict[str, Set[str]] = {
+        "coding": {"edit", "write", "shell", "git", "search", "overview"},
+        "research": {"web_search", "web_fetch", "overview"},
+        "devops": {"shell", "git", "docker", "overview"},
+        "data_analysis": {"shell", "write", "overview"},
+    }
+
+    # Vertical-specific readonly_only_for_analysis settings
+    VERTICAL_READONLY_DEFAULTS: Dict[str, bool] = {
+        "coding": False,  # Coding often needs write tools
+        "research": True,  # Research is primarily reading
+        "devops": False,  # DevOps needs execution tools
+        "data_analysis": False,  # Data analysis often writes results
+    }
+
+    @classmethod
+    def create(
+        cls,
+        vertical_core: Set[str],
+        mandatory: Optional[Set[str]] = None,
+        readonly_only_for_analysis: bool = True,
+        semantic_pool: Optional[Set[str]] = None,
+        stage_tools: Optional[Dict[str, Set[str]]] = None,
+    ) -> TieredToolConfig:
+        """Create a TieredToolConfig with standard mandatory tools.
+
+        Args:
+            vertical_core: Domain-specific core tools for the vertical
+            mandatory: Override mandatory tools (uses DEFAULT_MANDATORY if None)
+            readonly_only_for_analysis: Whether to hide write tools for analysis
+            semantic_pool: DEPRECATED - tools for semantic selection
+            stage_tools: DEPRECATED - stage-specific tools
+
+        Returns:
+            Configured TieredToolConfig
+        """
+        return TieredToolConfig(
+            mandatory=mandatory if mandatory is not None else cls.DEFAULT_MANDATORY.copy(),
+            vertical_core=vertical_core,
+            semantic_pool=semantic_pool or set(),
+            stage_tools=stage_tools or {},
+            readonly_only_for_analysis=readonly_only_for_analysis,
+        )
+
+    @classmethod
+    def for_vertical(cls, vertical: str) -> Optional[TieredToolConfig]:
+        """Get pre-configured TieredToolConfig for a known vertical.
+
+        Args:
+            vertical: Vertical name (coding, research, devops, data_analysis)
+
+        Returns:
+            Configured TieredToolConfig or None if vertical not known
+        """
+        if vertical not in cls.VERTICAL_CORES:
+            return None
+
+        return cls.create(
+            vertical_core=cls.VERTICAL_CORES[vertical].copy(),
+            readonly_only_for_analysis=cls.VERTICAL_READONLY_DEFAULTS.get(vertical, True),
+        )
+
+    @classmethod
+    def for_coding(cls) -> TieredToolConfig:
+        """Get TieredToolConfig for coding vertical."""
+        return cls.for_vertical("coding")  # type: ignore
+
+    @classmethod
+    def for_research(cls) -> TieredToolConfig:
+        """Get TieredToolConfig for research vertical."""
+        return cls.for_vertical("research")  # type: ignore
+
+    @classmethod
+    def for_devops(cls) -> TieredToolConfig:
+        """Get TieredToolConfig for devops vertical."""
+        return cls.for_vertical("devops")  # type: ignore
+
+    @classmethod
+    def for_data_analysis(cls) -> TieredToolConfig:
+        """Get TieredToolConfig for data analysis vertical."""
+        return cls.for_vertical("data_analysis")  # type: ignore
+
+    @classmethod
+    def register_vertical(
+        cls,
+        name: str,
+        vertical_core: Set[str],
+        readonly_only_for_analysis: bool = True,
+    ) -> None:
+        """Register a new vertical's tool configuration.
+
+        Args:
+            name: Vertical name
+            vertical_core: Core tools for the vertical
+            readonly_only_for_analysis: Whether to hide write tools for analysis
+        """
+        cls.VERTICAL_CORES[name] = vertical_core
+        cls.VERTICAL_READONLY_DEFAULTS[name] = readonly_only_for_analysis
+
+    @classmethod
+    def list_verticals(cls) -> List[str]:
+        """List all registered verticals."""
+        return list(cls.VERTICAL_CORES.keys())
+
+
 __all__ = [
     # Stage Types
     "StageDefinition",
     # Task Types
     "TaskTypeHint",
+    "StandardTaskHints",
+    "StandardGroundingRules",
     # Middleware Types
     "MiddlewarePriority",
     "MiddlewareResult",
     # Tool Configuration
     "TieredToolConfig",
+    "TieredToolTemplate",
     # Config Base
     "VerticalConfigBase",
 ]

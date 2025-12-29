@@ -397,6 +397,9 @@ class OrchestratorServiceProvider:
             ServiceLifetime.SINGLETON,
         )
 
+        # ToolCacheManager - singleton for internal tool state (indexes, connections)
+        self._register_tool_cache_manager(container)
+
         # UsageLogger - singleton for usage logging
         container.register(
             UsageLoggerProtocol,
@@ -812,6 +815,26 @@ class OrchestratorServiceProvider:
                 registry=c.get_or_none("ToolRegistryProtocol"),
             ),
             ServiceLifetime.SCOPED,
+        )
+
+    def _register_tool_cache_manager(self, container: ServiceContainer) -> None:
+        """Register ToolCacheManager as singleton.
+
+        The ToolCacheManager provides centralized cache management for tools,
+        replacing module-level caches like _INDEX_CACHE in code_search_tool.py
+        and _connections in database_tool.py.
+
+        This enables:
+        - Proper test isolation (caches can be cleared between tests)
+        - DI-based tool configuration
+        - Unified cache statistics and monitoring
+        """
+        from victor.tools.cache_manager import ToolCacheManager
+
+        container.register(
+            ToolCacheManager,
+            lambda c: ToolCacheManager(),
+            ServiceLifetime.SINGLETON,
         )
 
     def _register_budget_manager(self, container: ServiceContainer) -> None:

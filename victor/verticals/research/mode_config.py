@@ -1,39 +1,48 @@
-"""Research Mode Configuration - Budget and iteration settings for research tasks."""
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-from dataclasses import dataclass
+"""Research mode configurations using central registry.
+
+This module registers research-specific operational modes with the central
+ModeConfigRegistry and exports a registry-based provider for protocol
+compatibility.
+"""
+
+from __future__ import annotations
+
 from typing import Dict, Optional
 
-from victor.verticals.protocols import ModeConfigProviderProtocol
+from victor.core.mode_config import (
+    ModeConfig,
+    ModeConfigRegistry,
+    ModeDefinition,
+    RegistryBasedModeConfigProvider,
+)
 
 
-@dataclass
-class ResearchModeConfig:
-    """Configuration for a research mode."""
+# =============================================================================
+# Research-Specific Modes (Registered with Central Registry)
+# =============================================================================
 
-    tool_budget: int
-    max_iterations: int
-    description: str
-    allowed_stages: list[str]
-
-
-# Research-specific mode configurations
-RESEARCH_MODE_CONFIGS: Dict[str, ResearchModeConfig] = {
-    "quick": ResearchModeConfig(
-        tool_budget=5,
-        max_iterations=10,
-        description="Fast lookup for simple factual queries",
-        allowed_stages=["INITIAL", "SEARCHING", "COMPLETION"],
-    ),
-    "standard": ResearchModeConfig(
-        tool_budget=15,
-        max_iterations=30,
-        description="Balanced research with source verification",
-        allowed_stages=["INITIAL", "SEARCHING", "READING", "SYNTHESIZING", "COMPLETION"],
-    ),
-    "deep": ResearchModeConfig(
+_RESEARCH_MODES: Dict[str, ModeDefinition] = {
+    "deep": ModeDefinition(
+        name="deep",
         tool_budget=30,
         max_iterations=60,
+        temperature=0.8,
         description="Comprehensive research with full verification cycle",
+        exploration_multiplier=2.0,
         allowed_stages=[
             "INITIAL",
             "SEARCHING",
@@ -44,10 +53,13 @@ RESEARCH_MODE_CONFIGS: Dict[str, ResearchModeConfig] = {
             "COMPLETION",
         ],
     ),
-    "academic": ResearchModeConfig(
+    "academic": ModeDefinition(
+        name="academic",
         tool_budget=50,
         max_iterations=100,
+        temperature=0.8,
         description="Thorough literature review with extensive citation",
+        exploration_multiplier=3.0,
         allowed_stages=[
             "INITIAL",
             "SEARCHING",
@@ -60,8 +72,8 @@ RESEARCH_MODE_CONFIGS: Dict[str, ResearchModeConfig] = {
     ),
 }
 
-# Default tool budgets by task complexity
-RESEARCH_DEFAULT_TOOL_BUDGETS: Dict[str, int] = {
+# Research-specific task type budgets
+_RESEARCH_TASK_BUDGETS: Dict[str, int] = {
     "simple_lookup": 3,
     "fact_check": 8,
     "comparison": 12,
@@ -71,35 +83,57 @@ RESEARCH_DEFAULT_TOOL_BUDGETS: Dict[str, int] = {
 }
 
 
-class ResearchModeConfigProvider(ModeConfigProviderProtocol):
-    """Provides mode configurations for research tasks."""
+# =============================================================================
+# Register with Central Registry
+# =============================================================================
 
-    def get_mode_configs(self) -> Dict[str, Dict]:
-        """Return available research modes as dictionaries."""
-        return {
-            name: {
-                "tool_budget": config.tool_budget,
-                "max_iterations": config.max_iterations,
-                "description": config.description,
-                "allowed_stages": config.allowed_stages,
-            }
-            for name, config in RESEARCH_MODE_CONFIGS.items()
-        }
+def _register_research_modes() -> None:
+    """Register research modes with the central registry."""
+    registry = ModeConfigRegistry.get_instance()
+    registry.register_vertical(
+        name="research",
+        modes=_RESEARCH_MODES,
+        task_budgets=_RESEARCH_TASK_BUDGETS,
+        default_mode="standard",
+        default_budget=15,
+    )
 
-    def get_default_tool_budget(self, task_type: Optional[str] = None) -> int:
-        """Return default tool budget for a task type."""
-        if task_type and task_type in RESEARCH_DEFAULT_TOOL_BUDGETS:
-            return RESEARCH_DEFAULT_TOOL_BUDGETS[task_type]
-        return 15  # Standard research budget
 
-    def get_default_max_iterations(self, task_type: Optional[str] = None) -> int:
-        """Return default max iterations for a task type."""
-        budget = self.get_default_tool_budget(task_type)
-        # Research typically needs 2x iterations per tool call
-        return budget * 2
+# Register on module load
+_register_research_modes()
+
+
+# =============================================================================
+# Provider (Protocol Compatibility)
+# =============================================================================
+
+
+class ResearchModeConfigProvider(RegistryBasedModeConfigProvider):
+    """Mode configuration provider for research vertical.
+
+    Uses the central ModeConfigRegistry but provides research-specific
+    complexity mapping.
+    """
+
+    def __init__(self) -> None:
+        """Initialize research mode provider."""
+        # Ensure registration (idempotent - handles singleton reset)
+        _register_research_modes()
+        super().__init__(
+            vertical="research",
+            default_mode="standard",
+            default_budget=15,
+        )
 
     def get_mode_for_complexity(self, complexity: str) -> str:
-        """Map complexity level to research mode."""
+        """Map complexity level to research mode.
+
+        Args:
+            complexity: Complexity level
+
+        Returns:
+            Recommended mode name
+        """
         mapping = {
             "trivial": "quick",
             "simple": "quick",
@@ -108,3 +142,35 @@ class ResearchModeConfigProvider(ModeConfigProviderProtocol):
             "highly_complex": "academic",
         }
         return mapping.get(complexity, "standard")
+
+
+# =============================================================================
+# Backward Compatibility Exports
+# =============================================================================
+
+# Legacy constant for backward compatibility
+RESEARCH_MODE_CONFIGS: Dict[str, ModeConfig] = {}
+RESEARCH_DEFAULT_TOOL_BUDGETS: Dict[str, int] = _RESEARCH_TASK_BUDGETS.copy()
+
+
+def _populate_legacy_configs() -> None:
+    """Populate legacy config dict from registry."""
+    global RESEARCH_MODE_CONFIGS
+    registry = ModeConfigRegistry.get_instance()
+    RESEARCH_MODE_CONFIGS = registry.get_modes("research")
+
+
+# Populate on module load
+_populate_legacy_configs()
+
+
+# Legacy dataclass alias
+ResearchModeConfig = ModeConfig
+
+
+__all__ = [
+    "ResearchModeConfigProvider",
+    "ResearchModeConfig",
+    "RESEARCH_MODE_CONFIGS",
+    "RESEARCH_DEFAULT_TOOL_BUDGETS",
+]

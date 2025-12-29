@@ -14,6 +14,10 @@
 
 """Unified database managers for Victor.
 
+Includes:
+- DatabaseManager: Global singleton for user-level data (sync + async APIs)
+- ProjectDatabaseManager: Per-project data
+
 Provides two database scopes to separate user-level and project-level data.
 
 See victor.core.schema for table constants and SQL definitions.
@@ -68,7 +72,9 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import queue
 import shutil
 import sqlite3
 import threading
@@ -495,6 +501,209 @@ class DatabaseManager:
         if hasattr(self._local, "conn") and self._local.conn:
             self._local.conn.close()
             self._local.conn = None
+
+    # =========================================================================
+    # Async API (wraps sync methods via thread pool)
+    # =========================================================================
+
+    def _ensure_async_state(self) -> None:
+        """Initialize async-related state if not already done."""
+        if not hasattr(self, "_write_queue"):
+            self._write_queue: queue.Queue[Tuple[str, Optional[Tuple[Any, ...]]]] = (
+                queue.Queue()
+            )
+            self._write_lock = threading.Lock()
+            self._batch_size = 100
+            self._flush_interval = 5.0
+            self._flush_task: Optional[asyncio.Task] = None
+            self._is_flushing = False
+
+    async def execute_async(
+        self,
+        sql: str,
+        params: Optional[Tuple[Any, ...]] = None,
+    ) -> sqlite3.Cursor:
+        """Execute SQL asynchronously.
+
+        Runs the sync execute in a thread pool to avoid blocking.
+
+        Args:
+            sql: SQL statement
+            params: Optional parameters
+
+        Returns:
+            Cursor with results
+        """
+        return await asyncio.to_thread(self.execute, sql, params)
+
+    async def executemany_async(
+        self,
+        sql: str,
+        params_list: List[Tuple[Any, ...]],
+    ) -> sqlite3.Cursor:
+        """Execute SQL for multiple parameter sets asynchronously.
+
+        Args:
+            sql: SQL statement
+            params_list: List of parameter tuples
+
+        Returns:
+            Cursor
+        """
+        return await asyncio.to_thread(self.executemany, sql, params_list)
+
+    async def query_async(
+        self,
+        sql: str,
+        params: Optional[Tuple[Any, ...]] = None,
+    ) -> List[sqlite3.Row]:
+        """Execute query asynchronously.
+
+        Args:
+            sql: SQL query
+            params: Optional parameters
+
+        Returns:
+            List of Row objects
+        """
+        return await asyncio.to_thread(self.query, sql, params)
+
+    async def query_one_async(
+        self,
+        sql: str,
+        params: Optional[Tuple[Any, ...]] = None,
+    ) -> Optional[sqlite3.Row]:
+        """Execute query and return first row asynchronously.
+
+        Args:
+            sql: SQL query
+            params: Optional parameters
+
+        Returns:
+            Row object or None
+        """
+        return await asyncio.to_thread(self.query_one, sql, params)
+
+    # =========================================================================
+    # Write Batching
+    # =========================================================================
+
+    def queue_write(
+        self,
+        sql: str,
+        params: Optional[Tuple[Any, ...]] = None,
+    ) -> None:
+        """Queue a write operation for batched execution.
+
+        Writes are batched and executed together for better performance.
+        Call flush_writes() to execute all queued writes.
+
+        Args:
+            sql: SQL statement (INSERT, UPDATE, DELETE)
+            params: Optional parameters
+        """
+        self._ensure_async_state()
+        self._write_queue.put((sql, params))
+
+        # Auto-flush if queue is large
+        if self._write_queue.qsize() >= self._batch_size:
+            self.flush_writes_sync()
+
+    def flush_writes_sync(self) -> int:
+        """Flush all queued writes synchronously.
+
+        Returns:
+            Number of writes executed
+        """
+        self._ensure_async_state()
+
+        with self._write_lock:
+            if self._is_flushing:
+                return 0
+            self._is_flushing = True
+
+        try:
+            writes: List[Tuple[str, Optional[Tuple[Any, ...]]]] = []
+
+            # Drain the queue
+            while not self._write_queue.empty():
+                try:
+                    writes.append(self._write_queue.get_nowait())
+                except Exception:
+                    break
+
+            if not writes:
+                return 0
+
+            # Execute in a transaction
+            conn = self.get_connection()
+            try:
+                for sql, params in writes:
+                    conn.execute(sql, params or ())
+                conn.commit()
+                logger.debug(f"Flushed {len(writes)} batched writes")
+                return len(writes)
+            except Exception as e:
+                conn.rollback()
+                logger.error(f"Failed to flush writes: {e}")
+                # Re-queue failed writes
+                for write in writes:
+                    self._write_queue.put(write)
+                raise
+
+        finally:
+            self._is_flushing = False
+
+    async def flush_writes_async(self) -> int:
+        """Flush all queued writes asynchronously.
+
+        Returns:
+            Number of writes executed
+        """
+        return await asyncio.to_thread(self.flush_writes_sync)
+
+    def get_write_queue_size(self) -> int:
+        """Get number of pending writes.
+
+        Returns:
+            Queue size
+        """
+        self._ensure_async_state()
+        return self._write_queue.qsize()
+
+    async def start_auto_flush(self, interval_seconds: Optional[float] = None) -> None:
+        """Start background task that periodically flushes writes.
+
+        Args:
+            interval_seconds: Flush interval (default 5.0)
+        """
+        self._ensure_async_state()
+
+        if interval_seconds is not None:
+            self._flush_interval = interval_seconds
+
+        async def _flush_loop() -> None:
+            while True:
+                await asyncio.sleep(self._flush_interval)
+                try:
+                    await self.flush_writes_async()
+                except Exception as e:
+                    logger.warning(f"Auto-flush error: {e}")
+
+        self._flush_task = asyncio.create_task(_flush_loop())
+
+    async def stop_auto_flush(self) -> None:
+        """Stop background flush task and flush remaining writes."""
+        if hasattr(self, "_flush_task") and self._flush_task:
+            self._flush_task.cancel()
+            try:
+                await self._flush_task
+            except asyncio.CancelledError:
+                pass
+            self._flush_task = None
+
+        # Final flush
+        await self.flush_writes_async()
 
 
 class ProjectDatabaseManager:

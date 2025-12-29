@@ -50,10 +50,14 @@ Example:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+
+if TYPE_CHECKING:
+    from victor.tools.cache_manager import ToolCacheManager, CacheNamespace
 
 
 class Permission(Enum):
@@ -161,6 +165,19 @@ class ToolExecutionContext:
 
     # Settings reference (optional, for backwards compatibility)
     settings: Optional[Any] = None
+
+    # ==========================================================================
+    # DI Fields (for dependency injection)
+    # ==========================================================================
+
+    # Cache manager for tool-level caching (replaces module-level caches)
+    cache_manager: Optional["ToolCacheManager"] = None
+
+    # Path resolver for consistent path handling
+    path_resolver: Optional[Any] = None
+
+    # Logger for tool-specific logging
+    logger: Optional[logging.Logger] = None
 
     # ==========================================================================
     # Budget Management
@@ -303,6 +320,78 @@ class ToolExecutionContext:
             Cached content or None
         """
         return self.open_files.get(path)
+
+    # ==========================================================================
+    # DI Accessors (with fallback to global state)
+    # ==========================================================================
+
+    def get_cache(self, namespace: str) -> "CacheNamespace":
+        """Get a namespaced cache.
+
+        Uses injected cache_manager if available, otherwise falls back
+        to global cache manager.
+
+        Args:
+            namespace: Cache namespace name (e.g., "code_search_index")
+
+        Returns:
+            CacheNamespace for the requested namespace
+        """
+        if self.cache_manager is not None:
+            return self.cache_manager.get_namespace(namespace)
+
+        # Fallback to global cache manager
+        from victor.tools.cache_manager import get_tool_cache_manager
+
+        return get_tool_cache_manager().get_namespace(namespace)
+
+    def get_path_resolver(self) -> Any:
+        """Get the path resolver.
+
+        Uses injected path_resolver if available, otherwise falls back
+        to global path resolver.
+
+        Returns:
+            PathResolver instance
+        """
+        if self.path_resolver is not None:
+            return self.path_resolver
+
+        # Fallback to global path resolver
+        from victor.tools.filesystem import get_path_resolver
+
+        return get_path_resolver()
+
+    def get_logger(self, name: str = "victor.tools") -> logging.Logger:
+        """Get a logger for the tool.
+
+        Uses injected logger if available, otherwise creates one.
+
+        Args:
+            name: Logger name (default: victor.tools)
+
+        Returns:
+            Logger instance
+        """
+        if self.logger is not None:
+            return self.logger
+
+        return logging.getLogger(name)
+
+    @property
+    def index_cache(self) -> "CacheNamespace":
+        """Get code search index cache (convenience property)."""
+        return self.get_cache("code_search_index")
+
+    @property
+    def file_content_cache(self) -> "CacheNamespace":
+        """Get file content cache (convenience property)."""
+        return self.get_cache("file_content")
+
+    @property
+    def connection_pool(self) -> "CacheNamespace":
+        """Get database connection pool (convenience property)."""
+        return self.get_cache("database_connections")
 
     # ==========================================================================
     # Backward Compatibility

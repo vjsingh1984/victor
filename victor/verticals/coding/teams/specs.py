@@ -43,18 +43,18 @@ class CodingRoleConfig:
 
 
 # Coding-specific roles with tool allocations
+# Note: Uses canonical tool names from victor/tools/tool_names.py
 CODING_ROLES: Dict[str, CodingRoleConfig] = {
     "code_researcher": CodingRoleConfig(
         base_role="researcher",
         tools=[
-            "read_file",
+            "read",
             "grep",
             "code_search",
-            "semantic_code_search",
-            "project_overview",
-            "symbols",
-            "references",
-            "list_directory",
+            "overview",
+            "symbol",
+            "refs",
+            "ls",
         ],
         tool_budget=25,
         description="Researches and analyzes codebase patterns",
@@ -62,9 +62,9 @@ CODING_ROLES: Dict[str, CodingRoleConfig] = {
     "code_planner": CodingRoleConfig(
         base_role="planner",
         tools=[
-            "read_file",
-            "project_overview",
-            "plan_files",
+            "read",
+            "overview",
+            "plan",
             "grep",
         ],
         tool_budget=15,
@@ -73,12 +73,11 @@ CODING_ROLES: Dict[str, CodingRoleConfig] = {
     "code_executor": CodingRoleConfig(
         base_role="executor",
         tools=[
-            "read_file",
-            "write_file",
-            "edit_files",
-            "bash",
-            "git_status",
-            "git_diff",
+            "read",
+            "write",
+            "edit",
+            "shell",
+            "git",
         ],
         tool_budget=40,
         description="Implements code changes",
@@ -86,10 +85,10 @@ CODING_ROLES: Dict[str, CodingRoleConfig] = {
     "code_reviewer": CodingRoleConfig(
         base_role="reviewer",
         tools=[
-            "read_file",
-            "git_diff",
-            "run_tests",
-            "bash",
+            "read",
+            "git",
+            "test",
+            "shell",
             "grep",
         ],
         tool_budget=20,
@@ -98,11 +97,10 @@ CODING_ROLES: Dict[str, CodingRoleConfig] = {
     "test_writer": CodingRoleConfig(
         base_role="executor",
         tools=[
-            "read_file",
-            "write_file",
-            "run_tests",
-            "bash",
-            "test_file",
+            "read",
+            "write",
+            "test",
+            "shell",
         ],
         tool_budget=30,
         description="Writes and runs tests",
@@ -110,9 +108,9 @@ CODING_ROLES: Dict[str, CodingRoleConfig] = {
     "doc_writer": CodingRoleConfig(
         base_role="executor",
         tools=[
-            "read_file",
-            "write_file",
-            "edit_files",
+            "read",
+            "write",
+            "edit",
             "grep",
         ],
         tool_budget=20,
@@ -121,10 +119,10 @@ CODING_ROLES: Dict[str, CodingRoleConfig] = {
     "security_reviewer": CodingRoleConfig(
         base_role="researcher",
         tools=[
-            "read_file",
+            "read",
             "grep",
             "code_search",
-            "bash",
+            "shell",
         ],
         tool_budget=20,
         description="Reviews code for security issues",

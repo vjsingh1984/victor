@@ -646,6 +646,30 @@ class Settings(BaseSettings):
     hitl_auto_approve_low_risk: bool = False  # Auto-approve LOW risk actions
     hitl_keyboard_shortcuts_enabled: bool = True  # Enable y/n shortcuts in TUI
 
+    # ==========================================================================
+    # Prompt Enrichment Settings (Auto Optimization)
+    # ==========================================================================
+    # Controls automatic prompt enrichment with contextual information.
+    # Enrichment adds relevant context from knowledge graph, web search,
+    # conversation history, etc. to improve prompt quality.
+    #
+    # Trade-off: Higher quality responses vs. latency overhead (~500ms max)
+    # Disable for simple tasks or when agents are confident in context.
+    prompt_enrichment_enabled: bool = True  # Master toggle for prompt enrichment
+    prompt_enrichment_max_tokens: int = 2000  # Max tokens to add via enrichment
+    prompt_enrichment_timeout_ms: float = 500.0  # Timeout in milliseconds
+    prompt_enrichment_cache_enabled: bool = True  # Cache enrichments for repeated prompts
+    prompt_enrichment_cache_ttl: int = 300  # Cache TTL in seconds (5 minutes)
+    prompt_enrichment_strategies: List[str] = Field(
+        default_factory=lambda: ["knowledge_graph", "conversation", "web_search"],
+        description="Enabled enrichment strategies (order matters for priority)",
+    )
+    # Per-vertical enrichment toggles (when prompt_enrichment_enabled=True)
+    prompt_enrichment_coding: bool = True  # Knowledge graph, code snippets
+    prompt_enrichment_research: bool = True  # Web search, citations
+    prompt_enrichment_devops: bool = True  # Infrastructure context
+    prompt_enrichment_data_analysis: bool = True  # Schema context, query patterns
+
     # Plugin System
     plugin_enabled: bool = True  # Enable plugin system
     # Note: plugin_dirs now uses get_project_paths().global_plugins_dir

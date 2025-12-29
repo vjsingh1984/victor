@@ -12,82 +12,67 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Coding-specific mode configurations.
+"""Coding-specific mode configurations using central registry.
 
-This module defines operational modes for software development tasks,
-including tool budgets, iteration limits, and temperature settings.
+This module registers coding-specific operational modes with the central
+ModeConfigRegistry and exports a registry-based provider for protocol
+compatibility.
 """
 
 from __future__ import annotations
 
 from typing import Dict
 
-from victor.verticals.protocols import ModeConfig, ModeConfigProviderProtocol
+from victor.core.mode_config import (
+    ModeConfig,
+    ModeConfigRegistry,
+    ModeDefinition,
+    RegistryBasedModeConfigProvider,
+)
 
 
-# Mode configurations for coding tasks
-CODING_MODE_CONFIGS: Dict[str, ModeConfig] = {
-    "fast": ModeConfig(
-        name="fast",
-        tool_budget=5,
-        max_iterations=10,
-        temperature=0.5,
-        description="Quick code changes with minimal exploration",
-    ),
-    "default": ModeConfig(
-        name="default",
-        tool_budget=10,
-        max_iterations=30,
-        temperature=0.7,
-        description="Balanced mode for typical coding tasks",
-    ),
-    "explore": ModeConfig(
-        name="explore",
-        tool_budget=20,
-        max_iterations=60,
-        temperature=0.7,
-        description="Extended exploration for understanding codebases",
-    ),
-    "thorough": ModeConfig(
-        name="thorough",
-        tool_budget=30,
-        max_iterations=80,
-        temperature=0.8,
-        description="Deep analysis and comprehensive changes",
-    ),
-    "architect": ModeConfig(
+# =============================================================================
+# Coding-Specific Modes (Registered with Central Registry)
+# =============================================================================
+
+# Vertical-specific modes that extend/override defaults
+_CODING_MODES: Dict[str, ModeDefinition] = {
+    "architect": ModeDefinition(
         name="architect",
         tool_budget=40,
         max_iterations=100,
         temperature=0.8,
         description="Architecture analysis and design tasks",
+        exploration_multiplier=2.5,
     ),
-    "refactor": ModeConfig(
+    "refactor": ModeDefinition(
         name="refactor",
         tool_budget=25,
         max_iterations=60,
         temperature=0.6,
         description="Code refactoring with safety checks",
+        exploration_multiplier=1.5,
     ),
-    "debug": ModeConfig(
+    "debug": ModeDefinition(
         name="debug",
         tool_budget=15,
         max_iterations=40,
         temperature=0.5,
         description="Debugging and issue investigation",
+        exploration_multiplier=1.2,
     ),
-    "test": ModeConfig(
+    "test": ModeDefinition(
         name="test",
         tool_budget=15,
         max_iterations=40,
         temperature=0.5,
         description="Test creation and execution",
+        exploration_multiplier=1.0,
     ),
 }
 
-
-# Default tool budgets by task type (used when no mode specified)
-DEFAULT_TOOL_BUDGETS: Dict[str, int] = {
+# Coding-specific task type budgets
+_CODING_TASK_BUDGETS: Dict[str, int] = {
     "code_generation": 3,
     "create_simple": 2,
     "create": 5,
@@ -104,69 +89,90 @@ DEFAULT_TOOL_BUDGETS: Dict[str, int] = {
 }
 
 
-class CodingModeConfigProvider(ModeConfigProviderProtocol):
+# =============================================================================
+# Register with Central Registry
+# =============================================================================
+
+def _register_coding_modes() -> None:
+    """Register coding modes with the central registry."""
+    registry = ModeConfigRegistry.get_instance()
+    registry.register_vertical(
+        name="coding",
+        modes=_CODING_MODES,
+        task_budgets=_CODING_TASK_BUDGETS,
+        default_mode="default",
+        default_budget=10,
+    )
+
+
+# Register on module load
+_register_coding_modes()
+
+
+# =============================================================================
+# Provider (Protocol Compatibility)
+# =============================================================================
+
+
+class CodingModeConfigProvider(RegistryBasedModeConfigProvider):
     """Mode configuration provider for coding vertical.
 
-    Provides coding-specific operational modes with appropriate
-    tool budgets and iteration limits for different task types.
+    Uses the central ModeConfigRegistry but provides coding-specific
+    complexity mapping.
     """
 
-    def __init__(
-        self,
-        additional_modes: Dict[str, ModeConfig] | None = None,
-        default_mode: str = "default",
-    ):
-        """Initialize the provider.
+    def __init__(self) -> None:
+        """Initialize coding mode provider."""
+        # Ensure registration (idempotent - handles singleton reset)
+        _register_coding_modes()
+        super().__init__(
+            vertical="coding",
+            default_mode="default",
+            default_budget=10,
+        )
+
+    def get_mode_for_complexity(self, complexity: str) -> str:
+        """Map complexity level to coding mode.
 
         Args:
-            additional_modes: Additional or override modes
-            default_mode: Name of the default mode
-        """
-        self._modes = CODING_MODE_CONFIGS.copy()
-        if additional_modes:
-            self._modes.update(additional_modes)
-        self._default_mode = default_mode
-
-    def get_mode_configs(self) -> Dict[str, ModeConfig]:
-        """Get all coding mode configurations.
+            complexity: Complexity level
 
         Returns:
-            Dict mapping mode names to configurations
+            Recommended mode name
         """
-        return self._modes.copy()
+        mapping = {
+            "trivial": "fast",
+            "simple": "fast",
+            "moderate": "default",
+            "complex": "thorough",
+            "highly_complex": "architect",
+        }
+        return mapping.get(complexity, "default")
 
-    def get_default_mode(self) -> str:
-        """Get the default mode name.
 
-        Returns:
-            Name of the default mode
-        """
-        return self._default_mode
+# =============================================================================
+# Backward Compatibility Exports
+# =============================================================================
 
-    def get_default_tool_budget(self) -> int:
-        """Get default tool budget when no mode is specified.
+# Legacy constant names for backward compatibility
+# These reference the same data registered with the registry
+CODING_MODE_CONFIGS: Dict[str, ModeConfig] = {}
+DEFAULT_TOOL_BUDGETS: Dict[str, int] = _CODING_TASK_BUDGETS.copy()
 
-        Returns:
-            Default tool call budget
-        """
-        return 10
 
-    def get_tool_budget_for_task(self, task_type: str) -> int:
-        """Get recommended tool budget for a specific task type.
+def _populate_legacy_configs() -> None:
+    """Populate legacy config dict from registry."""
+    global CODING_MODE_CONFIGS
+    registry = ModeConfigRegistry.get_instance()
+    CODING_MODE_CONFIGS = registry.get_modes("coding")
 
-        Args:
-            task_type: The detected task type
 
-        Returns:
-            Recommended tool budget
-        """
-        return DEFAULT_TOOL_BUDGETS.get(task_type.lower(), self.get_default_tool_budget())
+# Populate on module load
+_populate_legacy_configs()
 
 
 def get_mode_config(mode_name: str) -> ModeConfig | None:
     """Get a specific mode configuration.
-
-    Convenience function for direct mode lookup.
 
     Args:
         mode_name: Name of the mode
@@ -187,15 +193,12 @@ def get_tool_budget(mode_name: str | None = None, task_type: str | None = None) 
     Returns:
         Recommended tool budget
     """
-    if mode_name:
-        config = get_mode_config(mode_name)
-        if config:
-            return config.tool_budget
-
-    if task_type:
-        return DEFAULT_TOOL_BUDGETS.get(task_type.lower(), 10)
-
-    return 10
+    registry = ModeConfigRegistry.get_instance()
+    return registry.get_tool_budget(
+        vertical="coding",
+        mode_name=mode_name,
+        task_type=task_type,
+    )
 
 
 __all__ = [

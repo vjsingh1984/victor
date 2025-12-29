@@ -39,6 +39,158 @@ from victor.core.schema import Tables, Schema
 logger = logging.getLogger(__name__)
 
 
+class BatchedOutcomeWriter:
+    """Batched writer for RL outcomes to reduce database commits.
+
+    Instead of committing each outcome immediately, this class queues
+    outcomes and writes them in batches. This significantly reduces
+    I/O overhead when recording multiple outcomes.
+
+    Example:
+        writer = BatchedOutcomeWriter(coordinator, batch_size=50)
+        for outcome in outcomes:
+            writer.queue_outcome("learner", outcome, "vertical")
+        writer.flush()  # Commit all queued outcomes
+
+        # Or use as context manager
+        with BatchedOutcomeWriter(coordinator) as writer:
+            writer.queue_outcome("learner", outcome, "vertical")
+        # Auto-flush on exit
+
+    Attributes:
+        coordinator: RLCoordinator to write to
+        batch_size: Max outcomes per batch before auto-flush
+        _queue: List of queued (learner_name, outcome, vertical) tuples
+    """
+
+    def __init__(
+        self,
+        coordinator: "RLCoordinator",
+        batch_size: int = 50,
+        auto_flush_on_exit: bool = True,
+    ) -> None:
+        """Initialize batched writer.
+
+        Args:
+            coordinator: RLCoordinator to write to
+            batch_size: Max outcomes per batch before auto-flush
+            auto_flush_on_exit: Flush on context manager exit
+        """
+        self.coordinator = coordinator
+        self.batch_size = batch_size
+        self.auto_flush_on_exit = auto_flush_on_exit
+        self._queue: list[tuple[str, RLOutcome, str]] = []
+        self._flush_count = 0
+
+    def __enter__(self) -> "BatchedOutcomeWriter":
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Exit context manager, optionally flushing."""
+        if self.auto_flush_on_exit and self._queue:
+            self.flush()
+
+    def queue_outcome(
+        self,
+        learner_name: str,
+        outcome: RLOutcome,
+        vertical: str = "coding",
+    ) -> None:
+        """Queue an outcome for batched writing.
+
+        Args:
+            learner_name: Name of learner to update
+            outcome: Outcome data
+            vertical: Which vertical this came from
+        """
+        self._queue.append((learner_name, outcome, vertical))
+
+        # Auto-flush if batch is full
+        if len(self._queue) >= self.batch_size:
+            self.flush()
+
+    def flush(self) -> int:
+        """Flush all queued outcomes to database.
+
+        Writes all outcomes in a single transaction for efficiency.
+
+        Returns:
+            Number of outcomes written
+        """
+        if not self._queue:
+            return 0
+
+        count = len(self._queue)
+        queue_copy = self._queue.copy()
+        self._queue.clear()
+
+        # Use coordinator's db connection for transaction
+        db = self.coordinator.db
+        cursor = db.cursor()
+
+        try:
+            from datetime import datetime as dt
+
+            timestamp_now = dt.now().isoformat()
+
+            for learner_name, outcome, vertical in queue_copy:
+                outcome.vertical = vertical
+
+                # Record in learner-specific tables
+                learner = self.coordinator.get_learner(learner_name)
+                if learner:
+                    # Use learner's record_outcome but skip learner's commit
+                    learner.record_outcome(outcome)
+
+                # Record in shared outcomes table
+                cursor.execute(
+                    f"""
+                    INSERT INTO {Tables.RL_OUTCOME} (
+                        learner_name, learner_id, provider, model, task_type, vertical,
+                        success, quality_score, metadata, timestamp, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                    """,
+                    (
+                        learner_name,
+                        learner_name,
+                        outcome.provider,
+                        outcome.model,
+                        outcome.task_type,
+                        outcome.vertical or "general",
+                        1 if outcome.success else 0,
+                        outcome.quality_score,
+                        outcome.to_dict()["metadata"],
+                        timestamp_now,
+                    ),
+                )
+
+            # Single commit for all outcomes
+            db.commit()
+            self._flush_count += count
+            logger.debug(f"RL: Flushed batch of {count} outcomes")
+            return count
+
+        except Exception as e:
+            logger.error(f"RL: Failed to flush {count} outcomes: {e}")
+            db.rollback()
+            # Re-queue failed outcomes
+            self._queue.extend(queue_copy)
+            raise
+
+    def get_queue_size(self) -> int:
+        """Get number of queued outcomes."""
+        return len(self._queue)
+
+    def get_flush_count(self) -> int:
+        """Get total number of outcomes flushed."""
+        return self._flush_count
+
+    async def flush_async(self) -> int:
+        """Async version of flush."""
+        return await asyncio.to_thread(self.flush)
+
+
 class RLCoordinator:
     """Centralized coordinator for all RL learners.
 

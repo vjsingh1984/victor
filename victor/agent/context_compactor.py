@@ -649,6 +649,166 @@ class ContextCompactor:
         self._last_compaction_turn = 0
         logger.debug("Compactor statistics reset")
 
+    # =========================================================================
+    # Async API
+    # =========================================================================
+
+    def _ensure_async_state(self) -> None:
+        """Initialize async-related state if not already done."""
+        if not hasattr(self, "_monitor_task"):
+            import asyncio
+
+            self._monitor_task: Optional[asyncio.Task] = None
+            self._async_running = False
+            self._check_interval_seconds = 30.0
+            self._last_check_time = 0.0
+            self._async_compactions = 0
+            self._background_checks = 0
+
+    async def check_and_compact_async(
+        self,
+        current_query: Optional[str] = None,
+        force: bool = False,
+    ) -> CompactionAction:
+        """Check and compact asynchronously.
+
+        Runs the sync compaction in a thread pool to avoid blocking.
+
+        Args:
+            current_query: Current user query for relevance
+            force: Force compaction
+
+        Returns:
+            CompactionAction describing what was done
+        """
+        import asyncio
+
+        self._ensure_async_state()
+        action = await asyncio.to_thread(self.check_and_compact, current_query, force)
+
+        if action.action_taken:
+            self._async_compactions += 1
+
+        return action
+
+    async def should_compact_async(self) -> Tuple[bool, CompactionTrigger]:
+        """Check if compaction should be performed (async).
+
+        Returns:
+            Tuple of (should_compact, trigger_reason)
+        """
+        import asyncio
+
+        return await asyncio.to_thread(self.should_compact)
+
+    async def truncate_tool_result_async(
+        self,
+        content: str,
+        max_chars: Optional[int] = None,
+        max_lines: Optional[int] = None,
+        content_type: str = "mixed",
+    ) -> TruncationResult:
+        """Truncate tool result asynchronously.
+
+        Args:
+            content: Tool result content
+            max_chars: Max characters
+            max_lines: Max lines
+            content_type: Content type
+
+        Returns:
+            TruncationResult
+        """
+        import asyncio
+
+        return await asyncio.to_thread(
+            self.truncate_tool_result,
+            content,
+            max_chars,
+            max_lines,
+            content_type,
+        )
+
+    async def start_background_compaction(
+        self,
+        interval_seconds: Optional[float] = None,
+    ) -> None:
+        """Start background task that monitors and compacts proactively.
+
+        Args:
+            interval_seconds: Override check interval (default 30.0)
+        """
+        import asyncio
+        import time
+
+        self._ensure_async_state()
+
+        if self._async_running:
+            return
+
+        if interval_seconds is not None:
+            self._check_interval_seconds = interval_seconds
+
+        self._async_running = True
+
+        async def _monitor_loop() -> None:
+            while self._async_running:
+                await asyncio.sleep(self._check_interval_seconds)
+                if not self._async_running:
+                    break
+
+                try:
+                    self._background_checks += 1
+                    should, trigger = await self.should_compact_async()
+
+                    if should and trigger != CompactionTrigger.NONE:
+                        logger.debug(f"Background compaction triggered: {trigger.value}")
+                        await self.check_and_compact_async()
+
+                    self._last_check_time = time.time()
+
+                except Exception as e:
+                    logger.warning(f"Background compaction error: {e}")
+
+        self._monitor_task = asyncio.create_task(_monitor_loop())
+        logger.debug(
+            f"ContextCompactor: Started background monitoring "
+            f"(interval={self._check_interval_seconds}s)"
+        )
+
+    async def stop_background_compaction(self) -> None:
+        """Stop background compaction monitoring."""
+        import asyncio
+
+        self._ensure_async_state()
+        self._async_running = False
+
+        if self._monitor_task:
+            self._monitor_task.cancel()
+            try:
+                await self._monitor_task
+            except asyncio.CancelledError:
+                pass
+            self._monitor_task = None
+
+        logger.debug("ContextCompactor: Stopped background monitoring")
+
+    def get_async_statistics(self) -> Dict[str, Any]:
+        """Get async compactor statistics.
+
+        Returns:
+            Dict with both sync and async statistics
+        """
+        self._ensure_async_state()
+        base_stats = self.get_statistics()
+        base_stats.update({
+            "async_compactions": self._async_compactions,
+            "background_checks": self._background_checks,
+            "background_running": self._async_running,
+            "last_check_time": self._last_check_time,
+        })
+        return base_stats
+
 
 def create_context_compactor(
     controller: "ConversationController",

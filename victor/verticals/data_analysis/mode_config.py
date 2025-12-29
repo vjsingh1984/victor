@@ -1,62 +1,48 @@
-"""Data Analysis Mode Configuration - Budget settings for analysis tasks."""
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-from dataclasses import dataclass
+"""Data Analysis mode configurations using central registry.
+
+This module registers data analysis-specific operational modes with the central
+ModeConfigRegistry and exports a registry-based provider for protocol
+compatibility.
+"""
+
+from __future__ import annotations
+
 from typing import Dict, Optional
 
-from victor.verticals.protocols import ModeConfigProviderProtocol
+from victor.core.mode_config import (
+    ModeConfig,
+    ModeConfigRegistry,
+    ModeDefinition,
+    RegistryBasedModeConfigProvider,
+)
 
 
-@dataclass
-class DataAnalysisModeConfig:
-    """Configuration for a data analysis mode."""
+# =============================================================================
+# Data Analysis-Specific Modes (Registered with Central Registry)
+# =============================================================================
 
-    tool_budget: int
-    max_iterations: int
-    description: str
-    allowed_stages: list[str]
-
-
-# Data analysis-specific mode configurations
-DATA_ANALYSIS_MODE_CONFIGS: Dict[str, DataAnalysisModeConfig] = {
-    "quick": DataAnalysisModeConfig(
-        tool_budget=10,
-        max_iterations=20,
-        description="Quick data overview and basic stats",
-        allowed_stages=["INITIAL", "DATA_LOADING", "EXPLORATION", "COMPLETION"],
-    ),
-    "standard": DataAnalysisModeConfig(
-        tool_budget=25,
-        max_iterations=50,
-        description="Standard analysis with cleaning and visualization",
-        allowed_stages=[
-            "INITIAL",
-            "DATA_LOADING",
-            "EXPLORATION",
-            "CLEANING",
-            "ANALYSIS",
-            "VISUALIZATION",
-            "COMPLETION",
-        ],
-    ),
-    "comprehensive": DataAnalysisModeConfig(
-        tool_budget=50,
-        max_iterations=100,
-        description="Full analysis pipeline with ML and reporting",
-        allowed_stages=[
-            "INITIAL",
-            "DATA_LOADING",
-            "EXPLORATION",
-            "CLEANING",
-            "ANALYSIS",
-            "VISUALIZATION",
-            "REPORTING",
-            "COMPLETION",
-        ],
-    ),
-    "research": DataAnalysisModeConfig(
+_DATA_ANALYSIS_MODES: Dict[str, ModeDefinition] = {
+    "research": ModeDefinition(
+        name="research",
         tool_budget=80,
         max_iterations=150,
+        temperature=0.8,
         description="Deep research analysis with multiple iterations",
+        exploration_multiplier=3.0,
         allowed_stages=[
             "INITIAL",
             "DATA_LOADING",
@@ -70,8 +56,8 @@ DATA_ANALYSIS_MODE_CONFIGS: Dict[str, DataAnalysisModeConfig] = {
     ),
 }
 
-# Default tool budgets by analysis complexity
-DATA_ANALYSIS_DEFAULT_TOOL_BUDGETS: Dict[str, int] = {
+# Data Analysis-specific task type budgets
+_DATA_ANALYSIS_TASK_BUDGETS: Dict[str, int] = {
     "data_profiling": 8,
     "basic_stats": 10,
     "visualization": 12,
@@ -84,35 +70,57 @@ DATA_ANALYSIS_DEFAULT_TOOL_BUDGETS: Dict[str, int] = {
 }
 
 
-class DataAnalysisModeConfigProvider(ModeConfigProviderProtocol):
-    """Provides mode configurations for data analysis tasks."""
+# =============================================================================
+# Register with Central Registry
+# =============================================================================
 
-    def get_mode_configs(self) -> Dict[str, Dict]:
-        """Return available analysis modes as dictionaries."""
-        return {
-            name: {
-                "tool_budget": config.tool_budget,
-                "max_iterations": config.max_iterations,
-                "description": config.description,
-                "allowed_stages": config.allowed_stages,
-            }
-            for name, config in DATA_ANALYSIS_MODE_CONFIGS.items()
-        }
+def _register_data_analysis_modes() -> None:
+    """Register data analysis modes with the central registry."""
+    registry = ModeConfigRegistry.get_instance()
+    registry.register_vertical(
+        name="data_analysis",
+        modes=_DATA_ANALYSIS_MODES,
+        task_budgets=_DATA_ANALYSIS_TASK_BUDGETS,
+        default_mode="standard",
+        default_budget=25,
+    )
 
-    def get_default_tool_budget(self, task_type: Optional[str] = None) -> int:
-        """Return default tool budget for a task type."""
-        if task_type and task_type in DATA_ANALYSIS_DEFAULT_TOOL_BUDGETS:
-            return DATA_ANALYSIS_DEFAULT_TOOL_BUDGETS[task_type]
-        return 25  # Standard analysis budget
 
-    def get_default_max_iterations(self, task_type: Optional[str] = None) -> int:
-        """Return default max iterations for a task type."""
-        budget = self.get_default_tool_budget(task_type)
-        # Analysis typically needs 2x iterations per tool call
-        return budget * 2
+# Register on module load
+_register_data_analysis_modes()
+
+
+# =============================================================================
+# Provider (Protocol Compatibility)
+# =============================================================================
+
+
+class DataAnalysisModeConfigProvider(RegistryBasedModeConfigProvider):
+    """Mode configuration provider for data analysis vertical.
+
+    Uses the central ModeConfigRegistry but provides analysis-specific
+    complexity mapping.
+    """
+
+    def __init__(self) -> None:
+        """Initialize data analysis mode provider."""
+        # Ensure registration (idempotent - handles singleton reset)
+        _register_data_analysis_modes()
+        super().__init__(
+            vertical="data_analysis",
+            default_mode="standard",
+            default_budget=25,
+        )
 
     def get_mode_for_complexity(self, complexity: str) -> str:
-        """Map complexity level to analysis mode."""
+        """Map complexity level to analysis mode.
+
+        Args:
+            complexity: Complexity level
+
+        Returns:
+            Recommended mode name
+        """
         mapping = {
             "trivial": "quick",
             "simple": "quick",
@@ -121,3 +129,35 @@ class DataAnalysisModeConfigProvider(ModeConfigProviderProtocol):
             "highly_complex": "research",
         }
         return mapping.get(complexity, "standard")
+
+
+# =============================================================================
+# Backward Compatibility Exports
+# =============================================================================
+
+# Legacy constant for backward compatibility
+DATA_ANALYSIS_MODE_CONFIGS: Dict[str, ModeConfig] = {}
+DATA_ANALYSIS_DEFAULT_TOOL_BUDGETS: Dict[str, int] = _DATA_ANALYSIS_TASK_BUDGETS.copy()
+
+
+def _populate_legacy_configs() -> None:
+    """Populate legacy config dict from registry."""
+    global DATA_ANALYSIS_MODE_CONFIGS
+    registry = ModeConfigRegistry.get_instance()
+    DATA_ANALYSIS_MODE_CONFIGS = registry.get_modes("data_analysis")
+
+
+# Populate on module load
+_populate_legacy_configs()
+
+
+# Legacy dataclass alias
+DataAnalysisModeConfig = ModeConfig
+
+
+__all__ = [
+    "DataAnalysisModeConfigProvider",
+    "DataAnalysisModeConfig",
+    "DATA_ANALYSIS_MODE_CONFIGS",
+    "DATA_ANALYSIS_DEFAULT_TOOL_BUDGETS",
+]

@@ -241,6 +241,7 @@ from victor.core.mode_config import (
     DEFAULT_MODES,
     DEFAULT_TASK_BUDGETS,
     ModeConfigRegistry,
+    RegistryBasedModeConfigProvider,
     get_mode_config,
     get_tool_budget,
     register_vertical_modes,
@@ -259,9 +260,12 @@ from victor.core.tool_types import (
 from victor.core.vertical_types import (
     StageDefinition,
     TaskTypeHint,
+    StandardTaskHints,
+    StandardGroundingRules,
     MiddlewarePriority as VerticalMiddlewarePriority,
     MiddlewareResult as VerticalMiddlewareResult,
     TieredToolConfig,
+    TieredToolTemplate,
     VerticalConfigBase,
 )
 
@@ -469,6 +473,7 @@ __all__ = [
     "DEFAULT_MODES",
     "DEFAULT_TASK_BUDGETS",
     "ModeConfigRegistry",
+    "RegistryBasedModeConfigProvider",
     "get_mode_config",
     "get_tool_budget",
     "register_vertical_modes",
@@ -481,11 +486,14 @@ __all__ = [
     # Vertical Types (cross-vertical abstractions)
     "StageDefinition",
     "TaskTypeHint",
+    "StandardTaskHints",
+    "StandardGroundingRules",
     "VerticalMiddlewarePriority",
     "VerticalMiddlewareResult",
     "TieredToolConfig",
+    "TieredToolTemplate",
     "VerticalConfigBase",
-    # Database
+    # Database (DatabaseManager now includes async methods directly)
     "DatabaseManager",
     "ProjectDatabaseManager",
     "get_database",

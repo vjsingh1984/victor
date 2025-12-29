@@ -177,7 +177,7 @@ class ModelSelectorLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Load global Q-values
-        cursor.execute("SELECT * FROM {Tables.RL_MODEL_Q}")
+        cursor.execute(f"SELECT * FROM {Tables.RL_MODEL_Q}")
         for row in cursor.fetchall():
             stats = dict(row)
             provider = stats["provider"]
@@ -186,7 +186,7 @@ class ModelSelectorLearner(BaseLearner):
             self._total_selections += stats["selection_count"]
 
         # Load task-specific Q-values
-        cursor.execute("SELECT * FROM {Tables.RL_MODEL_TASK}")
+        cursor.execute(f"SELECT * FROM {Tables.RL_MODEL_TASK}")
         for row in cursor.fetchall():
             stats = dict(row)
             provider = stats["provider"]
@@ -201,7 +201,7 @@ class ModelSelectorLearner(BaseLearner):
 
         # Load epsilon and total_selections
         cursor.execute(
-            "SELECT * FROM {Tables.RL_MODEL_STATE} WHERE key IN ('epsilon', 'total_selections')"
+            f"SELECT * FROM {Tables.RL_MODEL_STATE} WHERE key IN ('epsilon', 'total_selections')"
         )
         for row in cursor.fetchall():
             stats = dict(row)
@@ -281,7 +281,7 @@ class ModelSelectorLearner(BaseLearner):
 
         # Save global Q-value
         cursor.execute(
-            """
+            f"""
             INSERT OR REPLACE INTO {Tables.RL_MODEL_Q}
             (provider, q_value, selection_count, last_updated)
             VALUES (?, ?, ?, ?)
@@ -298,7 +298,7 @@ class ModelSelectorLearner(BaseLearner):
         if task_type and provider in self._q_table_by_task:
             if task_type in self._q_table_by_task[provider]:
                 cursor.execute(
-                    """
+                    f"""
                     INSERT OR REPLACE INTO {Tables.RL_MODEL_TASK}
                     (provider, task_type, q_value, selection_count, last_updated)
                     VALUES (?, ?, ?, ?, ?)
@@ -314,11 +314,11 @@ class ModelSelectorLearner(BaseLearner):
 
         # Save epsilon and total_selections
         cursor.execute(
-            "INSERT OR REPLACE INTO {Tables.RL_MODEL_STATE} (key, value) VALUES ('epsilon', ?)",
+            f"INSERT OR REPLACE INTO {Tables.RL_MODEL_STATE} (key, value) VALUES ('epsilon', ?)",
             (str(self.epsilon),),
         )
         cursor.execute(
-            "INSERT OR REPLACE INTO {Tables.RL_MODEL_STATE} (key, value) VALUES ('total_selections', ?)",
+            f"INSERT OR REPLACE INTO {Tables.RL_MODEL_STATE} (key, value) VALUES ('total_selections', ?)",
             (str(self._total_selections),),
         )
 

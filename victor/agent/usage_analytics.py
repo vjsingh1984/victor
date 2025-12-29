@@ -45,6 +45,7 @@ Usage:
     metrics = analytics.export_prometheus_metrics()
 """
 
+import asyncio
 import json
 import logging
 import pickle
@@ -336,6 +337,221 @@ class UsageAnalytics:
         with self._data_lock:
             if self._current_session:
                 self._current_session.provider_switches += 1
+
+    def record_tool_selection(
+        self,
+        method: str,
+        num_tools: int,
+        selection_time_ms: float = 0,
+        task_type: Optional[str] = None,
+        query_hash: Optional[str] = None,
+    ) -> None:
+        """Record tool selection for analytics.
+
+        This tracks how tools are being selected to optimize the process.
+
+        Args:
+            method: Selection method used ("semantic", "keyword", "hybrid")
+            num_tools: Number of tools selected
+            selection_time_ms: Time taken for selection in milliseconds
+            task_type: Type of task (for correlation analysis)
+            query_hash: Hash of query (for pattern detection)
+        """
+        with self._data_lock:
+            # Track selection method distribution
+            if "_selection_stats" not in self.__dict__:
+                self._selection_stats: Dict[str, Dict[str, Any]] = {}
+
+            if method not in self._selection_stats:
+                self._selection_stats[method] = {
+                    "count": 0,
+                    "total_tools_selected": 0,
+                    "total_time_ms": 0,
+                    "task_types": {},
+                }
+
+            stats = self._selection_stats[method]
+            stats["count"] += 1
+            stats["total_tools_selected"] += num_tools
+            stats["total_time_ms"] += selection_time_ms
+
+            if task_type:
+                stats["task_types"][task_type] = stats["task_types"].get(task_type, 0) + 1
+
+        logger.debug(
+            f"Recorded tool selection: method={method}, tools={num_tools}, "
+            f"time={selection_time_ms:.1f}ms"
+        )
+
+    def record_first_token(
+        self,
+        provider_name: str,
+        model: str,
+        time_to_first_token_ms: float,
+    ) -> None:
+        """Record time to first token for latency tracking.
+
+        This helps optimize perceived responsiveness.
+
+        Args:
+            provider_name: Name of the provider
+            model: Model used
+            time_to_first_token_ms: Time from request to first token
+        """
+        with self._data_lock:
+            # Track TTFT stats per provider/model
+            if "_ttft_stats" not in self.__dict__:
+                self._ttft_stats: Dict[str, List[float]] = {}
+
+            key = f"{provider_name}:{model}"
+            if key not in self._ttft_stats:
+                self._ttft_stats[key] = []
+
+            self._ttft_stats[key].append(time_to_first_token_ms)
+
+            # Keep last 100 samples
+            if len(self._ttft_stats[key]) > 100:
+                self._ttft_stats[key] = self._ttft_stats[key][-100:]
+
+        logger.debug(
+            f"Recorded first token: {provider_name}/{model}, "
+            f"TTFT={time_to_first_token_ms:.1f}ms"
+        )
+
+    def record_streaming_metrics(
+        self,
+        provider_name: str,
+        model: str,
+        total_tokens: int,
+        total_duration_ms: float,
+        time_to_first_token_ms: Optional[float] = None,
+        tokens_per_second: Optional[float] = None,
+    ) -> None:
+        """Record comprehensive streaming metrics.
+
+        Args:
+            provider_name: Name of the provider
+            model: Model used
+            total_tokens: Total tokens generated
+            total_duration_ms: Total streaming duration
+            time_to_first_token_ms: Time to first token
+            tokens_per_second: Token generation rate
+        """
+        with self._data_lock:
+            # Track streaming stats
+            if "_streaming_stats" not in self.__dict__:
+                self._streaming_stats: Dict[str, Dict[str, Any]] = {}
+
+            key = f"{provider_name}:{model}"
+            if key not in self._streaming_stats:
+                self._streaming_stats[key] = {
+                    "count": 0,
+                    "total_tokens": 0,
+                    "total_duration_ms": 0,
+                    "ttft_samples": [],
+                    "tps_samples": [],
+                }
+
+            stats = self._streaming_stats[key]
+            stats["count"] += 1
+            stats["total_tokens"] += total_tokens
+            stats["total_duration_ms"] += total_duration_ms
+
+            if time_to_first_token_ms is not None:
+                stats["ttft_samples"].append(time_to_first_token_ms)
+                if len(stats["ttft_samples"]) > 100:
+                    stats["ttft_samples"] = stats["ttft_samples"][-100:]
+
+            if tokens_per_second is not None:
+                stats["tps_samples"].append(tokens_per_second)
+                if len(stats["tps_samples"]) > 100:
+                    stats["tps_samples"] = stats["tps_samples"][-100:]
+
+        logger.debug(
+            f"Recorded streaming metrics: {provider_name}/{model}, "
+            f"tokens={total_tokens}, duration={total_duration_ms:.1f}ms"
+        )
+
+    def get_selection_insights(self) -> Dict[str, Any]:
+        """Get insights about tool selection patterns.
+
+        Returns:
+            Dictionary with selection statistics and recommendations
+        """
+        with self._data_lock:
+            if not hasattr(self, "_selection_stats") or not self._selection_stats:
+                return {"status": "no_data"}
+
+            insights = {}
+            for method, stats in self._selection_stats.items():
+                avg_tools = (
+                    stats["total_tools_selected"] / stats["count"]
+                    if stats["count"] > 0
+                    else 0
+                )
+                avg_time = (
+                    stats["total_time_ms"] / stats["count"]
+                    if stats["count"] > 0
+                    else 0
+                )
+
+                insights[method] = {
+                    "count": stats["count"],
+                    "avg_tools_selected": avg_tools,
+                    "avg_selection_time_ms": avg_time,
+                    "task_distribution": stats.get("task_types", {}),
+                }
+
+            # Add recommendations
+            recommendations = []
+            if "semantic" in insights and "keyword" in insights:
+                if insights["semantic"]["avg_selection_time_ms"] > 100:
+                    recommendations.append(
+                        "Semantic selection is slow. Consider caching embeddings."
+                    )
+
+            insights["recommendations"] = recommendations
+            insights["status"] = "ok"
+
+            return insights
+
+    def get_ttft_insights(self, provider_name: Optional[str] = None) -> Dict[str, Any]:
+        """Get time-to-first-token insights.
+
+        Args:
+            provider_name: Optional filter by provider
+
+        Returns:
+            Dictionary with TTFT statistics
+        """
+        with self._data_lock:
+            if not hasattr(self, "_ttft_stats") or not self._ttft_stats:
+                return {"status": "no_data"}
+
+            insights = {}
+            for key, samples in self._ttft_stats.items():
+                prov, model = key.split(":", 1)
+                if provider_name and prov != provider_name:
+                    continue
+
+                if not samples:
+                    continue
+
+                sorted_samples = sorted(samples)
+                p50_idx = int(len(sorted_samples) * 0.50)
+                p95_idx = min(int(len(sorted_samples) * 0.95), len(sorted_samples) - 1)
+
+                insights[key] = {
+                    "samples": len(samples),
+                    "avg_ms": sum(samples) / len(samples),
+                    "p50_ms": sorted_samples[p50_idx],
+                    "p95_ms": sorted_samples[p95_idx],
+                    "min_ms": sorted_samples[0],
+                    "max_ms": sorted_samples[-1],
+                }
+
+            insights["status"] = "ok" if insights else "no_data"
+            return insights
 
     # ========================================================================
     # Aggregate Updates
@@ -747,6 +963,338 @@ class UsageAnalytics:
             self._current_session = None
 
         logger.debug("Analytics data cleared")
+
+    # =========================================================================
+    # Async API + Write Buffering
+    # =========================================================================
+
+    def _ensure_buffer_state(self) -> None:
+        """Initialize buffer state if not already done."""
+        if not hasattr(self, "_tool_buffer"):
+            self._tool_buffer: List[Dict[str, Any]] = []
+            self._provider_buffer: List[Dict[str, Any]] = []
+            self._selection_buffer: List[Dict[str, Any]] = []
+            self._streaming_buffer: List[Dict[str, Any]] = []
+            self._buffer_lock = threading.Lock()
+            self._buffer_size = 100
+            self._flush_interval = 5.0
+            self._flush_task: Optional[asyncio.Task] = None
+            self._auto_flush_running = False
+            self._total_buffered = 0
+            self._total_flushed = 0
+
+    def buffer_tool_execution(
+        self,
+        tool_name: str,
+        success: bool,
+        execution_time_ms: float,
+        error_type: Optional[str] = None,
+        context_tokens: int = 0,
+        query_hash: Optional[str] = None,
+    ) -> None:
+        """Buffer a tool execution record for later batch writing.
+
+        Non-blocking - queues the record for later writing.
+
+        Args:
+            tool_name: Name of the executed tool
+            success: Whether execution succeeded
+            execution_time_ms: Execution time in milliseconds
+            error_type: Error type if failed
+            context_tokens: Number of context tokens
+            query_hash: Hash of the query
+        """
+        self._ensure_buffer_state()
+        record = {
+            "tool_name": tool_name,
+            "success": success,
+            "execution_time_ms": execution_time_ms,
+            "error_type": error_type,
+            "context_tokens": context_tokens,
+            "query_hash": query_hash,
+        }
+
+        with self._buffer_lock:
+            self._tool_buffer.append(record)
+            self._total_buffered += 1
+
+            # Auto-flush if buffer is full
+            if len(self._tool_buffer) >= self._buffer_size:
+                self._flush_tool_buffer_internal()
+
+    def buffer_provider_call(
+        self,
+        provider_name: str,
+        model: str,
+        success: bool,
+        latency_ms: float,
+        tokens_in: int = 0,
+        tokens_out: int = 0,
+        error_type: Optional[str] = None,
+    ) -> None:
+        """Buffer a provider call record for later batch writing.
+
+        Non-blocking - queues the record for later writing.
+
+        Args:
+            provider_name: Name of the provider
+            model: Model used
+            success: Whether call succeeded
+            latency_ms: Total latency
+            tokens_in: Input tokens
+            tokens_out: Output tokens
+            error_type: Error type if failed
+        """
+        self._ensure_buffer_state()
+        record = {
+            "provider_name": provider_name,
+            "model": model,
+            "success": success,
+            "latency_ms": latency_ms,
+            "tokens_in": tokens_in,
+            "tokens_out": tokens_out,
+            "error_type": error_type,
+        }
+
+        with self._buffer_lock:
+            self._provider_buffer.append(record)
+            self._total_buffered += 1
+
+            # Auto-flush if buffer is full
+            if len(self._provider_buffer) >= self._buffer_size:
+                self._flush_provider_buffer_internal()
+
+    def buffer_tool_selection(
+        self,
+        method: str,
+        num_tools: int,
+        selection_time_ms: float = 0,
+        task_type: Optional[str] = None,
+        query_hash: Optional[str] = None,
+    ) -> None:
+        """Buffer a tool selection record.
+
+        Args:
+            method: Selection method
+            num_tools: Number of tools selected
+            selection_time_ms: Time taken
+            task_type: Task type
+            query_hash: Query hash
+        """
+        self._ensure_buffer_state()
+        record = {
+            "method": method,
+            "num_tools": num_tools,
+            "selection_time_ms": selection_time_ms,
+            "task_type": task_type,
+            "query_hash": query_hash,
+        }
+
+        with self._buffer_lock:
+            self._selection_buffer.append(record)
+            self._total_buffered += 1
+
+    def buffer_streaming_metrics(
+        self,
+        provider_name: str,
+        model: str,
+        total_tokens: int,
+        total_duration_ms: float,
+        time_to_first_token_ms: Optional[float] = None,
+        tokens_per_second: Optional[float] = None,
+    ) -> None:
+        """Buffer streaming metrics.
+
+        Args:
+            provider_name: Provider name
+            model: Model used
+            total_tokens: Tokens generated
+            total_duration_ms: Total duration
+            time_to_first_token_ms: TTFT
+            tokens_per_second: Generation rate
+        """
+        self._ensure_buffer_state()
+        record = {
+            "provider_name": provider_name,
+            "model": model,
+            "total_tokens": total_tokens,
+            "total_duration_ms": total_duration_ms,
+            "time_to_first_token_ms": time_to_first_token_ms,
+            "tokens_per_second": tokens_per_second,
+        }
+
+        with self._buffer_lock:
+            self._streaming_buffer.append(record)
+            self._total_buffered += 1
+
+    def _flush_tool_buffer_internal(self) -> int:
+        """Flush tool buffer (called under lock)."""
+        if not self._tool_buffer:
+            return 0
+
+        records = self._tool_buffer.copy()
+        self._tool_buffer.clear()
+
+        count = 0
+        for record in records:
+            try:
+                self.record_tool_execution(**record)
+                count += 1
+            except Exception as e:
+                logger.warning(f"Failed to flush tool record: {e}")
+
+        self._total_flushed += count
+        return count
+
+    def _flush_provider_buffer_internal(self) -> int:
+        """Flush provider buffer (called under lock)."""
+        if not self._provider_buffer:
+            return 0
+
+        records = self._provider_buffer.copy()
+        self._provider_buffer.clear()
+
+        count = 0
+        for record in records:
+            try:
+                self.record_provider_call(**record)
+                count += 1
+            except Exception as e:
+                logger.warning(f"Failed to flush provider record: {e}")
+
+        self._total_flushed += count
+        return count
+
+    def _flush_selection_buffer_internal(self) -> int:
+        """Flush selection buffer (called under lock)."""
+        if not self._selection_buffer:
+            return 0
+
+        records = self._selection_buffer.copy()
+        self._selection_buffer.clear()
+
+        count = 0
+        for record in records:
+            try:
+                self.record_tool_selection(**record)
+                count += 1
+            except Exception as e:
+                logger.warning(f"Failed to flush selection record: {e}")
+
+        self._total_flushed += count
+        return count
+
+    def _flush_streaming_buffer_internal(self) -> int:
+        """Flush streaming buffer (called under lock)."""
+        if not self._streaming_buffer:
+            return 0
+
+        records = self._streaming_buffer.copy()
+        self._streaming_buffer.clear()
+
+        count = 0
+        for record in records:
+            try:
+                self.record_streaming_metrics(**record)
+                count += 1
+            except Exception as e:
+                logger.warning(f"Failed to flush streaming record: {e}")
+
+        self._total_flushed += count
+        return count
+
+    def flush_buffers_sync(self) -> int:
+        """Flush all buffers synchronously.
+
+        Returns:
+            Total number of records flushed
+        """
+        self._ensure_buffer_state()
+
+        with self._buffer_lock:
+            total = 0
+            total += self._flush_tool_buffer_internal()
+            total += self._flush_provider_buffer_internal()
+            total += self._flush_selection_buffer_internal()
+            total += self._flush_streaming_buffer_internal()
+
+            if total > 0:
+                logger.debug(f"UsageAnalytics: Flushed {total} buffered records")
+
+            return total
+
+    async def flush_buffers_async(self) -> int:
+        """Flush all buffers asynchronously.
+
+        Runs the sync flush in a thread pool to avoid blocking.
+
+        Returns:
+            Total number of records flushed
+        """
+        return await asyncio.to_thread(self.flush_buffers_sync)
+
+    async def start_auto_flush(self, interval_seconds: Optional[float] = None) -> None:
+        """Start background task that periodically flushes buffers.
+
+        Args:
+            interval_seconds: Override flush interval (default 5.0)
+        """
+        self._ensure_buffer_state()
+
+        if self._auto_flush_running:
+            return
+
+        if interval_seconds is not None:
+            self._flush_interval = interval_seconds
+
+        self._auto_flush_running = True
+
+        async def _flush_loop() -> None:
+            while self._auto_flush_running:
+                await asyncio.sleep(self._flush_interval)
+                if self._auto_flush_running:
+                    try:
+                        await self.flush_buffers_async()
+                    except Exception as e:
+                        logger.warning(f"Auto-flush error: {e}")
+
+        self._flush_task = asyncio.create_task(_flush_loop())
+        logger.debug(f"UsageAnalytics: Started auto-flush (interval={self._flush_interval}s)")
+
+    async def stop_auto_flush(self) -> None:
+        """Stop background flush task and flush remaining records."""
+        self._auto_flush_running = False
+
+        if hasattr(self, "_flush_task") and self._flush_task:
+            self._flush_task.cancel()
+            try:
+                await self._flush_task
+            except asyncio.CancelledError:
+                pass
+            self._flush_task = None
+
+        # Final flush
+        await self.flush_buffers_async()
+        logger.debug("UsageAnalytics: Stopped auto-flush")
+
+    def get_buffer_stats(self) -> Dict[str, Any]:
+        """Get buffer statistics.
+
+        Returns:
+            Dict with buffer sizes and flush counts
+        """
+        self._ensure_buffer_state()
+
+        with self._buffer_lock:
+            return {
+                "total_buffered": self._total_buffered,
+                "total_flushed": self._total_flushed,
+                "pending_tool_records": len(self._tool_buffer),
+                "pending_provider_records": len(self._provider_buffer),
+                "pending_selection_records": len(self._selection_buffer),
+                "pending_streaming_records": len(self._streaming_buffer),
+                "auto_flush_running": self._auto_flush_running,
+            }
 
 
 def create_usage_analytics(cache_dir: Optional[Path] = None) -> UsageAnalytics:

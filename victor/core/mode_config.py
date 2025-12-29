@@ -62,8 +62,31 @@ class ModeLevel(Enum):
 
 
 @dataclass
+class ModeConfig:
+    """Simplified mode configuration with core operational parameters.
+
+    This is the primary dataclass for mode configuration, providing the essential
+    parameters needed for agent operation control.
+
+    Attributes:
+        tool_budget: Maximum number of tool calls allowed
+        max_iterations: Maximum conversation iterations
+        exploration_multiplier: Factor to multiply exploration iterations (default 1.0)
+        allowed_tools: Optional set of allowed tool names (None means all tools allowed)
+    """
+
+    tool_budget: int
+    max_iterations: int
+    exploration_multiplier: float = 1.0
+    allowed_tools: Optional[Set[str]] = None
+
+
+@dataclass
 class ModeDefinition:
     """Definition of an operational mode.
+
+    Extended mode definition with additional metadata for vertical-specific
+    configurations. Use ModeConfig for simpler use cases.
 
     Attributes:
         name: Mode identifier
@@ -71,8 +94,10 @@ class ModeDefinition:
         max_iterations: Maximum conversation iterations
         temperature: LLM temperature setting
         description: Human-readable description
+        exploration_multiplier: Factor to multiply exploration iterations
         allowed_stages: Optional list of allowed workflow stages
         priority_tools: Optional list of tools to prioritize
+        allowed_tools: Optional set of allowed tool names
         metadata: Additional mode-specific configuration
     """
 
@@ -81,9 +106,20 @@ class ModeDefinition:
     max_iterations: int
     temperature: float = 0.7
     description: str = ""
+    exploration_multiplier: float = 1.0
     allowed_stages: List[str] = field(default_factory=list)
     priority_tools: List[str] = field(default_factory=list)
+    allowed_tools: Optional[Set[str]] = None
     metadata: Dict[str, any] = field(default_factory=dict)
+
+    def to_mode_config(self) -> ModeConfig:
+        """Convert to simplified ModeConfig."""
+        return ModeConfig(
+            tool_budget=self.tool_budget,
+            max_iterations=self.max_iterations,
+            exploration_multiplier=self.exploration_multiplier,
+            allowed_tools=self.allowed_tools,
+        )
 
     def to_dict(self) -> Dict:
         """Convert to dictionary format."""
@@ -93,8 +129,10 @@ class ModeDefinition:
             "max_iterations": self.max_iterations,
             "temperature": self.temperature,
             "description": self.description,
+            "exploration_multiplier": self.exploration_multiplier,
             "allowed_stages": self.allowed_stages,
             "priority_tools": self.priority_tools,
+            "allowed_tools": list(self.allowed_tools) if self.allowed_tools else None,
             "metadata": self.metadata,
         }
 
@@ -126,6 +164,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
         max_iterations=10,
         temperature=0.5,
         description="Quick tasks with minimal exploration",
+        exploration_multiplier=0.5,
     ),
     "fast": ModeDefinition(
         name="fast",
@@ -133,6 +172,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
         max_iterations=10,
         temperature=0.5,
         description="Alias for quick mode",
+        exploration_multiplier=0.5,
     ),
     "standard": ModeDefinition(
         name="standard",
@@ -140,6 +180,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
         max_iterations=40,
         temperature=0.7,
         description="Balanced mode for typical tasks",
+        exploration_multiplier=1.0,
     ),
     "default": ModeDefinition(
         name="default",
@@ -147,6 +188,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
         max_iterations=30,
         temperature=0.7,
         description="Default operational mode",
+        exploration_multiplier=1.0,
     ),
     "comprehensive": ModeDefinition(
         name="comprehensive",
@@ -154,6 +196,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
         max_iterations=80,
         temperature=0.8,
         description="Thorough analysis and comprehensive changes",
+        exploration_multiplier=2.0,
     ),
     "thorough": ModeDefinition(
         name="thorough",
@@ -161,6 +204,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
         max_iterations=80,
         temperature=0.8,
         description="Alias for comprehensive mode",
+        exploration_multiplier=2.0,
     ),
     "explore": ModeDefinition(
         name="explore",
@@ -168,6 +212,15 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
         max_iterations=60,
         temperature=0.7,
         description="Extended exploration for understanding",
+        exploration_multiplier=3.0,
+    ),
+    "plan": ModeDefinition(
+        name="plan",
+        tool_budget=15,
+        max_iterations=50,
+        temperature=0.6,
+        description="Planning and analysis mode before implementation",
+        exploration_multiplier=2.5,
     ),
     "extended": ModeDefinition(
         name="extended",
@@ -175,6 +228,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
         max_iterations=100,
         temperature=0.8,
         description="Extended operations for large tasks",
+        exploration_multiplier=2.5,
     ),
 }
 
@@ -433,6 +487,63 @@ class ModeConfigRegistry:
         """
         self._mode_aliases[alias.lower()] = target.lower()
 
+    def get_modes(
+        self, vertical: Optional[str] = None
+    ) -> Dict[str, ModeConfig]:
+        """Get all modes as simplified ModeConfig objects.
+
+        Returns default modes when no vertical specified, or merged modes
+        with vertical overrides when vertical is provided.
+
+        Args:
+            vertical: Optional vertical name for mode overrides
+
+        Returns:
+            Dict mapping mode name to ModeConfig
+        """
+        result: Dict[str, ModeConfig] = {}
+
+        # Add defaults first
+        for name, mode_def in self._default_modes.items():
+            result[name] = mode_def.to_mode_config()
+
+        # Override with vertical-specific modes
+        if vertical and vertical in self._verticals:
+            for name, mode_def in self._verticals[vertical].modes.items():
+                result[name] = mode_def.to_mode_config()
+
+        return result
+
+    def register_modes(
+        self, vertical: str, modes: Dict[str, ModeConfig]
+    ) -> None:
+        """Register vertical-specific modes using simplified ModeConfig.
+
+        This method allows registering modes using the simpler ModeConfig
+        dataclass. The modes will be converted to ModeDefinition internally.
+
+        Args:
+            vertical: Vertical name
+            modes: Dict mapping mode name to ModeConfig
+        """
+        mode_definitions: Dict[str, ModeDefinition] = {}
+        for name, config in modes.items():
+            mode_definitions[name] = ModeDefinition(
+                name=name,
+                tool_budget=config.tool_budget,
+                max_iterations=config.max_iterations,
+                exploration_multiplier=config.exploration_multiplier,
+                allowed_tools=config.allowed_tools,
+            )
+
+        if vertical in self._verticals:
+            self._verticals[vertical].modes.update(mode_definitions)
+        else:
+            self._verticals[vertical] = VerticalModeConfig(
+                vertical_name=vertical,
+                modes=mode_definitions,
+            )
+
 
 # =============================================================================
 # Convenience Functions
@@ -494,10 +605,137 @@ def register_vertical_modes(
     registry.register_vertical(vertical, modes, task_budgets)
 
 
+# =============================================================================
+# Registry-Based Provider (Protocol Adapter)
+# =============================================================================
+
+
+class RegistryBasedModeConfigProvider:
+    """Mode config provider that delegates to the central registry.
+
+    This class implements the ModeConfigProviderProtocol pattern but uses
+    the central ModeConfigRegistry, eliminating duplicate code in verticals.
+
+    Example:
+        # In vertical __init__.py or mode_config.py
+        from victor.core.mode_config import (
+            ModeConfigRegistry,
+            ModeDefinition,
+            RegistryBasedModeConfigProvider,
+        )
+
+        # Register vertical-specific modes at import time
+        registry = ModeConfigRegistry.get_instance()
+        registry.register_vertical(
+            "coding",
+            modes={
+                "architect": ModeDefinition(name="architect", tool_budget=40, ...),
+                "refactor": ModeDefinition(name="refactor", tool_budget=25, ...),
+            },
+            task_budgets={"code_generation": 3, "refactor": 15},
+        )
+
+        # Export provider for protocol compatibility
+        CodingModeConfigProvider = RegistryBasedModeConfigProvider("coding")
+    """
+
+    def __init__(
+        self,
+        vertical: str,
+        default_mode: str = "default",
+        default_budget: int = 10,
+    ):
+        """Initialize registry-based provider.
+
+        Args:
+            vertical: Vertical name for mode lookups
+            default_mode: Default mode name
+            default_budget: Default tool budget
+        """
+        self._vertical = vertical
+        self._default_mode = default_mode
+        self._default_budget = default_budget
+
+    def get_mode_configs(self) -> Dict[str, "ModeConfig"]:
+        """Get mode configurations from the registry.
+
+        Returns:
+            Dict mapping mode names to ModeConfig
+        """
+        registry = ModeConfigRegistry.get_instance()
+        return registry.get_modes(self._vertical)
+
+    def get_default_mode(self) -> str:
+        """Get the default mode name.
+
+        Returns:
+            Name of the default mode
+        """
+        registry = ModeConfigRegistry.get_instance()
+        return registry.get_default_mode(self._vertical)
+
+    def get_default_tool_budget(self, task_type: str | None = None) -> int:
+        """Get default tool budget, optionally for a task type.
+
+        Args:
+            task_type: Optional task type for specialized budget
+
+        Returns:
+            Recommended tool budget
+        """
+        registry = ModeConfigRegistry.get_instance()
+        return registry.get_tool_budget(
+            vertical=self._vertical,
+            task_type=task_type,
+        )
+
+    def get_default_max_iterations(self, task_type: str | None = None) -> int:
+        """Get default max iterations.
+
+        Args:
+            task_type: Optional task type
+
+        Returns:
+            Max iterations (default 2x tool budget)
+        """
+        budget = self.get_default_tool_budget(task_type)
+        return budget * 2
+
+    def get_tool_budget_for_task(self, task_type: str) -> int:
+        """Get recommended tool budget for a specific task type.
+
+        Args:
+            task_type: The detected task type
+
+        Returns:
+            Recommended tool budget
+        """
+        return self.get_default_tool_budget(task_type)
+
+    def get_mode_for_complexity(self, complexity: str) -> str:
+        """Map complexity level to mode name.
+
+        Args:
+            complexity: Complexity level (trivial, simple, moderate, complex, highly_complex)
+
+        Returns:
+            Recommended mode name
+        """
+        mapping = {
+            "trivial": "quick",
+            "simple": "quick",
+            "moderate": "standard",
+            "complex": "comprehensive",
+            "highly_complex": "extended",
+        }
+        return mapping.get(complexity, "standard")
+
+
 __all__ = [
     # Enums
     "ModeLevel",
     # Dataclasses
+    "ModeConfig",
     "ModeDefinition",
     "VerticalModeConfig",
     # Constants
@@ -505,6 +743,8 @@ __all__ = [
     "DEFAULT_TASK_BUDGETS",
     # Registry
     "ModeConfigRegistry",
+    # Provider
+    "RegistryBasedModeConfigProvider",
     # Functions
     "get_mode_config",
     "get_tool_budget",

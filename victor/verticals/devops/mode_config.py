@@ -1,54 +1,48 @@
-"""DevOps Mode Configuration - Budget and iteration settings for infrastructure tasks."""
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-from dataclasses import dataclass
+"""DevOps mode configurations using central registry.
+
+This module registers DevOps-specific operational modes with the central
+ModeConfigRegistry and exports a registry-based provider for protocol
+compatibility.
+"""
+
+from __future__ import annotations
+
 from typing import Dict, Optional
 
-from victor.verticals.protocols import ModeConfigProviderProtocol
+from victor.core.mode_config import (
+    ModeConfig,
+    ModeConfigRegistry,
+    ModeDefinition,
+    RegistryBasedModeConfigProvider,
+)
 
 
-@dataclass
-class DevOpsModeConfig:
-    """Configuration for a DevOps mode."""
+# =============================================================================
+# DevOps-Specific Modes (Registered with Central Registry)
+# =============================================================================
 
-    tool_budget: int
-    max_iterations: int
-    description: str
-    allowed_stages: list[str]
-
-
-# DevOps-specific mode configurations
-DEVOPS_MODE_CONFIGS: Dict[str, DevOpsModeConfig] = {
-    "quick": DevOpsModeConfig(
-        tool_budget=8,
-        max_iterations=15,
-        description="Quick configuration tweaks and small changes",
-        allowed_stages=["INITIAL", "IMPLEMENTATION", "COMPLETION"],
-    ),
-    "standard": DevOpsModeConfig(
-        tool_budget=20,
-        max_iterations=40,
-        description="Standard infrastructure changes with validation",
-        allowed_stages=["INITIAL", "ASSESSMENT", "IMPLEMENTATION", "VALIDATION", "COMPLETION"],
-    ),
-    "comprehensive": DevOpsModeConfig(
-        tool_budget=40,
-        max_iterations=80,
-        description="Full infrastructure setup with all stages",
-        allowed_stages=[
-            "INITIAL",
-            "ASSESSMENT",
-            "PLANNING",
-            "IMPLEMENTATION",
-            "VALIDATION",
-            "DEPLOYMENT",
-            "MONITORING",
-            "COMPLETION",
-        ],
-    ),
-    "migration": DevOpsModeConfig(
+_DEVOPS_MODES: Dict[str, ModeDefinition] = {
+    "migration": ModeDefinition(
+        name="migration",
         tool_budget=60,
         max_iterations=120,
+        temperature=0.7,
         description="Large-scale infrastructure migrations",
+        exploration_multiplier=2.5,
         allowed_stages=[
             "INITIAL",
             "ASSESSMENT",
@@ -62,8 +56,8 @@ DEVOPS_MODE_CONFIGS: Dict[str, DevOpsModeConfig] = {
     ),
 }
 
-# Default tool budgets by task complexity
-DEVOPS_DEFAULT_TOOL_BUDGETS: Dict[str, int] = {
+# DevOps-specific task type budgets
+_DEVOPS_TASK_BUDGETS: Dict[str, int] = {
     "dockerfile_simple": 5,
     "dockerfile_complex": 10,
     "docker_compose": 12,
@@ -77,35 +71,57 @@ DEVOPS_DEFAULT_TOOL_BUDGETS: Dict[str, int] = {
 }
 
 
-class DevOpsModeConfigProvider(ModeConfigProviderProtocol):
-    """Provides mode configurations for DevOps tasks."""
+# =============================================================================
+# Register with Central Registry
+# =============================================================================
 
-    def get_mode_configs(self) -> Dict[str, Dict]:
-        """Return available DevOps modes as dictionaries."""
-        return {
-            name: {
-                "tool_budget": config.tool_budget,
-                "max_iterations": config.max_iterations,
-                "description": config.description,
-                "allowed_stages": config.allowed_stages,
-            }
-            for name, config in DEVOPS_MODE_CONFIGS.items()
-        }
+def _register_devops_modes() -> None:
+    """Register DevOps modes with the central registry."""
+    registry = ModeConfigRegistry.get_instance()
+    registry.register_vertical(
+        name="devops",
+        modes=_DEVOPS_MODES,
+        task_budgets=_DEVOPS_TASK_BUDGETS,
+        default_mode="standard",
+        default_budget=20,
+    )
 
-    def get_default_tool_budget(self, task_type: Optional[str] = None) -> int:
-        """Return default tool budget for a task type."""
-        if task_type and task_type in DEVOPS_DEFAULT_TOOL_BUDGETS:
-            return DEVOPS_DEFAULT_TOOL_BUDGETS[task_type]
-        return 20  # Standard DevOps budget
 
-    def get_default_max_iterations(self, task_type: Optional[str] = None) -> int:
-        """Return default max iterations for a task type."""
-        budget = self.get_default_tool_budget(task_type)
-        # DevOps typically needs 2x iterations per tool call
-        return budget * 2
+# Register on module load
+_register_devops_modes()
+
+
+# =============================================================================
+# Provider (Protocol Compatibility)
+# =============================================================================
+
+
+class DevOpsModeConfigProvider(RegistryBasedModeConfigProvider):
+    """Mode configuration provider for DevOps vertical.
+
+    Uses the central ModeConfigRegistry but provides DevOps-specific
+    complexity mapping.
+    """
+
+    def __init__(self) -> None:
+        """Initialize DevOps mode provider."""
+        # Ensure registration (idempotent - handles singleton reset)
+        _register_devops_modes()
+        super().__init__(
+            vertical="devops",
+            default_mode="standard",
+            default_budget=20,
+        )
 
     def get_mode_for_complexity(self, complexity: str) -> str:
-        """Map complexity level to DevOps mode."""
+        """Map complexity level to DevOps mode.
+
+        Args:
+            complexity: Complexity level
+
+        Returns:
+            Recommended mode name
+        """
         mapping = {
             "trivial": "quick",
             "simple": "quick",
@@ -114,3 +130,35 @@ class DevOpsModeConfigProvider(ModeConfigProviderProtocol):
             "highly_complex": "migration",
         }
         return mapping.get(complexity, "standard")
+
+
+# =============================================================================
+# Backward Compatibility Exports
+# =============================================================================
+
+# Legacy constant for backward compatibility
+DEVOPS_MODE_CONFIGS: Dict[str, ModeConfig] = {}
+DEVOPS_DEFAULT_TOOL_BUDGETS: Dict[str, int] = _DEVOPS_TASK_BUDGETS.copy()
+
+
+def _populate_legacy_configs() -> None:
+    """Populate legacy config dict from registry."""
+    global DEVOPS_MODE_CONFIGS
+    registry = ModeConfigRegistry.get_instance()
+    DEVOPS_MODE_CONFIGS = registry.get_modes("devops")
+
+
+# Populate on module load
+_populate_legacy_configs()
+
+
+# Legacy dataclass alias
+DevOpsModeConfig = ModeConfig
+
+
+__all__ = [
+    "DevOpsModeConfigProvider",
+    "DevOpsModeConfig",
+    "DEVOPS_MODE_CONFIGS",
+    "DEVOPS_DEFAULT_TOOL_BUDGETS",
+]
