@@ -152,6 +152,12 @@ from victor.safety.infrastructure import (
     get_safety_reminders as get_infrastructure_reminders,
 )
 
+# Registry for unified scanner management
+from victor.safety.registry import (
+    ISafetyScanner,
+    SafetyRegistry,
+)
+
 __all__ = [
     # Core types
     "SafetyPattern",
@@ -218,4 +224,7 @@ __all__ = [
     "validate_kubernetes_manifest",
     "get_all_infrastructure_patterns",
     "get_infrastructure_reminders",
+    # Registry
+    "ISafetyScanner",
+    "SafetyRegistry",
 ]

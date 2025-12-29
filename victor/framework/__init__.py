@@ -542,13 +542,19 @@ except ImportError:
 # Module Loader (Shared infrastructure for dynamic module loading)
 try:
     from victor.framework.module_loader import (
-        DynamicModuleLoader,
+        CachedEntryPoints,
         DebouncedReloadTimer,
+        DynamicModuleLoader,
+        EntryPointCache,
+        get_entry_point_cache,
     )
 
     _MODULE_LOADER_EXPORTS = [
-        "DynamicModuleLoader",
+        "CachedEntryPoints",
         "DebouncedReloadTimer",
+        "DynamicModuleLoader",
+        "EntryPointCache",
+        "get_entry_point_cache",
     ]
 except ImportError:
     _MODULE_LOADER_EXPORTS = []
@@ -809,6 +815,120 @@ try:
     ]
 
     __all__ = list(__all__) + _VERTICAL_INTEGRATION_EXPORTS
+except ImportError:
+    pass
+
+# HITL Protocol (Human-in-the-Loop)
+try:
+    from victor.framework.hitl import (
+        ApprovalHandler,
+        ApprovalRequest,
+        ApprovalStatus,
+        Checkpoint,
+        HITLController,
+    )
+
+    _HITL_EXPORTS = [
+        "ApprovalHandler",
+        "ApprovalRequest",
+        "ApprovalStatus",
+        "Checkpoint",
+        "HITLController",
+    ]
+
+    __all__ = list(__all__) + _HITL_EXPORTS
+except ImportError:
+    pass
+
+# Persona System
+try:
+    from victor.framework.personas import (
+        Persona,
+        PERSONA_REGISTRY,
+        get_persona,
+        register_persona,
+        list_personas,
+    )
+
+    _PERSONA_EXPORTS = [
+        "Persona",
+        "PERSONA_REGISTRY",
+        "get_persona",
+        "register_persona",
+        "list_personas",
+    ]
+
+    __all__ = list(__all__) + _PERSONA_EXPORTS
+except ImportError:
+    pass
+
+# Agent Protocols (Multi-Agent Orchestration)
+try:
+    from victor.framework.agent_protocols import (
+        AgentCapability,
+        AgentMessage,
+        IAgentPersona,
+        IAgentRole,
+        ITeamCoordinator,
+        ITeamMember,
+        MessageType,
+        TeamFormation as AgentTeamFormation,  # Alias to avoid conflict with teams.py
+    )
+
+    _AGENT_PROTOCOLS_EXPORTS = [
+        "AgentCapability",
+        "AgentMessage",
+        "IAgentPersona",
+        "IAgentRole",
+        "ITeamCoordinator",
+        "ITeamMember",
+        "MessageType",
+        "AgentTeamFormation",
+    ]
+
+    __all__ = list(__all__) + _AGENT_PROTOCOLS_EXPORTS
+except ImportError:
+    pass
+
+# Agent Roles (Built-in role definitions)
+try:
+    from victor.framework.agent_roles import (
+        ExecutorRole,
+        ManagerRole,
+        ResearcherRole,
+        ReviewerRole,
+        ROLE_REGISTRY,
+        get_role,
+    )
+
+    _AGENT_ROLES_EXPORTS = [
+        "ExecutorRole",
+        "ManagerRole",
+        "ResearcherRole",
+        "ReviewerRole",
+        "ROLE_REGISTRY",
+        "get_role",
+    ]
+
+    __all__ = list(__all__) + _AGENT_ROLES_EXPORTS
+except ImportError:
+    pass
+
+# Team Coordinator (Multi-Agent Coordination)
+try:
+    from victor.framework.team_coordinator import (
+        FrameworkTeamCoordinator,
+        MemberResult as CoordinatorMemberResult,  # Alias to avoid conflict
+        TeamResult as CoordinatorTeamResult,  # Alias to avoid conflict
+    )
+
+    _TEAM_COORDINATOR_EXPORTS = [
+        "FrameworkTeamCoordinator",
+        "CoordinatorMemberResult",
+        "CoordinatorTeamResult",
+    ]
+
+    __all__ = list(__all__) + _TEAM_COORDINATOR_EXPORTS
 except ImportError:
     pass
 

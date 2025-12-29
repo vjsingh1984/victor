@@ -48,6 +48,7 @@ import importlib
 import logging
 import sys
 import threading
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
@@ -608,7 +609,441 @@ class DynamicModuleLoader:
         self.stop_file_watcher()
 
 
+# =============================================================================
+# Entry Point Cache
+# =============================================================================
+
+
+@dataclass
+class CachedEntryPoints:
+    """Cached entry points data with metadata.
+
+    Attributes:
+        group: Entry point group name
+        entries: Dictionary of name -> module path
+        env_hash: Hash of package environment when cached
+        timestamp: When the cache was created
+        ttl: Time-to-live in seconds
+    """
+
+    group: str
+    entries: Dict[str, str]  # name -> module:attr
+    env_hash: str
+    timestamp: float
+    ttl: float = 3600.0  # 1 hour default
+
+    def is_expired(self, current_time: Optional[float] = None) -> bool:
+        """Check if cache entry has expired.
+
+        Args:
+            current_time: Current time (defaults to time.time())
+
+        Returns:
+            True if expired
+        """
+        import time
+
+        now = current_time or time.time()
+        return (now - self.timestamp) > self.ttl
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to dictionary for JSON storage."""
+        return {
+            "group": self.group,
+            "entries": self.entries,
+            "env_hash": self.env_hash,
+            "timestamp": self.timestamp,
+            "ttl": self.ttl,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "CachedEntryPoints":
+        """Deserialize from dictionary."""
+        return cls(
+            group=data["group"],
+            entries=data["entries"],
+            env_hash=data["env_hash"],
+            timestamp=data["timestamp"],
+            ttl=data.get("ttl", 3600.0),
+        )
+
+
+class EntryPointCache:
+    """Cache for Python entry point scanning results.
+
+    Entry point scanning via importlib.metadata.entry_points() can be slow
+    as it scans all installed packages. This cache:
+
+    1. Stores scan results in memory for fast repeated access
+    2. Persists to disk for cross-session reuse
+    3. Uses environment hash to detect package changes
+    4. Provides TTL-based expiration as fallback
+
+    Thread Safety:
+        The cache is thread-safe for reads. Writes use a lock for
+        atomic updates.
+
+    Usage:
+        cache = EntryPointCache()
+
+        # Get entry points for a group (cached)
+        eps = cache.get_entry_points("victor.verticals")
+
+        # Force refresh if needed
+        eps = cache.get_entry_points("victor.verticals", force_refresh=True)
+
+        # Async version
+        eps = await cache.get_entry_points_async("victor.tools")
+
+    Attributes:
+        cache_dir: Directory for persistent cache storage
+        default_ttl: Default TTL in seconds for cache entries
+    """
+
+    # Singleton instance
+    _instance: Optional["EntryPointCache"] = None
+    _lock = threading.Lock()
+
+    def __init__(
+        self,
+        cache_dir: Optional[Path] = None,
+        default_ttl: float = 3600.0,
+    ) -> None:
+        """Initialize entry point cache.
+
+        Args:
+            cache_dir: Directory for cache file (defaults to ~/.victor/cache)
+            default_ttl: Default TTL in seconds (default 1 hour)
+        """
+        self._cache_dir = cache_dir or Path.home() / ".victor" / "cache"
+        self._cache_file = self._cache_dir / "entry_points.json"
+        self._default_ttl = default_ttl
+
+        # In-memory cache
+        self._memory_cache: Dict[str, CachedEntryPoints] = {}
+        self._env_hash: Optional[str] = None
+        self._cache_lock = threading.RLock()
+
+        # Load from disk on init
+        self._load_from_disk()
+
+    @classmethod
+    def get_instance(
+        cls,
+        cache_dir: Optional[Path] = None,
+        default_ttl: float = 3600.0,
+    ) -> "EntryPointCache":
+        """Get or create singleton instance.
+
+        Args:
+            cache_dir: Directory for cache file
+            default_ttl: Default TTL in seconds
+
+        Returns:
+            Singleton EntryPointCache instance
+        """
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls(cache_dir, default_ttl)
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Reset singleton instance (for testing)."""
+        with cls._lock:
+            cls._instance = None
+
+    def _compute_env_hash(self) -> str:
+        """Compute hash of installed package environment.
+
+        Uses hash of sorted package names and versions to detect
+        when the environment has changed (packages installed/removed).
+
+        Returns:
+            Hash string
+        """
+        import hashlib
+
+        try:
+            # Get installed packages
+            if sys.version_info >= (3, 10):
+                from importlib.metadata import distributions
+            else:
+                from importlib_metadata import distributions
+
+            # Build sorted list of package:version pairs
+            packages = []
+            for dist in distributions():
+                name = dist.metadata.get("Name", "unknown")
+                version = dist.metadata.get("Version", "0.0.0")
+                packages.append(f"{name}=={version}")
+
+            packages.sort()
+            package_str = "\n".join(packages)
+
+            # Hash the package list
+            return hashlib.sha256(package_str.encode()).hexdigest()[:16]
+
+        except Exception as e:
+            logger.warning(f"Failed to compute env hash: {e}")
+            # Return timestamp-based hash as fallback
+            import time
+
+            return f"time_{int(time.time())}"
+
+    def _get_env_hash(self) -> str:
+        """Get cached or compute environment hash.
+
+        Returns:
+            Environment hash string
+        """
+        if self._env_hash is None:
+            self._env_hash = self._compute_env_hash()
+        return self._env_hash
+
+    def _load_from_disk(self) -> None:
+        """Load cache from disk if available."""
+        if not self._cache_file.exists():
+            return
+
+        try:
+            import json
+
+            with open(self._cache_file, "r") as f:
+                data = json.load(f)
+
+            # Current env hash for validation
+            current_hash = self._get_env_hash()
+
+            with self._cache_lock:
+                for group, entry_data in data.items():
+                    try:
+                        cached = CachedEntryPoints.from_dict(entry_data)
+                        # Only load if env hash matches and not expired
+                        if cached.env_hash == current_hash and not cached.is_expired():
+                            self._memory_cache[group] = cached
+                            logger.debug(f"Loaded cached entry points for '{group}'")
+                    except Exception as e:
+                        logger.warning(f"Failed to load cache entry for '{group}': {e}")
+
+            if self._memory_cache:
+                logger.info(
+                    f"Loaded {len(self._memory_cache)} entry point groups from cache"
+                )
+
+        except Exception as e:
+            logger.warning(f"Failed to load entry point cache from disk: {e}")
+
+    def _save_to_disk(self) -> None:
+        """Save cache to disk."""
+        try:
+            import json
+
+            # Ensure cache directory exists
+            self._cache_dir.mkdir(parents=True, exist_ok=True)
+
+            with self._cache_lock:
+                data = {
+                    group: cached.to_dict()
+                    for group, cached in self._memory_cache.items()
+                }
+
+            with open(self._cache_file, "w") as f:
+                json.dump(data, f, indent=2)
+
+            logger.debug(f"Saved entry point cache to {self._cache_file}")
+
+        except Exception as e:
+            logger.warning(f"Failed to save entry point cache to disk: {e}")
+
+    def get_entry_points(
+        self,
+        group: str,
+        force_refresh: bool = False,
+    ) -> Dict[str, str]:
+        """Get entry points for a group (cached).
+
+        Args:
+            group: Entry point group name (e.g., "victor.verticals")
+            force_refresh: Force refresh from metadata (bypass cache)
+
+        Returns:
+            Dictionary mapping entry point names to module:attr strings
+        """
+        import time
+
+        current_hash = self._get_env_hash()
+
+        with self._cache_lock:
+            cached = self._memory_cache.get(group)
+
+            # Check cache validity
+            if not force_refresh and cached is not None:
+                if cached.env_hash == current_hash and not cached.is_expired():
+                    logger.debug(f"Cache hit for entry point group '{group}'")
+                    return cached.entries.copy()
+
+        # Cache miss or invalid - scan entry points
+        logger.debug(f"Scanning entry points for group '{group}'")
+        entries = self._scan_entry_points(group)
+
+        # Store in cache
+        cached_entry = CachedEntryPoints(
+            group=group,
+            entries=entries,
+            env_hash=current_hash,
+            timestamp=time.time(),
+            ttl=self._default_ttl,
+        )
+
+        with self._cache_lock:
+            self._memory_cache[group] = cached_entry
+
+        # Persist to disk (async-safe)
+        self._save_to_disk()
+
+        return entries.copy()
+
+    def _scan_entry_points(self, group: str) -> Dict[str, str]:
+        """Scan entry points for a group.
+
+        Args:
+            group: Entry point group name
+
+        Returns:
+            Dictionary mapping names to module:attr strings
+        """
+        entries = {}
+
+        try:
+            if sys.version_info >= (3, 10):
+                from importlib.metadata import entry_points
+
+                eps = entry_points(group=group)
+            else:
+                from importlib_metadata import entry_points
+
+                eps = entry_points(group=group)
+
+            for ep in eps:
+                # Store as "module:attr" format
+                entries[ep.name] = f"{ep.value}"
+
+        except Exception as e:
+            logger.warning(f"Failed to scan entry points for '{group}': {e}")
+
+        return entries
+
+    async def get_entry_points_async(
+        self,
+        group: str,
+        force_refresh: bool = False,
+    ) -> Dict[str, str]:
+        """Get entry points for a group asynchronously.
+
+        Offloads the potentially slow scan to a thread pool.
+
+        Args:
+            group: Entry point group name
+            force_refresh: Force refresh from metadata
+
+        Returns:
+            Dictionary mapping entry point names to module:attr strings
+        """
+        import asyncio
+
+        return await asyncio.to_thread(self.get_entry_points, group, force_refresh)
+
+    def invalidate(self, group: Optional[str] = None) -> int:
+        """Invalidate cache entries.
+
+        Args:
+            group: Specific group to invalidate, or None for all
+
+        Returns:
+            Number of entries invalidated
+        """
+        with self._cache_lock:
+            if group:
+                if group in self._memory_cache:
+                    del self._memory_cache[group]
+                    self._save_to_disk()
+                    return 1
+                return 0
+            else:
+                count = len(self._memory_cache)
+                self._memory_cache.clear()
+                self._env_hash = None  # Force re-compute
+                self._save_to_disk()
+                return count
+
+    def invalidate_on_env_change(self) -> bool:
+        """Check if environment changed and invalidate if so.
+
+        Returns:
+            True if cache was invalidated due to env change
+        """
+        old_hash = self._env_hash
+        self._env_hash = None  # Force re-compute
+        new_hash = self._get_env_hash()
+
+        if old_hash != new_hash:
+            logger.info("Package environment changed, invalidating entry point cache")
+            self.invalidate()
+            return True
+        return False
+
+    def get_cached_groups(self) -> List[str]:
+        """Get list of cached entry point groups.
+
+        Returns:
+            List of group names
+        """
+        with self._cache_lock:
+            return list(self._memory_cache.keys())
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache statistics.
+
+        Returns:
+            Dictionary with cache stats
+        """
+        import time
+
+        with self._cache_lock:
+            stats = {
+                "groups_cached": len(self._memory_cache),
+                "env_hash": self._env_hash,
+                "cache_file": str(self._cache_file),
+                "groups": {},
+            }
+
+            now = time.time()
+            for group, cached in self._memory_cache.items():
+                stats["groups"][group] = {
+                    "entries": len(cached.entries),
+                    "age_seconds": now - cached.timestamp,
+                    "ttl_remaining": max(0, cached.ttl - (now - cached.timestamp)),
+                    "expired": cached.is_expired(now),
+                }
+
+            return stats
+
+
+def get_entry_point_cache() -> EntryPointCache:
+    """Get the singleton entry point cache instance.
+
+    Returns:
+        Global EntryPointCache instance
+    """
+    return EntryPointCache.get_instance()
+
+
 __all__ = [
     "DynamicModuleLoader",
     "DebouncedReloadTimer",
+    "EntryPointCache",
+    "CachedEntryPoints",
+    "get_entry_point_cache",
 ]
