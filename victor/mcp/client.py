@@ -72,6 +72,7 @@ class MCPClient:
         max_reconnect_attempts: int = 3,
         reconnect_delay: int = 5,
         sandbox_config: Optional["SandboxConfig"] = None,
+        command: Optional[List[str]] = None,
     ):
         """Initialize MCP client.
 
@@ -83,6 +84,14 @@ class MCPClient:
             max_reconnect_attempts: Maximum reconnection attempts before giving up
             reconnect_delay: Seconds to wait between reconnection attempts
             sandbox_config: Optional sandboxing config for subprocess resource limits
+            command: Optional command to auto-connect when used as async context manager.
+                     If provided, __aenter__ will call connect(command) automatically.
+
+        Example with command parameter for context manager usage:
+            async with MCPClient(command=["python", "server.py"]) as client:
+                # Client is automatically connected
+                tools = await client.refresh_tools()
+            # Client is automatically cleaned up
         """
         self.name = name
         self.version = version
@@ -106,11 +115,12 @@ class MCPClient:
         self._sandboxed_process: Optional["SandboxedProcess"] = None
 
         # Connection state
-        self._command: Optional[List[str]] = None
+        self._command: Optional[List[str]] = command  # Store for reconnection and context manager
         self._last_health_check: float = 0.0
         self._consecutive_failures: int = 0
         self._health_task: Optional[asyncio.Task] = None
         self._running = False
+        self._auto_connect_command: Optional[List[str]] = command  # For context manager
 
         # Event callbacks
         self._on_connect_callbacks: List[Callable[[], None]] = []
@@ -513,11 +523,51 @@ class MCPClient:
                 except Exception as e:
                     logger.error(f"Disconnect callback error: {e}")
 
+    async def cleanup(self, reason: Optional[str] = None) -> None:
+        """Clean up all resources properly (async).
+
+        This is the recommended method for cleaning up the MCP client.
+        It properly handles:
+        - Cancelling background health monitoring tasks
+        - Terminating sandboxed processes
+        - Closing subprocess file handles (stdin, stdout, stderr)
+        - Terminating the subprocess
+        - Emitting disconnect callbacks
+
+        Args:
+            reason: Optional reason for cleanup/disconnection
+
+        Example:
+            client = MCPClient()
+            try:
+                await client.connect(["python", "server.py"])
+                # ... use client ...
+            finally:
+                await client.cleanup()
+
+            # Or use as async context manager:
+            async with MCPClient() as client:
+                await client.connect(["python", "server.py"])
+                # ... use client ...
+            # cleanup() called automatically on exit
+        """
+        await self._cleanup_internal(reason)
+
     async def close(self, reason: Optional[str] = None) -> None:
         """Disconnect from MCP server (async version with proper cleanup).
 
+        This is an alias for cleanup() for backward compatibility.
+
         Args:
             reason: Optional reason for disconnection
+        """
+        await self._cleanup_internal(reason)
+
+    async def _cleanup_internal(self, reason: Optional[str] = None) -> None:
+        """Internal cleanup implementation.
+
+        Args:
+            reason: Optional reason for cleanup
         """
         self._running = False
 
@@ -772,13 +822,56 @@ class MCPClient:
         """
         return self._last_health_check
 
-    async def __aenter__(self):
-        """Async context manager entry."""
+    async def __aenter__(self) -> "MCPClient":
+        """Async context manager entry.
+
+        If a command was provided in __init__, this will automatically
+        call connect(command). Otherwise, you must call connect() manually
+        after entering the context.
+
+        Returns:
+            self
+
+        Raises:
+            ConnectionError: If auto-connect was configured but connection failed
+
+        Example:
+            # With command - auto-connects
+            async with MCPClient(command=["python", "server.py"]) as client:
+                tools = client.tools  # Already connected
+
+            # Without command - manual connect required
+            async with MCPClient() as client:
+                await client.connect(["python", "server.py"])
+                tools = client.tools
+        """
+        if self._auto_connect_command is not None:
+            success = await self.connect(self._auto_connect_command)
+            if not success:
+                # Clean up any partial state before raising
+                await self.cleanup()
+                raise ConnectionError(
+                    f"Failed to connect to MCP server with command: {self._auto_connect_command}"
+                )
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit with proper async cleanup."""
-        await self.close()
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit with proper async cleanup.
+
+        This method ensures all resources are properly cleaned up:
+        - Background tasks are cancelled
+        - Subprocess is terminated
+        - File handles are closed
+
+        Args:
+            exc_type: Exception type if an exception was raised
+            exc_val: Exception value if an exception was raised
+            exc_tb: Exception traceback if an exception was raised
+
+        Returns:
+            None (exceptions are not suppressed)
+        """
+        await self.cleanup()
 
     def __del__(self):
         """Destructor to ensure cleanup on garbage collection.

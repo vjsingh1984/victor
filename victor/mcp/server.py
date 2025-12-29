@@ -18,9 +18,11 @@ Exposes Victor's tools and resources through the Model Context Protocol,
 allowing other MCP clients to use Victor's capabilities.
 """
 
+import asyncio
 import json
+import sys
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -78,6 +80,8 @@ class MCPServer:
         self.initialized = False
         self.resources: List[MCPResource] = []
         self._running = False  # For graceful shutdown of stdio server
+        self._reader: Optional[asyncio.StreamReader] = None
+        self._writer_transport: Optional[asyncio.WriteTransport] = None
 
     def register_resource(self, resource: MCPResource) -> None:
         """Register a resource with the MCP server.
@@ -363,32 +367,149 @@ class MCPServer:
             "error": {"code": code, "message": message},
         }
 
+    async def _setup_async_stdio(
+        self,
+    ) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+        """Set up async stdin/stdout streams.
+
+        Returns:
+            Tuple of (reader, writer) for async I/O.
+
+        Raises:
+            OSError: If unable to set up async stdio streams.
+        """
+        loop = asyncio.get_running_loop()
+
+        # Set up async stdin reader
+        reader = asyncio.StreamReader(loop=loop)
+        protocol = asyncio.StreamReaderProtocol(reader, loop=loop)
+
+        try:
+            await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+        except (OSError, ValueError) as e:
+            raise OSError(f"Failed to set up async stdin reader: {e}") from e
+
+        # Set up async stdout writer
+        try:
+            writer_transport, writer_protocol = await loop.connect_write_pipe(
+                lambda: asyncio.streams.FlowControlMixin(loop=loop),
+                sys.stdout,
+            )
+            writer = asyncio.StreamWriter(writer_transport, writer_protocol, reader, loop)
+        except (OSError, ValueError) as e:
+            raise OSError(f"Failed to set up async stdout writer: {e}") from e
+
+        # Store references for cleanup
+        self._reader = reader
+        self._writer_transport = writer_transport
+
+        return reader, writer
+
+    async def _write_response(self, writer: asyncio.StreamWriter, response: Dict[str, Any]) -> None:
+        """Write a JSON response to the output stream.
+
+        Args:
+            writer: Async stream writer
+            response: Response dictionary to serialize and write
+        """
+        try:
+            response_json = json.dumps(response) + "\n"
+            writer.write(response_json.encode("utf-8"))
+            await writer.drain()
+        except (ConnectionError, BrokenPipeError) as e:
+            print(f"Error writing response: {e}", file=sys.stderr)
+            raise
+
     async def start_stdio_server(self) -> None:
         """Start MCP server on stdio (for MCP clients).
 
         This allows the server to communicate via stdin/stdout,
         which is the standard MCP transport mechanism.
-        """
-        import asyncio
-        import sys
 
+        Uses native async I/O with asyncio.StreamReader/StreamWriter
+        to avoid blocking the event loop.
+        """
         print("MCP Server started on stdio", file=sys.stderr)
         print(f"Server: {self.name} v{self.version}", file=sys.stderr)
         print("Waiting for messages...", file=sys.stderr)
+
+        try:
+            reader, writer = await self._setup_async_stdio()
+        except OSError as e:
+            print(f"Failed to initialize async stdio: {e}", file=sys.stderr)
+            # Fallback to executor-based I/O for compatibility
+            await self._start_stdio_server_fallback()
+            return
+
+        self._running = True
+
+        try:
+            while self._running:
+                try:
+                    # Read line with timeout using native async readline
+                    try:
+                        line = await asyncio.wait_for(
+                            reader.readline(),
+                            timeout=300.0,  # 5 minute timeout for server idle
+                        )
+                    except asyncio.TimeoutError:
+                        # No message received, continue waiting
+                        continue
+
+                    if not line:
+                        # EOF reached (stdin closed)
+                        break
+
+                    # Decode and parse message
+                    line_str = line.decode("utf-8").strip()
+                    if not line_str:
+                        continue
+
+                    message = json.loads(line_str)
+                    response = await self.handle_message(message)
+
+                    # Write response using native async write
+                    await self._write_response(writer, response)
+
+                except json.JSONDecodeError as e:
+                    error_response = self._create_error(None, -32700, f"Parse error: {str(e)}")
+                    await self._write_response(writer, error_response)
+
+                except (ConnectionError, BrokenPipeError):
+                    # Connection lost, stop server
+                    break
+
+                except Exception as e:
+                    error_response = self._create_error(None, -32603, f"Internal error: {str(e)}")
+                    try:
+                        await self._write_response(writer, error_response)
+                    except (ConnectionError, BrokenPipeError):
+                        break
+
+        finally:
+            # Clean up resources
+            self._cleanup_stdio()
+
+    async def _start_stdio_server_fallback(self) -> None:
+        """Fallback stdio server using executor-based I/O.
+
+        Used when native async stdio setup fails (e.g., on some platforms
+        or when stdin/stdout are redirected in incompatible ways).
+        """
+        print("Using fallback executor-based I/O", file=sys.stderr)
 
         loop = asyncio.get_running_loop()
         self._running = True
 
         while self._running:
             try:
-                # Read JSON-RPC message from stdin using run_in_executor to avoid blocking
+                # Read JSON-RPC message from stdin using run_in_executor
                 try:
                     line = await asyncio.wait_for(
                         loop.run_in_executor(None, sys.stdin.readline),
-                        timeout=300.0,  # 5 minute timeout for server idle
+                        timeout=300.0,
                     )
                 except asyncio.TimeoutError:
-                    # No message received, continue waiting
                     continue
 
                 if not line:
@@ -397,9 +518,9 @@ class MCPServer:
                 message = json.loads(line)
                 response = await self.handle_message(message)
 
-                # Write response to stdout using run_in_executor to avoid blocking
+                # Write response to stdout
                 response_json = json.dumps(response)
-                await loop.run_in_executor(None, lambda: (print(response_json, flush=True)))
+                await loop.run_in_executor(None, lambda: print(response_json, flush=True))
 
             except json.JSONDecodeError as e:
                 error_response = self._create_error(None, -32700, f"Parse error: {str(e)}")
@@ -413,9 +534,20 @@ class MCPServer:
                     None, lambda r=error_response: print(json.dumps(r), flush=True)
                 )
 
+    def _cleanup_stdio(self) -> None:
+        """Clean up stdio stream resources."""
+        if self._writer_transport is not None:
+            try:
+                self._writer_transport.close()
+            except Exception:
+                pass
+            self._writer_transport = None
+        self._reader = None
+
     def stop(self) -> None:
         """Stop the stdio server gracefully."""
         self._running = False
+        self._cleanup_stdio()
 
     def get_server_info(self) -> Dict[str, Any]:
         """Get server information.
