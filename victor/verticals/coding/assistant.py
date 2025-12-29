@@ -473,8 +473,8 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         return CodingRLHooks()
 
     @classmethod
-    def get_team_specs(cls) -> Dict[str, Any]:
-        """Get team specifications for complex coding tasks.
+    def get_team_spec_provider(cls) -> Optional[Any]:
+        """Get team specification provider for Coding tasks.
 
         Provides pre-configured team specifications for:
         - feature_team: Feature implementation
@@ -485,11 +485,11 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         - documentation_team: Documentation generation
 
         Returns:
-            Dict mapping team names to CodingTeamSpec instances
+            CodingTeamSpecProvider instance (implements TeamSpecProviderProtocol)
         """
-        from victor.verticals.coding.teams import CODING_TEAM_SPECS
+        from victor.verticals.coding.teams import CodingTeamSpecProvider
 
-        return CODING_TEAM_SPECS
+        return CodingTeamSpecProvider()
 
     @classmethod
     def get_capability_provider(cls) -> Any:

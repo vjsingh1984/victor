@@ -703,8 +703,9 @@ class TestRealVerticalIntegration:
         """Test that coding vertical provides team specs."""
         from victor.verticals.coding import CodingAssistant
 
-        teams = CodingAssistant.get_team_specs()
-        assert teams is not None
+        team_provider = CodingAssistant.get_team_spec_provider()
+        assert team_provider is not None
+        teams = team_provider.get_team_specs()
         assert len(teams) > 0
         assert "feature_team" in teams
 

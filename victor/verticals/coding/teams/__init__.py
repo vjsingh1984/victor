@@ -78,6 +78,8 @@ __all__ = [
     # Types from specs
     "CodingRoleConfig",
     "CodingTeamSpec",
+    # Provider
+    "CodingTeamSpecProvider",
     # Role configurations
     "CODING_ROLES",
     # Team specifications
@@ -104,6 +106,44 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+
+from typing import Dict, List, Optional
+
+
+class CodingTeamSpecProvider:
+    """Team specification provider for Coding vertical.
+
+    Implements TeamSpecProviderProtocol interface for consistent
+    ISP compliance across all verticals.
+    """
+
+    def get_team_specs(self) -> Dict[str, CodingTeamSpec]:
+        """Get all Coding team specifications.
+
+        Returns:
+            Dictionary mapping team names to CodingTeamSpec instances
+        """
+        return CODING_TEAM_SPECS
+
+    def get_team_for_task(self, task_type: str) -> Optional[CodingTeamSpec]:
+        """Get appropriate team for a task type.
+
+        Args:
+            task_type: Type of task
+
+        Returns:
+            CodingTeamSpec or None if no matching team
+        """
+        return get_team_for_task(task_type)
+
+    def list_team_types(self) -> List[str]:
+        """List all available team types.
+
+        Returns:
+            List of team type names
+        """
+        return list_team_types()
 
 
 def _auto_register_teams() -> int:
