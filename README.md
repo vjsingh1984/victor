@@ -509,6 +509,69 @@ Comprehensive tool classification for intelligent selection (victor/tools/base.p
 - SEMANTIC: Embeddings-based relevance
 - HYBRID: Combined scoring
 
+### Framework Architecture Strengths
+
+Victor's framework is built on SOLID principles for extensibility and maintainability:
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                     FRAMEWORK STRENGTHS                              │
+├─────────────────┬────────────────────────────────────────────────────┤
+│ Capability      │ Evidence                                           │
+├─────────────────┼────────────────────────────────────────────────────┤
+│ Provider        │ 25+ providers via BaseProvider protocol            │
+│ Agnostic        │ (victor/providers/base.py)                         │
+├─────────────────┼────────────────────────────────────────────────────┤
+│ Tool Ecosystem  │ 45 tools with cost-aware semantic selection        │
+│                 │ (victor/tools/, BAAI/bge-small-en-v1.5)            │
+├─────────────────┼────────────────────────────────────────────────────┤
+│ Multi-Agent     │ 4 formations: Sequential, Parallel, Pipeline,      │
+│ Teams           │ Hierarchical (victor/agent/teams/)                 │
+├─────────────────┼────────────────────────────────────────────────────┤
+│ DAG Workflows   │ YAML-based workflow DSL with HITL nodes            │
+│                 │ (victor/workflows/)                                │
+├─────────────────┼────────────────────────────────────────────────────┤
+│ Adaptive        │ 13 RL learners for tool selection, mode            │
+│ Learning        │ transition, quality weights (victor/agent/rl/)     │
+├─────────────────┼────────────────────────────────────────────────────┤
+│ Vertical        │ 4 domain verticals: Coding, Research, DevOps,      │
+│ Extensibility   │ Data Analysis (victor/verticals/)                  │
+├─────────────────┼────────────────────────────────────────────────────┤
+│ Air-Gapped      │ 100% local operation with Ollama/vLLM              │
+│ Support         │ (airgapped_mode=True)                              │
+├─────────────────┼────────────────────────────────────────────────────┤
+│ MCP Protocol    │ Both client and server implementation              │
+│                 │ (victor/mcp/)                                      │
+└─────────────────┴────────────────────────────────────────────────────┘
+```
+
+**SOLID Principles in Practice**:
+
+| Principle | Implementation | Location |
+|-----------|----------------|----------|
+| **Single Responsibility** | Each tool/provider handles one concern | `BaseTool`, `BaseProvider` |
+| **Open/Closed** | Extend via protocols without modifying core | `VerticalBase`, `PromptContributorProtocol` |
+| **Liskov Substitution** | All providers interchangeable | Provider inheritance hierarchy |
+| **Interface Segregation** | Small, focused protocols | 15+ protocols in `victor/protocols/` |
+| **Dependency Inversion** | DI container for service resolution | `victor/core/container.py` |
+
+**Agent Persona Support** (TeamMember with rich attributes):
+
+```python
+from victor.agent.teams.team import TeamMember
+
+researcher = TeamMember(
+    id="security_analyst",
+    role=SubAgentRole.RESEARCHER,
+    name="Security Analyst",
+    goal="Find authentication vulnerabilities",
+    backstory="10 years of security experience...",  # Rich persona
+    memory=True,   # Persist discoveries
+    cache=True,    # Cache tool results
+    tool_budget=25,
+)
+```
+
 ---
 
 ## Contributing
