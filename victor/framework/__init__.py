@@ -625,5 +625,55 @@ __all__ = (
     + _CREW_EXPORTS
 )
 
+# Vertical Integration (Phase 3.1 - Step Handlers)
+try:
+    from victor.framework.vertical_integration import (
+        IntegrationResult,
+        OrchestratorVerticalProtocol,
+        VerticalIntegrationPipeline,
+        apply_vertical,
+        create_integration_pipeline,
+        create_integration_pipeline_with_handlers,
+    )
+    from victor.framework.step_handlers import (
+        BaseStepHandler,
+        ConfigStepHandler,
+        ContextStepHandler,
+        ExtensionsStepHandler,
+        FrameworkStepHandler,
+        MiddlewareStepHandler,
+        PromptStepHandler,
+        SafetyStepHandler,
+        StepHandlerProtocol,
+        StepHandlerRegistry,
+        ToolStepHandler,
+    )
+
+    _VERTICAL_INTEGRATION_EXPORTS = [
+        # Integration pipeline
+        "IntegrationResult",
+        "OrchestratorVerticalProtocol",
+        "VerticalIntegrationPipeline",
+        "apply_vertical",
+        "create_integration_pipeline",
+        "create_integration_pipeline_with_handlers",
+        # Step handlers (Phase 3.1)
+        "BaseStepHandler",
+        "ConfigStepHandler",
+        "ContextStepHandler",
+        "ExtensionsStepHandler",
+        "FrameworkStepHandler",
+        "MiddlewareStepHandler",
+        "PromptStepHandler",
+        "SafetyStepHandler",
+        "StepHandlerProtocol",
+        "StepHandlerRegistry",
+        "ToolStepHandler",
+    ]
+
+    __all__ = list(__all__) + _VERTICAL_INTEGRATION_EXPORTS
+except ImportError:
+    pass
+
 # Version of the framework API
 __version__ = "0.3.0"

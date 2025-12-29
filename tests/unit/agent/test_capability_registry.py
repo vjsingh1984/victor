@@ -25,6 +25,7 @@ from victor.framework.protocols import (
     CapabilityType,
     OrchestratorCapability,
     CapabilityRegistryProtocol,
+    IncompatibleVersionError,
 )
 from victor.agent.capability_registry import CapabilityRegistryMixin
 
@@ -183,6 +184,132 @@ class TestOrchestratorCapability:
 
 
 # =============================================================================
+# Test Capability Versioning
+# =============================================================================
+
+
+class TestCapabilityVersioning:
+    """Tests for capability version functionality."""
+
+    def test_default_version_is_1_0(self):
+        """Test capabilities default to version 1.0."""
+        cap = OrchestratorCapability(
+            name="test_cap",
+            capability_type=CapabilityType.TOOL,
+            setter="set_test",
+        )
+        assert cap.version == "1.0"
+
+    def test_create_capability_with_custom_version(self):
+        """Test creating capability with custom version."""
+        cap = OrchestratorCapability(
+            name="test_cap",
+            capability_type=CapabilityType.TOOL,
+            setter="set_test",
+            version="2.1",
+        )
+        assert cap.version == "2.1"
+
+    def test_invalid_version_format_raises_error(self):
+        """Test that invalid version format raises ValueError."""
+        with pytest.raises(ValueError, match="invalid version"):
+            OrchestratorCapability(
+                name="test_cap",
+                capability_type=CapabilityType.TOOL,
+                setter="set_test",
+                version="invalid",
+            )
+
+    def test_invalid_version_single_number(self):
+        """Test that single number version is invalid."""
+        with pytest.raises(ValueError, match="invalid version"):
+            OrchestratorCapability(
+                name="test_cap",
+                capability_type=CapabilityType.TOOL,
+                setter="set_test",
+                version="1",
+            )
+
+    def test_invalid_version_three_parts(self):
+        """Test that three-part version is invalid."""
+        with pytest.raises(ValueError, match="invalid version"):
+            OrchestratorCapability(
+                name="test_cap",
+                capability_type=CapabilityType.TOOL,
+                setter="set_test",
+                version="1.2.3",
+            )
+
+    def test_is_compatible_with_same_version(self):
+        """Test capability is compatible with same version."""
+        cap = OrchestratorCapability(
+            name="test_cap",
+            capability_type=CapabilityType.TOOL,
+            setter="set_test",
+            version="1.5",
+        )
+        assert cap.is_compatible_with("1.5")
+
+    def test_is_compatible_with_lower_version(self):
+        """Test capability is compatible with lower required version."""
+        cap = OrchestratorCapability(
+            name="test_cap",
+            capability_type=CapabilityType.TOOL,
+            setter="set_test",
+            version="2.0",
+        )
+        assert cap.is_compatible_with("1.0")
+        assert cap.is_compatible_with("1.5")
+
+    def test_is_compatible_with_lower_minor(self):
+        """Test capability is compatible with lower minor version."""
+        cap = OrchestratorCapability(
+            name="test_cap",
+            capability_type=CapabilityType.TOOL,
+            setter="set_test",
+            version="1.5",
+        )
+        assert cap.is_compatible_with("1.0")
+        assert cap.is_compatible_with("1.3")
+
+    def test_is_not_compatible_with_higher_version(self):
+        """Test capability is not compatible with higher required version."""
+        cap = OrchestratorCapability(
+            name="test_cap",
+            capability_type=CapabilityType.TOOL,
+            setter="set_test",
+            version="1.0",
+        )
+        assert not cap.is_compatible_with("2.0")
+        assert not cap.is_compatible_with("1.5")
+
+    def test_version_comparison_semantic(self):
+        """Test version comparison is semantic (1.10 > 1.9)."""
+        cap = OrchestratorCapability(
+            name="test_cap",
+            capability_type=CapabilityType.TOOL,
+            setter="set_test",
+            version="1.10",
+        )
+        assert cap.is_compatible_with("1.9")
+        assert cap.is_compatible_with("1.10")
+        assert not cap.is_compatible_with("1.11")
+
+    def test_deprecated_capability(self):
+        """Test creating deprecated capability."""
+        cap = OrchestratorCapability(
+            name="old_cap",
+            capability_type=CapabilityType.TOOL,
+            setter="set_old",
+            version="1.0",
+            deprecated=True,
+            deprecated_message="Use 'new_cap' instead",
+        )
+        assert cap.deprecated is True
+        assert "new_cap" in cap.deprecated_message
+
+
+# =============================================================================
 # Test CapabilityRegistryMixin
 # =============================================================================
 
@@ -264,6 +391,38 @@ class TestCapabilityRegistryMixin:
         """Test get_capability_value raises for unknown capability."""
         with pytest.raises(KeyError, match="not found"):
             orchestrator.get_capability_value("unknown")
+
+    def test_get_capability_version_returns_version(self, orchestrator):
+        """Test get_capability_version returns correct version."""
+        version = orchestrator.get_capability_version("enabled_tools")
+        assert version == "1.0"
+
+    def test_get_capability_version_returns_none_for_unknown(self, orchestrator):
+        """Test get_capability_version returns None for unknown capability."""
+        assert orchestrator.get_capability_version("unknown") is None
+
+    def test_has_capability_with_min_version_check(self, orchestrator):
+        """Test has_capability with version requirements."""
+        # Capability is v1.0, should pass for 1.0 requirement
+        assert orchestrator.has_capability("enabled_tools", min_version="1.0")
+        # Should fail for higher version requirement
+        assert not orchestrator.has_capability("enabled_tools", min_version="2.0")
+
+    def test_invoke_capability_with_compatible_version(self, orchestrator):
+        """Test invoke_capability with compatible version requirement."""
+        tools = {"read", "write"}
+        # Should work with compatible version
+        orchestrator.invoke_capability("enabled_tools", tools, min_version="1.0")
+        assert orchestrator._enabled_tools == tools
+
+    def test_invoke_capability_with_incompatible_version_raises(self, orchestrator):
+        """Test invoke_capability raises IncompatibleVersionError for incompatible version."""
+        tools = {"read", "write"}
+        with pytest.raises(IncompatibleVersionError) as exc_info:
+            orchestrator.invoke_capability("enabled_tools", tools, min_version="2.0")
+        assert exc_info.value.capability_name == "enabled_tools"
+        assert exc_info.value.required_version == "2.0"
+        assert exc_info.value.actual_version == "1.0"
 
 
 # =============================================================================
@@ -417,3 +576,33 @@ class TestVerticalIntegrationHelpers:
         tools = {"read", "write"}
         _invoke_capability(obj, "enabled_tools", tools)
         assert obj.tools == tools
+
+    def test_check_capability_with_version_requirement(self):
+        """Test _check_capability with min_version requirement."""
+        from victor.framework.vertical_integration import _check_capability
+
+        orch = MockOrchestrator()
+        # Capability is v1.0
+        assert _check_capability(orch, "enabled_tools", min_version="1.0")
+        assert not _check_capability(orch, "enabled_tools", min_version="2.0")
+
+    def test_invoke_capability_with_version_requirement(self):
+        """Test _invoke_capability with min_version requirement."""
+        from victor.framework.vertical_integration import _invoke_capability
+
+        orch = MockOrchestrator()
+        tools = {"read", "write"}
+
+        # Should work with compatible version
+        _invoke_capability(orch, "enabled_tools", tools, min_version="1.0")
+        assert orch._enabled_tools == tools
+
+    def test_invoke_capability_with_incompatible_version(self):
+        """Test _invoke_capability raises for incompatible version."""
+        from victor.framework.vertical_integration import _invoke_capability
+
+        orch = MockOrchestrator()
+        tools = {"read", "write"}
+
+        with pytest.raises(IncompatibleVersionError):
+            _invoke_capability(orch, "enabled_tools", tools, min_version="2.0")

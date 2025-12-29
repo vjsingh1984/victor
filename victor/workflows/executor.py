@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.agent.subagents import SubAgentOrchestrator
     from victor.agent.rl.checkpoint_store import CheckpointStore
+    from victor.workflows.cache import WorkflowCache, WorkflowCacheConfig
 
 logger = logging.getLogger(__name__)
 
@@ -183,17 +184,22 @@ class WorkflowResult:
 
 
 class WorkflowExecutor:
-    """Executes workflow definitions with optional checkpointing.
+    """Executes workflow definitions with optional checkpointing and caching.
 
     Traverses the workflow DAG and executes nodes using the
     SubAgent infrastructure. Supports checkpointing for workflow
     resumption via the existing RL CheckpointStore.
+
+    Supports optional node-level caching for deterministic nodes
+    (TransformNode, ConditionNode) to improve performance on
+    repeated workflow executions.
 
     Attributes:
         orchestrator: Agent orchestrator for spawning agents
         max_parallel: Maximum parallel node executions
         default_timeout: Default timeout per node (seconds)
         checkpointer: Optional CheckpointStore for persistence
+        cache: Optional WorkflowCache for node result caching
 
     Example:
         executor = WorkflowExecutor(orchestrator)
@@ -210,6 +216,14 @@ class WorkflowExecutor:
             initial_context={"files": ["main.py"]},
             thread_id="my-workflow-123",
         )
+
+        # With caching enabled for deterministic nodes:
+        from victor.workflows.cache import WorkflowCache, WorkflowCacheConfig
+        cache_config = WorkflowCacheConfig(enabled=True, ttl_seconds=3600)
+        executor = WorkflowExecutor(
+            orchestrator,
+            cache=WorkflowCache(cache_config),
+        )
     """
 
     def __init__(
@@ -219,6 +233,8 @@ class WorkflowExecutor:
         max_parallel: int = 4,
         default_timeout: float = 300.0,
         checkpointer: Optional["CheckpointStore"] = None,
+        cache: Optional["WorkflowCache"] = None,
+        cache_config: Optional["WorkflowCacheConfig"] = None,
     ):
         """Initialize executor.
 
@@ -227,6 +243,8 @@ class WorkflowExecutor:
             max_parallel: Maximum parallel executions
             default_timeout: Default timeout per node
             checkpointer: Optional CheckpointStore for persistence
+            cache: Optional WorkflowCache for node result caching
+            cache_config: Optional config to create a cache (alternative to cache param)
         """
         self.orchestrator = orchestrator
         self.max_parallel = max_parallel
@@ -234,6 +252,15 @@ class WorkflowExecutor:
         self._checkpointer = checkpointer
         self._sub_agents: Optional["SubAgentOrchestrator"] = None
         self._active_executions: Dict[str, asyncio.Task] = {}
+
+        # Initialize cache if config provided
+        if cache is not None:
+            self._cache = cache
+        elif cache_config is not None:
+            from victor.workflows.cache import WorkflowCache
+            self._cache: Optional["WorkflowCache"] = WorkflowCache(cache_config)
+        else:
+            self._cache = None
 
     @property
     def sub_agents(self) -> "SubAgentOrchestrator":
@@ -243,6 +270,21 @@ class WorkflowExecutor:
 
             self._sub_agents = SubAgentOrchestrator(self.orchestrator)
         return self._sub_agents
+
+    @property
+    def cache(self) -> Optional["WorkflowCache"]:
+        """Get the workflow cache (if enabled)."""
+        return self._cache
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache statistics.
+
+        Returns:
+            Dictionary with cache stats, or empty dict if cache disabled
+        """
+        if self._cache is not None:
+            return self._cache.get_stats()
+        return {"enabled": False}
 
     async def execute(
         self,
@@ -411,7 +453,7 @@ class WorkflowExecutor:
                 node_id=node_id,
                 node_type=node.node_type.value if hasattr(node, 'node_type') else 'unknown',
                 success=result.status == NodeStatus.COMPLETED,
-                duration=result.duration,
+                duration=result.duration_seconds,
             )
 
             # If failed, stop unless configured to continue
@@ -457,6 +499,9 @@ class WorkflowExecutor:
     ) -> NodeResult:
         """Execute a single workflow node.
 
+        Checks cache for cacheable nodes before execution.
+        Caches successful results for deterministic nodes.
+
         Args:
             node: Node to execute
             context: Execution context
@@ -467,26 +512,47 @@ class WorkflowExecutor:
         logger.debug(f"Executing node: {node.id} ({node.node_type.value})")
         start_time = time.time()
 
+        # Check cache for cacheable nodes (TransformNode, ConditionNode)
+        if self._cache is not None:
+            cached_result = self._cache.get(node, context.data)
+            if cached_result is not None:
+                logger.debug(f"Cache hit for node: {node.id}")
+                # Return cached result with updated timing
+                return NodeResult(
+                    node_id=cached_result.node_id,
+                    status=cached_result.status,
+                    output=cached_result.output,
+                    error=cached_result.error,
+                    duration_seconds=time.time() - start_time,  # Cache lookup time
+                    tool_calls_used=cached_result.tool_calls_used,
+                )
+
         try:
             if isinstance(node, AgentNode):
-                return await self._execute_agent_node(node, context, start_time)
+                result = await self._execute_agent_node(node, context, start_time)
 
             elif isinstance(node, ConditionNode):
-                return await self._execute_condition_node(node, context, start_time)
+                result = await self._execute_condition_node(node, context, start_time)
 
             elif isinstance(node, ParallelNode):
-                return await self._execute_parallel_node(node, context, start_time)
+                result = await self._execute_parallel_node(node, context, start_time)
 
             elif isinstance(node, TransformNode):
-                return await self._execute_transform_node(node, context, start_time)
+                result = await self._execute_transform_node(node, context, start_time)
 
             else:
                 # Unknown node type - skip
-                return NodeResult(
+                result = NodeResult(
                     node_id=node.id,
                     status=NodeStatus.SKIPPED,
                     duration_seconds=time.time() - start_time,
                 )
+
+            # Cache successful results for cacheable nodes
+            if self._cache is not None and result.success:
+                self._cache.set(node, context.data, result)
+
+            return result
 
         except Exception as e:
             logger.error(f"Node '{node.id}' failed: {e}", exc_info=True)

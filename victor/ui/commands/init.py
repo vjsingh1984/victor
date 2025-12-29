@@ -247,10 +247,11 @@ providers:
                 )
 
             if update and existing_content:
-                from victor.ui.slash_commands import SlashCommandHandler
+                from victor.ui.slash.commands.codebase import InitCommand
 
-                handler = SlashCommandHandler(console, None)
-                content = handler._merge_init_content(existing_content, new_content)
+                # Use InitCommand's public merge function
+                init_cmd = InitCommand()
+                content = init_cmd.merge_init_content(existing_content, new_content)
                 console.print("[dim]  Merged with existing content[/]")
             else:
                 content = new_content

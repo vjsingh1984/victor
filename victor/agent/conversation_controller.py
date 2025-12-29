@@ -107,6 +107,7 @@ class ConversationController:
         self._system_added = False
         self._context_callbacks: List[Callable[[ContextMetrics], None]] = []
         self._compaction_summaries: List[str] = []
+        self._current_plan: Optional[Any] = None
 
     @property
     def messages(self) -> List[Message]:
@@ -123,6 +124,23 @@ class ConversationController:
     @property
     def system_prompt(self) -> Optional[str]:
         return self._system_prompt
+
+    @property
+    def current_plan(self) -> Optional[Any]:
+        """Get the current execution plan.
+
+        Returns:
+            The current ExecutionPlan or None if no plan is active.
+        """
+        return self._current_plan
+
+    def set_current_plan(self, plan: Optional[Any]) -> None:
+        """Set the current execution plan.
+
+        Args:
+            plan: The ExecutionPlan to set, or None to clear.
+        """
+        self._current_plan = plan
 
     def set_system_prompt(self, prompt: str) -> None:
         self._system_prompt = prompt

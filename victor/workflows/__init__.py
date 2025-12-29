@@ -69,6 +69,14 @@ from victor.workflows.yaml_loader import (
     load_workflow_from_file,
     load_workflows_from_directory,
 )
+from victor.workflows.cache import (
+    WorkflowCacheConfig,
+    CacheEntry,
+    WorkflowCache,
+    WorkflowCacheManager,
+    get_workflow_cache_manager,
+    configure_workflow_cache,
+)
 
 __all__ = [
     # Base
@@ -103,4 +111,11 @@ __all__ = [
     "load_workflow_from_yaml",
     "load_workflow_from_file",
     "load_workflows_from_directory",
+    # Cache
+    "WorkflowCacheConfig",
+    "CacheEntry",
+    "WorkflowCache",
+    "WorkflowCacheManager",
+    "get_workflow_cache_manager",
+    "configure_workflow_cache",
 ]

@@ -48,6 +48,7 @@ from victor.framework.protocols import (
     CapabilityType,
     OrchestratorCapability,
     CapabilityRegistryProtocol,
+    IncompatibleVersionError,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,10 +84,22 @@ class CapabilityRegistryMixin:
         """Register a capability with its methods.
 
         Args:
-            capability: Capability declaration
+            capability: Capability declaration (includes version)
             setter_method: Method to call for setting (if capability.setter)
             getter_method: Method to call for getting (if capability.getter)
+
+        Note:
+            Capabilities default to version "1.0" for backward compatibility.
+            Use the version field in OrchestratorCapability to specify a
+            different version when registering updated capabilities.
         """
+        # Warn if registering deprecated capability
+        if capability.deprecated:
+            logger.warning(
+                f"Registering deprecated capability: {capability.name} "
+                f"(v{capability.version}). {capability.deprecated_message}"
+            )
+
         self._capabilities[capability.name] = capability
 
         if capability.setter and setter_method:
@@ -96,7 +109,7 @@ class CapabilityRegistryMixin:
 
         logger.debug(
             f"Registered capability: {capability.name} "
-            f"(type={capability.capability_type.value})"
+            f"(type={capability.capability_type.value}, version={capability.version})"
         )
 
     def _register_default_capabilities(self) -> None:
@@ -311,19 +324,43 @@ class CapabilityRegistryMixin:
         """
         return dict(self._capabilities)
 
-    def has_capability(self, name: str) -> bool:
-        """Check if a capability is available.
+    def has_capability(
+        self,
+        name: str,
+        min_version: Optional[str] = None,
+    ) -> bool:
+        """Check if a capability is available and meets version requirements.
 
         Args:
             name: Capability name to check
+            min_version: Minimum required version (default: None = any version)
 
         Returns:
-            True if capability is registered and functional
+            True if capability is registered, functional, and meets version requirement
+
+        Example:
+            # Check for any version
+            if orch.has_capability("enabled_tools"):
+                ...
+
+            # Check for minimum version
+            if orch.has_capability("enabled_tools", min_version="1.1"):
+                # Use v1.1+ features
+                ...
         """
         if name not in self._capabilities:
             return False
 
         cap = self._capabilities[name]
+
+        # Check version compatibility if min_version specified
+        if min_version is not None:
+            if not cap.is_compatible_with(min_version):
+                logger.debug(
+                    f"Capability '{name}' v{cap.version} does not meet "
+                    f"required version {min_version}"
+                )
+                return False
 
         # Check if the underlying component exists
         if cap.attribute:
@@ -348,17 +385,36 @@ class CapabilityRegistryMixin:
         """
         return self._capabilities.get(name)
 
+    def get_capability_version(self, name: str) -> Optional[str]:
+        """Get the version of a registered capability.
+
+        Args:
+            name: Capability name
+
+        Returns:
+            Version string or None if capability not found
+
+        Example:
+            version = orch.get_capability_version("enabled_tools")
+            if version:
+                print(f"enabled_tools is at version {version}")
+        """
+        cap = self._capabilities.get(name)
+        return cap.version if cap else None
+
     def invoke_capability(
         self,
         name: str,
         *args: Any,
+        min_version: Optional[str] = None,
         **kwargs: Any,
     ) -> Any:
-        """Invoke a capability's setter method.
+        """Invoke a capability's setter method with optional version check.
 
         Args:
             name: Capability name
             *args: Positional arguments for setter
+            min_version: Minimum required version (default: None = no check)
             **kwargs: Keyword arguments for setter
 
         Returns:
@@ -367,11 +423,43 @@ class CapabilityRegistryMixin:
         Raises:
             KeyError: If capability not found
             TypeError: If capability has no setter
+            IncompatibleVersionError: If capability version is incompatible
+
+        Example:
+            # Invoke without version check (backward compatible)
+            orch.invoke_capability("enabled_tools", {"read", "write"})
+
+            # Invoke with version requirement
+            orch.invoke_capability(
+                "enabled_tools",
+                {"read", "write"},
+                min_version="1.1"
+            )
         """
         if name not in self._capabilities:
             raise KeyError(f"Capability '{name}' not found")
 
         cap = self._capabilities[name]
+
+        # Check version compatibility if required
+        if min_version is not None:
+            if not cap.is_compatible_with(min_version):
+                raise IncompatibleVersionError(
+                    capability_name=name,
+                    required_version=min_version,
+                    actual_version=cap.version,
+                )
+
+        # Warn if invoking deprecated capability
+        if cap.deprecated:
+            import warnings
+            warnings.warn(
+                f"Capability '{name}' (v{cap.version}) is deprecated. "
+                f"{cap.deprecated_message}",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         if not cap.setter:
             raise TypeError(f"Capability '{name}' has no setter method")
 

@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, List, Optional, Tuple
 
 from rich.console import Console
 from rich.panel import Panel
@@ -69,6 +69,7 @@ class SlashCommandHandler:
         self.settings = settings
         self.agent = agent
         self._registry = registry or get_command_registry()
+        self.exit_callback: Optional[Callable[[], None]] = None
 
         # Auto-discover commands if registry is empty
         if auto_discover and not any(self._registry.iter_commands()):
@@ -89,6 +90,16 @@ class SlashCommandHandler:
     def set_agent(self, agent: "AgentOrchestrator") -> None:
         """Set the agent reference (for commands that need it)."""
         self.agent = agent
+
+    def set_exit_callback(self, callback: Optional[Callable[[], None]]) -> None:
+        """Set a custom exit callback for TUI mode.
+
+        When set, commands like /exit will call this instead of sys.exit().
+
+        Args:
+            callback: Callable to invoke on exit, or None to clear.
+        """
+        self.exit_callback = callback
 
     @property
     def registry(self) -> CommandRegistry:

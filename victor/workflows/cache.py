@@ -1,0 +1,534 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Workflow node caching for deterministic workflow steps.
+
+Provides caching for workflow nodes that have deterministic outputs
+given their inputs, improving performance for repeated workflow executions.
+
+Cacheable node types:
+- TransformNode: Pure functions that transform context data
+- ConditionNode: Deterministic branching based on context
+
+Non-cacheable node types:
+- AgentNode: Non-deterministic (LLM responses vary)
+- ParallelNode: Orchestration node (no direct output)
+- HITLNode: Human-in-the-loop (inherently non-deterministic)
+
+Example:
+    from victor.workflows.cache import WorkflowCache, WorkflowCacheConfig
+
+    # Create cache with custom config
+    config = WorkflowCacheConfig(enabled=True, ttl_seconds=3600)
+    cache = WorkflowCache(config)
+
+    # Check for cached result
+    result = cache.get(node, context)
+    if result is not None:
+        return result  # Cache hit
+
+    # Execute node and cache result
+    result = await execute_node(node, context)
+    cache.set(node, context, result)
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import threading
+import time
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+
+from cachetools import TTLCache  # type: ignore[import-untyped]
+
+if TYPE_CHECKING:
+    from victor.workflows.definition import (
+        ConditionNode,
+        TransformNode,
+        WorkflowNode,
+    )
+    from victor.workflows.executor import NodeResult
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class WorkflowCacheConfig:
+    """Configuration for workflow node caching.
+
+    Attributes:
+        enabled: Whether caching is enabled (default: False)
+        ttl_seconds: Time-to-live for cache entries in seconds
+        max_entries: Maximum number of entries in memory cache
+        cacheable_node_types: Node types that can be cached
+        excluded_context_keys: Context keys to exclude from cache key generation
+    """
+
+    enabled: bool = False
+    ttl_seconds: int = 3600  # 1 hour default
+    max_entries: int = 500
+    cacheable_node_types: Set[str] = field(
+        default_factory=lambda: {"transform", "condition"}
+    )
+    excluded_context_keys: Set[str] = field(
+        default_factory=lambda: {"_internal", "_debug", "_timestamps"}
+    )
+
+
+@dataclass
+class CacheEntry:
+    """A cached node result.
+
+    Attributes:
+        node_id: ID of the cached node
+        result: The cached NodeResult
+        created_at: Timestamp when entry was created
+        hit_count: Number of times this entry was accessed
+    """
+
+    node_id: str
+    result: "NodeResult"
+    created_at: float
+    hit_count: int = 0
+
+
+class WorkflowCache:
+    """Cache for workflow node execution results.
+
+    Provides in-memory caching for deterministic workflow nodes
+    (TransformNode, ConditionNode) to avoid redundant computation
+    during workflow re-execution.
+
+    Thread-safe implementation using locks.
+
+    Attributes:
+        config: Cache configuration
+        stats: Cache statistics (hits, misses, etc.)
+
+    Example:
+        cache = WorkflowCache(WorkflowCacheConfig(enabled=True))
+
+        # Try to get cached result
+        result = cache.get(node, context)
+        if result is None:
+            result = await execute_node(node, context)
+            cache.set(node, context, result)
+    """
+
+    def __init__(self, config: Optional[WorkflowCacheConfig] = None):
+        """Initialize workflow cache.
+
+        Args:
+            config: Cache configuration (uses defaults if None)
+        """
+        self.config = config or WorkflowCacheConfig()
+        self._lock = threading.RLock()
+
+        # Statistics tracking
+        self._stats: Dict[str, int] = {
+            "hits": 0,
+            "misses": 0,
+            "sets": 0,
+            "evictions": 0,
+            "skipped_non_cacheable": 0,
+        }
+
+        # Initialize cache if enabled
+        if self.config.enabled:
+            self._cache: Optional[TTLCache] = TTLCache(
+                maxsize=self.config.max_entries,
+                ttl=self.config.ttl_seconds,
+            )
+            logger.info(
+                f"Workflow cache initialized: max_entries={self.config.max_entries}, "
+                f"ttl={self.config.ttl_seconds}s"
+            )
+        else:
+            self._cache = None
+            logger.debug("Workflow cache disabled")
+
+    def is_cacheable(self, node: "WorkflowNode") -> bool:
+        """Check if a node type is cacheable.
+
+        Args:
+            node: The workflow node to check
+
+        Returns:
+            True if the node type can be cached
+        """
+        if not self.config.enabled:
+            return False
+
+        node_type = node.node_type.value if hasattr(node, "node_type") else "unknown"
+        return node_type in self.config.cacheable_node_types
+
+    def get(
+        self,
+        node: "WorkflowNode",
+        context: Dict[str, Any],
+    ) -> Optional["NodeResult"]:
+        """Get cached result for a node.
+
+        Args:
+            node: The workflow node
+            context: Current workflow context
+
+        Returns:
+            Cached NodeResult or None if not found
+        """
+        if not self.config.enabled or self._cache is None:
+            return None
+
+        if not self.is_cacheable(node):
+            self._stats["skipped_non_cacheable"] += 1
+            return None
+
+        cache_key = self._make_cache_key(node, context)
+
+        with self._lock:
+            try:
+                entry: Optional[CacheEntry] = self._cache.get(cache_key)
+                if entry is not None:
+                    entry.hit_count += 1
+                    self._stats["hits"] += 1
+                    logger.debug(f"Workflow cache hit: node={node.id}, key={cache_key[:16]}...")
+                    return entry.result
+            except KeyError:
+                pass
+
+            self._stats["misses"] += 1
+            logger.debug(f"Workflow cache miss: node={node.id}")
+            return None
+
+    def set(
+        self,
+        node: "WorkflowNode",
+        context: Dict[str, Any],
+        result: "NodeResult",
+    ) -> bool:
+        """Cache a node result.
+
+        Args:
+            node: The workflow node
+            context: Workflow context at execution time
+            result: The execution result to cache
+
+        Returns:
+            True if successfully cached
+        """
+        if not self.config.enabled or self._cache is None:
+            return False
+
+        if not self.is_cacheable(node):
+            return False
+
+        # Don't cache failed results
+        if not result.success:
+            logger.debug(f"Skipping cache for failed node: {node.id}")
+            return False
+
+        cache_key = self._make_cache_key(node, context)
+
+        with self._lock:
+            entry = CacheEntry(
+                node_id=node.id,
+                result=result,
+                created_at=time.time(),
+            )
+
+            try:
+                self._cache[cache_key] = entry
+                self._stats["sets"] += 1
+                logger.debug(f"Workflow cache set: node={node.id}, key={cache_key[:16]}...")
+                return True
+            except Exception as e:
+                logger.warning(f"Failed to cache workflow result: {e}")
+                return False
+
+    def invalidate(self, node_id: str) -> int:
+        """Invalidate all cache entries for a specific node.
+
+        Args:
+            node_id: ID of the node to invalidate
+
+        Returns:
+            Number of entries invalidated
+        """
+        if not self.config.enabled or self._cache is None:
+            return 0
+
+        with self._lock:
+            keys_to_delete = [
+                k for k, v in self._cache.items()
+                if isinstance(v, CacheEntry) and v.node_id == node_id
+            ]
+
+            count = 0
+            for key in keys_to_delete:
+                try:
+                    del self._cache[key]
+                    count += 1
+                except KeyError:
+                    pass
+
+            if count > 0:
+                logger.info(f"Invalidated {count} cache entries for node: {node_id}")
+
+            return count
+
+    def clear(self) -> int:
+        """Clear all cache entries.
+
+        Returns:
+            Number of entries cleared
+        """
+        if not self.config.enabled or self._cache is None:
+            return 0
+
+        with self._lock:
+            count = len(self._cache)
+            self._cache.clear()
+            logger.info(f"Cleared {count} workflow cache entries")
+            return count
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get cache statistics.
+
+        Returns:
+            Dictionary with cache statistics
+        """
+        with self._lock:
+            stats = self._stats.copy()
+
+            total = stats["hits"] + stats["misses"]
+            stats["hit_rate"] = stats["hits"] / total if total > 0 else 0.0
+
+            if self._cache is not None:
+                stats["current_size"] = len(self._cache)
+                stats["max_size"] = self.config.max_entries
+            else:
+                stats["current_size"] = 0
+                stats["max_size"] = 0
+
+            stats["enabled"] = self.config.enabled
+
+            return stats
+
+    def _make_cache_key(
+        self,
+        node: "WorkflowNode",
+        context: Dict[str, Any],
+    ) -> str:
+        """Generate cache key for a node execution.
+
+        Cache key is based on:
+        - Node ID (unique identifier)
+        - Node type
+        - Relevant context values (filtered)
+
+        Args:
+            node: The workflow node
+            context: Current workflow context
+
+        Returns:
+            Hash-based cache key
+        """
+        # Get relevant context for this node type
+        relevant_context = self._get_relevant_context(node, context)
+
+        # Build key data
+        key_data = {
+            "node_id": node.id,
+            "node_type": node.node_type.value if hasattr(node, "node_type") else "unknown",
+            "context": relevant_context,
+        }
+
+        # Add node-specific data for more accurate cache matching
+        if hasattr(node, "transform"):
+            # For transform nodes, include function identity if possible
+            key_data["transform_name"] = getattr(
+                node.transform, "__name__", "anonymous"
+            )
+        elif hasattr(node, "condition"):
+            # For condition nodes, include condition function identity
+            key_data["condition_name"] = getattr(
+                node.condition, "__name__", "anonymous"
+            )
+
+        # Generate hash
+        key_str = json.dumps(key_data, sort_keys=True, default=str)
+        return hashlib.sha256(key_str.encode()).hexdigest()
+
+    def _get_relevant_context(
+        self,
+        node: "WorkflowNode",
+        context: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Extract relevant context values for cache key.
+
+        Filters out excluded keys and limits depth to avoid
+        huge cache keys.
+
+        Args:
+            node: The workflow node
+            context: Full workflow context
+
+        Returns:
+            Filtered context dictionary
+        """
+        relevant = {}
+
+        for key, value in context.items():
+            # Skip excluded keys
+            if key in self.config.excluded_context_keys:
+                continue
+
+            # Skip private keys
+            if key.startswith("_"):
+                continue
+
+            # Limit value size for large strings/lists
+            if isinstance(value, str) and len(value) > 1000:
+                # Use hash for large strings
+                relevant[key] = f"hash:{hashlib.sha256(value.encode()).hexdigest()[:16]}"
+            elif isinstance(value, (list, dict)) and len(str(value)) > 1000:
+                # Use hash for large collections
+                relevant[key] = f"hash:{hashlib.sha256(str(value).encode()).hexdigest()[:16]}"
+            else:
+                relevant[key] = value
+
+        return relevant
+
+
+class WorkflowCacheManager:
+    """Manager for workflow caching with namespace support.
+
+    Provides a higher-level interface for managing workflow caches
+    across multiple workflows with namespace isolation.
+
+    Example:
+        manager = WorkflowCacheManager()
+        cache = manager.get_cache("my_workflow")
+        result = cache.get(node, context)
+    """
+
+    def __init__(self, default_config: Optional[WorkflowCacheConfig] = None):
+        """Initialize cache manager.
+
+        Args:
+            default_config: Default configuration for new caches
+        """
+        self._default_config = default_config or WorkflowCacheConfig()
+        self._caches: Dict[str, WorkflowCache] = {}
+        self._lock = threading.Lock()
+
+    def get_cache(
+        self,
+        workflow_name: str,
+        config: Optional[WorkflowCacheConfig] = None,
+    ) -> WorkflowCache:
+        """Get or create cache for a workflow.
+
+        Args:
+            workflow_name: Name of the workflow
+            config: Optional override configuration
+
+        Returns:
+            WorkflowCache instance
+        """
+        with self._lock:
+            if workflow_name not in self._caches:
+                cache_config = config or self._default_config
+                self._caches[workflow_name] = WorkflowCache(cache_config)
+                logger.debug(f"Created workflow cache for: {workflow_name}")
+
+            return self._caches[workflow_name]
+
+    def clear_workflow(self, workflow_name: str) -> int:
+        """Clear cache for a specific workflow.
+
+        Args:
+            workflow_name: Name of the workflow
+
+        Returns:
+            Number of entries cleared
+        """
+        with self._lock:
+            if workflow_name in self._caches:
+                return self._caches[workflow_name].clear()
+            return 0
+
+    def clear_all(self) -> int:
+        """Clear all workflow caches.
+
+        Returns:
+            Total entries cleared across all workflows
+        """
+        with self._lock:
+            total = 0
+            for cache in self._caches.values():
+                total += cache.clear()
+            return total
+
+    def get_all_stats(self) -> Dict[str, Dict[str, Any]]:
+        """Get statistics for all workflow caches.
+
+        Returns:
+            Dictionary mapping workflow names to their stats
+        """
+        with self._lock:
+            return {
+                name: cache.get_stats()
+                for name, cache in self._caches.items()
+            }
+
+
+# Global cache manager instance
+_global_cache_manager: Optional[WorkflowCacheManager] = None
+
+
+def get_workflow_cache_manager() -> WorkflowCacheManager:
+    """Get the global workflow cache manager.
+
+    Returns:
+        Global WorkflowCacheManager instance
+    """
+    global _global_cache_manager
+    if _global_cache_manager is None:
+        _global_cache_manager = WorkflowCacheManager()
+    return _global_cache_manager
+
+
+def configure_workflow_cache(config: WorkflowCacheConfig) -> None:
+    """Configure the global workflow cache manager.
+
+    Args:
+        config: Configuration to apply
+    """
+    global _global_cache_manager
+    _global_cache_manager = WorkflowCacheManager(config)
+    logger.info(f"Workflow cache configured: enabled={config.enabled}")
+
+
+__all__ = [
+    "WorkflowCacheConfig",
+    "CacheEntry",
+    "WorkflowCache",
+    "WorkflowCacheManager",
+    "get_workflow_cache_manager",
+    "configure_workflow_cache",
+]

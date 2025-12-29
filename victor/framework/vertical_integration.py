@@ -23,18 +23,25 @@ Design Philosophy:
 - Protocol-based access (no private attribute writes)
 - Type-safe configuration through VerticalContext
 - SOLID-compliant extension points
+- Step handlers for Single Responsibility (Phase 3.1)
 
-Architecture:
-    VerticalIntegrationPipeline
-    ├── Step 1: Create VerticalContext
-    ├── Step 2: Apply tools filter
-    ├── Step 3: Apply system prompt
-    ├── Step 4: Apply stages
-    ├── Step 5: Apply middleware
-    ├── Step 6: Apply safety extensions
-    ├── Step 7: Apply prompt contributors
-    ├── Step 8: Apply mode configuration
-    └── Step 9: Apply tool dependencies
+Architecture (Refactored with Step Handlers):
+    VerticalIntegrationPipeline (Facade)
+    │
+    └── StepHandlerRegistry
+        ├── ToolStepHandler (order=10) - Apply tools filter
+        ├── PromptStepHandler (order=20) - Apply system prompt
+        ├── ConfigStepHandler (order=40) - Apply stages
+        ├── ExtensionsStepHandler (order=45)
+        │   ├── MiddlewareStepHandler - Apply middleware
+        │   ├── SafetyStepHandler - Apply safety patterns
+        │   ├── PromptStepHandler - Apply prompt contributors
+        │   └── ConfigStepHandler - Apply mode config & tool deps
+        ├── FrameworkStepHandler (order=60)
+        │   ├── Workflows - Register workflow definitions
+        │   ├── RL Config - Configure RL learners
+        │   └── Team Specs - Register team specifications
+        └── ContextStepHandler (order=100) - Attach context
 
 Usage:
     from victor.framework.vertical_integration import (
@@ -54,6 +61,13 @@ Usage:
         print(f"Tools: {result.tools_applied}")
     else:
         print(f"Errors: {result.errors}")
+
+    # Custom step handlers (Phase 3.1)
+    from victor.framework.step_handlers import StepHandlerRegistry
+
+    registry = StepHandlerRegistry.default()
+    registry.add_handler(MyCustomStepHandler())
+    pipeline = VerticalIntegrationPipeline(step_registry=registry)
 """
 
 from __future__ import annotations
@@ -78,6 +92,7 @@ from victor.agent.vertical_context import VerticalContext, create_vertical_conte
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
+    from victor.framework.step_handlers import StepHandlerRegistry
     from victor.verticals.base import VerticalBase, VerticalConfig
     from victor.verticals.protocols import (
         MiddlewareProtocol,
@@ -102,8 +117,12 @@ from victor.verticals.protocols import (
 from victor.framework.protocols import CapabilityRegistryProtocol
 
 
-def _check_capability(obj: Any, capability_name: str) -> bool:
-    """Check if object has capability via registry.
+def _check_capability(
+    obj: Any,
+    capability_name: str,
+    min_version: Optional[str] = None,
+) -> bool:
+    """Check if object has capability via registry with optional version check.
 
     Uses protocol-based capability discovery. Orchestrators must implement
     CapabilityRegistryProtocol for proper capability checking.
@@ -115,16 +134,33 @@ def _check_capability(obj: Any, capability_name: str) -> bool:
     Args:
         obj: Object to check (should implement CapabilityRegistryProtocol)
         capability_name: Name of capability
+        min_version: Minimum required version (default: None = any version)
 
     Returns:
-        True if capability is available via the registry
+        True if capability is available via the registry and meets version requirement
+
+    Example:
+        # Check for any version
+        if _check_capability(obj, "enabled_tools"):
+            ...
+
+        # Check for minimum version
+        if _check_capability(obj, "enabled_tools", min_version="1.1"):
+            ...
     """
     # Check capability registry (protocol-based only)
     if isinstance(obj, CapabilityRegistryProtocol):
-        return obj.has_capability(capability_name)
+        return obj.has_capability(capability_name, min_version=min_version)
 
     # For objects not implementing protocol, check for public method
+    # Note: Version checking not available without protocol implementation
     # Note: No private attribute fallbacks (SOLID compliant)
+    if min_version is not None:
+        logger.debug(
+            f"Version check requested for '{capability_name}' but object does not "
+            f"implement CapabilityRegistryProtocol. Falling back to hasattr check."
+        )
+
     public_methods = {
         "enabled_tools": "set_enabled_tools",
         "prompt_builder": "prompt_builder",
@@ -141,8 +177,14 @@ def _check_capability(obj: Any, capability_name: str) -> bool:
     )
 
 
-def _invoke_capability(obj: Any, capability_name: str, *args: Any, **kwargs: Any) -> Any:
-    """Invoke capability via registry or public method call.
+def _invoke_capability(
+    obj: Any,
+    capability_name: str,
+    *args: Any,
+    min_version: Optional[str] = None,
+    **kwargs: Any,
+) -> Any:
+    """Invoke capability via registry or public method call with optional version check.
 
     Uses protocol-based capability invocation. Orchestrators must implement
     CapabilityRegistryProtocol for proper capability invocation.
@@ -155,6 +197,7 @@ def _invoke_capability(obj: Any, capability_name: str, *args: Any, **kwargs: Any
         obj: Object to invoke capability on (should implement CapabilityRegistryProtocol)
         capability_name: Name of capability
         *args: Arguments for capability
+        min_version: Minimum required version (default: None = no check)
         **kwargs: Keyword arguments for capability
 
     Returns:
@@ -162,16 +205,31 @@ def _invoke_capability(obj: Any, capability_name: str, *args: Any, **kwargs: Any
 
     Raises:
         AttributeError: If capability cannot be invoked
+        IncompatibleVersionError: If capability version is incompatible
+
+    Example:
+        # Invoke without version check
+        _invoke_capability(obj, "enabled_tools", {"read", "write"})
+
+        # Invoke with version requirement
+        _invoke_capability(obj, "enabled_tools", {"read", "write"}, min_version="1.1")
     """
     # Use capability registry if available (preferred)
     if isinstance(obj, CapabilityRegistryProtocol):
         try:
-            return obj.invoke_capability(capability_name, *args, **kwargs)
+            return obj.invoke_capability(capability_name, *args, min_version=min_version, **kwargs)
         except (KeyError, TypeError) as e:
             logger.debug(f"Registry invoke failed for {capability_name}: {e}")
             # Fall through to public method fallback
 
     # Fallback: use public method mappings only (no private attributes)
+    # Note: Version checking not available without protocol implementation
+    if min_version is not None:
+        logger.debug(
+            f"Version check requested for '{capability_name}' but object does not "
+            f"implement CapabilityRegistryProtocol. Invoking without version check."
+        )
+
     public_method_mappings = {
         "enabled_tools": "set_enabled_tools",
         "vertical_middleware": "apply_vertical_middleware",
@@ -306,6 +364,11 @@ class VerticalIntegrationPipeline:
     2. **Protocol Compliance**: Uses proper methods, not private attrs
     3. **Error Handling**: Graceful degradation with detailed errors
     4. **Extensibility**: Hook points for custom integration steps
+    5. **Step Handlers**: Focused classes for each integration concern (Phase 3.1)
+
+    The pipeline now uses a registry of step handlers that can be customized.
+    Each step handler implements a single concern (Single Responsibility Principle).
+    New steps can be added without modifying existing ones (Open/Closed Principle).
 
     Example:
         pipeline = VerticalIntegrationPipeline()
@@ -322,6 +385,13 @@ class VerticalIntegrationPipeline:
             CodingAssistant,
             config_overrides={"tool_budget": 30},
         )
+
+        # Use custom step handlers (Phase 3.1)
+        from victor.framework.step_handlers import StepHandlerRegistry
+
+        registry = StepHandlerRegistry.default()
+        registry.add_handler(MyCustomStepHandler())
+        pipeline = VerticalIntegrationPipeline(step_registry=registry)
     """
 
     def __init__(
@@ -329,6 +399,8 @@ class VerticalIntegrationPipeline:
         strict_mode: bool = False,
         pre_hooks: Optional[List[Callable[[Any, Type], None]]] = None,
         post_hooks: Optional[List[Callable[[Any, IntegrationResult], None]]] = None,
+        step_registry: Optional["StepHandlerRegistry"] = None,
+        use_step_handlers: bool = True,
     ):
         """Initialize the pipeline.
 
@@ -336,10 +408,37 @@ class VerticalIntegrationPipeline:
             strict_mode: If True, fail on any integration error
             pre_hooks: Callables to run before integration
             post_hooks: Callables to run after integration
+            step_registry: Custom step handler registry (uses default if None)
+            use_step_handlers: If True, use step handlers; if False, use legacy methods
         """
         self._strict_mode = strict_mode
         self._pre_hooks = pre_hooks or []
         self._post_hooks = post_hooks or []
+        self._use_step_handlers = use_step_handlers
+
+        # Initialize step handler registry
+        if step_registry is not None:
+            self._step_registry = step_registry
+        elif use_step_handlers:
+            try:
+                from victor.framework.step_handlers import StepHandlerRegistry
+
+                self._step_registry = StepHandlerRegistry.default()
+            except ImportError:
+                logger.debug("Step handlers not available, using legacy methods")
+                self._step_registry = None
+                self._use_step_handlers = False
+        else:
+            self._step_registry = None
+
+    @property
+    def step_registry(self) -> Optional["StepHandlerRegistry"]:
+        """Get the step handler registry.
+
+        Returns:
+            The step handler registry or None if not using step handlers
+        """
+        return self._step_registry
 
     def apply(
         self,
@@ -352,7 +451,7 @@ class VerticalIntegrationPipeline:
         This is the main entry point for vertical integration. It:
         1. Resolves the vertical (if string name)
         2. Creates a VerticalContext
-        3. Applies all vertical extensions
+        3. Applies all vertical extensions via step handlers (or legacy methods)
         4. Attaches context to orchestrator
 
         Args:
@@ -386,19 +485,13 @@ class VerticalIntegrationPipeline:
             return result
         result.context = context
 
-        # Apply all integration steps
-        self._apply_tools(orchestrator, vertical_class, context, result)
-        self._apply_system_prompt(orchestrator, vertical_class, context, result)
-        self._apply_stages(orchestrator, vertical_class, context, result)
-        self._apply_extensions(orchestrator, vertical_class, context, result)
-
-        # Apply new framework integrations (workflows, RL, teams)
-        self._apply_workflows(orchestrator, vertical_class, context, result)
-        self._apply_rl_config(orchestrator, vertical_class, context, result)
-        self._apply_team_specs(orchestrator, vertical_class, context, result)
-
-        # Attach context to orchestrator
-        self._attach_context(orchestrator, context, result)
+        # Apply integration steps
+        if self._use_step_handlers and self._step_registry is not None:
+            # Use step handlers (Phase 3.1)
+            self._apply_with_step_handlers(orchestrator, vertical_class, context, result)
+        else:
+            # Use legacy methods (backward compatibility)
+            self._apply_with_legacy_methods(orchestrator, vertical_class, context, result)
 
         # Run post-hooks
         for hook in self._post_hooks:
@@ -415,6 +508,79 @@ class VerticalIntegrationPipeline:
         )
 
         return result
+
+    def _apply_with_step_handlers(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: VerticalContext,
+        result: IntegrationResult,
+    ) -> None:
+        """Apply vertical using step handlers.
+
+        This is the new Phase 3.1 implementation using focused step handler
+        classes for each concern.
+
+        Args:
+            orchestrator: Orchestrator instance
+            vertical: Vertical class
+            context: Vertical context
+            result: Integration result
+        """
+        if self._step_registry is None:
+            return
+
+        # Execute all step handlers in order
+        for handler in self._step_registry.get_ordered_handlers():
+            try:
+                handler.apply(
+                    orchestrator,
+                    vertical,
+                    context,
+                    result,
+                    strict_mode=self._strict_mode,
+                )
+            except Exception as e:
+                if self._strict_mode:
+                    result.add_error(f"Step handler '{handler.name}' failed: {e}")
+                else:
+                    result.add_warning(f"Step handler '{handler.name}' error: {e}")
+                logger.debug(
+                    f"Step handler '{handler.name}' failed: {e}",
+                    exc_info=True,
+                )
+
+    def _apply_with_legacy_methods(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: VerticalContext,
+        result: IntegrationResult,
+    ) -> None:
+        """Apply vertical using legacy inline methods.
+
+        This preserves backward compatibility for code that depends on
+        the old implementation.
+
+        Args:
+            orchestrator: Orchestrator instance
+            vertical: Vertical class
+            context: Vertical context
+            result: Integration result
+        """
+        # Apply all integration steps
+        self._apply_tools(orchestrator, vertical, context, result)
+        self._apply_system_prompt(orchestrator, vertical, context, result)
+        self._apply_stages(orchestrator, vertical, context, result)
+        self._apply_extensions(orchestrator, vertical, context, result)
+
+        # Apply new framework integrations (workflows, RL, teams)
+        self._apply_workflows(orchestrator, vertical, context, result)
+        self._apply_rl_config(orchestrator, vertical, context, result)
+        self._apply_team_specs(orchestrator, vertical, context, result)
+
+        # Attach context to orchestrator
+        self._attach_context(orchestrator, context, result)
 
     def _resolve_vertical(
         self, vertical: Union[Type["VerticalBase"], str]
@@ -1096,16 +1262,79 @@ class VerticalIntegrationPipeline:
 
 def create_integration_pipeline(
     strict: bool = False,
+    use_step_handlers: bool = True,
 ) -> VerticalIntegrationPipeline:
     """Create a vertical integration pipeline.
 
     Args:
         strict: Whether to use strict mode
+        use_step_handlers: If True, use step handlers (Phase 3.1)
 
     Returns:
         Configured VerticalIntegrationPipeline
     """
-    return VerticalIntegrationPipeline(strict_mode=strict)
+    return VerticalIntegrationPipeline(
+        strict_mode=strict,
+        use_step_handlers=use_step_handlers,
+    )
+
+
+def create_integration_pipeline_with_handlers(
+    strict: bool = False,
+    custom_handlers: Optional[List[Any]] = None,
+) -> VerticalIntegrationPipeline:
+    """Create a pipeline with custom step handlers.
+
+    This factory function allows adding custom step handlers to the
+    default set for specialized integration needs.
+
+    Args:
+        strict: Whether to use strict mode
+        custom_handlers: Optional list of additional step handlers
+
+    Returns:
+        Configured VerticalIntegrationPipeline with custom handlers
+
+    Example:
+        from victor.framework.step_handlers import BaseStepHandler
+
+        class MyCustomHandler(BaseStepHandler):
+            @property
+            def name(self) -> str:
+                return "my_custom"
+
+            @property
+            def order(self) -> int:
+                return 55  # Between extensions and framework
+
+            def _do_apply(self, orchestrator, vertical, context, result):
+                # Custom integration logic
+                pass
+
+        pipeline = create_integration_pipeline_with_handlers(
+            custom_handlers=[MyCustomHandler()]
+        )
+    """
+    try:
+        from victor.framework.step_handlers import StepHandlerRegistry
+
+        registry = StepHandlerRegistry.default()
+
+        if custom_handlers:
+            for handler in custom_handlers:
+                registry.add_handler(handler)
+
+        return VerticalIntegrationPipeline(
+            strict_mode=strict,
+            step_registry=registry,
+            use_step_handlers=True,
+        )
+    except ImportError:
+        # Fallback to legacy if step handlers not available
+        return VerticalIntegrationPipeline(
+            strict_mode=strict,
+            use_step_handlers=False,
+        )
 
 
 def apply_vertical(
@@ -1132,5 +1361,6 @@ __all__ = [
     "VerticalIntegrationPipeline",
     "OrchestratorVerticalProtocol",
     "create_integration_pipeline",
+    "create_integration_pipeline_with_handlers",
     "apply_vertical",
 ]

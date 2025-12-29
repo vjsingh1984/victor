@@ -47,14 +47,15 @@ class ModeCommand(BaseSlashCommand):
 
         from victor.agent.adaptive_mode_controller import AgentMode
 
-        mode_controller = getattr(ctx.agent, "_mode_controller", None)
+        # Use ModeAwareMixin's public mode_controller property (lazy-loads)
+        mode_controller = ctx.agent.mode_controller
 
         if not ctx.args:
-            # Show current mode
+            # Show current mode using public interface
             current_mode = (
-                mode_controller.get_current_mode()
+                mode_controller.current_mode
                 if mode_controller
-                else getattr(ctx.agent, "_current_mode", AgentMode.BUILD)
+                else AgentMode.BUILD  # Default fallback
             )
 
             ctx.console.print(
@@ -85,7 +86,13 @@ class ModeCommand(BaseSlashCommand):
             if mode_controller:
                 mode_controller.switch_mode(new_mode)
             else:
-                ctx.agent._current_mode = new_mode
+                # Use ModeAwareMixin's mode_controller property (lazy-loads)
+                mc = ctx.agent.mode_controller
+                if mc:
+                    mc.switch_mode(new_mode)
+                else:
+                    ctx.console.print("[yellow]Mode controller not available[/]")
+                    return
 
             ctx.console.print(f"[green]Switched to mode:[/] [cyan]{mode_name}[/]")
 
@@ -187,12 +194,14 @@ class PlanCommand(BaseSlashCommand):
 
         from victor.agent.adaptive_mode_controller import AgentMode
 
-        # Switch to plan mode
-        mode_controller = getattr(ctx.agent, "_mode_controller", None)
-        if mode_controller:
-            mode_controller.switch_mode(AgentMode.PLAN)
+        # Switch to plan mode using public interface
+        # Uses ModeAwareMixin's mode_controller property (lazy-loads)
+        mc = ctx.agent.mode_controller
+        if mc:
+            mc.switch_mode(AgentMode.PLAN)
         else:
-            ctx.agent._current_mode = AgentMode.PLAN
+            ctx.console.print("[yellow]Mode controller not available[/]")
+            return
 
         ctx.console.print("[green]Switched to planning mode[/]")
         ctx.console.print("[dim]Sandbox edits enabled in .victor/sandbox/ directory[/]")
@@ -246,10 +255,10 @@ class PlanCommand(BaseSlashCommand):
         current_plan = getattr(planner, "current_plan", None) if planner else None
 
         if not current_plan:
-            # Check if there's a plan in conversation context
-            conv_controller = getattr(ctx.agent, "conversation_controller", None)
+            # Check if there's a plan in conversation context using public interface
+            conv_controller = ctx.agent.conversation_controller
             if conv_controller:
-                current_plan = getattr(conv_controller, "_current_plan", None)
+                current_plan = conv_controller.current_plan
 
         if not current_plan:
             ctx.console.print(
@@ -303,14 +312,15 @@ class PlanCommand(BaseSlashCommand):
                 ctx.console.print("[dim]Use /plan list to see available plans.[/]")
                 return
 
-            # Attach plan to agent
+            # Attach plan to agent using public interface
             planner = getattr(ctx.agent, "_planner", None)
             if planner:
                 planner.current_plan = plan
             else:
-                conv_controller = getattr(ctx.agent, "conversation_controller", None)
+                # Use public conversation_controller property and set_current_plan method
+                conv_controller = ctx.agent.conversation_controller
                 if conv_controller:
-                    conv_controller._current_plan = plan
+                    conv_controller.set_current_plan(plan)
 
             from rich.markdown import Markdown
 
@@ -371,9 +381,10 @@ class PlanCommand(BaseSlashCommand):
         current_plan = getattr(planner, "current_plan", None) if planner else None
 
         if not current_plan:
-            conv_controller = getattr(ctx.agent, "conversation_controller", None)
+            # Use public interface for conversation controller and current_plan
+            conv_controller = ctx.agent.conversation_controller
             if conv_controller:
-                current_plan = getattr(conv_controller, "_current_plan", None)
+                current_plan = conv_controller.current_plan
 
         if not current_plan:
             ctx.console.print(
