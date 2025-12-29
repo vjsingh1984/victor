@@ -127,6 +127,163 @@ class TestTeamMemberSpec:
         assert member.is_manager is True
 
 
+class TestTeamMemberSpecPersona:
+    """Tests for TeamMemberSpec persona attributes (CrewAI-compatible)."""
+
+    def test_persona_defaults(self):
+        """TeamMemberSpec persona attributes should have sensible defaults."""
+        spec = TeamMemberSpec(role="researcher", goal="Find patterns")
+
+        assert spec.backstory == ""
+        assert spec.memory is False
+        assert spec.cache is True
+        assert spec.verbose is False
+        assert spec.max_iterations is None
+
+    def test_persona_with_backstory(self):
+        """TeamMemberSpec should store backstory."""
+        spec = TeamMemberSpec(
+            role="researcher",
+            goal="Find patterns",
+            backstory="You are a security expert with 10 years experience.",
+        )
+
+        assert spec.backstory == "You are a security expert with 10 years experience."
+
+    def test_persona_with_memory(self):
+        """TeamMemberSpec should store memory flag."""
+        spec = TeamMemberSpec(
+            role="researcher",
+            goal="Research",
+            memory=True,
+        )
+
+        assert spec.memory is True
+
+    def test_persona_with_cache_disabled(self):
+        """TeamMemberSpec should allow disabling cache."""
+        spec = TeamMemberSpec(
+            role="executor",
+            goal="Execute",
+            cache=False,
+        )
+
+        assert spec.cache is False
+
+    def test_persona_with_verbose(self):
+        """TeamMemberSpec should store verbose flag."""
+        spec = TeamMemberSpec(
+            role="reviewer",
+            goal="Review",
+            verbose=True,
+        )
+
+        assert spec.verbose is True
+
+    def test_persona_with_max_iterations(self):
+        """TeamMemberSpec should store max_iterations."""
+        spec = TeamMemberSpec(
+            role="executor",
+            goal="Execute",
+            max_iterations=25,
+        )
+
+        assert spec.max_iterations == 25
+
+    def test_persona_all_fields(self):
+        """TeamMemberSpec should store all persona fields together."""
+        spec = TeamMemberSpec(
+            role="researcher",
+            goal="Find authentication code",
+            name="Auth Researcher",
+            backstory="You are a meticulous code archaeologist.",
+            memory=True,
+            cache=True,
+            verbose=True,
+            max_iterations=30,
+        )
+
+        assert spec.backstory == "You are a meticulous code archaeologist."
+        assert spec.memory is True
+        assert spec.cache is True
+        assert spec.verbose is True
+        assert spec.max_iterations == 30
+
+    def test_to_team_member_passes_backstory(self):
+        """to_team_member should pass through backstory."""
+        spec = TeamMemberSpec(
+            role="researcher",
+            goal="Research",
+            backstory="Expert in security analysis.",
+        )
+        member = spec.to_team_member()
+
+        assert member.backstory == "Expert in security analysis."
+
+    def test_to_team_member_passes_memory(self):
+        """to_team_member should pass through memory flag."""
+        spec = TeamMemberSpec(
+            role="researcher",
+            goal="Research",
+            memory=True,
+        )
+        member = spec.to_team_member()
+
+        assert member.memory is True
+
+    def test_to_team_member_passes_cache(self):
+        """to_team_member should pass through cache flag."""
+        spec = TeamMemberSpec(
+            role="executor",
+            goal="Execute",
+            cache=False,
+        )
+        member = spec.to_team_member()
+
+        assert member.cache is False
+
+    def test_to_team_member_passes_verbose(self):
+        """to_team_member should pass through verbose flag."""
+        spec = TeamMemberSpec(
+            role="researcher",
+            goal="Debug",
+            verbose=True,
+        )
+        member = spec.to_team_member()
+
+        assert member.verbose is True
+
+    def test_to_team_member_passes_max_iterations(self):
+        """to_team_member should pass through max_iterations."""
+        spec = TeamMemberSpec(
+            role="executor",
+            goal="Execute",
+            max_iterations=50,
+        )
+        member = spec.to_team_member()
+
+        assert member.max_iterations == 50
+
+    def test_to_team_member_passes_all_persona_fields(self):
+        """to_team_member should pass through all persona fields."""
+        spec = TeamMemberSpec(
+            role="researcher",
+            goal="Research auth patterns",
+            backstory="Security expert with deep knowledge.",
+            memory=True,
+            cache=False,
+            verbose=True,
+            max_iterations=20,
+        )
+        member = spec.to_team_member()
+
+        assert member.backstory == "Security expert with deep knowledge."
+        assert member.memory is True
+        assert member.cache is False
+        assert member.verbose is True
+        assert member.max_iterations == 20
+
+
 class TestRoleMapping:
     """Tests for role string to SubAgentRole mapping."""
 

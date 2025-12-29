@@ -180,7 +180,7 @@ async def implement_node(state: CodingState) -> CodingState:
     return state
 
 
-async def test_node(state: CodingState) -> CodingState:
+async def execute_tests_node(state: CodingState) -> CodingState:
     """Run tests and capture results."""
     state["test_results"] = {
         "passed": True,  # Would be actual test results
@@ -332,7 +332,7 @@ def create_feature_workflow() -> StateGraph[CodingState]:
     graph.add_node("research", research_node)
     graph.add_node("plan", plan_node)
     graph.add_node("implement", implement_node)
-    graph.add_node("test", test_node)
+    graph.add_node("test", execute_tests_node)
     graph.add_node("review", review_node)
     graph.add_node("finalize", finalize_node)
 
