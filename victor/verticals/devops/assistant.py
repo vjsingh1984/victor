@@ -265,3 +265,61 @@ When creating configurations:
             # DevOps often needs write/execute tools even for analysis queries
             readonly_only_for_analysis=False,
         )
+
+    # =========================================================================
+    # New Framework Integrations (Workflows, RL, Teams)
+    # =========================================================================
+
+    @classmethod
+    def get_workflow_provider(cls) -> Optional[Any]:
+        """Get DevOps-specific workflow provider.
+
+        Provides workflows for:
+        - deploy_infrastructure: Infrastructure deployment
+        - container_setup: Docker container configuration
+        - cicd_pipeline: CI/CD pipeline setup
+
+        Returns:
+            DevOpsWorkflowProvider instance
+        """
+        from victor.verticals.devops.workflows import DevOpsWorkflowProvider
+
+        return DevOpsWorkflowProvider()
+
+    @classmethod
+    def get_rl_config(cls) -> Optional[Any]:
+        """Get RL configuration for DevOps vertical.
+
+        Returns:
+            DevOpsRLConfig instance
+        """
+        from victor.verticals.devops.rl import DevOpsRLConfig
+
+        return DevOpsRLConfig()
+
+    @classmethod
+    def get_rl_hooks(cls) -> Optional[Any]:
+        """Get RL hooks for DevOps vertical.
+
+        Returns:
+            DevOpsRLHooks instance
+        """
+        from victor.verticals.devops.rl import DevOpsRLHooks
+
+        return DevOpsRLHooks()
+
+    @classmethod
+    def get_team_specs(cls) -> Dict[str, Any]:
+        """Get team specifications for DevOps tasks.
+
+        Provides pre-configured team specifications for:
+        - deployment_team: Infrastructure deployment
+        - container_team: Container management
+        - monitoring_team: Observability setup
+
+        Returns:
+            Dict mapping team names to DevOpsTeamSpec instances
+        """
+        from victor.verticals.devops.teams import DEVOPS_TEAM_SPECS
+
+        return DEVOPS_TEAM_SPECS
