@@ -17,7 +17,9 @@
 import logging
 from typing import Any, Dict, List, Optional
 
+from victor.agent.prompt_enrichment import EnrichmentContext
 from victor.tools.base import BaseTool, CostTier, ToolResult
+from victor.verticals.rag.enrichment import get_rag_enrichment_strategy
 
 logger = logging.getLogger(__name__)
 
@@ -167,9 +169,7 @@ class RAGQueryTool(BaseTool):
                     else:
                         break
 
-                context_parts.append(
-                    f"[Source {i}: {source}]\n{chunk_text}"
-                )
+                context_parts.append(f"[Source {i}: {source}]\n{chunk_text}")
                 sources.append(f"{i}. {source} (relevance: {result.score:.2f})")
                 total_chars += len(chunk_text)
 
@@ -181,22 +181,37 @@ class RAGQueryTool(BaseTool):
                 output = (
                     f"QUESTION: {question}\n\n"
                     f"RETRIEVED CONTEXT ({len(context_parts)} sources):\n"
-                    f"{'=' * 50}\n\n"
-                    + context_str
-                    + f"\n\n{'=' * 50}\n"
-                    f"SOURCES:\n" + "\n".join(sources)
+                    f"{'=' * 50}\n\n" + context_str + f"\n\n{'=' * 50}\n"
+                    f"SOURCES:\n"
+                    + "\n".join(sources)
                     + "\n\nUse this context to answer the question. "
                     "Cite sources by their number (e.g., [1], [2])."
                 )
                 return ToolResult(success=True, output=output)
 
-            # Synthesize answer using LLM
+            # Get enrichment strategy and enrich the prompt
+            enrichment_strategy = get_rag_enrichment_strategy()
+            enrichment_context = EnrichmentContext(
+                task_type="rag_query",
+                metadata={
+                    "doc_sources": [s.split(" ")[0] for s in sources],  # Extract source paths
+                },
+            )
+
+            # Get enrichments
+            enrichments = await enrichment_strategy.get_context_enrichments(
+                prompt=question,
+                context=enrichment_context,
+            )
+
+            # Synthesize answer using LLM with enriched prompt
             answer = await self._synthesize_answer(
                 question=question,
                 context=context_str,
                 sources=sources,
                 provider=provider,
                 model=model,
+                enrichments=enrichments,
             )
 
             # Format final output
@@ -223,8 +238,9 @@ class RAGQueryTool(BaseTool):
         sources: List[str],
         provider: Optional[str] = None,
         model: Optional[str] = None,
+        enrichments: Optional[List[Any]] = None,
     ) -> str:
-        """Synthesize an answer using an LLM provider.
+        """Synthesize an answer using an LLM provider with enrichment.
 
         Args:
             question: The user's question
@@ -232,6 +248,7 @@ class RAGQueryTool(BaseTool):
             sources: List of source citations
             provider: LLM provider name
             model: Model name
+            enrichments: Optional list of enrichments to include
 
         Returns:
             Synthesized answer string
@@ -263,15 +280,14 @@ class RAGQueryTool(BaseTool):
                 f"Please answer: {question}"
             )
 
-        # Build prompt for synthesis
-        user_prompt = f"""Based on the following context, answer the question.
-
-CONTEXT:
-{context}
-
-QUESTION: {question}
-
-Provide a clear, concise answer citing sources using [Source N] format."""
+        # Build enriched prompt for synthesis
+        enrichment_strategy = get_rag_enrichment_strategy()
+        user_prompt = enrichment_strategy.enrich_synthesis_prompt(
+            question=question,
+            context=context,
+            sources=sources,
+            enrichments=enrichments,
+        )
 
         messages = [
             {"role": "system", "content": RAG_SYSTEM_PROMPT},
