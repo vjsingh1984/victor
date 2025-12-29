@@ -246,6 +246,11 @@ from victor.core.mode_config import (
     register_vertical_modes,
 )
 
+from victor.core.tool_dependency_base import (
+    BaseToolDependencyProvider,
+    ToolDependencyConfig,
+)
+
 __all__ = [
     # Container
     "ServiceContainer",
@@ -435,4 +440,7 @@ __all__ = [
     "get_mode_config",
     "get_tool_budget",
     "register_vertical_modes",
+    # Tool Dependency Base
+    "BaseToolDependencyProvider",
+    "ToolDependencyConfig",
 ]
