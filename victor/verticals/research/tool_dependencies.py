@@ -1,12 +1,29 @@
-"""Research Tool Dependencies - Tool relationships and sequencing for research workflows."""
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Research Tool Dependencies - Tool relationships for research workflows.
+
+Extends the core BaseToolDependencyProvider with research-specific data.
+"""
 
 from typing import Dict, List, Set, Tuple
 
-from victor.verticals.protocols import ToolDependencyProviderProtocol, ToolDependency
+from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
+from victor.core.tool_types import ToolDependency
 
 
 # Tool dependency graph for research workflows
-# Format: tool_name -> list of tools that commonly follow
 RESEARCH_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = {
     # Search tools lead to fetch/read
     "web_search": [
@@ -63,113 +80,69 @@ RESEARCH_TOOL_SEQUENCES: Dict[str, List[str]] = {
     "report_writing": ["read_file", "web_search", "web_fetch", "write_file", "edit_files"],
 }
 
+# Tool dependencies for research
+RESEARCH_TOOL_DEPENDENCIES: List[ToolDependency] = [
+    ToolDependency(
+        tool_name="web_fetch",
+        depends_on={"web_search"},
+        enables={"write_file", "web_fetch"},
+        weight=0.7,
+    ),
+    ToolDependency(
+        tool_name="write_file",
+        depends_on={"web_fetch", "read_file"},
+        enables={"read_file", "edit_files"},
+        weight=0.5,
+    ),
+    ToolDependency(
+        tool_name="code_search",
+        depends_on=set(),
+        enables={"read_file", "semantic_code_search"},
+        weight=0.5,
+    ),
+]
 
-class ResearchToolDependencyProvider(ToolDependencyProviderProtocol):
-    """Provides tool dependency information for research workflows."""
+# Required tools for research
+RESEARCH_REQUIRED_TOOLS: Set[str] = {"web_search", "web_fetch", "read_file", "write_file"}
 
-    def get_dependencies(self) -> List[ToolDependency]:
-        """Get tool dependencies as ToolDependency objects."""
-        return [
-            ToolDependency(
-                tool_name="web_fetch",
-                depends_on={"web_search"},
-                enables={"write_file", "web_fetch"},
-                weight=0.7,
-            ),
-            ToolDependency(
-                tool_name="write_file",
-                depends_on={"web_fetch", "read_file"},
-                enables={"read_file", "edit_files"},
-                weight=0.5,
-            ),
-            ToolDependency(
-                tool_name="code_search",
-                depends_on=set(),
-                enables={"read_file", "semantic_code_search"},
-                weight=0.5,
-            ),
-        ]
+# Optional tools that enhance research
+RESEARCH_OPTIONAL_TOOLS: Set[str] = {
+    "code_search",
+    "semantic_code_search",
+    "codebase_overview",
+    "list_directory",
+    "edit_files",
+}
 
-    def get_tool_transitions(self) -> Dict[str, List[Tuple[str, float]]]:
-        """Return tool transition probabilities.
 
-        Returns:
-            Dict mapping tool_name to list of (next_tool, probability) tuples.
-        """
-        return RESEARCH_TOOL_TRANSITIONS
+class ResearchToolDependencyProvider(BaseToolDependencyProvider):
+    """Tool dependency provider for research vertical.
 
-    def get_tool_clusters(self) -> Dict[str, Set[str]]:
-        """Return tool clusters that work well together.
+    Extends BaseToolDependencyProvider with research-specific tool
+    relationships for fact-checking, literature review, and report writing.
+    """
 
-        Returns:
-            Dict mapping cluster_name to set of tool_names.
-        """
-        return RESEARCH_TOOL_CLUSTERS
+    def __init__(self):
+        """Initialize the provider with research-specific config."""
+        super().__init__(
+            ToolDependencyConfig(
+                dependencies=RESEARCH_TOOL_DEPENDENCIES,
+                transitions=RESEARCH_TOOL_TRANSITIONS,
+                clusters=RESEARCH_TOOL_CLUSTERS,
+                sequences=RESEARCH_TOOL_SEQUENCES,
+                required_tools=RESEARCH_REQUIRED_TOOLS,
+                optional_tools=RESEARCH_OPTIONAL_TOOLS,
+                default_sequence=["web_search", "web_fetch"],
+            )
+        )
 
-    def get_recommended_sequence(self, task_type: str) -> List[str]:
-        """Get recommended tool sequence for a task type.
 
-        Args:
-            task_type: Type of research task.
-
-        Returns:
-            List of tool names in recommended order.
-        """
-        return RESEARCH_TOOL_SEQUENCES.get(task_type, ["web_search", "web_fetch"])
-
-    def get_required_tools(self) -> Set[str]:
-        """Return tools that are essential for research.
-
-        Returns:
-            Set of tool names that should always be available.
-        """
-        return {"web_search", "web_fetch", "read_file", "write_file"}
-
-    def get_optional_tools(self) -> Set[str]:
-        """Return tools that enhance research but aren't essential.
-
-        Returns:
-            Set of optional tool names.
-        """
-        return {
-            "code_search",
-            "semantic_code_search",
-            "codebase_overview",
-            "list_directory",
-            "edit_files",
-        }
-
-    def get_tool_sequences(self) -> List[List[str]]:
-        """Return recommended tool sequences for research workflows.
-
-        Returns:
-            List of tool sequences (each sequence is a list of tool names).
-        """
-        return [list(seq) for seq in RESEARCH_TOOL_SEQUENCES.values()]
-
-    def suggest_next_tool(self, current_tool: str, used_tools: List[str]) -> str:
-        """Suggest the next tool based on current tool and history.
-
-        Args:
-            current_tool: The tool that was just used.
-            used_tools: List of tools used so far in the session.
-
-        Returns:
-            Suggested next tool name.
-        """
-        transitions = self.get_tool_transitions()
-        if current_tool not in transitions:
-            return "web_search"  # Default to search
-
-        # Get transition probabilities
-        candidates = transitions[current_tool]
-
-        # Prefer tools not recently used (avoid loops)
-        recent = set(used_tools[-3:]) if len(used_tools) >= 3 else set(used_tools)
-
-        for tool, _prob in candidates:
-            if tool not in recent:
-                return tool
-
-        # Fall back to highest probability
-        return candidates[0][0] if candidates else "web_search"
+__all__ = [
+    "ResearchToolDependencyProvider",
+    "RESEARCH_TOOL_DEPENDENCIES",
+    "RESEARCH_TOOL_TRANSITIONS",
+    "RESEARCH_TOOL_CLUSTERS",
+    "RESEARCH_TOOL_SEQUENCES",
+    "RESEARCH_REQUIRED_TOOLS",
+    "RESEARCH_OPTIONAL_TOOLS",
+]

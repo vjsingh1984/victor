@@ -1,8 +1,26 @@
-"""DevOps Tool Dependencies - Tool relationships for infrastructure workflows."""
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""DevOps Tool Dependencies - Tool relationships for infrastructure workflows.
+
+Extends the core BaseToolDependencyProvider with DevOps-specific data.
+"""
 
 from typing import Dict, List, Set, Tuple
 
-from victor.verticals.protocols import ToolDependencyProviderProtocol, ToolDependency
+from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
+from victor.core.tool_types import ToolDependency
 
 
 # Tool dependency graph for DevOps workflows
@@ -88,80 +106,77 @@ DEVOPS_TOOL_SEQUENCES: Dict[str, List[str]] = {
     "config_update": ["read_file", "edit_files", "bash", "git_status", "git_commit"],
 }
 
+# Tool dependencies for DevOps
+DEVOPS_TOOL_DEPENDENCIES: List[ToolDependency] = [
+    ToolDependency(
+        tool_name="bash",
+        depends_on={"read_file"},
+        enables={"write_file", "git_status"},
+        weight=0.6,
+    ),
+    ToolDependency(
+        tool_name="edit_files",
+        depends_on={"read_file"},
+        enables={"bash", "git_diff"},
+        weight=0.5,
+    ),
+    ToolDependency(
+        tool_name="git_commit",
+        depends_on={"git_status", "git_diff"},
+        enables=set(),
+        weight=0.4,
+    ),
+    ToolDependency(
+        tool_name="write_file",
+        depends_on={"read_file"},
+        enables={"bash", "git_status"},
+        weight=0.5,
+    ),
+]
 
-class DevOpsToolDependencyProvider(ToolDependencyProviderProtocol):
-    """Provides tool dependency information for DevOps workflows."""
+# Required tools for DevOps
+DEVOPS_REQUIRED_TOOLS: Set[str] = {"read_file", "write_file", "edit_files", "bash"}
 
-    def get_dependencies(self) -> List[ToolDependency]:
-        """Get tool dependencies as ToolDependency objects."""
-        return [
-            ToolDependency(
-                tool_name="bash",
-                depends_on={"read_file"},
-                enables={"write_file", "git_status"},
-                weight=0.6,
-            ),
-            ToolDependency(
-                tool_name="edit_files",
-                depends_on={"read_file"},
-                enables={"bash", "git_diff"},
-                weight=0.5,
-            ),
-            ToolDependency(
-                tool_name="git_commit",
-                depends_on={"git_status", "git_diff"},
-                enables=set(),
-                weight=0.4,
-            ),
-        ]
+# Optional tools that enhance DevOps
+DEVOPS_OPTIONAL_TOOLS: Set[str] = {
+    "code_search",
+    "semantic_code_search",
+    "git_status",
+    "git_diff",
+    "git_commit",
+    "web_search",
+    "web_fetch",
+}
 
-    def get_tool_transitions(self) -> Dict[str, List[Tuple[str, float]]]:
-        """Return tool transition probabilities."""
-        return DEVOPS_TOOL_TRANSITIONS
 
-    def get_tool_clusters(self) -> Dict[str, Set[str]]:
-        """Return tool clusters that work well together."""
-        return DEVOPS_TOOL_CLUSTERS
+class DevOpsToolDependencyProvider(BaseToolDependencyProvider):
+    """Tool dependency provider for DevOps vertical.
 
-    def get_recommended_sequence(self, task_type: str) -> List[str]:
-        """Get recommended tool sequence for a task type."""
-        return DEVOPS_TOOL_SEQUENCES.get(task_type, ["read_file", "write_file", "bash"])
+    Extends BaseToolDependencyProvider with DevOps-specific tool
+    relationships for infrastructure and CI/CD workflows.
+    """
 
-    def get_required_tools(self) -> Set[str]:
-        """Return tools that are essential for DevOps."""
-        return {"read_file", "write_file", "edit_files", "bash"}
+    def __init__(self):
+        """Initialize the provider with DevOps-specific config."""
+        super().__init__(
+            ToolDependencyConfig(
+                dependencies=DEVOPS_TOOL_DEPENDENCIES,
+                transitions=DEVOPS_TOOL_TRANSITIONS,
+                clusters=DEVOPS_TOOL_CLUSTERS,
+                sequences=DEVOPS_TOOL_SEQUENCES,
+                required_tools=DEVOPS_REQUIRED_TOOLS,
+                optional_tools=DEVOPS_OPTIONAL_TOOLS,
+                default_sequence=["read_file", "write_file", "bash"],
+            )
+        )
 
-    def get_optional_tools(self) -> Set[str]:
-        """Return tools that enhance DevOps but aren't essential."""
-        return {
-            "code_search",
-            "semantic_code_search",
-            "git_status",
-            "git_diff",
-            "git_commit",
-            "web_search",
-            "web_fetch",
-        }
 
-    def get_tool_sequences(self) -> List[List[str]]:
-        """Return recommended tool sequences for DevOps workflows."""
-        return [list(seq) for seq in DEVOPS_TOOL_SEQUENCES.values()]
-
-    def suggest_next_tool(self, current_tool: str, used_tools: List[str]) -> str:
-        """Suggest the next tool based on current tool and history."""
-        transitions = self.get_tool_transitions()
-        if current_tool not in transitions:
-            return "read_file"  # Default to reading
-
-        # Get transition probabilities
-        candidates = transitions[current_tool]
-
-        # Prefer tools not recently used (avoid loops)
-        recent = set(used_tools[-3:]) if len(used_tools) >= 3 else set(used_tools)
-
-        for tool, _prob in candidates:
-            if tool not in recent:
-                return tool
-
-        # Fall back to highest probability
-        return candidates[0][0] if candidates else "read_file"
+__all__ = [
+    "DevOpsToolDependencyProvider",
+    "DEVOPS_TOOL_DEPENDENCIES",
+    "DEVOPS_TOOL_TRANSITIONS",
+    "DEVOPS_TOOL_CLUSTERS",
+    "DEVOPS_TOOL_SEQUENCES",
+    "DEVOPS_REQUIRED_TOOLS",
+    "DEVOPS_OPTIONAL_TOOLS",
+]

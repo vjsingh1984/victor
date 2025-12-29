@@ -251,6 +251,11 @@ from victor.core.tool_dependency_base import (
     ToolDependencyConfig,
 )
 
+from victor.core.tool_types import (
+    ToolDependency,
+    ToolDependencyProviderProtocol,
+)
+
 __all__ = [
     # Container
     "ServiceContainer",
@@ -443,4 +448,7 @@ __all__ = [
     # Tool Dependency Base
     "BaseToolDependencyProvider",
     "ToolDependencyConfig",
+    # Tool Types
+    "ToolDependency",
+    "ToolDependencyProviderProtocol",
 ]

@@ -1,8 +1,26 @@
-"""Data Analysis Tool Dependencies - Tool relationships for analysis workflows."""
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Data Analysis Tool Dependencies - Tool relationships for analysis workflows.
+
+Extends the core BaseToolDependencyProvider with data analysis-specific data.
+"""
 
 from typing import Dict, List, Set, Tuple
 
-from victor.verticals.protocols import ToolDependencyProviderProtocol, ToolDependency
+from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
+from victor.core.tool_types import ToolDependency
 
 
 # Tool dependency graph for data analysis workflows
@@ -65,79 +83,70 @@ DATA_ANALYSIS_TOOL_SEQUENCES: Dict[str, List[str]] = {
     "report_generation": ["read_file", "bash", "write_file", "write_file"],
 }
 
+# Tool dependencies for data analysis
+DATA_ANALYSIS_TOOL_DEPENDENCIES: List[ToolDependency] = [
+    ToolDependency(
+        tool_name="bash",
+        depends_on={"read_file"},
+        enables={"write_file", "bash"},
+        weight=0.6,
+    ),
+    ToolDependency(
+        tool_name="write_file",
+        depends_on={"bash"},
+        enables={"read_file"},
+        weight=0.5,
+    ),
+    ToolDependency(
+        tool_name="code_search",
+        depends_on=set(),
+        enables={"read_file", "bash"},
+        weight=0.4,
+    ),
+]
 
-class DataAnalysisToolDependencyProvider(ToolDependencyProviderProtocol):
-    """Provides tool dependency information for data analysis workflows."""
+# Required tools for data analysis
+DATA_ANALYSIS_REQUIRED_TOOLS: Set[str] = {"read_file", "write_file", "bash"}
 
-    def get_dependencies(self) -> List[ToolDependency]:
-        """Get tool dependencies as ToolDependency objects."""
-        return [
-            ToolDependency(
-                tool_name="bash",
-                depends_on={"read_file"},
-                enables={"write_file", "bash"},
-                weight=0.6,
-            ),
-            ToolDependency(
-                tool_name="write_file",
-                depends_on={"bash"},
-                enables={"read_file"},
-                weight=0.5,
-            ),
-            ToolDependency(
-                tool_name="code_search",
-                depends_on=set(),
-                enables={"read_file", "bash"},
-                weight=0.4,
-            ),
-        ]
+# Optional tools that enhance data analysis
+DATA_ANALYSIS_OPTIONAL_TOOLS: Set[str] = {
+    "code_search",
+    "semantic_code_search",
+    "edit_files",
+    "list_directory",
+    "web_search",
+    "web_fetch",
+}
 
-    def get_tool_transitions(self) -> Dict[str, List[Tuple[str, float]]]:
-        """Return tool transition probabilities."""
-        return DATA_ANALYSIS_TOOL_TRANSITIONS
 
-    def get_tool_clusters(self) -> Dict[str, Set[str]]:
-        """Return tool clusters that work well together."""
-        return DATA_ANALYSIS_TOOL_CLUSTERS
+class DataAnalysisToolDependencyProvider(BaseToolDependencyProvider):
+    """Tool dependency provider for data analysis vertical.
 
-    def get_recommended_sequence(self, task_type: str) -> List[str]:
-        """Get recommended tool sequence for a task type."""
-        return DATA_ANALYSIS_TOOL_SEQUENCES.get(task_type, ["read_file", "bash", "write_file"])
+    Extends BaseToolDependencyProvider with data analysis-specific tool
+    relationships for data profiling, visualization, and ML workflows.
+    """
 
-    def get_required_tools(self) -> Set[str]:
-        """Return tools that are essential for data analysis."""
-        return {"read_file", "write_file", "bash"}
+    def __init__(self):
+        """Initialize the provider with data analysis-specific config."""
+        super().__init__(
+            ToolDependencyConfig(
+                dependencies=DATA_ANALYSIS_TOOL_DEPENDENCIES,
+                transitions=DATA_ANALYSIS_TOOL_TRANSITIONS,
+                clusters=DATA_ANALYSIS_TOOL_CLUSTERS,
+                sequences=DATA_ANALYSIS_TOOL_SEQUENCES,
+                required_tools=DATA_ANALYSIS_REQUIRED_TOOLS,
+                optional_tools=DATA_ANALYSIS_OPTIONAL_TOOLS,
+                default_sequence=["read_file", "bash", "write_file"],
+            )
+        )
 
-    def get_optional_tools(self) -> Set[str]:
-        """Return tools that enhance analysis but aren't essential."""
-        return {
-            "code_search",
-            "semantic_code_search",
-            "edit_files",
-            "list_directory",
-            "web_search",
-            "web_fetch",
-        }
 
-    def get_tool_sequences(self) -> List[List[str]]:
-        """Return recommended tool sequences for data analysis workflows."""
-        return [list(seq) for seq in DATA_ANALYSIS_TOOL_SEQUENCES.values()]
-
-    def suggest_next_tool(self, current_tool: str, used_tools: List[str]) -> str:
-        """Suggest the next tool based on current tool and history."""
-        transitions = self.get_tool_transitions()
-        if current_tool not in transitions:
-            return "bash"  # Default to Python execution
-
-        # Get transition probabilities
-        candidates = transitions[current_tool]
-
-        # Prefer tools not recently used (avoid loops)
-        recent = set(used_tools[-3:]) if len(used_tools) >= 3 else set(used_tools)
-
-        for tool, _prob in candidates:
-            if tool not in recent:
-                return tool
-
-        # Fall back to highest probability
-        return candidates[0][0] if candidates else "bash"
+__all__ = [
+    "DataAnalysisToolDependencyProvider",
+    "DATA_ANALYSIS_TOOL_DEPENDENCIES",
+    "DATA_ANALYSIS_TOOL_TRANSITIONS",
+    "DATA_ANALYSIS_TOOL_CLUSTERS",
+    "DATA_ANALYSIS_TOOL_SEQUENCES",
+    "DATA_ANALYSIS_REQUIRED_TOOLS",
+    "DATA_ANALYSIS_OPTIONAL_TOOLS",
+]

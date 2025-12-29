@@ -71,6 +71,10 @@ if TYPE_CHECKING:
 # (it was originally defined here but moved to break circular imports)
 from victor.safety.types import SafetyPattern
 
+# Import tool types from core for backward compatibility
+# (moved to core to avoid circular imports between core and verticals)
+from victor.core.tool_types import ToolDependency, ToolDependencyProviderProtocol
+
 
 # =============================================================================
 # Data Types
@@ -144,21 +148,7 @@ class ModeConfig:
     description: str = ""
 
 
-@dataclass
-class ToolDependency:
-    """Dependency relationship between tools.
-
-    Attributes:
-        tool_name: The tool
-        depends_on: Tools that should be called before this one
-        enables: Tools that are enabled after this one succeeds
-        weight: Transition probability weight
-    """
-
-    tool_name: str
-    depends_on: Set[str] = field(default_factory=set)
-    enables: Set[str] = field(default_factory=set)
-    weight: float = 1.0
+# NOTE: ToolDependency is now imported from victor.core.tool_types
 
 
 @dataclass
@@ -555,45 +545,8 @@ class ModeConfigProviderProtocol(Protocol):
 
 # =============================================================================
 # Tool Dependency Provider Protocol
+# NOTE: ToolDependencyProviderProtocol is now imported from victor.core.tool_types
 # =============================================================================
-
-
-@runtime_checkable
-class ToolDependencyProviderProtocol(Protocol):
-    """Protocol for providing tool dependency information.
-
-    Enables verticals to define tool execution patterns and
-    transition probabilities for intelligent tool selection.
-
-    Example:
-        class CodingToolDependencies(ToolDependencyProviderProtocol):
-            def get_dependencies(self) -> List[ToolDependency]:
-                return [
-                    ToolDependency(
-                        tool_name="edit_files",
-                        depends_on={"read_file"},
-                        enables={"run_tests"},
-                        weight=0.8,
-                    ),
-                ]
-    """
-
-    @abstractmethod
-    def get_dependencies(self) -> List[ToolDependency]:
-        """Get tool dependencies for this vertical.
-
-        Returns:
-            List of tool dependency definitions
-        """
-        ...
-
-    def get_tool_sequences(self) -> List[List[str]]:
-        """Get common tool call sequences.
-
-        Returns:
-            List of tool name sequences representing common workflows
-        """
-        return []
 
 
 # =============================================================================

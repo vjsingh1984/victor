@@ -16,13 +16,16 @@
 
 This module defines tool execution patterns and transition probabilities
 for intelligent tool selection in software development tasks.
+
+Extends the core BaseToolDependencyProvider with coding-specific data.
 """
 
 from __future__ import annotations
 
-from typing import List
+from typing import Dict, List, Set, Tuple
 
-from victor.verticals.protocols import ToolDependency, ToolDependencyProviderProtocol
+from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
+from victor.core.tool_types import ToolDependency
 
 
 # Tool dependencies for coding tasks
@@ -95,103 +98,146 @@ CODING_TOOL_DEPENDENCIES: List[ToolDependency] = [
     ),
 ]
 
+# Tool transition probabilities for coding workflows
+CODING_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = {
+    "read_file": [
+        ("edit_files", 0.4),
+        ("code_search", 0.3),
+        ("write_file", 0.2),
+        ("run_tests", 0.1),
+    ],
+    "code_search": [
+        ("read_file", 0.6),
+        ("semantic_code_search", 0.2),
+        ("list_directory", 0.2),
+    ],
+    "list_directory": [
+        ("read_file", 0.5),
+        ("code_search", 0.3),
+        ("write_file", 0.2),
+    ],
+    "edit_files": [
+        ("run_tests", 0.5),
+        ("read_file", 0.3),
+        ("git_status", 0.2),
+    ],
+    "write_file": [
+        ("run_tests", 0.4),
+        ("read_file", 0.3),
+        ("git_status", 0.3),
+    ],
+    "run_tests": [
+        ("edit_files", 0.4),
+        ("git_status", 0.3),
+        ("read_file", 0.3),
+    ],
+    "git_status": [
+        ("git_diff", 0.5),
+        ("git_commit", 0.3),
+        ("read_file", 0.2),
+    ],
+    "git_diff": [
+        ("git_commit", 0.5),
+        ("edit_files", 0.3),
+        ("git_status", 0.2),
+    ],
+}
+
+# Tool clusters for coding
+CODING_TOOL_CLUSTERS: Dict[str, Set[str]] = {
+    "file_operations": {"read_file", "write_file", "edit_files", "list_directory"},
+    "search_operations": {"code_search", "semantic_code_search", "symbols"},
+    "git_operations": {"git_status", "git_diff", "git_commit", "git_push"},
+    "testing": {"run_tests", "execute_bash"},
+    "refactoring": {"refactor_rename_symbol", "refactor_extract_function"},
+}
 
 # Common tool sequences for coding workflows
-CODING_TOOL_SEQUENCES: List[List[str]] = [
-    # Exploration workflow
-    ["list_directory", "read_file", "code_search"],
-    # Edit workflow
-    ["read_file", "edit_files", "run_tests"],
-    # Create workflow
-    ["list_directory", "read_file", "write_file", "run_tests"],
-    # Refactor workflow
-    ["read_file", "symbols", "refactor_rename_symbol", "run_tests"],
-    # Git workflow
-    ["git_status", "git_diff", "git_commit"],
-    # Debug workflow
-    ["read_file", "code_search", "execute_bash"],
-    # Architecture analysis
-    ["list_directory", "read_file", "semantic_code_search", "read_file"],
-    # Test workflow
-    ["read_file", "run_tests", "edit_files", "run_tests"],
-]
+CODING_TOOL_SEQUENCES: Dict[str, List[str]] = {
+    "exploration": ["list_directory", "read_file", "code_search"],
+    "edit": ["read_file", "edit_files", "run_tests"],
+    "create": ["list_directory", "read_file", "write_file", "run_tests"],
+    "refactor": ["read_file", "symbols", "refactor_rename_symbol", "run_tests"],
+    "git": ["git_status", "git_diff", "git_commit"],
+    "debug": ["read_file", "code_search", "execute_bash"],
+    "architecture": ["list_directory", "read_file", "semantic_code_search", "read_file"],
+    "test_fix": ["read_file", "run_tests", "edit_files", "run_tests"],
+}
+
+# Required tools for coding vertical
+CODING_REQUIRED_TOOLS: Set[str] = {
+    "read_file",
+    "write_file",
+    "edit_files",
+    "list_directory",
+    "code_search",
+}
+
+# Optional tools that enhance coding
+CODING_OPTIONAL_TOOLS: Set[str] = {
+    "semantic_code_search",
+    "symbols",
+    "run_tests",
+    "git_status",
+    "git_diff",
+    "git_commit",
+    "refactor_rename_symbol",
+    "refactor_extract_function",
+    "execute_bash",
+}
 
 
-class CodingToolDependencyProvider(ToolDependencyProviderProtocol):
+class CodingToolDependencyProvider(BaseToolDependencyProvider):
     """Tool dependency provider for coding vertical.
 
-    Provides tool execution patterns and sequences that improve
-    intelligent tool selection for software development tasks.
+    Extends BaseToolDependencyProvider with coding-specific tool
+    relationships, transitions, and sequences.
+
+    Provides tool execution patterns that improve intelligent tool
+    selection for software development tasks.
     """
 
     def __init__(
         self,
         additional_dependencies: List[ToolDependency] | None = None,
-        additional_sequences: List[List[str]] | None = None,
+        additional_sequences: Dict[str, List[str]] | None = None,
     ):
         """Initialize the provider.
 
         Args:
-            additional_dependencies: Additional tool dependencies
-            additional_sequences: Additional tool sequences
+            additional_dependencies: Additional tool dependencies to merge
+            additional_sequences: Additional tool sequences to merge
         """
-        self._dependencies = CODING_TOOL_DEPENDENCIES.copy()
+        # Build dependencies list
+        dependencies = CODING_TOOL_DEPENDENCIES.copy()
         if additional_dependencies:
-            self._dependencies.extend(additional_dependencies)
+            dependencies.extend(additional_dependencies)
 
-        self._sequences = CODING_TOOL_SEQUENCES.copy()
+        # Build sequences dict
+        sequences = CODING_TOOL_SEQUENCES.copy()
         if additional_sequences:
-            self._sequences.extend(additional_sequences)
+            sequences.update(additional_sequences)
 
-    def get_dependencies(self) -> List[ToolDependency]:
-        """Get coding tool dependencies.
-
-        Returns:
-            List of tool dependency definitions
-        """
-        return self._dependencies.copy()
-
-    def get_tool_sequences(self) -> List[List[str]]:
-        """Get common coding tool sequences.
-
-        Returns:
-            List of tool name sequences representing common workflows
-        """
-        return self._sequences.copy()
-
-    def get_transition_weight(self, from_tool: str, to_tool: str) -> float:
-        """Get the transition weight between two tools.
-
-        Higher weight means the transition is more likely to be useful.
-
-        Args:
-            from_tool: Previous tool called
-            to_tool: Candidate next tool
-
-        Returns:
-            Transition weight (0.0 to 1.0)
-        """
-        # Check if to_tool depends on from_tool
-        for dep in self._dependencies:
-            if dep.tool_name == to_tool and from_tool in dep.depends_on:
-                return dep.weight
-
-        # Check if from_tool enables to_tool
-        for dep in self._dependencies:
-            if dep.tool_name == from_tool and to_tool in dep.enables:
-                return dep.weight * 0.8  # Slightly lower weight for enables
-
-        # Check sequences for adjacency
-        for seq in self._sequences:
-            for i, tool in enumerate(seq[:-1]):
-                if tool == from_tool and seq[i + 1] == to_tool:
-                    return 0.6  # Moderate weight for sequence match
-
-        return 0.3  # Default low weight
+        # Initialize base class with coding-specific config
+        super().__init__(
+            ToolDependencyConfig(
+                dependencies=dependencies,
+                transitions=CODING_TOOL_TRANSITIONS.copy(),
+                clusters=CODING_TOOL_CLUSTERS.copy(),
+                sequences=sequences,
+                required_tools=CODING_REQUIRED_TOOLS.copy(),
+                optional_tools=CODING_OPTIONAL_TOOLS.copy(),
+                default_sequence=["read_file", "edit_files", "run_tests"],
+            )
+        )
 
 
 __all__ = [
     "CodingToolDependencyProvider",
     "CODING_TOOL_DEPENDENCIES",
     "CODING_TOOL_SEQUENCES",
+    "CODING_TOOL_TRANSITIONS",
+    "CODING_TOOL_CLUSTERS",
+    "CODING_REQUIRED_TOOLS",
+    "CODING_OPTIONAL_TOOLS",
 ]

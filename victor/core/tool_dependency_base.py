@@ -42,7 +42,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
 
-from victor.verticals.protocols import ToolDependency, ToolDependencyProviderProtocol
+from victor.core.tool_types import ToolDependency, ToolDependencyProviderProtocol
 
 
 @dataclass
