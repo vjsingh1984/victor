@@ -51,6 +51,7 @@ from victor.verticals.coding import CodingAssistant
 from victor.verticals.devops import DevOpsAssistant
 from victor.verticals.research import ResearchAssistant
 from victor.verticals.data_analysis import DataAnalysisAssistant
+from victor.verticals.rag import RAGAssistant
 
 __all__ = [
     # Base classes
@@ -63,6 +64,7 @@ __all__ = [
     "DevOpsAssistant",
     "ResearchAssistant",
     "DataAnalysisAssistant",
+    "RAGAssistant",
     # Helper functions
     "get_vertical",
     "list_verticals",
@@ -120,5 +122,6 @@ VerticalRegistry.register(CodingAssistant)
 VerticalRegistry.register(DevOpsAssistant)
 VerticalRegistry.register(ResearchAssistant)
 VerticalRegistry.register(DataAnalysisAssistant)
+VerticalRegistry.register(RAGAssistant)
 
 __version__ = "0.2.0"

@@ -46,13 +46,8 @@ import logging
 import sys
 from typing import TYPE_CHECKING, Dict, List, Optional, Type
 
+from victor.framework.module_loader import EntryPointCache, get_entry_point_cache
 from victor.verticals.base import VerticalBase, VerticalRegistry
-
-# Python 3.10+ has entry_points with group parameter
-if sys.version_info >= (3, 10):
-    from importlib.metadata import entry_points
-else:
-    from importlib_metadata import entry_points
 
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
@@ -68,6 +63,7 @@ BUILTIN_VERTICALS: Dict[str, str] = {
     "research": "victor.verticals.research.ResearchAssistant",
     "devops": "victor.verticals.devops.DevOpsAssistant",
     "data_analysis": "victor.verticals.data_analysis.DataAnalysisAssistant",
+    "rag": "victor.verticals.rag.RAGAssistant",
 }
 
 
@@ -183,11 +179,18 @@ class VerticalLoader:
         discovered = self.discover_verticals()
         return discovered.get(name)
 
-    def discover_verticals(self) -> Dict[str, Type[VerticalBase]]:
+    def discover_verticals(
+        self,
+        force_refresh: bool = False,
+    ) -> Dict[str, Type[VerticalBase]]:
         """Discover verticals from installed packages via entry points.
 
         Scans the 'victor.verticals' entry point group for installed
-        vertical plugins. Results are cached for performance.
+        vertical plugins. Results are cached for performance using
+        EntryPointCache for fast startup.
+
+        Args:
+            force_refresh: Force re-scan of entry points (bypass cache)
 
         Returns:
             Dictionary mapping vertical names to their classes
@@ -201,40 +204,75 @@ class VerticalLoader:
             verticals = loader.discover_verticals()
             # {'coding': <class 'victor_coding.CodingVertical'>}
         """
-        if self._discovered_verticals is not None:
+        if self._discovered_verticals is not None and not force_refresh:
             return self._discovered_verticals
 
         self._discovered_verticals = {}
 
         try:
-            eps = entry_points(group="victor.verticals")
-            for ep in eps:
+            # Use cached entry points for fast startup
+            cache = get_entry_point_cache()
+            ep_entries = cache.get_entry_points(
+                "victor.verticals",
+                force_refresh=force_refresh,
+            )
+
+            for name, value in ep_entries.items():
                 try:
-                    vertical_cls = ep.load()
+                    # Parse "module:attr" format and load
+                    vertical_cls = self._load_entry_point(name, value)
                     if isinstance(vertical_cls, type) and issubclass(
                         vertical_cls, VerticalBase
                     ):
-                        self._discovered_verticals[ep.name] = vertical_cls
+                        self._discovered_verticals[name] = vertical_cls
                         # Also register in the global registry
                         VerticalRegistry.register(vertical_cls)
-                        logger.debug("Discovered vertical plugin: %s", ep.name)
+                        logger.debug("Discovered vertical plugin: %s", name)
                     else:
                         logger.warning(
                             "Entry point '%s' is not a VerticalBase subclass",
-                            ep.name,
+                            name,
                         )
                 except Exception as e:
-                    logger.warning("Failed to load vertical entry point '%s': %s", ep.name, e)
+                    logger.warning("Failed to load vertical entry point '%s': %s", name, e)
         except Exception as e:
             logger.warning("Failed to discover vertical entry points: %s", e)
 
         return self._discovered_verticals
 
-    def discover_tools(self) -> Dict[str, Type]:
+    def _load_entry_point(self, name: str, value: str) -> Type:
+        """Load an entry point by its value string.
+
+        Args:
+            name: Entry point name
+            value: Entry point value (module:attr format)
+
+        Returns:
+            Loaded class/object
+        """
+        import importlib
+
+        if ":" in value:
+            module_name, attr_name = value.split(":", 1)
+        else:
+            # Handle "module.Class" format
+            module_name, attr_name = value.rsplit(".", 1)
+
+        module = importlib.import_module(module_name)
+        return getattr(module, attr_name)
+
+    def discover_tools(
+        self,
+        force_refresh: bool = False,
+    ) -> Dict[str, Type]:
         """Discover tools from installed packages via entry points.
 
         Scans the 'victor.tools' entry point group for installed
-        tool plugins. Results are cached for performance.
+        tool plugins. Results are cached for performance using
+        EntryPointCache for fast startup.
+
+        Args:
+            force_refresh: Force re-scan of entry points (bypass cache)
 
         Returns:
             Dictionary mapping tool names to their classes
@@ -248,20 +286,26 @@ class VerticalLoader:
             tools = loader.discover_tools()
             # {'code_search': <class 'victor_coding.tools.CodeSearchTool'>}
         """
-        if self._discovered_tools is not None:
+        if self._discovered_tools is not None and not force_refresh:
             return self._discovered_tools
 
         self._discovered_tools = {}
 
         try:
-            eps = entry_points(group="victor.tools")
-            for ep in eps:
+            # Use cached entry points for fast startup
+            cache = get_entry_point_cache()
+            ep_entries = cache.get_entry_points(
+                "victor.tools",
+                force_refresh=force_refresh,
+            )
+
+            for name, value in ep_entries.items():
                 try:
-                    tool_cls = ep.load()
-                    self._discovered_tools[ep.name] = tool_cls
-                    logger.debug("Discovered tool plugin: %s", ep.name)
+                    tool_cls = self._load_entry_point(name, value)
+                    self._discovered_tools[name] = tool_cls
+                    logger.debug("Discovered tool plugin: %s", name)
                 except Exception as e:
-                    logger.warning("Failed to load tool entry point '%s': %s", ep.name, e)
+                    logger.warning("Failed to load tool entry point '%s': %s", name, e)
         except Exception as e:
             logger.warning("Failed to discover tool entry points: %s", e)
 
@@ -271,9 +315,16 @@ class VerticalLoader:
         """Refresh the cached plugin discovery.
 
         Call this after installing new packages to re-scan entry points.
+        Invalidates both the local cache and the global EntryPointCache.
         """
         self._discovered_verticals = None
         self._discovered_tools = None
+
+        # Also invalidate the entry point cache
+        cache = get_entry_point_cache()
+        cache.invalidate("victor.verticals")
+        cache.invalidate("victor.tools")
+
         logger.info("Plugin cache cleared, will re-discover on next access")
 
     def _activate(self, vertical: Type[VerticalBase]) -> None:
