@@ -493,6 +493,92 @@ try:
 except ImportError:
     _TEAM_REGISTRY_EXPORTS = []
 
+# Graph Workflow Engine (LangGraph-compatible StateGraph)
+try:
+    from victor.framework.graph import (
+        StateGraph,
+        CompiledGraph,
+        Node,
+        Edge,
+        EdgeType,
+        NodeStatus,
+        ExecutionResult,
+        GraphConfig,
+        Checkpoint,
+        CheckpointerProtocol,
+        MemoryCheckpointer,
+        StateProtocol,
+        NodeFunctionProtocol,
+        ConditionFunctionProtocol,
+        END,
+        START,
+        create_graph,
+    )
+
+    _GRAPH_EXPORTS = [
+        "StateGraph",
+        "CompiledGraph",
+        "Node",
+        "Edge",
+        "EdgeType",
+        "NodeStatus",
+        "ExecutionResult",
+        "GraphConfig",
+        "Checkpoint",
+        "CheckpointerProtocol",
+        "MemoryCheckpointer",
+        "StateProtocol",
+        "NodeFunctionProtocol",
+        "ConditionFunctionProtocol",
+        "END",
+        "START",
+        "create_graph",
+    ]
+except ImportError:
+    _GRAPH_EXPORTS = []
+
+# Checkpointer Implementations (Persistence backends for StateGraph)
+try:
+    from victor.framework.checkpointer import (
+        SQLiteCheckpointer,
+        JSONFileCheckpointer,
+    )
+
+    _CHECKPOINTER_EXPORTS = [
+        "SQLiteCheckpointer",
+        "JSONFileCheckpointer",
+    ]
+except ImportError:
+    _CHECKPOINTER_EXPORTS = []
+
+# Crew System (CrewAI-compatible multi-agent orchestration)
+try:
+    from victor.framework.crew import (
+        Crew,
+        CrewAgent,
+        CrewTask,
+        CrewOutput,
+        Process,
+        VerbosityLevel,
+        CrewAgentProtocol,
+        create_agent,
+        create_task,
+    )
+
+    _CREW_EXPORTS = [
+        "Crew",
+        "CrewAgent",
+        "CrewTask",
+        "CrewOutput",
+        "Process",
+        "VerbosityLevel",
+        "CrewAgentProtocol",
+        "create_agent",
+        "create_task",
+    ]
+except ImportError:
+    _CREW_EXPORTS = []
+
 __all__ = (
     [
         # Core classes (the 5 concepts)
@@ -564,7 +650,10 @@ __all__ = (
     + _TEAMS_EXPORTS
     + _RL_EXPORTS
     + _TEAM_REGISTRY_EXPORTS
+    + _GRAPH_EXPORTS
+    + _CHECKPOINTER_EXPORTS
+    + _CREW_EXPORTS
 )
 
 # Version of the framework API
-__version__ = "0.2.0"
+__version__ = "0.3.0"
