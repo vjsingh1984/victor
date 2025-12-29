@@ -446,14 +446,14 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         )
 
     @classmethod
-    def get_rl_config(cls) -> Optional[Any]:
-        """Get RL configuration for coding vertical.
+    def get_rl_config_provider(cls) -> Optional[Any]:
+        """Get RL configuration provider for Coding vertical.
 
         Provides configuration for reinforcement learning integration,
         including active learners, task type mappings, and quality thresholds.
 
         Returns:
-            CodingRLConfig instance
+            CodingRLConfig instance (implements RLConfigProviderProtocol)
         """
         from victor.verticals.coding.rl import CodingRLConfig
 

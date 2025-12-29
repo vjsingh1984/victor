@@ -692,7 +692,7 @@ class TestRealVerticalIntegration:
         """Test that coding vertical provides RL config."""
         from victor.verticals.coding import CodingAssistant
 
-        rl_config = CodingAssistant.get_rl_config()
+        rl_config = CodingAssistant.get_rl_config_provider()
         assert rl_config is not None
 
         # Check config attributes
