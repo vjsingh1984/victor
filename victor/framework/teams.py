@@ -212,12 +212,20 @@ class TeamMemberSpec:
         tool_budget: Maximum tool calls (default based on role)
         is_manager: Whether this member is the team manager (for hierarchical)
         priority: Execution priority (lower = earlier, for sequential/pipeline)
+        backstory: Rich persona description for agent personality
+        memory: Whether to persist discoveries across tasks
+        cache: Whether to cache tool results
+        verbose: Whether to show detailed execution logs
+        max_iterations: Per-member iteration limit
 
     Example:
         TeamMemberSpec(
             role="researcher",
             goal="Find all authentication code and patterns",
+            backstory="You are a security expert with 10 years experience "
+                      "analyzing authentication systems.",
             tool_budget=20,
+            memory=True,
         )
     """
 
@@ -227,6 +235,12 @@ class TeamMemberSpec:
     tool_budget: Optional[int] = None
     is_manager: bool = False
     priority: int = 0
+    # Rich persona attributes (CrewAI-compatible)
+    backstory: str = ""
+    memory: bool = False
+    cache: bool = True
+    verbose: bool = False
+    max_iterations: Optional[int] = None
 
     def to_team_member(self, index: int = 0) -> TeamMember:
         """Convert to internal TeamMember.
@@ -268,6 +282,12 @@ class TeamMemberSpec:
             tool_budget=tool_budget,
             is_manager=self.is_manager,
             priority=self.priority if self.priority else index,
+            # Pass through persona attributes
+            backstory=self.backstory,
+            memory=self.memory,
+            cache=self.cache,
+            verbose=self.verbose,
+            max_iterations=self.max_iterations,
         )
 
 
