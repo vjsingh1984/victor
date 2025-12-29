@@ -473,6 +473,26 @@ try:
 except ImportError:
     _RL_EXPORTS = []
 
+# Team Registry (Framework-level team spec management)
+try:
+    from victor.framework.team_registry import (
+        TeamSpecRegistry,
+        TeamSpecEntry,
+        get_team_registry,
+        register_team_spec,
+        get_team_spec,
+    )
+
+    _TEAM_REGISTRY_EXPORTS = [
+        "TeamSpecRegistry",
+        "TeamSpecEntry",
+        "get_team_registry",
+        "register_team_spec",
+        "get_team_spec",
+    ]
+except ImportError:
+    _TEAM_REGISTRY_EXPORTS = []
+
 __all__ = (
     [
         # Core classes (the 5 concepts)
@@ -543,6 +563,7 @@ __all__ = (
     + _METRICS_EXPORTS
     + _TEAMS_EXPORTS
     + _RL_EXPORTS
+    + _TEAM_REGISTRY_EXPORTS
 )
 
 # Version of the framework API
