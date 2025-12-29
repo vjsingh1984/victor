@@ -83,10 +83,20 @@ if TYPE_CHECKING:
         MiddlewareProtocol,
         ModeConfigProviderProtocol,
         PromptContributorProtocol,
+        RLConfigProviderProtocol,
         SafetyExtensionProtocol,
+        TeamSpecProviderProtocol,
         ToolDependencyProviderProtocol,
         VerticalExtensions,
+        WorkflowProviderProtocol,
     )
+
+# Import protocols for runtime isinstance checks
+from victor.verticals.protocols import (
+    RLConfigProviderProtocol,
+    TeamSpecProviderProtocol,
+    WorkflowProviderProtocol,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -367,15 +377,17 @@ class VerticalIntegrationPipeline:
         try:
             tools = vertical.get_tools()
             if tools:
-                context.apply_enabled_tools(set(tools))
-                result.tools_applied = set(tools)
+                # Canonicalize tool names to ensure consistency
+                canonical_tools = self._canonicalize_tool_names(set(tools))
+                context.apply_enabled_tools(canonical_tools)
+                result.tools_applied = canonical_tools
 
                 # Use protocol method if available
                 if hasattr(orchestrator, "set_enabled_tools") and callable(
                     orchestrator.set_enabled_tools
                 ):
-                    orchestrator.set_enabled_tools(set(tools))
-                    logger.debug(f"Applied {len(tools)} tools via set_enabled_tools")
+                    orchestrator.set_enabled_tools(canonical_tools)
+                    logger.debug(f"Applied {len(canonical_tools)} tools via set_enabled_tools")
                 else:
                     result.add_warning(
                         "Orchestrator does not implement set_enabled_tools(); "
@@ -386,6 +398,26 @@ class VerticalIntegrationPipeline:
                 result.add_error(f"Failed to apply tools: {e}")
             else:
                 result.add_warning(f"Tools application error: {e}")
+
+    def _canonicalize_tool_names(self, tools: Set[str]) -> Set[str]:
+        """Canonicalize tool names to ensure consistency.
+
+        Converts legacy tool names (e.g., 'read_file', 'edit_files') to
+        canonical short names (e.g., 'read', 'edit').
+
+        Args:
+            tools: Set of tool names (may include legacy names)
+
+        Returns:
+            Set of canonical tool names
+        """
+        try:
+            from victor.tools.tool_names import get_canonical_name
+            return {get_canonical_name(tool) for tool in tools}
+        except ImportError:
+            # Fallback if tool_names module not available
+            logger.debug("Tool name canonicalization not available")
+            return tools
 
     def _apply_system_prompt(
         self,
@@ -714,11 +746,17 @@ class VerticalIntegrationPipeline:
             result: Result to update
         """
         try:
-            # Check if vertical has workflow provider
-            if not hasattr(vertical, "get_workflow_provider"):
-                return
+            # Check if vertical has workflow provider using protocol
+            workflow_provider = None
+            if hasattr(vertical, "get_workflow_provider"):
+                workflow_provider = vertical.get_workflow_provider()
 
-            workflow_provider = vertical.get_workflow_provider()
+            # Also check if vertical itself is a WorkflowProviderProtocol
+            if workflow_provider is None and isinstance(vertical, type):
+                if hasattr(vertical, "get_workflows"):
+                    # Vertical class implements protocol directly
+                    workflow_provider = vertical
+
             if workflow_provider is None:
                 return
 
@@ -780,11 +818,20 @@ class VerticalIntegrationPipeline:
             result: Result to update
         """
         try:
-            # Check if vertical has RL config
-            if not hasattr(vertical, "get_rl_config"):
-                return
+            # Check if vertical has RL config using protocol
+            rl_config = None
+            rl_provider = None
 
-            rl_config = vertical.get_rl_config()
+            # Check for RL config provider method
+            if hasattr(vertical, "get_rl_config_provider"):
+                rl_provider = vertical.get_rl_config_provider()
+                if rl_provider and isinstance(rl_provider, RLConfigProviderProtocol):
+                    rl_config = rl_provider.get_rl_config()
+
+            # Fallback: check if vertical implements RLConfigProviderProtocol directly
+            if rl_config is None and hasattr(vertical, "get_rl_config"):
+                rl_config = vertical.get_rl_config()
+
             if rl_config is None:
                 return
 
@@ -837,11 +884,20 @@ class VerticalIntegrationPipeline:
             result: Result to update
         """
         try:
-            # Check if vertical has team specs
-            if not hasattr(vertical, "get_team_specs"):
-                return
+            # Check if vertical has team specs using protocol
+            team_specs = None
+            team_provider = None
 
-            team_specs = vertical.get_team_specs()
+            # Check for team spec provider method
+            if hasattr(vertical, "get_team_spec_provider"):
+                team_provider = vertical.get_team_spec_provider()
+                if team_provider and isinstance(team_provider, TeamSpecProviderProtocol):
+                    team_specs = team_provider.get_team_specs()
+
+            # Fallback: check if vertical implements TeamSpecProviderProtocol directly
+            if team_specs is None and hasattr(vertical, "get_team_specs"):
+                team_specs = vertical.get_team_specs()
+
             if not team_specs:
                 return
 
