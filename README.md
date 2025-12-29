@@ -555,6 +555,8 @@ Victor's framework is built on SOLID principles for extensibility and maintainab
 | **Interface Segregation** | Small, focused protocols | 15+ protocols in `victor/protocols/` |
 | **Dependency Inversion** | DI container for service resolution | `victor/core/container.py` |
 
+See [docs/ARCHITECTURE_ROADMAP.md](docs/ARCHITECTURE_ROADMAP.md) for improvement phases and technical debt tracking.
+
 **Agent Persona Support** (TeamMember with rich attributes):
 
 ```python

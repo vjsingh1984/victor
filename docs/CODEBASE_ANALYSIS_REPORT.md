@@ -34,6 +34,13 @@ Victor is an enterprise-ready AI coding assistant with a solid protocol-first ar
 3. **Tool Calling Adapters**: Unified system for provider-agnostic tool calling
 4. **Agentic Harness**: Separate harness for tool-enabled benchmark evaluation
 
+**Recently Completed (December 2025)**:
+1. **Phase 1 Foundation Fixes**: SOLID compliance improvements
+   - Removed duplicate vertical files (coding.py, research.py)
+   - Enforced TaskTypeHint return type in all verticals (LSP compliance)
+   - Fixed CapabilityRegistryProtocol coupling (removed private attr fallbacks)
+   - Added vertical config caching (26x speedup)
+
 **Remaining Technical Debt**:
 1. **God Object Anti-pattern**: `orchestrator.py` grew to 3,178 lines (was 2,859)
 2. **Tool Dependency Injection**: Tools still use global state pattern
@@ -42,6 +49,8 @@ Victor is an enterprise-ready AI coding assistant with a solid protocol-first ar
 5. **Monolithic Execution Loop**: `stream_chat` in `orchestrator.py` is a single, highly coupled control flow that mixes classification, context building, tool selection, execution, and recovery. This is the top maintenance risk and needs decomposition with targeted unit tests.
 6. **VS Code Packaging Gaps**: `.vscodeignore` aggressively strips transitive dependencies (axios → form-data → combined-stream → delayed-stream → mime-types), leading to activation failures. Either bundle the extension or explicitly whitelist the full dependency chain in packaging.
 7. **Underdocumented MCP Integration**: MCP setup is present in tool registration but lacks user-facing documentation and safe defaults (feature flag, auth, and failure modes).
+
+See [ARCHITECTURE_ROADMAP.md](ARCHITECTURE_ROADMAP.md) for Phase 2-4 improvement plans.
 
 ---
 

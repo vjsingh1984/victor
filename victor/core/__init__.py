@@ -256,6 +256,15 @@ from victor.core.tool_types import (
     ToolDependencyProviderProtocol,
 )
 
+from victor.core.vertical_types import (
+    StageDefinition,
+    TaskTypeHint,
+    MiddlewarePriority as VerticalMiddlewarePriority,
+    MiddlewareResult as VerticalMiddlewareResult,
+    TieredToolConfig,
+    VerticalConfigBase,
+)
+
 from victor.core.database import (
     DatabaseManager,
     ProjectDatabaseManager,
@@ -469,6 +478,13 @@ __all__ = [
     # Tool Types
     "ToolDependency",
     "ToolDependencyProviderProtocol",
+    # Vertical Types (cross-vertical abstractions)
+    "StageDefinition",
+    "TaskTypeHint",
+    "VerticalMiddlewarePriority",
+    "VerticalMiddlewareResult",
+    "TieredToolConfig",
+    "VerticalConfigBase",
     # Database
     "DatabaseManager",
     "ProjectDatabaseManager",

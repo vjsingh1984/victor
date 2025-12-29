@@ -45,37 +45,9 @@ from typing import Any, Dict, List, Optional, Set, Type
 
 from victor.framework.tools import ToolSet
 
-
-@dataclass
-class StageDefinition:
-    """Definition of a conversation stage for a vertical.
-
-    Attributes:
-        name: Stage name (e.g., "PLANNING", "EXECUTION")
-        description: Human-readable description
-        tools: Tools relevant to this stage
-        keywords: Keywords that suggest this stage
-        next_stages: Valid stages to transition to
-        min_confidence: Minimum confidence to enter this stage
-    """
-
-    name: str
-    description: str
-    tools: Set[str] = field(default_factory=set)
-    keywords: List[str] = field(default_factory=list)
-    next_stages: Set[str] = field(default_factory=set)
-    min_confidence: float = 0.5
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            "name": self.name,
-            "description": self.description,
-            "tools": list(self.tools),
-            "keywords": self.keywords,
-            "next_stages": list(self.next_stages),
-            "min_confidence": self.min_confidence,
-        }
+# Import StageDefinition from core for centralized definition
+# Re-export for backward compatibility
+from victor.core.vertical_types import StageDefinition
 
 
 @dataclass
