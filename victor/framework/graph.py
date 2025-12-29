@@ -316,6 +316,78 @@ class MemoryCheckpointer:
         return self._checkpoints.get(thread_id, [])
 
 
+class RLCheckpointerAdapter:
+    """Adapter to use existing RL CheckpointStore for graph checkpointing.
+
+    Bridges the graph's CheckpointerProtocol with the existing
+    victor.agent.rl.checkpoint_store.CheckpointStore infrastructure.
+    """
+
+    def __init__(self, learner_name: str = "state_graph"):
+        """Initialize adapter.
+
+        Args:
+            learner_name: Name to use in checkpoint store (default: "state_graph")
+        """
+        self.learner_name = learner_name
+        self._store = None
+
+    def _get_store(self):
+        """Lazy load checkpoint store."""
+        if self._store is None:
+            from victor.agent.rl.checkpoint_store import get_checkpoint_store
+            self._store = get_checkpoint_store()
+        return self._store
+
+    async def save(self, checkpoint: Checkpoint) -> None:
+        """Save checkpoint using RL checkpoint store."""
+        store = self._get_store()
+        # Convert to PolicyCheckpoint format
+        store.create_checkpoint(
+            learner_name=f"{self.learner_name}_{checkpoint.thread_id}",
+            version=checkpoint.checkpoint_id,
+            state={
+                "node_id": checkpoint.node_id,
+                "state": checkpoint.state,
+                "timestamp": checkpoint.timestamp,
+            },
+            metadata=checkpoint.metadata,
+        )
+
+    async def load(self, thread_id: str) -> Optional[Checkpoint]:
+        """Load latest checkpoint from RL checkpoint store."""
+        store = self._get_store()
+        policy_cp = store.get_latest_checkpoint(f"{self.learner_name}_{thread_id}")
+        if not policy_cp:
+            return None
+
+        return Checkpoint(
+            checkpoint_id=policy_cp.version,
+            thread_id=thread_id,
+            node_id=policy_cp.state.get("node_id", ""),
+            state=policy_cp.state.get("state", {}),
+            timestamp=policy_cp.state.get("timestamp", 0.0),
+            metadata=policy_cp.metadata,
+        )
+
+    async def list(self, thread_id: str) -> List[Checkpoint]:
+        """List all checkpoints for thread."""
+        store = self._get_store()
+        policy_cps = store.list_checkpoints(f"{self.learner_name}_{thread_id}")
+
+        return [
+            Checkpoint(
+                checkpoint_id=cp.version,
+                thread_id=thread_id,
+                node_id=cp.state.get("node_id", ""),
+                state=cp.state.get("state", {}),
+                timestamp=cp.state.get("timestamp", 0.0),
+                metadata=cp.metadata,
+            )
+            for cp in policy_cps
+        ]
+
+
 @dataclass
 class GraphConfig:
     """Configuration for graph execution.
@@ -985,6 +1057,7 @@ __all__ = [
     "Checkpoint",
     "CheckpointerProtocol",
     "MemoryCheckpointer",
+    "RLCheckpointerAdapter",  # Uses existing RL CheckpointStore
     # Protocols
     "StateProtocol",
     "NodeFunctionProtocol",

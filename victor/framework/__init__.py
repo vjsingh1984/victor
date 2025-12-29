@@ -507,6 +507,7 @@ try:
         Checkpoint,
         CheckpointerProtocol,
         MemoryCheckpointer,
+        RLCheckpointerAdapter,
         StateProtocol,
         NodeFunctionProtocol,
         ConditionFunctionProtocol,
@@ -527,6 +528,7 @@ try:
         "Checkpoint",
         "CheckpointerProtocol",
         "MemoryCheckpointer",
+        "RLCheckpointerAdapter",  # Integrates with existing RL CheckpointStore
         "StateProtocol",
         "NodeFunctionProtocol",
         "ConditionFunctionProtocol",
@@ -537,7 +539,10 @@ try:
 except ImportError:
     _GRAPH_EXPORTS = []
 
-# Checkpointer Implementations (Persistence backends for StateGraph)
+# Checkpointer - Reuse existing RL CheckpointStore
+# Note: SQLiteCheckpointer and JSONFileCheckpointer are available via
+# victor.framework.checkpointer for backwards compatibility, but prefer
+# using RLCheckpointerAdapter which integrates with the unified RL checkpoint store
 try:
     from victor.framework.checkpointer import (
         SQLiteCheckpointer,
